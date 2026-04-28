@@ -10,16 +10,10 @@
 """
 Natural Bond Orbital driver.
 
-This module is a clean restart scaffold. It keeps the public VeloxChem API
-importable, implements a small deterministic NAO/NPA baseline, and deliberately
-removes the previous threshold-driven Lewis/NBO assignment heuristics.
-
-The replacement implementation should be built as three separate layers:
-
-1. NAO/NPA layer: construct a documented orbital basis and populations.
-2. Candidate layer: generate one-centre and two-centre orbital candidates.
-3. Assignment layer: select a Lewis structure from candidates using an explicit
-   objective and documented constraints.
+This module implements the VeloxChem NBO analysis pipeline: NAO/NPA
+construction, MO composition in the NAO basis, NBO candidate generation,
+Lewis/resonance assignment, donor-acceptor diagnostics, and optional NRA/NRT
+density fitting for closed-shell and open-shell alternatives.
 """
 
 from dataclasses import asdict, dataclass, field, fields
@@ -46,6 +40,7 @@ class NboComputeOptions:
     mo_analysis_top: int = 6
     mo_analysis_threshold: float = 1.0e-2
     lone_pair_min_occupation: float = 1.50
+    rydberg_max_occupation: float = 0.50
     bond_min_occupation: float = 1.20
     bond_min_atom_weight: float = 0.10
     pi_min_occupation: float = 0.20
@@ -55,11 +50,15 @@ class NboComputeOptions:
     include_nra: bool = False
     nra_subspace: str = 'selected'
     nra_fit_metric: str = 'frobenius'
+    nra_prior_weights: object = None
+    nra_prior_strength: float = 0.0
+    nra_prior_mode: str = 'regularized'
+    nra_spin_fit: str = 'total_spin'
 
 
 @dataclass(frozen=True)
 class NboConstraints:
-    """Constraint container reserved for the future assignment layer."""
+    """Constraint container for Lewis/NBO assignment and resonance search."""
 
     required_bonds: tuple = field(default_factory=tuple)
     forbidden_bonds: tuple = field(default_factory=tuple)
@@ -84,6 +83,128 @@ class NaoData:
     angular_momentum_map: np.ndarray
     equivalent_atom_groups: tuple = field(default_factory=tuple)
     local_frames: tuple = field(default_factory=tuple)
+
+
+@dataclass(frozen=True)
+class SpinNaoData:
+    """Spin-resolved NAO density data."""
+
+    alpha_density: np.ndarray
+    beta_density: np.ndarray
+    spin_density: np.ndarray
+    spin_populations: np.ndarray
+    unpaired_electrons: float
+
+
+_ELECTRON_PAIR_PENALTY_WEIGHT = 2.0
+_FORMAL_CHARGE_PENALTY_WEIGHT = 1.0
+_OCTET_PENALTY_WEIGHT = 2.0
+_VALENCE_WARNING_PENALTY_WEIGHT = 1.0
+_NONCLASSICAL_PENALTY_WEIGHT = 0.05
+_ACCEPTOR_TYPES = {'BD*', 'RY'}
+_SPIN_ACTIVE_MIN_OCCUPATION = 0.20
+
+
+def _foundation_invariant_status(value, tolerance):
+    """Return a compact pass/fail diagnostic entry for one invariant."""
+
+    value = float(value)
+    tolerance = float(tolerance)
+    return {
+        'value': value,
+        'tolerance': tolerance,
+        'passed': bool(value <= tolerance),
+    }
+
+
+def _build_foundation_diagnostics(molecule,
+                                  overlap,
+                                  ao_density,
+                                  nao_data,
+                                  natural_charges,
+                                  mo_analysis,
+                                  candidate_counts,
+                                  primary_counts,
+                                  compute_constraints):
+    """Build stable diagnostics for the NAO/NPA foundation invariants."""
+
+    nao_overlap = nao_data.transform.T @ overlap @ nao_data.transform
+    nao_density = (nao_data.transform.T @ overlap @ ao_density @ overlap @
+                   nao_data.transform)
+    nao_density = 0.5 * (nao_density + nao_density.T)
+    identity = np.eye(nao_overlap.shape[0])
+
+    electron_count = float(np.trace(nao_data.density).real)
+    target_electron_count = float(molecule.number_of_electrons())
+    charge_sum = float(np.sum(natural_charges).real)
+    molecular_charge = float(molecule.get_charge())
+
+    orthonormality_error = float(np.linalg.norm(nao_data.overlap - identity))
+    density_formula_error = float(np.linalg.norm(nao_data.density - nao_density))
+    density_symmetry_error = float(np.linalg.norm(nao_data.density -
+                                                  nao_data.density.T))
+    electron_count_error = abs(electron_count - target_electron_count)
+    charge_conservation_error = abs(charge_sum - molecular_charge)
+    population_trace_error = abs(float(np.sum(nao_data.populations)) -
+                                 electron_count)
+    mo_normalization_error = float(
+        mo_analysis.get('max_normalization_error', 0.0))
+
+    tolerances = {
+        'orthonormality_error': 1.0e-8,
+        'density_formula_error': 1.0e-8,
+        'density_symmetry_error': 1.0e-10,
+        'electron_count_error': 1.0e-8,
+        'charge_conservation_error': 1.0e-8,
+        'population_trace_error': 1.0e-10,
+        'mo_nao_max_normalization_error': 1.0e-8,
+    }
+    foundation_invariants = {
+        'orthonormality': _foundation_invariant_status(
+            orthonormality_error, tolerances['orthonormality_error']),
+        'density_transform': _foundation_invariant_status(
+            density_formula_error, tolerances['density_formula_error']),
+        'density_symmetry': _foundation_invariant_status(
+            density_symmetry_error, tolerances['density_symmetry_error']),
+        'electron_count': _foundation_invariant_status(
+            electron_count_error, tolerances['electron_count_error']),
+        'charge_conservation': _foundation_invariant_status(
+            charge_conservation_error, tolerances['charge_conservation_error']),
+        'population_trace': _foundation_invariant_status(
+            population_trace_error, tolerances['population_trace_error']),
+        'mo_normalization': _foundation_invariant_status(
+            mo_normalization_error,
+            tolerances['mo_nao_max_normalization_error']),
+    }
+
+    return {
+        'electron_count': electron_count,
+        'target_electron_count': target_electron_count,
+        'electron_count_error': electron_count_error,
+        'natural_charge_sum': charge_sum,
+        'molecular_charge': molecular_charge,
+        'charge_conservation_error': charge_conservation_error,
+        'orthonormality_error': orthonormality_error,
+        'density_formula_error': density_formula_error,
+        'density_symmetry_error': density_symmetry_error,
+        'population_trace_error': population_trace_error,
+        'foundation_tolerances': tolerances,
+        'foundation_invariants': foundation_invariants,
+        'foundation_invariants_passed': all(
+            item['passed'] for item in foundation_invariants.values()),
+        'equivalent_atom_groups': [
+            tuple(int(atom + 1) for atom in group)
+            for group in nao_data.equivalent_atom_groups
+        ],
+        'local_frames': [frame.tolist() for frame in nao_data.local_frames],
+        'mo_nao_max_normalization_error': mo_normalization_error,
+        'nbo_candidate_counts': candidate_counts,
+        'primary_nbo_counts': primary_counts,
+        'constraint_summary': {
+            key: len(value) if hasattr(value, '__len__') else value
+            for key, value in asdict(compute_constraints).items()
+        },
+    }
 
 
 def _symmetric_orthogonalizer(overlap, threshold=1.0e-10):
@@ -268,6 +389,18 @@ def _canonicalize_degenerate_rotations(occupations,
     """Make near-degenerate atom-block eigenvectors deterministic."""
 
     rotations = np.array(rotations, copy=True)
+    local_count = rotations.shape[0]
+    priority_values = (np.asarray(angular_labels, dtype=float) *
+                       float(local_count + 1) +
+                       np.arange(local_count, dtype=float))
+    priority_operator = np.diag(priority_values)
+
+    def fix_column_sign(column):
+        pivot = int(np.argmax(np.abs(column)))
+        if column[pivot] < 0.0:
+            return -column
+        return column
+
     start = 0
     while start < len(occupations):
         stop = start + 1
@@ -276,16 +409,16 @@ def _canonicalize_degenerate_rotations(occupations,
             stop += 1
 
         if stop - start > 1:
-            cols = list(range(start, stop))
-            old_rotations = rotations.copy()
-            scores = []
-            for col in cols:
-                weights = rotations[:, col]**2
-                dominant_l = int(angular_labels[int(np.argmax(weights))])
-                dominant_ao = int(np.argmax(weights))
-                scores.append((dominant_l, dominant_ao, col))
-            for new_pos, (_, _, old_col) in enumerate(sorted(scores)):
-                rotations[:, start + new_pos] = old_rotations[:, old_col]
+            subspace = rotations[:, start:stop]
+            projected_priority = subspace.T @ priority_operator @ subspace
+            tie_values, tie_vectors = np.linalg.eigh(projected_priority)
+            order = np.argsort(tie_values)
+            canonical_subspace = subspace @ tie_vectors[:, order]
+            for offset in range(stop - start):
+                rotations[:, start + offset] = fix_column_sign(
+                    canonical_subspace[:, offset])
+        else:
+            rotations[:, start] = fix_column_sign(rotations[:, start])
 
         start = stop
 
@@ -310,6 +443,46 @@ def _build_density_matrix(mol_orbs):
 
     density += spin_density(mol_orbs.occb_to_numpy(), mol_orbs.beta_to_numpy())
     return density
+
+
+def _spin_ao_density_matrices(mol_orbs):
+    """Build alpha and beta AO density matrices from molecular orbitals."""
+
+    from .molecularorbitals import molorb
+
+    def spin_density(occupations, coefficients):
+        occ = np.asarray(occupations)
+        coeff = np.asarray(coefficients)
+        selected = occ > 1.0e-12
+        return coeff[:, selected] @ np.diag(occ[selected]) @ coeff[:, selected].T
+
+    alpha_density = spin_density(mol_orbs.occa_to_numpy(),
+                                 mol_orbs.alpha_to_numpy())
+    if mol_orbs.get_orbitals_type() == molorb.rest:
+        return alpha_density, alpha_density.copy()
+
+    beta_density = spin_density(mol_orbs.occb_to_numpy(),
+                                mol_orbs.beta_to_numpy())
+    return alpha_density, beta_density
+
+
+def _build_spin_nao_data(mol_orbs, overlap, nao_data):
+    """Build spin-resolved densities in the NAO basis."""
+
+    alpha_ao, beta_ao = _spin_ao_density_matrices(mol_orbs)
+    alpha_nao = nao_data.transform.T @ overlap @ alpha_ao @ overlap @ nao_data.transform
+    beta_nao = nao_data.transform.T @ overlap @ beta_ao @ overlap @ nao_data.transform
+    alpha_nao = 0.5 * (alpha_nao + alpha_nao.T)
+    beta_nao = 0.5 * (beta_nao + beta_nao.T)
+    spin_density = alpha_nao - beta_nao
+    spin_populations = np.diag(spin_density)
+    unpaired_electrons = float(np.trace(spin_density).real)
+
+    return SpinNaoData(alpha_density=alpha_nao,
+                       beta_density=beta_nao,
+                       spin_density=spin_density,
+                       spin_populations=spin_populations,
+                       unpaired_electrons=unpaired_electrons)
 
 
 def _mo_spin_blocks(mol_orbs):
@@ -616,6 +789,84 @@ def _candidate_coefficients(vector, threshold=1.0e-6):
     } for index in np.where(np.abs(vector) > threshold)[0]]
 
 
+def _candidate_vector_from_local(pair_indices, local_vector, norb):
+    """Return a normalized full NAO vector from pair-local coefficients."""
+
+    components = {
+        int(index): float(coefficient)
+        for index, coefficient in zip(pair_indices, local_vector)
+    }
+    return _normal_orbital_candidate_vector(norb, components)
+
+
+def _atom_side_weights(local_vector, left_size):
+    """Return left/right weights for a two-center local vector."""
+
+    left_weight = float(np.sum(local_vector[:left_size]**2))
+    right_weight = float(np.sum(local_vector[left_size:]**2))
+    return left_weight, right_weight
+
+
+def _append_antibonding_complement(candidates,
+                                   serial,
+                                   parent,
+                                   occupations,
+                                   rotations,
+                                   pair_indices,
+                                   left_size,
+                                   density,
+                                   atom_i,
+                                   atom_j,
+                                   bond_min_atom_weight,
+                                   norb,
+                                   used_roots,
+                                   source):
+    """Append a same-subspace BD* complement for an occupied BD candidate."""
+
+    parent_vector = _candidate_vector_from_coefficients(parent, norb)
+    for root in np.argsort(occupations):
+        root = int(root)
+        if root in used_roots:
+            continue
+
+        local_vector = rotations[:, root]
+        left_weight, right_weight = _atom_side_weights(local_vector,
+                                                       left_size)
+        if (left_weight < bond_min_atom_weight or
+                right_weight < bond_min_atom_weight):
+            continue
+
+        vector = _candidate_vector_from_local(pair_indices,
+                                              local_vector,
+                                              norb)
+        if abs(float(np.dot(parent_vector, vector))) > 1.0e-10:
+            continue
+
+        candidates.append({
+            'index': serial,
+            'type': 'BD*',
+            'subtype': parent.get('subtype', ''),
+            'atoms': (int(atom_i), int(atom_j)),
+            'non_sigma': bool(parent.get('non_sigma', False)),
+            'electron_count': 0.0,
+            'occupation': _candidate_occupation(vector, density),
+            'polarization': {
+                int(atom_i + 1): left_weight,
+                int(atom_j + 1): right_weight,
+            },
+            'coefficients': _candidate_coefficients(vector),
+            'source': source,
+            'parent_index': int(parent.get('index', 0)),
+            'parent_type': parent.get('type', ''),
+            'parent_subtype': parent.get('subtype', ''),
+            'parent_overlap': float(np.dot(parent_vector, vector)),
+        })
+        used_roots.add(root)
+        return serial + 1
+
+    return serial
+
+
 def _graph_distance(connectivity, start, stop, max_depth=3):
     """Return graph distance up to max_depth, or None if not reached."""
 
@@ -662,6 +913,7 @@ def _requested_pi_pairs(constraints, natoms):
 def _pi_pair_candidates(atom_i,
                         atom_j,
                         density,
+                        spin_density,
                         atom_map,
                         angular_map,
                         populations,
@@ -670,7 +922,9 @@ def _pi_pair_candidates(atom_i,
                         pi_min_occupation,
                         norb,
                         serial,
-                        source):
+                        source,
+                        non_sigma=True,
+                        include_pair_candidate=True):
     """Generate p-space two-center pi candidates for an atom pair."""
 
     left = [idx for idx in np.where(atom_map == atom_i)[0]
@@ -689,54 +943,116 @@ def _pi_pair_candidates(atom_i,
     order = np.argsort(occupations)[::-1]
     candidates = []
     accepted = 0
+    occupied_roots = []
+    used_complement_roots = set()
 
-    for root in order:
-        if accepted >= 1:
-            break
-        occupation = float(occupations[root])
-        if occupation < pi_min_occupation:
-            break
-        local_vector = rotations[:, root]
-        left_weight = float(np.sum(local_vector[:len(left)]**2))
-        right_weight = float(np.sum(local_vector[len(left):]**2))
-        if (left_weight < bond_min_atom_weight or
-                right_weight < bond_min_atom_weight):
-            continue
+    if include_pair_candidate:
+        for root in order:
+            if accepted >= 1:
+                break
+            occupation = float(occupations[root])
+            if occupation < pi_min_occupation:
+                break
+            local_vector = rotations[:, root]
+            left_weight = float(np.sum(local_vector[:len(left)]**2))
+            right_weight = float(np.sum(local_vector[len(left):]**2))
+            if (left_weight < bond_min_atom_weight or
+                    right_weight < bond_min_atom_weight):
+                continue
 
-        components = {
-            int(index): float(coefficient)
-            for index, coefficient in zip(pair_indices, local_vector)
-        }
-        vector = _normal_orbital_candidate_vector(norb, components)
-        candidates.append({
-            'index': serial,
-            'type': 'BD',
-            'subtype': 'pi',
-            'atoms': (int(atom_i), int(atom_j)),
-            'non_sigma': True,
-            'occupation': _candidate_occupation(vector, density),
-            'polarization': {
-                int(atom_i + 1): left_weight,
-                int(atom_j + 1): right_weight,
-            },
-            'coefficients': _candidate_coefficients(vector),
-            'source': source,
-        })
-        serial += 1
-        accepted += 1
+            vector = _candidate_vector_from_local(pair_indices,
+                                                  local_vector,
+                                                  norb)
+            candidate = {
+                'index': serial,
+                'type': 'BD',
+                'subtype': 'pi',
+                'atoms': (int(atom_i), int(atom_j)),
+                'non_sigma': bool(non_sigma),
+                'occupation': _candidate_occupation(vector, density),
+                'polarization': {
+                    int(atom_i + 1): left_weight,
+                    int(atom_j + 1): right_weight,
+                },
+                'coefficients': _candidate_coefficients(vector),
+                'source': source,
+            }
+            candidates.append(candidate)
+            occupied_roots.append(int(root))
+            serial += 1
+            accepted += 1
+
+    used_complement_roots.update(occupied_roots)
+    for candidate in [cand for cand in candidates if cand.get('type') == 'BD']:
+        serial = _append_antibonding_complement(
+            candidates,
+            serial,
+            candidate,
+            occupations,
+            rotations,
+            pair_indices,
+            len(left),
+            density,
+            atom_i,
+            atom_j,
+            bond_min_atom_weight,
+            norb,
+            used_complement_roots,
+            f'{source} antibonding complement',
+        )
+
+    if spin_density is not None:
+        pair_spin_density = spin_density[np.ix_(pair_indices, pair_indices)]
+        pair_spin_density = 0.5 * (pair_spin_density + pair_spin_density.T)
+        spin_occupations, spin_rotations = np.linalg.eigh(pair_spin_density)
+        for root in np.argsort(spin_occupations)[::-1]:
+            spin_occupation = float(spin_occupations[root])
+            if spin_occupation < _SPIN_ACTIVE_MIN_OCCUPATION:
+                break
+
+            local_vector = spin_rotations[:, root]
+            left_weight = float(np.sum(local_vector[:len(left)]**2))
+            right_weight = float(np.sum(local_vector[len(left):]**2))
+            if (left_weight < bond_min_atom_weight or
+                    right_weight < bond_min_atom_weight):
+                continue
+
+            vector = _candidate_vector_from_local(pair_indices,
+                                                  local_vector,
+                                                  norb)
+            candidates.append({
+                'index': serial,
+                'type': 'BD',
+                'subtype': 'pi',
+                'atoms': (int(atom_i), int(atom_j)),
+                'non_sigma': bool(non_sigma),
+                'electron_count': 1.0,
+                'occupation': _candidate_occupation(vector, density),
+                'spin_occupation': float(vector.T @ spin_density @ vector),
+                'polarization': {
+                    int(atom_i + 1): left_weight,
+                    int(atom_j + 1): right_weight,
+                },
+                'coefficients': _candidate_coefficients(vector),
+                'source': f'{source} spin-active one-electron pi candidate',
+            })
+            serial += 1
+            break
 
     return candidates, serial
 
 
 def _build_nbo_candidates(molecule,
                           nao_data,
+                          spin_data=None,
                           lone_pair_min_occupation=1.50,
+                          rydberg_max_occupation=0.50,
                           bond_min_occupation=1.20,
                           bond_min_atom_weight=0.10,
                           pi_min_occupation=0.20,
                           conjugated_pi_max_path=2,
                           constraints=None):
-    """Build first-pass NBO candidates from the orthonormal NAO density.
+    """Build NBO candidates from the orthonormal NAO density.
 
     This is a candidate layer, not a Lewis assignment layer.  Candidates are
     deterministic one-center core/lone-pair orbitals and two-center natural
@@ -748,6 +1064,9 @@ def _build_nbo_candidates(molecule,
     natoms = molecule.number_of_atoms()
     connectivity = molecule.get_connectivity_matrix()
     populations = np.array(nao_data.populations, dtype=float)
+    spin_populations = (np.array(spin_data.spin_populations, dtype=float)
+                        if spin_data is not None else
+                        np.zeros_like(populations))
     density = np.array(nao_data.density, dtype=float)
     atom_map = np.array(nao_data.atom_map, dtype=int)
     angular_map = np.array(nao_data.angular_momentum_map, dtype=int)
@@ -789,10 +1108,45 @@ def _build_nbo_candidates(molecule,
             continue
 
         valence = [idx for idx in ordered if idx not in core_indices]
+        spin_active_one_center = set()
+        for nao_index in valence:
+            if spin_populations[nao_index] < _SPIN_ACTIVE_MIN_OCCUPATION:
+                continue
+            spin_active_one_center.add(int(nao_index))
+            vector = _normal_orbital_candidate_vector(norb, {nao_index: 1.0})
+            candidates.append({
+                'index': serial,
+                'type': 'SOMO',
+                'subtype': 'one-electron',
+                'atoms': (int(atom),),
+                'electron_count': 1.0,
+                'occupation': _candidate_occupation(vector, density),
+                'spin_occupation': float(vector.T @ spin_data.spin_density @ vector),
+                'polarization': {int(atom + 1): 1.0},
+                'coefficients': _candidate_coefficients(vector),
+                'source': 'one-center spin population',
+            })
+            serial += 1
+            candidates.append({
+                'index': serial,
+                'type': 'LP',
+                'subtype': 'radical-lone-pair',
+                'atoms': (int(atom),),
+                'electron_count': 1.0,
+                'occupation': _candidate_occupation(vector, density),
+                'spin_occupation': float(vector.T @ spin_data.spin_density @ vector),
+                'polarization': {int(atom + 1): 1.0},
+                'coefficients': _candidate_coefficients(vector),
+                'source': 'one-center spin-active lone-pair candidate',
+            })
+            serial += 1
+
+        lone_pair_indices = set()
         for nao_index in valence:
             if populations[nao_index] < lone_pair_min_occupation:
                 continue
             one_center_lp.add(int(nao_index))
+            lone_pair_indices.add(int(nao_index))
             vector = _normal_orbital_candidate_vector(norb, {nao_index: 1.0})
             candidates.append({
                 'index': serial,
@@ -803,6 +1157,27 @@ def _build_nbo_candidates(molecule,
                 'polarization': {int(atom + 1): 1.0},
                 'coefficients': _candidate_coefficients(vector),
                 'source': 'one-center NAO occupation',
+            })
+            serial += 1
+
+        for nao_index in valence:
+            if int(nao_index) in lone_pair_indices:
+                continue
+            if int(nao_index) in spin_active_one_center:
+                continue
+            if populations[nao_index] > rydberg_max_occupation:
+                continue
+            vector = _normal_orbital_candidate_vector(norb, {nao_index: 1.0})
+            candidates.append({
+                'index': serial,
+                'type': 'RY',
+                'subtype': 'one-center',
+                'atoms': (int(atom),),
+                'electron_count': 0.0,
+                'occupation': _candidate_occupation(vector, density),
+                'polarization': {int(atom + 1): 1.0},
+                'coefficients': _candidate_coefficients(vector),
+                'source': 'one-center low-occupation NAO complement',
             })
             serial += 1
 
@@ -827,6 +1202,9 @@ def _build_nbo_candidates(molecule,
             order = np.argsort(occupations)[::-1]
             max_pair_candidates = min(len(left), len(right), 3)
             accepted = 0
+            accepted_candidates = []
+            occupied_roots = []
+            used_complement_roots = set()
 
             for root in order:
                 if accepted >= max_pair_candidates:
@@ -843,13 +1221,11 @@ def _build_nbo_candidates(molecule,
                         right_weight < bond_min_atom_weight):
                     continue
 
-                components = {
-                    int(index): float(coefficient)
-                    for index, coefficient in zip(pair_indices, local_vector)
-                }
-                vector = _normal_orbital_candidate_vector(norb, components)
+                vector = _candidate_vector_from_local(pair_indices,
+                                                      local_vector,
+                                                      norb)
                 subtype = 'sigma' if accepted == 0 else 'pi'
-                candidates.append({
+                candidate = {
                     'index': serial,
                     'type': 'BD',
                     'subtype': subtype,
@@ -862,9 +1238,31 @@ def _build_nbo_candidates(molecule,
                     },
                     'coefficients': _candidate_coefficients(vector),
                     'source': 'connected atom-pair density diagonalization',
-                })
+                }
+                candidates.append(candidate)
+                accepted_candidates.append(candidate)
+                occupied_roots.append(int(root))
                 serial += 1
                 accepted += 1
+
+            used_complement_roots.update(occupied_roots)
+            for candidate in accepted_candidates:
+                serial = _append_antibonding_complement(
+                    candidates,
+                    serial,
+                    candidate,
+                    occupations,
+                    rotations,
+                    pair_indices,
+                    len(left),
+                    density,
+                    atom_i,
+                    atom_j,
+                    bond_min_atom_weight,
+                    norb,
+                    used_complement_roots,
+                    'connected atom-pair antibonding complement',
+                )
 
     requested_pi_pairs = _requested_pi_pairs(constraints, natoms)
     existing_pi_pairs = {
@@ -877,8 +1275,6 @@ def _build_nbo_candidates(molecule,
         if not _pi_capable_atom(atom_i, atom_map, angular_map):
             continue
         for atom_j in range(atom_i + 1, natoms):
-            if connectivity[atom_i, atom_j] != 0:
-                continue
             if not _pi_capable_atom(atom_j, atom_map, angular_map):
                 continue
 
@@ -890,13 +1286,17 @@ def _build_nbo_candidates(molecule,
             is_requested = pair in requested_pi_pairs
             if distance is None and not is_requested:
                 continue
-            if pair in existing_pi_pairs:
-                continue
+
+            source = ('connected p-p density diagonalization'
+                      if connectivity[atom_i, atom_j] != 0 else
+                      'conjugated non-sigma p-p density diagonalization')
+            non_sigma = bool(connectivity[atom_i, atom_j] == 0)
 
             new_candidates, serial = _pi_pair_candidates(
                 atom_i,
                 atom_j,
                 density,
+                spin_data.spin_density if spin_data is not None else None,
                 atom_map,
                 angular_map,
                 populations,
@@ -905,10 +1305,13 @@ def _build_nbo_candidates(molecule,
                 pi_min_occupation,
                 norb,
                 serial,
-                'conjugated non-sigma p-p density diagonalization',
+                source,
+                non_sigma=non_sigma,
+                include_pair_candidate=pair not in existing_pi_pairs,
             )
             candidates.extend(new_candidates)
-            if new_candidates:
+            if any(candidate.get('electron_count', 2.0) > 1.0
+                   for candidate in new_candidates):
                 existing_pi_pairs.add(pair)
 
     return candidates
@@ -922,6 +1325,286 @@ def _candidate_type_counts(candidates):
         candidate_type = candidate.get('type', '?')
         counts[candidate_type] = counts.get(candidate_type, 0) + 1
     return counts
+
+
+def _candidate_electron_count(candidate):
+    """Return the ideal Lewis electron count for a candidate."""
+
+    return float(candidate.get('electron_count', 2.0))
+
+
+def _split_sigma_pi_nbos(nbo_list):
+    """Split selected NBOs into fixed sigma framework and pi part."""
+
+    pi_nbos = [candidate for candidate in nbo_list
+               if candidate.get('type') == 'BD' and
+               candidate.get('subtype') == 'pi']
+    sigma_nbos = [candidate for candidate in nbo_list
+                  if candidate not in pi_nbos]
+    sigma_occupation = float(sum(candidate.get('occupation', 0.0)
+                                 for candidate in sigma_nbos))
+    pi_occupation = float(sum(candidate.get('occupation', 0.0)
+                              for candidate in pi_nbos))
+    return {
+        'sigma_nbo_list': sigma_nbos,
+        'pi_nbo_list': pi_nbos,
+        'sigma_counts': _candidate_type_counts(sigma_nbos),
+        'pi_counts': _candidate_type_counts(pi_nbos),
+        'sigma_electron_pairs': len(sigma_nbos),
+        'pi_electron_pairs': len(pi_nbos),
+        'sigma_occupation_sum': sigma_occupation,
+        'pi_occupation_sum': pi_occupation,
+    }
+
+
+def _neutral_valence_electron_count(nuclear_charge):
+    """Return the neutral-atom valence electron count used for Lewis checks."""
+
+    n_core = _n_core_orbitals_from_z(nuclear_charge)
+    return max(0.0, float(nuclear_charge) - 2.0 * float(n_core))
+
+
+def _lewis_valence_target(nuclear_charge):
+    """Return the duet/octet target for Lewis diagnostics."""
+
+    if nuclear_charge <= 2:
+        return 2.0
+    return 8.0
+
+
+def _build_lewis_accounting(molecule, nbo_list):
+    """Compute per-atom Lewis electron ownership diagnostics."""
+
+    labels = molecule.get_labels()
+    natoms = molecule.number_of_atoms()
+    nuclear_charges = np.array([
+        chemical_element_identifier(labels[atom]) for atom in range(natoms)
+    ], dtype=float)
+    neutral_valence = np.array([
+        _neutral_valence_electron_count(charge) for charge in nuclear_charges
+    ], dtype=float)
+    valence_targets = np.array([
+        _lewis_valence_target(charge) for charge in nuclear_charges
+    ], dtype=float)
+
+    atom_electron_count = np.zeros(natoms, dtype=float)
+    atom_core_electron_count = np.zeros(natoms, dtype=float)
+    selected_electron_count = 0.0
+    warnings = []
+
+    for candidate in nbo_list:
+        atoms = tuple(int(atom) for atom in candidate.get('atoms', ()))
+        if not atoms:
+            continue
+
+        contribution = _candidate_electron_count(candidate)
+        selected_electron_count += contribution
+        share = contribution / float(len(atoms))
+        for atom in atoms:
+            atom_electron_count[atom] += share
+            if candidate.get('type') == 'CR':
+                atom_core_electron_count[atom] += share
+
+    atom_valence_electron_count = atom_electron_count - atom_core_electron_count
+    formal_charges = neutral_valence - atom_valence_electron_count
+    octet_excess = np.maximum(atom_valence_electron_count - valence_targets, 0.0)
+    electron_ownership_error = abs(
+        float(np.sum(atom_electron_count)) - selected_electron_count)
+
+    for atom, excess in enumerate(octet_excess):
+        if excess > 1.0e-8:
+            warnings.append(
+                f'{labels[atom]}{atom + 1} exceeds the Lewis valence target by '
+                f'{excess:.6f} electrons.'
+            )
+
+    return {
+        'selected_lewis_electron_count': float(selected_electron_count),
+        'atom_electron_count': [float(value) for value in atom_electron_count],
+        'atom_core_electron_count': [
+            float(value) for value in atom_core_electron_count
+        ],
+        'atom_valence_electron_count': [
+            float(value) for value in atom_valence_electron_count
+        ],
+        'neutral_valence_electron_count': [
+            float(value) for value in neutral_valence
+        ],
+        'formal_charges': [float(value) for value in formal_charges],
+        'octet_excess': [float(value) for value in octet_excess],
+        'electron_ownership_error': float(electron_ownership_error),
+        'valence_warnings': warnings,
+    }
+
+
+def _normalize_atom_index(index, natoms):
+    """Normalize a user atom index to zero-based form."""
+
+    atom = int(index)
+    if 1 <= atom <= natoms:
+        return atom - 1
+    assert_msg_critical(0 <= atom < natoms,
+                        f'NBO constraints: invalid atom index {index}')
+    return atom
+
+
+def _constraint_formal_charge_targets(molecule, constraints):
+    """Return target formal charges for Lewis scoring, or None for no target."""
+
+    natoms = molecule.number_of_atoms()
+    targets = np.zeros(natoms, dtype=float)
+    formal_charge_constraints = dict(constraints.formal_charges)
+
+    if formal_charge_constraints:
+        for atom_index, charge in formal_charge_constraints.items():
+            atom = _normalize_atom_index(atom_index, natoms)
+            targets[atom] = float(charge)
+        return targets
+
+    if abs(float(molecule.get_charge())) < 1.0e-12:
+        return targets
+
+    return None
+
+
+def _build_lewis_score_terms(molecule,
+                             assignment,
+                             constraints,
+                             allowed_pi_bonus=0.0):
+    """Build transparent score terms for a Lewis assignment."""
+
+    formal_charges = np.array(assignment.get('formal_charges', []), dtype=float)
+    octet_excess = np.array(assignment.get('octet_excess', []), dtype=float)
+    target_electrons = float(assignment.get('target_electron_count',
+                                            2.0 * assignment.get('target_electron_pairs', 0)))
+    selected_electrons = float(assignment.get('selected_lewis_electron_count',
+                                              2.0 * assignment.get('electron_pairs', 0)))
+    target_formal_charges = _constraint_formal_charge_targets(molecule,
+                                                              constraints)
+
+    occupation_reward = float(assignment.get('occupation_sum', 0.0))
+    electron_pair_penalty = (_ELECTRON_PAIR_PENALTY_WEIGHT *
+                             abs(selected_electrons - target_electrons))
+
+    if target_formal_charges is None:
+        formal_charge_error = 0.0
+        formal_charge_penalty = 0.0
+        target_formal_charge_list = None
+    else:
+        formal_charge_error = float(
+            np.sum((formal_charges - target_formal_charges)**2))
+        formal_charge_penalty = (_FORMAL_CHARGE_PENALTY_WEIGHT *
+                                 formal_charge_error)
+        target_formal_charge_list = [
+            float(charge) for charge in target_formal_charges
+        ]
+
+    octet_error = float(np.sum(octet_excess**2))
+    octet_penalty = _OCTET_PENALTY_WEIGHT * octet_error
+    valence_penalty = (_VALENCE_WARNING_PENALTY_WEIGHT *
+                       len(assignment.get('valence_warnings', [])))
+    nonclassical_count = sum(
+        1 for candidate in assignment.get('nbo_list', [])
+        if candidate.get('non_sigma', False)
+    )
+    nonclassical_penalty = (_NONCLASSICAL_PENALTY_WEIGHT *
+                            float(nonclassical_count))
+
+    total = (occupation_reward + float(allowed_pi_bonus) -
+             electron_pair_penalty - formal_charge_penalty - octet_penalty -
+             valence_penalty - nonclassical_penalty)
+
+    return {
+        'occupation_reward': occupation_reward,
+        'allowed_pi_bonus': float(allowed_pi_bonus),
+        'electron_pair_penalty': float(electron_pair_penalty),
+        'formal_charge_penalty': float(formal_charge_penalty),
+        'formal_charge_error': float(formal_charge_error),
+        'target_formal_charges': target_formal_charge_list,
+        'octet_penalty': float(octet_penalty),
+        'octet_error': float(octet_error),
+        'valence_penalty': float(valence_penalty),
+        'nonclassical_penalty': float(nonclassical_penalty),
+        'nonclassical_count': int(nonclassical_count),
+        'total': float(total),
+    }
+
+
+def _active_space_fields(nbo_list, active_candidate_ids=None):
+    """Return fixed and variable active-space fields for an assignment."""
+
+    if active_candidate_ids is None:
+        active_candidate_ids = {
+            int(candidate.get('index', 0))
+            for candidate in nbo_list
+            if candidate.get('type') == 'BD' and
+            candidate.get('subtype') == 'pi'
+        }
+    else:
+        active_candidate_ids = {int(index) for index in active_candidate_ids}
+
+    active_nbos = [candidate for candidate in nbo_list
+                   if int(candidate.get('index', 0)) in active_candidate_ids]
+    fixed_nbos = [candidate for candidate in nbo_list
+                  if int(candidate.get('index', 0)) not in active_candidate_ids]
+    active_pi_nbos = [candidate for candidate in active_nbos
+                      if candidate.get('type') == 'BD' and
+                      candidate.get('subtype') == 'pi']
+    active_lone_pair_nbos = [candidate for candidate in active_nbos
+                             if candidate.get('type') == 'LP']
+    active_one_electron_nbos = [candidate for candidate in active_nbos
+                                if _candidate_electron_count(candidate) == 1.0]
+
+    return {
+        'fixed_nbo_list': fixed_nbos,
+        'active_nbo_list': active_nbos,
+        'active_pi_nbo_list': active_pi_nbos,
+        'active_lone_pair_nbo_list': active_lone_pair_nbos,
+        'active_one_electron_nbo_list': active_one_electron_nbos,
+        'active_counts': _candidate_type_counts(active_nbos),
+        'fixed_counts': _candidate_type_counts(fixed_nbos),
+        'active_electron_pairs': len(active_nbos),
+        'active_pi_electron_pairs': len(active_pi_nbos),
+        'active_lone_pair_electron_pairs': len(active_lone_pair_nbos),
+        'active_one_electron_count': len(active_one_electron_nbos),
+        'active_occupation_sum': float(sum(candidate.get('occupation', 0.0)
+                                           for candidate in active_nbos)),
+        'fixed_occupation_sum': float(sum(candidate.get('occupation', 0.0)
+                                          for candidate in fixed_nbos)),
+        'active_electron_count': _candidate_list_electron_count(active_nbos),
+        'fixed_electron_count': _candidate_list_electron_count(fixed_nbos),
+    }
+
+
+def _assignment_payload(molecule,
+                        nbo_list,
+                        target_pairs,
+                        occupation_sum,
+                        warnings,
+                        constraints,
+                        allowed_pi_bonus=0.0,
+                        active_candidate_ids=None):
+    """Build a Lewis assignment dictionary with explicit sigma/pi parts."""
+
+    payload = {
+        'nbo_list': nbo_list,
+        'counts': _candidate_type_counts(nbo_list),
+        'electron_pairs': len(nbo_list),
+        'target_electron_pairs': target_pairs,
+        'target_electron_count': float(molecule.number_of_electrons()),
+        'occupation_sum': occupation_sum,
+        'warnings': warnings,
+    }
+    payload.update(_split_sigma_pi_nbos(nbo_list))
+    payload.update(_active_space_fields(nbo_list, active_candidate_ids))
+    payload.update(_build_lewis_accounting(molecule, nbo_list))
+    score_terms = _build_lewis_score_terms(molecule,
+                                           payload,
+                                           constraints,
+                                           allowed_pi_bonus=allowed_pi_bonus)
+    payload['score_terms'] = score_terms
+    payload['score'] = score_terms['total']
+    return payload
 
 
 def _report_atom_text(candidate, labels):
@@ -1020,7 +1703,7 @@ def _constraint_pi_pair_sets(constraints, natoms):
 def _candidate_sort_key(candidate):
     """Sort key for deterministic primary candidate assignment."""
 
-    type_priority = {'CR': 0, 'LP': 1, 'BD': 2}
+    type_priority = {'CR': 0, 'LP': 1, 'BD': 2, 'SOMO': 3}
     subtype_priority = {'sigma': 0, 'pi': 1}
     return (
         type_priority.get(candidate.get('type', '?'), 9),
@@ -1032,16 +1715,16 @@ def _candidate_sort_key(candidate):
 
 
 def _build_primary_assignment(molecule, candidates, constraints):
-    """Select a first Lewis-like primary set from generated candidates.
+    """Select the primary Lewis/NBO set from generated candidates.
 
-    This is intentionally a small, deterministic assignment layer.  It selects
-    occupied candidates up to the electron-pair count, respecting forbidden
-    bonds and prioritizing required bonds.  It does not yet optimize resonance
-    alternatives or generate anti-bonding/Rydberg complements.
+    The assignment layer selects occupied candidates up to the electron count,
+    respecting forbidden bonds and prioritizing required bonds. Resonance
+    alternatives and candidate-only acceptors are handled by later layers.
     """
 
     natoms = molecule.number_of_atoms()
-    target_pairs = int(round(0.5 * molecule.number_of_electrons()))
+    target_electrons = float(molecule.number_of_electrons())
+    target_pairs = int(np.ceil(0.5 * target_electrons))
     required_pairs, forbidden_pairs = _constraint_pair_sets(constraints, natoms)
     required_pi_pairs, allowed_pi_pairs, forbidden_pi_pairs = _constraint_pi_pair_sets(
         constraints,
@@ -1067,6 +1750,14 @@ def _build_primary_assignment(molecule, candidates, constraints):
     selected_ids = set()
     warnings = []
 
+    def selected_electrons():
+        return float(sum(_candidate_electron_count(candidate)
+                         for candidate in selected))
+
+    def can_add(candidate):
+        return (selected_electrons() + _candidate_electron_count(candidate) <=
+                target_electrons + 1.0e-12)
+
     for candidate_type in ('CR',):
         for candidate in sorted((cand for cand in pool
                                  if cand.get('type') == candidate_type),
@@ -1089,6 +1780,8 @@ def _build_primary_assignment(molecule, candidates, constraints):
         for candidate in sorted(pair_candidates, key=_candidate_sort_key):
             if len(selected) >= target_pairs:
                 break
+            if not can_add(candidate):
+                continue
             selected.append(candidate)
             selected_ids.add(candidate.get('index'))
 
@@ -1108,24 +1801,30 @@ def _build_primary_assignment(molecule, candidates, constraints):
         for candidate in sorted(pair_candidates, key=_candidate_sort_key):
             if len(selected) >= target_pairs:
                 break
+            if not can_add(candidate):
+                continue
             selected.append(candidate)
             selected_ids.add(candidate.get('index'))
 
     remaining = [
         candidate for candidate in pool
         if candidate.get('index') not in selected_ids and
-        candidate.get('type') in {'LP', 'BD'}
+        candidate.get('type') in {'LP', 'SOMO', 'BD'} and
+        not (candidate.get('type') == 'LP' and
+             candidate.get('subtype') == 'radical-lone-pair')
     ]
     for candidate in sorted(remaining, key=_candidate_sort_key):
-        if len(selected) >= target_pairs:
+        if selected_electrons() >= target_electrons - 1.0e-12:
             break
+        if not can_add(candidate):
+            continue
         selected.append(candidate)
         selected_ids.add(candidate.get('index'))
 
-    if len(selected) < target_pairs:
+    if selected_electrons() < target_electrons - 1.0e-12:
         warnings.append(
-            f'Primary assignment selected {len(selected)} electron pairs; '
-            f'target is {target_pairs}.'
+            f'Primary assignment selected {selected_electrons():.6f} electrons; '
+            f'target is {target_electrons:.6f}.'
         )
     if forbidden_pairs:
         warnings.append('Forbidden bonds were excluded from primary assignment.')
@@ -1133,17 +1832,13 @@ def _build_primary_assignment(molecule, candidates, constraints):
     selected = sorted(selected, key=lambda item: int(item.get('index', 0)))
     occupation_sum = float(sum(candidate.get('occupation', 0.0)
                                for candidate in selected))
-    score = occupation_sum - 2.0 * abs(len(selected) - target_pairs)
 
-    return {
-        'nbo_list': selected,
-        'counts': _candidate_type_counts(selected),
-        'score': score,
-        'electron_pairs': len(selected),
-        'target_electron_pairs': target_pairs,
-        'occupation_sum': occupation_sum,
-        'warnings': warnings,
-    }
+    return _assignment_payload(molecule,
+                               selected,
+                               target_pairs,
+                               occupation_sum,
+                               warnings,
+                               constraints)
 
 
 def _compatible_pi_combo(combo):
@@ -1163,6 +1858,39 @@ def _compatible_pi_combo(combo):
     return True
 
 
+def _active_pi_bonds(active_candidates):
+    """Return sorted zero-based pi-bond pairs from active candidates."""
+
+    return {
+        tuple(sorted(candidate.get('atoms', ())))
+        for candidate in active_candidates
+        if candidate.get('type') == 'BD' and candidate.get('subtype') == 'pi'
+    }
+
+
+def _unique_pi_candidates_by_pair(pi_candidates):
+    """Return one deterministic pi candidate per atom pair."""
+
+    best_by_pair = {}
+    for candidate in sorted(pi_candidates, key=_candidate_sort_key):
+        pair = tuple(sorted(candidate.get('atoms', ())))
+        best_by_pair.setdefault(pair, candidate)
+    return [best_by_pair[pair] for pair in sorted(best_by_pair)]
+
+
+def _candidate_index(candidate):
+    """Return the integer candidate index."""
+
+    return int(candidate.get('index', 0))
+
+
+def _candidate_list_electron_count(candidates):
+    """Return the ideal electron count for a candidate list."""
+
+    return float(sum(_candidate_electron_count(candidate)
+                     for candidate in candidates))
+
+
 def _enumerate_lewis_alternatives(molecule,
                                   candidates,
                                   primary_assignment,
@@ -1176,19 +1904,15 @@ def _enumerate_lewis_alternatives(molecule,
         'target_electron_pairs',
         round(0.5 * molecule.number_of_electrons()),
     ))
+    target_electrons = float(primary_assignment.get(
+        'target_electron_count',
+        molecule.number_of_electrons(),
+    ))
     required_pi_pairs, allowed_pi_pairs, forbidden_pi_pairs = (
         _constraint_pi_pair_sets(constraints, natoms))
 
     primary_nbos = list(primary_assignment.get('nbo_list', ()))
-    fixed = [candidate for candidate in primary_nbos
-             if not (candidate.get('type') == 'BD' and
-                     candidate.get('subtype') == 'pi')]
-    pi_slots = target_pairs - len(fixed)
     warnings = []
-
-    if pi_slots < 0:
-        warnings.append('Primary assignment has more non-pi NBOs than electron-pair slots.')
-        pi_slots = 0
 
     pi_pool = []
     for candidate in candidates:
@@ -1201,43 +1925,127 @@ def _enumerate_lewis_alternatives(molecule,
                 pair not in required_pi_pairs and pair not in allowed_pi_pairs):
             continue
         pi_pool.append(candidate)
+    pi_pool = _unique_pi_candidates_by_pair(pi_pool)
 
-    if len(pi_pool) < pi_slots:
+    pi_active_atoms = {
+        int(atom)
+        for candidate in pi_pool
+        for atom in candidate.get('atoms', ())
+    }
+    donor_lone_pairs = [
+        candidate for candidate in primary_nbos
+        if candidate.get('type') == 'LP' and
+        int(candidate.get('atoms', (-1,))[0]) in pi_active_atoms
+    ]
+    donor_lone_pair_ids = {
+        int(candidate.get('index', 0)) for candidate in donor_lone_pairs
+    }
+    one_electron_primary_ids = {
+        int(candidate.get('index', 0)) for candidate in primary_nbos
+        if _candidate_electron_count(candidate) == 1.0
+    }
+
+    fixed = [
+        candidate for candidate in primary_nbos
+        if not (candidate.get('type') == 'BD' and
+                candidate.get('subtype') == 'pi') and
+        int(candidate.get('index', 0)) not in donor_lone_pair_ids and
+        int(candidate.get('index', 0)) not in one_electron_primary_ids
+    ]
+    active_target_electrons = target_electrons - _candidate_list_electron_count(fixed)
+
+    if active_target_electrons < -1.0e-12:
         warnings.append(
-            f'Only {len(pi_pool)} pi candidates available for {pi_slots} pi slots.'
+            'Primary assignment has more fixed electrons than the molecular target.'
+        )
+        active_target_electrons = 0.0
+
+    active_pool_by_id = {}
+    one_electron_pool = [
+        candidate for candidate in candidates
+        if _candidate_electron_count(candidate) == 1.0 and
+        candidate.get('type') in {'SOMO', 'LP', 'BD'}
+    ]
+    for candidate in pi_pool + donor_lone_pairs + one_electron_pool:
+        active_pool_by_id[_candidate_index(candidate)] = candidate
+    active_pool = sorted(active_pool_by_id.values(), key=_candidate_sort_key)
+    expected_one_electron_count = max(
+        int(round(float(molecule.get_multiplicity()) - 1.0)),
+        int(round(active_target_electrons)) % 2,
+    )
+
+    if (_candidate_list_electron_count(active_pool) <
+            active_target_electrons - 1.0e-12):
+        warnings.append(
+            f'Only {_candidate_list_electron_count(active_pool):.6f} active '
+            f'electrons available for {active_target_electrons:.6f} active electrons.'
         )
 
     alternatives = []
-    for combo in combinations(pi_pool, min(pi_slots, len(pi_pool))):
-        combo_pairs = {
-            tuple(sorted(candidate.get('atoms', ())))
-            for candidate in combo
-        }
-        if not required_pi_pairs.issubset(combo_pairs):
-            continue
-        if not _compatible_pi_combo(combo):
-            continue
+    for combo_size in range(len(active_pool) + 1):
+        for combo in combinations(active_pool, combo_size):
+            combo_electrons = _candidate_list_electron_count(combo)
+            if abs(combo_electrons - active_target_electrons) > 1.0e-12:
+                continue
+            one_electron_count = sum(
+                1 for candidate in combo
+                if _candidate_electron_count(candidate) == 1.0
+            )
+            if one_electron_count != expected_one_electron_count:
+                continue
 
-        nbo_list = sorted(fixed + list(combo),
-                          key=lambda candidate: int(candidate.get('index', 0)))
-        occupation_sum = float(sum(candidate.get('occupation', 0.0)
-                                   for candidate in nbo_list))
-        allowed_bonus = 0.05 * len(combo_pairs & allowed_pi_pairs)
-        score = occupation_sum + allowed_bonus - 2.0 * abs(
-            len(nbo_list) - target_pairs)
-        alternatives.append({
-            'rank': 0,
-            'nbo_list': nbo_list,
-            'counts': _candidate_type_counts(nbo_list),
-            'score': score,
-            'weight': 0.0,
-            'electron_pairs': len(nbo_list),
-            'target_electron_pairs': target_pairs,
-            'occupation_sum': occupation_sum,
-            'pi_bonds': [tuple(int(atom + 1) for atom in pair)
-                         for pair in sorted(combo_pairs)],
-            'warnings': list(warnings),
-        })
+            combo_ids = {_candidate_index(candidate) for candidate in combo}
+            duplicate_one_center = False
+            one_center_vectors = {}
+            for candidate in combo:
+                if _candidate_electron_count(candidate) != 1.0:
+                    continue
+                if len(candidate.get('atoms', ())) != 1:
+                    continue
+                coefficient_key = tuple(
+                    (int(item['nao_index']), round(float(item['coefficient']), 12))
+                    for item in candidate.get('coefficients', [])
+                )
+                if coefficient_key in one_center_vectors:
+                    duplicate_one_center = True
+                    break
+                one_center_vectors[coefficient_key] = _candidate_index(candidate)
+            if duplicate_one_center:
+                continue
+
+            combo_pairs = _active_pi_bonds(combo)
+            if not required_pi_pairs.issubset(combo_pairs):
+                continue
+            pi_combo = [candidate for candidate in combo
+                        if candidate.get('type') == 'BD' and
+                        candidate.get('subtype') == 'pi']
+            if not _compatible_pi_combo(pi_combo):
+                continue
+
+            nbo_list = sorted(fixed + list(combo),
+                              key=lambda candidate: int(candidate.get('index', 0)))
+            occupation_sum = float(sum(candidate.get('occupation', 0.0)
+                                       for candidate in nbo_list))
+            allowed_bonus = 0.05 * len(combo_pairs & allowed_pi_pairs)
+            alternative = _assignment_payload(molecule,
+                                              nbo_list,
+                                              target_pairs,
+                                              occupation_sum,
+                                              list(warnings),
+                                              constraints,
+                                              allowed_pi_bonus=allowed_bonus,
+                                              active_candidate_ids=combo_ids)
+            alternative.update({
+                'rank': 0,
+                'weight': 0.0,
+                'pi_bonds': [tuple(int(atom + 1) for atom in pair)
+                             for pair in sorted(combo_pairs)],
+                'active_lone_pair_atoms': [
+                    int(candidate.get('atoms', (0,))[0] + 1)
+                    for candidate in alternative.get('active_lone_pair_nbo_list', [])
+                ],
+            })
+            alternatives.append(alternative)
 
     if not alternatives:
         fallback = dict(primary_assignment)
@@ -1286,20 +2094,163 @@ def _candidate_vector_from_coefficients(candidate, norb):
     return vector
 
 
+def _candidate_atom_indices(candidate):
+    """Return one-based atom indices for a candidate."""
+
+    return tuple(int(atom + 1) for atom in candidate.get('atoms', ()))
+
+
+def _build_donor_acceptor_diagnostics(candidates,
+                                      primary_assignment,
+                                      density,
+                                      max_interactions=64,
+                                      min_abs_coupling=0.0):
+    """Build donor-acceptor density-coupling diagnostics.
+
+    This is a diagnostic layer only. It uses the NAO density matrix as the
+    current coupling operator and does not feed back into Lewis selection.
+    """
+
+    norb = density.shape[0]
+    donors = [
+        candidate for candidate in primary_assignment.get('nbo_list', [])
+        if _candidate_electron_count(candidate) > 0.0
+    ]
+    acceptors = [
+        candidate for candidate in candidates
+        if candidate.get('type') in _ACCEPTOR_TYPES and
+        _candidate_electron_count(candidate) == 0.0
+    ]
+    interactions = []
+
+    for donor in donors:
+        donor_vector = _candidate_vector_from_coefficients(donor, norb)
+        if np.linalg.norm(donor_vector) < 1.0e-14:
+            continue
+        for acceptor in acceptors:
+            acceptor_vector = _candidate_vector_from_coefficients(acceptor,
+                                                                  norb)
+            if np.linalg.norm(acceptor_vector) < 1.0e-14:
+                continue
+
+            coupling = float(donor_vector.T @ density @ acceptor_vector)
+            overlap = float(np.dot(donor_vector, acceptor_vector))
+            abs_coupling = abs(coupling)
+            if abs_coupling < min_abs_coupling:
+                continue
+
+            interactions.append({
+                'donor_index': int(donor.get('index', 0)),
+                'donor_type': donor.get('type', ''),
+                'donor_subtype': donor.get('subtype', ''),
+                'donor_atoms': _candidate_atom_indices(donor),
+                'donor_occupation': float(donor.get('occupation', 0.0)),
+                'acceptor_index': int(acceptor.get('index', 0)),
+                'acceptor_type': acceptor.get('type', ''),
+                'acceptor_subtype': acceptor.get('subtype', ''),
+                'acceptor_atoms': _candidate_atom_indices(acceptor),
+                'acceptor_occupation': float(acceptor.get('occupation', 0.0)),
+                'acceptor_parent_index': acceptor.get('parent_index'),
+                'overlap': overlap,
+                'abs_overlap': abs(overlap),
+                'density_coupling': coupling,
+                'abs_density_coupling': abs_coupling,
+                'density_coupling_squared': float(coupling * coupling),
+            })
+
+    interactions = sorted(
+        interactions,
+        key=lambda item: (-item['abs_density_coupling'],
+                          item['donor_index'],
+                          item['acceptor_index']),
+    )[:max(0, int(max_interactions))]
+
+    return {
+        'model': 'nao_density_coupling',
+        'description': (
+            'Density-coupling diagnostics from occupied primary donors to '
+            'candidate-only BD*/RY acceptors; not a second-order perturbation energy.'
+        ),
+        'donor_count': len(donors),
+        'acceptor_count': len(acceptors),
+        'interaction_count': len(interactions),
+        'interactions': interactions,
+        'warnings': [
+            'No NBO Fock matrix or energy denominator is used in this first diagnostic layer.'
+        ],
+    }
+
+
 def _lewis_density_from_nbos(nbo_list, norb):
-    """Build a closed-shell ideal Lewis density from selected NBO vectors."""
+    """Build an ideal Lewis density from selected NBO vectors."""
 
     density = np.zeros((norb, norb))
     for candidate in nbo_list:
         vector = _candidate_vector_from_coefficients(candidate, norb)
         if np.linalg.norm(vector) < 1.0e-14:
             continue
-        density += 2.0 * np.outer(vector, vector)
+        density += _candidate_electron_count(candidate) * np.outer(vector, vector)
     return 0.5 * (density + density.T)
 
 
+def _lewis_spin_density_components_from_nbos(nbo_list, norb):
+    """Build ideal total and spin Lewis densities from selected NBOs."""
+
+    total_density = np.zeros((norb, norb))
+    spin_density = np.zeros((norb, norb))
+    for candidate in nbo_list:
+        vector = _candidate_vector_from_coefficients(candidate, norb)
+        if np.linalg.norm(vector) < 1.0e-14:
+            continue
+        projector = np.outer(vector, vector)
+        electron_count = _candidate_electron_count(candidate)
+        total_density += electron_count * projector
+        if abs(electron_count - 1.0) < 1.0e-12:
+            spin_density += projector
+
+    return (0.5 * (total_density + total_density.T),
+            0.5 * (spin_density + spin_density.T))
+
+
+def _nra_fit_target_and_columns(nao_data,
+                                spin_data,
+                                alternatives,
+                                indices,
+                                norb,
+                                spin_fit):
+    """Build NRA vector target and structure columns for total/spin fitting."""
+
+    spin_fit = str(spin_fit).lower()
+    if spin_fit not in {'none', 'total_spin'}:
+        spin_fit = 'total_spin'
+
+    use_spin = spin_data is not None and spin_fit == 'total_spin'
+    target_parts = [_vectorize_symmetric_block(nao_data.density, indices)]
+    if use_spin:
+        target_parts.append(_vectorize_symmetric_block(spin_data.spin_density,
+                                                       indices))
+    target = np.concatenate(target_parts)
+
+    total_densities = []
+    spin_densities = []
+    columns = []
+    for alternative in alternatives:
+        total_density, spin_density = _lewis_spin_density_components_from_nbos(
+            alternative.get('nbo_list', []), norb)
+        total_densities.append(total_density)
+        spin_densities.append(spin_density)
+        column_parts = [_vectorize_symmetric_block(total_density, indices)]
+        if use_spin:
+            column_parts.append(_vectorize_symmetric_block(spin_density,
+                                                           indices))
+        columns.append(np.concatenate(column_parts))
+
+    fit_matrix = np.column_stack(columns)
+    return target, fit_matrix, total_densities, spin_densities, use_spin
+
+
 def _nra_subspace_indices(subspace, alternatives, atom_map, angular_map, norb):
-    """Return NAO indices used for the requested first-pass NRA fit."""
+    """Return NAO indices used for the requested NRA/NRT fit."""
 
     subspace = str(subspace).lower()
     if subspace == 'full':
@@ -1389,7 +2340,146 @@ def _equality_constrained_least_squares(matrix, target):
     return weights
 
 
-def _build_nra_results(molecule, nao_data, alternatives, subspace, fit_metric):
+def _normalize_nra_prior_weights(prior_weights, alternatives):
+    """Return normalized NRA prior weights aligned with alternatives."""
+
+    count = len(alternatives)
+    if prior_weights is None:
+        return None, None, []
+
+    warnings = []
+    if isinstance(prior_weights, dict):
+        raw = np.zeros(count, dtype=float)
+        for position, alternative in enumerate(alternatives):
+            rank = int(alternative.get('rank', position + 1))
+            label = _nra_structure_label(alternative.get('pi_bonds', []))
+            pi_key = tuple(tuple(pair) for pair in alternative.get('pi_bonds', []))
+            for key in (rank, str(rank), label, pi_key, str(pi_key)):
+                if key in prior_weights:
+                    raw[position] = float(prior_weights[key])
+                    break
+    else:
+        raw = np.array(prior_weights, dtype=float).reshape(-1)
+        assert_msg_critical(
+            raw.size == count,
+            'NRA prior weights must have one entry per Lewis alternative.'
+        )
+
+    raw = np.maximum(raw, 0.0)
+    total = float(np.sum(raw))
+    if total < 1.0e-14:
+        warnings.append(
+            'NRA prior weights were all zero; prior regularization was disabled.'
+        )
+        return [float(value) for value in raw], None, warnings
+
+    normalized = raw / total
+    return [float(value) for value in raw], normalized, warnings
+
+
+def _nra_weights_with_prior(matrix,
+                            target,
+                            prior_weights=None,
+                            prior_strength=0.0,
+                            prior_mode='regularized'):
+    """Fit NRA simplex weights with optional prior regularization."""
+
+    warnings = []
+    mode = str(prior_mode).lower()
+    if mode not in {'regularized', 'fixed'}:
+        warnings.append(
+            f"Unknown NRA prior mode '{prior_mode}'; regularized mode was used."
+        )
+        mode = 'regularized'
+
+    strength = max(0.0, float(prior_strength))
+    if prior_weights is None:
+        weights = _equality_constrained_least_squares(matrix, target)
+        return weights, {
+            'active': False,
+            'mode': mode,
+            'strength': strength,
+            'input_weights': None,
+            'normalized_weights': None,
+            'fixed': False,
+            'warnings': warnings,
+        }
+
+    if mode == 'fixed':
+        weights = np.array(prior_weights, dtype=float)
+        warnings.append(
+            'NRA prior mode fixed: density fitting was evaluated at normalized prior weights.'
+        )
+        return weights, {
+            'active': True,
+            'mode': mode,
+            'strength': strength,
+            'input_weights': None,
+            'normalized_weights': [float(weight) for weight in weights],
+            'fixed': True,
+            'warnings': warnings,
+        }
+
+    if strength <= 0.0:
+        weights = _equality_constrained_least_squares(matrix, target)
+        return weights, {
+            'active': False,
+            'mode': mode,
+            'strength': strength,
+            'input_weights': None,
+            'normalized_weights': [float(weight) for weight in prior_weights],
+            'fixed': False,
+            'warnings': warnings,
+        }
+
+    scale = np.sqrt(strength)
+    augmented_matrix = np.vstack([
+        matrix,
+        scale * np.eye(matrix.shape[1]),
+    ])
+    augmented_target = np.concatenate([
+        target,
+        scale * np.array(prior_weights, dtype=float),
+    ])
+    weights = _equality_constrained_least_squares(augmented_matrix,
+                                                  augmented_target)
+    return weights, {
+        'active': True,
+        'mode': mode,
+        'strength': strength,
+        'input_weights': None,
+        'normalized_weights': [float(weight) for weight in prior_weights],
+        'fixed': False,
+        'warnings': warnings,
+    }
+
+
+def _normalized_pi_bond_set(pi_bonds):
+    """Return a stable one-based pi-bond tuple for structure signatures."""
+
+    return tuple(sorted({tuple(sorted(int(atom) for atom in pair))
+                         for pair in pi_bonds}))
+
+
+def _nra_structure_label(pi_bonds):
+    """Return a molecule-independent NRA/NRT structure signature."""
+
+    pi_set = _normalized_pi_bond_set(pi_bonds)
+    if not pi_set:
+        return 'sigma-only'
+    return 'pi:' + ','.join(f'{left}-{right}' for left, right in pi_set)
+
+
+def _build_nra_results(molecule,
+                       nao_data,
+                       spin_data,
+                       alternatives,
+                       subspace,
+                       fit_metric,
+                       prior_weights=None,
+                       prior_strength=0.0,
+                       prior_mode='regularized',
+                       spin_fit='total_spin'):
     """Fit ideal Lewis densities to the actual NAO density."""
 
     fit_metric = str(fit_metric).lower()
@@ -1402,26 +2492,16 @@ def _build_nra_results(molecule, nao_data, alternatives, subspace, fit_metric):
         )
         fit_metric = 'frobenius'
 
-    if molecule.get_multiplicity() != 1:
-        return {
-            'subspace': str(subspace).lower(),
-            'fit_metric': fit_metric,
-            'weights': [],
-            'residual_norm': None,
-            'relative_residual': None,
-            'structures': [],
-            'warnings': [
-                'NRA is currently implemented only for closed-shell singlet alternatives.'
-            ],
-        }
-
     if not alternatives:
         return {
             'subspace': str(subspace).lower(),
             'fit_metric': fit_metric,
+            'spin_fit': 'none',
             'weights': [],
             'residual_norm': None,
             'relative_residual': None,
+            'spin_residual_norm': None,
+            'relative_spin_residual': None,
             'structures': [],
             'warnings': ['No Lewis alternatives were available for NRA fitting.'],
         }
@@ -1435,50 +2515,111 @@ def _build_nra_results(molecule, nao_data, alternatives, subspace, fit_metric):
     )
     warnings.extend(subspace_warnings)
 
-    target = _vectorize_symmetric_block(nao_data.density, indices)
-    lewis_densities = [
-        _lewis_density_from_nbos(alternative.get('nbo_list', []), norb)
-        for alternative in alternatives
-    ]
-    fit_matrix = np.column_stack([
-        _vectorize_symmetric_block(density, indices)
-        for density in lewis_densities
-    ])
-    weights = _equality_constrained_least_squares(fit_matrix, target)
+    use_spin_fit = molecule.get_multiplicity() != 1 and spin_data is not None
+    active_spin_fit = spin_fit if use_spin_fit else 'none'
+    target, fit_matrix, lewis_densities, lewis_spin_densities, used_spin = (
+        _nra_fit_target_and_columns(
+            nao_data,
+            spin_data if use_spin_fit else None,
+            alternatives,
+            indices,
+            norb,
+            active_spin_fit,
+        )
+    )
+    if used_spin:
+        warnings.append(
+            'Open-shell NRA/NRT fit used concatenated total-density and spin-density residuals.'
+        )
+    raw_prior_weights, normalized_prior_weights, prior_warnings = (
+        _normalize_nra_prior_weights(prior_weights, alternatives)
+    )
+    warnings.extend(prior_warnings)
+    weights, prior = _nra_weights_with_prior(
+        fit_matrix,
+        target,
+        prior_weights=normalized_prior_weights,
+        prior_strength=prior_strength,
+        prior_mode=prior_mode,
+    )
+    prior['input_weights'] = raw_prior_weights
+    warnings.extend(prior.get('warnings', []))
     model = fit_matrix @ weights if len(weights) else np.zeros_like(target)
     residual = target - model
     residual_norm = float(np.linalg.norm(residual))
     target_norm = float(np.linalg.norm(target))
     relative_residual = (residual_norm / target_norm
                          if target_norm > 1.0e-14 else 0.0)
+    total_target = _vectorize_symmetric_block(nao_data.density, indices)
+    total_model = np.column_stack([
+        _vectorize_symmetric_block(density, indices)
+        for density in lewis_densities
+    ]) @ weights if len(weights) else np.zeros_like(total_target)
+    total_residual = total_target - total_model
+    total_residual_norm = float(np.linalg.norm(total_residual))
+    total_target_norm = float(np.linalg.norm(total_target))
+    relative_total_residual = (total_residual_norm / total_target_norm
+                               if total_target_norm > 1.0e-14 else 0.0)
+    if used_spin:
+        spin_target = _vectorize_symmetric_block(spin_data.spin_density,
+                                                 indices)
+        spin_model = np.column_stack([
+            _vectorize_symmetric_block(density, indices)
+            for density in lewis_spin_densities
+        ]) @ weights if len(weights) else np.zeros_like(spin_target)
+        spin_residual = spin_target - spin_model
+        spin_residual_norm = float(np.linalg.norm(spin_residual))
+        spin_target_norm = float(np.linalg.norm(spin_target))
+        relative_spin_residual = (spin_residual_norm / spin_target_norm
+                                  if spin_target_norm > 1.0e-14 else 0.0)
+    else:
+        spin_residual_norm = None
+        relative_spin_residual = None
 
     structures = []
-    for alternative, weight, lewis_density in zip(alternatives,
-                                                  weights,
-                                                  lewis_densities):
+    for position, (alternative, weight, lewis_density, lewis_spin_density) in enumerate(zip(
+            alternatives,
+            weights,
+            lewis_densities,
+            lewis_spin_densities)):
         structure_vector = _vectorize_symmetric_block(lewis_density, indices)
+        spin_structure_vector = _vectorize_symmetric_block(lewis_spin_density,
+                                                           indices)
         structures.append({
             'rank': int(alternative.get('rank', 0)),
             'pi_bonds': list(alternative.get('pi_bonds', [])),
+            'label': _nra_structure_label(alternative.get('pi_bonds', [])),
+            'sigma_electron_pairs': int(alternative.get('sigma_electron_pairs', 0)),
+            'pi_electron_pairs': int(alternative.get('pi_electron_pairs', 0)),
             'nra_weight': float(weight),
+            'prior_weight': (None if normalized_prior_weights is None else
+                             float(normalized_prior_weights[position])),
             'score_weight': float(alternative.get('weight', 0.0)),
             'score': float(alternative.get('score', 0.0)),
-            'residual_norm': float(np.linalg.norm(target - structure_vector)),
+            'residual_norm': float(np.linalg.norm(total_target - structure_vector)),
+            'spin_residual_norm': (None if not used_spin else
+                                   float(np.linalg.norm(spin_target - spin_structure_vector))),
         })
 
     return {
         'subspace': str(subspace).lower(),
         'fit_metric': fit_metric,
+        'spin_fit': 'total_spin' if used_spin else 'none',
         'weights': [float(weight) for weight in weights],
         'residual_norm': residual_norm,
         'relative_residual': relative_residual,
+        'total_residual_norm': total_residual_norm,
+        'relative_total_residual': relative_total_residual,
+        'spin_residual_norm': spin_residual_norm,
+        'relative_spin_residual': relative_spin_residual,
+        'prior': prior,
         'structures': structures,
         'warnings': warnings,
     }
 
 
 class NboDriver:
-    """Natural Bond Orbital analysis driver restart scaffold."""
+    """Natural Bond Orbital analysis driver."""
 
     def __init__(self, comm=None, ostream=None):
         if comm is None:
@@ -1497,6 +2638,7 @@ class NboDriver:
 
         self.npa_report_level = 'summary'
         self.nbo_report_level = 'summary'
+        self.nra_report_level = 'summary'
         self.verbose = True
         self._last_molecule = None
         self._last_results = None
@@ -1523,16 +2665,10 @@ class NboDriver:
                 mode='npa',
                 options=None,
                 constraints=None):
-        """Compute the clean NAO/NPA baseline.
-
-        Full Lewis/NBO assignment is intentionally not implemented in this
-        restart scaffold. ``'primary'`` is accepted as a compatibility alias
-        for ``'npa'`` and does not perform Lewis/NBO assignment.
-        """
+        """Compute NAO/NPA, NBO candidates, Lewis alternatives, and reports data."""
 
         assert_msg_critical(mode in {'npa', 'primary'},
-                    "NBO restart scaffold: only mode='npa' or "
-                    "mode='primary' is implemented")
+                            "NboDriver: choose mode='npa' or mode='primary'")
 
         compute_options = self._coerce_dataclass(options,
                                                  NboComputeOptions,
@@ -1562,6 +2698,7 @@ class NboDriver:
                                                    natoms,
                                                    equivalent_groups,
                                                    local_frames)
+            spin_data = _build_spin_nao_data(mol_orbs, overlap, nao_data)
             mo_analysis = (_build_mo_nao_analysis(
                 molecule,
                 mol_orbs,
@@ -1573,7 +2710,9 @@ class NboDriver:
             nbo_candidates = (_build_nbo_candidates(
                 molecule,
                 nao_data,
+                spin_data=spin_data,
                 lone_pair_min_occupation=compute_options.lone_pair_min_occupation,
+                rydberg_max_occupation=compute_options.rydberg_max_occupation,
                 bond_min_occupation=compute_options.bond_min_occupation,
                 bond_min_atom_weight=compute_options.bond_min_atom_weight,
                 pi_min_occupation=compute_options.pi_min_occupation,
@@ -1585,20 +2724,18 @@ class NboDriver:
                 molecule,
                 nbo_candidates,
                 compute_constraints,
-            ) if compute_options.include_lewis_assignment else {
-                'nbo_list': nbo_candidates,
-                'counts': candidate_counts,
-                'score': 0.0,
-                'electron_pairs': len(nbo_candidates),
-                'target_electron_pairs': int(round(
-                    0.5 * molecule.number_of_electrons())),
-                'occupation_sum': float(sum(
-                    candidate.get('occupation', 0.0)
-                    for candidate in nbo_candidates)),
-                'warnings': [
-                    'NBO candidate layer only: Lewis/NBO assignment was not requested.'
-                ],
-            })
+            ) if compute_options.include_lewis_assignment else
+                                  _assignment_payload(
+                                      molecule,
+                                      nbo_candidates,
+                                      int(round(0.5 * molecule.number_of_electrons())),
+                                      float(sum(candidate.get('occupation', 0.0)
+                                                for candidate in nbo_candidates)),
+                                      [
+                                          'NBO candidate layer only: Lewis/NBO assignment was not requested.'
+                                      ],
+                                      compute_constraints,
+                                  ))
             alternatives = _enumerate_lewis_alternatives(
                 molecule,
                 nbo_candidates,
@@ -1622,17 +2759,46 @@ class NboDriver:
                         primary_assignment['rank'] = alternative.get('rank', 0)
                         break
             primary_counts = primary_assignment['counts']
+            donor_acceptor_diagnostics = _build_donor_acceptor_diagnostics(
+                nbo_candidates,
+                primary_assignment,
+                nao_data.density,
+            )
             nra_results = (_build_nra_results(
                 molecule,
                 nao_data,
+                spin_data,
                 alternatives,
                 compute_options.nra_subspace,
                 compute_options.nra_fit_metric,
+                prior_weights=compute_options.nra_prior_weights,
+                prior_strength=compute_options.nra_prior_strength,
+                prior_mode=compute_options.nra_prior_mode,
+                spin_fit=compute_options.nra_spin_fit,
             ) if compute_options.include_nra else None)
 
             natural_charges = nuclear_charges.copy()
             for nao_index, atom in enumerate(nao_data.atom_map):
                 natural_charges[atom] -= nao_data.populations[nao_index]
+
+            diagnostics = (_build_foundation_diagnostics(
+                molecule,
+                overlap,
+                density,
+                nao_data,
+                natural_charges,
+                mo_analysis,
+                candidate_counts,
+                primary_counts,
+                compute_constraints,
+            ) if compute_options.include_diagnostics else {})
+            if diagnostics:
+                diagnostics['donor_acceptor_summary'] = {
+                    'model': donor_acceptor_diagnostics['model'],
+                    'donor_count': donor_acceptor_diagnostics['donor_count'],
+                    'acceptor_count': donor_acceptor_diagnostics['acceptor_count'],
+                    'interaction_count': donor_acceptor_diagnostics['interaction_count'],
+                }
 
             results = {
                 'nao_transform': nao_data.transform,
@@ -1641,31 +2807,19 @@ class NboDriver:
                 'nao_populations': nao_data.populations,
                 'nao_atom_map': nao_data.atom_map,
                 'nao_l_map': nao_data.angular_momentum_map,
+                'nao_alpha_density_matrix': spin_data.alpha_density,
+                'nao_beta_density_matrix': spin_data.beta_density,
+                'nao_spin_density_matrix': spin_data.spin_density,
+                'nao_spin_populations': spin_data.spin_populations,
+                'unpaired_electrons': spin_data.unpaired_electrons,
                 'natural_charges': natural_charges,
                 'mo_analysis': mo_analysis,
                 'nbo_candidates': nbo_candidates,
                 'nbo_list': primary_assignment['nbo_list'],
                 'primary': primary_assignment,
                 'alternatives': alternatives,
-                'diagnostics': {
-                    'electron_count': float(np.trace(nao_data.density).real),
-                    'orthonormality_error': float(np.linalg.norm(
-                        nao_data.overlap - np.eye(nao_data.overlap.shape[0]))),
-                    'equivalent_atom_groups': [
-                        tuple(int(atom + 1) for atom in group)
-                        for group in nao_data.equivalent_atom_groups
-                    ],
-                    'local_frames': [frame.tolist()
-                                     for frame in nao_data.local_frames],
-                    'mo_nao_max_normalization_error': float(
-                        mo_analysis.get('max_normalization_error', 0.0)),
-                    'nbo_candidate_counts': candidate_counts,
-                    'primary_nbo_counts': primary_counts,
-                    'constraint_summary': {
-                        key: len(value) if hasattr(value, '__len__') else value
-                        for key, value in asdict(compute_constraints).items()
-                    },
-                } if compute_options.include_diagnostics else {},
+                'donor_acceptor_diagnostics': donor_acceptor_diagnostics,
+                'diagnostics': diagnostics,
                 'provenance': {
                     'api_version': 'nbo-restart-v0',
                     'mode': mode,
@@ -1702,6 +2856,15 @@ class NboDriver:
                             f"Invalid NBO report level '{level}'. "
                             f"Choose one of {sorted(valid)}")
         self.nbo_report_level = level
+
+    def set_nra_report_level(self, level):
+        """Set NRA report level."""
+
+        valid = {'none', 'summary', 'full'}
+        assert_msg_critical(level in valid,
+                            f"Invalid NRA report level '{level}'. "
+                            f"Choose one of {sorted(valid)}")
+        self.nra_report_level = level
 
     def get_npa_data(self, molecule, results):
         """Return structured NPA reporting data."""
@@ -2008,8 +3171,8 @@ class NboDriver:
 
         lines.append('Natural Bond Orbital (NBO) Primary Summary')
         lines.append('=' * width)
-        lines.append('First-pass Lewis-like primary assignment from generated NBO candidates.')
-        lines.append('Implemented now: NAO/NPA, MO-in-NAO analysis, candidates, and primary selection.')
+        lines.append('Lewis assignment from generated NBO candidates.')
+        lines.append('Available layers: NAO/NPA, MO-in-NAO analysis, candidates, alternatives, diagnostics, and NRA/NRT.')
         lines.append('Report order: CR, BD(sigma), BD(pi), LP, RY, then antibonding/other candidates.')
         lines.append('')
         if counts:
@@ -2033,8 +3196,8 @@ class NboDriver:
             )
             if 'weight' in primary:
                 lines.append(
-                    f"Primary resonance rank={primary.get('rank', '?')}  "
-                    f"weight={primary.get('weight', 0.0):.5f}"
+                    f"Primary alternative rank={primary.get('rank', '?')}  "
+                    f"Score weight={primary.get('weight', 0.0):.5f}"
                 )
             for warning in primary.get('warnings', []):
                 lines.append(f'Warning: {warning}')
@@ -2084,8 +3247,8 @@ class NboDriver:
             lines.append('Lewis/resonance alternatives')
             lines.append('-' * width)
             lines.append(
-                f"{'Rank':>4} {'Weight':>10} {'Score':>12} "
-                f"{'Pairs':>7} {'Pi bonds'}"
+                f"{'Rank':>4} {'Score weight':>12} {'Score':>12} "
+                f"{'Pairs':>7} {'Sigma/Pi':>9} {'Pi bonds'}"
             )
             lines.append('-' * width)
             for alternative in alternatives:
@@ -2095,10 +3258,12 @@ class NboDriver:
                 )
                 lines.append(
                     f"{alternative.get('rank', 0):>4} "
-                    f"{alternative.get('weight', 0.0):>10.5f} "
+                    f"{alternative.get('weight', 0.0):>12.5f} "
                     f"{alternative.get('score', 0.0):>12.5f} "
                     f"{alternative.get('electron_pairs', 0):>7}/"
                     f"{alternative.get('target_electron_pairs', '?'):<3} "
+                    f"{alternative.get('sigma_electron_pairs', 0):>4}/"
+                    f"{alternative.get('pi_electron_pairs', 0):<4} "
                     f"{pi_text}"
                 )
 
@@ -2135,6 +3300,172 @@ class NboDriver:
         assert_msg_critical(results is not None,
                             'nbo_report: no results provided and no prior compute() context available')
         text = self.format_nbo_report(molecule, results, level=level)
+        if return_text:
+            return text
+        if text:
+            print(text, file=ostream if ostream is not None else sys.stdout)
+        return text
+
+    def get_nra_data(self, molecule, results):
+        """Return structured NRA/NRT reporting data."""
+
+        assert_msg_critical('nra' in results,
+                            'get_nra_data: results do not contain NRA data; '
+                            'run compute() with include_nra=True')
+        nra = results['nra']
+        assert_msg_critical(bool(nra),
+                            'get_nra_data: NRA data are empty')
+        return nra
+
+    def format_nra_report(self, molecule, results, level=None):
+        """Return an NRA/NRT density-fit report string."""
+
+        if level is None:
+            level = self.nra_report_level
+        valid = {'none', 'summary', 'full'}
+        assert_msg_critical(level in valid,
+                            f"Invalid NRA report level '{level}'. "
+                            f"Choose one of {sorted(valid)}")
+        if level == 'none':
+            return ''
+
+        data = self.get_nra_data(molecule, results)
+        structures = data.get('structures', [])
+        lines = []
+        width = 104
+
+        lines.append('Natural Resonance Analysis (NRA/NRT) Density-Fit Summary')
+        lines.append('=' * width)
+        lines.append(
+            'NRA weights are density-fit weights; Score weights are Lewis ranking weights.'
+        )
+        lines.append('')
+        lines.append(
+            f"Subspace: {data.get('subspace', 'n/a')}  "
+            f"Metric: {data.get('fit_metric', 'n/a')}  "
+            f"Residual: {data.get('residual_norm', 0.0):.6e}  "
+            f"Relative residual: {data.get('relative_residual', 0.0):.6e}"
+        )
+        lines.append(
+            f"Spin fit: {data.get('spin_fit', 'none')}  "
+            f"Total residual: {data.get('total_residual_norm', 0.0):.6e}  "
+            f"Spin residual: {data.get('spin_residual_norm', 0.0) if data.get('spin_residual_norm') is not None else 'n/a'}"
+        )
+        prior = data.get('prior', {})
+        lines.append(
+            f"Prior mode: {prior.get('mode', 'regularized')}  "
+            f"Prior strength: {prior.get('strength', 0.0):.6g}  "
+            f"Prior active: {bool(prior.get('active', False))}"
+        )
+
+        for warning in data.get('warnings', []):
+            lines.append(f'Warning: {warning}')
+
+        lines.append('')
+        show_prior = any(structure.get('prior_weight') is not None
+                         for structure in structures)
+        if show_prior:
+            lines.append(
+                f"{'Rank':>4} {'Signature':<18} {'NRA weight':>12} "
+                f"{'Prior weight':>12} {'Score weight':>13} {'Score':>12} "
+                f"{'Residual':>12}  {'Sigma/Pi':>9} {'Pi bonds'}"
+            )
+        else:
+            lines.append(
+                f"{'Rank':>4} {'Signature':<18} {'NRA weight':>12} "
+                f"{'Score weight':>13} {'Score':>12} {'Residual':>12}  "
+                f"{'Sigma/Pi':>9} {'Pi bonds'}"
+            )
+        lines.append('-' * width)
+        if structures:
+            for structure in structures:
+                pi_text = ', '.join(
+                    f"{pair[0]}-{pair[1]}"
+                    for pair in structure.get('pi_bonds', [])
+                ) or 'none'
+                common = (
+                    f"{structure.get('rank', 0):>4} "
+                    f"{structure.get('label', 'n/a'):<18.18} "
+                    f"{structure.get('nra_weight', 0.0):>12.6f} "
+                )
+                if show_prior:
+                    prior_weight = structure.get('prior_weight')
+                    prior_text = ('n/a' if prior_weight is None else
+                                  f'{prior_weight:12.6f}')
+                    common += f"{prior_text:>12} "
+                lines.append(
+                    common +
+                    f"{structure.get('score_weight', 0.0):>13.6f} "
+                    f"{structure.get('score', 0.0):>12.5f} "
+                    f"{structure.get('residual_norm', 0.0):>12.5e}  "
+                    f"{structure.get('sigma_electron_pairs', 0):>4}/"
+                    f"{structure.get('pi_electron_pairs', 0):<4} "
+                    f"{pi_text}"
+                )
+        else:
+            lines.append(f"{'':>4} {'No NRA structures available.':<60}")
+
+        if level == 'full' and structures:
+            lines.append('')
+            lines.append('Structure details')
+            lines.append('-' * width)
+            alternatives = results.get('alternatives', [])
+            alternatives_by_rank = {
+                int(alternative.get('rank', 0)): alternative
+                for alternative in alternatives
+            }
+            for structure in structures:
+                rank = int(structure.get('rank', 0))
+                alternative = alternatives_by_rank.get(rank, {})
+                counts = _candidate_type_counts(
+                    alternative.get('nbo_list', [])
+                )
+                if counts:
+                    count_text = ', '.join(
+                        f'{key}={value}' for key, value in sorted(counts.items())
+                    )
+                else:
+                    count_text = 'n/a'
+                electron_pairs = alternative.get('electron_pairs', 'n/a')
+                target_pairs = alternative.get('target_electron_pairs', 'n/a')
+                lines.append(
+                    f"Rank {rank}: selected NBO counts: {count_text}; "
+                    f"pairs={electron_pairs}/{target_pairs}"
+                )
+
+        lines.append('=' * width)
+        return '\n'.join(lines)
+
+    def print_nra_report(self, molecule, results, level=None, ostream=None):
+        """Print an NRA/NRT density-fit report."""
+
+        text = self.format_nra_report(molecule, results, level=level)
+        if not text:
+            return
+        if ostream is None:
+            ostream = self.ostream
+        if hasattr(ostream, 'print_header'):
+            for line in text.splitlines():
+                ostream.print_header(line)
+            ostream.print_blank()
+        else:
+            print(text, file=ostream if ostream is not None else sys.stdout)
+
+    def nra_report(self,
+                   level=None,
+                   molecule=None,
+                   results=None,
+                   ostream=None,
+                   return_text=False):
+        """Convenience NRA/NRT reporting API."""
+
+        molecule = self._last_molecule if molecule is None else molecule
+        results = self._last_results if results is None else results
+        assert_msg_critical(molecule is not None,
+                            'nra_report: no molecule provided and no prior compute() context available')
+        assert_msg_critical(results is not None,
+                            'nra_report: no results provided and no prior compute() context available')
+        text = self.format_nra_report(molecule, results, level=level)
         if return_text:
             return text
         if text:

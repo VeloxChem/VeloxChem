@@ -1,718 +1,191 @@
-# NboDriver implementation notes
+# NboDriver Technical Notes
 
-This document records the current implementation details of the clean-restart `NboDriver`.  It is intended for developers who need to understand, modify, or extend the code.
+These notes describe the implemented algorithms in VeloxChem's `NboDriver`. The emphasis is on reproducibility, explicit electron accounting, and clear separation between candidate generation, Lewis assignment, and NRA/NRT density fitting.
 
-The central design choice is separation of layers:
+## Pipeline
 
-$$
-\mathrm{AO/SCF}\;\longrightarrow\;\mathrm{NAO/NPA}\;\longrightarrow\;
-\mathrm{MO\ analysis}\;\longrightarrow\;\mathrm{NBO\ candidates}\;\longrightarrow\;
-\mathrm{Lewis/resonance\ assignment}\;\longrightarrow\;\mathrm{NRA/NRT\ density\ fit}.
-$$
+The computation proceeds through the following layers:
 
-Each layer stores structured data in `results`, rather than mixing analysis, assignment, and printing.
+```text
+AO overlap and SCF density
+-> NAO orthonormalization and NPA
+-> MO analysis in the NAO basis
+-> NBO candidate generation
+-> primary Lewis assignment
+-> active-space Lewis/resonance alternatives
+-> optional NRA/NRT density fitting
+-> reports and diagnostics
+```
 
-## 1. Inputs and AO density
+The layers are intentionally one-way. NRA/NRT weights are computed after alternatives are available and do not alter the candidate pool or primary assignment.
 
-The driver receives a `Molecule`, a `MolecularBasis`, and a VeloxChem molecular-orbital object.  The AO overlap matrix is computed as
+## NAO/NPA construction
 
-$$
-S_{\mu\nu} = \langle \chi_\mu | \chi_\nu \rangle.
-$$
+The input AO overlap matrix is `S`, and the SCF AO density is `P`. The NAO transformation `T` is assembled from atom-local AO blocks and canonicalized so equivalent atom-block rotations are deterministic. The defining invariant is
 
-The total AO density matrix $P$ is built from the SCF orbitals.  For restricted orbitals,
+```text
+T^T S T = I.
+```
 
-$$
-P_{\mu\nu} = 2 \sum_i f_i C_{\mu i} C_{\nu i}.
-$$
+The total NAO density is
 
-For unrestricted orbitals,
+```text
+D_NAO = T^T S P S T.
+```
 
-$$
-P_{\mu\nu} = \sum_i f_i^\alpha C^\alpha_{\mu i} C^\alpha_{\nu i}
-           + \sum_i f_i^\beta  C^\beta_{\mu i}  C^\beta_{\nu i}.
-$$
+For unrestricted references, alpha and beta densities are transformed separately:
 
-The electron-count invariant in a nonorthogonal AO basis is
+```text
+D_alpha_NAO = T^T S P_alpha S T
+D_beta_NAO  = T^T S P_beta  S T
+D_spin_NAO  = D_alpha_NAO - D_beta_NAO.
+```
 
-$$
-N_e = \mathrm{Tr}(SP).
-$$
+The implementation records diagnostics for orthonormality, density symmetry, electron count, trace conservation, and charge conservation. NPA populations are atom-block traces of `D_NAO`; NPA charges are nuclear charge minus the corresponding atom population.
 
-This invariant is used to guard conservative density symmetrization.
+## MO-in-NAO analysis
 
-## 2. AO metadata
+Molecular orbitals are projected into the orthonormal NAO basis. For restricted references the occupied and virtual orbital compositions are reported from the closed-shell coefficient set. For unrestricted references, alpha and beta channels are handled independently and the spin density is retained for radical diagnostics.
 
-The function `_ao_shell_map()` builds two integer arrays:
+MO composition is diagnostic. It does not determine the Lewis assignment directly, but it provides interpretable orbital character in the same basis used for NBO candidate vectors.
 
-$$
-a(\mu) = \text{atom index of AO } \mu,
-\qquad
-\ell(\mu) = \text{angular momentum of AO } \mu.
-$$
+## Candidate construction
 
-The angular momentum encoding is
+Candidates are normalized vectors in NAO space with explicit metadata:
 
-$$
-s=0,\quad p=1,\quad d=2,\quad f=3,\quad g=4,\quad h=5.
-$$
+```text
+n(c) = c^T D_NAO c
+m(c) = c^T D_spin_NAO c.
+```
 
-These maps are deliberately kept simple.  They are used to maintain atom labels during NAO construction and to identify p-type spaces for pi candidates.
+The driver generates these candidate families:
 
-## 3. Equivalent atoms and local frames
-
-Equivalent atom groups are detected from element labels and local connectivity/distance signatures.  For atom $A$, a simplified signature is
-
-$$
-\sigma_A = \left(Z_A, \mathrm{sort}\{(Z_B, \lfloor r_{AB}/\tau \rceil): B \in \mathcal{N}(A)\}\right),
-$$
-
-where $\tau$ is the distance tolerance and $\mathcal{N}(A)$ is the connectivity-neighbor set.
-
-Local frames are also built for each atom.  If atom $A$ has neighbor directions $\hat{b}_1, \hat{b}_2, \ldots$, the first axis is
-
-$$
-\hat{x}_A = \hat{b}_1.
-$$
-
-If a second bond direction exists, the second axis is the component of $\hat{b}_2$ orthogonal to $\hat{x}_A$:
-
-$$
-\hat{y}_A = \frac{\hat{b}_2 - (\hat{b}_2 \cdot \hat{x}_A)\hat{x}_A}
-                 {\|\hat{b}_2 - (\hat{b}_2 \cdot \hat{x}_A)\hat{x}_A\|}.
-$$
-
-The third axis is
-
-$$
-\hat{z}_A = \frac{\hat{x}_A \times \hat{y}_A}{\|\hat{x}_A \times \hat{y}_A\|},
-\qquad
-\hat{y}_A \leftarrow \frac{\hat{z}_A \times \hat{x}_A}{\|\hat{z}_A \times \hat{x}_A\|}.
-$$
-
-At present these frames are diagnostic and a future hook for oriented NHO construction.
-
-## 4. Conservative equivalent-atom density symmetrization
-
-The current symmetrizer only acts on equivalent groups with identical all-s AO layouts.  This is intentionally conservative: it stabilizes equivalent hydrogens without rotating p/d functions between atoms.
-
-For an equivalent group with $g$ atoms, AO permutation matrices $\Pi_k$ are built from cyclic atom permutations.  The symmetrized density is
-
-$$
-P_{\mathrm{sym}} = \frac{1}{g}\sum_{k=1}^{g} \Pi_k^T P \Pi_k.
-$$
-
-The result is made symmetric:
-
-$$
-P_{\mathrm{sym}} \leftarrow \frac{1}{2}(P_{\mathrm{sym}} + P_{\mathrm{sym}}^T).
-$$
-
-The implementation checks electron conservation:
-
-$$
-\left|\mathrm{Tr}(S P_{\mathrm{sym}}) - \mathrm{Tr}(SP)\right| < \epsilon.
-$$
-
-If the check fails, the original density is retained.  This avoids the earlier electron-loss bug caused by row/column averaging in a nonorthogonal basis.
-
-## 5. Orthonormal NAO construction
-
-The current NAO construction is intentionally simple and robust.
-
-### 5.1 Löwdin orthogonalized AO basis
-
-Diagonalize the AO overlap matrix:
-
-$$
-S = U s U^T.
-$$
-
-The square Löwdin inverse square root is
-
-$$
-X = S^{-1/2} = U s^{-1/2} U^T.
-$$
-
-It satisfies
-
-$$
-X^T S X = I.
-$$
-
-The density in this orthonormal AO-like basis is
-
-$$
-D^{(X)} = X^T S P S X.
-$$
-
-The symmetrized numerical form is
-
-$$
-D^{(X)} \leftarrow \frac{1}{2}\left(D^{(X)} + D^{(X)T}\right).
-$$
-
-### 5.2 Atom-block density diagonalization
-
-For each atom $A$, collect the Löwdin AO indices
-
-$$
-\mathcal{I}_A = \{\mu : a(\mu)=A\}.
-$$
-
-The atom block is
-
-$$
-D_A = D^{(X)}[\mathcal{I}_A,\mathcal{I}_A].
-$$
-
-Then solve
-
-$$
-D_A R_A = R_A n_A.
-$$
-
-The eigenvectors are sorted by descending occupation.  Near-degenerate subspaces are canonicalized deterministically by dominant angular momentum and AO index.  The block rotations are assembled into a block-diagonal matrix
-
-$$
-R = \bigoplus_A R_A.
-$$
-
-The final AO-to-NAO transformation is
-
-$$
-T = X R.
-$$
-
-This guarantees
-
-$$
-T^T S T = R^T X^T S X R = R^T R = I.
-$$
-
-The final NAO density is
-
-$$
-D^{\mathrm{NAO}} = T^T S P S T.
-$$
-
-The population of NAO $i$ is
-
-$$
-n_i = D^{\mathrm{NAO}}_{ii}.
-$$
-
-This atom-block approach prevents the label stealing observed when the full basis is diagonalized globally.
-
-## 6. NPA classification and charges
-
-Core-orbital counts are currently simple closed-shell counts from nuclear charge:
-
-$$
-n_{\mathrm{core}}(Z) =
-\begin{cases}
-0, & Z \le 2,\\
-1, & 2 < Z \le 10,\\
-5, & 10 < Z \le 18,\\
-9, & 18 < Z \le 36,\\
-18, & Z > 36.
-\end{cases}
-$$
-
-For first-row atoms, the core orbital is chosen preferentially from the highest-populated s-type NAO to avoid unphysical labels such as `Cor(1p)`.
-
-The atom population is
-
-$$
-N_A = \sum_{i \in A} n_i.
-$$
-
-The natural charge is
-
-$$
-q_A = Z_A - N_A.
-$$
-
-The molecular charge sum should obey
-
-$$
-\sum_A q_A = \sum_A Z_A - \sum_A N_A
-          = Z_{\mathrm{tot}} - N_e
-          = Q_{\mathrm{mol}}.
-$$
-
-Valence electron configurations are reported by angular momentum:
-
-$$
-N_{A\ell}^{\mathrm{val}} = \sum_{i \in A,\; \ell_i=\ell,\; i\notin\mathrm{core}} n_i.
-$$
-
-## 7. MO-in-NAO analysis
-
-Canonical MOs are transformed to the NAO basis as
-
-$$
-C^{\mathrm{NAO}} = T^T S C^{\mathrm{AO}}.
-$$
-
-For MO $m$, the NAO coefficient vector is $c_m^{\mathrm{NAO}}$.  The normalization diagnostic is
-
-$$
-\delta_m = \left|\sum_i |c^{\mathrm{NAO}}_{im}|^2 - 1\right|.
-$$
-
-The reported maximum normalization error is
-
-$$
-\delta_{\max} = \max_m \delta_m.
-$$
-
-The atom contribution to MO $m$ is
-
-$$
-W_{Am} = \sum_{i\in A}|c^{\mathrm{NAO}}_{im}|^2.
-$$
-
-The report keeps the largest NAO and atom weights according to `mo_analysis_top` and `mo_analysis_threshold`.
-
-## 8. NBO candidate generation
-
-Candidate generation is intentionally separate from final assignment.  Every candidate is stored as a normalized vector $v$ in the NAO basis:
-
-$$
-\|v\|_2 = 1.
-$$
-
-Its occupation is
-
-$$
-n(v) = v^T D^{\mathrm{NAO}} v.
-$$
-
-### 8.1 Core candidates
-
-Core candidates are one-center NAOs:
-
-$$
-v_i = e_i,
-\qquad
-n(v_i)=D^{\mathrm{NAO}}_{ii}.
-$$
-
-They are stored as type `CR` and subtype `core`.
-
-### 8.2 Lone-pair candidates
-
-For non-hydrogen atoms, non-core valence NAOs with
-
-$$
-n_i \ge n_{\mathrm{LP,min}}
-$$
-
-are stored as one-center lone-pair candidates.  The current default is
-
-$$
-n_{\mathrm{LP,min}} = 1.50.
-$$
-
-These are stored as type `LP` and subtype `lone-pair`.
-
-### 8.3 Connected atom-pair candidates
-
-For connected atom pairs $A-B$, the candidate builder removes selected core and obvious one-center lone-pair NAOs from the bonding search space.  The remaining atom-local index sets are
-
-$$
-\mathcal{L}_A,\qquad \mathcal{L}_B.
-$$
-
-The pair index set is
-
-$$
-\mathcal{P}_{AB} = \mathcal{L}_A \cup \mathcal{L}_B.
-$$
-
-The pair density block is
-
-$$
-D_{AB} = D^{\mathrm{NAO}}[\mathcal{P}_{AB},\mathcal{P}_{AB}].
-$$
-
-The algorithm solves
-
-$$
-D_{AB} u_k = n_k u_k.
-$$
-
-A two-center candidate is accepted if
-
-$$
-n_k \ge n_{\mathrm{BD,min}},
-$$
-
-and both atomic side weights satisfy
-
-$$
-w_A = \sum_{i\in\mathcal{L}_A}|u_{ki}|^2 \ge w_{\mathrm{atom,min}},
-\qquad
-w_B = \sum_{i\in\mathcal{L}_B}|u_{ki}|^2 \ge w_{\mathrm{atom,min}}.
-$$
-
-Defaults are
-
-$$
-n_{\mathrm{BD,min}} = 1.20,
-\qquad
-w_{\mathrm{atom,min}} = 0.10.
-$$
-
-For each connected atom pair, the first accepted candidate is labeled
-
-$$
-\mathrm{BD}(\sigma),
-$$
-
-and later accepted candidates for the same pair are labeled
-
-$$
-\mathrm{BD}(\pi).
-$$
-
-### 8.4 Non-sigma pi candidates
-
-Non-sigma pi candidates are generated from p-type NAOs.  An atom is pi-capable if
-
-$$
-\exists i\in A \quad \ell_i = 1.
-$$
-
-For a non-connected pair $A-B$, a p-space candidate may be generated if either:
-
-1. the graph distance $d(A,B)$ is within `conjugated_pi_max_path`, or
-2. the pair is explicitly requested by `allowed_pi_bonds` or `required_pi_bonds`.
-
-The graph-distance condition is
-
-$$
-d(A,B) \le d_{\max}.
-$$
-
-The p-space block is diagonalized exactly like a connected pair block, but only the top accepted p-p candidate is retained.  It is stored as
-
-$$
-\mathrm{BD}(\pi),\quad \mathrm{non\_sigma}=\mathrm{True}.
-$$
-
-The current primary assignment refuses non-sigma pi candidates unless the pair is explicitly allowed or required by user constraints.  This protects normal Lewis assignments while permitting allyl terminal and Dewar-style tests.
-
-## 9. Primary Lewis-like assignment
-
-The electron-pair target is
-
-$$
-N_{\mathrm{pair}} = \mathrm{round}\left(\frac{N_e}{2}\right).
-$$
-
-The selection order is deterministic:
-
-1. all core candidates,
-2. required bond candidates,
-3. required pi-bond candidates,
-4. remaining lone-pair and bond candidates by score/order until the target is reached.
-
-The candidate sort key is effectively
-
-$$
-\mathrm{CR} \prec \mathrm{LP} \prec \mathrm{BD}(\sigma) \prec \mathrm{BD}(\pi),
-$$
-
-with higher occupation before lower occupation inside comparable classes.
-
-The primary occupation sum is
-
-$$
-O = \sum_{v\in\mathcal{S}} n(v),
-$$
-
-where $\mathcal{S}$ is the selected candidate set.  The current primary score is
-
-$$
-s_{\mathrm{primary}} = O - 2\left| |\mathcal{S}| - N_{\mathrm{pair}} \right|.
-$$
-
-This is a deliberately simple first-pass objective.
-
-## 10. Lewis/resonance alternatives
-
-The current alternative enumerator keeps the non-pi part of the primary assignment fixed and varies compatible pi-bond matchings.
-
-Let the fixed set be
-
-$$
-\mathcal{F} = \{v\in\mathcal{S}_{\mathrm{primary}} : v \text{ is not } \mathrm{BD}(\pi)\}.
-$$
-
-The number of pi slots is
-
-$$
-N_\pi = N_{\mathrm{pair}} - |\mathcal{F}|.
-$$
-
-The pi pool $\mathcal{P}$ contains `BD(pi)` candidates passing forbidden/allowed constraints.  The enumerator chooses combinations
-
-$$
-\mathcal{C}_k \subset \mathcal{P},
-\qquad
-|\mathcal{C}_k| = N_\pi.
-$$
-
-A combination is compatible if it is a simple matching:
-
-$$
-\forall (A,B),(C,D)\in\mathcal{C}_k,
-\quad
-\{A,B\}\cap\{C,D\}=\varnothing
-\quad\text{unless the two pairs are identical, which is disallowed.}
-$$
-
-The candidate selected set for alternative $k$ is
-
-$$
-\mathcal{S}_k = \mathcal{F}\cup\mathcal{C}_k.
-$$
-
-Its occupation sum is
-
-$$
-O_k = \sum_{v\in\mathcal{S}_k} n(v).
-$$
-
-The current alternative score is
-
-$$
-s_k = O_k + 0.05\,N^{\mathrm{allowed}}_k
-      - 2\left||\mathcal{S}_k|-N_{\mathrm{pair}}\right|,
-$$
-
-where $N^{\mathrm{allowed}}_k$ is the number of selected pi pairs also present in `allowed_pi_bonds`.  The small allowed-pair bonus is a practical tie-breaker for user-enabled alternatives.
-
-The alternatives are sorted by decreasing $s_k$, truncated to `max_alternatives`, and converted to weights:
-
-$$
-w_k = \frac{\exp\{\beta(s_k-s_{\max})\}}
-           {\sum_l\exp\{\beta(s_l-s_{\max})\}},
-\qquad
-s_{\max}=\max_l s_l.
-$$
-
-The weights satisfy
-
-$$
-\sum_k w_k = 1.
-$$
-
-These are development weights for ranking Lewis alternatives, not final VB amplitudes.
-
-## 11. NRA/NRT density-fit layer
-
-The current NRA/NRT layer is optional and runs only when `include_nra=True`. It is implemented as post-processing on the already enumerated `alternatives` list, so it does not affect candidate generation, primary assignment, or the existing score/ranking weights.
-
-For each alternative $k$, the selected NBO coefficient lists are reconstructed into normalized NAO-space vectors $v_{ki}$. The first implementation assumes closed-shell pair occupation for all selected candidates:
-
-$$
-D_k^{\mathrm{Lewis}} = 2\sum_i v_{ki}v_{ki}^T.
-$$
-
-The target is the actual NAO density $D^{\mathrm{NAO}}$. The fit chooses nonnegative weights that sum to one:
-
-$$
-\min_w \left\|D^{\mathrm{NAO}} - \sum_k w_kD_k^{\mathrm{Lewis}}\right\|_F^2,
-\qquad
-w_k \ge 0,
-\qquad
-\sum_k w_k = 1.
-$$
-
-The dependency-free active-set solver first solves the equality-constrained least-squares problem, removes structures with negative provisional weights, and refits on the remaining active set until all weights are nonnegative. A one-structure pool returns weight 1.0 by construction.
-
-The implemented subspaces are:
-
-| `nra_subspace` | Current behavior |
+| Family | Role |
 | --- | --- |
-| `"selected"` | Uses the union of NAOs appearing in the selected alternatives. |
-| `"pi"` | Uses p-type NAOs on atoms involved in alternative pi bonds; falls back to `"selected"` if empty. |
-| `"valence"` | Uses selected non-core candidate support. |
-| `"full"` | Uses the full NAO density. |
+| `CR` | Core orbitals from atom-local occupied NAO space. |
+| `LP` | Lone-pair candidates from one-center valence density blocks. |
+| `SOMO` | Singly occupied open-shell candidates. |
+| `BD(sigma)` | Two-center sigma bonding candidates. |
+| `BD(pi)` | Two-center pi bonding candidates. |
+| one-electron `LP`/`BD(pi)` | Radical active-space candidates with `electron_count = 1`. |
+| `BD*` | Antibonding complements to bonding candidates. |
+| `RY` | One-center Rydberg/acceptor complements with low occupation. |
 
-For the Frobenius metric, symmetric matrix blocks are vectorized over the upper triangle with off-diagonal entries scaled by $\sqrt{2}$, so the vector norm matches the full symmetric-matrix Frobenius norm.
+Occupied Lewis assignment uses candidates with explicit electron counts. Candidate-only acceptors (`BD*` and `RY`) are retained for diagnostics and reports but are not inserted into occupied Lewis structures.
 
-The `results["nra"]` dictionary contains:
+Two-center candidates are built from atom-pair density blocks. Sigma and pi candidates are kept separate in metadata and downstream result fields. Pi candidates enter the resonance active space; sigma bonds and non-participating lone pairs normally form the fixed framework unless constraints or electron accounting require otherwise.
 
-```python
-{
-      "subspace": "pi",
-      "fit_metric": "frobenius",
-      "weights": [...],
-      "residual_norm": ...,
-      "relative_residual": ...,
-      "structures": [
-            {
-                  "rank": ...,
-                  "pi_bonds": [...],
-                  "nra_weight": ...,
-                  "score_weight": ...,
-                  "score": ...,
-                  "residual_norm": ...,
-            },
-      ],
-      "warnings": [...],
-}
+## Primary Lewis assignment
+
+Primary assignment selects a chemically conservative occupied NBO list with exact electron counting. The selected structure includes:
+
+- `nbo_list`: all occupied objects in report order.
+- `sigma_nbo_list`: core, sigma, and fixed non-pi framework objects.
+- `pi_nbo_list`: occupied pi objects.
+- `fixed_nbo_list`: occupied objects held fixed during resonance enumeration.
+- `active_nbo_list`: occupied objects considered in the resonance active space.
+- `active_pi_nbo_list`: active pi objects.
+- `active_lone_pair_nbo_list`: active lone-pair donation objects.
+- `active_one_electron_nbo_list`: radical one-electron active objects.
+
+Lewis accounting is evaluated per atom. Each selected candidate contributes its `electron_count` to its participating atoms according to its type. The driver records valence electron counts, formal-charge diagnostics, duet/octet deviations, missing/extra electron diagnostics, and score terms.
+
+## Constraints
+
+`NboConstraints` can require or forbid sigma bonds and can require or restrict pi bonds. Constraints are normalized to atom-index tuples and are applied during candidate selection and alternative enumeration. Violations are surfaced through score terms rather than hidden state.
+
+## Lewis/resonance alternatives
+
+Alternatives are generated from the active space by exact electron-count enumeration. The fixed framework contributes a known electron count, and active choices are accepted only if the target active electron count is recovered. This allows closed-shell pi resonance, lone-pair donation, and radical one-electron alternatives to use the same mechanism.
+
+Alternatives are ranked by an explicit Lewis score. The score combines candidate occupations, bond/constraint satisfaction, formal-charge diagnostics, octet/duet diagnostics, and consistency penalties. The ranking weight is
+
+```text
+w_score,k = exp(-beta s_k) / sum_j exp(-beta s_j),
 ```
 
-The layer currently targets closed-shell singlet alternatives. Open-shell/radical NRA is intentionally deferred until one-electron candidates and spin-resolved assignment are available.
+where `s_k` is the Lewis score and `beta` is `NboComputeOptions.lewis_weight_beta`.
 
-## 12. Report formatting
+These weights are useful for ordering alternatives. They are not NRA/NRT density weights and are not VB amplitudes.
 
-The NBO report separates candidate counts from primary counts.  It sorts selected NBOs by chemical reporting priority:
+## NRA/NRT density fitting
 
-$$
-\mathrm{CR},\quad \mathrm{BD}(\sigma),\quad \mathrm{BD}(\pi),\quad
-\mathrm{LP},\quad \mathrm{RY},\quad \mathrm{BD^*}/\mathrm{other}.
-$$
+When requested, NRA/NRT constructs a model density for each alternative and fits the SCF density as a convex combination of those model densities. For a selected NAO subspace, the closed-shell problem is
 
-For a bond candidate between atoms $A$ and $B$, atom labels are reported heavier-to-lighter.  This keeps reports visually stable, for example reporting C-H rather than H-C.
-
-There is not yet a public `nra_report()` formatter. NRA/NRT results are inspected directly through `results["nra"]`.
-
-## 13. Important invariants
-
-The following identities are expected for a healthy run:
-
-### NAO orthonormality
-
-$$
-\|T^T S T - I\|_F \ll 1.
-$$
-
-### Electron conservation
-
-$$
-\mathrm{Tr}(D^{\mathrm{NAO}})
-= \mathrm{Tr}(T^T S P S T)
-= \mathrm{Tr}(P S T T^T S)
-\approx N_e.
-$$
-
-Because $T$ spans the full AO space in the current square construction,
-
-$$
-T T^T S \approx S^{-1}S = I,
-$$
-
-so the NAO trace should match the AO electron count.
-
-### MO normalization
-
-For each canonical MO,
-
-$$
-\sum_i |C^{\mathrm{NAO}}_{im}|^2 \approx 1.
-$$
-
-### Charge conservation
-
-$$
-\sum_A q_A = Q_{\mathrm{mol}}.
-$$
-
-### NRA/NRT simplex weights
-
-When NRA is requested for a closed-shell structure pool,
-
-$$
-w_k^{\mathrm{NRA}} \ge 0,
-\qquad
-\sum_k w_k^{\mathrm{NRA}} = 1,
-$$
-
-and the residual norms should be finite.
-
-## 14. Current limitations
-
-The implementation is a clean development scaffold, not the final scientific endpoint.  Known limitations include:
-
-1. The primary Lewis score is occupation-driven and simple.
-2. Formal charges are stored in `NboConstraints` but are not yet deeply coupled into scoring.
-3. `fixed_lone_pairs`, `fixed_core`, and `fragment_locks` are reserved hooks.
-4. Radical/open-shell alternatives are still mostly pair-based diagnostics.
-5. `alternatives[*]["weight"]` values are softmax ranking weights, not NRA or VB weights.
-6. NRA/NRT density weights are implemented only as a first closed-shell density fit; there is no spin-resolved radical NRA yet.
-7. There is no public `nra_report()` formatter yet.
-8. Antibonding NBOs and Rydberg complements are not yet constructed as a full NBO basis.
-9. NHO/hybrid directionality is not yet a separate layer; current candidates are density-block natural orbitals in NAO space.
-
-## 15. Suggested next implementation steps
-
-The natural next steps are:
-
-1. Add an explicit valence/electron-accounting model per atom.
-2. Add octet and hypervalence penalties:
-
-$$
-E_{\mathrm{octet}} = \sum_A \lambda_A \max(0, N_A^{\mathrm{val}} - N_A^{\mathrm{allowed}})^2.
-$$
-
-3. Activate formal-charge scoring:
-
-$$
-E_{\mathrm{charge}} = \sum_A \gamma_A(q_A^{\mathrm{Lewis}} - q_A^{\mathrm{target}})^2.
-$$
-
-4. Add radical-specific one-electron alternatives, where a singly occupied candidate has occupancy target
-
-$$
-n(v) \approx 1
-$$
-
-instead of pair occupancy
-
-$$
-n(v) \approx 2.
-$$
-
-5. Add `nra_report(level="summary")` and `nra_report(level="full")` formatters.
-6. Expand NRA validation to carboxylate, nitrate, ozone, nitrobenzene, and amides.
-7. Separate sigma framework selection from pi-resonance enumeration.
-8. Add optional prior-regularized NRA weights.
-9. Replace or supplement the current softmax score with a documented VB/BOND-inspired model when available.
-
-## 16. Developer checklist
-
-When changing the implementation, verify at least:
-
-$$
-\mathrm{Tr}(D^{\mathrm{NAO}}) \approx N_e,
-\qquad
-\|T^T S T - I\|_F \ll 1,
-\qquad
-\max_m\left|\sum_i |C^{\mathrm{NAO}}_{im}|^2 - 1\right| \ll 1.
-$$
-
-Also inspect:
-
-```python
-results["diagnostics"]["nbo_candidate_counts"]
-results["diagnostics"]["primary_nbo_counts"]
-results["alternatives"]
+```text
+min_w || d - A w ||^2
+subject to w_k >= 0, sum_k w_k = 1.
 ```
 
-When `include_nra=True`, also verify:
+`d` is the vectorized target density in the chosen subspace, and column `A_k` is the vectorized model density for alternative `k`. The implementation reports the fitted weights, residual norm, rank diagnostics, structure metadata, and the subspace used.
 
-```python
-weights = np.array(results["nra"]["weights"])
-assert np.all(weights >= -1.0e-12)
-assert abs(float(np.sum(weights)) - 1.0) < 1.0e-10
-assert np.isfinite(results["nra"]["residual_norm"])
-assert np.isfinite(results["nra"]["relative_residual"])
+Supported subspaces are:
+
+| Subspace | Description |
+| --- | --- |
+| `selected` | NAOs touched by the selected alternatives. |
+| `pi` | Pi-active NAO support. |
+| `valence` | Non-core valence NAO support. |
+| `full` | Full NAO density. |
+
+The fit uses nonnegative normalized weights. The reported `nra_weight` values are density-reconstruction weights, not wavefunction weights.
+
+## Prior-regularized NRA/NRT
+
+Optional priors add a regularization target without replacing the density objective:
+
+```text
+min_w || d - A w ||^2 + lambda || w - w0 ||^2
+subject to w_k >= 0, sum_k w_k = 1.
 ```
 
-For benchmark-style development examples, keep checking H2C=O, water, methane, ethylene, benzene, allyl cation, allyl radical, allyl anion, and constrained benzene Kekulé/Dewar alternatives.
+Priors can be matched by alternative index or recognized label. The normalized prior vector, matched structures, unmatched entries, mode, and regularization strength are stored in `results["nra"]["prior"]`. Each structure may also carry `prior_weight`.
+
+The regularization is deliberately explicit because prior-guided weights are still density-fit weights. A nonzero prior can influence the fitted distribution, but the residual and model densities remain visible for interpretation.
+
+## Open-shell treatment
+
+For unrestricted references, the driver keeps total and spin NAO densities. Radical candidates carry one-electron `electron_count` metadata, and doublet active spaces are constrained so alternatives preserve the intended radical electron count.
+
+Open-shell NRA/NRT with `nra_spin_fit="total_spin"` concatenates total-density and spin-density residuals:
+
+```text
+min_w || [d_total; d_spin] - [A_total; A_spin] w ||^2
+subject to w_k >= 0, sum_k w_k = 1.
+```
+
+This gives alternatives weights that reconstruct both charge distribution and spin distribution in the selected subspace.
+
+## Donor-acceptor diagnostics
+
+`BD*` candidates are constructed as orthogonal antibonding complements in the same two-center subspace as their parent `BD` candidates. `RY` candidates are one-center low-occupation complements. Both remain candidate-only acceptors.
+
+For each occupied donor and candidate-only acceptor, the driver reports a density-coupling diagnostic in the NAO basis. This ranking identifies plausible donation channels and keeps zero or small channels visible when useful for regression testing.
+
+The diagnostic is not the mature NBO second-order perturbation expression. That expression requires an NBO Fock matrix and energy denominator, which are outside the current implementation.
+
+## Reporting and labels
+
+Reports are generated from structured result dictionaries. The primary report presents foundation diagnostics, selected NBOs, candidate counts, Lewis accounting, and donor-acceptor diagnostics. The NRA report presents structure weights, residuals, spin-fit metadata, and prior metadata.
+
+Structure signatures are generated directly from the pi-bond set, for example `pi:1-2,3-4`. They are useful for display and prior matching, but the algorithmic representation remains sigma/pi and fixed/active partition fields. The implementation does not contain molecule-specific structure-name classifiers.
+
+## Validation coverage
+
+The regression suite covers:
+
+- NAO orthonormality, charge conservation, and deterministic canonicalization.
+- Restricted and unrestricted MO-in-NAO analysis.
+- Candidate counts and candidate metadata.
+- Required/forbidden bond and pi-bond constraints.
+- Sigma/pi partition fields and fixed/active fields.
+- Lewis electron accounting, formal-charge diagnostics, octet diagnostics, and score terms.
+- Lone-pair donation alternatives.
+- Closed-shell NRA/NRT structure pools and reports.
+- NRA/NRT prior regularization and metadata.
+- Open-shell SOMO candidates, one-electron alternatives, and total-plus-spin NRA/NRT.
+- `BD*`, `RY`, and donor-acceptor diagnostics.
+
+## Scientific scope
+
+The implemented driver is a coherent, documented NBO/NRA/NRT analysis layer. It intentionally keeps several advanced NBO concepts out of scope until their required mathematical layers are present: NHO directionality, NBO Fock-matrix perturbation energies, broad automatic NRT labeling, and VB/wavefunction state weights.

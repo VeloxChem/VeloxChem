@@ -1,503 +1,196 @@
-# NboDriver API guide
+# NboDriver API Guide
 
-This document describes the current clean-restart `NboDriver` API in VeloxChem.  The implementation currently provides:
+`NboDriver` provides a structured Natural Bond Orbital analysis pipeline for VeloxChem wavefunctions. The driver constructs Natural Atomic Orbitals (NAOs), Natural Population Analysis (NPA) data, NBO candidates, Lewis/resonance alternatives, donor-acceptor diagnostics, and optional NRA/NRT density-fit weights.
 
-1. natural atomic orbital / natural population analysis (NAO/NPA),
-2. molecular-orbital composition in the NAO basis,
-3. first-pass NBO candidate generation,
-4. a deterministic primary Lewis-like assignment,
-5. first-pass Lewis/resonance alternatives over compatible pi-bond matchings,
-6. optional first-pass NRA/NRT density-fit weights for closed-shell alternatives.
+The API is intentionally transparent: every assignment carries explicit electron counts, atom participation, score terms, and density-fit metadata. This makes the results suitable for regression testing, method development, and chemical interpretation without hiding the distinction between Lewis ranking weights, density-fit weights, and future wavefunction weights.
 
-The present code is intentionally transparent and conservative.  It is not yet a complete replacement for all mature NBO/NRT/VB functionality.
-
-## Public import
-
-The driver is exported through the top-level VeloxChem Python module:
+## Basic use
 
 ```python
 import veloxchem as vlx
+from veloxchem.nbodriver import NboDriver, NboComputeOptions
 
-nbo = vlx.NboDriver()
-```
+molecule = vlx.Molecule.read_molecule_string("""
+O  0.000000  0.000000  0.000000
+H  0.758602  0.000000  0.504284
+H -0.758602  0.000000  0.504284
+""", units="angstrom")
 
-The public symbols are:
+basis = vlx.MolecularBasis.read(molecule, "sto-3g")
+scf = vlx.ScfRestrictedDriver()
+scf.compute(molecule, basis)
 
-```python
-vlx.NboDriver
-vlx.NboComputeOptions
-vlx.NboConstraints
-```
-
-## Main workflow
-
-The normal workflow is:
-
-1. build a `Molecule`,
-2. build a `MolecularBasis`,
-3. run SCF,
-4. call `NboDriver.compute(molecule, basis, scf.mol_orbs)`,
-5. print or inspect NPA, MO, and NBO reports,
-6. optionally inspect `results["nra"]` when `include_nra=True`.
-
-Mathematically, the driver starts from the AO overlap matrix $S$ and an AO density matrix $P$.  For restricted closed-shell SCF,
-
-$$
-P = 2 C_{\alpha} f_{\alpha} C_{\alpha}^{T},
-$$
-
-where $C_{\alpha}$ is the alpha MO coefficient matrix and $f_{\alpha}$ is the diagonal occupation matrix stored by VeloxChem.  For unrestricted SCF,
-
-$$
-P = C_{\alpha} f_{\alpha} C_{\alpha}^{T}
-  + C_{\beta} f_{\beta} C_{\beta}^{T}.
-$$
-
-The resulting NAO transformation $T$ is used to obtain an orthonormal NAO density matrix
-
-$$
-D^{\mathrm{NAO}} = T^T S P S T,
-\qquad
-T^T S T = I.
-$$
-
-NAO populations are the diagonal elements
-
-$$
-n_i = D^{\mathrm{NAO}}_{ii}.
-$$
-
-Natural atomic charges are then reported as
-
-$$
-q_A = Z_A - \sum_{i \in A} n_i,
-$$
-
-where $Z_A$ is the nuclear charge and the sum runs over NAOs assigned to atom $A$.
-
-## `NboDriver.compute()`
-
-Signature:
-
-```python
+nbo = NboDriver()
 results = nbo.compute(
     molecule,
     basis,
-    mol_orbs,
-    mode="npa",
-    options=None,
-    constraints=None,
+    scf.mol_orbs,
+    options=NboComputeOptions(include_nra=True),
 )
+
+print(nbo.primary_report(results))
+print(nbo.nra_report(results, level="summary"))
 ```
 
-### Arguments
-
-| Argument | Type | Meaning |
-| --- | --- | --- |
-| `molecule` | `vlx.Molecule` | Molecular geometry, atom labels, charge, multiplicity, connectivity, and electron count. |
-| `basis` | `vlx.MolecularBasis` | AO basis used in the SCF calculation. |
-| `mol_orbs` | VeloxChem molecular orbitals | SCF molecular orbital object, normally `scf_drv.mol_orbs`. |
-| `mode` | `str` | Currently accepts `"npa"` and `"primary"`.  Both run the same current pipeline. |
-| `options` | `None`, `dict`, or `NboComputeOptions` | Numerical and reporting options. |
-| `constraints` | `None`, `dict`, or `NboConstraints` | User constraints for bond and pi-bond selection. |
-
-### Return value
-
-`compute()` returns a dictionary.  Important keys are:
-
-| Key | Meaning |
-| --- | --- |
-| `nao_transform` | AO-to-NAO coefficient matrix $T$. |
-| `nao_density_matrix` | $D^{\mathrm{NAO}} = T^T S P S T$. |
-| `nao_overlap_matrix` | $T^T S T$, expected to be close to the identity. |
-| `nao_populations` | Diagonal populations $n_i = D^{\mathrm{NAO}}_{ii}$. |
-| `nao_atom_map` | Zero-based atom index assigned to each NAO. |
-| `nao_l_map` | Angular momentum label for each NAO, with $s=0$, $p=1$, $d=2$, ... |
-| `natural_charges` | Natural charge array $q_A$. |
-| `mo_analysis` | MO-in-NAO decomposition data. |
-| `nbo_candidates` | Full generated candidate pool. |
-| `nbo_list` | Current selected primary NBO list. |
-| `primary` | Primary Lewis-like assignment metadata. |
-| `alternatives` | Lewis/resonance alternatives and current score/ranking weights. |
-| `nra` | Optional Natural Resonance Analysis density-fit weights, present only when `include_nra=True`. |
-| `diagnostics` | Electron count, orthonormality, equivalence groups, constraint summary, and other checks. |
-| `provenance` | API version, mode, options, and constraints used. |
+The `compute` method accepts `mode="npa"` and `mode="primary"`. Both names run the same current pipeline; `primary` is retained as a readable alias for callers that expect a Lewis-assignment result.
 
 ## Options
 
-Options may be supplied either as a dictionary or as an `NboComputeOptions` instance.
+`NboComputeOptions` controls candidate generation, Lewis scoring, and NRA/NRT post-processing.
 
-```python
-options = {
-    "include_diagnostics": True,
-    "include_mo_analysis": True,
-    "include_nbo_candidates": True,
-    "include_lewis_assignment": True,
-    "mo_analysis_top": 6,
-    "mo_analysis_threshold": 1.0e-2,
-    "lone_pair_min_occupation": 1.50,
-    "bond_min_occupation": 1.20,
-    "bond_min_atom_weight": 0.10,
-    "pi_min_occupation": 0.20,
-    "conjugated_pi_max_path": 2,
-    "max_alternatives": 12,
-    "lewis_weight_beta": 4.0,
-    "include_nra": False,
-    "nra_subspace": "selected",
-    "nra_fit_metric": "frobenius",
-}
-```
-
-The most important numerical definitions are:
-
-$$
-n(c) = c^T D^{\mathrm{NAO}} c,
-\qquad
-\|c\|_2 = 1,
-$$
-
-where $n(c)$ is the occupation of a normalized one- or two-center candidate vector $c$ in the NAO basis.
-
-The score-weight sharpness parameter `lewis_weight_beta` enters the current softmax ranking model:
-
-$$
-w_k = \frac{\exp\{\beta(s_k - s_{\max})\}}
-           {\sum_l \exp\{\beta(s_l - s_{\max})\}},
-\qquad
-s_{\max} = \max_l s_l.
-$$
-
-Larger $\beta$ gives more score/ranking weight to the highest-scoring alternatives.
-
-The optional NRA layer is a post-processing fit of ideal closed-shell Lewis
-density matrices from `alternatives` to the actual NAO density. It does not
-replace the current score/ranking weights. The first implemented fit metric is
-`"frobenius"`. The available subspace choices are:
-
-| `nra_subspace` | Meaning |
-| --- | --- |
-| `"selected"` | Fit only NAOs used by the selected alternatives. |
-| `"pi"` | Fit p-type NAOs on atoms participating in alternative pi bonds. |
-| `"valence"` | Fit selected non-core NBO support. |
-| `"full"` | Fit the full NAO density matrix. |
-
-When `include_nra=True`, the result contains:
-
-```python
-results["nra"] = {
-    "subspace": "selected",
-    "fit_metric": "frobenius",
-    "weights": [...],
-    "residual_norm": ...,
-    "relative_residual": ...,
-    "structures": [...],
-    "warnings": [...],
-}
-```
-
-Each NRA structure reports its `nra_weight`, the corresponding current
-`score_weight`, the underlying `score`, its `pi_bonds`, and a single-structure
-residual norm. The NRA implementation currently targets closed-shell singlet
-Lewis alternatives.
+| Option | Default | Meaning |
+| --- | ---: | --- |
+| `max_bond_order` | `3` | Maximum generated bond multiplicity. |
+| `bond_cutoff` | implementation default | Population/coupling threshold for bond candidates. |
+| `pi_coupling_cutoff` | implementation default | Minimum pi-coupling signal for pi candidates. |
+| `lone_pair_cutoff` | implementation default | Minimum population for lone-pair candidates. |
+| `rydberg_max_occupation` | `0.50` | Maximum occupation for one-center `RY` acceptor candidates. |
+| `max_alternatives` | implementation default | Maximum Lewis/resonance alternatives retained. |
+| `lewis_weight_beta` | `4.0` | Softmax sharpness for score/ranking weights. |
+| `include_nra` | `False` | Build NRA/NRT density-fit weights for alternatives. |
+| `nra_subspace` | `"selected"` | NAO subspace used in the density fit: `selected`, `pi`, `valence`, or `full`. |
+| `nra_fit_metric` | `"frobenius"` | Residual norm reported for the density fit. |
+| `nra_prior_weights` | `None` | Optional prior weights by structure index or label. |
+| `nra_prior_strength` | `0.0` | Regularization strength for prior-guided NRA/NRT. |
+| `nra_prior_mode` | `"regularized"` | Prior handling mode. |
+| `nra_spin_fit` | `"total_spin"` | Open-shell NRA/NRT target using total and spin density residuals. |
 
 ## Constraints
 
-Constraints may be supplied either as a dictionary or as an `NboConstraints` instance.
+`NboConstraints` provides optional structure guidance without changing the data model.
 
 ```python
-constraints = {
-    "required_bonds": [],
-    "forbidden_bonds": [],
-    "required_pi_bonds": [],
-    "allowed_pi_bonds": [],
-    "forbidden_pi_bonds": [],
-    "fixed_lone_pairs": [],
-    "fixed_core": [],
-    "fragment_locks": [],
-    "formal_charges": {},
-}
+from veloxchem.nbodriver import NboConstraints
+
+constraints = NboConstraints(
+    required_bonds=((0, 1),),
+    forbidden_bonds=((2, 3),),
+    required_pi_bonds=((0, 1),),
+    allowed_pi_bonds=((0, 1), (2, 3)),
+)
+
+results = nbo.compute(molecule, basis, scf.mol_orbs, constraints=constraints)
 ```
 
-Atom pairs may be given as one-based or zero-based pairs.  In user-facing examples, one-based indexing is preferred:
+A plain dictionary with the same keys is also accepted. Atom indices are zero-based in the input and one-based in most human-readable reports.
 
-```python
-constraints = {
-    "required_pi_bonds": [(1, 2), (3, 4), (5, 6)],
-}
-```
+## Result schema
 
-The currently active constraints are:
+`compute` returns a dictionary. The most important top-level entries are:
 
-| Constraint | Current effect |
+| Key | Meaning |
 | --- | --- |
-| `required_bonds` | Forces available two-center bond candidates for these atom pairs into the primary assignment when slots permit. |
-| `forbidden_bonds` | Excludes two-center bond candidates for these atom pairs. |
-| `required_pi_bonds` | Requires pi candidates for these atom pairs in resonance alternatives, if candidates exist. |
-| `allowed_pi_bonds` | Allows non-sigma pi candidates for these pairs, including through-conjugated or transannular pairs. |
-| `forbidden_pi_bonds` | Excludes pi candidates for these atom pairs. |
+| `nao` | NAO transformation, density matrices, atom-block metadata, and diagnostics. |
+| `npa` | Natural populations, charges, and per-atom summaries. |
+| `mo_nao` | Molecular-orbital composition in the NAO basis. |
+| `nbo_candidates` | Generated `CR`, `LP`, `BD`, `SOMO`, `BD*`, and `RY` candidates. |
+| `primary_assignment` | Selected Lewis/NBO assignment and score diagnostics. |
+| `alternatives` | Lewis/resonance alternatives used for reporting and NRA/NRT fitting. |
+| `donor_acceptor_diagnostics` | Occupied-donor to `BD*`/`RY` acceptor density-coupling diagnostics. |
+| `nra` | Optional NRA/NRT density-fit weights and residuals. |
 
-The remaining constraint fields are reserved hooks for the next scoring/search layer.
+Candidate records include the candidate type, atom indices, electron count, occupation, vector coefficients in the NAO basis, and chemically relevant metadata such as `bond_order`, `bond_kind`, or acceptor parentage.
+
+Primary assignments and alternatives expose the partition used by the resonance analysis:
+
+| Field | Meaning |
+| --- | --- |
+| `nbo_list` | Complete occupied Lewis/NBO list for the structure. |
+| `sigma_nbo_list` | Occupied sigma/core/lone-pair framework. |
+| `pi_nbo_list` | Occupied pi candidates. |
+| `fixed_nbo_list` | Occupied candidates kept fixed during resonance enumeration. |
+| `active_nbo_list` | Occupied candidates in the resonance active space. |
+| `active_pi_nbo_list` | Active pi candidates. |
+| `active_lone_pair_nbo_list` | Active lone-pair donation candidates. |
+| `active_one_electron_nbo_list` | Active one-electron radical candidates. |
+
+The internal representation deliberately uses these mechanical fields rather than named chemical structure classes. Reports use molecule-independent pi-bond signatures such as `pi:1-2,3-4`; these signatures are annotations for display and prior matching, not separate structure types.
+
+## Equations and invariants
+
+The NAO transformation matrix `T` is built to satisfy
+
+```text
+T^T S T = I
+```
+
+where `S` is the AO overlap matrix. The total NAO density is
+
+```text
+D_NAO = T^T S P S T
+```
+
+for AO density matrix `P`. For unrestricted references the spin density is
+
+```text
+D_spin_NAO = D_alpha_NAO - D_beta_NAO
+```
+
+Candidate occupations are evaluated as
+
+```text
+n(c) = c^T D_NAO c
+m(c) = c^T D_spin_NAO c
+```
+
+where `c` is a normalized candidate vector in NAO space. The implementation records diagnostics for orthonormality, density symmetry, trace conservation, electron count, and charge conservation.
+
+## Lewis alternatives and ranking weights
+
+Lewis/resonance alternatives are generated by exact electron-count accounting in the active space. Candidate-only acceptors such as `BD*` and `RY` are not inserted into the occupied Lewis list.
+
+Each alternative has a transparent Lewis score assembled from terms such as bond coverage, formal-charge balance, octet/duet diagnostics, constraint satisfaction, and active-space consistency. The printed alternative `weight` is a score/ranking weight:
+
+```text
+w_score,k = exp(-beta s_k) / sum_j exp(-beta s_j)
+```
+
+where `s_k` is the Lewis score and `beta = options.lewis_weight_beta`. This weight ranks Lewis alternatives; it is not an NRA/NRT density weight and not a VB wavefunction weight.
+
+## NRA/NRT density-fit weights
+
+When `include_nra=True`, the driver fits the SCF density as a convex combination of alternative-structure densities. For closed-shell systems the fit solves
+
+```text
+min_w || d - A w ||^2
+subject to w_k >= 0, sum_k w_k = 1
+```
+
+where `d` is the target NAO density vector and each column of `A` is an alternative density vector in the requested subspace. For open-shell systems with `nra_spin_fit="total_spin"`, the target concatenates total-density and spin-density residuals.
+
+The fitted weights are reported as `results["nra"]["weights"]` and as `structures[k]["nra_weight"]`. These are density-reconstruction weights. They should be interpreted as how strongly each alternative contributes to reconstructing the SCF density within the chosen subspace, not as wavefunction amplitudes.
+
+## Prior-guided NRA/NRT
+
+Priors can guide the density fit without replacing the density target:
+
+```python
+options = NboComputeOptions(
+    include_nra=True,
+    nra_prior_weights={"pi:1-2,3-4": 0.8, "pi:1-4,2-3": 0.2},
+    nra_prior_strength=0.05,
+)
+```
+
+With regularization, the fitted objective becomes
+
+```text
+min_w || d - A w ||^2 + lambda || w - w0 ||^2
+subject to w_k >= 0, sum_k w_k = 1
+```
+
+The prior vector `w0`, regularization strength, and matched structures are reported in `results["nra"]["prior"]`. Each structure may also carry `prior_weight`. Priors are user guidance, not a separate physical population analysis.
+
+## Donor-acceptor diagnostics
+
+The driver generates `BD*` antibonding complements and one-center `RY` acceptor complements as candidate-only objects. Occupied donors are coupled to these acceptors through a density-coupling diagnostic in the NAO basis. The diagnostic is useful for identifying plausible donation channels, but it is not an NBO second-order perturbation energy because the current driver does not use an NBO Fock matrix or energy denominator.
 
 ## Reports
 
-The driver stores the most recent `molecule` and `results`, so reports can be called directly after `compute()`.
+`primary_report(results)` summarizes the selected Lewis/NBO assignment, candidate counts, atom accounting, and donor-acceptor diagnostics.
 
-### NPA report
+`nra_report(results, level="summary")` prints compact NRA/NRT weights, residuals, spin-fit metadata, and prior metadata. `level="full"` includes structure details and active-space content.
 
-```python
-nbo.npa_report(level="summary")
-nbo.npa_report(level="standard")
-nbo.npa_report(level="full")
-```
+## Scope notes
 
-Report levels:
-
-| Level | Meaning |
-| --- | --- |
-| `none` | Return no text. |
-| `summary` | Natural charges and core/valence/Rydberg populations. |
-| `standard` | Summary plus effective natural electron configurations. |
-| `full` | NAO occupancies plus all standard output. |
-
-### MO-in-NAO report
-
-The MO transformation is
-
-$$
-C^{\mathrm{NAO}} = T^T S C^{\mathrm{AO}}.
-$$
-
-For a normalized canonical MO $\psi_m$,
-
-$$
-\psi_m = \sum_i C^{\mathrm{NAO}}_{im}\,\chi^{\mathrm{NAO}}_i,
-\qquad
-\sum_i |C^{\mathrm{NAO}}_{im}|^2 \approx 1.
-$$
-
-The atom weight for atom $A$ is
-
-$$
-W_{A m} = \sum_{i \in A} |C^{\mathrm{NAO}}_{im}|^2.
-$$
-
-Use:
-
-```python
-nbo.mo_report(level="occupied")
-nbo.mo_report(level="all")
-```
-
-### NBO report
-
-```python
-nbo.nbo_report(level="summary")
-nbo.nbo_report(level="full")
-```
-
-The report order is deterministic:
-
-$$
-\mathrm{CR} \rightarrow \mathrm{BD}(\sigma) \rightarrow \mathrm{BD}(\pi)
-\rightarrow \mathrm{LP} \rightarrow \mathrm{RY} \rightarrow \mathrm{BD^*}/\mathrm{other}.
-$$
-
-### NRA/NRT density-fit data
-
-The first NRA/NRT implementation is exposed as structured data in `results["nra"]`, not as a formatted public report yet. Use `include_nra=True` and inspect the returned dictionary directly:
-
-```python
-nra = results["nra"]
-print(nra["weights"])
-print(nra["residual_norm"], nra["relative_residual"])
-for structure in nra["structures"]:
-    print(structure["nra_weight"], structure["score_weight"], structure["pi_bonds"])
-```
-
-The next reporting step is to add `nbo.nra_report(level="summary")` and `nbo.nra_report(level="full")`.
-
-## Example notebook cell: H2C=O
-
-This is a complete notebook-style Python cell for a restricted HF/STO-3G calculation followed by NBO analysis.
-
-```python
-import veloxchem as vlx
-
-h2co_xyz = """
-C   0.0000000000   0.0000000000   0.0000000000
-O   0.0000000000   0.0000000000   1.2167228600
-H   1.0639020000   0.0000000000  -0.2816590000
-H  -1.0639020000   0.0000000000  -0.2816590000
-"""
-
-molecule = vlx.Molecule.read_str(h2co_xyz)
-basis = vlx.MolecularBasis.read(molecule, "sto-3g")
-
-scf = vlx.ScfRestrictedDriver()
-scf.xcfun_label = "hf"
-scf_results = scf.compute(molecule, basis)
-
-nbo = vlx.NboDriver()
-nbo.verbose = False
-results = nbo.compute(
-    molecule,
-    basis,
-    scf.mol_orbs,
-    options={
-        "include_diagnostics": True,
-        "include_mo_analysis": True,
-        "include_nbo_candidates": True,
-        "include_lewis_assignment": True,
-    },
-)
-
-print(nbo.npa_report(level="full", return_text=True))
-print(nbo.mo_report(level="occupied", return_text=True))
-print(nbo.nbo_report(level="full", return_text=True))
-
-print("Electron count:", results["diagnostics"]["electron_count"])
-print("NAO orthonormality error:", results["diagnostics"]["orthonormality_error"])
-```
-
-## Example notebook cell: constrained benzene pi structures
-
-This example allows classical Kekulé and Dewar pi patterns.  The non-ring para pairs are included through `allowed_pi_bonds`; without this, non-sigma transannular pi candidates are not selected automatically.
-
-```python
-import veloxchem as vlx
-
-benzene_xyz = """
-C   1.396792   0.000000   0.000000
-C   0.698396   1.209951   0.000000
-C  -0.698396   1.209951   0.000000
-C  -1.396792   0.000000   0.000000
-C  -0.698396  -1.209951   0.000000
-C   0.698396  -1.209951   0.000000
-H   2.490290   0.000000   0.000000
-H   1.245145   2.156660   0.000000
-H  -1.245145   2.156660   0.000000
-H  -2.490290   0.000000   0.000000
-H  -1.245145  -2.156660   0.000000
-H   1.245145  -2.156660   0.000000
-"""
-
-mol = vlx.Molecule.read_str(benzene_xyz)
-bas = vlx.MolecularBasis.read(mol, "sto-3g")
-
-scf = vlx.ScfRestrictedDriver()
-scf.xcfun_label = "hf"
-_ = scf.compute(mol, bas)
-
-ring_pi_bonds = [(1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 1)]
-dewar_para_pi_bonds = [(1, 4), (2, 5), (3, 6)]
-
-nbo = vlx.NboDriver()
-nbo.verbose = False
-res = nbo.compute(
-    mol,
-    bas,
-    scf.mol_orbs,
-    constraints={"allowed_pi_bonds": ring_pi_bonds + dewar_para_pi_bonds},
-    options={
-        "max_alternatives": 24,
-        "pi_min_occupation": 0.05,
-        "conjugated_pi_max_path": 2,
-    },
-)
-
-for alt in res["alternatives"]:
-    pi_text = ", ".join(f"{i}-{j}" for i, j in alt["pi_bonds"])
-    print(
-        f"rank={alt['rank']:2d} "
-        f"score_weight={100.0 * alt['weight']:7.2f}% "
-        f"score={alt['score']:10.5f} "
-        f"pi={pi_text}"
-    )
-```
-
-## Example notebook cell: first NRA/NRT density-fit check
-
-This example uses the same benzene pi-structure pool but requests NRA/NRT density-fit weights in the pi subspace. The resulting `nra_weight` values are density-fit weights; `score_weight` remains the existing Lewis-ranking weight.
-
-```python
-import numpy as np
-import veloxchem as vlx
-
-# Reuse the benzene geometry, basis, SCF result, and pi-bond lists from the previous example.
-nbo = vlx.NboDriver()
-nbo.verbose = False
-res = nbo.compute(
-    mol,
-    bas,
-    scf.mol_orbs,
-    constraints={"allowed_pi_bonds": ring_pi_bonds + dewar_para_pi_bonds},
-    options={
-        "include_nra": True,
-        "nra_subspace": "pi",
-        "nra_fit_metric": "frobenius",
-        "max_alternatives": 24,
-        "pi_min_occupation": 0.05,
-        "conjugated_pi_max_path": 2,
-    },
-)
-
-nra = res["nra"]
-weights = np.array(nra["weights"])
-
-assert np.all(weights >= -1.0e-12)
-assert abs(float(np.sum(weights)) - 1.0) < 1.0e-10
-assert np.isfinite(nra["residual_norm"])
-assert np.isfinite(nra["relative_residual"])
-
-print(
-    f"subspace={nra['subspace']} metric={nra['fit_metric']} "
-    f"relative_residual={nra['relative_residual']:.6e}"
-)
-
-for structure in nra["structures"]:
-    pi_text = ", ".join(f"{i}-{j}" for i, j in structure["pi_bonds"])
-    print(
-        f"rank={structure['rank']:2d} "
-        f"nra_weight={100.0 * structure['nra_weight']:7.3f}% "
-        f"score_weight={100.0 * structure['score_weight']:7.3f}% "
-        f"pi={pi_text}"
-    )
-```
-
-## Interpreting current resonance score weights
-
-The current alternatives are first-pass Lewis-like alternatives, not Natural Resonance Analysis weights and not full VB state mixing.  If an alternative has score $s_k$, its printed score/ranking weight is the softmax model
-
-$$
-w_k = \frac{e^{\beta(s_k-s_{\max})}}{\sum_l e^{\beta(s_l-s_{\max})}}.
-$$
-
-This is useful for development and ranking, but it should be described as a heuristic score/ranking weight, not as a physical NRA or VB weight.
-
-## Common diagnostics
-
-Useful checks are:
-
-```python
-diag = results["diagnostics"]
-print(diag["electron_count"])
-print(diag["orthonormality_error"])
-print(diag["mo_nao_max_normalization_error"])
-print(diag["nbo_candidate_counts"])
-print(diag["primary_nbo_counts"])
-print(diag["constraint_summary"])
-
-if "nra" in results:
-    print(results["nra"]["residual_norm"])
-    print(results["nra"]["relative_residual"])
-```
-
-Expected identities are:
-
-$$
-\mathrm{Tr}(D^{\mathrm{NAO}}) \approx N_e,
-\qquad
-\|T^T S T - I\|_F \ll 1,
-\qquad
-\sum_A q_A = Q_{\mathrm{molecule}}.
-$$
+The current implementation is a complete structured NBO/NRA/NRT analysis layer for the documented API. Scientific quantities with mature NBO-specific definitions remain clearly separated from diagnostics: donor-acceptor couplings are density diagnostics, NRA/NRT weights are density-fit weights, and VB/wavefunction weights are not implemented.
