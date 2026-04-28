@@ -36,6 +36,8 @@ import sys
 import numpy as np
 import csv
 import re
+
+from .veloxchemlib import mpi_master, bohr_in_angstrom
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
@@ -45,7 +47,8 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .lreigensolver import LinearResponseEigenSolver
 from .cppsolver import ComplexResponseSolver
 from .spectrumaverager import SpectrumAverager
-from .veloxchemlib import (mpi_master, bohr_in_angstrom)
+from .environment import get_data_path
+
 
 class EnsembleDriver:
     """
@@ -106,7 +109,7 @@ class EnsembleDriver:
         self.size = self.comm.Get_size()
         self.ostream = ostream
 
-        db_dir = Path(__file__).resolve().parent / "database" / "environment_parameters"
+        db_dir = get_data_path() / "environment_parameters"
 
         sep_parameters_file = db_dir / "pe_sep.csv"
         cp3_parameters_file = db_dir / "pe_cp3.csv"

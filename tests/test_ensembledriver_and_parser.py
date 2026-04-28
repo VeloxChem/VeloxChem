@@ -1,29 +1,18 @@
 from pathlib import Path
 import pytest
 import numpy as np
-import sys
 
-try:
-    import MDAnalysis
-except ImportError:
-    mdanalysis_available = False
-else:
-    mdanalysis_available = True
+from veloxchem.veloxchemlib import mpi_master
+from veloxchem.ensembleparser import EnsembleParser
+from veloxchem.ensembledriver import EnsembleDriver
 
-try:
-    import pyframe
-except ImportError:
-    pass
-
-if mdanalysis_available:
-    import veloxchem as vlx
+pytest.importorskip("MDAnalysis")
+pytest.importorskip("pyframe")
 
 
 @pytest.mark.solvers
-@pytest.mark.skipif(not mdanalysis_available, reason="MDAnalysis not available")
 class TestEnsembleDriverOptions:
 
-    @pytest.mark.skipif("pyframe" not in sys.modules, reason="pyframe not available")
     def test_compute_with_scf_and_property_options(self, tmp_path):
         """
         Regression test for notebook-style ensemble API:
@@ -37,7 +26,7 @@ class TestEnsembleDriverOptions:
         traj = str(data_dir / "alpha-helix-acetone-water.xtc")
         top = str(data_dir / "alpha-helix-acetone-water.tpr")
 
-        ens_parser = vlx.EnsembleParser()
+        ens_parser = EnsembleParser()
         ensemble = ens_parser.structures(
             trajectory_file=traj,
             topology_file=top,
@@ -47,7 +36,7 @@ class TestEnsembleDriverOptions:
             npe_cutoff=5.0,
         )
 
-        ens_drv = vlx.EnsembleDriver()
+        ens_drv = EnsembleDriver()
         ens_drv.set_env_models(
             pe_model=["CP3", "SEP"],
             npe_model=["ff19sb", "tip3p"],
@@ -67,7 +56,7 @@ class TestEnsembleDriverOptions:
             "nto": True,
         }
 
-        potdir = tmp_path / "pot_frames"
+        potdir = data_dir
         results = ens_drv.compute(
             ensemble,
             basis_set="6-31G",
@@ -97,62 +86,72 @@ class TestEnsembleDriverOptions:
         got_frames = [int(frame) for frame, _ in results["scf_all"]]
         assert got_frames == ref_frames
 
-        got_scf = np.array([float(scf_res["scf_energy"]) for _, scf_res in results["scf_all"]])
-        np.testing.assert_allclose(got_scf, ref_scf, rtol=0.0, atol=2.0e-6)
+        if ens_drv.rank == mpi_master():
+            got_scf = np.array([float(scf_res["scf_energy"]) for _, scf_res in results["scf_all"]])
+            np.testing.assert_allclose(got_scf, ref_scf, rtol=0.0, atol=2.0e-6)
 
-        for frame, scf_res in results["scf_all"]:
-            expected_name = f"pe_frame_{int(frame):06d}.pot"
-            expected_path = potdir / expected_name
+            for frame, scf_res in results["scf_all"]:
+                expected_name = f"pe_frame_{int(frame):06d}.pot"
+                expected_path = potdir / expected_name
 
-            # Each snapshot must use its own PE file
-            assert expected_path.is_file()
-            assert str(scf_res.get("potfile", "")).endswith(expected_name)
+                # Each snapshot must use its own PE file
+                assert expected_path.is_file()
+                assert str(scf_res.get("potfile", "")).endswith(expected_name)
 
-            # Reference .pot regression for mixed PE+NPE writer stability
-            reference_name = f"ensemble_alphahelix_reference_{expected_name}"
-            reference_path = data_dir / reference_name
-            assert reference_path.is_file(), f"Missing reference file: {reference_path}"
+                # Reference .pot regression for mixed PE+NPE writer stability
+                reference_name = f"ensemble_alphahelix_reference_{expected_name}"
+                reference_path = data_dir / reference_name
+                assert reference_path.is_file(), f"Missing reference file: {reference_path}"
 
-            generated_lines = expected_path.read_text().splitlines()
-            reference_lines = reference_path.read_text().splitlines()
-            assert generated_lines == reference_lines, (
-                f"PE+NPE pot mismatch for frame {frame}: {expected_name}"
-            )
+                generated_lines = expected_path.read_text().splitlines()
+                reference_lines = reference_path.read_text().splitlines()
+                assert generated_lines == reference_lines, (
+                    f"PE+NPE pot mismatch for frame {frame}: {expected_name}"
+                )
 
-        for frame, rsp_res in results["rsp_all"]:
-            frame = int(frame)
-            eig = np.array(rsp_res.get("eigenvalues", []), dtype=float)
-            assert int(rsp_res.get("number_of_states", 0)) == 10
-            assert eig.shape == (10,)
-            np.testing.assert_allclose(
-                eig,
-                ref_eigs[frame],
-                rtol=0.0,
-                atol=2.0e-5,
-            )
-        
-        # Ensemble-averaged spectra output
-        pytest.importorskip("matplotlib")
-        import matplotlib.pyplot as plt
+            for frame, rsp_res in results["rsp_all"]:
+                frame = int(frame)
+                eig = np.array(rsp_res.get("eigenvalues", []), dtype=float)
+                assert int(rsp_res.get("number_of_states", 0)) == 10
+                assert eig.shape == (10,)
+                np.testing.assert_allclose(
+                    eig,
+                    ref_eigs[frame],
+                    rtol=0.0,
+                    atol=2.0e-5,
+                )
 
-        generated_csv = tmp_path / "averaged_spectra.csv"
-        ax = ens_drv.plot_uv_vis_spectra(
-            results,
-            show_individual=True,
-            xlim_nm=(100, 200),
-            save_averaged_spectra=True,
-            averaged_spectra_filename=generated_csv,
-        )
+            # cleanup
+            (data_dir / ".alpha-helix-acetone-water.xtc_offsets.npz").unlink(missing_ok=True)
+            (data_dir / "pe_frame_000000.pot").unlink(missing_ok=True)
+            (data_dir / "pe_frame_000000.json").unlink(missing_ok=True)
+            (data_dir / "pe_frame_000100.pot").unlink(missing_ok=True)
+            (data_dir / "pe_frame_000100.json").unlink(missing_ok=True)
 
-        assert ax is not None
-        assert generated_csv.is_file()
+            # Ensemble-averaged spectra output
+            try:
+                import matplotlib.pyplot as plt
 
-        ref_csv = data_dir / "averaged_spectra.csv"
-        assert ref_csv.is_file(), f"Missing reference CSV: {ref_csv}"
+                generated_csv = tmp_path / "averaged_spectra.csv"
+                ax = ens_drv.plot_uv_vis_spectra(
+                    results,
+                    show_individual=True,
+                    xlim_nm=(100, 200),
+                    save_averaged_spectra=True,
+                    averaged_spectra_filename=generated_csv,
+                )
 
-        got = np.loadtxt(generated_csv, delimiter=",", skiprows=1)
-        ref = np.loadtxt(ref_csv, delimiter=",", skiprows=1)
-        assert got.shape == ref.shape
-        np.testing.assert_allclose(got, ref, rtol=0.0, atol=1.0e-6)
+                assert ax is not None
+                assert generated_csv.is_file()
 
-        plt.close(ax.figure)
+                ref_csv = data_dir / "averaged_spectra.csv"
+                assert ref_csv.is_file(), f"Missing reference CSV: {ref_csv}"
+
+                got = np.loadtxt(generated_csv, delimiter=",", skiprows=1)
+                ref = np.loadtxt(ref_csv, delimiter=",", skiprows=1)
+                assert got.shape == ref.shape
+                np.testing.assert_allclose(got, ref, rtol=0.0, atol=1.0e-6)
+
+                plt.close(ax.figure)
+            except ImportError:
+                pass
