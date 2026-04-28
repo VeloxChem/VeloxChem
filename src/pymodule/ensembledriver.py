@@ -1036,20 +1036,20 @@ class EnsembleDriver:
         """
         Build SCF driver from scf_options['scf_type'].
         Allowed values:
-            - 'scf'   : ScfRestrictedDriver
-            - 'roscf' : ScfRestrictedOpenDriver
-            - 'uscf'  : ScfUnrestrictedDriver
+            - 'restricted'           : ScfRestrictedDriver
+            - 'unrestricted'         : ScfUnrestrictedDriver
+            - 'restricted_openshell' : ScfRestrictedOpenDriver
         """
-        scf_type = str(scf_options.get("scf_type", "scf")).lower()
-        if scf_type == "scf":
+        scf_type = str(scf_options.get("scf_type", "restricted")).lower()
+        if scf_type == "restricted":
             return ScfRestrictedDriver()
-        if scf_type == "roscf":
-            return ScfRestrictedOpenDriver()
-        if scf_type == "uscf":
+        if scf_type == "unrestricted":
             return ScfUnrestrictedDriver()
+        if scf_type == "restricted_openshell":
+            return ScfRestrictedOpenDriver()
         raise ValueError(
             "Invalid scf_type in scf_options. "
-            "Expected one of: 'scf', 'roscf', 'uscf'."
+            "Expected one of: 'restricted', 'unrestricted', 'restricted_openshell'."
         )
 
     @staticmethod
@@ -1117,7 +1117,8 @@ class EnsembleDriver:
             Basis set.
         :param scf_options: (dict)
             SCF/method options merged in one dictionary.
-            Includes optional key 'scf_type' in {'scf', 'roscf', 'uscf'} to select the SCF driver.
+            Includes optional key 'scf_type' in {'restricted', 'unrestricted', 'restricted_openshell'}
+            to select the SCF driver.
         :param property_options: (dict)
             Property options dictionary with keys:
             'property' ('absorption' or 'ecd') + ('nstates' or 'frequencies').
@@ -1190,11 +1191,11 @@ class EnsembleDriver:
 
         # Guard against open-shell response requests for now:
         if do_rsp:
-            scf_type = str(scf_options.get("scf_type", "scf")).lower()
-            if scf_type in {"roscf", "uscf"}:
+            scf_type = str(scf_options.get("scf_type", "restricted")).lower()
+            if scf_type != "restricted":
                 raise NotImplementedError(
                     "Open-shell response is not yet supported in EnsembleDriver.compute. "
-                    "Use scf_type='scf' for response calculations."
+                    "Use scf_type='restricted' for response calculations."
                 )
 
         scf_all = []

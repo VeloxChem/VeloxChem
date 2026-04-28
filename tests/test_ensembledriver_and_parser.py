@@ -43,7 +43,7 @@ class TestEnsembleDriverOptions:
         )
 
         scf_options = {
-            "scf_type": "scf",
+            "scf_type": "restricted",
             "conv_thresh": 1.0e-7,
             "max_iter": 150,
             "xcfun": "CAM-B3LYP",
