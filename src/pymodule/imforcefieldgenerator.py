@@ -43,6 +43,8 @@ from contextlib import redirect_stderr
 from io import StringIO
 from copy import deepcopy
 import json
+from contextlib import contextmanager
+from os import environ
 
 
 from .xtbdriver import XtbDriver
@@ -112,6 +114,41 @@ with redirect_stderr(StringIO()) as fg_err:
 #                 raise RuntimeError(f"{phase_name} failed on another rank")
 #             comm.barrier()
 #             return result
+@contextmanager
+def scoped_omp_num_threads(nthreads):
+    if nthreads is None:
+        yield
+        return
+
+    nthreads = int(nthreads)
+    if nthreads < 1:
+        raise ValueError("OpenMP thread count must be >= 1")
+
+    old_env = environ.get("OMP_NUM_THREADS")
+    old_runtime = None
+    set_runtime_threads = None
+
+    # try:
+    #     from .veloxchemlib import get_number_of_threads, set_number_of_threads
+    #     old_runtime = int(get_number_of_threads())
+    #     set_runtime_threads = set_number_of_threads
+    # except Exception:
+    #     pass
+
+    environ["OMP_NUM_THREADS"] = str(nthreads)
+    if set_runtime_threads is not None:
+        set_runtime_threads(nthreads)
+    print("Setting_trhead", nthreads)
+    try:
+        yield
+    finally:
+        if old_env is None:
+            environ.pop("OMP_NUM_THREADS", None)
+        else:
+            environ["OMP_NUM_THREADS"] = old_env
+
+        if set_runtime_threads is not None and old_runtime is not None:
+            set_runtime_threads(old_runtime)
 
 class IMForceFieldGenerator:
     """
@@ -408,6 +445,13 @@ class IMForceFieldGenerator:
 
         self.profile_runtime_timing = False
         self.profile_interpolation_timing = False
+
+        self.qm_omp_threads = {
+                                "energy": None,
+                                "response": None,
+                                "gradient": None,
+                                "hessian": None,
+                            }
 
         # self.use_local_preload = False
         # self.local_preload_workers = 2
@@ -1052,8 +1096,8 @@ class IMForceFieldGenerator:
 
             rotatable_bonds = deepcopy(ff_gen.rotatable_bonds)
             org_rotatable_bonds = deepcopy(ff_gen.rotatable_bonds)
-
-
+            
+            
             # Work in zero-based indexing (same convention as z-matrix dihedrals)
             # and remove all symmetry-related rotatable bonds from the scan list.
             rotatable_bonds_zero_based = [tuple(sorted((i - 1, j - 1))) for (i, j) in rotatable_bonds]
@@ -1129,7 +1173,7 @@ class IMForceFieldGenerator:
                 self.symmetry_information[new_key][3] = new_inclusion[new_key]
 
         self.symmetry_rotors = self._build_rotor_defintions(self.roots_z_matrix[root], dih_list, dihedral_start)
-
+        
         if self.reaction_structures is not None:
             self.seed_structures = self.build_initial_seed_structures(
                                     molecule=molecule,
@@ -1226,6 +1270,8 @@ class IMForceFieldGenerator:
                     )
                     for target_deg, mode in schedule:
                         mol_i = Molecule.from_xyz_string(seed_molecule.get_xyz_string())
+                        mol_i.set_charge(molecule.get_charge())
+                        mol_i.set_multiplicity(molecule.get_multiplicity())
                         mol_i.set_dihedral_in_degrees(dih_key, target_deg, verbose=False)
                         actual = float(mol_i.get_dihedral_in_degrees(dih_key)) % 360.0
                         if _circ_err_deg(actual, target_deg) > 2.0:
@@ -1854,6 +1900,8 @@ class IMForceFieldGenerator:
             im_database_driver.symmetry_rotors = self.symmetry_rotors
             im_database_driver.rotor_corr_threshold = self.rotor_corr_threshold
             im_database_driver.use_opt_confidence_radius = self.use_opt_confidence_radius
+
+            im_database_driver.qm_omp_threads = self.qm_omp_threads
             
             
             im_database_driver.system_from_molecule(dynamics_molecule, self.roots_z_matrix, forcefield_generator, solvent=self.solvent, qm_atoms='all')  
@@ -3606,7 +3654,7 @@ class IMForceFieldGenerator:
                             coupling_map[b.rotor_id, a.rotor_id] = rotor_coupling
 
                     clusters = build_rotor_clusters(self.symmetry_rotors, coupling_map, self.rotor_corr_threshold)
-
+                    print(clusters)
                     rotor_to_cluster_inf[state_key] = build_rotor_cluster_information(
                         self.symmetry_rotors,
                         clusters,
@@ -3623,6 +3671,7 @@ class IMForceFieldGenerator:
                     
 
                     for job in cluster_jobs:
+
                         if job['is_anchor']:
                             continue
          
@@ -3633,6 +3682,11 @@ class IMForceFieldGenerator:
                         constraints = []
                         for dihedral in job["dihedrals_to_rotate"]:
                             angle = job["angle_assignment"].get(dihedral)
+                            if dihedral[0] > dihedral[3]:
+                                dihedral = dihedral[::-1]
+
+                            print("herte is the dihedral", dihedral)
+                            
                             cur_molecule.set_dihedral(
                                 [
                                     dihedral[0] + 1,
@@ -3640,7 +3694,14 @@ class IMForceFieldGenerator:
                                     dihedral[2] + 1,
                                     dihedral[3] + 1,
                                 ],
-                                angle,
+                                cur_molecule.get_dihedral(
+                                    (
+                                        dihedral[0] + 1,
+                                        dihedral[1] + 1,
+                                        dihedral[2] + 1,
+                                        dihedral[3] + 1,
+                                    ), "radian"
+                                    ) + angle,
                                 "radian",
                             )
                             current_angles_setting.append(angle)
@@ -3649,7 +3710,7 @@ class IMForceFieldGenerator:
                         current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
 
                         if not mol_basis[7]:
-                            if isinstance(drivers[0], ScfRestrictedDriver):
+                            if isinstance(drivers[0], ScfRestrictedDriver) or isinstance(drivers[0], ScfUnrestrictedDriver):
 
                                 energies, scf_results, rsp_results = self._compute_energy(drivers[0], cur_molecule, current_basis)
                             #     _, scf_results, _ = self._compute_energy_mpi_safe(
@@ -3983,7 +4044,7 @@ class IMForceFieldGenerator:
                     opt_results = None
                     scf_results = None
                     if transition_state:
-                        if isinstance(self.drivers['gs'][0], ScfRestrictedDriver):
+                        if isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver):
                             _, scf_results, _ = self._compute_energy(self.drivers['gs'][0], cur_molecule, current_basis)
                             # _, scf_results, _ = self._compute_energy_mpi_safe(
                             #     self.drivers['gs'][0],
@@ -4407,42 +4468,40 @@ class IMForceFieldGenerator:
 
         # XTB
         if isinstance(qm_driver, XtbDriver):
-            
-            qm_driver.ostream.mute()
-            qm_driver.compute(molecule)
-            qm_energy_local = qm_driver.get_energy()
-            if hasattr(qm_driver, 'comm') and qm_driver.comm is not None:
-                qm_energy = qm_driver.comm.bcast(
-                    qm_energy_local if qm_driver.comm.Get_rank() == mpi_master() else None,
-                    root=mpi_master(),
-                )
-            else:
-                qm_energy = qm_energy_local
-
+            with scoped_omp_num_threads(self.qm_omp_threads['energy']):
+                qm_driver.ostream.mute()
+                try:
+                    qm_driver.compute(molecule)
+                    qm_energy = qm_driver.get_energy()
+                finally:
+                    qm_driver.ostream.unmute()
             if qm_energy is None:
                 raise RuntimeError('XTB energy is None on this rank after MPI synchronization.')
             qm_energy = np.array([qm_energy])
 
         # restricted SCF
-        elif isinstance(qm_driver, ScfRestrictedDriver):
-            qm_driver.ostream.mute()
-            scf_results = qm_driver.compute(molecule, basis)
-            qm_energy = np.array([qm_driver.scf_energy])
-            qm_driver.ostream.unmute()
-            qm_driver.filename = None
-            qm_driver.checkpoint_file = None
+        elif isinstance(qm_driver, ScfRestrictedDriver) or isinstance(qm_driver, ScfUnrestrictedDriver):
+            with scoped_omp_num_threads(self.qm_omp_threads['energy']):
+                qm_driver.ostream.mute()
+                try:
+                    scf_results = qm_driver.compute(molecule, basis)
+                    qm_energy = np.array([qm_driver.scf_energy])
+                finally:
+                    qm_driver.ostream.unmute()
+                    qm_driver.filename = None
+                    qm_driver.checkpoint_file = None
 
             print('qm_energy in SCF driver', qm_energy)
         
-        elif isinstance(qm_driver, ScfUnrestrictedDriver):
-            qm_driver.ostream.mute()
-            scf_results = qm_driver.compute(molecule, basis)
-            qm_energy = np.array([qm_driver.scf_energy])
-            qm_driver.ostream.unmute()
-            qm_driver.filename = None
-            qm_driver.checkpoint_file = None
+        # elif isinstance(qm_driver, ScfUnrestrictedDriver):
+        #     qm_driver.ostream.mute()
+        #     scf_results = qm_driver.compute(molecule, basis)
+        #     qm_energy = np.array([qm_driver.scf_energy])
+        #     qm_driver.ostream.unmute()
+        #     qm_driver.filename = None
+        #     qm_driver.checkpoint_file = None
 
-            print('qm_energy in SCF driver', qm_energy)
+        #     print('qm_energy in SCF driver', qm_energy)
 
         elif isinstance(qm_driver, LinearResponseEigenSolver) or isinstance(qm_driver, TdaEigenSolver):
             self.drivers['es'][0].ostream.mute()
@@ -4479,18 +4538,24 @@ class IMForceFieldGenerator:
         qm_gradient = None
 
         if isinstance(grad_driver, XtbGradientDriver):
-            grad_driver.ostream.mute()
-            grad_driver.compute(molecule)
-            grad_driver.ostream.unmute()
-            qm_gradient = grad_driver.gradient
-            qm_gradient = np.array([qm_gradient])
+            with scoped_omp_num_threads(self.qm_omp_threads['gradient']):
+                grad_driver.ostream.mute()
+                try:
+                    grad_driver.compute(molecule)
+                    qm_gradient = grad_driver.gradient
+                    qm_gradient = np.array([qm_gradient])
+                finally:
+                    grad_driver.ostream.unmute()
 
         elif isinstance(grad_driver, ScfGradientDriver):
-            grad_driver.ostream.mute()
-            grad_driver.compute(molecule, basis, scf_results)
-            qm_gradient = grad_driver.gradient
-            qm_gradient = np.array([qm_gradient])
-            grad_driver.ostream.unmute()
+            with scoped_omp_num_threads(self.qm_omp_threads['gradient']):
+                grad_driver.ostream.mute()
+                try:
+                    grad_driver.compute(molecule, basis, scf_results)
+                    qm_gradient = grad_driver.gradient
+                    qm_gradient = np.array([qm_gradient])
+                finally:
+                    grad_driver.ostream.unmute()
         
         elif isinstance(grad_driver, TddftGradientDriver):
             grad_driver.ostream.mute()
@@ -4521,28 +4586,27 @@ class IMForceFieldGenerator:
         qm_hessians = None
 
         if isinstance(hess_driver, XtbHessianDriver):
-            hess_driver.ostream.mute()
-            hess_driver.compute(molecule)
-            qm_hessian_local = hess_driver.hessian
-            if hasattr(hess_driver, 'comm') and hess_driver.comm is not None:
-                qm_hessian = hess_driver.comm.bcast(
-                    qm_hessian_local if hess_driver.comm.Get_rank() == mpi_master() else None,
-                    root=mpi_master(),
-                )
-            else:
-                qm_hessian = qm_hessian_local
-            hess_driver.ostream.unmute()
+            with scoped_omp_num_threads(self.qm_omp_threads['hessian']):
+                hess_driver.ostream.mute()
+                try:
+                    hess_driver.compute(molecule)
+                    qm_hessian = hess_driver.hessian
+                finally:
+                    hess_driver.ostream.unmute()
 
             if qm_hessian is None:
                 raise RuntimeError('XTB Hessian is None on this rank after MPI synchronization.')
             qm_hessians = np.array([qm_hessian])
 
         elif isinstance(hess_driver, ScfHessianDriver):
-            hess_driver.ostream.mute()
-            hess_driver.compute(molecule, basis)
-            qm_hessian = hess_driver.hessian
-            qm_hessians = np.array([qm_hessian])
-            hess_driver.ostream.unmute()
+            with scoped_omp_num_threads(self.qm_omp_threads['hessian']):
+                hess_driver.ostream.mute()
+                try:
+                    hess_driver.compute(molecule, basis)
+                    qm_hessian = hess_driver.hessian
+                    qm_hessians = np.array([qm_hessian])
+                finally:
+                    hess_driver.ostream.unmute()
 
         elif isinstance(hess_driver, TddftHessianDriver):
             roots = self.drivers['es'][1].state_deriv_index

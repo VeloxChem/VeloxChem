@@ -50,6 +50,8 @@ import json
 import itertools
 import re
 import os, copy, math
+from os import environ
+from contextlib import contextmanager
 
 from pathlib import Path
 from sys import stdout
@@ -60,6 +62,7 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from contextlib import redirect_stderr, contextmanager
 from io import StringIO
+
 
 from typing import Callable, Optional, Dict, Any, List
 from copy import deepcopy
@@ -111,38 +114,73 @@ try:
 except ImportError:
     pass
 
-def _rank_root_print(*args, **kwargs):
-    """
-    Print only on MPI root rank to avoid delayed/duplicated worker stdout noise.
-    Falls back to normal print when MPI rank detection is unavailable.
-    """
+# def _rank_root_print(*args, **kwargs):
+#     """
+#     Print only on MPI root rank to avoid delayed/duplicated worker stdout noise.
+#     Falls back to normal print when MPI rank detection is unavailable.
+#     """
+#     try:
+#         if MPI.COMM_WORLD.Get_rank() == mpi_master():
+#             builtins.print(*args, **kwargs)
+#     except Exception:
+#         builtins.print(*args, **kwargs)
+
+
+# print = _rank_root_print
+
+# def _collective_call_inline_style(comm, rank, root, phase_name, fn, *args, **kwargs):
+#     comm.barrier()
+#     local_err = None
+#     result = None
+#     try:
+#         result = fn(*args, **kwargs)
+#     except Exception as exc:
+#         local_err = f"rank {rank}: {exc}"
+
+#     errs = [e for e in comm.allgather(local_err) if e is not None]
+#     if errs:
+#         if rank == root:
+#             raise RuntimeError(f"{phase_name} failed\n" + "\n".join(errs))
+#         raise RuntimeError(f"{phase_name} failed on another rank")
+
+#     comm.barrier()
+#     return result
+
+@contextmanager
+def scoped_omp_num_threads(nthreads):
+    if nthreads is None:
+        yield
+        return
+
+    nthreads = int(nthreads)
+    if nthreads < 1:
+        raise ValueError("OpenMP thread count must be >= 1")
+
+    old_env = environ.get("OMP_NUM_THREADS")
+    old_runtime = None
+    set_runtime_threads = None
+
+    # try:
+    #     from .veloxchemlib import get_number_of_threads, set_number_of_threads
+    #     old_runtime = int(get_number_of_threads())
+    #     set_runtime_threads = set_number_of_threads
+    # except Exception:
+    #     pass
+
+    environ["OMP_NUM_THREADS"] = str(nthreads)
+    if set_runtime_threads is not None:
+        set_runtime_threads(nthreads)
+    print("Setting_trhead", nthreads)
     try:
-        if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            builtins.print(*args, **kwargs)
-    except Exception:
-        builtins.print(*args, **kwargs)
+        yield
+    finally:
+        if old_env is None:
+            environ.pop("OMP_NUM_THREADS", None)
+        else:
+            environ["OMP_NUM_THREADS"] = old_env
 
-
-print = _rank_root_print
-
-def _collective_call_inline_style(comm, rank, root, phase_name, fn, *args, **kwargs):
-    comm.barrier()
-    local_err = None
-    result = None
-    try:
-        result = fn(*args, **kwargs)
-    except Exception as exc:
-        local_err = f"rank {rank}: {exc}"
-
-    errs = [e for e in comm.allgather(local_err) if e is not None]
-    if errs:
-        if rank == root:
-            raise RuntimeError(f"{phase_name} failed\n" + "\n".join(errs))
-        raise RuntimeError(f"{phase_name} failed on another rank")
-
-    comm.barrier()
-    return result
-
+        if set_runtime_threads is not None and old_runtime is not None:
+            set_runtime_threads(old_runtime)
 
 class IMDatabasePointCollecter:
     """
@@ -437,6 +475,10 @@ class IMDatabasePointCollecter:
         self._collect_step_trace: bool = False
         self._step_trace: List[Dict[str, Any]] = []
         self._strict_test_hooks: bool = False
+
+        self.qm_omp_threads = {
+            "energy": None
+        }
         
 
     def _create_platform(self):
@@ -3856,7 +3898,7 @@ class IMDatabasePointCollecter:
                                    
                     print('Main CONSTRAINTS', main_constraint_list)
                     opt_results = None
-                    if isinstance(drivers[0], ScfRestrictedDriver):
+                    if isinstance(drivers[0], ScfRestrictedDriver) or isinstance(drivers[0], ScfUnrestrictedDriver):
 
                             energies, scf_results, rsp_results = self._compute_energy(drivers[0], molecule, current_basis)
                     
@@ -4593,6 +4635,8 @@ class IMDatabasePointCollecter:
                         # constraints = outside_constraints.copy()
                         for dihedral in job["dihedrals_to_rotate"]:
                             angle = job["angle_assignment"].get(dihedral)
+                            if dihedral[0] > dihedral[3]:
+                                dihedral = dihedral[::-1]
                             cur_molecule.set_dihedral(
                                 [
                                     dihedral[0] + 1,
@@ -4600,7 +4644,14 @@ class IMDatabasePointCollecter:
                                     dihedral[2] + 1,
                                     dihedral[3] + 1,
                                 ],
-                                angle,
+                                cur_molecule.get_dihedral(
+                                    (
+                                        dihedral[0] + 1,
+                                        dihedral[1] + 1,
+                                        dihedral[2] + 1,
+                                        dihedral[3] + 1,
+                                    ), "radian"
+                                    ) + angle,
                                 "radian",
                             )
                             current_angles_setting.append(angle)
@@ -6286,54 +6337,54 @@ class IMDatabasePointCollecter:
 
     #     return optimized_molecule, opt_results
 
-    def _compute_energy_mpi_safe(self, qm_driver, molecule, basis=None, collective=False, phase_name='Energy calcualtion'):
-        if collective:
-            comm = self._mpi_collective_comm()
-            rank = comm.Get_rank()
-            root = mpi_master()
-            return _collective_call_inline_style(
-                comm, rank, root, phase_name, self.compute_energy, qm_driver, molecule, basis
-            )
+    # def _compute_energy_mpi_safe(self, qm_driver, molecule, basis=None, collective=False, phase_name='Energy calcualtion'):
+    #     if collective:
+    #         comm = self._mpi_collective_comm()
+    #         rank = comm.Get_rank()
+    #         root = mpi_master()
+    #         return _collective_call_inline_style(
+    #             comm, rank, root, phase_name, self.compute_energy, qm_driver, molecule, basis
+    #         )
 
-        with self._mpi_root_local_qm_context(extra_objects=[qm_driver]):
-            if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root() and hasattr(qm_driver, "comm"):
-                if qm_driver.comm.Get_size() != 1:
-                    raise RuntimeError("Root-local MPI override failed for QM energy driver (comm size != 1).")
-            return self.compute_energy(qm_driver, molecule, basis)
+    #     with self._mpi_root_local_qm_context(extra_objects=[qm_driver]):
+    #         if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root() and hasattr(qm_driver, "comm"):
+    #             if qm_driver.comm.Get_size() != 1:
+    #                 raise RuntimeError("Root-local MPI override failed for QM energy driver (comm size != 1).")
+    #         return self.compute_energy(qm_driver, molecule, basis)
 
-    def _compute_gradient_mpi_safe(
-        self, grad_driver, molecule, basis=None, scf_results=None, rsp_results=None,
-        collective=False, phase_name='Gradient Calculation'
-    ):
-        if collective:
-            comm = self._mpi_collective_comm()
-            rank = comm.Get_rank()
-            root = mpi_master()
-            return _collective_call_inline_style(
-                comm, rank, root, phase_name,
-                self.compute_gradient, grad_driver, molecule, basis, scf_results, rsp_results
-            )
+    # def _compute_gradient_mpi_safe(
+    #     self, grad_driver, molecule, basis=None, scf_results=None, rsp_results=None,
+    #     collective=False, phase_name='Gradient Calculation'
+    # ):
+    #     if collective:
+    #         comm = self._mpi_collective_comm()
+    #         rank = comm.Get_rank()
+    #         root = mpi_master()
+    #         return _collective_call_inline_style(
+    #             comm, rank, root, phase_name,
+    #             self.compute_gradient, grad_driver, molecule, basis, scf_results, rsp_results
+    #         )
 
-        with self._mpi_root_local_qm_context(extra_objects=[grad_driver]):
-            if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root() and hasattr(grad_driver, "comm"):
-                if grad_driver.comm.Get_size() != 1:
-                    raise RuntimeError("Root-local MPI override failed for QM gradient driver (comm size != 1).")
-            return self.compute_gradient(grad_driver, molecule, basis, scf_results, rsp_results)
+    #     with self._mpi_root_local_qm_context(extra_objects=[grad_driver]):
+    #         if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root() and hasattr(grad_driver, "comm"):
+    #             if grad_driver.comm.Get_size() != 1:
+    #                 raise RuntimeError("Root-local MPI override failed for QM gradient driver (comm size != 1).")
+    #         return self.compute_gradient(grad_driver, molecule, basis, scf_results, rsp_results)
 
-    def _compute_hessian_mpi_safe(self, hess_driver, molecule, basis=None, collective=False, phase_name='hessian calculation'):
-        if collective:
-            comm = self._mpi_collective_comm()
-            rank = comm.Get_rank()
-            root = mpi_master()
-            return _collective_call_inline_style(
-                comm, rank, root, phase_name, self.compute_hessian, hess_driver, molecule, basis
-            )
+    # def _compute_hessian_mpi_safe(self, hess_driver, molecule, basis=None, collective=False, phase_name='hessian calculation'):
+    #     if collective:
+    #         comm = self._mpi_collective_comm()
+    #         rank = comm.Get_rank()
+    #         root = mpi_master()
+    #         return _collective_call_inline_style(
+    #             comm, rank, root, phase_name, self.compute_hessian, hess_driver, molecule, basis
+    #         )
 
-        with self._mpi_root_local_qm_context(extra_objects=[hess_driver]):
-            if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root() and hasattr(hess_driver, "comm"):
-                if hess_driver.comm.Get_size() != 1:
-                    raise RuntimeError("Root-local MPI override failed for QM hessian driver (comm size != 1).")
-            return self.compute_hessian(hess_driver, molecule, basis)
+    #     with self._mpi_root_local_qm_context(extra_objects=[hess_driver]):
+    #         if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root() and hasattr(hess_driver, "comm"):
+    #             if hess_driver.comm.Get_size() != 1:
+    #                 raise RuntimeError("Root-local MPI override failed for QM hessian driver (comm size != 1).")
+    #         return self.compute_hessian(hess_driver, molecule, basis)
     
     def _compute_energy(self, qm_driver, molecule, basis=None):
         """ Computes the QM energy using self.qm_driver.
@@ -6354,39 +6405,30 @@ class IMDatabasePointCollecter:
 
         # XTB
         if isinstance(qm_driver, XtbDriver):
-            qm_driver.ostream.mute()
-            qm_driver.compute(molecule)
-            qm_energy_local = qm_driver.get_energy()
-            if hasattr(qm_driver, 'comm') and qm_driver.comm is not None:
-                qm_energy = qm_driver.comm.bcast(
-                    qm_energy_local if qm_driver.comm.Get_rank() == mpi_master() else None,
-                    root=mpi_master(),
-                )
-            else:
-                qm_energy = qm_energy_local
-
+            with scoped_omp_num_threads(self.qm_omp_threads['energy']):
+                qm_driver.ostream.mute()
+                try:
+                    qm_driver.compute(molecule)
+                    qm_energy = qm_driver.get_energy()
+                finally:
+                    qm_driver.ostream.unmute()
             if qm_energy is None:
                 raise RuntimeError('XTB energy is None on this rank after MPI synchronization.')
             qm_energy = np.array([qm_energy])
 
         # restricted SCF
-        elif isinstance(qm_driver, ScfRestrictedDriver):
-            qm_driver.ostream.mute()
-            scf_results = qm_driver.compute(molecule, basis)
-            qm_energy = qm_driver.scf_energy
-            qm_energy = np.array([qm_energy])
-            qm_driver.ostream.unmute()
-            qm_driver.filename = None
-            qm_driver.checkpoint_file = None
-        
-        elif isinstance(qm_driver, ScfUnrestrictedDriver):
-            qm_driver.ostream.mute()
-            scf_results = qm_driver.compute(molecule, basis)
-            qm_energy = qm_driver.scf_energy
-            qm_energy = np.array([qm_energy])
-            qm_driver.ostream.unmute()
-            qm_driver.filename = None
-            qm_driver.checkpoint_file = None
+        elif isinstance(qm_driver, ScfRestrictedDriver) or isinstance(qm_driver, ScfUnrestrictedDriver):
+            with scoped_omp_num_threads(self.qm_omp_threads['energy']):
+                qm_driver.ostream.mute()
+                try:
+                    scf_results = qm_driver.compute(molecule, basis)
+                    qm_energy = np.array([qm_driver.scf_energy])
+                finally:
+                    qm_driver.ostream.unmute()
+                    qm_driver.filename = None
+                    qm_driver.checkpoint_file = None
+
+            print('qm_energy in SCF driver', qm_energy)
         
         elif isinstance(qm_driver, LinearResponseEigenSolver) or isinstance(qm_driver, TdaEigenSolver):
             self.drivers['es'][0].ostream.mute()
@@ -6421,18 +6463,24 @@ class IMDatabasePointCollecter:
         qm_gradient = None
 
         if isinstance(grad_driver, XtbGradientDriver):
-            grad_driver.ostream.mute()
-            grad_driver.compute(molecule)
-            grad_driver.ostream.unmute()
-            qm_gradient = grad_driver.gradient
-            qm_gradient = np.array([qm_gradient])
+            with scoped_omp_num_threads(self.qm_omp_threads['gradient']):
+                grad_driver.ostream.mute()
+                try:
+                    grad_driver.compute(molecule)
+                    qm_gradient = grad_driver.gradient
+                    qm_gradient = np.array([qm_gradient])
+                finally:
+                    grad_driver.ostream.unmute()
 
         elif isinstance(grad_driver, ScfGradientDriver):
-            grad_driver.ostream.mute()
-            grad_driver.compute(molecule, basis, scf_results)
-            qm_gradient = grad_driver.gradient
-            qm_gradient = np.array([qm_gradient])
-            grad_driver.ostream.unmute()
+            with scoped_omp_num_threads(self.qm_omp_threads['gradient']):
+                grad_driver.ostream.mute()
+                try:
+                    grad_driver.compute(molecule, basis, scf_results)
+                    qm_gradient = grad_driver.gradient
+                    qm_gradient = np.array([qm_gradient])
+                finally:
+                    grad_driver.ostream.unmute()
 
         elif isinstance(grad_driver, TddftGradientDriver):
             grad_driver.ostream.mute()
@@ -6463,28 +6511,27 @@ class IMDatabasePointCollecter:
         qm_hessians = None
 
         if isinstance(hess_driver, XtbHessianDriver):
-            hess_driver.ostream.mute()
-            hess_driver.compute(molecule)
-            qm_hessian_local = hess_driver.hessian
-            if hasattr(hess_driver, 'comm') and hess_driver.comm is not None:
-                qm_hessian = hess_driver.comm.bcast(
-                    qm_hessian_local if hess_driver.comm.Get_rank() == mpi_master() else None,
-                    root=mpi_master(),
-                )
-            else:
-                qm_hessian = qm_hessian_local
-            hess_driver.ostream.unmute()
+            with scoped_omp_num_threads(self.qm_omp_threads['hessian']):
+                hess_driver.ostream.mute()
+                try:
+                    hess_driver.compute(molecule)
+                    qm_hessian = hess_driver.hessian
+                finally:
+                    hess_driver.ostream.unmute()
 
             if qm_hessian is None:
                 raise RuntimeError('XTB Hessian is None on this rank after MPI synchronization.')
             qm_hessians = np.array([qm_hessian])
 
         elif isinstance(hess_driver, ScfHessianDriver):
-            hess_driver.ostream.mute()
-            hess_driver.compute(molecule, basis)
-            qm_hessian = hess_driver.hessian
-            qm_hessians = np.array([qm_hessian])
-            hess_driver.ostream.unmute()
+            with scoped_omp_num_threads(self.qm_omp_threads['hessian']):
+                hess_driver.ostream.mute()
+                try:
+                    hess_driver.compute(molecule, basis)
+                    qm_hessian = hess_driver.hessian
+                    qm_hessians = np.array([qm_hessian])
+                finally:
+                    hess_driver.ostream.unmute()
         
         elif isinstance(hess_driver, TddftHessianDriver):
             roots = self.drivers['es'][1].state_deriv_index
