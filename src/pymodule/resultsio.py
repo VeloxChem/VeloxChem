@@ -432,7 +432,7 @@ def write_rsp_solution_with_multiple_keys(fname,
                 hf[label] = dset
 
 
-def write_lr_rsp_results_to_hdf5(fname, rsp_results):
+def write_lr_rsp_results_to_hdf5(fname, rsp_results, group_label='rsp'):
     """
     Writes the results of a linear response calculation to HDF5 file.
 
@@ -440,10 +440,12 @@ def write_lr_rsp_results_to_hdf5(fname, rsp_results):
         Name of the HDF5 file.
     :param rsp_results:
         The dictionary containing the linear response results.
+    :param group_label:
+        The HDF5 group label.
     """
 
     write_results_to_hdf5(fname,
-                          'rsp',
+                          group_label,
                           rsp_results,
                           value_label='response result',
                           replace_group=False)
