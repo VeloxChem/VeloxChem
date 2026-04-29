@@ -212,44 +212,6 @@ class EnsembleDriver:
         return db
 
     @staticmethod
-    def _load_npe_db(csv_path: Path) -> dict:
-        """
-        Loads NPE-like table:
-            molecule,res_name,atom_name,element,M0
-
-        :param csv_path:
-            Path to the CSV file containing NPE parameters.
-
-        :return:
-            db[res_name][atom_name] = {"element": str, "charge": float}
-        """
-        if not csv_path.is_file():
-            raise FileNotFoundError(f"NPE parameter file not found: {csv_path}")
-
-        db: dict[str, dict[str, dict]] = {}
-
-        with csv_path.open("r", newline="") as fh:
-            reader = csv.DictReader(fh)
-            for row in reader:
-                resn = str(row["res_name"]).strip()
-                atom = str(row["atom_name"]).strip()
-                elem = str(row["element"]).strip()
-                if not resn or not atom or not elem:
-                    continue
-
-                q = float(row["M0"])
-
-                rdb = db.setdefault(resn, {})
-                if atom in rdb:
-                    old = rdb[atom]
-                    if abs(old["charge"] - q) > 1e-12 or old["element"] != elem:
-                        raise ValueError(
-                            f"Inconsistent duplicate entries for {resn}/{atom} in {csv_path}"
-                        )
-                rdb[atom] = {"element": elem, "charge": q}
-        return db
-
-    @staticmethod
     def _build_ff19sb_db(ff19sb_params_path, ff19sb_aliases_path):
         """
         Builds ff19SB parameters.
