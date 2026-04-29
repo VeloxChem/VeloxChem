@@ -189,6 +189,12 @@ class OpenMMDynamics:
 
         # Default value for the C-H linker distance
         self.linking_atom_distance = 1.0705 
+
+        # Default parameters for implicit solvation
+        self.solute_dielectric = 1.0
+        self.solvent_dielectric = 78.39
+        self.implicit_solvent_model = 'gbn'
+
         
     # Loading methods
     # TODO: Integrate the guess with the read_pdb_file in Molecule.
@@ -362,6 +368,21 @@ class OpenMMDynamics:
             msg = f"CustomExternalForce found at index {self.qm_force_index}."
             self.ostream.print_info(msg)
             self.ostream.flush()
+    
+    def show_available_implicit_solvent_models(self):
+
+        if self._rank == mpi_master():
+            implicit_folder_path = Path(
+                mm.__file__).parent / "app" / "data" / "implicit"
+            implicit_solvent_files = [
+                f for f in implicit_folder_path.iterdir()
+                if f.is_file() and f.suffix == ".xml"
+            ]
+            print("Available implicit solvent files:")
+            for f in implicit_solvent_files:
+                print(f.name)
+    
+    
             
     # Method to generate OpenMM system from VeloxChem objects
     def create_system_from_molecule(self, 
@@ -379,9 +400,9 @@ class OpenMMDynamics:
         :param ff_gen:
             VeloxChem forcefield generator object.
         :param solvent:
-            Available options:'gas', 'cspce', 'ctip3p', 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone',
+            Available options: 'gas', 'cspce', 'ctip3p', 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone',
             'chloroform', 'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf', 
-            'acetonitrile', 'other' or 'itself'.
+            'acetonitrile', 'other', 'itself' or 'implicit'.
         :param qm_atoms:
             Options: None, 'all', or list of atom indices for QM region.
         :param filename:
@@ -435,8 +456,20 @@ class OpenMMDynamics:
             self.pdb = app.PDBFile(f'{filename}.pdb')     
             # Common forcefield loading, modified according to phase specifics
             forcefield_files = [f'{filename}.xml']
+        
+        elif solvent == 'implicit':
+            phase = 'implicit'
+            self.pdb = app.PDBFile(f'{filename}.pdb')
+            implicit_fpath = Path(mm.__file__).parent / "app" / "data" / "implicit"
+            implicit_model_fname = str(implicit_fpath /
+                                           f"{self.implicit_solvent_model}.xml")
+            assert_msg_critical(
+                    Path(implicit_model_fname).is_file(),
+                    f"ConformerGenerator: Could not find file {implicit_model_fname}"
+                )
+            forcefield_files = [f'{filename}.xml', implicit_model_fname]
 
-        if solvent != 'gas':
+        elif solvent != 'gas':
             # Solvate the molecule using the SolvationBuilder
             phase = 'periodic'
             sol_builder = SolvationBuilder()
@@ -473,11 +506,20 @@ class OpenMMDynamics:
         if phase == 'gas':
             self.system = forcefield.createSystem(self.pdb.topology, nonbondedMethod=app.NoCutoff, constraints=app.HBonds)
 
+        elif phase == 'implicit':
+            self.system = forcefield.createSystem(self.pdb.topology,
+                    nonbondedMethod=app.NoCutoff,
+                    constraints=app.HBonds,
+                    soluteDielectric=self.solute_dielectric,
+                    solventDielectric=self.solvent_dielectric
+                )
+
         else:
             self.system = forcefield.createSystem(self.pdb.topology, 
                                                   nonbondedMethod=app.PME, 
                                                   nonbondedCutoff=self.cutoff * unit.nanometer, 
                                                   constraints=app.HBonds)
+                                                
         
         # Modify the system to include QM and QM/MM forces.
         if qm_atoms:
