@@ -32,8 +32,9 @@
 
 from pathlib import Path
 from mpi4py import MPI
-import sys
 import numpy as np
+import xml.etree.ElementTree as ET
+import sys
 import csv
 import re
 
@@ -114,14 +115,15 @@ class EnsembleDriver:
 
         sep_parameters_file = db_dir / "pe_sep.csv"
         cp3_parameters_file = db_dir / "pe_cp3.csv"
-        tip3p_parameters_file = db_dir / "npe_tip3p.csv"
-        ff19sb_parameters_file = db_dir / "npe_ff19sb.csv"
+        ff19sb_parameters_file = db_dir / "protein.ff19SB.xml"
+        ff19sb_aliases_file = db_dir / "ff19SB_aliases.csv"
 
         if self.rank == mpi_master():
             self._sep_db = self._load_pe_db(sep_parameters_file)
             self._cp3_db = self._load_pe_db(cp3_parameters_file)
-            self._tip3p_db = self._load_npe_db(tip3p_parameters_file)
-            self._ff19sb_db = self._load_npe_db(ff19sb_parameters_file)
+            self._tip3p_db = self._build_tip3p_db()
+            self._ff19sb_db = self._build_ff19sb_db(ff19sb_parameters_file,
+                                                    ff19sb_aliases_file)
         else:
             self._sep_db = None
             self._cp3_db = None
@@ -245,6 +247,138 @@ class EnsembleDriver:
                             f"Inconsistent duplicate entries for {resn}/{atom} in {csv_path}"
                         )
                 rdb[atom] = {"element": elem, "charge": q}
+        return db
+
+    @staticmethod
+    def _build_ff19sb_db(ff19sb_params_path, ff19sb_aliases_path):
+        """
+        Builds ff19SB parameters.
+
+        :param ff19sb_params_path:
+            The path to ff19SB parameters file.
+        :param ff19sb_aliases_path:
+            The path to ff19SB name aliases file.
+        :return:
+            The dictionary of ff19SB parameters.
+        """
+
+        name_aliases = {}
+        with ff19sb_aliases_path.open("r", newline="") as fh:
+            reader = csv.DictReader(fh)
+            for row in reader:
+                resn = str(row["res_name"]).strip()
+                alt_name = str(row["alternative_name"]).strip()
+                name = str(row["original_name"]).strip()
+                if resn not in name_aliases:
+                    name_aliases[resn] = {}
+                name_aliases[resn][alt_name] = name
+
+        tree = ET.parse(str(ff19sb_params_path))
+        root = tree.getroot()
+
+        data = {
+            'version': None,
+            'refs': [],
+            'atom_types': {},
+            'residues': {},
+        }
+
+        for node in root:
+
+            if node.tag == 'Info':
+                for subnode in node:
+                    if subnode.tag == 'Source':
+                        info = subnode.attrib
+                        data['version'] = info['Source']
+                    elif subnode.tag == 'Reference':
+                        data['refs'].append(subnode.text)
+
+            elif node.tag == 'AtomTypes':
+                for subnode in node:
+                    if subnode.tag == 'Type':
+                        info = subnode.attrib
+                        atomtype = info['name']
+                        data['atom_types'][atomtype] = {'element': info['element']}
+
+            elif node.tag == 'Residues':
+                for subnode in node:
+                    if subnode.tag == 'Residue':
+                        info = subnode.attrib
+                        resname = info['name']
+                        res_atoms = []
+                        for subsubnode in subnode:
+                            if subsubnode.tag == 'Atom':
+                                atom_info = subsubnode.attrib
+                                res_atoms.append(atom_info)
+                        data['residues'][resname] = res_atoms
+
+
+        db = {}
+
+        for resname in data['residues']:
+            db[resname] = {}
+
+            for atom in data['residues'][resname]:
+                atomname = atom['name']
+                db[resname][atomname] = {}
+
+                atomtype = atom['type']
+                element = data['atom_types'][atomtype]['element']
+
+                db[resname][atomname]['element'] = element
+                db[resname][atomname]['charge'] = float(atom['charge'])
+
+        for resname in db:
+            if resname in name_aliases:
+                for alt_name, name in name_aliases[resname].items():
+                    db[resname][alt_name] = db[resname][name]
+
+        return db
+
+    @staticmethod
+    def _build_tip3p_db():
+        """
+        Builds tip3p parameters.
+
+        :return:
+            The tip3p parameters.
+        """
+
+        db = {}
+
+        # W. L. Jorgensen, J. Chandrasekhar, J. D. Madura, R. W. Impey, M. L. Klein,
+        # J. Chem. Phys. 79, 926-935 (1983)
+        tip3p_params = {
+            'OW': {'element': 'O', 'charge': -0.834},
+            'HW': {'element': 'H', 'charge': 0.417},
+            'HW1': {'element': 'H', 'charge': 0.417},
+            'HW2': {'element': 'H', 'charge': 0.417},
+       }
+
+        db['WAT'] = tip3p_params
+        db['HOH'] = tip3p_params
+        db['SOL'] = tip3p_params
+
+        ions_params = {
+            'Na': {'element': 'Na', 'charge': 1.0},
+            'K': {'element': 'K', 'charge': 1.0},
+            'Ca': {'element': 'Ca', 'charge': 2.0},
+            'Mg': {'element': 'Mg', 'charge': 2.0},
+            'Zn': {'element': 'Zn', 'charge': 2.0},
+            'Cl': {'element': 'Cl', 'charge': -1.0},
+            'Br': {'element': 'Cl', 'charge': -1.0},
+        }
+
+        for key, val in ions_params.items():
+            db[key] = {key: val}
+            db[key.upper()] = {key.upper(): val}
+            if val['charge'] == 2.0:
+                db[f'{key}2+'] = {f'{key}2+': val}
+            elif val['charge'] == 1.0:
+                db[f'{key}+'] = {f'{key}+': val}
+            elif val['charge'] == -1.0:
+                db[f'{key}-'] = {f'{key}-': val}
+
         return db
 
     def _get_npe_params(self, atom_name: str, resname: str) -> dict:

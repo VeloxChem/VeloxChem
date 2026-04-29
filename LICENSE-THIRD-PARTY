@@ -8,6 +8,7 @@ the respective files.
 
 - MIT-licensed files:
   - database/gaff-2.11.xml
+  - database/environment_parameters/protein.ff19SB.xml
 
 - CC-BY-4.0-licensed files:
   - database/environment_parameters/pe_cp3.csv
