@@ -178,6 +178,7 @@ from .subcommunicators import SubCommunicators
 from .peforcefieldgenerator import PEForceFieldGenerator
 from .firstorderpropdriver import FirstOrderPropertyDriver
 from .firstorderprop import FirstOrderProperties
+from .excitedstatemomentdriver import ExcitedStateMomentDriver
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .tddftgradientdriver import TddftGradientDriver
 from .hessiandriver import HessianDriver
