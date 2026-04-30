@@ -42,6 +42,7 @@
 #include "ExportT2CIntegrals.hpp"
 #include "ExportT3CIntegrals.hpp"
 #include "ExportT4CIntegrals.hpp"
+#include "ExportAOERIs.hpp"
 
 PYBIND11_MODULE(veloxchemlib, m)
 {
@@ -64,4 +65,6 @@ PYBIND11_MODULE(veloxchemlib, m)
     vlx_t3cintegrals::export_t3cintegrals(m);
 
     vlx_t4cintegrals::export_t4cintegrals(m);
+
+    export_aoeris(m);
 }

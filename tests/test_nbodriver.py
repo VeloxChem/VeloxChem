@@ -179,6 +179,22 @@ def _selected_bond_pairs(results, subtype=None):
     return pairs
 
 
+class _RecordingOutputStream:
+
+    def __init__(self):
+        self.lines = []
+        self.flush_count = 0
+
+    def print_header(self, line):
+        self.lines.append(line)
+
+    def print_blank(self):
+        self.lines.append('')
+
+    def flush(self):
+        self.flush_count += 1
+
+
 def _alternative_pi_sets(results):
 
     return {
@@ -310,6 +326,27 @@ def _pi_bond_set(alternative):
 
 @pytest.mark.solvers
 class TestNboDriver:
+
+    def test_compute_flushes_verbose_report_output(self):
+
+        molecule = Molecule.read_str(MOLECULE_XYZ['water'])
+        basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = 'hf'
+        scf_drv.compute(molecule, basis)
+
+        ostream = _RecordingOutputStream()
+        nbo_drv = NboDriver(ostream=ostream)
+        nbo_drv.compute(molecule, basis, scf_drv.mol_orbs)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert ostream.flush_count == 1
+            assert any('Natural Population Analysis' in line
+                       for line in ostream.lines)
+            assert any('Natural Bond Orbital (NBO) Primary Summary' in line
+                       for line in ostream.lines)
 
     @pytest.mark.parametrize('name', ['water', 'methane', 'ethylene', 'benzene'])
     def test_nao_foundation_invariants(self, name):

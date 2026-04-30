@@ -17,6 +17,7 @@ pybind11_add_module(veloxchemlib
     ExportT3CIntegrals.cpp
     ExportT4CIntegrals.cpp
     ExportVeloxChemLib.cpp
+    ExportAOERIs.cpp
   )
 
 target_link_libraries(veloxchemlib
