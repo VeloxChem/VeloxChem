@@ -220,7 +220,7 @@ from .tsguesser import TransitionStateGuesser
 from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
-from .orbitallocalization import OrbitalLocalization
+from .orbitallocalization import OrbitalLocalizationDriver
 from .ensembleparser import EnsembleParser
 from .ensembledriver import EnsembleDriver
 from .spectrumaverager import SpectrumAverager

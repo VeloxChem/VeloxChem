@@ -33,9 +33,11 @@
 import numpy as np
 
 from .mathutils import symmetric_matrix_function
+from .oneeints import compute_electric_dipole_integrals, compute_overlap_integrals
+from .molecularorbitals import MolecularOrbitals
 
 
-class OrbitalLocalization:
+class OrbitalLocalizationDriver:
     """
     Orbital localization driver
 
@@ -155,35 +157,67 @@ class OrbitalLocalization:
             return 0.0
 
         return 0.25 * np.arctan2(g, h)
+    
+    def _mol_orbs_wrapper(self, loc_orbs, mol_orbs):
+        """
+        Wrap the localized orbitals into MolecularOrbitals container
+        """
 
-    def pipek_mezey(self, C, S, atom_map, projector="lowdin"):
+        if isinstance(mol_orbs, MolecularOrbitals):
+            return MolecularOrbitals(orbs=loc_orbs, enes=mol_orbs._energies,
+                                     occs=mol_orbs._occupations,
+                                     orbs_type=mol_orbs._orbitals_type)
+        else:
+            raise TypeError(f"mol_orbs type {type(mol_orbs)} is not supported")
+
+    def pipek_mezey(self, molecule, basis, mol_orbs, projector="mulliken"):
         """
         Pipek–Mezey orbital localization
 
         Parameters
         ----------
-        C : np.ndarray
-            MO coefficients
+        molecule : Molecule
+            The molecule
+
+        basis : MolecularBasis
+            AO basis set
+
+        mol_orbs: np.ndarray, MolecularOrbitals
 
         projector : str
             "lowdin"
             "mulliken"
 
-        S : np.ndarray, optional
-            Overlap matrix
-
-        atom_map : list[int]
-            AO -> atom mapping
-
         Returns
         -------
-        C : np.ndarray
-            Localized MO coefficients
+        C : np.ndarray, MolecularOrbitals
+            Localized MOs
         """
 
-        self.C = np.array(C, copy=True)
+        if isinstance(mol_orbs, np.ndarray):
+            self.C = mol_orbs
+        elif isinstance(mol_orbs, MolecularOrbitals):
+            if len(mol_orbs._orbitals) == 2:
+                # localize alpha and beta independently
+                alpha = self.pipek_mezey(
+                    molecule, basis, mol_orbs.alpha_to_numpy(), projector=projector
+                )
+                beta = self.pipek_mezey(
+                    molecule, basis, mol_orbs.beta_to_numpy(), projector=projector
+                )
+                return self._mol_orbs_wrapper([alpha, beta], mol_orbs)
+            else:
+                alpha = self.pipek_mezey(
+                    molecule, basis, mol_orbs.alpha_to_numpy(), projector=projector
+                )
+                return self._mol_orbs_wrapper([alpha], mol_orbs)
+        else:
+            raise TypeError(f"mol_orbs type {type(mol_orbs)} is not supported")
         self.nao, self.norb = self.C.shape
-        self.S = np.array(S)
+        self.S = compute_overlap_integrals(molecule, basis)
+        # AO -> atom mapping
+        atom_map_raw = basis.get_ao_basis_map(molecule)
+        atom_map = [int(atom_map_raw[i].split()[0]) for i in range(len(atom_map_raw))]
 
         # transform MOs according to projector
         eigs = np.linalg.eigvalsh(self.S)
@@ -253,26 +287,41 @@ class OrbitalLocalization:
 
         return self.C
 
-    def boys(self, C, dipole_integrals):
+    def boys(self, molecule, basis, mol_orbs):
         """
         Boys orbital localization
 
         Parameters
         ----------
-        C : np.ndarray
-            MO coefficients
+        molecule : Molecule
+            The molecule
 
-        dipole integrals : np.ndarray, tuple(np.ndarray), list(np.ndarray)
+        basis : MolecularBasis
+            AO basis set
+
+        mol_orbs: np.ndarray, MolecularOrbitals
 
         Returns
         -------
-        C : np.ndarray
-            Localized MO coefficients
+        C : np.ndarray, MolecularOrbitals
+            Localized MOs
         """
 
-        self.C = np.array(C, copy=True)
+        if isinstance(mol_orbs, np.ndarray):
+            self.C = mol_orbs
+        elif isinstance(mol_orbs, MolecularOrbitals):
+            if len(mol_orbs._orbitals) == 2:
+                # localize alpha and beta independently
+                alpha = self.boys(molecule, basis, mol_orbs.alpha_to_numpy())
+                beta = self.boys(molecule, basis, mol_orbs.beta_to_numpy())
+                return self._mol_orbs_wrapper([alpha, beta], mol_orbs)
+            else:
+                alpha = self.boys(molecule, basis, mol_orbs.alpha_to_numpy())
+                return self._mol_orbs_wrapper([alpha], mol_orbs)
+        else:
+            raise TypeError(f"mol_orbs type {type(mol_orbs)} is not supported")
         self.nao, self.norb = self.C.shape
-        mu = dipole_integrals
+        mu = compute_electric_dipole_integrals(molecule, basis)
 
         self.r = np.array(
             [np.matmul(self.C.T, np.matmul(mu[k], self.C)) for k in range(3)])
@@ -312,7 +361,7 @@ class OrbitalLocalization:
 
         return self.C
 
-    def edmiston_ruedenberg(self, eri):
+    def edmiston_ruedenberg(self, molecule, basis, mol_orbs):
         """
         Placeholder for ER localization scheme
         """
