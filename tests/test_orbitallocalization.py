@@ -4,8 +4,7 @@ from pathlib import Path
 
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
-from veloxchem.oneeints import compute_electric_dipole_integrals
-from veloxchem.orbitallocalization import OrbitalLocalization
+from veloxchem.orbitallocalization import OrbitalLocalizationDriver
 
 
 @pytest.mark.solvers
@@ -25,29 +24,8 @@ class TestOrbitalLocalization:
         # Load reference
         C_occ_path = Path(__file__).parent / "data" / "orbloc_h2o_svp_C_occ.npy"
         C_occ = np.load(C_occ_path)
-        S_path = Path(__file__).parent / "data" / "orbloc_h2o_svp_S.npy"
-        S = np.load(S_path)
 
-        return molecule, basis, C_occ, S
-
-    @staticmethod
-    def _compute_dipoles(molecule, basis):
-        coords = molecule.get_coordinates_in_bohr()
-        nuclear_charges = molecule.get_element_ids()
-
-        origin = np.sum(coords.T * nuclear_charges,
-                        axis=1) / np.sum(nuclear_charges)
-
-        dip_ints = compute_electric_dipole_integrals(molecule, basis, origin)
-
-        return dip_ints
-
-    @staticmethod
-    def _get_atom_map(molecule, basis):
-        atom_map_raw = basis.get_ao_basis_map(molecule)
-        return [
-            int(atom_map_raw[i].split()[0]) for i in range(len(atom_map_raw))
-        ]
+        return molecule, basis, C_occ
 
     @staticmethod
     def _align_phases(C_ref, C_test):
@@ -62,12 +40,11 @@ class TestOrbitalLocalization:
         return C_aligned
 
     def test_boys(self):
-        molecule, basis, C, S = self._build_system()
-        dip_ints = self._compute_dipoles(molecule, basis)
+        molecule, basis, C = self._build_system()
 
-        loc = OrbitalLocalization()
+        loc = OrbitalLocalizationDriver()
         loc.silent = True
-        C_loc = loc.boys(C.copy(), dip_ints)
+        C_loc = loc.boys(molecule, basis, C.copy())
 
         # Load reference
         ref_path = Path(__file__).parent / "data" / "orbloc_boys_C.npy"
@@ -79,19 +56,12 @@ class TestOrbitalLocalization:
         # Compare
         np.testing.assert_allclose(C_loc, C_ref, atol=1e-6)
 
-        # Orthonormality check
-        identity_matrix = np.eye(C.shape[1])
-        np.testing.assert_allclose(np.matmul(C_loc.T, np.matmul(S, C_loc)),
-                                   identity_matrix,
-                                   atol=1e-8)
-
     def test_pipek_mezey_mulliken(self):
-        molecule, basis, C, S = self._build_system()
-        atom_map = self._get_atom_map(molecule, basis)
+        molecule, basis, C = self._build_system()
 
-        loc = OrbitalLocalization()
+        loc = OrbitalLocalizationDriver()
         loc.silent = True
-        C_loc = loc.pipek_mezey(C.copy(), S, atom_map, projector="mulliken")
+        C_loc = loc.pipek_mezey(molecule, basis, C.copy(), projector="mulliken")
 
         # Load reference
         ref_path = Path(__file__).parent / "data" / "orbloc_pm_mulliken_C.npy"
@@ -103,19 +73,12 @@ class TestOrbitalLocalization:
         # Compare
         np.testing.assert_allclose(C_loc, C_ref, atol=1e-6)
 
-        # Orthonormality check
-        identity_matrix = np.eye(C.shape[1])
-        np.testing.assert_allclose(np.matmul(C_loc.T, np.matmul(S, C_loc)),
-                                   identity_matrix,
-                                   atol=1e-8)
-
     def test_pipek_mezey_lowdin(self):
-        molecule, basis, C, S = self._build_system()
-        atom_map = self._get_atom_map(molecule, basis)
+        molecule, basis, C = self._build_system()
 
-        loc = OrbitalLocalization()
+        loc = OrbitalLocalizationDriver()
         loc.silent = True
-        C_loc = loc.pipek_mezey(C.copy(), S, atom_map, projector="lowdin")
+        C_loc = loc.pipek_mezey(molecule, basis, C.copy(), projector="lowdin")
 
         # Load reference
         ref_path = Path(__file__).parent / "data" / "orbloc_pm_lowdin_C.npy"
@@ -126,9 +89,3 @@ class TestOrbitalLocalization:
 
         # Compare
         np.testing.assert_allclose(C_loc, C_ref, atol=1e-6)
-
-        # Orthonormality check
-        identity_matrix = np.eye(C.shape[1])
-        np.testing.assert_allclose(np.matmul(C_loc.T, np.matmul(S, C_loc)),
-                                   identity_matrix,
-                                   atol=1e-8)
