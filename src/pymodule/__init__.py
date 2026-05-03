@@ -222,6 +222,8 @@ from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
 from .orbitallocalization import OrbitalLocalization
 from .nbodriver import NboDriver, NboComputeOptions, NboConstraints
+from .vbdriver import VbDriver, VbComputeOptions, VbOrbital, VbStructure, VbActiveSpace
+from .orbitalanalyzerdriver import OrbitalAnalyzer, OrbitalAnalyzerOptions, OrbitalAnalysisResult
 # for backward compatibility only
 from .cppsolver import ComplexResponseSolver as ComplexResponse
 from .tdacppsolver import ComplexResponseTdaSolver as ComplexResponseTDA
@@ -247,3 +249,4 @@ set_vlxdatapath()
 set_omp_num_threads()
 
 __version__ = "1.0rc4"
+

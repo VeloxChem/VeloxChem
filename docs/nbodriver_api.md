@@ -1,6 +1,6 @@
 # NboDriver API Guide
 
-`NboDriver` provides a structured Natural Bond Orbital analysis pipeline for VeloxChem wavefunctions. The driver constructs Natural Atomic Orbitals (NAOs), Natural Population Analysis (NPA) data, NBO candidates, Lewis/resonance alternatives, donor-acceptor diagnostics, and optional NRA/NRT density-fit weights.
+`NboDriver` provides a structured Natural Bond Orbital analysis pipeline for VeloxChem wavefunctions. The driver consumes the shared `OrbitalAnalyzer` payload for Natural Atomic Orbitals (NAOs), Natural Population Analysis (NPA) data, MO-in-NAO diagnostics, and NBO-like candidates, then performs Lewis/resonance assignment, donor-acceptor diagnostics, and optional NRA/NRT density-fit weights.
 
 The API is intentionally transparent: every assignment carries explicit electron counts, atom participation, score terms, and density-fit metadata. This makes the results suitable for regression testing, method development, and chemical interpretation without hiding the distinction between Lewis ranking weights, density-fit weights, and future wavefunction weights.
 
@@ -88,8 +88,9 @@ A plain dictionary with the same keys is also accepted. Atom indices are zero-ba
 | `alternatives` | Lewis/resonance alternatives used for reporting and NRA/NRT fitting. |
 | `donor_acceptor_diagnostics` | Occupied-donor to `BD*`/`RY` acceptor density-coupling diagnostics. |
 | `nra` | Optional NRA/NRT density-fit weights and residuals. |
+| `orbital_analysis` | The shared `OrbitalAnalysisResult` used by NBO and VB; includes AO maps, NAO data, spin data, MO analysis, and candidate records. |
 
-Candidate records include the candidate type, atom indices, electron count, occupation, vector coefficients in the NAO basis, and chemically relevant metadata such as `bond_order`, `bond_kind`, or acceptor parentage.
+Candidate records include the candidate type, subtype, atom indices, electron count, occupation, vector coefficients in the NAO basis, and chemically relevant metadata such as sigma/pi character or acceptor parentage. These are the same records exposed to `VbDriver` for analyzer-driven orbital recognition.
 
 Primary assignments and alternatives expose the partition used by the resonance analysis:
 
@@ -193,4 +194,4 @@ The driver generates `BD*` antibonding complements and one-center `RY` acceptor 
 
 ## Scope notes
 
-The current implementation is a complete structured NBO/NRA/NRT analysis layer for the documented API. Scientific quantities with mature NBO-specific definitions remain clearly separated from diagnostics: donor-acceptor couplings are density diagnostics, NRA/NRT weights are density-fit weights, and VB/wavefunction weights are not implemented.
+The current implementation is a complete structured NBO/NRA/NRT analysis layer for the documented API. Scientific quantities with mature NBO-specific definitions remain clearly separated from diagnostics: donor-acceptor couplings are density diagnostics and NRA/NRT weights are density-fit weights. VB/wavefunction weights are owned by `VbDriver`; the NBO API does not compute or reinterpret them.

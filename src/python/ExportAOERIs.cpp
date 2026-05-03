@@ -14,7 +14,7 @@ void export_aoeris(py::module_ &m) {
         screener.partition(basis, mol, "eri");
         CFockDriver fock_drv;
         int nao = basis.basis_functions().size();
-        int ithreshold = 0; // Use default threshold (tightest)
+        int ithreshold = 12; // 1.0e-12 screening threshold
         auto eri_tensor = fock_drv.compute_eri(screener, nao, ithreshold);
         // Convert to numpy array (shape: nao, nao, nao, nao)
         py::array_t<double> result({nao, nao, nao, nao});

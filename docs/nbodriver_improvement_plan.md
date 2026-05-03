@@ -41,7 +41,7 @@ NRA/NRT remains a post-processing density-fit layer on top of generated Lewis/re
 - Optional prior-regularized NRA/NRT weights with explicit prior metadata.
 - Regression coverage for foundation invariants, NBO counts, constraints, sigma/pi partitions, Lewis accounting, score terms, lone-pair donation, structure-pool invariants, open-shell SOMO/radical alternatives, antibonding/Rydberg complements, donor-acceptor diagnostics, NRA/NRT weights, NRA/NRT priors, open-shell spin-resolved NRA/NRT, labels, and reports.
 
-## Current status: 2026-04-30
+## Current status: 2026-05-03
 
 Recent implementation work added the general resonance machinery needed for aromatic, radical, anionic, and polar pi systems without molecule-specific rules.
 
@@ -51,6 +51,9 @@ Recent implementation work added the general resonance machinery needed for arom
 - Alternatives are sorted by descending score/ranking weight before final ranks are assigned.
 - `show_structures(...)` visualizes pi bonds, radical centers, lone-pair/negative centers, and positive centers.
 - The compact smoke-test notebook contains allyl, benzene, acene, coronene, and 1,3,5-trinitrobenzene examples. The trinitrobenzene example is intended to run after geometry optimization and should continue to expect 16 simple formal resonance structures.
+- `NboDriver` now obtains AO maps, NAO/NPA data, spin data, MO-in-NAO diagnostics, and candidate records from the shared `OrbitalAnalyzer` payload. The NBO driver owns the Lewis assignment, resonance alternatives, donor-acceptor diagnostics, NRA/NRT fitting, and reports.
+- The current donor-acceptor layer reports density-coupling diagnostics to candidate-only `BD*` and `RY` acceptors. It is not yet a second-order perturbation-energy layer.
+- NRA/NRT weights remain density-reconstruction weights and are intentionally separated from VB/wavefunction weights owned by `VbDriver`.
 
 The main remaining gap is not the enumeration of individual structures. The next missing layer is grouping chemically equivalent structures into resonance classes so that degeneracies and class-level weights can be reported separately from raw localized-orbital weights.
 
@@ -62,7 +65,7 @@ The implementation keeps three weight concepts separate:
 | --- | --- |
 | Score/ranking weight | Softmax weight derived from the Lewis assignment score. |
 | NRA/NRT density weight | Nonnegative density-fit weight from `results["nra"]`. |
-| VB/wavefunction weight | Future state-mixing quantity; not implemented. |
+| VB/wavefunction weight | State-mixing quantity owned by `VbDriver`; initially implemented for the H₂ two-orbital spin-adapted active-bond model, not part of NBO/NRA/NRT weighting. |
 
 User priors are not a fourth physical weight. They are optional guidance used only in the regularized NRA/NRT density fit and are reported separately as prior metadata.
 
@@ -208,3 +211,57 @@ These remain useful, but they are lower priority than the interpretation and val
 - Expand optional user-facing structure annotations without adding molecule-specific logic to the core driver.
 - Add broader validation notebooks and publication examples for additional radicals, zwitterionic systems, amides, nitro compounds, and transition-metal fragments.
 - Investigate VB/BOND-style state coupling if wavefunction weights are desired.
+
+### 8. Metal-ligand and coordination NBO analysis
+
+Goal: consume future `OrbitalAnalyzer` metal-ligand candidate records and make coordination chemistry interpretable without hard-coding organic Lewis assumptions into the analyzer.
+
+Implementation steps:
+
+1. Accept analyzer candidate metadata for metal-ligand sigma donation, pi donation, and metal-to-ligand back-donation.
+2. Add coordination-aware electron-accounting terms that can coexist with the current organic duet/octet diagnostics but do not force octet-style penalties on transition-metal centers.
+3. Add scoring terms for ligand donor occupation, metal acceptor/back-donation occupation, and charge balance.
+4. Keep coordination candidates separate from selected occupied organic NBO tables until their electron-count semantics are explicit.
+5. Add report sections for metal center, ligand donor atoms, candidate donor/acceptor channels, d-manifold character, and strongest donation/back-donation diagnostics.
+6. Validate first on small closed-shell donor complexes, then on pi-acceptor ligands and open-shell metal fragments.
+
+Acceptance checks:
+
+- Organic NBO output remains unchanged when no metal center is present.
+- Simple metal-ligand systems expose coordination candidate records and donor/acceptor diagnostics without crashing Lewis assignment.
+- Octet diagnostics remain meaningful for ligand atoms while metal-center diagnostics are reported separately.
+- Donation and back-donation channels are visibly distinct in full reports.
+
+### 9. Unified Orbital Analysis and Classification
+
+Goal: Centralize all orbital analysis, NAO construction, and classification in a single `OrbitalAnalyzer` class/module. This ensures that both the NBO and VB drivers use the same, chemically meaningful set of orbitals and labels, eliminating code duplication and inconsistencies.
+
+Current status: `NboDriver` and `VbDriver` now consume the same `OrbitalAnalyzer` payload (`nao_data`, `spin_data`, `mo_analysis`, and `orbital_candidates`). The communication layer has been confirmed: direct analyzer runs, NBO results, and VB diagnostics expose matching candidate records. The VB driver now uses those records to build the first generated H₂ one-active-bond model, while the NBO driver remains responsible for Lewis assignment, resonance alternatives, donor-acceptor diagnostics, NRA/NRT fitting, and reports. Any lower-level helper such as `orbitalclassifier.py` is private implementation detail, not a second driver-facing classifier.
+
+Implementation steps:
+
+1. Refactor the current orbital classification logic into a standalone `OrbitalAnalyzer` class. **Completed for the shared payload and candidate records.**
+2. Keep NBO-specific Lewis assignment and resonance machinery in `NboDriver`. **Completed architecturally.**
+3. Use the analyzer payload as the input for VB active-space and default-structure construction. **Completed for the current fixed-orbital H₂, ethylene, and π-ladder checkpoints; future VB work should keep the same analyzer contract.**
+2. `OrbitalAnalyzer` should:
+   - Accept a molecule, basis, and (optionally) orbitals.
+   - Run SCF if orbitals are not provided.
+   - Compute NAOs (via NBO driver) if requested.
+   - Classify all orbitals (core, valence, bonding, antibonding, lone pair, Rydberg, etc.).
+   - Store canonical MOs, NAOs, classification results, and mapping between representations.
+3. Update the NBO driver to accept orbitals and classification from `OrbitalAnalyzer`.
+4. Ensure all NBO diagnostics and reports reference the unified classification and labels.
+5. Document the new workflow and update all relevant examples and notebooks.
+
+Immediate regression target:
+
+- Run `OrbitalAnalyzer` once and verify that NBO candidate labels and atom/bond assignments are exactly the records used by the NBO primary assignment.
+- Verify that VB diagnostics report the same candidate labels for the same molecule.
+- Verify that no driver imports or calls a public `OrbitalClassifier` API.
+
+Benefits:
+- Guarantees that NBO analysis is always performed on a well-defined, classified set of orbitals.
+- Enables seamless integration with the VB driver and other modules.
+- Simplifies diagnostics and user interpretation.
+
+---

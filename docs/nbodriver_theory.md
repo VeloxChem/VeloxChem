@@ -221,7 +221,7 @@ The driver deliberately separates three weight concepts:
 | --- | --- | --- |
 | Lewis ranking weight | `alternatives[*]["weight"]` | Softmax ranking from the Lewis score. |
 | NRA/NRT density weight | `results["nra"]["weights"]`, `structures[*]["nra_weight"]` | Convex density-reconstruction coefficient. |
-| VB/wavefunction weight | not implemented | Would require a state-coupling model beyond the current density analysis. |
+| VB/wavefunction weight | `VbDriver` results | State-coupling quantity owned by the VB driver; not computed or reinterpreted by NBO/NRA/NRT. |
 
 Keeping these weights separate is part of the scientific contract of the implementation. It avoids presenting a density fit or a Lewis ranking heuristic as a wavefunction population.
 
