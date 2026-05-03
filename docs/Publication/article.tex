@@ -1,0 +1,1267 @@
+
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{enumitem}
+
+\title{NBO and VB Implementation in VeloxChem:\\Subtitle to Come}
+\author{Mathieu Linares\\GPT-5.5}
+\date{Draft outline --- \today}
+
+\newcommand{\ao}{\mathrm{AO}}
+\newcommand{\nao}{\mathrm{NAO}}
+\newcommand{\nbo}{\mathrm{NBO}}
+\newcommand{\vb}{\mathrm{VB}}
+\newcommand{\dens}{\mathbf{D}}
+\newcommand{\overlap}{\mathbf{S}}
+\newcommand{\ham}{\mathbf{H}}
+\newcommand{\coef}{\mathbf{C}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This article will document the implementation of Natural Bond Orbital (NBO) and Valence Bond (VB) functionality in VeloxChem as two complementary routes to chemical structure.  The NBO route starts from an electronic density and extracts Lewis-like orbitals, resonance alternatives, and density-reconstruction weights.  The VB route starts from chemically motivated structures and builds an explicit wavefunction through nonorthogonal structure overlaps and Hamiltonian couplings.  Both routes are connected by a shared \texttt{OrbitalAnalyzer} layer that provides AO maps, NAO/NPA data, and chemically labeled orbital candidates.  The article will present the theory, implementation architecture, integral interfaces, validation ladder, current limitations, and the AI-assisted development process openly, including which parts were designed, coded, tested, and documented with GPT-5.5 assistance.
+\end{abstract}
+
+\tableofcontents
+
+\section*{Purpose of this draft}
+This file is currently a detailed article plan, not a full manuscript.  It defines the intended scientific narrative, equations, figures, implementation sections, and reference targets before full paragraphs are written.
+
+\section{Article thesis and scope}
+
+\subsection{Central thesis}
+\begin{itemize}[leftmargin=*]
+	\item NBO and VB are presented as two faces of the same chemical-structure problem.
+	\item NBO direction: infer Lewis/resonance structure from the one-particle density.
+	\item VB direction: build a wavefunction from explicitly chosen VB structures and their overlap/Hamiltonian couplings.
+	\item Shared bridge: \texttt{OrbitalAnalyzer} supplies the common orbital-recognition vocabulary used by both \texttt{NboDriver} and \texttt{VbDriver}.
+\end{itemize}
+
+\subsection{Honest scope statement}
+\begin{itemize}[leftmargin=*]
+	\item The NBO implementation is currently a structured NBO/NPA/NRA/NRT analysis layer with explicit candidate records, Lewis assignment, resonance alternatives, donor--acceptor diagnostics, and density-fit weights.
+	\item The VB implementation is currently a fixed-orbital development driver with validated H$_2$, ethylene, allyl, butadiene, and benzene checkpoints; larger $\pi$ spaces use determinant-CI references with compact CSF projection diagnostics.
+	\item BOVB and VBB are planned future method layers, not complete production implementations.
+	\item VBB means Valence Bond BOND, where BOND stands for Breathing Orbital Naturally Delocalized, following Linares et al.; it is not a generic builder layer.
+	\item The article should explicitly acknowledge GPT-5.5 assistance in implementation planning, code generation, test construction, debugging, notebook diagnostics, and documentation drafting.
+\end{itemize}
+
+\section{Introduction}
+
+\subsection{Motivation and scope}
+
+Localized chemical structure remains one of the most useful languages for interpreting electronic-structure calculations.  Molecular orbitals, density matrices, and correlated wavefunctions are the natural numerical objects of quantum chemistry, but chemical reasoning is often expressed in terms of cores, lone pairs, sigma bonds, pi bonds, radical centers, donor--acceptor interactions, and resonance structures.  The central implementation problem is therefore not only to compute an electronic structure, but also to translate it into a set of chemically meaningful objects without hiding the approximations used in that translation.
+
+Natural Bond Orbital (NBO) analysis and Valence Bond (VB) theory approach this translation from opposite directions.  NBO analysis starts from a one-particle density and asks which localized Lewis-like orbitals and resonance alternatives are implied by that density.  VB theory starts from chemically chosen structures and asks how those structures overlap and couple to form an electronic wavefunction.  The two viewpoints are therefore complementary rather than redundant: NBO is primarily an analysis of a density, while VB is a constructive wavefunction model.  Presenting them together is useful because many of the same chemical labels appear in both methods, but the mathematical meaning of those labels and of the associated weights is different.
+
+This article documents the implementation of these two viewpoints in VeloxChem through a shared orbital-analysis layer.  The shared \texttt{OrbitalAnalyzer} provides AO maps, NAO/NPA data, molecular-orbital composition diagnostics, and chemically labeled orbital candidates.  \texttt{NboDriver} consumes this payload to perform Lewis assignment, resonance enumeration, donor--acceptor diagnostics, and optional density-reconstruction fits.  \texttt{VbDriver} consumes the same payload to build fixed-orbital active spaces, VB structures or determinant-CI references, Hamiltonian matrices, and wavefunction-weight diagnostics.  The shared analyzer is therefore the software bridge between density-derived chemical objects and wavefunction-based chemical structures.
+
+VeloxChem is a suitable platform for this development because it combines a Python-facing driver layer with a C++ integral and SCF backend.  This makes it possible to expose intermediate scientific objects as reproducible Python dictionaries while still relying on the existing molecular-integral and SCF infrastructure.  The implementation is deliberately notebook- and test-driven: notebooks provide compact human-readable demonstrations, whereas source-level regression tests encode invariants such as NAO orthonormality, electron counting, determinant dimensions, and consistency of analyzer/NBO/VB candidate labels.
+
+The scope is intentionally explicit.  The current NBO implementation is an analysis layer with NAO/NPA data, candidate records, Lewis alternatives, donor--acceptor diagnostics, and NRA/NRT-style density fits.  It is not a complete reimplementation of all mature NBO program capabilities, such as final NHO directionality analysis or perturbative NBO Fock-matrix $E^{(2)}$ energies.  The current VB implementation is a fixed-orbital development driver with validated two-electron and multi-center pi checkpoints, determinant-CI fallback, and compact resonance diagnostics.  It is not yet a production BOVB or VBB implementation.  Metal--ligand recognition is implemented as analyzer-level diagnostic metadata and as optional fixed-orbital VB active-space seeds, while production coordination NBO/VB treatments remain part of the roadmap.
+
+The article is also an implementation-process report.  It records not only the equations and data structures, but also the development strategy: a shared analyzer contract, driver-specific interpretation layers, regression tests, notebooks, and open documentation of current limitations.  GPT-5.5 was used as an assistant for implementation planning, code drafting, debugging hypotheses, test design, notebook summaries, and documentation drafts; final scientific direction, interpretation, method naming, and acceptance of changes remain the responsibility of the human author.
+
+The remainder of the article is organized into theory, implementation, validation, and roadmap sections.  The theory section establishes the conceptual and mathematical relation between NBO and VB.  The implementation sections then describe the shared \texttt{OrbitalAnalyzer} layer, the \texttt{NboDriver}, the \texttt{VbDriver}, the integral interfaces, and the public API.  The validation section collects the regression ladder and the metal--ligand and dissociation examples.  The final sections summarize the AI-assisted development process, current limitations, roadmap, and conclusions.
+
+\part{Theory and method concepts}
+
+\section{Theory: relation between NBO and VB}
+The conceptual starting point of this work is that NBO and VB analysis answer complementary questions about the same electronic structure.  NBO starts from a density matrix and asks which localized Lewis-like objects are implied by that density.  VB starts from a set of Lewis-like structures and asks how those structures couple to form a wavefunction.  In short,
+\begin{align}
+	\text{NBO:} \qquad
+	\dens &\longrightarrow \{\text{localized orbitals and Lewis alternatives}\}, \\
+	\text{VB:} \qquad
+	\{\Phi_I\} &\longrightarrow \Psi = \sum_I C_I \Phi_I.
+\end{align}
+The shared \texttt{OrbitalAnalyzer} layer makes this relation practical in VeloxChem: the same core, lone-pair, sigma-bond, pi-bond, radical, antibonding, and Rydberg/acceptor candidate records can be interpreted either as density-derived NBO objects or as input suggestions for VB active spaces.
+
+\subsection{NBO viewpoint: chemical structure from the density}
+
+The NBO viewpoint begins with the observation that much of ordinary chemical structure is already encoded in the one-particle density.  If the density is expressed in a basis that is close to atom-local and orthonormal, then its diagonal blocks measure atomic populations and its off-diagonal blocks measure bonding, conjugation, and donor--acceptor mixing.  The implementation therefore first transforms the SCF density from the AO representation to a Natural Atomic Orbital (NAO) representation.  The NAO basis is used not because it changes the underlying wavefunction, but because it provides a chemically stable coordinate system for recognizing atom-local and bond-local density patterns.
+
+Let $\{\chi_\mu\}$ be the AO basis, with AO overlap and density matrices
+\begin{align}
+	S_{\mu\nu} &= \langle \chi_\mu | \chi_\nu \rangle, \\
+	P_{\mu\nu} &= \text{AO density matrix}.
+\end{align}
+The NAO transformation $\mathbf{T}$ defines an orthonormal atom-local basis,
+\begin{align}
+	\mathbf{T}^{\mathrm{T}} \mathbf{S}\, \mathbf{T} = \mathbf{I},
+\end{align}
+and the density in that basis is
+\begin{align}
+	\dens_{\nao}
+	= \mathbf{T}^{\mathrm{T}} \mathbf{S}\, \mathbf{P}\, \mathbf{S}\mathbf{T}.
+	\label{eq:nao-density-section2}
+\end{align}
+For unrestricted references, the total and spin densities are
+\begin{align}
+	\dens^{\mathrm{tot}}_{\nao}
+	&= \dens^{\alpha}_{\nao}+\dens^{\beta}_{\nao}, \\
+	\dens^{\mathrm{spin}}_{\nao}
+	&= \dens^{\alpha}_{\nao}-\dens^{\beta}_{\nao}.
+\end{align}
+Natural populations are atom-block traces of the NAO density,
+\begin{align}
+	N_A &= \mathrm{Tr}_A(\dens^{\mathrm{tot}}_{\nao}), \\
+	q_A &= Z_A - N_A,
+\end{align}
+where $Z_A$ is the nuclear charge.  These quantities are density partitions and should not be confused with formal charges assigned later to a selected Lewis alternative.
+
+This distinction between density populations and formal Lewis bookkeeping is important.  The NPA charge $q_A$ is obtained directly from the density and the nuclear charge; it does not require choosing a resonance structure.  A formal charge, in contrast, is assigned only after selecting an electron-counted Lewis alternative.  The two quantities can be compared, but they answer different questions.  NPA asks how the SCF density is distributed over atoms; Lewis bookkeeping asks how an idealized electron-counting model represents that density.
+
+An NBO candidate is represented by a normalized vector $c$ in the NAO basis.  Its total occupation and spin occupation are
+\begin{align}
+	n(c) &= c^{\mathrm{T}}\dens^{\mathrm{tot}}_{\nao}c, \\
+	m(c) &= c^{\mathrm{T}}\dens^{\mathrm{spin}}_{\nao}c.
+\end{align}
+The implemented candidate families are generated from chemically meaningful density blocks: one-center blocks for core and lone-pair candidates, two-center density blocks for sigma and pi bonds, open-shell blocks for SOMO/radical candidates, and complementary low-occupation spaces for $\mathrm{BD}^{\ast}$ and Rydberg-like acceptors.  In practice, this means that the analyzer diagonalizes or inspects small atom-local and atom-pair density subspaces rather than attempting a global localization in one step.  A high-occupation one-center vector becomes a possible core or lone-pair candidate; a high-occupation two-center vector becomes a possible sigma or pi bond candidate; a low-occupation complementary vector becomes a candidate-only acceptor.  These records are deliberately candidates rather than final NBOs: they are the vocabulary from which the NBO driver later constructs a Lewis assignment.
+
+For open-shell references, the spin-density block adds an additional diagnostic.  A one-center vector with significant spin occupation can be labeled as a SOMO or radical lone-pair candidate.  The total-density occupation still controls electron counting, while the spin-density occupation identifies where the unpaired electron character resides.  This is necessary for treating radical alternatives and for keeping the NBO and VB descriptions consistent in open-shell examples.
+
+A Lewis alternative $k$ is an electron-counted selection of occupied candidates.  If $e_i$ is the electron count carried by candidate $i$, then a valid alternative satisfies
+\begin{align}
+	\sum_{i\in k} e_i = N_{\mathrm{target}},
+\end{align}
+with additional atom-local bookkeeping for valence, duet/octet, and formal-charge diagnostics.  The implementation assigns a transparent Lewis score $s_k$ to each alternative.  The score-derived ranking weight is
+\begin{align}
+	w^{\mathrm{score}}_k
+	= \frac{\exp(-\beta s_k)}{\sum_j \exp(-\beta s_j)}.
+	\label{eq:score-weight-section2}
+\end{align}
+This is only a ranking weight.  It does not reconstruct a density and it is not a wavefunction coefficient.
+
+The score is intentionally transparent rather than universal.  It combines occupation preference, electron-count consistency, user constraints, and chemically motivated penalties such as severe valence or duet/octet violations.  Its purpose is to choose and rank plausible Lewis alternatives within the current candidate set.  The score-derived weight in Eq.~\eqref{eq:score-weight-section2} should therefore be read as a soft ranking device: it says which alternatives are preferred by the implemented heuristic, not how much of the SCF density or wavefunction is physically made of that Lewis structure.
+
+When NRA/NRT is requested, each Lewis alternative defines a model density vector $\mathbf{A}_k$ in a chosen NAO subspace, and the SCF target density is vectorized as $\mathbf{d}$.  The closed-shell density-fitting problem is
+\begin{align}
+	\min_{\mathbf{w}}
+	\left\| \mathbf{d} - \mathbf{A}\mathbf{w} \right\|^2
+	\quad\text{subject to}\quad
+	w_k \ge 0,\qquad \sum_k w_k = 1,
+	\label{eq:nra-section2}
+\end{align}
+where $\mathbf{A}=[\mathbf{A}_1\;\mathbf{A}_2\;\cdots]$.  With a user prior $\mathbf{w}_0$, the regularized objective is
+\begin{align}
+	\min_{\mathbf{w}}
+	\left\| \mathbf{d} - \mathbf{A}\mathbf{w} \right\|^2
+	+ \lambda \left\| \mathbf{w}-\mathbf{w}_0 \right\|^2
+	\quad\text{subject to}\quad
+	w_k \ge 0,\qquad \sum_k w_k = 1.
+\end{align}
+For open-shell systems, the implemented fit can use both total-density and spin-density targets,
+\begin{align}
+	\min_{\mathbf{w}}
+	\left\|
+	\begin{bmatrix}
+	\mathbf{d}_{\mathrm{tot}} \\
+	\mathbf{d}_{\mathrm{spin}}
+	\end{bmatrix}
+	-
+	\begin{bmatrix}
+	\mathbf{A}_{\mathrm{tot}} \\
+	\mathbf{A}_{\mathrm{spin}}
+	\end{bmatrix}
+	\mathbf{w}
+	\right\|^2
+	\quad\text{subject to}\quad
+	w_k \ge 0,\qquad \sum_k w_k = 1.
+\end{align}
+The resulting NRA/NRT weights are density-reconstruction weights.  They answer how a set of Lewis alternatives can reproduce the SCF density in the selected subspace.  These weights are therefore different from the score weights above.  A Lewis alternative may be strongly preferred by the heuristic score but still be insufficient, together with the other selected alternatives, to reconstruct a chosen density block.  Conversely, a density-fit weight is meaningful only together with its residual norm and the definition of the fitted subspace.  For this reason the implementation reports both the normalized weights and the residual diagnostics.
+
+The NBO side of the implementation can thus be summarized as a sequence of increasingly interpretive layers.  NAO/NPA data are direct transformations and traces of the SCF density.  Candidate records are localized density-derived objects.  The primary Lewis assignment is an electron-counted selection from those candidates.  Resonance alternatives are nearby selections satisfying the same electron-count constraints.  NRA/NRT weights are constrained density-reconstruction coefficients over those alternatives.  Donor--acceptor and metal--ligand diagnostics are candidate-level coupling measures, not yet mature perturbative NBO $E^{(2)}$ energies.  Keeping these layers separate is the main safeguard against over-interpreting a diagnostic number as a wavefunction coefficient or a final resonance weight.
+
+\subsection{NBO candidate families and Lewis alternatives}
+
+Each candidate $i$ is a normalized NAO-space vector $c_i$.  Its occupation is computed from the NAO density,
+\begin{align}
+	n_i = c_i^{\mathrm{T}}\dens_{\nao}c_i,
+\end{align}
+and, for unrestricted references, its spin occupation is
+\begin{align}
+	m_i = c_i^{\mathrm{T}}\dens_{\nao}^{\mathrm{spin}}c_i.
+\end{align}
+The driver interprets the candidate type and electron count as
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+Candidate & Typical electron count & Occupied Lewis role & Other role \\
+\midrule
+\texttt{CR} & 2 & core & fixed framework \\
+\texttt{LP} & 2 or 1 & lone pair/radical lone pair & resonance donor \\
+\texttt{SOMO} & 1 & unpaired center & spin-density marker \\
+\texttt{BD(sigma)} & 2 & sigma bond & fixed framework \\
+\texttt{BD(pi)} & 2 or 1 & pi bond/radical pi object & active resonance object \\
+\texttt{BD*} & 0 & not occupied & acceptor diagnostic \\
+\texttt{RY} & 0 & not occupied & acceptor diagnostic \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Antibonding and Rydberg-like candidates are retained because they are essential for donor--acceptor diagnostics.  They are not inserted into the occupied Lewis table unless a future method layer explicitly changes their semantics.
+
+\subsection{Primary Lewis assignment}
+
+The primary Lewis assignment is an electron-counted selection of candidates.  If $x_i^{(0)}\in\{0,1\}$ denotes whether candidate $i$ is selected in the primary assignment, the selected electron count is
+\begin{align}
+	N_{\mathrm{sel}}^{(0)} = \sum_i x_i^{(0)} e_i,
+\end{align}
+where $e_i$ is the candidate electron count.  The assignment is accepted only if the molecular electron accounting and active-space requirements are satisfied within the implemented constraints.
+
+The selected list is partitioned as
+\begin{align}
+	\mathcal{L}_0
+	= \mathcal{L}_{\mathrm{fixed}}
+	\cup \mathcal{L}_{\mathrm{active}},
+\end{align}
+with further partitions
+\begin{align}
+	\mathcal{L}_{\mathrm{fixed}}
+	&= \mathcal{L}_{\mathrm{core}}
+	\cup \mathcal{L}_{\sigma}
+	\cup \mathcal{L}_{\mathrm{fixed\ LP}}, \\
+	\mathcal{L}_{\mathrm{active}}
+	&= \mathcal{L}_{\pi}
+	\cup \mathcal{L}_{\mathrm{active\ LP}}
+	\cup \mathcal{L}_{\mathrm{one\ electron}}.
+\end{align}
+This partition is the reason the same NBO driver can treat ordinary closed-shell pi resonance, lone-pair donation, anionic resonance, and radical alternatives without molecule-specific named rules.
+
+\subsection{Lewis score and alternatives}
+
+Each alternative $k$ is a different electron-counted selection $\mathcal{L}_k$ in the active space.  The implemented score can be written schematically as
+\begin{align}
+	s_k
+	= E_{\mathrm{occ}}(k)
+	+ E_{\mathrm{constraint}}(k)
+	+ E_{\mathrm{charge}}(k)
+	+ E_{\mathrm{octet}}(k)
+	+ E_{\mathrm{active}}(k),
+\end{align}
+where the terms represent occupation preference, required/forbidden bond satisfaction, formal-charge diagnostics, duet/octet diagnostics, and active-electron consistency.  The reported Lewis ranking weight remains the softmax quantity
+\begin{align}
+	w_k^{\mathrm{score}}
+	= \frac{\exp(-\beta s_k)}{\sum_j \exp(-\beta s_j)}.
+\end{align}
+This weight orders alternatives but is not a density fit.
+
+\subsection{NRA/NRT density reconstruction}
+
+For NRA/NRT, each alternative is converted into a model density.  The current implementation supports selected, pi, valence, and full NAO subspaces.  If $\Omega$ denotes the chosen subspace, the target vector is
+\begin{align}
+	\mathbf{d}_{\Omega} = \mathrm{vec}\left(\dens_{\nao}\big|_{\Omega}\right),
+\end{align}
+and each alternative gives a column
+\begin{align}
+	\mathbf{A}_{k,\Omega}
+	= \mathrm{vec}\left(\dens_k^{\mathrm{model}}\big|_{\Omega}\right).
+\end{align}
+The fitted weights solve Eq.~\eqref{eq:nra-section2}.  The resulting residual,
+\begin{align}
+	r_{\Omega}=\left\|\mathbf{d}_{\Omega}-\mathbf{A}_{\Omega}\mathbf{w}\right\|,
+\end{align}
+is part of the scientific output because it indicates whether the selected alternatives are sufficient to represent the density in that subspace.
+
+\subsection{Donor--acceptor diagnostics and current limits}
+
+The current donor--acceptor layer connects occupied donors $d$ to candidate-only acceptors $a$ through a density-based coupling diagnostic, which may be written generically as
+\begin{align}
+	\Delta_{d\rightarrow a}^{\dens}
+	\sim \left|c_d^{\mathrm{T}}\dens_{\nao}c_a\right|^2,
+\end{align}
+or, in the implementation, as the corresponding stored density-coupling quantity between the donor and acceptor candidate vectors.  This is intentionally not reported as the mature second-order NBO perturbation energy.  A perturbative expression would require an NBO Fock matrix and orbital-energy denominator, for example a layer of the form
+\begin{align}
+	E_{d\rightarrow a}^{(2)}
+	\propto
+	\frac{n_d |F_{da}^{\nbo}|^2}{\varepsilon_a-\varepsilon_d},
+\end{align}
+which is a future implementation target, not a current claim.
+
+The present NBO boundaries are therefore explicit: no final NHO directionality layer, no NBO Fock-matrix perturbation energies, no broad named-resonance classifier, and metal--ligand records are currently diagnostic analyzer candidates rather than coordination-aware Lewis or NRT assignments.
+
+\subsection{VB viewpoint: chemical structure as a wavefunction basis}
+
+In VB theory, the chemical structures are basis functions for an electronic wavefunction.  The ansatz is
+\begin{align}
+	|\Psi\rangle = \sum_I C_I |\Phi_I\rangle,
+\end{align}
+where the structures $|\Phi_I\rangle$ are generally nonorthogonal.  The structure overlap and Hamiltonian matrices are
+\begin{align}
+	S_{IJ}^{\vb} &= \langle \Phi_I | \Phi_J \rangle, \\
+	H_{IJ}^{\vb} &= \langle \Phi_I | \hat{H} | \Phi_J \rangle.
+\end{align}
+The stationary condition gives the generalized eigenvalue problem
+\begin{align}
+	\mathbf{H}^{\vb}\mathbf{C}
+	= E\,\mathbf{S}^{\vb}\mathbf{C},
+	\label{eq:vb-generalized-section2}
+\end{align}
+with normalization
+\begin{align}
+	\mathbf{C}^{\mathrm{T}}\mathbf{S}^{\vb}\mathbf{C}=1.
+\end{align}
+The VB driver therefore does not fit a density directly.  It constructs a wavefunction model and then reports coefficients and structure weights derived from the nonorthogonal metric.
+
+The Hamiltonian matrix ultimately depends on one- and two-electron integrals.  If active orbitals are expanded in the AO basis as $\phi_p=\sum_\mu C_{\mu p}\chi_\mu$, then
+\begin{align}
+	h_{pq} &= \sum_{\mu\nu} C_{\mu p} h_{\mu\nu} C_{\nu q}, \\
+	(pq|rs) &= \sum_{\mu\nu\lambda\sigma}
+	C_{\mu p}C_{\nu q}C_{\lambda r}C_{\sigma s}
+	(\mu\nu|\lambda\sigma).
+\end{align}
+For frozen-sigma or frozen-core embeddings, the active-space one-electron operator is modified by the inactive HF density,
+\begin{align}
+	\dens_{\mathrm{inactive}}
+	&= \dens_{\mathrm{HF}} - \dens_{\mathrm{active}}, \\
+	h^{\mathrm{eff}}_{\mu\nu}
+	&= h_{\mu\nu}
+	+ J_{\mu\nu}[\dens_{\mathrm{inactive}}]
+	- \frac{1}{2}K_{\mu\nu}[\dens_{\mathrm{inactive}}].
+\end{align}
+
+\subsection{VB structure weights}
+
+Because VB structures are nonorthogonal, the phrase ``weight of a structure'' is not unique.  The implementation therefore reports or discusses several different weight definitions.
+
+The simplest coefficient-square quantity,
+\begin{align}
+	W_I^{C^2} = C_I^2,
+\end{align}
+is easy to inspect but is not invariant to nonorthogonal basis transformations and generally does not sum to a meaningful population unless the structure basis is orthonormal.
+
+The Chirgwin--Coulson weight uses the VB metric explicitly,
+\begin{align}
+	W_I^{\mathrm{CC}}
+	= C_I\left(\mathbf{S}^{\vb}\mathbf{C}\right)_I,
+	\label{eq:cc-weight-section2}
+\end{align}
+and satisfies
+\begin{align}
+	\sum_I W_I^{\mathrm{CC}}
+	= \mathbf{C}^{\mathrm{T}}\mathbf{S}^{\vb}\mathbf{C}=1
+\end{align}
+for a normalized state.  However, individual Chirgwin--Coulson weights can be negative or larger than one in strongly nonorthogonal bases.
+
+A L\"owdin-style metric weight first forms symmetrically orthogonalized amplitudes,
+\begin{align}
+	\widetilde{\mathbf{C}}
+	= \left(\mathbf{S}^{\vb}\right)^{1/2}\mathbf{C},
+\end{align}
+and then defines
+\begin{align}
+	W_I^{\mathrm{L\ddot{o}wdin}}
+	= \widetilde{C}_I^2.
+	\label{eq:lowdin-weight-section2}
+\end{align}
+These weights are often more convenient for bounded visual interpretation, but they are still diagnostic quantities rather than observables.
+
+For determinant-CI fallback calculations in an orthonormal active-orbital basis, determinant weights reduce to coefficient squares,
+\begin{align}
+	W_D = |C_D|^2,
+\end{align}
+because the determinant metric is the identity.  The current VB implementation then groups determinants by chemically readable spatial occupations to obtain grouped resonance diagnostics,
+\begin{align}
+	W_G = \sum_{D\in G} |C_D|^2.
+\end{align}
+
+For graph-generated CSF or chemical-resonance templates $|\Theta_K\rangle$, the determinant-CI root $|\Psi_{\mathrm{det}}\rangle$ can be projected into the template subspace.  With template metric
+\begin{align}
+	M_{KL}=\langle \Theta_K|\Theta_L\rangle
+\end{align}
+and right-hand side
+\begin{align}
+	b_K=\langle \Theta_K|\Psi_{\mathrm{det}}\rangle,
+\end{align}
+the least-squares metric coefficients satisfy
+\begin{align}
+	\mathbf{M}\mathbf{a}=\mathbf{b}.
+\end{align}
+The captured-subspace weight is
+\begin{align}
+	W_{\mathrm{captured}}
+	= \langle \Psi_{\mathrm{proj}}|\Psi_{\mathrm{proj}}\rangle,
+	\qquad
+	|\Psi_{\mathrm{proj}}\rangle = \sum_K a_K |\Theta_K\rangle.
+\end{align}
+Normalized L\"owdin-style template weights are then used only to interpret the wavefunction inside the retained compact template subspace.
+
+\subsection{NBO/VB weight distinctions}
+
+The NBO and VB implementations therefore meet at the level of chemical orbital labels and Lewis-like alternatives, but they assign different mathematical meanings to weights:
+\begin{align}
+	\text{NBO score weight} &\neq \text{NRA/NRT density weight}, \\
+	\text{NRA/NRT density weight} &\neq \text{VB wavefunction weight}, \\
+	\text{VB coefficient} &\neq \text{VB structure weight in a nonorthogonal basis}.
+\end{align}
+This distinction is central to the article.  NBO extracts chemically localized structure from $\dens$; VB builds $|\Psi\rangle$ from chemically selected structures.  The shared analyzer makes the two routes consistent, while the separate NBO and VB drivers preserve the different mathematical meanings of density fitting, Lewis ranking, and wavefunction mixing.
+
+\section{Theory: VB active-space models and resonance diagnostics}
+
+\subsection{Two-electron H$_2$ reference model}
+
+The minimal H$_2$ model is the first nonorthogonal VB checkpoint.  It uses three structures,
+\begin{align}
+	\Phi_{\mathrm{cov}} &\sim \frac{1}{\sqrt{2}}
+	\left[a(1)b(2)+b(1)a(2)\right]\chi_{S=0}, \\
+	\Phi_{A^-B^+} &\sim a(1)a(2)\chi_{S=0}, \\
+	\Phi_{A^+B^-} &\sim b(1)b(2)\chi_{S=0},
+\end{align}
+where $a$ and $b$ are atom-centered active orbitals.  The driver constructs
+\begin{align}
+	S_{IJ}^{\vb}=\langle\Phi_I|\Phi_J\rangle,
+	\qquad
+	H_{IJ}^{\vb}=\langle\Phi_I|\hat{H}|\Phi_J\rangle,
+\end{align}
+and solves Eq.~\eqref{eq:vb-generalized-section2}.  This model is small enough that every overlap, Hamiltonian element, coefficient, and weight can be inspected.
+
+\subsection{Ethylene one-active-pi model}
+
+The ethylene checkpoint activates the analyzer-selected C=C $\pi$ candidate and freezes the sigma framework at the HF level.  The active model is still a two-electron/two-orbital VB-CI problem,
+\begin{align}
+	\mathcal{V}_{\mathrm{C=C}\ \pi}
+	= \left(N_{\mathrm{act}}=2,
+	n_{\mathrm{orb}}=2,
+	S=0\right),
+\end{align}
+but the Hamiltonian includes the inactive density through the frozen-HF embedding described below.  The generated structures are the pi-covalent and two pi-ionic structures.  The diagnostic output also reports which sigma candidates were inactive/frozen.
+
+\subsection{Fixed-orbital multi-center pi engine}
+
+The next layer generalizes the active model to
+\begin{align}
+	\mathcal{V}_{\pi}
+	= \left(N_{\mathrm{act}},n_{\pi},S,\{A_p\}_{p=1}^{n_{\pi}}\right),
+\end{align}
+where $A_p$ are the active pi centers.  The present validation ladder is
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+System & Active space & Spin & Current algebra \\
+\midrule
+allyl cation & 2e/3$\pi$ & singlet & spin-adapted two-electron VB \\
+allyl radical & 3e/3$\pi$ & doublet & determinant-CI fallback \\
+allyl anion & 4e/3$\pi$ & singlet & determinant-CI fallback \\
+butadiene & 4e/4$\pi$ & singlet & determinant-CI plus CSF projection \\
+benzene & 6e/6$\pi$ & singlet & determinant-CI plus CSF projection \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+For determinant-CI fallback calculations, the active orbitals are first orthonormalized,
+\begin{align}
+	\mathbf{Q}^{\mathrm{T}}\mathbf{S}_{\ao}\mathbf{Q}=\mathbf{I},
+\end{align}
+and the determinant Hamiltonian is built in the spin-orbital occupation-string basis.  For a determinant bitstring $D_I$, the Hamiltonian elements follow the Slater--Condon structure,
+\begin{align}
+	H_{IJ}^{\mathrm{det}}
+	= \langle D_I|\hat{H}|D_J\rangle.
+\end{align}
+In this orthonormal determinant basis, the determinant metric is the identity and coefficient-square weights are meaningful determinant weights.
+
+\subsection{Chemical resonance and CSF projection diagnostics}
+
+Determinant-CI is robust but not chemically compact.  The implementation therefore constructs graph-generated chemical resonance templates $\{\Theta_K\}$ and projects the determinant-CI root onto that template space.  With
+\begin{align}
+	M_{KL}=\langle\Theta_K|\Theta_L\rangle,
+	\qquad
+	b_K=\langle\Theta_K|\Psi_{\mathrm{det}}\rangle,
+\end{align}
+the template coefficients satisfy
+\begin{align}
+	\mathbf{M}\mathbf{a}=\mathbf{b}.
+\end{align}
+The implementation reports both the raw projection weights and the normalized L\"owdin-style interpretation inside the retained template subspace.  This is why the output distinguishes
+\begin{align}
+	W_{\mathrm{captured}}
+	\quad\text{from}\quad
+	\{W_K^{\mathrm{template}}\}.
+\end{align}
+The former measures how much of the determinant-CI root is captured by the compact template space; the latter describes the normalized composition inside that compact space.
+
+\subsection{Singlet root selection and phase convention}
+
+For singlet determinant-CI cases with equal numbers of alpha and beta electrons, the driver checks alpha/beta exchange symmetry.  If $\hat{P}_{\alpha\beta}$ exchanges alpha and beta occupation strings, a singlet-like root should have positive exchange parity,
+\begin{align}
+	p_{\alpha\beta}
+	= \langle\Psi|\hat{P}_{\alpha\beta}|\Psi\rangle > 0.
+\end{align}
+The butadiene checkpoint exposed the need to select the lowest exchange-symmetric root before CSF projection.  It also required the CSF template phases to be built directly in the alpha/beta occupation-string representation, avoiding a second application of creation-operator phase signs.
+
+\section{Theory: integral transformations and frozen embedding}
+
+\subsection{AO one-electron integrals}
+
+The one-electron AO Hamiltonian is assembled from kinetic and nuclear-attraction integrals,
+\begin{align}
+	h_{\mu\nu}
+	= T_{\mu\nu} + V_{\mu\nu}^{\mathrm{nuc}}.
+\end{align}
+In the current Python interface, this is obtained from the kinetic-energy and nuclear-potential drivers.  The AO overlap is
+\begin{align}
+	S_{\mu\nu}=\langle\chi_\mu|\chi_\nu\rangle.
+\end{align}
+These matrices are used both to normalize active orbitals and to transform between AO, NAO, and active orbital representations.
+
+\subsection{AO two-electron integrals}
+
+The electron-repulsion integrals are
+\begin{align}
+	(\mu\nu|\lambda\sigma)
+	= \iint
+	\chi_\mu(1)\chi_\nu(1)
+	\frac{1}{r_{12}}
+	\chi_\lambda(2)\chi_\sigma(2)
+	d\mathbf{r}_1d\mathbf{r}_2.
+\end{align}
+These integrals enter the active-space Hamiltonian after transformation from the AO basis to the selected active orbitals.
+
+\subsection{Transformation to active orbitals}
+
+For active orbital coefficients $C_{\mu p}$, the transformed active-space integrals are
+\begin{align}
+	S_{pq} &= \sum_{\mu\nu} C_{\mu p} S_{\mu\nu} C_{\nu q}, \\
+	h_{pq} &= \sum_{\mu\nu} C_{\mu p} h_{\mu\nu} C_{\nu q}, \\
+	(pq|rs) &= \sum_{\mu\nu\lambda\sigma}
+	C_{\mu p}C_{\nu q}C_{\lambda r}C_{\sigma s}
+	(\mu\nu|\lambda\sigma).
+\end{align}
+For nonorthogonal two-electron VB structures, $S_{pq}$ remains part of the structure overlap algebra.  For determinant-CI fallback calculations, the active orbitals are symmetrically orthonormalized before determinant Hamiltonian construction.
+
+\subsection{Two-electron spin-adapted matrix elements}
+
+For the two-orbital singlet model, each VB structure is expanded into spin-coupled product terms.  If a structure $I$ has terms $(p,q)$ with coefficients $u_{I,pq}$, then the overlap can be written schematically as
+\begin{align}
+	S_{IJ}^{\vb}
+	= \sum_{pqrs} u_{I,pq}u_{J,rs}
+	S_{pr}S_{qs},
+\end{align}
+and the Hamiltonian as
+\begin{align}
+	H_{IJ}^{\vb}
+	= \sum_{pqrs} u_{I,pq}u_{J,rs}
+	\left(
+	h_{pr}S_{qs}+S_{pr}h_{qs}+(pr|qs)+E_{\mathrm{nuc}}S_{pr}S_{qs}
+	\right).
+\end{align}
+This explicit algebra is the core of the H$_2$ and ethylene two-electron validation checkpoints.
+
+\subsection{Frozen-HF embedding}
+
+For embedded active spaces, the total HF density is partitioned as
+\begin{align}
+	\mathbf{P}_{\mathrm{HF}}
+	= \mathbf{P}_{\mathrm{active}}
+	+ \mathbf{P}_{\mathrm{inactive}}.
+\end{align}
+The inactive density creates an effective one-electron operator for the active problem,
+\begin{align}
+	h_{\mu\nu}^{\mathrm{eff}}
+	= h_{\mu\nu}
+	+ J_{\mu\nu}[\mathbf{P}_{\mathrm{inactive}}]
+	- \frac{1}{2}K_{\mu\nu}[\mathbf{P}_{\mathrm{inactive}}],
+\end{align}
+and a frozen constant contribution,
+\begin{align}
+	E_{\mathrm{frozen}}
+	= \mathrm{Tr}(\mathbf{P}_{\mathrm{inactive}}\mathbf{h})
+	+ \frac{1}{2}\mathrm{Tr}\left(\mathbf{P}_{\mathrm{inactive}}\mathbf{G}[\mathbf{P}_{\mathrm{inactive}}]\right)
+	+ E_{\mathrm{nuc}}.
+\end{align}
+The active-space calculation then uses $h^{\mathrm{eff}}$ and $E_{\mathrm{frozen}}$ instead of the bare one-electron Hamiltonian and nuclear repulsion alone.  The diagnostics report the active reference electron count, frozen electron count, and frozen constant energy.
+
+\part{VeloxChem implementation}
+
+\section{VeloxChem implementation: shared orbital-analysis layer}
+
+The shared orbital-analysis layer is the software device that makes the ``two faces of the same coin'' idea concrete.  Rather than letting the NBO and VB drivers construct separate and possibly inconsistent notions of a bond, lone pair, radical center, or pi orbital, VeloxChem now routes both drivers through a common \texttt{OrbitalAnalyzer} payload.  The analyzer does not decide the final chemical interpretation.  It constructs a neutral set of orbital data and candidate records; \texttt{NboDriver} and \texttt{VbDriver} then consume those records according to their own mathematical models.
+
+\subsubsection*{Analyzer inputs and outputs}
+
+The analyzer input is the minimal information needed to connect the molecular basis, an SCF reference, and optional chemical constraints:
+\begin{align}
+	\mathcal{I}_{\mathrm{analyzer}}
+	= \left(\mathcal{M},\mathcal{B},\mathbf{C}_{\mathrm{MO}},\mathcal{O},\mathcal{K}\right),
+\end{align}
+where $\mathcal{M}$ is the molecule, $\mathcal{B}$ is the AO basis, $\mathbf{C}_{\mathrm{MO}}$ denotes the molecular-orbital reference, $\mathcal{O}$ denotes analyzer options, and $\mathcal{K}$ denotes optional constraints.  If no molecular orbitals are supplied, the analyzer can still return AO maps.  With molecular orbitals, the full payload is
+\begin{align}
+	\mathcal{A}
+	= \{&\mathbf{a}_{\mathrm{atom}},
+	\mathbf{a}_{\ell},
+	\mathbf{S},
+	\mathbf{P},
+	\mathbf{T},
+	\dens_{\nao},
+	\dens^{\mathrm{spin}}_{\nao},
+	\mathcal{M}_{\mathrm{MO/NAO}},
+	\mathcal{C}_{\mathrm{orb}}\}.
+\end{align}
+Here $\mathbf{a}_{\mathrm{atom}}$ maps AO indices to atoms, $\mathbf{a}_{\ell}$ maps AO indices to angular momentum, $\mathbf{S}$ is the AO overlap matrix, $\mathbf{P}$ is the AO density matrix, $\mathbf{T}$ is the NAO transformation, $\mathcal{M}_{\mathrm{MO/NAO}}$ is the molecular-orbital composition analysis in the NAO basis, and $\mathcal{C}_{\mathrm{orb}}$ is the list of orbital candidates.
+
+The AO maps define two functions for every AO index $\mu$,
+\begin{align}
+	A(\mu) &= \text{atom carrying AO }\chi_\mu, \\
+	\ell(\mu) &= \text{angular momentum channel of AO }\chi_\mu.
+\end{align}
+These maps are small implementation details, but they are essential for reproducibility.  They define atom-local NAO blocks, atom-pair density blocks, pi-capable centers, and the active-orbital projections used by VB.
+
+\subsubsection*{NAO payload as the common coordinate system}
+
+The analyzer uses the NAO basis as the common coordinate system for both NBO and VB recognition.  The same orthonormality and density equations introduced in the theory section are therefore not merely formal equations; they define the software contract:
+\begin{align}
+	\mathbf{T}^{\mathrm{T}}\mathbf{S}\mathbf{T} &= \mathbf{I}, \\
+	\dens_{\nao} &= \mathbf{T}^{\mathrm{T}}\mathbf{S}\mathbf{P}\mathbf{S}\mathbf{T}.
+\end{align}
+Every candidate vector $c_i$ is stored in this NAO coordinate system and can be evaluated by
+\begin{align}
+	n_i &= c_i^{\mathrm{T}}\dens_{\nao}c_i, \\
+	m_i &= c_i^{\mathrm{T}}\dens^{\mathrm{spin}}_{\nao}c_i.
+\end{align}
+The same occupation $n_i$ may be used by NBO to rank or select a Lewis candidate and by VB to decide whether an analyzer candidate is a plausible active-orbital suggestion.  The meaning of the candidate is shared; the meaning of the final weight is not.
+
+\subsubsection*{Candidate-record schema}
+
+The analyzer candidate list is intentionally lightweight and dictionary-like.  A candidate record can be represented abstractly as
+\begin{align}
+	c_i = \{&\mathrm{index},\mathrm{type},\mathrm{subtype},\mathrm{atoms},
+	\mathrm{occupation},\mathrm{electron\_count},
+	\mathrm{polarization},\mathrm{coefficients},\mathrm{source},\ldots\}.
+\end{align}
+The present shared candidate families are summarized as
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Candidate family & Analyzer meaning & Downstream use \\
+\midrule
+\texttt{CR} & atom-local core orbital & NBO fixed Lewis core; VB frozen core diagnostic \\
+\texttt{LP} & one-center lone-pair candidate & NBO Lewis/resonance candidate; VB inactive or active suggestion \\
+\texttt{SOMO} & spin-active one-electron candidate & radical NBO/VB active-space information \\
+\texttt{BD(sigma)} & two-center sigma bond candidate & NBO sigma framework; VB inactive/frozen framework \\
+\texttt{BD(pi)} & two-center pi bond candidate & NBO pi resonance; VB pi active-space seed \\
+\texttt{BD*} & antibonding complement & NBO acceptor diagnostic; VB excluded/acceptor metadata \\
+\texttt{RY} & low-occupation one-center complement & NBO acceptor diagnostic; VB excluded/acceptor metadata \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A stable label can be built from the type, subtype, and serial index,
+\begin{align}
+	L_i = \mathrm{type}_i\_\mathrm{subtype}_i\_\mathrm{index}_i,
+\end{align}
+for example \texttt{BD\_pi\_4}.  The label is not the scientific object itself; it is a reproducible handle that allows notebook diagnostics, regression tests, NBO reports, and VB active-space summaries to refer to the same orbital candidate.
+
+\subsubsection*{NBO consumption of the analyzer payload}
+
+For NBO, the analyzer payload is consumed as a density-interpretation layer:
+\begin{align}
+	\mathcal{A}
+	\xrightarrow{\texttt{NboDriver}}
+	\left(\mathcal{L}_0,\{\mathcal{L}_k\},\mathbf{w}^{\mathrm{score}},
+	\mathbf{w}^{\mathrm{NRA/NRT}},\mathcal{D}_{\mathrm{DA}}\right).
+\end{align}
+Here $\mathcal{L}_0$ is the primary Lewis assignment, $\{\mathcal{L}_k\}$ are resonance alternatives, $\mathbf{w}^{\mathrm{score}}$ are Lewis ranking weights, $\mathbf{w}^{\mathrm{NRA/NRT}}$ are density-reconstruction weights, and $\mathcal{D}_{\mathrm{DA}}$ denotes donor--acceptor diagnostics.  The important point is that \texttt{NboDriver} owns the electron counting, Lewis scoring, resonance enumeration, and NRA/NRT fitting.  The analyzer supplies possible localized objects, not final resonance weights.
+
+\subsubsection*{VB consumption of the analyzer payload}
+
+For VB, the same candidate payload is consumed as an active-space suggestion layer:
+\begin{align}
+	\mathcal{A}
+	\xrightarrow{\texttt{VbDriver}}
+	\left(\mathcal{V},\{\Phi_I\},\mathbf{S}^{\vb},\mathbf{H}^{\vb},\mathbf{C},\mathcal{W}_{\vb}\right).
+\end{align}
+The active-space object $\mathcal{V}$ stores the active atoms, active candidate label, active orbitals, frozen candidates, inactive candidates, excluded candidates, electron count, and spin sector.  In a one-active-bond case, a two-center \texttt{BD(sigma)} or \texttt{BD(pi)} candidate is projected onto the two atom-local NAO blocks to form active orbitals.  In the multi-center pi cases, the analyzer pi candidates and NAO atom/angular maps are used to build one localized pi active orbital per selected center.
+
+This translation is deliberately one-way:
+\begin{align}
+	\text{candidate recognition} &\in \texttt{OrbitalAnalyzer}, \\
+	\text{Lewis assignment and density fitting} &\in \texttt{NboDriver}, \\
+	\text{VB structures, overlaps, and Hamiltonians} &\in \texttt{VbDriver}.
+\end{align}
+This separation prevents NBO-specific Lewis choices from becoming hidden assumptions in the VB wavefunction model.
+
+\subsubsection*{Candidate partitions and diagnostics}
+
+The VB driver exposes analyzer records in diagnostic partitions before using them in an active-space model:
+\begin{align}
+	\mathcal{C}_{\mathrm{orb}}
+	= \mathcal{C}_{\mathrm{core}}
+	\cup \mathcal{C}_{\sigma}
+	\cup \mathcal{C}_{\pi}
+	\cup \mathcal{C}_{\mathrm{LP}}
+	\cup \mathcal{C}_{\mathrm{rad}}
+	\cup \mathcal{C}_{\mathrm{acc}}
+	\cup \mathcal{C}_{\mathrm{other}}.
+\end{align}
+For ethylene, for example, the shared analyzer identifies the C=C sigma candidate, the C=C pi candidate, and the C--H sigma framework.  \texttt{VbDriver} can then activate the C=C pi candidate while reporting the sigma framework as inactive/frozen.  This is the core pattern used throughout the later fixed-orbital pi ladder.
+
+\subsubsection*{Analyzer-owned classification}
+
+The low-level candidate builder is now implemented inside \texttt{orbitalanalyzerdriver.py} as analyzer-private helper logic.  This makes the software architecture match the scientific architecture: candidate recognition belongs to \texttt{OrbitalAnalyzer}, while final NBO and VB interpretations belong to their respective drivers.  The public dependency relation is therefore
+\begin{align}
+	\texttt{NboDriver},\texttt{VbDriver}
+	\longrightarrow \texttt{OrbitalAnalyzer}.
+\end{align}
+There is no separate public orbital-classifier module.  Keeping the candidate builder inside the analyzer simplifies the dependency graph and makes it possible to test that NBO and VB see the same candidate labels and atom assignments.
+
+\subsubsection*{Implementation invariants}
+
+The article should later connect this section to source-level tests.  The important invariants are:
+\begin{align}
+	\left\|\mathbf{T}^{\mathrm{T}}\mathbf{S}\mathbf{T}-\mathbf{I}\right\| &< \epsilon, \\
+	\left|\mathrm{Tr}(\dens_{\nao})-N_e\right| &< \epsilon, \\
+	\sum_A q_A &= Q_{\mathrm{molecule}}, \\
+	\{L_i^{\mathrm{Analyzer}}\} &= \{L_i^{\mathrm{NBO}}\} = \{L_i^{\mathrm{VB\ diagnostics}}\}
+\end{align}
+for suitable numerical thresholds and for workflows where all three views are requested.  These invariants are more important than cosmetic report formatting because they ensure that both drivers are interpreting the same density-derived orbital information.
+
+\section{VeloxChem implementation: NBO driver}
+
+The NBO implementation is organized as a density-interpretation pipeline.  In compact form, the driver maps
+\begin{align}
+	\left(\mathbf{S},\mathbf{P},\mathcal{A}\right)
+	\longrightarrow
+	\left(\mathcal{N},\mathcal{P}_{\mathrm{NPA}},\mathcal{C}_{\mathrm{orb}},
+	\mathcal{L}_0,\{\mathcal{L}_k\},\mathcal{R}_{\mathrm{NRA}},\mathcal{D}_{\mathrm{DA}}\right),
+\end{align}
+where $\mathcal{N}$ is the NAO payload, $\mathcal{P}_{\mathrm{NPA}}$ is the natural population analysis, $\mathcal{C}_{\mathrm{orb}}$ is the analyzer candidate set, $\mathcal{L}_0$ is the primary Lewis assignment, $\{\mathcal{L}_k\}$ are resonance alternatives, $\mathcal{R}_{\mathrm{NRA}}$ contains optional NRA/NRT density-fitting results, and $\mathcal{D}_{\mathrm{DA}}$ contains donor--acceptor diagnostics.
+
+\subsubsection*{Driver pipeline}
+
+The implemented pipeline is deliberately layered:
+\begin{align}
+	\text{AO density}
+	&\rightarrow \text{NAO/NPA}, \\
+	&\rightarrow \text{MO-in-NAO analysis}, \\
+	&\rightarrow \text{NBO candidate records}, \\
+	&\rightarrow \text{primary Lewis assignment}, \\
+	&\rightarrow \text{Lewis/resonance alternatives}, \\
+	&\rightarrow \text{optional NRA/NRT density fitting}, \\
+	&\rightarrow \text{reports and diagnostics}.
+\end{align}
+The first three layers are supplied through \texttt{OrbitalAnalyzer}.  The NBO driver owns all subsequent interpretation: electron counting, Lewis scoring, active-space enumeration, NRA/NRT fitting, and textual reports.
+
+\section{VeloxChem implementation: VB driver}
+
+The VB implementation follows the opposite direction from NBO.  It takes analyzer-recognized chemical objects as input suggestions, constructs an active-space wavefunction model, and solves either a nonorthogonal VB generalized eigenvalue problem or an orthonormal determinant-CI reference problem.
+
+\subsubsection*{Driver pipeline}
+
+The current VB pipeline is
+\begin{align}
+	\mathcal{A}
+	&\rightarrow \mathcal{V}_{\mathrm{active}}, \\
+	&\rightarrow \{\phi_p^{\mathrm{active}}\}, \\
+	&\rightarrow \{\Phi_I\}\ \text{or}\ \{D_I\}, \\
+	&\rightarrow (\mathbf{S}^{\vb},\mathbf{H}^{\vb})\ \text{or}\ \mathbf{H}^{\mathrm{det}}, \\
+	&\rightarrow \left(E,\mathbf{C},\mathcal{W}_{\vb},\mathcal{D}_{\vb}\right).
+\end{align}
+Here $\mathcal{V}_{\mathrm{active}}$ is the active-space object, $\phi_p^{\mathrm{active}}$ are active orbitals, $\Phi_I$ are spin-adapted VB structures, $D_I$ are determinants in the fallback determinant-CI basis, $\mathcal{W}_{\vb}$ denotes the set of VB weight diagnostics, and $\mathcal{D}_{\vb}$ denotes additional diagnostics.
+
+\subsubsection*{VB roadmap boundaries}
+
+The current VB driver is not yet production BOVB or VBB.  The next method layers are:
+\begin{align}
+	\text{fixed-orbital determinant-CI}
+	\rightarrow \text{compact CSF Hamiltonians}
+	\rightarrow \text{BOVB}
+	\rightarrow \text{VBB}.
+\end{align}
+VBB is reserved for the Linares et al. Valence Bond BOND method, where BOND means Breathing Orbital Naturally Delocalized.
+
+\section{Integral and Hamiltonian implementation}
+
+The VB implementation depends directly on one- and two-electron integrals.  The theory section defines the AO one-electron Hamiltonian, electron-repulsion integrals, active-orbital transformations, spin-adapted two-electron matrix elements, and frozen-HF embedding equations.  This implementation section records how those objects are accessed and audited in VeloxChem.
+
+The current VB code obtains electron-repulsion integrals through
+\begin{center}
+\texttt{FockDriver.compute\_eri(molecule, basis, eri\_thresh=1.0e-12)}.
+\end{center}
+The explicit threshold is important for validation: if the ERI tensor is accidentally zero or overly screened, VB energies become physically meaningless.  The driver therefore checks that the ERI tensor is nonzero for multi-electron systems.
+
+\subsubsection*{Reproducibility implications}
+
+Integral access is not just a computational detail.  It determines whether notebook examples and source tests can be reproduced.  The article should therefore describe the public ERI path, the screening threshold, the nonzero-ERI checks, and the distinction between AO, NAO, active nonorthogonal orbital, and orthonormal determinant-CI bases.
+
+\section{API and software architecture}
+
+The software architecture mirrors the scientific separation described above.  The public objects are small Python-facing drivers with structured result dictionaries rather than opaque report generators.
+
+\subsubsection*{Public driver responsibilities}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Object & Scientific role & Owns \\
+\midrule
+\texttt{OrbitalAnalyzer} & shared orbital recognition & AO maps, NAO/NPA, candidates \\
+\texttt{NboDriver} & density interpretation & Lewis assignment, alternatives, NRA/NRT \\
+\texttt{VbDriver} & wavefunction construction & active spaces, structures, Hamiltonians \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The intended dependency graph is
+\begin{align}
+	\texttt{NboDriver} &\leftarrow \texttt{OrbitalAnalyzer} \rightarrow \texttt{VbDriver}, \\
+	\texttt{OrbitalAnalyzer} &\supset \text{candidate-classification helper functions}.
+\end{align}
+The arrows indicate data flow, not inheritance.  The analyzer is not a base class for NBO or VB; it is a shared payload producer.
+
+\subsubsection*{Representative APIs}
+
+The analyzer workflow is conceptually
+\begin{verbatim}
+analysis = OrbitalAnalyzer(
+    molecule, basis, mol_orbs=scf.mol_orbs,
+    options=OrbitalAnalyzerOptions(...),
+).run()
+\end{verbatim}
+The NBO workflow is
+\begin{verbatim}
+results = NboDriver().compute(
+    molecule, basis, scf.mol_orbs,
+    options=NboComputeOptions(include_nra=True),
+    constraints=NboConstraints(...),
+)
+\end{verbatim}
+and the VB workflow is
+\begin{verbatim}
+results = VbDriver().compute(
+    molecule, basis,
+    options=VbComputeOptions(
+        mode="vbci",
+        active_pi_atoms=(0, 1, 2, 3),
+        active_electron_count=4,
+        active_spin="singlet",
+        freeze_inactive_orbitals=True,
+    ),
+)
+\end{verbatim}
+These examples should later be shortened or moved to a code-listing figure if journal formatting requires it.
+
+\subsubsection*{Result dictionaries as scientific objects}
+
+The result dictionaries are part of the scientific API.  They expose intermediate quantities so the implementation can be audited.  For NBO, important keys include
+\begin{align}
+	&\texttt{nao},\quad \texttt{npa},\quad \texttt{mo\_nao},\quad
+	\texttt{nbo\_candidates},\quad \texttt{primary\_assignment}, \\
+	&\texttt{alternatives},\quad \texttt{donor\_acceptor\_diagnostics},
+	\quad \texttt{nra},\quad \texttt{orbital\_analysis}.
+\end{align}
+For VB, important keys include
+\begin{align}
+	&\texttt{energy},\quad \texttt{structure\_coefficients},\quad
+	\texttt{overlap},\quad \texttt{Hamiltonian},\quad \texttt{weights}, \\
+	&\texttt{lowdin\_weights},\quad \texttt{active\_space},\quad
+	\texttt{orbital\_analysis},\quad \texttt{diagnostics}.
+\end{align}
+The diagnostics are intentionally verbose during method development because they allow tests to assert scientific invariants rather than merely checking that a calculation did not crash.
+
+\subsubsection*{Notebook and test policy}
+
+The notebooks serve as human-readable validation narratives: they show the active candidates, weights, resonance labels, plots, and compact summaries.  They are not the only validation layer.  Source-level regression tests should encode the invariants that must not change, for example
+\begin{align}
+	\sum_I W_I^{\mathrm{VB}} &\approx 1, \\
+	\sum_K W_K^{\mathrm{template}} &\approx 1, \\
+	W_{\mathrm{captured}}^{\mathrm{butadiene}} &> 10^{-3}, \\
+	p_{\alpha\beta}^{\mathrm{singlet}} &> 0.5.
+\end{align}
+This policy is especially important because notebooks can retain stale kernel state.  The source tests are the regression source of truth; notebooks are demonstrations and interpretation aids.
+
+\subsubsection*{Roadmap as API discipline}
+
+The planned extensions should preserve the same separation of responsibilities.  Metal--ligand recognition belongs first in \texttt{OrbitalAnalyzer}; coordination-aware Lewis/NRT analysis belongs in \texttt{NboDriver}; metal--ligand active-space wavefunctions, BOVB, and VBB belong in \texttt{VbDriver}.  This API discipline is the main software-design result of the implementation.
+
+\section{Validation examples and roadmap}
+
+Validation was organized as a ladder rather than as a single end-to-end demonstration.  The reason is practical and scientific: NBO analysis validates density interpretation, whereas VB analysis validates wavefunction construction and Hamiltonian algebra.  The shared analyzer is validated by invariants that both drivers need.  The article should therefore present validation as three coupled layers,
+\begin{align}
+	\mathcal{V}_{\mathrm{all}}
+	= \mathcal{V}_{\mathrm{analyzer}}
+	\cup \mathcal{V}_{\mathrm{NBO}}
+	\cup \mathcal{V}_{\mathrm{VB}}.
+\end{align}
+
+\subsubsection*{Validation philosophy}
+
+The lowest layer verifies numerical consistency of the orbital representation.  The central checks are
+\begin{align}
+	\left\|\mathbf{T}_{\nao}^{\mathrm{T}}\mathbf{S}\mathbf{T}_{\nao}-\mathbf{I}\right\| &< \epsilon_{\mathrm{orth}}, \\
+	\left|\mathrm{Tr}\left(\dens_{\nao}\right)-N_e\right| &< \epsilon_N, \\
+	\left|\sum_A q_A-Q_{\mathrm{mol}}\right| &< \epsilon_q.
+\end{align}
+These tests are not cosmetic.  If they fail, then neither Lewis assignments nor VB active spaces have a stable meaning.
+
+The NBO layer then checks that the analyzer payload can be interpreted as a chemically consistent Lewis model.  The VB layer checks that the same candidate information can be used to build active wavefunction models whose overlaps, Hamiltonians, determinant counts, and resonance diagnostics are internally consistent.
+
+\begin{figure}[htbp]
+\centering
+\fbox{%
+\begin{minipage}{0.92\linewidth}
+\centering
+\textbf{Shared validation workflow}\\[0.6em]
+\begin{tabular}{c@{\quad$\longrightarrow$\quad}c@{\quad$\longrightarrow$\quad}c}
+AO density and integrals & shared analyzer invariants & NBO/VB driver checks \\
+\end{tabular}\\[0.8em]
+\begin{tabular}{p{0.27\linewidth}p{0.29\linewidth}p{0.29\linewidth}}
+\toprule
+Analyzer & NBO & VB \\
+\midrule
+NAO orthonormality; charge conservation; candidate labels & Lewis electron count; resonance alternatives; NRA/NRT residuals; donor--acceptor diagnostics & active electron count; determinant count; overlap/Hamiltonian sanity; VB and CSF weights \\
+\bottomrule
+\end{tabular}
+\end{minipage}}
+\caption{Validation is split into shared analyzer checks and driver-specific scientific checks.  The same density-derived orbital vocabulary must support both NBO interpretation and VB wavefunction construction.}
+\label{fig:validation-workflow}
+\end{figure}
+
+\subsubsection*{NBO validation categories}
+
+The current NBO validation categories are:
+\begin{enumerate}[leftmargin=*]
+	\item \textbf{NAO/NPA consistency:} orthonormality, electron conservation, atomic charge conservation, and spin-density conservation for open-shell cases.
+	\item \textbf{Candidate metadata:} every candidate must have a type, occupation, center list, coefficient vector, and stable label.
+	\item \textbf{Lewis accounting:} selected candidates must satisfy electron-count requirements and distinguish fixed, active, sigma, pi, lone-pair, and one-electron objects.
+	\item \textbf{Constraint handling:} user-required and user-forbidden candidates must change the selected Lewis model in predictable ways.
+	\item \textbf{Alternative enumeration:} closed-shell, radical, anionic, and polar pi examples must produce exact active electron counts.
+	\item \textbf{NRA/NRT fits:} fitted weights must be non-negative, normalized, and accompanied by residual norms.
+	\item \textbf{Donor--acceptor diagnostics:} donor and acceptor candidate labels must be stable, and the current output must be described as density-coupling diagnostics rather than mature perturbative $E^{(2)}$ energies.
+\end{enumerate}
+
+For NRA/NRT, the basic validation equations are
+\begin{align}
+	w_k &\geq 0, \\
+	\sum_k w_k &= 1, \\
+	r_{\Omega} &= \left\|\mathbf{d}_{\Omega}-\mathbf{A}_{\Omega}\mathbf{w}\right\|.
+\end{align}
+The residual $r_{\Omega}$ should be reported together with the weights because a normalized fit can still be chemically incomplete if the candidate alternatives do not span the target density block.
+
+\subsubsection*{VB validation ladder}
+
+The VB validation ladder starts from the smallest nonorthogonal model and then increases the number of active orbitals and active electrons.  The ladder is summarized in Fig.~\ref{fig:vb-validation-ladder}.
+
+\begin{figure}[htbp]
+\centering
+\fbox{%
+\begin{minipage}{0.92\linewidth}
+\centering
+\textbf{VB validation ladder}\\[0.7em]
+\begin{tabular}{c@{\ }c@{\ }c@{\ }c@{\ }c@{\ }c@{\ }c}
+H$_2$ & $\longrightarrow$ & C$_2$H$_4$ & $\longrightarrow$ & allyl family & $\longrightarrow$ & butadiene/benzene \\
+2e/2o & & 2e/2$\pi$ & & 2--4e/3$\pi$ & & 4e/4$\pi$, 6e/6$\pi$ \\
+nonorthogonal VB & & frozen-framework VB & & determinant-CI fallback & & CSF/resonance projection \\
+\end{tabular}\\[0.7em]
+\begin{tabular}{p{0.21\linewidth}p{0.21\linewidth}p{0.21\linewidth}p{0.21\linewidth}}
+\toprule
+H$_2$ & Ethylene & Allyl cation/radical/anion & Butadiene and benzene \\
+\midrule
+overlap and ionic/covalent weights & one active pi bond with frozen sigma/core embedding & active electron counting and determinant dimensions & exchange-symmetric singlet roots and CSF template weights \\
+\bottomrule
+\end{tabular}
+\end{minipage}}
+\caption{The VB validation ladder increases chemical and algebraic complexity step by step.  The present tests emphasize fixed-orbital models, determinant counts, root selection, and chemically labeled resonance diagnostics.}
+\label{fig:vb-validation-ladder}
+\end{figure}
+
+For a determinant-CI fallback with $M$ spatial active orbitals, $N_{\alpha}$ alpha electrons, and $N_{\beta}$ beta electrons, the determinant count is
+\begin{align}
+	N_{\mathrm{det}}
+	= \binom{M}{N_{\alpha}}\binom{M}{N_{\beta}}.
+\end{align}
+This simple combinatorial check is one of the most useful regression tests because it catches mistakes in active electron counts, spin selection, and active orbital construction before chemical weights are interpreted.
+
+For singlet pi systems, root selection and resonance projection are checked with
+\begin{align}
+	p_{\alpha\beta}
+	= \langle\Psi|\hat{P}_{\alpha\beta}|\Psi\rangle,
+	\qquad
+	W_{\mathrm{captured}}
+	= \langle\Psi|\hat{P}_{\Theta}|\Psi\rangle,
+\end{align}
+where $\hat{P}_{\Theta}$ is the projector onto the retained CSF/template resonance space.  The butadiene example is an important checkpoint because it requires the lowest exchange-symmetric singlet root and a consistent phase convention in the alpha/beta occupation-string basis.
+
+\subsubsection*{Metal--ligand validation and roadmap}
+
+\textbf{Current prototype and future development.}  Metal--ligand recognition is now implemented at the analyzer level as candidate metadata, not as an automatic NBO Lewis assignment.  The first implemented diagnostic split is
+\begin{align}
+	\mathrm{ML}/\sigma\text{-acceptor}
+	&: \text{ligand-to-metal sigma donation}, \\
+	\mathrm{ML}/\pi\text{-donor}
+	&: \text{metal-to-ligand pi back-donation}.
+\end{align}
+The naming is from the metal-ligand channel perspective: in the sigma channel the ligand is the donor and the metal is the acceptor, whereas in the pi channel the metal is the donor and ligand pi-type nonbonding or low-occupation acceptor functions define the receiving channel.  The records store metal atom, ligand atom, donor atom, acceptor atom, coordination mode, channel label, and density-coupling strength.  A prototype notebook compares Pd--NH$_3$, Pd--PH$_3$, and Pd--carbene diagnostic payloads; in both controlled mock payloads and real-SCF def2-SVP examples, Pd--PH$_3$ shows a larger pi back-donation diagnostic than Pd--NH$_3$, and the carbene example exposes both strong sigma donation and a pi-acceptor channel.
+
+\texttt{NboDriver.compute()} exposes these records in a structured \texttt{metal\_ligand\_diagnostics} payload while keeping them out of the primary Lewis assignment.  \texttt{VbDriver.compute()} can explicitly select them as fixed-orbital active-space seeds.  The current metal--ligand VB-CI prototype compares a sigma-only active space with a combined sigma-plus-pi active space, allowing the pi back-donation pair to be switched on and off.  The future analyzer extension should refine metal centers, ligand donor atoms, hapticity, bridging modes, d-manifold character, and local-frame sigma/pi/delta diagnostics.  Later VB method layers should compare fixed-orbital VB-CI with BOVB and VBB treatments of orbital relaxation and correlation.
+
+\subsubsection*{Pedagogical dissociation placeholders}
+
+Two dissociation narratives are planned because they expose the same conceptual issue at different chemical complexity.
+
+\paragraph{H$_2$ dissociation.}
+The H$_2$ section should become a pedagogical comparison of restricted Hartree--Fock, broken-symmetry unrestricted Hartree--Fock, fixed-orbital VB-CI, VB-SCF, and later BOVB.  The intended story is that RHF fails qualitatively at dissociation, UHF restores a spin-broken one-determinant description, and VB restores the covalent/ionic chemical structure explicitly.  BOVB should then be introduced as the orbital-relaxation/correlation layer that lowers the ionic and covalent structures without changing the basic two-electron VB interpretation.
+
+\paragraph{Metal--ligand dissociation.}
+The analogous metal--ligand example should scan a Pd--ligand distance for Pd--NH$_3$ and Pd--PH$_3$.  The baseline comparison is RHF/UHF versus fixed-orbital VB-CI active spaces.  The first VB-CI scan keeps the sigma donation pair active and then switches the pi back-donation pair on and off,
+\begin{align}
+	\Delta E_{\pi}
+	= E_{\mathrm{VB-CI}}(\sigma+\pi)
+	- E_{\mathrm{VB-CI}}(\sigma),
+\end{align}
+where a negative value indicates stabilization from including the back-donation pair in the fixed-orbital model.  The later BOVB placeholder is to let sigma-donation and back-donation structures breathe separately, making it possible to discuss how much of the metal--ligand binding is fixed-orbital resonance mixing versus orbital relaxation/correlation.
+
+\subsubsection*{Validation status table}
+
+\begin{table}[htbp]
+\centering
+\caption{Validation status for the current implementation state.  The table distinguishes implemented regression checks from demonstrations and from roadmap items.}
+\label{tab:validation-status}
+\begin{tabular}{p{0.22\linewidth}p{0.31\linewidth}p{0.31\linewidth}}
+\toprule
+Area & Current validation & Remaining validation target \\
+\midrule
+Shared analyzer & NAO orthonormality, NPA charge conservation, candidate labels, density-derived occupations, and metal--ligand sigma/pi channel records & local coordination-frame, hapticity, and broader metal--ligand benchmark diagnostics \\
+NBO Lewis layer & electron-counted primary assignments, candidate partitions, constraints, alternative enumeration & larger named-resonance classification and broader chemical benchmark set \\
+NBO NRA/NRT & non-negative normalized weights and density residuals for selected subspaces & systematic comparison against mature NBO/NRT reference calculations \\
+NBO donor--acceptor & density-coupling donor/acceptor diagnostic with stable labels; metal--ligand records exposed as candidate-only diagnostics & NBO Fock matrix and second-order perturbative $E^{(2)}$ energies \\
+VB two-electron models & H$_2$ and ethylene fixed-orbital VB-CI, Chirgwin--Coulson and L\"owdin weights & geometry scans and comparison to reference VB programs \\
+VB multi-center pi & allyl family, butadiene, benzene determinant counts, active electron counts, resonance/CSF diagnostics & compact spin-adapted CSF Hamiltonians and larger conjugated systems \\
+VB roadmap methods & fixed-orbital determinant-CI scaffold; metal--ligand sigma-only and sigma-plus-pi active spaces & compact CSFs, BOVB, VBB, and pedagogical H$_2$/metal--ligand dissociation scans \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The current source-level VB regression file \texttt{tests/test\_vbdriver.py} covers fixed-orbital pi chemical resonance diagnostics and the butadiene phase/root-selection issue.  In the article, notebooks should be cited as demonstration narratives, whereas source tests should be cited as regression evidence.  A concise statement of the validation policy is:
+\begin{align}
+	\text{notebook demonstration} \neq \text{regression guarantee}.
+\end{align}
+This distinction is part of the honesty of the manuscript.
+
+\section{AI-assisted development process}
+\begin{itemize}[leftmargin=*]
+	\item Describe the iterative process reconstructed from documentation:
+		\begin{enumerate}
+			\item Build shared analyzer infrastructure.
+			\item Wire NBO and VB to the same candidate payload.
+			\item Validate H$_2$ VB-CI and two-electron spin algebra.
+			\item Add ethylene sigma/$\pi$ diagnostics and one-active-$\pi$ VB-CI.
+			\item Generalize to fixed-orbital multi-center $\pi$ active spaces through benzene.
+			\item Add chemically labeled determinant and CSF/resonance diagnostics.
+			\item Fix butadiene singlet root selection and CSF phase convention.
+			\item Add analyzer-level metal--ligand sigma-donation/back-donation diagnostics and fixed-orbital VB-CI active-space probes.
+			\item Move notebook checks into source-level regression tests.
+			\item Update documentation and roadmap.
+		\end{enumerate}
+	\item Be explicit about GPT-5.5 contribution categories: code suggestions, refactoring plans, documentation drafting, test suggestions, debugging hypotheses, and notebook summaries.
+	\item Be explicit about human responsibility: scientific direction, chemical interpretation, method naming, acceptance of implementation choices, running builds/tests, and final authorship decisions.
+\end{itemize}
+
+\section{Limitations and roadmap}
+\begin{itemize}[leftmargin=*]
+	\item Analyzer: metal--ligand recognition and d-manifold/local-frame diagnostics.
+	\item NBO: resonance-class grouping, candidate-only acceptor report, NHO layer, NBO Fock matrix, second-order donor--acceptor energies, coordination NBO analysis.
+	\item VB: compact spin-adapted CSF Hamiltonians, pedagogical H$_2$ and metal--ligand dissociation scans, BOVB, VBB, and production metal--ligand VB active spaces.
+	\item Emphasize that the present paper documents an implementation state and roadmap, not a claim that all classical NBO/VB functionality is complete.
+\end{itemize}
+
+\section{Conclusions}
+\begin{itemize}[leftmargin=*]
+	\item Re-state NBO/VB complementarity.
+	\item Highlight the shared analyzer contract as the main software-design result.
+	\item Highlight transparent diagnostics and tests as the main reproducibility result.
+	\item Point to future BOVB, VBB, and metal--ligand extensions.
+\end{itemize}
+
+\appendix
+\section{Equation inventory and remaining manuscript notes}
+
+\subsection{AO, NAO, and density transformations}
+Planned equations:
+\begin{align}
+	\overlap_{\mu\nu} &= \langle \chi_\mu | \chi_\nu \rangle, \\
+	\mathbf{T}^{\mathrm{T}} \overlap \mathbf{T} &= \mathbf{I}, \\
+	\dens_{\nao} &= \mathbf{T}^{\mathrm{T}} \overlap\, \dens_{\ao}\, \overlap \mathbf{T}, \\
+	\dens^{\mathrm{spin}}_{\nao} &= \dens^{\alpha}_{\nao} - \dens^{\beta}_{\nao}.
+\end{align}
+
+Natural populations and charges:
+\begin{align}
+	N_A &= \mathrm{Tr}_A(\dens_{\nao}), \\
+	q_A &= Z_A - N_A.
+\end{align}
+
+Candidate occupations:
+\begin{align}
+	n(c) &= c^{\mathrm{T}} \dens_{\nao} c, \\
+	m(c) &= c^{\mathrm{T}} \dens^{\mathrm{spin}}_{\nao} c.
+\end{align}
+
+\subsection{NBO Lewis scoring and density fitting}
+Score-derived ranking weights:
+\begin{align}
+	w^{\mathrm{score}}_k = \frac{\exp(-\beta s_k)}{\sum_j \exp(-\beta s_j)}.
+\end{align}
+
+Closed-shell NRA/NRT density fit:
+\begin{align}
+	\min_{\mathbf{w}} \left\| \mathbf{d} - \mathbf{A}\mathbf{w} \right\|^2
+	\quad \mathrm{subject\ to} \quad
+	w_k \ge 0,\quad \sum_k w_k = 1.
+\end{align}
+
+Prior-regularized NRA/NRT:
+\begin{align}
+	\min_{\mathbf{w}} \left\| \mathbf{d} - \mathbf{A}\mathbf{w} \right\|^2
+	+ \lambda \left\| \mathbf{w} - \mathbf{w}_0 \right\|^2
+	\quad \mathrm{subject\ to} \quad
+	w_k \ge 0,\quad \sum_k w_k = 1.
+\end{align}
+
+Open-shell total-plus-spin fit:
+\begin{align}
+	\min_{\mathbf{w}}
+	\left\|
+	\begin{bmatrix}
+	\mathbf{d}_{\mathrm{tot}} \\
+	\mathbf{d}_{\mathrm{spin}}
+	\end{bmatrix}
+	-
+	\begin{bmatrix}
+	\mathbf{A}_{\mathrm{tot}} \\
+	\mathbf{A}_{\mathrm{spin}}
+	\end{bmatrix}
+	\mathbf{w}
+	\right\|^2,
+	\quad w_k \ge 0,\quad \sum_k w_k = 1.
+\end{align}
+
+\subsection{VB wavefunction, overlap, and generalized eigenproblem}
+VB wavefunction ansatz:
+\begin{align}
+	\Psi_{\vb} = \sum_I C_I \Phi_I.
+\end{align}
+
+Nonorthogonal structure matrices:
+\begin{align}
+	S_{IJ} &= \langle \Phi_I | \Phi_J \rangle, \\
+	H_{IJ} &= \langle \Phi_I | \hat{H} | \Phi_J \rangle.
+\end{align}
+
+Generalized eigenvalue problem:
+\begin{align}
+	\ham \mathbf{C} = E \overlap \mathbf{C}.
+\end{align}
+
+Chirgwin--Coulson and L\"owdin-style weights:
+\begin{align}
+	W_I^{\mathrm{CC}} &= C_I (\overlap \mathbf{C})_I, \\
+	\widetilde{\mathbf{C}} &= \overlap^{1/2}\mathbf{C}, \\
+	W_I^{\mathrm{L\ddot{o}wdin}} &= \widetilde{C}_I^2.
+\end{align}
+
+\subsection{Integral transformation and frozen embedding}
+One- and two-electron integrals:
+\begin{align}
+	h_{pq} &= \sum_{\mu\nu} C_{\mu p} h_{\mu\nu} C_{\nu q}, \\
+	(pq|rs) &= \sum_{\mu\nu\lambda\sigma}
+	C_{\mu p} C_{\nu q} C_{\lambda r} C_{\sigma s}
+	(\mu\nu|\lambda\sigma).
+\end{align}
+
+Frozen density partition:
+\begin{align}
+	\dens_{\mathrm{inactive}} &= \dens_{\mathrm{HF}} - \dens_{\mathrm{active}}.
+\end{align}
+
+Effective active-space one-electron operator:
+\begin{align}
+	h^{\mathrm{eff}}_{\mu\nu}
+	= h_{\mu\nu} + J_{\mu\nu}[\dens_{\mathrm{inactive}}]
+	- \frac{1}{2}K_{\mu\nu}[\dens_{\mathrm{inactive}}].
+\end{align}
+
+\subsection{Spin and determinant-CI diagnostics}
+Planned equations:
+\begin{itemize}[leftmargin=*]
+	\item alpha/beta occupation-string determinant basis;
+	\item second-quantized Slater--Condon Hamiltonian elements;
+	\item alpha/beta exchange operator used to identify singlet-symmetric roots;
+	\item projection of determinant-CI roots onto graph-generated CSF templates;
+	\item captured-subspace weight and normalized template weights.
+\end{itemize}
+
+\section{Planned figures}
+
+\subsection*{Figures already drafted in the manuscript}
+
+\begin{enumerate}[leftmargin=*]
+	\item \textbf{Shared validation workflow} (Fig.~\ref{fig:validation-workflow}). Analyzer, NBO, and VB validation layers.
+	\item \textbf{VB validation ladder} (Fig.~\ref{fig:vb-validation-ladder}). H$_2$ $\rightarrow$ ethylene $\rightarrow$ allyl family $\rightarrow$ butadiene/benzene.
+\end{enumerate}
+
+\subsection*{Figure to-do list}
+
+\begin{enumerate}[leftmargin=*]
+	\item \textbf{Conceptual two-face diagram.} Left: density $\rightarrow$ NBO Lewis structure. Right: VB structures $\rightarrow$ wavefunction. Center: shared chemical vocabulary.
+	\item \textbf{Software architecture diagram.} \texttt{OrbitalAnalyzer} as a hub feeding \texttt{NboDriver} and \texttt{VbDriver}; analyzer-owned candidate-classification helpers; public result dictionaries.
+	\item \textbf{NBO pipeline figure.} AO density $\rightarrow$ NAO/NPA $\rightarrow$ candidates $\rightarrow$ Lewis alternatives $\rightarrow$ NRA/NRT $\rightarrow$ reports.
+	\item \textbf{VB pipeline figure.} Analyzer candidates $\rightarrow$ active-space selection $\rightarrow$ active orbitals $\rightarrow$ structures/determinants $\rightarrow$ matrices $\rightarrow$ diagnostics.
+	\item \textbf{Pedagogical dissociation figure.} H$_2$ and Pd--ligand dissociation as parallel examples: RHF, UHF, fixed-orbital VB-CI, and future BOVB.
+	\item \textbf{Metal--ligand active-space figure.} Sigma-only two-orbital model versus sigma-plus-pi four-orbital model, showing the back-donation on/off comparison.
+	\item \textbf{Integral layer figure.} AO integrals from VeloxChem C++ backend/Python API, transformation to active orbitals, frozen-HF embedding.
+	\item \textbf{Weight taxonomy figure.} Lewis score weights vs NRA/NRT density weights vs VB wavefunction weights.
+	\item \textbf{Process timeline figure.} AI-assisted development sequence from shared analyzer to documentation and tests.
+\end{enumerate}
+
+\section{Planned tables}
+
+\subsection*{Tables already drafted in the manuscript}
+
+\begin{enumerate}[leftmargin=*]
+	\item \textbf{Validation-status table} (Table~\ref{tab:validation-status}). Current analyzer, NBO, and VB validation state with remaining targets.
+\end{enumerate}
+
+\subsection*{Table to-do list}
+
+\begin{enumerate}[leftmargin=*]
+	\item Driver responsibility table: \texttt{OrbitalAnalyzer}, \texttt{NboDriver}, \texttt{VbDriver}.
+	\item Candidate-family table: \texttt{CR}, \texttt{LP}, \texttt{SOMO}, \texttt{BD}, \texttt{BD*}, \texttt{RY}; NBO role; VB role.
+	\item Weight-definition table: score/ranking, density-fit, Chirgwin--Coulson, L\"owdin, CSF projection.
+	\item Future-roadmap table: analyzer metal--ligand recognition, NBO remaining layers, VB compact CSF/BOVB/VBB.
+	\item Dissociation comparison table: RHF, UHF, fixed-orbital VB-CI, VB-SCF, and BOVB for H$_2$ and representative metal--ligand scans.
+\end{enumerate}
+
+\section{Reference plan}
+
+Reference targets to verify and format before manuscript submission:
+\begin{itemize}[leftmargin=*]
+	\item NBO foundations: Foster--Weinhold natural hybrid orbitals; Reed--Weinhold natural bond orbital analysis; Reed--Curtiss--Weinhold donor--acceptor review; modern NBO program documentation.
+	\item NPA/NRA/NRT: natural population analysis and natural resonance theory references.
+	\item VB theory: classical VB and modern VB theory texts/reviews, including Shaik and Hiberty.
+	\item Nonorthogonal structure weights: Chirgwin--Coulson and L\"owdin orthogonalization/population references.
+	\item Integral and determinant algebra: Slater--Condon rules, nonorthogonal CI/VB matrix element references.
+	\item BOVB and VBB: BOVB references and Linares et al. VBB reference to be supplied/verified.
+	\item VeloxChem program reference.
+	\item AI-assisted scientific software/documentation references or policy statements, if needed by the target journal.
+\end{itemize}
+
+\begin{thebibliography}{99}
+\bibitem{FosterWeinhold1980} J. P. Foster and F. Weinhold, natural hybrid orbital/NBO foundations; full citation to verify.
+\bibitem{ReedCurtissWeinhold1988} A. E. Reed, L. A. Curtiss, and F. Weinhold, donor--acceptor NBO interpretation; full citation to verify.
+\bibitem{NBOProgram} E. D. Glendening and co-workers, modern NBO program documentation; exact version/reference to verify.
+\bibitem{ShaikHibertyVB} S. Shaik and P. C. Hiberty, modern valence bond theory reference; full citation to verify.
+\bibitem{Lowdin1950} P.-O. L\"owdin, symmetric orthogonalization/population analysis reference; full citation to verify.
+\bibitem{ChirgwinCoulson1950} B. H. Chirgwin and C. A. Coulson, nonorthogonal structure weights; full citation to verify.
+\bibitem{SlaterCondon} Slater--Condon determinant rules; full citation to verify.
+\bibitem{BOVB} Breathing-orbital valence bond reference; full citation to verify.
+\bibitem{LinaresVBB} M. Linares and co-workers, Valence Bond BOND (Breathing Orbital Naturally Delocalized) method; full citation to supply.
+\bibitem{VeloxChem} VeloxChem program reference; full citation to verify.
+\end{thebibliography}
+
+\end{document}

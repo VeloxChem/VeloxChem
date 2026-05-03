@@ -214,11 +214,11 @@ These remain useful, but they are lower priority than the interpretation and val
 
 ### 8. Metal-ligand and coordination NBO analysis
 
-Goal: consume future `OrbitalAnalyzer` metal-ligand candidate records and make coordination chemistry interpretable without hard-coding organic Lewis assumptions into the analyzer.
+Goal: consume `OrbitalAnalyzer` metal-ligand candidate records and make coordination chemistry interpretable without hard-coding organic Lewis assumptions into the analyzer.
 
 Implementation steps:
 
-1. Accept analyzer candidate metadata for metal-ligand sigma donation, pi donation, and metal-to-ligand back-donation.
+1. Accept analyzer candidate metadata for metal-ligand sigma donation, pi donation, and metal-to-ligand back-donation. **Initial diagnostic exposure is implemented through `metal_ligand_diagnostics`.**
 2. Add coordination-aware electron-accounting terms that can coexist with the current organic duet/octet diagnostics but do not force octet-style penalties on transition-metal centers.
 3. Add scoring terms for ligand donor occupation, metal acceptor/back-donation occupation, and charge balance.
 4. Keep coordination candidates separate from selected occupied organic NBO tables until their electron-count semantics are explicit.
@@ -236,7 +236,9 @@ Acceptance checks:
 
 Goal: Centralize all orbital analysis, NAO construction, and classification in a single `OrbitalAnalyzer` class/module. This ensures that both the NBO and VB drivers use the same, chemically meaningful set of orbitals and labels, eliminating code duplication and inconsistencies.
 
-Current status: `NboDriver` and `VbDriver` now consume the same `OrbitalAnalyzer` payload (`nao_data`, `spin_data`, `mo_analysis`, and `orbital_candidates`). The communication layer has been confirmed: direct analyzer runs, NBO results, and VB diagnostics expose matching candidate records. The VB driver now uses those records to build the first generated H₂ one-active-bond model, while the NBO driver remains responsible for Lewis assignment, resonance alternatives, donor-acceptor diagnostics, NRA/NRT fitting, and reports. Any lower-level helper such as `orbitalclassifier.py` is private implementation detail, not a second driver-facing classifier.
+Current status: `NboDriver` and `VbDriver` now consume the same `OrbitalAnalyzer` payload (`nao_data`, `spin_data`, `mo_analysis`, and `orbital_candidates`). The communication layer has been confirmed: direct analyzer runs, NBO results, and VB diagnostics expose matching candidate records. The VB driver now uses those records to build the first generated H₂ one-active-bond model, while the NBO driver remains responsible for Lewis assignment, resonance alternatives, donor-acceptor diagnostics, NRA/NRT fitting, and reports. Candidate classification is now analyzer-owned implementation detail inside `orbitalanalyzerdriver.py`, not a second driver-facing classifier module. The analyzer also now emits metal-ligand `ML/sigma-acceptor` and `ML/pi-donor` diagnostic records, separating ligand-to-metal sigma donation from metal-to-ligand pi back-donation without forcing either channel into the primary Lewis assignment.
+
+Metal-ligand update: `NboDriver.compute()` exposes analyzer `ML` records through `metal_ligand_diagnostics`, while the primary Lewis assignment remains organic/electron-counted and excludes `ML` records. `VbDriver.compute()` can explicitly activate these records for fixed-orbital sigma-only and sigma-plus-back-donation VB-CI diagnostics; this remains separate from NBO Lewis selection.
 
 Implementation steps:
 
@@ -263,5 +265,17 @@ Benefits:
 - Guarantees that NBO analysis is always performed on a well-defined, classified set of orbitals.
 - Enables seamless integration with the VB driver and other modules.
 - Simplifies diagnostics and user interpretation.
+
+## Tomorrow restart notes
+
+Start from the current NBO scope and keep coordination chemistry diagnostic until its electron-count semantics are explicit:
+
+1. Re-open `docs/metal_ligand_recognition.ipynb` and inspect the `NboDriver.compute()` payload for `metal_ligand_diagnostics` on Pd--NH3 and Pd--PH3.
+2. Keep `ML/sigma-acceptor` and `ML/pi-donor` out of the primary selected Lewis table for now. They are candidate diagnostics, not occupied organic Lewis NBOs.
+3. The next NBO implementation work should focus on resonance-class grouping, class-level reporting, and the separate `BD*`/`RY` acceptor-candidate report before production coordination-NBO logic.
+4. For coordination chemistry, the next safe step is fuller reporting of metal center, ligand donor atoms, d-manifold character, and donation/back-donation diagnostics without changing the current Lewis assignment.
+5. Longer-term coordination NBO/NRT work should add explicit metal-center electron-accounting rules and, later, true NBO Fock-matrix second-order donor-acceptor energies. The current donor-acceptor values are density-coupling diagnostics only.
+
+Current safe stopping point: `NboDriver` consumes the shared analyzer payload, exposes metal-ligand diagnostics, preserves organic Lewis/NRA/NRT behavior, and leaves wavefunction weights to `VbDriver`.
 
 ---

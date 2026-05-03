@@ -7,6 +7,7 @@ The `OrbitalAnalyzer` class provides a unified interface for orbital analysis, A
 - AO-to-atom and AO-to-angular-momentum mapping
 - NAO/NPA payload construction when molecular orbitals are provided
 - Shared orbital candidate records for core, sigma, pi, lone pair, radical, antibonding, and Rydberg orbitals
+- Metal-ligand diagnostic candidate records separating ligand-to-metal sigma donation from metal-to-ligand pi back-donation
 - Centralized logic for NBO/VB orbital diagnostics
 - Used by both NBO and VB drivers for seamless integration
 
@@ -18,7 +19,8 @@ Implemented and validated:
 
 - AO-to-atom and AO-to-angular-momentum maps are provided through one public analyzer entry point.
 - RHF/UHF molecular orbitals can be converted into a shared NAO/NPA payload with total-density and spin-density diagnostics.
-- The analyzer returns canonical candidate records for `CR`, `LP`, `SOMO`, `BD(sigma)`, `BD(pi)`, `BD*`, and `RY` objects.
+- The analyzer returns canonical candidate records for `CR`, `LP`, `SOMO`, `BD(sigma)`, `BD(pi)`, `BD*`, `RY`, and metal-ligand `ML` diagnostic objects.
+- Metal-ligand recognition currently separates `ML/sigma-acceptor` records for ligand-to-metal sigma donation from `ML/pi-donor` records for metal-to-ligand pi back-donation.
 - `NboDriver` consumes this payload for candidate generation while retaining Lewis assignment, resonance enumeration, donor-acceptor diagnostics, NRA/NRT fitting, and reports.
 - `VbDriver` consumes the same payload for active-space selection, active/inactive/frozen partitioning, and traceable fixed-orbital VB active spaces.
 - Notebook and source-level checks confirm that direct analyzer results, NBO results, and VB diagnostics expose consistent candidate labels and atom/bond assignments.
@@ -27,7 +29,7 @@ Current boundaries:
 
 - The analyzer identifies and labels orbital candidates; it does not choose a VB wavefunction model.
 - The analyzer does not perform Lewis assignment, NRT fitting, BOVB, or orbital optimization.
-- `orbitalclassifier.py` remains a private implementation helper. Driver-facing code should depend on `OrbitalAnalyzer`, not on a separate public classifier.
+- Candidate classification is now implemented directly inside `orbitalanalyzerdriver.py` through analyzer-private helper functions. Driver-facing code should depend on `OrbitalAnalyzer`, not on a separate classifier module.
 
 ## API
 
@@ -57,6 +59,7 @@ analysis = analyzer.run()
 - `include_nbo_candidates`: include shared `CR`, `LP`, `BD`, `SOMO`, `BD*`, and `RY` candidate records.
 - `mo_analysis_top` and `mo_analysis_threshold`: control the printed/recorded MO-in-NAO composition.
 - `lone_pair_min_occupation`, `rydberg_max_occupation`, `bond_min_occupation`, `bond_min_atom_weight`, `pi_min_occupation`, and `conjugated_pi_max_path`: candidate-generation thresholds shared by NBO and VB.
+- `include_metal_ligand_candidates`: include analyzer-level `ML/sigma-acceptor` and `ML/pi-donor` diagnostic records for metal-ligand contacts.
 
 ### Diagnostics
 - `ao_to_atom`: NumPy array mapping AO index to atom index
@@ -64,7 +67,7 @@ analysis = analyzer.run()
 - `nao_data`: shared NAO/NPA data when molecular orbitals are available
 - `spin_data`: spin-resolved NAO density diagnostics
 - `mo_analysis`: molecular-orbital composition in the NAO basis
-- `orbital_candidates`: shared NBO-like orbital candidates used by NBO and VB
+- `orbital_candidates`: shared orbital candidates used by NBO and VB, including organic NBO-like candidates and optional metal-ligand diagnostic candidates
 
 ## Usage Example
 ```python
@@ -84,9 +87,25 @@ print('AO to l:', diagnostics.ao_to_l)
 
 ### Metal-ligand recognition
 
-The next major analyzer-level chemistry extension is recognition of metal-ligand bonding patterns. This should remain an orbital-recognition layer, not a Lewis/VB decision layer.
+The first analyzer-level metal-ligand recognition layer is now implemented as neutral `ML` diagnostic records. This remains an orbital-recognition layer, not a Lewis/VB decision layer.
 
-Planned capabilities:
+Implemented channels:
+
+1. **`ML/sigma-acceptor`**
+	- Represents ligand-to-metal sigma donation.
+	- The ligand atom is the donor; the metal atom is the acceptor.
+	- The record stores `channel="ligand-to-metal-sigma-donation"`, `donation_strength`, and metal/ligand atom metadata.
+
+2. **`ML/pi-donor`**
+	- Represents metal-to-ligand pi back-donation.
+	- The metal atom is the pi donor; ligand pi-type nonbonding and low-occupation acceptor functions define the receiving channel.
+	- The record stores `channel="metal-to-ligand-pi-back-donation"`, `back_donation_strength`, and metal/ligand atom metadata.
+
+The notebook `docs/metal_ligand_recognition.ipynb` illustrates the intended interpretation with Pd--NH3, Pd--PH3, and Pd--carbene examples. In the mock diagnostic payload, Pd--PH3 has a larger pi back-donation metric than Pd--NH3, and the carbene example exposes both strong sigma donation and a pi-acceptor/back-donation channel. The notebook also contains a real-SCF Pd--NH3/Pd--PH3 section where `NboDriver.compute()` exposes `metal_ligand_diagnostics` and `VbDriver.compute()` exposes the same records in diagnostic partitions.
+
+This implementation is intentionally diagnostic at the analyzer and NBO levels. It does not force metal-ligand records into the NBO primary Lewis table. In VB, metal-ligand records can now be selected explicitly as fixed-orbital active-space seeds, including a sigma-only model and a combined sigma-plus-pi back-donation model through `active_metal_ligand_channels`.
+
+Further planned capabilities:
 
 1. **Metal-center and ligand-donor detection**
 	- Detect transition-metal and main-group coordination centers from element labels, connectivity, and coordination number.
@@ -94,8 +113,8 @@ Planned capabilities:
 	- Preserve hapticity and bridging metadata where the connectivity graph supports it.
 
 2. **Coordination-bond candidate records**
-	- Add neutral candidate metadata for metal-ligand sigma donation, pi donation, and pi back-donation.
-	- Keep the existing `type`/`subtype`/`atoms`/`occupation`/`coefficients` schema, extending it with optional fields such as `metal_atom`, `ligand_atoms`, `coordination_mode`, and `donor_acceptor_role`.
+	- Keep neutral candidate metadata for metal-ligand sigma donation, pi donation, and pi back-donation.
+	- Keep the existing `type`/`subtype`/`atoms`/`occupation`/`coefficients` schema, extending it with optional fields such as `metal_atom`, `ligand_atom`, `coordination_mode`, and `donor_acceptor_role`.
 	- Avoid adding selected Lewis assignments in the analyzer; expose candidates only.
 
 3. **d-orbital and local-frame diagnostics**
@@ -105,7 +124,7 @@ Planned capabilities:
 
 4. **Downstream contracts**
 	- Let `NboDriver` decide whether metal-ligand candidates enter Lewis/NRT alternatives.
-	- Let `VbDriver` decide whether metal-ligand candidates become active orbitals in a VB active space.
+	- Let `VbDriver` decide whether metal-ligand candidates become active orbitals in a VB active space; the current prototype supports explicit fixed-orbital sigma-only and sigma-plus-pi selections.
 	- Add tests that verify ligand-field candidate metadata without requiring a final NBO or VB interpretation.
 
 Acceptance checks:
@@ -118,7 +137,19 @@ Acceptance checks:
 ## Alignment
 - The `OrbitalAnalyzer` is the single source of truth for orbital analysis in VeloxChem, used by both the NBO and VB drivers.
 - Keeps all orbital logic, diagnostics, and mapping consistent and robust across the codebase.
-- `orbitalclassifier.py` is not a separate public classifier. It is only a private implementation helper for candidate construction; drivers should consume the `OrbitalAnalyzer` payload.
+- Candidate classification is part of `OrbitalAnalyzer`. There is no separate public orbital-classifier module; drivers should consume the `OrbitalAnalyzer` payload.
+
+## Tomorrow restart notes
+
+Start from the current analyzer contract rather than changing public APIs:
+
+1. Re-open `docs/metal_ligand_recognition.ipynb` and `tests/test_orbitalanalyzer_metal.py` to recover the validated Pd--NH3/Pd--PH3 metal-ligand examples.
+2. Treat `ML/sigma-acceptor` and `ML/pi-donor` records as diagnostic orbital candidates. Do not move Lewis assignment, VB model selection, BOVB, or VBB logic into the analyzer.
+3. If continuing metal-ligand work, first verify the current candidate metadata on additional real SCF coordination complexes before adding new channel definitions.
+4. Useful next analyzer improvements are local coordination-frame diagnostics, d-manifold summaries, hapticity/bridging metadata, and stronger regression tests for candidate metadata stability.
+5. Keep downstream ownership clear: `NboDriver` decides whether coordination candidates enter future Lewis/NRT alternatives, and `VbDriver` decides whether they become fixed-orbital active spaces.
+
+Current safe stopping point: analyzer, NBO, and VB paths expose the same metal-ligand candidate records; `ML` records remain diagnostic-only at the analyzer/NBO level and optional fixed-orbital seeds in VB.
 
 ## Shared NBO/VB Analysis Contract
 
@@ -131,8 +162,9 @@ Acceptance checks:
 - `ao_to_atom` and `ao_to_l` maps
 - `nao_data` with NAO transform, density, populations, atom map, and angular-momentum map
 - `mo_analysis` in the NAO basis when molecular orbitals are provided
-- `orbital_candidates`: canonical records for `CR`, `LP`, `BD(sigma)`, `BD(pi)`, `SOMO`, `BD*`, and `RY`
+- `orbital_candidates`: canonical records for `CR`, `LP`, `BD(sigma)`, `BD(pi)`, `SOMO`, `BD*`, `RY`, and optional metal-ligand `ML` diagnostics
 - stable orbital type/subtype/index records and atom/bond metadata suitable for both NBO reporting and VB active-space construction
+- metal-ligand channel metadata (`sigma-acceptor` and `pi-donor`) suitable for coordination-aware NBO/VB extensions
 
 ### Driver Integration
 
@@ -142,7 +174,7 @@ Acceptance checks:
 
 ### Existing NAO Payloads
 
-For workflows that already have NAO data, `OrbitalAnalyzer.classify_nao_data(...)` classifies that payload through the same shared candidate builder. This keeps the public VB and NBO interfaces on `OrbitalAnalyzer` even when the candidate implementation lives in a private helper module.
+For workflows that already have NAO data, `OrbitalAnalyzer.classify_nao_data(...)` classifies that payload through the same analyzer-owned candidate builder. This keeps the public VB and NBO interfaces on `OrbitalAnalyzer` and avoids a second classifier dependency.
 
 ### Communication Check
 

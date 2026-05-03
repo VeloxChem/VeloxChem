@@ -19,9 +19,10 @@ BOVB is still an important target, but it should be introduced only after the ac
 - AO-to-atom and AO-to-angular-momentum maps.
 - NAO/NPA data from an RHF/UHF reference.
 - Shared candidate records for `CR`, `BD(sigma)`, `BD(pi)`, `LP`, `SOMO`, `BD*`, and `RY` candidates.
+- Metal-ligand `ML` diagnostic records with separate `sigma-acceptor` and `pi-donor` channels.
 - Candidate labels and atom assignments consumed consistently by NBO and VB.
 
-`orbitalclassifier.py` is only a private implementation helper used by `OrbitalAnalyzer`. Public workflows should not depend on it directly.
+Candidate classification is implemented inside `orbitalanalyzerdriver.py` as analyzer-private helper logic. Public workflows should not depend on a separate classifier module.
 
 ### VB driver responsibilities
 
@@ -36,6 +37,8 @@ BOVB is still an important target, but it should be introduced only after the ac
 - structure weights and diagnostics.
 
 The analyzer identifies orbitals; the VB driver decides how those orbitals become a wavefunction.
+
+For metal-ligand systems, the analyzer records are intentionally diagnostic: `ML/sigma-acceptor` marks ligand-to-metal sigma donation, while `ML/pi-donor` marks metal-to-ligand pi back-donation into ligand pi-type nonbonding/acceptor space. `VbDriver` can now explicitly select these records as fixed-orbital active-space seeds. The analyzer does not activate them automatically, and NBO still keeps them out of the primary Lewis table.
 
 ## Current status: 2026-05-03
 
@@ -54,6 +57,7 @@ Implemented and validated:
 - Graph-automorphism averaged displayed resonance weights with raw unsymmetrized diagnostics retained.
 - Singlet determinant-CI root selection by alpha/beta exchange symmetry before CSF projection.
 - CSF template phase convention matched to the determinant-CI alpha/beta occupation-string representation.
+- Explicit metal-ligand fixed-orbital active spaces through `active_metal_ligand_channels`, including sigma-only and combined sigma-plus-pi back-donation determinant-CI scans.
 - Notebook validation and source-level regression tests for the fixed-orbital π resonance diagnostics, including butadiene captured-subspace weight and singlet exchange parity.
 
 Current boundaries:
@@ -412,11 +416,19 @@ Acceptance checks:
 
 ### 4. Metal-ligand VB active spaces
 
-Once `OrbitalAnalyzer` exposes metal-ligand candidate records, `VbDriver` should support optional VB active spaces involving ligand donation and back-donation.
+`OrbitalAnalyzer` now exposes metal-ligand candidate records and `VbDriver` supports optional fixed-orbital VB active spaces involving ligand donation and back-donation.
+
+Current status:
+
+- `active_metal_ligand_channels=("sigma-acceptor",)` builds a sigma-only donor/acceptor active space.
+- `active_metal_ligand_channels=("sigma-acceptor", "pi-donor")` builds a combined sigma-plus-back-donation active space.
+- The combined model is currently a determinant-CI active space with the sigma donor/acceptor pair and the pi donor/acceptor pair active.
+- The notebook `docs/metal_ligand_recognition.ipynb` scans Pd--NH3 and Pd--PH3 distances and compares `E_sigma_only` with `E_sigma_plus_pi`.
 
 Planned steps:
 
 - Treat metal-ligand candidates as analyzer-provided active-orbital suggestions, not as automatic selected VB structures.
+- Add a pedagogical dissociation sequence for metal-ligand bonds analogous to H2: RHF, broken-symmetry UHF, fixed-orbital VB-CI, and later BOVB/VBB correlation-orbital relaxation.
 - Add metal-ligand VBB benchmarks only after the organic VBB method layer is defined and validated.
 - Keep determinant-CI fallback available because compact spin coupling for metal centers may be system dependent.
 - Add diagnostics separating ligand-field interpretation from organic π resonance interpretation.
@@ -441,7 +453,20 @@ Current fixed-orbital π implementation status:
 - [ ] Replace selected determinant-CI diagnostics by true spin-adapted CSF Hamiltonians where chemically useful.
 - [ ] Add BOVB prototype for a two-orbital benchmark.
 - [ ] Add VBB method notes and prototypes for H₂/ethylene-style benchmarks, then extend to allyl, butadiene, and benzene.
-- [ ] Add metal-ligand active-space support after analyzer metal-ligand recognition exists.
+- [x] Add fixed-orbital metal-ligand active-space support after analyzer metal-ligand recognition exists.
+- [ ] Add H2 and metal-ligand dissociation notebooks comparing RHF, UHF, fixed-orbital VB-CI, and future BOVB correlation/orbital-relaxation effects.
+
+## Tomorrow restart notes
+
+Start from the validated fixed-orbital baseline, not from BOVB/VBB:
+
+1. Re-open `docs/metal_ligand_recognition.ipynb` for the current Pd--NH3/Pd--PH3 real-SCF workflow and the sigma-only versus sigma-plus-pi VB-CI scan.
+2. The metal-ligand entry points to remember are `active_metal_ligand_channels=("sigma-acceptor",)` for the sigma-only model and `active_metal_ligand_channels=("sigma-acceptor", "pi-donor")` for the combined sigma/back-donation model.
+3. The best next documentation/example task is a clean dissociation comparison: RHF, broken-symmetry UHF, fixed-orbital VB-CI, and clearly marked future BOVB/VBB placeholders.
+4. The best next implementation task is still compact spin-adapted CSF Hamiltonians for selected organic π examples, using determinant-CI as the regression oracle.
+5. Do not claim BOVB, VBB, or production metal-ligand VB is implemented. The current metal-ligand model is a fixed-orbital determinant-CI prototype seeded by analyzer diagnostics.
+
+Current safe stopping point: fixed-orbital H2, ethylene, π-ladder, and metal-ligand sigma/sigma-plus-pi active-space diagnostics are in place; orbital relaxation and production coordination VB remain roadmap items.
 
 ## Documentation and notebook policy
 

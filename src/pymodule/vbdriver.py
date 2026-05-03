@@ -78,6 +78,7 @@ class VbComputeOptions:
 	active_bond: Optional[Tuple[int, int]] = None
 	active_candidate_label: Optional[str] = None
 	active_candidate_subtype: Optional[str] = None
+	active_metal_ligand_channels: Optional[Tuple[str, ...]] = None
 	active_pi_atoms: Optional[Tuple[int, ...]] = None
 	active_electron_count: Optional[int] = None
 	active_spin: str = "singlet"
@@ -149,7 +150,7 @@ class VbDriver:
 		vb_orbitals = [
 			VbOrbital(
 				label=f"{c['type']}_{c['subtype']}_{c['index']}",
-				coefficients=np.array([coef['coefficient'] for coef in sorted(c['coefficients'], key=lambda x: x['nao_index'])]),
+				coefficients=self._candidate_coefficient_vector(c, n_ao),
 				center=c['atoms'][0] if 'atoms' in c and len(c['atoms']) > 0 else None,
 				kind=c['type'],
 			)
@@ -347,8 +348,25 @@ class VbDriver:
 	def _candidate_label(self, candidate):
 		return f"{candidate['type']}_{candidate.get('subtype', '')}_{candidate['index']}".replace("__", "_")
 
+	def _candidate_coefficient_vector(self, candidate, n_ao):
+		coefficients = candidate.get("coefficients", {})
+		vector = np.zeros(n_ao)
+		if isinstance(coefficients, dict):
+			for index, value in coefficients.items():
+				index = int(index)
+				if 0 <= index < n_ao:
+					vector[index] = float(value)
+		else:
+			for item in coefficients:
+				if not isinstance(item, dict):
+					continue
+				index = int(item.get("nao_index", 0)) - 1
+				if 0 <= index < n_ao:
+					vector[index] = float(item.get("coefficient", 0.0))
+		return vector
+
 	def _candidate_summary_record(self, candidate):
-		return {
+		record = {
 			"label": self._candidate_label(candidate),
 			"type": candidate.get("type"),
 			"subtype": candidate.get("subtype"),
@@ -356,6 +374,21 @@ class VbDriver:
 			"occupation": candidate.get("occupation"),
 			"source": candidate.get("source"),
 		}
+		for key in (
+			"channel",
+			"metal_atom",
+			"ligand_atom",
+			"donor_atom",
+			"acceptor_atom",
+			"donor_acceptor_role",
+			"coordination_mode",
+			"interaction_strength",
+			"donation_strength",
+			"back_donation_strength",
+		):
+			if key in candidate:
+				record[key] = candidate.get(key)
+		return record
 
 	def _bond_candidate_summary(self, candidates):
 		bond_records = []
@@ -384,6 +417,7 @@ class VbDriver:
 			"pi_bonds": [],
 			"lone_pairs": [],
 			"radicals": [],
+			"metal_ligand": [],
 			"antibonds": [],
 			"rydberg": [],
 			"other": [],
@@ -402,6 +436,8 @@ class VbDriver:
 				partitions["lone_pairs"].append(record)
 			elif candidate_type == "SOMO":
 				partitions["radicals"].append(record)
+			elif candidate_type == "ML":
+				partitions["metal_ligand"].append(record)
 			elif candidate_type == "BD*" or candidate_subtype == "antibonding":
 				partitions["antibonds"].append(record)
 			elif candidate_type == "RY":
@@ -435,11 +471,22 @@ class VbDriver:
 			return True
 		if getattr(options, 'active_candidate_subtype', None) is not None:
 			return True
+		if getattr(options, 'active_metal_ligand_channels', None) is not None:
+			return True
 		if getattr(options, 'active_pi_atoms', None) is not None:
 			return True
 		return self._is_h2_molecule(molecule)
 
 	def _build_one_active_bond_space(self, molecule, basis, candidates, nao_data, options):
+		if getattr(options, 'active_metal_ligand_channels', None) is not None:
+			return self._build_metal_ligand_active_space(
+				molecule,
+				basis,
+				candidates,
+				nao_data,
+				options,
+			)
+
 		if getattr(options, 'active_pi_atoms', None) is not None:
 			active_pi_atoms = tuple(int(atom) for atom in options.active_pi_atoms)
 			if len(active_pi_atoms) > 2:
@@ -622,6 +669,181 @@ class VbDriver:
 			},
 		)
 
+	def _build_metal_ligand_active_space(self,
+									molecule,
+									basis,
+									candidates,
+									nao_data,
+									options):
+		requested_channels = tuple(
+			str(channel).lower()
+			for channel in getattr(options, 'active_metal_ligand_channels', ())
+		)
+		if not requested_channels:
+			raise RuntimeError("No metal-ligand active channels were requested.")
+
+		selected = []
+		for channel in requested_channels:
+			matches = [
+				candidate for candidate in candidates
+				if candidate.get('type') == 'ML' and
+				str(candidate.get('subtype', '')).lower() == channel
+			]
+			if not matches:
+				raise RuntimeError(
+					f"No metal-ligand candidate found for channel '{channel}'.")
+			selected.append(
+				max(matches,
+					key=lambda candidate: float(
+						candidate.get('interaction_strength', 0.0))))
+
+		active_orbitals = []
+		for candidate in selected:
+			active_orbitals.extend(
+				self._metal_ligand_channel_active_orbitals(
+					candidate,
+					nao_data,
+					molecule,
+					basis,
+				)
+			)
+		n_orbitals = len(active_orbitals)
+		electron_count = int(getattr(options, 'active_electron_count', None) or
+						 2 * len(selected))
+		spin = str(getattr(options, 'active_spin', 'singlet') or 'singlet').lower()
+		n_alpha, n_beta = self._active_spin_occupations(electron_count, spin)
+		structures = tuple(
+			self._determinant_active_structures(n_orbitals, n_alpha, n_beta))
+		selected_indices = {int(candidate.get('index', -1)) for candidate in selected}
+		active_atoms = tuple(
+			int(atom) for atom in sorted({
+				atom for candidate in selected
+				for atom in candidate.get('atoms', ())
+			}))
+		active_centers = tuple(
+			int(orbital.center) if orbital.center is not None else index
+			for index, orbital in enumerate(active_orbitals)
+		)
+
+		frozen = []
+		inactive = []
+		excluded = []
+		for candidate in candidates:
+			if int(candidate.get('index', -1)) in selected_indices:
+				continue
+			candidate_type = candidate.get('type')
+			candidate_subtype = candidate.get('subtype')
+			if candidate_type == 'CR':
+				frozen.append(candidate)
+			elif candidate_type in ('BD', 'LP', 'SOMO') and candidate_subtype != 'antibonding':
+				inactive.append(candidate)
+			else:
+				excluded.append(candidate)
+
+		channel_label = "+".join(requested_channels)
+		return VbActiveSpace(
+			active_bond=active_atoms,
+			active_candidate_label="metal_ligand_" + channel_label.replace('-', '_'),
+			active_candidate={
+				'index': -1,
+				'type': 'ML_SYSTEM',
+				'subtype': channel_label,
+				'atoms': active_atoms,
+				'occupation': float(sum(
+					float(candidate.get('occupation', 0.0))
+					for candidate in selected)),
+				'source': 'combined metal-ligand active space',
+				'component_candidate_labels': [
+					self._candidate_label(candidate) for candidate in selected
+				],
+			},
+			active_orbitals=tuple(active_orbitals),
+			structures=structures,
+			frozen_candidates=tuple(frozen),
+			inactive_candidates=tuple(inactive),
+			excluded_candidates=tuple(excluded),
+			metadata={
+				"source": "OrbitalAnalyzer",
+				"model": "metal-ligand-channel-determinant-ci",
+				"electron_count": electron_count,
+				"spin": spin,
+				"n_alpha": n_alpha,
+				"n_beta": n_beta,
+				"determinant_ci": True,
+				"determinant_count": len(structures),
+				"active_pi_atoms": active_centers,
+				"metal_ligand_channels": requested_channels,
+				"component_candidate_labels": [
+					self._candidate_label(candidate) for candidate in selected
+				],
+				"include_ionic": bool(options.include_ionic),
+				"frozen_hf_reference": bool(options.freeze_inactive_orbitals),
+			},
+		)
+
+	def _metal_ligand_channel_active_orbitals(self,
+									candidate,
+									nao_data,
+									molecule,
+									basis):
+		if nao_data is None:
+			raise RuntimeError(
+				"Metal-ligand active-space construction requires NAO data.")
+		candidate_vector = self._candidate_nao_vector(candidate, nao_data)
+		if candidate_vector is None:
+			raise RuntimeError(
+				"Metal-ligand candidate has no usable NAO coefficient vector.")
+		import veloxchem as vlx
+		S_ao = vlx.OverlapDriver().compute(molecule, basis).to_numpy()
+		atom_map = np.array(nao_data.atom_map, dtype=int)
+		orbitals = []
+		subtype = str(candidate.get('subtype') or 'ml').replace('-', '_')
+		for role, atom_key in (('donor', 'donor_atom'), ('acceptor', 'acceptor_atom')):
+			atom = int(candidate.get(atom_key))
+			indices = np.where(atom_map == atom)[0]
+			if len(indices) == 0:
+				raise RuntimeError(
+					f"No NAO functions found on metal-ligand {role} atom {atom}.")
+			nao_side = np.zeros_like(candidate_vector)
+			nao_side[indices] = candidate_vector[indices]
+			if np.linalg.norm(nao_side) <= 1.0e-14:
+				raise RuntimeError(
+					f"No {role} contribution in metal-ligand candidate {subtype}.")
+			coeffs = nao_data.transform @ nao_side
+			coeffs = self._s_normalize(coeffs, S_ao)
+			orbitals.append(
+				VbOrbital(
+					label=f"active_{subtype}_{role}_atom_{atom + 1}",
+					coefficients=coeffs,
+					center=atom,
+					kind="active",
+				)
+			)
+		return orbitals
+
+	def _determinant_active_structures(self, n_orbitals, n_alpha, n_beta):
+		from itertools import combinations
+
+		structures = []
+		for alpha_sites in combinations(range(n_orbitals), n_alpha):
+			alpha_occ = [0] * n_orbitals
+			for site in alpha_sites:
+				alpha_occ[site] = 1
+			for beta_sites in combinations(range(n_orbitals), n_beta):
+				beta_occ = [0] * n_orbitals
+				for site in beta_sites:
+					beta_occ[site] = 1
+				alpha_label = "a" + "".join(str(site + 1) for site in alpha_sites)
+				beta_label = "b" + "".join(str(site + 1) for site in beta_sites)
+				structures.append(
+					VbStructure(
+						label=f"det_{alpha_label}_{beta_label}",
+						occupation=(tuple(alpha_occ), tuple(beta_occ)),
+						spin='determinant',
+					)
+				)
+		return structures
+
 	def _active_spin_occupations(self, electron_count, spin):
 		if spin == 'singlet':
 			if electron_count % 2 != 0:
@@ -783,9 +1005,13 @@ class VbDriver:
 
 		bond_candidates = []
 		for candidate in candidates:
-			if candidate.get('type') != 'BD':
+			candidate_type = candidate.get('type')
+			if candidate_type not in ('BD', 'ML'):
 				continue
-			if candidate.get('subtype') not in ('sigma', 'pi'):
+			if (candidate_type == 'BD' and
+					candidate.get('subtype') not in ('sigma', 'pi')):
+				continue
+			if candidate_type == 'ML' and requested_label is None and requested_subtype is None:
 				continue
 			atoms = tuple(int(atom) for atom in candidate.get('atoms', ()))
 			if len(atoms) != 2:
@@ -834,10 +1060,19 @@ class VbDriver:
 		if nao_data is None or not candidate.get('coefficients'):
 			return None
 		vector = np.zeros(len(nao_data.populations))
-		for item in candidate.get('coefficients', []):
-			index = int(item['nao_index']) - 1
-			if 0 <= index < len(vector):
-				vector[index] = float(item['coefficient'])
+		coefficients = candidate.get('coefficients', [])
+		if isinstance(coefficients, dict):
+			for index, value in coefficients.items():
+				index = int(index)
+				if 0 <= index < len(vector):
+					vector[index] = float(value)
+		else:
+			for item in coefficients:
+				if not isinstance(item, dict):
+					continue
+				index = int(item.get('nao_index', 0)) - 1
+				if 0 <= index < len(vector):
+					vector[index] = float(item.get('coefficient', 0.0))
 		norm = float(np.linalg.norm(vector))
 		if norm <= 1.0e-14:
 			return None
