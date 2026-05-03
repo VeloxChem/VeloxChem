@@ -36,8 +36,6 @@
 #include <ranges>
 #include <cmath>
 
-#include <boost/math/special_functions/bessel.hpp>
-
 #include "CustomViews.hpp"
 #include "TensorComponents.hpp"
 #include "MathConst.hpp"
@@ -101,7 +99,7 @@ bessel_il_scaled(int l, double x) -> double
 
     // For smaller x
     const double nu = l + 0.5;
-    const double I = boost::math::cyl_bessel_i(nu, ax);
+    const double I = std::cyl_bessel_i(nu, ax);
     const double i_l = std::sqrt(M_PI / (2.0 * ax)) * I;
 
     return sgn * std::exp(-ax) * i_l;
