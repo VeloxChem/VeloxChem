@@ -433,13 +433,24 @@ class TpaDriver(NonlinearSolver):
                     sum_val += val[(w, -w, w)]
                 gamma[(w, -w, w)] = sum_val
 
-            ret_dict.update(other_dict)
-
             ret_dict.update({
-                't4_dict': t4_dict,
-                't3_dict': t3_dict,
+                'tpa_terms': {},
                 'gamma': gamma,
                 'frequencies': list(self.frequencies),
+            })
+
+            ret_dict['tpa_terms'].update(other_dict)
+            ret_dict['tpa_terms'].update({
+                't4_dict': t4_dict,
+                't3_dict': t3_dict,
+            })
+
+            tpa_spectrum = self.get_spectrum(ret_dict, 'au')
+            assert_msg_critical(
+                '[GM]' in tpa_spectrum['y_label'],
+                'TpaDriver: In valid unit in TPA spectrum y_label')
+            ret_dict.update({
+                'cross_sections': list(tpa_spectrum['y_data'])
             })
 
             self._print_results(ret_dict)
@@ -1001,14 +1012,14 @@ class TpaDriver(NonlinearSolver):
             '[GM]' in spectrum['y_label'],
             'TpaDriver._print_spectrum: In valid unit in y_label')
 
-        title = '{:<20s}{:<20s}{:>15s}'.format('Frequency[a.u.]',
-                                               'Frequency[eV]',
+        title = '{:<22s}{:<22s}{:>18s}'.format('Photon Energy[a.u.]',
+                                               'Photon Energy[eV]',
                                                'TPA cross-section[GM]')
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_header(('-' * len(title)).ljust(width))
 
         for w, cross_section in zip(spectrum['x_data'], spectrum['y_data']):
-            output = '{:<20.4f}{:<20.5f}{:>13.8f}'.format(
+            output = '{:<22.4f}{:<22.5f}{:>13.8f}'.format(
                 w, w * hartree_in_ev(), cross_section)
             self.ostream.print_header(output.ljust(width))
 
