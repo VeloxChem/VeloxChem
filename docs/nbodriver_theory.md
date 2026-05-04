@@ -246,5 +246,16 @@ The implemented theory is a density-based NBO/NRA/NRT model. The following conce
 - NBO Fock-matrix second-order donor-acceptor energies.
 - General automatic classification of every resonance pattern into named chemical classes.
 - VB or wavefunction state-mixing weights.
+- Metal-ligand `ML` records are diagnostic orbital-recognition objects. They can be used to follow ligand-to-metal sigma donation and metal-to-ligand pi back-donation in notebooks, but they are not yet coordination-aware Lewis/NRT structures and they are not VB dissociation energies.
 
 These boundaries do not weaken the implemented model; they make clear which quantities are available from the present density analysis and which require additional theoretical machinery.
+
+## Current metal-ligand interpretation checkpoint
+
+The current Pd--NH3/Pd--PH3 notebook separates three layers that should not be conflated:
+
+1. B3LYP constrained-scan and HF single-point total energies provide the validated reference potential-energy curves, plotted as `E(R) - E(5.0 Angstrom)`.
+2. Analyzer/NBO `ML/sigma-acceptor` and `ML/pi-donor` records provide density-based channel diagnostics along the same geometries.
+3. VB-SCF/BOVB sigma metal-ligand traces are downstream wavefunction diagnostics and are not currently accepted as validated dissociation-energy curves.
+
+This separation is the current scientific state: NBO owns density interpretation, VB owns wavefunction diagnostics, and only total-energy reference methods are presently used for quantitative Pd--ligand dissociation energies.

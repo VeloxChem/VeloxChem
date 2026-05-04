@@ -1,6 +1,6 @@
 # NboDriver API Guide
 
-`NboDriver` provides a structured Natural Bond Orbital analysis pipeline for VeloxChem wavefunctions. The driver consumes the shared `OrbitalAnalyzer` payload for Natural Atomic Orbitals (NAOs), Natural Population Analysis (NPA) data, MO-in-NAO diagnostics, and NBO-like candidates, then performs Lewis/resonance assignment, donor-acceptor diagnostics, and optional NRA/NRT density-fit weights.
+`NboDriver` provides a structured Natural Bond Orbital analysis pipeline for VeloxChem wavefunctions. The driver consumes the shared `OrbitalAnalyzer` payload for Natural Atomic Orbitals (NAOs), Natural Population Analysis (NPA) data, MO-in-NAO diagnostics, and NBO-like candidates, then performs Lewis/resonance assignment, resonance-class grouping, donor-acceptor diagnostics, and optional NRA/NRT density-fit weights.
 
 The API is intentionally transparent: every assignment carries explicit electron counts, atom participation, score terms, and density-fit metadata. This makes the results suitable for regression testing, method development, and chemical interpretation without hiding the distinction between Lewis ranking weights, density-fit weights, and future wavefunction weights.
 
@@ -86,7 +86,9 @@ A plain dictionary with the same keys is also accepted. Atom indices are zero-ba
 | `nbo_candidates` | Generated `CR`, `LP`, `BD`, `SOMO`, `BD*`, and `RY` candidates. |
 | `primary_assignment` | Selected Lewis/NBO assignment and score diagnostics. |
 | `alternatives` | Lewis/resonance alternatives used for reporting and NRA/NRT fitting. |
+| `resonance_classes` | Symmetry-equivalent resonance classes with degeneracy, member ranks, and class-level score/ranking weight summaries. |
 | `donor_acceptor_diagnostics` | Occupied-donor to `BD*`/`RY` acceptor density-coupling diagnostics. |
+| `metal_ligand_diagnostics` | Analyzer-owned metal-ligand diagnostic records, when present; not selected occupied organic Lewis NBOs. |
 | `nra` | Optional NRA/NRT density-fit weights and residuals. |
 | `orbital_analysis` | The shared `OrbitalAnalysisResult` used by NBO and VB; includes AO maps, NAO data, spin data, MO analysis, and candidate records. |
 
@@ -105,7 +107,7 @@ Primary assignments and alternatives expose the partition used by the resonance 
 | `active_lone_pair_nbo_list` | Active lone-pair donation candidates. |
 | `active_one_electron_nbo_list` | Active one-electron radical candidates. |
 
-The internal representation deliberately uses these mechanical fields rather than named chemical structure classes. Reports use molecule-independent pi-bond signatures such as `pi:1-2,3-4`; these signatures are annotations for display and prior matching, not separate structure types.
+The internal representation deliberately uses these mechanical fields rather than named chemical structure classes. Reports use molecule-independent resonance signatures such as `pi:1-2,3-4` or `pi:1-2; lp:3; pos:2`; these signatures are annotations for display, prior matching, and class grouping, not separate structure types.
 
 ## Equations and invariants
 
@@ -148,6 +150,35 @@ w_score,k = exp(-beta s_k) / sum_j exp(-beta s_j)
 
 where `s_k` is the Lewis score and `beta = options.lewis_weight_beta`. This weight ranks Lewis alternatives; it is not an NRA/NRT density weight and not a VB wavefunction weight.
 
+## Resonance classes
+
+When alternatives are available, `NboDriver` builds symmetry-equivalent resonance classes from graph automorphisms that preserve element labels and connectivity. Individual alternatives remain visible and keep their own `rank`, `score`, and score/ranking `weight`.
+
+Each alternative may contain:
+
+| Field | Meaning |
+| --- | --- |
+| `resonance_signature` | Structured one-based signature using pi bonds and active lone-pair, positive, and one-electron centers. |
+| `resonance_label` | Compact text form of the signature. |
+| `resonance_class_id` | Class id such as `R1`. |
+| `class_signature` | Canonical representative signature under graph automorphisms. |
+| `class_label` | Compact text form of the class signature. |
+| `class_degeneracy` | Number of alternatives in the class. |
+
+The top-level `results["resonance_classes"]` records contain class summaries:
+
+| Field | Meaning |
+| --- | --- |
+| `class_id` | Class id shared by member alternatives. |
+| `class_label` | Representative class label. |
+| `member_ranks` | Ranks of member alternatives. |
+| `member_labels` | Individual member resonance labels. |
+| `class_degeneracy` | Number of member alternatives. |
+| `class_weight_sum` | Sum of member score/ranking weights. |
+| `class_weight_mean`, `class_weight_min`, `class_weight_max` | Spread diagnostics for member score/ranking weights. |
+
+For benzene with ring pi bonds allowed, the two localized Kekule alternatives are grouped into one class with degeneracy 2. The class weight is the sum of the two localized score/ranking weights. This is still a Lewis ranking summary, not an NRA/NRT density weight.
+
 ## NRA/NRT density-fit weights
 
 When `include_nra=True`, the driver fits the SCF density as a convex combination of alternative-structure densities. For closed-shell systems the fit solves
@@ -186,9 +217,19 @@ The prior vector `w0`, regularization strength, and matched structures are repor
 
 The driver generates `BD*` antibonding complements and one-center `RY` acceptor complements as candidate-only objects. Occupied donors are coupled to these acceptors through a density-coupling diagnostic in the NAO basis. The diagnostic is useful for identifying plausible donation channels, but it is not an NBO second-order perturbation energy because the current driver does not use an NBO Fock matrix or energy denominator.
 
+In `nbo_report(level="full")`, the strongest candidate-only `BD*` and `RY` acceptor channels are shown in their own section. They are diagnostics only and are not selected occupied Lewis NBOs.
+
+## Metal-ligand diagnostics
+
+When the shared analyzer emits `ML` records, `compute` exposes them through `results["metal_ligand_diagnostics"]`. These records are analyzer-owned diagnostics for ligand-to-metal donation and metal-to-ligand back-donation channels. They are not currently inserted into occupied organic Lewis assignments. In `nbo_report(level="full")`, they are shown in a diagnostic-only metal-ligand section with metal atom, ligand atom, coordination mode, channel, occupation, donation strength, back-donation strength, and role.
+
+Current checkpoint, 2026-05-04: the real Pd--NH3/Pd--PH3 notebook uses these `ML` records to track sigma donation and pi back-donation along constrained Pd--ligand scans. The validated dissociation curves in that notebook are B3LYP constrained-scan total energies and HF single-point total energies shifted to the 5.0 Angstrom point. The `ML` records remain diagnostic NBO output; they do not define occupied Lewis NBOs and they do not by themselves provide a coordination-aware NRT or VB dissociation energy.
+
 ## Reports
 
-`primary_report(results)` summarizes the selected Lewis/NBO assignment, candidate counts, atom accounting, and donor-acceptor diagnostics.
+`primary_report(results)` summarizes the selected Lewis/NBO assignment, candidate counts, atom accounting, resonance classes, Lewis/resonance alternatives, and donor-acceptor diagnostics.
+
+`nbo_report(level="full")` includes the resonance-class table, the individual Lewis/resonance alternatives, the candidate-only `BD*`/`RY` acceptor section, and the diagnostic-only `ML` metal-ligand section when those data are present.
 
 `nra_report(results, level="summary")` prints compact NRA/NRT weights, residuals, spin-fit metadata, and prior metadata. `level="full"` includes structure details and active-space content.
 

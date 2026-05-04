@@ -11,7 +11,7 @@ The `OrbitalAnalyzer` class provides a unified interface for orbital analysis, A
 - Centralized logic for NBO/VB orbital diagnostics
 - Used by both NBO and VB drivers for seamless integration
 
-## Current status: 2026-05-03
+## Current status: 2026-05-04
 
 `OrbitalAnalyzer` is now the shared orbital-recognition layer for the NBO and VB drivers.
 
@@ -24,6 +24,7 @@ Implemented and validated:
 - `NboDriver` consumes this payload for candidate generation while retaining Lewis assignment, resonance enumeration, donor-acceptor diagnostics, NRA/NRT fitting, and reports.
 - `VbDriver` consumes the same payload for active-space selection, active/inactive/frozen partitioning, and traceable fixed-orbital VB active spaces.
 - Notebook and source-level checks confirm that direct analyzer results, NBO results, and VB diagnostics expose consistent candidate labels and atom/bond assignments.
+- The real Pd--NH3/Pd--PH3 scan notebook uses analyzer `ML/sigma-acceptor` and `ML/pi-donor` records to track donation/back-donation strengths along B3LYP constrained geometries. The analyzer role remains diagnostic recognition only: validated dissociation curves come from B3LYP/HF total energies, while metal-ligand VB-SCF/BOVB sigma traces remain downstream VB diagnostics.
 
 Current boundaries:
 
@@ -101,7 +102,7 @@ Implemented channels:
 	- The metal atom is the pi donor; ligand pi-type nonbonding and low-occupation acceptor functions define the receiving channel.
 	- The record stores `channel="metal-to-ligand-pi-back-donation"`, `back_donation_strength`, and metal/ligand atom metadata.
 
-The notebook `docs/metal_ligand_recognition.ipynb` illustrates the intended interpretation with Pd--NH3, Pd--PH3, and Pd--carbene examples. In the mock diagnostic payload, Pd--PH3 has a larger pi back-donation metric than Pd--NH3, and the carbene example exposes both strong sigma donation and a pi-acceptor/back-donation channel. The notebook also contains a real-SCF Pd--NH3/Pd--PH3 section where `NboDriver.compute()` exposes `metal_ligand_diagnostics` and `VbDriver.compute()` exposes the same records in diagnostic partitions.
+The notebook `docs/metal_ligand_recognition.ipynb` illustrates the intended interpretation with Pd--NH3, Pd--PH3, and Pd--carbene examples. In the mock diagnostic payload, Pd--PH3 has a larger pi back-donation metric than Pd--NH3, and the carbene example exposes both strong sigma donation and a pi-acceptor/back-donation channel. The notebook also contains a real-SCF Pd--NH3/Pd--PH3 section where `NboDriver.compute()` exposes `metal_ligand_diagnostics` and `VbDriver.compute()` exposes the same records in diagnostic partitions. The current scan section validates the B3LYP/HF reference potential-energy curves and uses analyzer `ML` strengths as channel diagnostics; it does not claim that the present metal-ligand VB sigma traces are production dissociation curves.
 
 This implementation is intentionally diagnostic at the analyzer and NBO levels. It does not force metal-ligand records into the NBO primary Lewis table. In VB, metal-ligand records can now be selected explicitly as fixed-orbital active-space seeds, including a sigma-only model and a combined sigma-plus-pi back-donation model through `active_metal_ligand_channels`.
 

@@ -40,7 +40,7 @@ The analyzer identifies orbitals; the VB driver decides how those orbitals becom
 
 For metal-ligand systems, the analyzer records are intentionally diagnostic: `ML/sigma-acceptor` marks ligand-to-metal sigma donation, while `ML/pi-donor` marks metal-to-ligand pi back-donation into ligand pi-type nonbonding/acceptor space. `VbDriver` can now explicitly select these records as fixed-orbital active-space seeds. The analyzer does not activate them automatically, and NBO still keeps them out of the primary Lewis table.
 
-## Current status: 2026-05-03
+## Current status: 2026-05-04
 
 `VbDriver` is currently a fixed-orbital VB development driver with shared analyzer input, validated two-electron spin-adapted algebra, frozen-HF embedding, and a determinant-CI fallback for larger π active spaces.
 
@@ -49,22 +49,42 @@ Implemented and validated:
 - Shared `OrbitalAnalyzer` consumption for active-orbital selection and active/inactive/frozen candidate diagnostics.
 - H₂ one-active-bond VB-CI with covalent/ionic structures, spin-adapted two-electron algebra, generalized overlap metric pruning, and Chirgwin-Coulson/Löwdin weights.
 - H₂ one-angle VB-SCF diagnostic path retained as a prototype, while fixed-orbital VB-CI remains the validated baseline.
+- H₂ and ethylene-style two-orbital BOVB with structure-specific, center-local breathing active orbitals, frozen-HF embedding where applicable, and regression coverage against the fixed-orbital VB-CI baseline.
+- Stable automatic H₂ active-space selection: H₂ scans now use an atom-centered H-H active pair instead of independently selected analyzer `BD_sigma_*` candidates, avoiding active-label switches along dissociation curves.
+- Allyl-cation compact-CSF BOVB for the two-electron three-center π singlet checkpoint, using center-local π breathing directions in split-valence bases.
 - Ethylene one-active-π VB-CI with frozen sigma/core HF embedding.
 - Fixed-orbital multi-center π active spaces through allyl cation, allyl radical, allyl anion, butadiene, and benzene.
+- Compact spin-adapted CSF Hamiltonian mode for the allyl cation 2e/3π singlet benchmark, using adjacent π-bond graph templates and the full fixed-orbital VB-CI result as the regression oracle.
 - Orthonormal determinant-CI fallback for larger and open-shell active spaces.
 - Chemically readable determinant labels and grouped spatial-occupation resonance diagnostics.
 - Graph-generated spin-adapted chemical resonance/CSF template projection diagnostics for allyl radical, allyl anion, butadiene, and benzene.
 - Graph-automorphism averaged displayed resonance weights with raw unsymmetrized diagnostics retained.
 - Singlet determinant-CI root selection by alpha/beta exchange symmetry before CSF projection.
 - CSF template phase convention matched to the determinant-CI alpha/beta occupation-string representation.
-- Explicit metal-ligand fixed-orbital active spaces through `active_metal_ligand_channels`, including sigma-only and combined sigma-plus-pi back-donation determinant-CI scans.
+- Explicit metal-ligand fixed-orbital active spaces through `active_metal_ligand_channels`, including sigma-only and combined sigma-plus-pi back-donation determinant-CI models.
+- Metal-ligand diagnostics that label the active model as `sigma-only`, `sigma-plus-backdonation`, or a custom channel selection, and expose whether metal-to-ligand back-donation is blocked or enabled.
+- Metal-ligand VB-SCF channel scans for both sigma-only and sigma-plus-backdonation determinant spaces, using a common-active-orbital reference with the same donation/back-donation switch metadata as BOVB.
+- Metal-ligand BOVB for analyzer-selected determinant-CI channel spaces, using center-local breathing-orbital relaxation and retaining the fixed determinant-CI zero-amplitude limit as the internal baseline.
+- ECP-aware VB AO Hamiltonians for Pd/def2-SVP and other ECP basis workflows, using the same effective-charge nuclear attraction plus ECP one-electron terms as the SCF driver.
+- Real Pd--NH3 and Pd--PH3 notebook distance scans with B3LYP constrained geometries and HF total-energy references. These are the currently validated metal-ligand dissociation curves. The notebook also computes state-tracked sigma-channel VB-SCF/BOVB metal-ligand diagnostics, but those traces are not yet accepted as production dissociation-energy curves. Pi back-donation is currently tracked as an `ML/pi-donor` diagnostic strength, not yet as a finished four-electron sigma+pi VB total-energy dissociation curve.
 - Notebook validation and source-level regression tests for the fixed-orbital π resonance diagnostics, including butadiene captured-subspace weight and singlet exchange parity.
 
 Current boundaries:
 
 - The multi-center π engine is still fixed-orbital; it is not BOVB.
-- Larger π systems currently solve a determinant-CI reference and then project chemically compact CSF templates onto that root; this is not yet a true compact CSF Hamiltonian.
-- The current BOVB/VBB work is planned but not implemented.
+- Larger π systems currently solve a determinant-CI reference and then project chemically compact CSF templates onto that root; only the allyl cation 2e/3π singlet path has been promoted to a compact CSF Hamiltonian so far.
+- BOVB is currently implemented for two-orbital/two-electron singlet active spaces, for the allyl-cation compact-CSF checkpoint, and for metal-ligand determinant-CI channel spaces as a channel-local breathing-orbital relaxation layer. Metal-ligand VB-SCF currently provides the corresponding common-active-orbital determinant reference for the same channel selections, while BOVB adds structure/channel-local breathing freedom. In bases with same-center external functions, H₂ and allyl compact-CSF can lower below their zero-amplitude fixed-orbital limits; minimal bases can still collapse to the fixed-orbital limit because no external breathing direction exists. Automatic H₂ scans use a stable atom-centered active pair to keep dissociation curves on the same active-space branch. Metal-ligand sigma-channel scans now support state-tracked active orbitals and corrected ECP total-energy reporting, but the resulting VB-SCF/BOVB sigma traces remain diagnostics until they produce physically stable Pd--ligand potential curves. The combined sigma+pi back-donation determinant space still needs a size-consistent four-electron total-energy formulation before it should be interpreted as a quantitative dissociation curve. Larger organic π systems beyond the allyl checkpoint are still fixed-orbital.
+
+## Metal-ligand scan checkpoint: 2026-05-04
+
+The current real Pd--NH3/Pd--PH3 notebook state is deliberately conservative:
+
+- The validated dissociation curves are the B3LYP/def2-SVP constrained-scan energies and the HF single-point total energies evaluated on those geometries.
+- The curves are plotted as `E(R) - E(5.0 Angstrom)` in kJ/mol, so the potential well is negative and the 5.0 Angstrom point is the common zero.
+- The current grid has internal reference minima, not boundary minima: Pd--NH3 has B3LYP/HF minima at about 2.21/2.49 Angstrom, and Pd--PH3 has B3LYP/HF minima at about 2.33/2.33 Angstrom.
+- The corresponding grid dissociation energies are about 96.4/24.5 kJ mol^-1 for Pd--NH3 at B3LYP/HF and about 141.5/52.4 kJ mol^-1 for Pd--PH3 at B3LYP/HF.
+- State-tracked sigma-only VB-SCF/BOVB metal-ligand values are still printed as diagnostics, but they are not reported as validated dissociation energies because the present metal-ligand VB total-energy model does not yet give stable production potential curves.
+- The next VB task is not another notebook plot. It is a method fix: a size-consistent metal-ligand total-energy formulation for sigma donation plus pi back-donation, followed by regression tests that reject branch switches, ECP Hamiltonian mismatches, and boundary-minimum scans.
 - `VbDriver` owns wavefunction algebra; `OrbitalAnalyzer` only supplies recognition and candidate metadata.
 
 ## Implemented capabilities
@@ -328,11 +348,13 @@ The fixed-orbital π engine is now stable enough to define the next VB roadmap. 
 
 Goal: promote the current diagnostic CSF projections into an optional working Hamiltonian basis where chemically useful.
 
+Current status: implemented for allyl cation 2e/3π singlet as `mode="compact-csf"`. The compact basis contains the two adjacent π-bond CSFs, solves its own generalized Hamiltonian, and reports the full fixed-orbital VB-CI reference energy plus the captured-subspace weight.
+
 Implementation steps:
 
-1. Reuse the graph-generated CSF templates for allyl, butadiene, and benzene.
-2. Build the Hamiltonian and overlap matrices directly in the retained CSF-template metric.
-3. Compare CSF-Hamiltonian roots against determinant-CI roots for the same fixed active orbitals.
+1. Reuse the graph-generated CSF templates for allyl, butadiene, and benzene. **Status: allyl cation adjacent π-bond templates are implemented as a working compact basis.**
+2. Build the Hamiltonian and overlap matrices directly in the retained CSF-template metric. **Status: implemented for the two-electron singlet multicenter π path.**
+3. Compare CSF-Hamiltonian roots against determinant-CI or full fixed-orbital VB-CI roots for the same fixed active orbitals. **Status: allyl cation reports the full fixed-orbital VB-CI oracle.**
 4. Keep determinant-CI as the reference fallback and as a regression oracle.
 5. Report captured-subspace weight whenever a compact CSF basis is used so users can tell whether the compact basis is faithful.
 
@@ -348,8 +370,8 @@ BOVB should be introduced after the fixed-orbital multi-center π engine and the
 
 Recommended BOVB order:
 
-1. Revisit ethylene with two π structures and structure-specific breathing orbitals.
-2. Apply BOVB to allyl cation after fixed-orbital 2e/3π works.
+1. Revisit ethylene with two π structures and structure-specific breathing orbitals. **Status: implemented for the current covalent plus ionic one-active-π active space.**
+2. Apply BOVB to allyl cation after fixed-orbital 2e/3π works and after the compact CSF/structure-specific orbital layer is ready. **Status: implemented for `mode="compact-csf-bovb"` on allyl-cation-like 2e/3π singlet active spaces.**
 3. Extend to butadiene and benzene only after the active-space generator and spin handling are stable.
 
 BOVB requirements:
@@ -362,8 +384,8 @@ BOVB requirements:
 
 Implementation steps:
 
-1. Start with ethylene and H₂-like two-structure/two-orbital cases, where the fixed-orbital baseline is already transparent.
-2. Represent each VB structure with its own allowed active-orbital set while sharing frozen core/sigma orbitals where requested.
+1. Start with ethylene and H₂-like two-orbital cases, where the fixed-orbital baseline is already transparent. **Status: implemented for H₂ and ethylene one-active-π VB active spaces.**
+2. Represent each VB structure with its own allowed active-orbital set while sharing frozen core/sigma orbitals where requested. **Status: implemented for the two-orbital/two-electron singlet path, including center-local external breathing directions when the AO basis supplies them.**
 3. Add constraints that preserve active-center identity and prevent collapse into unrestricted HF-like orbitals.
 4. Optimize orbital parameters and structure coefficients with a robust alternating or joint optimizer.
 5. Add diagnostics for structure-specific orbital overlaps, breathing magnitude, orbital gradients, line-search progress, and energy lowering relative to fixed-orbital VB-CI.
@@ -420,15 +442,18 @@ Acceptance checks:
 
 Current status:
 
-- `active_metal_ligand_channels=("sigma-acceptor",)` builds a sigma-only donor/acceptor active space.
-- `active_metal_ligand_channels=("sigma-acceptor", "pi-donor")` builds a combined sigma-plus-back-donation active space.
-- The combined model is currently a determinant-CI active space with the sigma donor/acceptor pair and the pi donor/acceptor pair active.
-- The notebook `docs/metal_ligand_recognition.ipynb` scans Pd--NH3 and Pd--PH3 distances and compares `E_sigma_only` with `E_sigma_plus_pi`.
+- `active_metal_ligand_channels=("sigma-acceptor",)` builds a sigma-only donor/acceptor active space and reports `metal_ligand_model="sigma-only"` with back-donation blocked.
+- `active_metal_ligand_channels=("sigma-acceptor", "pi-donor")` builds a combined sigma-plus-back-donation active space and reports `metal_ligand_model="sigma-plus-backdonation"` with back-donation enabled.
+- The sigma-only model is a 2-orbital/2-electron determinant-CI active space for the ligand-to-metal sigma channel.
+- The sigma-plus-back-donation model is a 4-orbital/4-electron determinant-CI active space with both the sigma donor/acceptor pair and the pi donor/acceptor pair active.
+- Result diagnostics expose the selected metal-ligand records, active orbital count, active electron count, determinant count, requested channels, and the blocked/enabled back-donation switch.
+- `mode="bovb"` with `active_metal_ligand_channels` keeps the same channel switches, optimizes center-local breathing directions for the active metal-ligand orbitals, and reports `metal_ligand_bovb_initial_energy`, `metal_ligand_bovb_energy_lowering`, and per-orbital breathing amplitudes.
+- The notebook `docs/metal_ligand_recognition.ipynb` now runs real Pd--NH3 and Pd--PH3 SCF/NBO calculations, reuses the real NAO payload, and compares sigma-only against sigma-plus-back-donation VB-CI and BOVB without mock payloads.
 
 Planned steps:
 
 - Treat metal-ligand candidates as analyzer-provided active-orbital suggestions, not as automatic selected VB structures.
-- Add a pedagogical dissociation sequence for metal-ligand bonds analogous to H2: RHF, broken-symmetry UHF, fixed-orbital VB-CI, and later BOVB/VBB correlation-orbital relaxation.
+- Add a pedagogical dissociation sequence for metal-ligand bonds analogous to H2: RHF, broken-symmetry UHF, fixed-orbital VB-CI, and BOVB/VBB correlation-orbital relaxation.
 - Add metal-ligand VBB benchmarks only after the organic VBB method layer is defined and validated.
 - Keep determinant-CI fallback available because compact spin coupling for metal centers may be system dependent.
 - Add diagnostics separating ligand-field interpretation from organic π resonance interpretation.
@@ -450,8 +475,18 @@ Current fixed-orbital π implementation status:
 - [x] Add notebook cells for allyl cation and the validation ladder through benzene.
 - [x] Add source-level smoke tests for allyl cation, allyl radical, allyl anion, butadiene, and benzene.
 - [x] Add source-level regression tests for resonance/CSF labels, counts, projection weights, butadiene captured-subspace weight, and singlet exchange parity.
-- [ ] Replace selected determinant-CI diagnostics by true spin-adapted CSF Hamiltonians where chemically useful.
-- [ ] Add BOVB prototype for a two-orbital benchmark.
+- [x] Add source-level H2 gate comparing stretched RHF, broken-symmetry UHF, fixed-orbital VB-CI, and H2 VB-SCF before extending the workflow to metal-ligand systems.
+- [x] Add a narrow H2 BOVB prototype with structure-specific breathing orbitals and regression coverage against the H2 RHF/UHF/VB-CI/VBSCF gate.
+- [x] Generalize the BOVB route from H₂-only to two-orbital/two-electron singlet active spaces and add ethylene one-active-π regression coverage with frozen sigma/core embedding.
+- [x] Add center-local external breathing directions to two-orbital BOVB and validate that H₂/6-31G lowers below the fixed-orbital limit while minimal-basis H₂ remains unchanged.
+- [x] Stabilize automatic H₂ dissociation scans by forcing the default H₂ active space to an atom-centered H-H pair across all bond distances.
+- [x] Add allyl compact-CSF BOVB and validate that the same-orbital zero-amplitude compact limit lowers in a split-valence basis.
+- [x] Add source-level regression tests for metal-ligand sigma-only versus sigma-plus-back-donation active-space metadata.
+- [x] Add metal-ligand BOVB for sigma-only and sigma-plus-back-donation determinant-CI channel spaces with zero-amplitude fixed-limit diagnostics.
+- [x] Add compact spin-adapted CSF Hamiltonian mode for allyl cation 2e/3π with the full fixed-orbital VB-CI result as oracle.
+- [ ] Extend compact spin-adapted CSF Hamiltonians to selected determinant-CI diagnostics where chemically useful.
+- [x] Generalize BOVB beyond two-orbital/two-electron singlet active spaces for analyzer-selected metal-ligand determinant-CI channel models.
+- [ ] Generalize BOVB beyond two-orbital/two-electron singlet active spaces for larger organic π determinant-CI models.
 - [ ] Add VBB method notes and prototypes for H₂/ethylene-style benchmarks, then extend to allyl, butadiene, and benzene.
 - [x] Add fixed-orbital metal-ligand active-space support after analyzer metal-ligand recognition exists.
 - [ ] Add H2 and metal-ligand dissociation notebooks comparing RHF, UHF, fixed-orbital VB-CI, and future BOVB correlation/orbital-relaxation effects.
@@ -460,13 +495,14 @@ Current fixed-orbital π implementation status:
 
 Start from the validated fixed-orbital baseline, not from BOVB/VBB:
 
-1. Re-open `docs/metal_ligand_recognition.ipynb` for the current Pd--NH3/Pd--PH3 real-SCF workflow and the sigma-only versus sigma-plus-pi VB-CI scan.
-2. The metal-ligand entry points to remember are `active_metal_ligand_channels=("sigma-acceptor",)` for the sigma-only model and `active_metal_ligand_channels=("sigma-acceptor", "pi-donor")` for the combined sigma/back-donation model.
-3. The best next documentation/example task is a clean dissociation comparison: RHF, broken-symmetry UHF, fixed-orbital VB-CI, and clearly marked future BOVB/VBB placeholders.
-4. The best next implementation task is still compact spin-adapted CSF Hamiltonians for selected organic π examples, using determinant-CI as the regression oracle.
-5. Do not claim BOVB, VBB, or production metal-ligand VB is implemented. The current metal-ligand model is a fixed-orbital determinant-CI prototype seeded by analyzer diagnostics.
+1. Keep H2 as the gatekeeper before metal-ligand VB: stretched RHF must fail relative to broken-symmetry UHF, fixed-orbital VB-CI must track the UHF dissociation limit, and H2 VB-SCF/BOVB must remain no higher than fixed-orbital VB-CI.
+2. Treat BOVB as implemented for two-orbital/two-electron singlet active spaces, the allyl compact-CSF checkpoint, and metal-ligand determinant-CI channel spaces. The H₂, allyl, and metal-ligand split-valence benchmarks now exercise real center-local breathing relaxation; larger organic π systems still need their own orbital-optimization layer and regression tests.
+3. Re-open `docs/metal_ligand_recognition.ipynb` only after the H2 VB-CI/VB-SCF/BOVB ladder is clean enough to use as the organic reference.
+4. The metal-ligand entry points to remember are `active_metal_ligand_channels=("sigma-acceptor",)` for the sigma-only model and `active_metal_ligand_channels=("sigma-acceptor", "pi-donor")` for the combined sigma/back-donation model.
+5. The best next implementation task is a Pd--ligand distance checkpoint comparing RHF, UHF, fixed VB-CI, and ML-BOVB for sigma-only versus sigma-plus-backdonation.
+6. Do not claim VBB or production metal-ligand VB is implemented. The current metal-ligand BOVB model is a determinant-CI channel-relaxation prototype seeded by analyzer diagnostics.
 
-Current safe stopping point: fixed-orbital H2, ethylene, π-ladder, and metal-ligand sigma/sigma-plus-pi active-space diagnostics are in place; orbital relaxation and production coordination VB remain roadmap items.
+Current safe stopping point: fixed-orbital H2, ethylene, π-ladder, allyl cation compact CSF/BOVB, metal-ligand sigma-only/sigma-plus-back-donation VB-CI/BOVB diagnostics, and two-orbital H₂/ethylene BOVB are in place; larger organic multicenter orbital relaxation, VBB, and production coordination VB remain roadmap items.
 
 ## Documentation and notebook policy
 
@@ -484,4 +520,4 @@ Current safe stopping point: fixed-orbital H2, ethylene, π-ladder, and metal-li
 
 ## Current short-term decision
 
-The initial fixed-orbital multi-center π engine is now in place through benzene. The immediate next VB step is to keep the determinant-CI fallback as a reference while promoting selected CSF diagnostics into compact spin-adapted Hamiltonians. BOVB and VBB should follow only with explicit regression tests against the fixed-orbital baseline.
+The initial fixed-orbital multi-center π engine is now in place through benzene, the first non-H₂ BOVB step is in place for ethylene-style two-orbital active spaces, and allyl cation now has a compact CSF Hamiltonian benchmark. The immediate next VB step is to extend compact CSF Hamiltonians to selected determinant-CI template spaces; multicenter BOVB and VBB should follow only with explicit regression tests against the fixed-orbital baseline.

@@ -729,6 +729,8 @@ def _metal_ligand_pairs(labels, connectivity, coords=None):
     for atom_i in range(natoms):
         if not _is_metal_label(labels[atom_i]):
             continue
+        nearest_ligand_atom = None
+        nearest_distance = float('inf')
         for atom_j in range(natoms):
             if atom_i == atom_j or _is_metal_label(labels[atom_j]):
                 continue
@@ -736,12 +738,22 @@ def _metal_ligand_pairs(labels, connectivity, coords=None):
                 continue
             connected = bool(connectivity[atom_i, atom_j] != 0)
             close_contact = False
+            distance = None
             if coords is not None:
                 distance = float(np.linalg.norm(coords[atom_i] - coords[atom_j]))
                 close_contact = distance <= _metal_ligand_cutoff(labels[atom_i],
                                                                  labels[atom_j])
             if connected or close_contact:
                 pairs.append((int(atom_i), int(atom_j)))
+            elif (distance is not None and
+                  distance <= _metal_ligand_diagnostic_cutoff(labels[atom_i],
+                                                              labels[atom_j]) and
+                  distance < nearest_distance):
+                nearest_ligand_atom = atom_j
+                nearest_distance = distance
+        if (nearest_ligand_atom is not None and
+                not any(pair[0] == int(atom_i) for pair in pairs)):
+            pairs.append((int(atom_i), int(nearest_ligand_atom)))
     return pairs
 
 
@@ -762,6 +774,10 @@ def _metal_ligand_cutoff(metal_label, ligand_label):
         'S': 2.75,
     }
     return ligand_cutoffs.get(ligand_label.capitalize(), 2.55)
+
+
+def _metal_ligand_diagnostic_cutoff(metal_label, ligand_label):
+    return max(_metal_ligand_cutoff(metal_label, ligand_label), 5.25)
 
 
 def _coordination_mode(connectivity, metal_atom, ligand_atom, labels):

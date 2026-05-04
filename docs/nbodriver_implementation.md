@@ -70,6 +70,7 @@ The shared analyzer candidate layer generates these candidate families for both 
 | one-electron `LP`/`BD(pi)` | Radical active-space candidates with `electron_count = 1`. |
 | `BD*` | Antibonding complements to bonding candidates. |
 | `RY` | One-center Rydberg/acceptor complements with low occupation. |
+| `ML` | Metal-ligand diagnostic records emitted by `OrbitalAnalyzer`; not selected as occupied organic Lewis NBOs. |
 
 Occupied Lewis assignment uses candidates with explicit electron counts. Candidate-only acceptors (`BD*` and `RY`) are retained for diagnostics and reports but are not inserted into occupied Lewis structures. VB workflows consume the same candidate records as labels and initial active-orbital suggestions, without depending on NBO Lewis-assignment internals.
 
@@ -107,6 +108,37 @@ w_score,k = exp(-beta s_k) / sum_j exp(-beta s_j),
 where `s_k` is the Lewis score and `beta` is `NboComputeOptions.lewis_weight_beta`.
 
 These weights are useful for ordering alternatives. They are not NRA/NRT density weights and are not VB amplitudes.
+
+## Resonance signatures and classes
+
+Each alternative receives a molecule-independent structured resonance signature built from the one-based report fields:
+
+```text
+pi_bonds
+active_lone_pair_atoms
+active_positive_atoms
+active_one_electron_atoms
+```
+
+The same information is stored as a compact display label such as `pi:1-2,3-4,5-6` or `pi:1-2; lp:3; pos:2`. These labels are report annotations and prior-matching handles; the actual data model remains the explicit fixed/active and sigma/pi partitions.
+
+Symmetry-equivalent alternatives are grouped with conservative graph automorphisms that preserve element labels and connectivity. Each alternative stores:
+
+- `resonance_signature`
+- `resonance_label`
+- `class_signature`
+- `class_label`
+- `resonance_class_id`
+- `class_degeneracy`
+
+The top-level `results["resonance_classes"]` list reports one record per class with member ranks, member labels, degeneracy, and class-level score/ranking weight summaries:
+
+- `class_weight_sum`
+- `class_weight_mean`
+- `class_weight_min`
+- `class_weight_max`
+
+For benzene with only ring pi bonds allowed, the two localized Kekule alternatives have distinct resonance signatures but share one class with degeneracy 2. This separates localized alternative ranking from chemically equivalent class interpretation.
 
 ## NRA/NRT density fitting
 
@@ -164,11 +196,24 @@ For each occupied donor and candidate-only acceptor, the driver reports a densit
 
 The diagnostic is not the mature NBO second-order perturbation expression. That expression requires an NBO Fock matrix and energy denominator, which are outside the current implementation.
 
+In full NBO reports, `BD*` and `RY` acceptors are printed in a separate candidate-only section. This keeps them visible for interpretation while preserving the invariant that selected occupied Lewis tables contain only occupied Lewis NBOs.
+
+## Metal-ligand diagnostics
+
+`OrbitalAnalyzer` can emit metal-ligand `ML` records for coordination diagnostics, including ligand-to-metal sigma donation and metal-to-ligand pi/back-donation channels. `NboDriver.compute()` exposes these records through `metal_ligand_diagnostics`, and `nbo_report(level="full")` prints them in a diagnostic-only metal-ligand section. They are not used in occupied organic Lewis assignment.
+
+The current boundary is deliberate:
+
+- organic Lewis assignment remains governed by explicit electron counts, valence diagnostics, and duet/octet checks;
+- `ML` records are diagnostic candidate records until their electron-count semantics are defined for NBO selection;
+- current full reports present metal center, ligand atom, coordination mode, channel, occupation, donation strength, back-donation strength, and role separately from the selected organic Lewis table;
+- future reports should add richer d-manifold character and metal-aware electron-accounting interpretation.
+
 ## Reporting and labels
 
-Reports are generated from structured result dictionaries. The primary report presents foundation diagnostics, selected NBOs, candidate counts, Lewis accounting, and donor-acceptor diagnostics. The NRA report presents structure weights, residuals, spin-fit metadata, and prior metadata.
+Reports are generated from structured result dictionaries. The primary report presents foundation diagnostics, selected NBOs, candidate counts, Lewis accounting, resonance classes, Lewis/resonance alternatives, and donor-acceptor diagnostics. The NRA report presents structure weights, residuals, spin-fit metadata, and prior metadata.
 
-Structure signatures are generated directly from the pi-bond set, for example `pi:1-2,3-4`. They are useful for display and prior matching, but the algorithmic representation remains sigma/pi and fixed/active partition fields. The implementation does not contain molecule-specific structure-name classifiers.
+Structure signatures are generated directly from the pi-bond and active-center metadata, for example `pi:1-2,3-4` or `pi:1-2; lp:3; pos:2`. They are useful for display, prior matching, and resonance-class grouping, but the algorithmic representation remains sigma/pi and fixed/active partition fields. The implementation does not contain molecule-specific structure-name classifiers.
 
 ## Validation coverage
 
@@ -181,12 +226,14 @@ The regression suite covers:
 - Sigma/pi partition fields and fixed/active fields.
 - Lewis electron accounting, formal-charge diagnostics, octet diagnostics, and score terms.
 - Lone-pair donation alternatives.
+- Resonance signatures, symmetry-equivalent classes, class-level weights, and final rank ordering.
+- Polar-resonance metadata needed by `show_structures(...)`.
 - Closed-shell NRA/NRT structure pools and reports.
 - NRA/NRT prior regularization and metadata.
 - Open-shell SOMO candidates, one-electron alternatives, and total-plus-spin NRA/NRT.
-- `BD*`, `RY`, and donor-acceptor diagnostics.
+- `BD*`, `RY`, donor-acceptor diagnostics, candidate-only acceptor report sections, and diagnostic-only `ML` report sections.
 
-## Current status: 2026-05-03
+## Current status: 2026-05-04
 
 `NboDriver` is currently a structured NBO/NRA/NRT analysis driver built on the shared `OrbitalAnalyzer` payload.
 
@@ -197,17 +244,27 @@ Implemented and validated:
 - Sigma/pi/fixed/active partitions for Lewis and resonance analysis.
 - General pi-resonance alternatives for organic conjugated systems, including closed-shell, radical, anionic, and polar pi cases.
 - Candidate-only `BD*` and `RY` acceptors plus donor-acceptor density-coupling diagnostics.
+- Resonance signatures, symmetry-equivalent resonance classes, class degeneracies, and class-level score/ranking weight summaries.
+- Full-report candidate-only acceptor sections for `BD*` and `RY` diagnostics.
+- Full-report diagnostic-only metal-ligand sections for analyzer-owned `ML` records.
 - Closed-shell NRA/NRT density fitting with selected, pi, valence, and full subspaces.
 - Prior-regularized NRA/NRT with explicit prior metadata.
 - Open-shell total-density plus spin-density NRA/NRT fitting.
 - Structured reports and regression coverage for the current pipeline.
+
+Metal-ligand checkpoint for the current notebook work:
+
+- `OrbitalAnalyzer` emits `ML/sigma-acceptor` and `ML/pi-donor` diagnostic records through the shared payload.
+- `NboDriver.compute()` exposes these records through `metal_ligand_diagnostics`, and `nbo_report(level="full")` prints them in a diagnostic-only section.
+- The real Pd--NH3/Pd--PH3 notebook now treats B3LYP constrained-scan and HF single-point total energies as the validated reference dissociation curves, plotted as `E(R) - E(5.0 Angstrom)`.
+- The validated grid dissociation energies are taken only from those reference total-energy curves. Metal-ligand VB-SCF/BOVB sigma values are kept outside NBO interpretation and are documented as VB diagnostics, not NBO or NRT observables.
 
 Important boundaries:
 
 - NBO score/ranking weights are Lewis-ranking diagnostics, not density-fit weights.
 - NRA/NRT weights are density-reconstruction weights, not VB wavefunction amplitudes.
 - Donor-acceptor diagnostics are not yet second-order perturbation energies because an NBO Fock matrix and orbital-energy denominator layer are not implemented.
-- Metal-ligand chemistry is not yet recognized as a first-class candidate family; that recognition belongs first in `OrbitalAnalyzer`, after which `NboDriver` can decide how to use it.
+- Metal-ligand chemistry is recognized as analyzer-owned diagnostic `ML` records, exposed through `metal_ligand_diagnostics`, and printed in full NBO reports. Metal-aware electron-accounting interpretation is not yet implemented.
 
 ## Scientific scope
 
@@ -217,31 +274,21 @@ The implemented driver is a coherent, documented NBO/NRA/NRT analysis layer. It 
 
 The remaining NBO work should focus on interpretation, reporting, validation breadth, and mathematically distinct NBO layers that are not present yet.
 
-1. **Resonance-class grouping**
-	- Build graph-automorphism-aware resonance class keys from structured alternative metadata.
-	- Report class degeneracy and class-level weights separately from individual localized alternatives.
-	- Keep raw individual alternatives visible for debugging and regression tests.
+1. **Metal-ligand NBO reporting and interpretation**
+	- Consume analyzer `ML` records for sigma donation, pi donation, and back-donation diagnostics.
+	- Extend the initial full-report coordination section with d-manifold character and richer ligand-channel interpretation.
+	- Keep `ML` diagnostics separate from occupied organic Lewis tables until their electron-count semantics are explicit.
 
-2. **Report candidate-only acceptors clearly**
-	- Add a full-report table for the strongest `BD*` and `RY` acceptor candidates.
-	- Include donor label, acceptor label, occupation, atom/bond identity, and density-coupling diagnostic.
-	- Keep acceptors separate from occupied selected Lewis NBOs.
-
-3. **NHO and directional hybrids**
+2. **NHO and directional hybrids**
 	- Add a natural hybrid orbital layer on top of NAO-space candidates.
 	- Provide stable hybrid directionality and percent s/p/d character.
 	- Preserve deterministic behavior for nearly degenerate local rotations.
 
-4. **NBO Fock matrix and second-order donor-acceptor energies**
+3. **NBO Fock matrix and second-order donor-acceptor energies**
 	- Transform a Fock-like operator into the NBO basis.
 	- Add donor-acceptor perturbation energies only after orbital energies and denominators are well defined.
 	- Keep the current density-coupling diagnostic available as a separate lightweight ranking.
 
-5. **Metal-ligand NBO analysis**
-	- Consume future analyzer metal-ligand candidate records for sigma donation, pi donation, and back-donation.
-	- Add electron-accounting rules and scoring terms appropriate for coordination bonds without forcing covalent organic assumptions.
-	- Report metal-centered d-manifold and ligand donor/acceptor participation in a separate coordination section.
-
-6. **Broader validation and examples**
+4. **Broader validation and examples**
 	- Extend regression tests for benzene, allyl ions/radicals, nitro systems, zwitterions, amides, and transition-metal fragments.
 	- Keep notebooks as human-facing demonstrations, not as the only source of validation.

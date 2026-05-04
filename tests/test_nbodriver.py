@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -14,6 +15,13 @@ from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 
 NBODRIVER_PATH = (Path(__file__).resolve().parents[1] / 'src' / 'pymodule' /
                   'nbodriver.py')
+ANALYZER_PATH = (Path(__file__).resolve().parents[1] / 'src' / 'pymodule' /
+                 'orbitalanalyzerdriver.py')
+ANALYZER_SPEC = importlib.util.spec_from_file_location(
+    'veloxchem.orbitalanalyzerdriver', ANALYZER_PATH)
+ANALYZER_MODULE = importlib.util.module_from_spec(ANALYZER_SPEC)
+sys.modules['veloxchem.orbitalanalyzerdriver'] = ANALYZER_MODULE
+ANALYZER_SPEC.loader.exec_module(ANALYZER_MODULE)
 NBODRIVER_SPEC = importlib.util.spec_from_file_location('veloxchem.nbodriver',
                                                         NBODRIVER_PATH)
 NBODRIVER_MODULE = importlib.util.module_from_spec(NBODRIVER_SPEC)
@@ -158,6 +166,116 @@ def _run_nbo(name, constraints=None, options=None, basis_label='sto-3g'):
     return molecule, results
 
 
+def _mock_pd_ligand_molecule(ligand='NH3'):
+
+    if ligand == 'NH3':
+        xyz = """
+Pd  0.0000  0.0000  0.0000
+N   2.0500  0.0000  0.0000
+H   2.4500  0.9300  0.0000
+H   2.4500 -0.4650  0.8050
+H   2.4500 -0.4650 -0.8050
+"""
+    elif ligand == 'PH3':
+        xyz = """
+Pd  0.0000  0.0000  0.0000
+P   2.2500  0.0000  0.0000
+H   2.8500  1.1500  0.0000
+H   2.8500 -0.5750  0.9960
+H   2.8500 -0.5750 -0.9960
+"""
+    else:
+        raise ValueError(ligand)
+
+    molecule = Molecule.read_str(xyz)
+    molecule.set_charge(0)
+    molecule.set_multiplicity(1)
+    return molecule
+
+
+def _mock_metal_ligand_analysis(ligand='NH3', sigma_coupling=0.12,
+                                pi_coupling=0.04):
+
+    molecule = _mock_pd_ligand_molecule(ligand)
+    atom_map = np.array([0, 0, 0, 0, 1, 1, 1, 1], dtype=int)
+    angular_map = np.array([2, 2, 2, 0, 0, 1, 1, 2], dtype=int)
+    populations = np.array([1.75, 1.70, 1.65, 0.25,
+                            2.00, 1.90, 0.20, 0.20])
+    density = np.diag(populations)
+    density[5, 3] = density[3, 5] = sigma_coupling
+    density[0, 7] = density[7, 0] = pi_coupling
+    density[1, 7] = density[7, 1] = 0.5 * pi_coupling
+    density[2, 6] = density[6, 2] = 0.25 * pi_coupling
+
+    nao_data = SimpleNamespace(
+        populations=populations,
+        density=density,
+        atom_map=atom_map,
+        angular_momentum_map=angular_map,
+        transform=np.eye(len(populations)),
+        overlap=np.eye(len(populations)),
+        equivalent_atom_groups=[],
+        local_frames=[],
+    )
+    spin_data = SimpleNamespace(
+        alpha_density=0.5 * density,
+        beta_density=0.5 * density,
+        spin_density=np.zeros_like(density),
+        spin_populations=np.zeros_like(populations),
+        unpaired_electrons=0.0,
+    )
+    candidates = ANALYZER_MODULE._build_orbital_candidates(
+        molecule,
+        nao_data,
+        spin_data=None,
+        include_metal_ligand_candidates=True,
+    )
+    analysis = SimpleNamespace(
+        overlap=np.eye(len(populations)),
+        density=density,
+        nao_data=nao_data,
+        spin_data=spin_data,
+        mo_analysis={'max_normalization_error': 0.0},
+        orbital_candidates=candidates,
+    )
+    return molecule, analysis
+
+
+def _run_mock_metal_ligand_nbo(monkeypatch, ligand='NH3',
+                               sigma_coupling=0.12, pi_coupling=0.04):
+
+    molecule, analysis = _mock_metal_ligand_analysis(
+        ligand,
+        sigma_coupling=sigma_coupling,
+        pi_coupling=pi_coupling,
+    )
+
+    class MockOrbitalAnalyzer:
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def run(self):
+            return analysis
+
+    monkeypatch.setattr(NBODRIVER_MODULE, 'OrbitalAnalyzer',
+                        MockOrbitalAnalyzer)
+    driver = NboDriver()
+    driver.verbose = False
+    driver.ostream.mute()
+    results = driver.compute(
+        molecule,
+        basis=SimpleNamespace(),
+        mol_orbs=SimpleNamespace(),
+        options=NBODRIVER_MODULE.NboComputeOptions(
+            include_diagnostics=True,
+            include_mo_analysis=False,
+            max_alternatives=0,
+        ),
+    )
+    return molecule, results, driver
+
+
 def _nbo_type_counts(results):
 
     counts = {'CR': 0, 'BD': 0, 'LP': 0, 'BD*': 0, 'RY': 0}
@@ -186,6 +304,9 @@ class _RecordingOutputStream:
         self.flush_count = 0
 
     def print_header(self, line):
+        self.lines.append(line)
+
+    def print_line(self, line):
         self.lines.append(line)
 
     def print_blank(self):
@@ -314,6 +435,18 @@ def _assert_active_partition(molecule, assignment):
     assert assignment['active_lone_pair_electron_pairs'] == len(assignment['active_lone_pair_nbo_list'])
     assert abs(assignment['selected_lewis_electron_count'] -
                molecule.number_of_electrons()) < 1.0e-12
+
+
+def _assert_ranked_by_descending_weight(alternatives):
+
+    weights = [float(alternative.get('weight', 0.0))
+               for alternative in alternatives]
+    ranks = [int(alternative.get('rank', 0))
+             for alternative in alternatives]
+
+    assert ranks == list(range(1, len(alternatives) + 1))
+    assert all(left >= right - 1.0e-14
+               for left, right in zip(weights, weights[1:]))
 
 
 def _pi_bond_set(alternative):
@@ -496,7 +629,7 @@ class TestNboDriver:
 
     def test_rydberg_complements_and_donor_acceptor_diagnostics_are_candidate_only(self):
 
-        _, results = _run_nbo('water', basis_label='def2-svp')
+        _, results, drv = _run_nbo_with_driver('water', basis_label='def2-svp')
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             candidates = results['nbo_candidates']
@@ -547,6 +680,13 @@ class TestNboDriver:
             }
             assert {'BD*', 'RY'}.issubset(interaction_acceptor_types)
 
+            report = drv.nbo_report(level='full', return_text=True)
+            assert 'Candidate-only acceptors (BD*/RY)' in report
+            assert 'diagnostics only' in report
+            assert 'BD*' in report
+            assert 'RY(' in report
+            assert '|Dens. coup.|' in report
+
             for interaction in diagnostics['interactions']:
                 assert interaction['donor_index'] in primary_ids
                 assert interaction['acceptor_index'] in acceptor_ids
@@ -555,6 +695,78 @@ class TestNboDriver:
                 assert interaction['abs_density_coupling'] == abs(
                     interaction['density_coupling'])
                 assert interaction['abs_overlap'] == abs(interaction['overlap'])
+
+    def test_organic_system_has_no_metal_ligand_diagnostics_or_report_section(self):
+
+        _, results, drv = _run_nbo_with_driver('water', basis_label='def2-svp')
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert results['metal_ligand_diagnostics'] == []
+            assert results['diagnostics']['metal_ligand_summary'] == {
+                'candidate_count': 0,
+                'channels': [],
+            }
+            assert not any(candidate.get('type') == 'ML'
+                           for candidate in results['nbo_candidates'])
+            assert not any(candidate.get('type') == 'ML'
+                           for candidate in results['nbo_list'])
+            for alternative in results['alternatives']:
+                assert not any(candidate.get('type') == 'ML'
+                               for candidate in alternative['nbo_list'])
+
+            report = drv.nbo_report(level='full', return_text=True)
+            assert 'Metal-ligand diagnostics (ML)' not in report
+
+    def test_metal_ligand_diagnostics_are_reported_but_not_selected(self,
+                                                                    monkeypatch):
+
+        _, results, drv = _run_mock_metal_ligand_nbo(monkeypatch, ligand='NH3')
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            records = results['metal_ligand_diagnostics']
+            subtypes = {record['subtype'] for record in records}
+            channels = {record['channel'] for record in records}
+
+            assert subtypes == {'sigma-acceptor', 'pi-donor'}
+            assert channels == {
+                'ligand-to-metal-sigma-donation',
+                'metal-to-ligand-pi-back-donation',
+            }
+            assert not any(candidate.get('type') == 'ML'
+                           for candidate in results['nbo_list'])
+            assert not any(candidate.get('type') == 'ML'
+                           for alternative in results['alternatives']
+                           for candidate in alternative['nbo_list'])
+            assert results['diagnostics']['metal_ligand_summary'] == {
+                'candidate_count': len(records),
+                'channels': sorted(channels),
+            }
+
+            sigma = next(record for record in records
+                         if record['subtype'] == 'sigma-acceptor')
+            pi = next(record for record in records
+                      if record['subtype'] == 'pi-donor')
+            assert sigma['metal_atom'] == 1
+            assert sigma['ligand_atom'] == 2
+            assert sigma['donor_atom'] == 2
+            assert sigma['acceptor_atom'] == 1
+            assert sigma['donation_strength'] > 0.0
+            assert sigma['back_donation_strength'] == 0.0
+            assert pi['donor_atom'] == 1
+            assert pi['acceptor_atom'] == 2
+            assert pi['back_donation_strength'] > 0.0
+            assert pi['donation_strength'] == 0.0
+
+            report = drv.nbo_report(level='full', return_text=True)
+            assert 'Metal-ligand diagnostics (ML)' in report
+            assert 'diagnostics only' in report
+            assert 'Pd1' in report
+            assert 'N2' in report
+            assert 'sigma-acceptor' in report
+            assert 'pi-donor' in report
+            assert 'ligand-to-metal-sigma-donation' in report
+            assert 'metal-to-ligand-pi-back-donation' in report
+            assert 'Role: ligand sigma donor / metal acceptor' in report
 
     @pytest.mark.parametrize('name', ['water', 'methane', 'ethylene', 'benzene'])
     def test_lewis_accounting_for_closed_shell_examples(self, name):
@@ -698,6 +910,117 @@ class TestNboDriver:
                 assert alternative['pi_electron_pairs'] == len(alternative['pi_nbo_list'])
                 assert alternative['pi_electron_pairs'] == len(alternative['pi_bonds'])
                 assert alternative['sigma_electron_pairs'] + alternative['pi_electron_pairs'] == alternative['electron_pairs']
+
+    def test_benzene_resonance_classes_group_kekule_alternatives(self):
+
+        ring_pi_bonds = [(1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 1)]
+        _, results, drv = _run_nbo_with_driver(
+            'benzene',
+            constraints={'allowed_pi_bonds': ring_pi_bonds},
+            options={
+                'max_alternatives': 12,
+                'pi_min_occupation': 0.05,
+                'conjugated_pi_max_path': 2,
+            },
+        )
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            alternatives = results['alternatives']
+            classes = results['resonance_classes']
+
+            assert len(alternatives) == 2
+            assert len(classes) == 1
+            assert classes[0]['class_degeneracy'] == 2
+            assert classes[0]['member_ranks'] == [1, 2]
+            assert abs(classes[0]['class_weight_sum'] - 1.0) < 1.0e-12
+            assert classes[0]['class_label'].startswith('pi:')
+
+            class_ids = {alternative['resonance_class_id']
+                         for alternative in alternatives}
+            assert class_ids == {classes[0]['class_id']}
+            for alternative in alternatives:
+                assert 'resonance_signature' in alternative
+                assert 'resonance_label' in alternative
+                assert 'class_signature' in alternative
+                assert alternative['class_degeneracy'] == 2
+
+            report = drv.nbo_report(level='full', return_text=True)
+            assert 'Resonance classes' in report
+            assert 'Weight sum' in report
+            assert classes[0]['class_id'] in report
+            assert 'Lewis/resonance alternatives' in report
+
+    def test_lewis_alternatives_are_ranked_by_score_weight(self):
+
+        ring_pi_bonds = [(1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 1)]
+        cross_ring_pi_bonds = [(1, 4), (2, 5), (3, 6)]
+        _, results = _run_nbo(
+            'benzene',
+            constraints={
+                'allowed_pi_bonds': ring_pi_bonds + cross_ring_pi_bonds
+            },
+            options={
+                'max_alternatives': 24,
+                'pi_min_occupation': 0.05,
+                'conjugated_pi_max_path': 2,
+            },
+        )
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            alternatives = results['alternatives']
+
+            assert alternatives
+            _assert_ranked_by_descending_weight(alternatives)
+            class_member_ranks = sorted(
+                rank for record in results['resonance_classes']
+                for rank in record['member_ranks']
+            )
+            assert class_member_ranks == [alternative['rank']
+                                          for alternative in alternatives]
+
+    def test_ozone_polar_resonance_metadata_supports_visualization(self):
+
+        molecule, results, drv = _run_nbo_with_driver(
+            'ozone',
+            options={
+                'max_alternatives': 24,
+                'lone_pair_min_occupation': 1.0,
+                'pi_min_occupation': 0.05,
+                'conjugated_pi_max_path': 2,
+            },
+        )
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            alternatives = results['alternatives']
+            polar_alternatives = [
+                alternative for alternative in alternatives
+                if alternative.get('active_positive_atoms') and
+                alternative.get('active_lone_pair_atoms')
+            ]
+
+            assert polar_alternatives
+            _assert_ranked_by_descending_weight(alternatives)
+            assert {(1, 2), (2, 3)}.issubset(set().union(*[
+                _pi_bond_set(alternative) for alternative in polar_alternatives
+            ]))
+
+            for alternative in polar_alternatives:
+                assert alternative['active_positive_atoms'] == [2]
+                assert set(alternative['active_lone_pair_atoms']).issubset({1, 3})
+                assert alternative['resonance_class_id']
+                assert alternative['resonance_label'].startswith('pi:')
+                assert 'lp:' in alternative['resonance_label']
+                assert 'pos:' in alternative['resonance_label']
+                _assert_lewis_accounting(molecule, alternative)
+                _assert_active_partition(molecule, alternative)
+
+            pytest.importorskip('py3Dmol')
+            view = drv.show_structures(results=results,
+                                       molecule=molecule,
+                                       ranks=[alternative['rank']
+                                              for alternative in polar_alternatives[:2]],
+                                       display=False)
+            assert view is not None
 
     @pytest.mark.parametrize(
         'name, options',

@@ -910,7 +910,7 @@ def _polar_resonance_lone_pair_atoms(molecule, atom_map, angular_map):
         for terminal in np.where(connectivity[center] != 0)[0]:
             terminal = int(terminal)
             terminal_charge = nuclear_charges[terminal]
-            if terminal_charge < 7 or terminal_charge <= center_charge:
+            if terminal_charge < 7 or terminal_charge < center_charge:
                 continue
             if not _pi_capable_atom(terminal, atom_map, angular_map):
                 continue
@@ -1208,6 +1208,16 @@ def _build_lewis_accounting(molecule, nbo_list):
 
     atom_valence_electron_count = atom_electron_count - atom_core_electron_count
     formal_charges = neutral_valence - atom_valence_electron_count
+    for candidate in nbo_list:
+        if not (candidate.get('type') == 'BD' and
+                candidate.get('subtype') == 'pi' and
+                candidate.get('non_sigma', False)):
+            continue
+        atoms = tuple(sorted(int(atom) for atom in candidate.get('atoms', ())))
+        if len(atoms) != 2:
+            continue
+        formal_charges[atoms[0]] += 1.0
+        formal_charges[atoms[1]] -= 1.0
     octet_excess = np.maximum(atom_valence_electron_count - valence_targets, 0.0)
     electron_ownership_error = abs(
         float(np.sum(atom_electron_count)) - selected_electron_count)
@@ -1922,7 +1932,7 @@ def _polar_pi_resonance_units(molecule, pi_candidates, lone_pair_candidates):
         for terminal in np.where(connectivity[center] != 0)[0]:
             terminal = int(terminal)
             terminal_charge = nuclear_charges[terminal]
-            if terminal_charge < 7 or terminal_charge <= center_charge:
+            if terminal_charge < 7 or terminal_charge < center_charge:
                 continue
             pair = tuple(sorted((center, terminal)))
             if pair not in pi_by_pair:
@@ -2117,6 +2127,180 @@ def _alternative_resonance_signature(alternative):
     return pi_bonds, one_electron_atoms, lone_pair_atoms, positive_atoms
 
 
+def _alternative_resonance_signature_record(alternative):
+    """Return structured one-based resonance metadata for an alternative."""
+
+    pi_bonds, one_electron_atoms, lone_pair_atoms, positive_atoms = (
+        _alternative_resonance_signature(alternative))
+    return {
+        'pi_bonds': pi_bonds,
+        'active_one_electron_atoms': one_electron_atoms,
+        'active_lone_pair_atoms': lone_pair_atoms,
+        'active_positive_atoms': positive_atoms,
+    }
+
+
+def _resonance_signature_label(signature):
+    """Return a compact text label for a structured resonance signature."""
+
+    def atom_list(atoms):
+        return ','.join(str(int(atom)) for atom in atoms) or 'none'
+
+    pi_bonds = signature.get('pi_bonds', ())
+    pi_text = ','.join(f'{int(pair[0])}-{int(pair[1])}'
+                       for pair in pi_bonds) or 'none'
+    pieces = [f'pi:{pi_text}']
+    if signature.get('active_one_electron_atoms'):
+        pieces.append(
+            f"one-e:{atom_list(signature['active_one_electron_atoms'])}")
+    if signature.get('active_lone_pair_atoms'):
+        pieces.append(f"lp:{atom_list(signature['active_lone_pair_atoms'])}")
+    if signature.get('active_positive_atoms'):
+        pieces.append(f"pos:{atom_list(signature['active_positive_atoms'])}")
+    return '; '.join(pieces)
+
+
+def _transform_resonance_signature(signature, atom_mapping):
+    """Transform a one-based resonance signature by a zero-based atom map."""
+
+    def map_atom(atom):
+        return int(atom_mapping[int(atom) - 1] + 1)
+
+    pi_bonds = tuple(sorted(
+        tuple(sorted((map_atom(pair[0]), map_atom(pair[1]))))
+        for pair in signature.get('pi_bonds', ())
+    ))
+    one_electron_atoms = tuple(sorted(
+        map_atom(atom)
+        for atom in signature.get('active_one_electron_atoms', ())
+    ))
+    lone_pair_atoms = tuple(sorted(
+        map_atom(atom)
+        for atom in signature.get('active_lone_pair_atoms', ())
+    ))
+    positive_atoms = tuple(sorted(
+        map_atom(atom)
+        for atom in signature.get('active_positive_atoms', ())
+    ))
+    return {
+        'pi_bonds': pi_bonds,
+        'active_one_electron_atoms': one_electron_atoms,
+        'active_lone_pair_atoms': lone_pair_atoms,
+        'active_positive_atoms': positive_atoms,
+    }
+
+
+def _resonance_signature_key(signature):
+    """Return a sortable immutable key for a resonance signature record."""
+
+    return (
+        tuple(signature.get('pi_bonds', ())),
+        tuple(signature.get('active_one_electron_atoms', ())),
+        tuple(signature.get('active_lone_pair_atoms', ())),
+        tuple(signature.get('active_positive_atoms', ())),
+    )
+
+
+def _graph_automorphisms(molecule, max_count=2048):
+    """Return conservative element/connectivity preserving atom maps."""
+
+    labels = tuple(molecule.get_labels())
+    connectivity = np.array(molecule.get_connectivity_matrix())
+    natoms = molecule.number_of_atoms()
+    degrees = np.count_nonzero(connectivity, axis=1)
+    candidates = []
+    for atom in range(natoms):
+        atom_candidates = [
+            other for other in range(natoms)
+            if labels[other] == labels[atom] and degrees[other] == degrees[atom]
+        ]
+        candidates.append(tuple(atom_candidates))
+
+    order = sorted(range(natoms), key=lambda atom: (len(candidates[atom]), atom))
+    mapping = [-1] * natoms
+    used = set()
+    automorphisms = []
+
+    def compatible(atom, image):
+        for previous in range(natoms):
+            mapped_previous = mapping[previous]
+            if mapped_previous < 0:
+                continue
+            if connectivity[atom, previous] != connectivity[image, mapped_previous]:
+                return False
+        return True
+
+    def search(position):
+        if len(automorphisms) >= int(max_count):
+            return
+        if position == len(order):
+            automorphisms.append(tuple(mapping))
+            return
+        atom = order[position]
+        for image in candidates[atom]:
+            if image in used:
+                continue
+            if not compatible(atom, image):
+                continue
+            mapping[atom] = int(image)
+            used.add(int(image))
+            search(position + 1)
+            used.remove(int(image))
+            mapping[atom] = -1
+
+    search(0)
+    if not automorphisms:
+        return [tuple(range(natoms))]
+    return automorphisms
+
+
+def _build_resonance_classes(molecule, alternatives):
+    """Annotate alternatives and return symmetry-equivalent classes."""
+
+    if not alternatives:
+        return []
+
+    automorphisms = _graph_automorphisms(molecule)
+    groups = {}
+    for alternative in alternatives:
+        signature = _alternative_resonance_signature_record(alternative)
+        class_signature = min(
+            (_transform_resonance_signature(signature, automorphism)
+             for automorphism in automorphisms),
+            key=_resonance_signature_key,
+        )
+        class_key = _resonance_signature_key(class_signature)
+        alternative['resonance_signature'] = signature
+        alternative['resonance_label'] = _resonance_signature_label(signature)
+        alternative['class_signature'] = class_signature
+        alternative['class_label'] = _resonance_signature_label(class_signature)
+        groups.setdefault(class_key, []).append(alternative)
+
+    resonance_classes = []
+    for class_index, class_key in enumerate(sorted(groups), start=1):
+        members = sorted(groups[class_key],
+                         key=lambda item: int(item.get('rank', 0)))
+        class_id = f'R{class_index}'
+        weights = [float(member.get('weight', 0.0)) for member in members]
+        class_signature = members[0]['class_signature']
+        for member in members:
+            member['resonance_class_id'] = class_id
+            member['class_degeneracy'] = len(members)
+        resonance_classes.append({
+            'class_id': class_id,
+            'class_signature': class_signature,
+            'class_label': _resonance_signature_label(class_signature),
+            'member_ranks': [int(member.get('rank', 0)) for member in members],
+            'member_labels': [member.get('resonance_label', '') for member in members],
+            'class_degeneracy': len(members),
+            'class_weight_sum': float(sum(weights)),
+            'class_weight_mean': float(np.mean(weights)) if weights else 0.0,
+            'class_weight_min': float(np.min(weights)) if weights else 0.0,
+            'class_weight_max': float(np.max(weights)) if weights else 0.0,
+        })
+    return resonance_classes
+
+
 def _alternative_pi_signature(alternative):
     """Return the zero-based pi-bond signature visible in a Lewis alternative."""
 
@@ -2286,14 +2470,13 @@ def _enumerate_lewis_alternatives(molecule,
         if _candidate_electron_count(candidate) == 1.0
     }
 
-    fixed = [
+    fixed_base = [
         candidate for candidate in primary_nbos
         if not (candidate.get('type') == 'BD' and
                 candidate.get('subtype') == 'pi') and
-        int(candidate.get('index', 0)) not in active_lone_pair_ids and
         int(candidate.get('index', 0)) not in one_electron_primary_ids
     ]
-    active_target_electrons = target_electrons - _candidate_list_electron_count(fixed)
+    active_target_electrons = target_electrons - _candidate_list_electron_count(fixed_base)
 
     if active_target_electrons < -1.0e-12:
         warnings.append(
@@ -2318,9 +2501,6 @@ def _enumerate_lewis_alternatives(molecule,
         expected_one_electron_count == 0 and
         float(molecule.get_charge()) > 1.0e-12
     )
-    resonance_target_electrons = (
-        4.0 if include_lone_pair_resonance else active_target_electrons
-    )
     if include_lone_pair_resonance:
         active_lone_pair_ids.update(
             _candidate_index(candidate)
@@ -2340,6 +2520,76 @@ def _enumerate_lewis_alternatives(molecule,
         active_pool_by_id[_candidate_index(candidate)] = candidate
     active_pool = sorted(active_pool_by_id.values(), key=_candidate_sort_key)
 
+    polar_resonance = (bool(polar_units) and
+                       expected_one_electron_count == 0 and
+                       not include_lone_pair_resonance)
+    resonance_target_electrons = (
+        4.0 if include_lone_pair_resonance else active_target_electrons
+    )
+    if polar_resonance:
+        polar_primary_ids = {
+            _candidate_index(candidate)
+            for candidate in primary_nbos
+            if _candidate_index(candidate) in polar_lone_pair_ids
+        }
+        resonance_target_electrons = (
+            2.0 + _candidate_list_electron_count([
+                candidate for candidate in primary_nbos
+                if _candidate_index(candidate) in polar_primary_ids
+            ]))
+
+    def fixed_for_combo(combo, lp_replacement_atoms=None):
+        combo_ids = {_candidate_index(candidate) for candidate in combo}
+        combo_lp_atoms = [
+            int(candidate.get('atoms', ())[0])
+            for candidate in combo
+            if candidate.get('type') == 'LP' and
+            _candidate_electron_count(candidate) > 1.0 and
+            len(candidate.get('atoms', ())) == 1
+        ]
+        combo_pi_atoms = {
+            int(atom)
+            for candidate in combo
+            if candidate.get('type') == 'BD' and
+            candidate.get('subtype') == 'pi'
+            for atom in candidate.get('atoms', ())
+        }
+        replaced_lp_atoms = set()
+        fixed_candidates = []
+        for candidate in fixed_base:
+            candidate_id = _candidate_index(candidate)
+            if candidate_id in combo_ids:
+                if (candidate.get('type') == 'LP' and
+                        _candidate_electron_count(candidate) > 1.0 and
+                        len(candidate.get('atoms', ())) == 1):
+                    replaced_lp_atoms.add(int(candidate.get('atoms', ())[0]))
+                continue
+            fixed_candidates.append(candidate)
+
+        if lp_replacement_atoms is None:
+            lp_replacement_atoms = list(combo_lp_atoms)
+        else:
+            lp_replacement_atoms = list(lp_replacement_atoms)
+        if include_lone_pair_resonance:
+            lp_replacement_atoms.extend(sorted(combo_pi_atoms))
+
+        for atom in lp_replacement_atoms:
+            if atom in replaced_lp_atoms:
+                continue
+            for index, candidate in enumerate(fixed_candidates):
+                if candidate.get('type') != 'LP':
+                    continue
+                if _candidate_electron_count(candidate) <= 1.0:
+                    continue
+                if len(candidate.get('atoms', ())) != 1:
+                    continue
+                if int(candidate.get('atoms', ())[0]) != atom:
+                    continue
+                del fixed_candidates[index]
+                replaced_lp_atoms.add(atom)
+                break
+        return fixed_candidates
+
     if (_candidate_list_electron_count(active_pool) <
             resonance_target_electrons - 1.0e-12):
         warnings.append(
@@ -2347,7 +2597,6 @@ def _enumerate_lewis_alternatives(molecule,
             f'electrons available for {resonance_target_electrons:.6f} active electrons.'
         )
 
-    polar_resonance = bool(polar_units) and expected_one_electron_count == 0
     pi_only_resonance = all(
         candidate.get('type') == 'BD' and candidate.get('subtype') == 'pi'
         for candidate in active_pool
@@ -2455,6 +2704,7 @@ def _enumerate_lewis_alternatives(molecule,
         if not polar_resonance and not _compatible_pi_lone_pair_combo(combo):
             continue
 
+        fixed = fixed_for_combo(combo)
         nbo_list = sorted(fixed + list(combo),
                           key=lambda candidate: int(candidate.get('index', 0)))
         occupation_sum = float(sum(candidate.get('occupation', 0.0)
@@ -2487,6 +2737,17 @@ def _enumerate_lewis_alternatives(molecule,
             ),
             'active_positive_atoms': positive_atoms,
         })
+        if include_lone_pair_resonance:
+            primary_positive_atoms = [
+                int(atom + 1)
+                for atom, charge in enumerate(
+                    primary_assignment.get('formal_charges', []))
+                if float(charge) > 0.5 and atom in pi_active_atoms
+            ]
+            if primary_positive_atoms:
+                alternative['active_positive_atoms'] = primary_positive_atoms
+                alternative['formal_charges'] = list(
+                    primary_assignment.get('formal_charges', []))
         alternatives.append(alternative)
 
     if include_lone_pair_resonance:
@@ -2535,6 +2796,7 @@ def _enumerate_lewis_alternatives(molecule,
                 continue
 
             combo_ids = {_candidate_index(candidate) for candidate in combo}
+            fixed = fixed_for_combo(combo)
             nbo_list = sorted(fixed + list(combo),
                               key=lambda candidate: int(candidate.get('index', 0)))
             occupation_sum = float(sum(candidate.get('occupation', 0.0)
@@ -2558,11 +2820,92 @@ def _enumerate_lewis_alternatives(molecule,
                 ],
                 'active_positive_atoms': [],
             })
+            primary_positive_atoms = [
+                int(atom + 1)
+                for atom, charge in enumerate(
+                    primary_assignment.get('formal_charges', []))
+                if float(charge) > 0.5 and atom in pi_active_atoms
+            ]
+            if primary_positive_atoms:
+                alternative['active_positive_atoms'] = primary_positive_atoms
+                alternative['formal_charges'] = list(
+                    primary_assignment.get('formal_charges', []))
             signature = _alternative_resonance_signature(alternative)
             if signature in existing_signatures:
                 continue
             existing_signatures.add(signature)
             alternatives.append(alternative)
+
+    if polar_resonance:
+        existing_signatures = {
+            _alternative_resonance_signature(alternative)
+            for alternative in alternatives
+        }
+        for unit in polar_units:
+            center = int(unit['center'])
+            for selected_terminal in unit['terminals']:
+                pi_candidate = unit['pi_by_terminal'].get(selected_terminal)
+                if pi_candidate is None:
+                    continue
+                negative_terminals = [
+                    int(terminal) for terminal in unit['terminals']
+                    if int(terminal) != int(selected_terminal)
+                ]
+                if not negative_terminals:
+                    continue
+                lone_pair_combo = []
+                for terminal in negative_terminals:
+                    terminal_lone_pairs = sorted(
+                        unit['lone_pairs_by_terminal'].get(terminal, []),
+                        key=_candidate_sort_key,
+                    )
+                    if not terminal_lone_pairs:
+                        lone_pair_combo = []
+                        break
+                    lone_pair_combo.append(terminal_lone_pairs[0])
+                if not lone_pair_combo:
+                    continue
+
+                combo = tuple([pi_candidate] + lone_pair_combo)
+                combo_ids = {_candidate_index(candidate) for candidate in combo}
+                fixed = fixed_for_combo(
+                    combo,
+                    lp_replacement_atoms=(negative_terminals +
+                                          [int(selected_terminal)]),
+                )
+                nbo_list = sorted(fixed + list(combo),
+                                  key=lambda candidate: int(candidate.get('index', 0)))
+                if abs(_candidate_list_electron_count(nbo_list) - target_electrons) > 1.0e-12:
+                    continue
+                combo_pairs = _active_pi_bonds(combo)
+                occupation_sum = float(sum(candidate.get('occupation', 0.0)
+                                           for candidate in nbo_list))
+                alternative = _assignment_payload(
+                    molecule,
+                    nbo_list,
+                    target_pairs,
+                    occupation_sum,
+                    list(warnings),
+                    constraints,
+                    allowed_pi_bonus=0.05 * len(combo_pairs & allowed_pi_pairs),
+                    active_candidate_ids=combo_ids,
+                )
+                alternative.update({
+                    'rank': 0,
+                    'weight': 0.0,
+                    'pi_bonds': [tuple(int(atom + 1) for atom in pair)
+                                 for pair in sorted(combo_pairs)],
+                    'active_one_electron_atoms': [],
+                    'active_lone_pair_atoms': [
+                        int(atom + 1) for atom in sorted(negative_terminals)
+                    ],
+                    'active_positive_atoms': [int(center + 1)],
+                })
+                signature = _alternative_resonance_signature(alternative)
+                if signature in existing_signatures:
+                    continue
+                existing_signatures.add(signature)
+                alternatives.append(alternative)
 
     if not alternatives:
         fallback = dict(primary_assignment)
@@ -3404,6 +3747,8 @@ class NboDriver:
                 max_alternatives=compute_options.max_alternatives,
                 weight_beta=compute_options.lewis_weight_beta,
             ) if compute_options.include_lewis_assignment else []
+            resonance_classes = _build_resonance_classes(molecule,
+                                                         alternatives)
             if alternatives:
                 primary_ids = {
                     candidate.get('index')
@@ -3488,6 +3833,7 @@ class NboDriver:
                 'nbo_list': primary_assignment['nbo_list'],
                 'primary': primary_assignment,
                 'alternatives': alternatives,
+                'resonance_classes': resonance_classes,
                 'donor_acceptor_diagnostics': donor_acceptor_diagnostics,
                 'metal_ligand_diagnostics': metal_ligand_diagnostics,
                 'diagnostics': diagnostics,
@@ -3952,7 +4298,9 @@ class NboDriver:
             if show_labels:
                 rank = int(alternative.get('rank', index + 1))
                 weight = float(alternative.get('weight', 0.0))
-                title = f'Lewis {rank}: w={weight:.3f}'
+                class_id = alternative.get('resonance_class_id')
+                class_text = f' {class_id}' if class_id else ''
+                title = f'Lewis {rank}{class_text}: w={weight:.3f}'
                 self._add_viewer_label(view,
                                        title,
                                        label_position,
@@ -4343,7 +4691,28 @@ class NboDriver:
                                  f"{', '.join(pieces)}")
 
         alternatives = results.get('alternatives', [])
+        resonance_classes = results.get('resonance_classes', [])
         if level == 'full' and alternatives:
+            if resonance_classes:
+                lines.append('')
+                lines.append('Resonance classes')
+                lines.append('-' * width)
+                lines.append(
+                    f"{'Class':>6} {'Deg':>4} {'Weight sum':>12} "
+                    f"{'Mean':>10} {'Min':>10} {'Max':>10}  Signature"
+                )
+                lines.append('-' * width)
+                for record in resonance_classes:
+                    lines.append(
+                        f"{record.get('class_id', ''):>6} "
+                        f"{record.get('class_degeneracy', 0):>4} "
+                        f"{record.get('class_weight_sum', 0.0):>12.5f} "
+                        f"{record.get('class_weight_mean', 0.0):>10.5f} "
+                        f"{record.get('class_weight_min', 0.0):>10.5f} "
+                        f"{record.get('class_weight_max', 0.0):>10.5f}  "
+                        f"{record.get('class_label', '')}"
+                    )
+
             lines.append('')
             lines.append('Lewis/resonance alternatives')
             lines.append('-' * width)
@@ -4368,8 +4737,9 @@ class NboDriver:
                 extra_headers.append(f"{'Pos':<12}")
             extra_text = ''.join(f'{header} ' for header in extra_headers)
             lines.append(
-                f"{'Rank':>4} {'Score weight':>12} {'Score':>12} "
-                f"{'Pairs':>7} {'Sigma/Pi':>9} {extra_text}{'Pi bonds'}"
+                f"{'Rank':>4} {'Class':>6} {'Score weight':>12} "
+                f"{'Score':>12} {'Pairs':>7} {'Sigma/Pi':>9} "
+                f"{extra_text}{'Pi bonds'}"
             )
             lines.append('-' * width)
             for alternative in alternatives:
@@ -4391,6 +4761,7 @@ class NboDriver:
                 ) or 'none'
                 prefix = (
                     f"{alternative.get('rank', 0):>4} "
+                    f"{alternative.get('resonance_class_id', ''):>6} "
                     f"{alternative.get('weight', 0.0):>12.5f} "
                     f"{alternative.get('score', 0.0):>12.5f} "
                     f"{alternative.get('electron_pairs', 0):>7}/"
@@ -4415,6 +4786,79 @@ class NboDriver:
                 lines.append('Alternative notes')
                 for warning in dict.fromkeys(alternative_warnings):
                     lines.append(f'- {warning}')
+
+        donor_acceptor = results.get('donor_acceptor_diagnostics', {})
+        interactions = donor_acceptor.get('interactions', [])
+        if level == 'full' and interactions:
+            lines.append('')
+            lines.append('Candidate-only acceptors (BD*/RY)')
+            lines.append('-' * width)
+            lines.append(
+                'These acceptors are diagnostics only and are not selected occupied Lewis NBOs.'
+            )
+            lines.append(
+                f"{'Donor':<16} {'Acceptor':<16} {'Type':<10} "
+                f"{'Occ':>10} {'|Dens. coup.|':>14} {'Dens. coup.':>14}"
+            )
+            lines.append('-' * width)
+
+            def atom_text(atoms):
+                return '-'.join(f'{labels[int(atom) - 1]}{int(atom)}'
+                                for atom in atoms) or 'none'
+
+            for interaction in interactions[:12]:
+                donor_text = atom_text(interaction.get('donor_atoms', ()))
+                acceptor_text = atom_text(interaction.get('acceptor_atoms', ()))
+                acceptor_type = interaction.get('acceptor_type', '')
+                acceptor_subtype = interaction.get('acceptor_subtype', '')
+                type_text = (acceptor_type if not acceptor_subtype else
+                             f'{acceptor_type}({acceptor_subtype})')
+                lines.append(
+                    f"{donor_text:<16.16} {acceptor_text:<16.16} "
+                    f"{type_text:<10.10} "
+                    f"{interaction.get('acceptor_occupation', 0.0):>10.5f} "
+                    f"{interaction.get('abs_density_coupling', 0.0):>14.6f} "
+                    f"{interaction.get('density_coupling', 0.0):>14.6f}"
+                )
+
+        metal_ligand = results.get('metal_ligand_diagnostics', [])
+        if level == 'full' and metal_ligand:
+            lines.append('')
+            lines.append('Metal-ligand diagnostics (ML)')
+            lines.append('-' * width)
+            lines.append(
+                'These channels are diagnostics only and are not selected occupied Lewis NBOs.'
+            )
+            lines.append(
+                f"{'Metal':<8} {'Ligand':<8} {'Subtype':<16} "
+                f"{'Mode':<10} {'Occ':>9} {'Donation':>10} "
+                f"{'Back-don.':>10} {'Strength':>10}  Channel"
+            )
+            lines.append('-' * width)
+
+            def one_atom_text(atom):
+                if atom is None:
+                    return 'n/a'
+                atom_index = int(atom)
+                if atom_index < 1 or atom_index > len(labels):
+                    return str(atom_index)
+                return f'{labels[atom_index - 1]}{atom_index}'
+
+            for record in metal_ligand[:12]:
+                lines.append(
+                    f"{one_atom_text(record.get('metal_atom')):<8.8} "
+                    f"{one_atom_text(record.get('ligand_atom')):<8.8} "
+                    f"{record.get('subtype', ''):<16.16} "
+                    f"{record.get('coordination_mode', ''):<10.10} "
+                    f"{record.get('occupation', 0.0):>9.5f} "
+                    f"{record.get('donation_strength', 0.0):>10.6f} "
+                    f"{record.get('back_donation_strength', 0.0):>10.6f} "
+                    f"{record.get('interaction_strength', 0.0):>10.6f}  "
+                    f"{record.get('channel', '')}"
+                )
+                role = record.get('donor_acceptor_role')
+                if role:
+                    lines.append(f"      Role: {role}")
 
         lines.append('=' * width)
         return '\n'.join(lines)
