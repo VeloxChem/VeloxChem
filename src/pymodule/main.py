@@ -676,8 +676,8 @@ def main():
         lr_drv.frequencies = polgrad_drv.frequencies
         lr_results = lr_drv.compute(task.molecule, task.ao_basis, scf_results)
 
-        polgrad_results = polgrad_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_results,
-                            lr_results)
+        polgrad_results_not_used = polgrad_drv.compute(
+            task.molecule, task.ao_basis, scf_drv.scf_results, lr_results)
 
     # Response
 

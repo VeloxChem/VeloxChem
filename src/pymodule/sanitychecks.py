@@ -500,7 +500,24 @@ def pe_sanity_check(obj, method_dict=None, molecule=None):
                 },
             }
         else:
-            potfile = obj.embedding['inputs']['json_file']
+            # If current-frame potfile is explicitly provided, it must take
+            # precedence over any embedding object carried from a previous frame.
+            if obj.potfile:
+                potfile = None
+                if obj.rank == mpi_master():
+                    potfile = obj.potfile
+                    if not Path(potfile).is_file():
+                        potfile = str(
+                            Path(obj.filename).parent / Path(potfile).name)
+                    assert_msg_critical(
+                        Path(potfile).is_file(),
+                        'PE sanity check: potfile does not exist')
+                
+                potfile = obj.comm.bcast(potfile, root=mpi_master())
+                obj.embedding['inputs']['json_file'] = potfile
+            else:
+                potfile = obj.embedding['inputs']['json_file']
+
             obj.pe_options['potfile'] = potfile
 
         # update potfile in case it is not in json format
@@ -698,6 +715,7 @@ def write_pe_jsonfile(molecule, potfile):
             float(val[1]) * prefac,
             float(val[2]) * prefac,
             float(val[3]) * prefac,
+            val[6] if len(val) > 6 else None,
         ])
 
     # process charges (a dictionary with residue name as key)
@@ -749,13 +767,86 @@ def write_pe_jsonfile(molecule, potfile):
     }
 
     # MM atoms
+    # Build exclusion lists with peptide-neighbor handling:
+    # - own residue
+    # - previous residue: CA/C/O/OXT (+ HA*)
+    # - next residue: N/H*/CA (+ HA*)
+    # This matches expected CP3 behavior for amino-acid chains. Neighbor
+    # handling requires force-field atom names from the optional 7th column in
+    # @environment; if absent, use intramolecular exclusions only.
 
     classical_fragments = []
 
-    mm_atom_count = 0
+    # sorting res_ids for later identification of peptide bonds
+    sorted_resids = sorted(list(residues.keys()))
+    residue_infos = []
+    atom_counter = 0
+    for resid in sorted_resids:
+        natoms = len(residues[resid]['atoms'])
+        start_idx = atom_counter + 1
+        end_idx = atom_counter + natoms
+        atom_names = [
+            str(a[4]).upper() if a[4] is not None else None
+            for a in residues[resid]['atoms']
+        ]
+        residue_infos.append({
+            'resid': resid,
+            'start_idx': start_idx,
+            'end_idx': end_idx,
+            'atoms': residues[resid]['atoms'],
+            'atom_names': atom_names,
+            'has_atom_names': all(name is not None for name in atom_names),
+        })
+        atom_counter = end_idx
 
-    for res_count, resid in enumerate(sorted(list(residues.keys()))):
+    # Residue atom coordinates are stored in Angstrom at this point.
+    peptide_bond_cutoff = 1.55
+    peptide_bond_cutoff_sq = peptide_bond_cutoff**2
+
+    prev_neighbor_names = {
+        'CA', 'C', 'O', 'OXT', 'OT1', 'OT2', 'OC1', 'OC2',
+        'HA', 'HA1', 'HA2', 'HA3', '1HA', '2HA', '3HA',
+    }
+    next_neighbor_names = {
+        'N', 'HN', 'H', 'H1', 'H2', 'H3', '1H', '2H', '3H',
+        'HN1', 'HN2', 'HN3', 'HT1', 'HT2', 'HT3',
+        'CA', 'HA', 'HA1', 'HA2', 'HA3', '1HA', '2HA', '3HA',
+    }
+
+    def _select_indices(info, selected_names):
+        if any(name is None for name in info['atom_names']):
+            return []
+        return [
+            info['start_idx'] + i for i, name in enumerate(info['atom_names'])
+            if name in selected_names
+        ]
+
+    def _atom_distance_sq(atom_i, atom_j):
+        return sum((atom_i[k] - atom_j[k])**2 for k in range(1, 4))
+
+    def _has_peptide_bond(left_info, right_info):
+        if (not left_info['has_atom_names'] or
+                not right_info['has_atom_names']):
+            return False
+
+        left_c_atoms = [
+            atom for atom, name in zip(left_info['atoms'],
+                                       left_info['atom_names'])
+            if name == 'C'
+        ]
+        right_n_atoms = [
+            atom for atom, name in zip(right_info['atoms'],
+                                       right_info['atom_names'])
+            if name == 'N'
+        ]
+
+        return any(
+            _atom_distance_sq(c_atom, n_atom) <= peptide_bond_cutoff_sq
+            for c_atom in left_c_atoms for n_atom in right_n_atoms)
+
+    for res_count, resid in enumerate(sorted_resids):
         resname = residues[resid]['resname']
+        info = residue_infos[res_count]
 
         classical_fragments.append({
             "index": res_count + 1,
@@ -784,15 +875,23 @@ def write_pe_jsonfile(molecule, potfile):
                           for p in range(6)]
                          for x in range(len(residues[resid]['atoms']))]
 
-        # coordinates
-
-        res_atom_start = mm_atom_count
+        # coordinates + exclusions
+        exclusions = list(range(info['start_idx'], info['end_idx'] + 1))
+        if res_count > 0 and _has_peptide_bond(residue_infos[res_count - 1],
+                                               info):
+            exclusions.extend(
+                _select_indices(residue_infos[res_count - 1], prev_neighbor_names))
+        if (res_count + 1 < len(residue_infos) and
+                _has_peptide_bond(info, residue_infos[res_count + 1])):
+            exclusions.extend(
+                _select_indices(residue_infos[res_count + 1], next_neighbor_names))
+        exclusions = sorted(set(exclusions))
 
         for atom_idx, atom in enumerate(residues[resid]['atoms']):
             # Note: make sure all elements in classical_fragments
             # are serializable by json
             classical_fragments[-1]["atoms"].append({
-                "index": mm_atom_count + 1,
+                "index": info['start_idx'] + atom_idx,
                 "element": atom[0].capitalize(),
                 "coordinate": [
                     float(atom[1]) / bohr_in_angstroms(),
@@ -802,16 +901,12 @@ def write_pe_jsonfile(molecule, potfile):
                 "multipoles": {
                     "elements": [atom_chgs[atom_idx]],
                 },
-                "exclusions": list(
-                    range(res_atom_start + 1,
-                          res_atom_start + 1 + len(residues[resid]['atoms']))),
+                "exclusions": list(exclusions),
                 "polarizabilities": {
                     "elements": ([0.0, 0.0, 0.0, 0.0] + atom_pols[atom_idx]),
                     "order": [1, 1],
                 },
             })
-
-            mm_atom_count += 1
 
     embedding_json.update({
         "classical_subsystems": [{

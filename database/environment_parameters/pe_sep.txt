@@ -1,0 +1,103 @@
+molecule,res_name,atom_name,element
+water,WAT,OW,O
+water,WAT,HW,H
+water,WAT,HW1,H
+water,WAT,HW2,H
+water,HOH,OW,O
+water,HOH,HW,H
+water,HOH,HW1,H
+water,HOH,HW2,H
+water,SOL,OW,O
+water,SOL,HW,H
+water,SOL,HW1,H
+water,SOL,HW2,H
+methanol,MTL,C,C
+methanol,MTL,O,O
+methanol,MTL,HC,H
+methanol,MTL,HO,H
+ethanol,ETL,C2,C
+ethanol,ETL,C1,C
+ethanol,ETL,O,O
+ethanol,ETL,H2,H
+ethanol,ETL,H1,H
+ethanol,ETL,HO,H
+propanol,PRL,C3,C
+propanol,PRL,C2,C
+propanol,PRL,C1,C
+propanol,PRL,O,O
+propanol,PRL,H3,H
+propanol,PRL,H2,H
+propanol,PRL,H1,H
+propanol,PRL,HO,H
+formic acid,FOR,HC,H
+formic acid,FOR,C,C
+formic acid,FOR,O,O
+formic acid,FOR,HO,H
+formic acid,FOR,OH,O
+formamide,FRM,O,O
+formamide,FRM,C,C
+formamide,FRM,N,N
+formamide,FRM,HC,H
+formamide,FRM,HN,H
+dimethyl sulfoxide,DMS,C,C
+dimethyl sulfoxide,DMS,S,S
+dimethyl sulfoxide,DMS,O,O
+dimethyl sulfoxide,DMS,H,H
+propylene carbonate,PRC,O1,O
+propylene carbonate,PRC,C1,C
+propylene carbonate,PRC,C2,C
+propylene carbonate,PRC,O2,O
+propylene carbonate,PRC,C3,C
+propylene carbonate,PRC,C4,C
+propylene carbonate,PRC,O3,O
+propylene carbonate,PRC,H1,H
+propylene carbonate,PRC,H2,H
+propylene carbonate,PRC,H3,H
+dichloromethane,DCM,Cl,Cl
+dichloromethane,DCM,C,C
+dichloromethane,DCM,H,H
+acetone,ACE,CO,C
+acetone,ACE,CH,C
+acetone,ACE,O,O
+acetone,ACE,H,H
+diethyl ether,DEE,C2,C
+diethyl ether,DEE,H2,H
+diethyl ether,DEE,C1,C
+diethyl ether,DEE,H1,H
+diethyl ether,DEE,O,O
+tetrahydrofuran,THF,C1,C
+tetrahydrofuran,THF,H1,H
+tetrahydrofuran,THF,C2,C
+tetrahydrofuran,THF,H2,H
+tetrahydrofuran,THF,O,O
+toluene,TOL,C1,C
+toluene,TOL,H1,H
+toluene,TOL,C2,C
+toluene,TOL,C3,C
+toluene,TOL,H3,H
+toluene,TOL,C4,C
+toluene,TOL,H4,H
+toluene,TOL,C5,C
+toluene,TOL,H5,H
+benzene,BEN,C,C
+benzene,BEN,H,H
+hexane,HEX,C1,C
+hexane,HEX,C2,C
+hexane,HEX,C3,C
+hexane,HEX,H1,H
+hexane,HEX,H2,H
+hexane,HEX,H3,H
+chloroform,CHL,Cl,Cl
+chloroform,CHL,C,C
+chloroform,CHL,H,H
+carbon tetrachloride,TET,C,C
+carbon tetrachloride,TET,Cl,Cl
+phenol,PHN,C1,C
+phenol,PHN,H1,H
+phenol,PHN,C2,C
+phenol,PHN,H2,H
+phenol,PHN,C3,C
+phenol,PHN,H3,H
+phenol,PHN,CO,C
+phenol,PHN,O,O
+phenol,PHN,HO,H

@@ -157,12 +157,17 @@ class ValetAnalyzer:
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
 
-        # RPA vs TDA
+        str_s = "S%d" % state_index
+
+        # RPA vs TDA vs rsp_results from h5
         if 'eigenvectors_distributed' in rsp_results:
             eigvec = self.get_full_solution_vector(
                 rsp_results['eigenvectors_distributed'][state_index - 1])
         elif 'eigenvectors' in rsp_results:
             eigvec = rsp_results['eigenvectors'][:, state_index - 1].copy()
+        elif str_s in rsp_results:
+            # from h5 file
+            eigvec = rsp_results[str_s].copy()
 
         nexc = nocc * nvir
         z_mat = eigvec[:nexc]

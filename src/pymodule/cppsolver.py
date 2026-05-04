@@ -817,21 +817,6 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
         #assert_msg_critical(self.property in ['absorption', 'ecd'],
         #                    'get_cpp_property_densities: Invalid CPP property')
 
-        #assert_msg_critical(
-        #    ('x', w) in cpp_results['solutions'] and
-        #    ('y', w) in cpp_results['solutions'] and
-        #    ('z', w) in cpp_results['solutions'],
-        #    f'get_cpp_property_densities: Could not find frequency {w} in ' +
-        #    'CPP results')
-
-        ## solution vectors
-        #cpp_solution_vector_x = self.get_full_solution_vector(
-        #    cpp_results['solutions'][('x', w)])
-        #cpp_solution_vector_y = self.get_full_solution_vector(
-        #    cpp_results['solutions'][('y', w)])
-        #cpp_solution_vector_z = self.get_full_solution_vector(
-        #for     cpp_results['solutions'][('z', w)])
-
         if 'solutions' in cpp_results:
             assert_msg_critical(
                 ('x', w) in cpp_results['solutions'] and
@@ -865,7 +850,6 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                 cpp_solution_vector_x = None
                 cpp_solution_vector_y = None
                 cpp_solution_vector_z = None
-
 
         # property gradient for a operator
         a_prop_grad = self.get_complex_prop_grad(self.a_operator,
