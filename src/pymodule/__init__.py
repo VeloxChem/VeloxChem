@@ -158,6 +158,7 @@ from .tpatransitiondriver import TpaTransitionDriver
 from .threepatransitiondriver import ThreePATransitionDriver
 from .tpafulldriver import TpaFullDriver
 from .tpareddriver import TpaReducedDriver
+from .tpareddriver import TpaReducedDriver as TpaDriver
 from .espchargesdriver import EspChargesDriver
 from .respchargesdriver import RespChargesDriver
 from .rspproperty import ResponseProperty

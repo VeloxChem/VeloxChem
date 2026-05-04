@@ -5,7 +5,7 @@ import pytest
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.outputstream import OutputStream
-from veloxchem.tpadriver import TpaDriver
+from veloxchem.tpadriverbase import TpaDriverBase
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.rsptpa import TPA
@@ -117,7 +117,7 @@ class TestTPA:
             'memory_tracing': True,
         }
 
-        tpa_drv = TpaDriver(MPI.COMM_WORLD, OutputStream(None))
+        tpa_drv = TpaDriverBase(MPI.COMM_WORLD, OutputStream(None))
 
         for key, val in tpa_dict.items():
             assert getattr(tpa_drv, key) != val

@@ -356,12 +356,12 @@ class ResponseProperty:
                 'only implemented for restricted case')
 
             if ('tpa_type' not in self._rsp_dict or
-                    self._rsp_dict['tpa_type'].lower() == 'full'):
-                self._rsp_driver = TpaFullDriver(self.comm, self.ostream)
-
-            elif ('tpa_type' in self._rsp_dict and
                   self._rsp_dict['tpa_type'].lower() == 'reduced'):
                 self._rsp_driver = TpaReducedDriver(self.comm, self.ostream)
+
+            elif ('tpa_type' in self._rsp_dict and
+                    self._rsp_dict['tpa_type'].lower() == 'full'):
+                self._rsp_driver = TpaFullDriver(self.comm, self.ostream)
 
             self._rsp_driver._input_keywords['response'].update({
                 'tpa_type': ('str_lower', 'full or reduced TPA calculation'),

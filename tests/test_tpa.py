@@ -8,7 +8,7 @@ from veloxchem.veloxchemlib import (mpi_master, bohr_in_angstrom,
                                     fine_structure_constant,
                                     speed_of_light_in_vacuum_in_SI)
 from veloxchem.outputstream import OutputStream
-from veloxchem.tpadriver import TpaDriver
+from veloxchem.tpadriverbase import TpaDriverBase
 from veloxchem.tpafulldriver import TpaFullDriver
 from veloxchem.tpareddriver import TpaReducedDriver
 from veloxchem.mpitask import MpiTask
@@ -139,7 +139,7 @@ class TestTPA:
             'memory_tracing': True,
         }
 
-        tpa_drv = TpaDriver(MPI.COMM_WORLD, OutputStream(None))
+        tpa_drv = TpaDriverBase(MPI.COMM_WORLD, OutputStream(None))
 
         for key, val in tpa_dict.items():
             assert getattr(tpa_drv, key) != val
@@ -166,9 +166,9 @@ class TestTPA:
             'frequencies': [0.0, 0.05, 0.10],
         }
 
-        spectrum_au = TpaDriver.get_spectrum(rsp_results, 'au')
-        spectrum_ev = TpaDriver.get_spectrum(rsp_results, 'ev')
-        spectrum_nm = TpaDriver.get_spectrum(rsp_results, 'nm')
+        spectrum_au = TpaDriverBase.get_spectrum(rsp_results, 'au')
+        spectrum_ev = TpaDriverBase.get_spectrum(rsp_results, 'ev')
+        spectrum_nm = TpaDriverBase.get_spectrum(rsp_results, 'nm')
 
         assert spectrum_au['x_label'] == 'Photon energy [a.u.]'
         assert spectrum_ev['x_label'] == 'Photon energy [eV]'

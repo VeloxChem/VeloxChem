@@ -49,7 +49,7 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
 from .errorhandler import assert_msg_critical
 
 
-class TpaDriver(NonlinearSolver):
+class TpaDriverBase(NonlinearSolver):
     """
     Implements the isotropic cubic response driver for two-photon absorption
     (TPA)
@@ -448,7 +448,7 @@ class TpaDriver(NonlinearSolver):
             tpa_spectrum = self.get_spectrum(ret_dict, 'au')
             assert_msg_critical(
                 '[GM]' in tpa_spectrum['y_label'],
-                'TpaDriver: In valid unit in TPA spectrum y_label')
+                'TpaDriverBase: In valid unit in TPA spectrum y_label')
             ret_dict.update({
                 'cross_sections': list(tpa_spectrum['y_data'])
             })
@@ -936,7 +936,7 @@ class TpaDriver(NonlinearSolver):
 
         assert_msg_critical(
             x_unit.lower() in ['au', 'ev', 'nm'],
-            'TpaDriver.get_spectrum: x_unit should be au, ev or nm')
+            'TpaDriverBase.get_spectrum: x_unit should be au, ev or nm')
 
         au2ev = hartree_in_ev()
         auxnm = 1.0 / hartree_in_inverse_nm()
@@ -1007,10 +1007,10 @@ class TpaDriver(NonlinearSolver):
 
         assert_msg_critical(
             '[a.u.]' in spectrum['x_label'],
-            'TpaDriver._print_spectrum: In valid unit in x_label')
+            'TpaDriverBase._print_spectrum: In valid unit in x_label')
         assert_msg_critical(
             '[GM]' in spectrum['y_label'],
-            'TpaDriver._print_spectrum: In valid unit in y_label')
+            'TpaDriverBase._print_spectrum: In valid unit in y_label')
 
         title = '{:<22s}{:<22s}{:>18s}'.format('Photon Energy[a.u.]',
                                                'Photon Energy[eV]',
