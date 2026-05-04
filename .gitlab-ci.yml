@@ -40,13 +40,13 @@ workflow:
   rules:
     - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
       when: never
-    - if: $CI_PIPELINE_SOURCE != "schedule"
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID != $CI_PROJECT_ID'
+      when: never
     - when: always
 
 stages:
   - build
   - test
-  - deploy
 
 .monkey:conf:
   variables:
@@ -135,7 +135,3 @@ monkey:python_tests:
     - git clone https://github.com/VeloxChem/vlx-extra-tests.git
     - python -m pytest --capture=no --log-cli-level=INFO vlx-extra-tests/tests
   timeout: 2h
-
-include:
-  - '.gitlab/cron-deploy.yml'
-  - '.gitlab/deploy.yml'
