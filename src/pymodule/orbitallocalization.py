@@ -34,7 +34,7 @@ import numpy as np
 
 from .mathutils import symmetric_matrix_function
 from .oneeints import compute_electric_dipole_integrals, compute_overlap_integrals
-from .molecularorbitals import MolecularOrbitals
+from .molecularorbitals import MolecularOrbitals, molorb
 
 
 class OrbitalLocalizationDriver:
@@ -158,19 +158,30 @@ class OrbitalLocalizationDriver:
 
         return 0.25 * np.arctan2(g, h)
     
-    def _mol_orbs_wrapper(self, loc_orbs, mol_orbs):
+    def _mol_orbs_wrapper(self, loc_orbs, scf_res):
         """
         Wrap the localized orbitals into MolecularOrbitals container
         """
 
-        if isinstance(mol_orbs, MolecularOrbitals):
-            return MolecularOrbitals(orbs=loc_orbs, enes=mol_orbs._energies,
-                                     occs=mol_orbs._occupations,
-                                     orbs_type=mol_orbs._orbitals_type)
+        if scf_res["scf_type"] == "restricted":
+            return MolecularOrbitals(orbs=loc_orbs, enes=[scf_res["E_alpha"]],
+                                     occs=[scf_res["occ_alpha"]],
+                                     orbs_type=molorb.rest)
+        elif scf_res["scf_type"] == "unrestricted":
+            return MolecularOrbitals(orbs=loc_orbs,
+                                     enes=[scf_res["E_alpha"], scf_res["E_beta"]],
+                                     occs=[scf_res["occ_alpha"], scf_res["occ_beta"]],
+                                     orbs_type=molorb.unrest)
+        elif scf_res["scf_type"] == "restricted_openshell":
+            return MolecularOrbitals(orbs=loc_orbs,
+                                     enes=[scf_res["E_alpha"]],
+                                     occs=[scf_res["occ_alpha"], scf_res["occ_beta"]],
+                                     orbs_type=molorb.restopen)
         else:
-            raise TypeError(f"mol_orbs type {type(mol_orbs)} is not supported")
+            raise ValueError(f"scf type {scf_res["scf_type"]} unknown")
 
-    def pipek_mezey(self, molecule, basis, mol_orbs, projector="mulliken"):
+    def pipek_mezey(self, molecule, basis, scf_res,
+                    mo_range=None, projector="mulliken"):
         """
         Pipek–Mezey orbital localization
 
@@ -182,7 +193,11 @@ class OrbitalLocalizationDriver:
         basis : MolecularBasis
             AO basis set
 
-        mol_orbs: np.ndarray, MolecularOrbitals
+        scf_res: np.ndarray, result dict from scfdriver
+            SCF result
+
+        mo_range: tuple, list
+            start and end of MOs to be localized
 
         projector : str
             "lowdin"
@@ -190,29 +205,37 @@ class OrbitalLocalizationDriver:
 
         Returns
         -------
-        C : np.ndarray, MolecularOrbitals
+        C : np.ndarray, {"loc_orbs": MolecularOrbitals}
             Localized MOs
         """
 
-        if isinstance(mol_orbs, np.ndarray):
-            self.C = mol_orbs
-        elif isinstance(mol_orbs, MolecularOrbitals):
-            if len(mol_orbs._orbitals) == 2:
+        if isinstance(scf_res, np.ndarray):
+            self.C = scf_res
+        elif isinstance(scf_res, dict):
+            if scf_res["scf_type"] == "unrestricted":
                 # localize alpha and beta independently
                 alpha = self.pipek_mezey(
-                    molecule, basis, mol_orbs.alpha_to_numpy(), projector=projector
+                    molecule, basis, scf_res["C_alpha"],
+                    mo_range=mo_range, projector=projector
                 )
                 beta = self.pipek_mezey(
-                    molecule, basis, mol_orbs.beta_to_numpy(), projector=projector
+                    molecule, basis, scf_res["C_beta"],
+                    mo_range=mo_range, projector=projector
                 )
-                return self._mol_orbs_wrapper([alpha, beta], mol_orbs)
+                return {"loc_orbs": self._mol_orbs_wrapper([alpha, beta], scf_res)}
             else:
                 alpha = self.pipek_mezey(
-                    molecule, basis, mol_orbs.alpha_to_numpy(), projector=projector
+                    molecule, basis, scf_res["C_alpha"],
+                    mo_range=mo_range, projector=projector
                 )
-                return self._mol_orbs_wrapper([alpha], mol_orbs)
+                return {"loc_orbs": self._mol_orbs_wrapper([alpha], scf_res)}
         else:
-            raise TypeError(f"mol_orbs type {type(mol_orbs)} is not supported")
+            raise TypeError(f"scf_res type {type(scf_res)} is not supported")
+        # localize only user defined MOs
+        if mo_range:
+            if len(mo_range) != 2:
+                raise ValueError("mo_range object should be of length 2")
+            self.C = self.C[:, mo_range[0]:mo_range[1]]
         self.nao, self.norb = self.C.shape
         self.S = compute_overlap_integrals(molecule, basis)
         # AO -> atom mapping
@@ -287,7 +310,7 @@ class OrbitalLocalizationDriver:
 
         return self.C
 
-    def boys(self, molecule, basis, mol_orbs):
+    def boys(self, molecule, basis, scf_res, mo_range=None):
         """
         Boys orbital localization
 
@@ -299,27 +322,39 @@ class OrbitalLocalizationDriver:
         basis : MolecularBasis
             AO basis set
 
-        mol_orbs: np.ndarray, MolecularOrbitals
+        scf_res: np.ndarray, result dict from scfdriver
+            SCF result
+
+        mo_range: tuple, list
+            start and end of MOs to be localized
 
         Returns
         -------
-        C : np.ndarray, MolecularOrbitals
+        C : np.ndarray, {"loc_orbs": MolecularOrbitals}
             Localized MOs
         """
 
-        if isinstance(mol_orbs, np.ndarray):
-            self.C = mol_orbs
-        elif isinstance(mol_orbs, MolecularOrbitals):
-            if len(mol_orbs._orbitals) == 2:
+        if isinstance(scf_res, np.ndarray):
+            self.C = scf_res
+        elif isinstance(scf_res, dict):
+            if scf_res["scf_type"] == "unrestricted":
                 # localize alpha and beta independently
-                alpha = self.boys(molecule, basis, mol_orbs.alpha_to_numpy())
-                beta = self.boys(molecule, basis, mol_orbs.beta_to_numpy())
-                return self._mol_orbs_wrapper([alpha, beta], mol_orbs)
+                alpha = self.boys(molecule, basis, scf_res["C_alpha"],
+                                  mo_range=mo_range)
+                beta = self.boys(molecule, basis, scf_res["C_beta"],
+                                 mo_range=mo_range)
+                return {"loc_orbs": self._mol_orbs_wrapper([alpha, beta], scf_res)}
             else:
-                alpha = self.boys(molecule, basis, mol_orbs.alpha_to_numpy())
-                return self._mol_orbs_wrapper([alpha], mol_orbs)
+                alpha = self.boys(molecule, basis, scf_res["C_alpha"],
+                                  mo_range=mo_range)
+                return {"loc_orbs": self._mol_orbs_wrapper([alpha], scf_res)}
         else:
-            raise TypeError(f"mol_orbs type {type(mol_orbs)} is not supported")
+            raise TypeError(f"scf_res type {type(scf_res)} is not supported")
+        # localize only user defined MOs
+        if mo_range:
+            if len(mo_range) != 2:
+                raise ValueError("mo_range object should be of length 2")
+            self.C = self.C[:, mo_range[0]:mo_range[1]]
         self.nao, self.norb = self.C.shape
         mu = compute_electric_dipole_integrals(molecule, basis)
 
@@ -361,7 +396,7 @@ class OrbitalLocalizationDriver:
 
         return self.C
 
-    def edmiston_ruedenberg(self, molecule, basis, mol_orbs):
+    def edmiston_ruedenberg(self, molecule, basis, scf_res, range=None):
         """
         Placeholder for ER localization scheme
         """
