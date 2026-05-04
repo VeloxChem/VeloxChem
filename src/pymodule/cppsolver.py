@@ -814,23 +814,58 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
         Gets CPP property densities.
         """
 
-        assert_msg_critical(self.property in ['absorption', 'ecd'],
-                            'get_cpp_property_densities: Invalid CPP property')
+        #assert_msg_critical(self.property in ['absorption', 'ecd'],
+        #                    'get_cpp_property_densities: Invalid CPP property')
 
-        assert_msg_critical(
-            ('x', w) in cpp_results['solutions'] and
-            ('y', w) in cpp_results['solutions'] and
-            ('z', w) in cpp_results['solutions'],
-            f'get_cpp_property_densities: Could not find frequency {w} in ' +
-            'CPP results')
+        #assert_msg_critical(
+        #    ('x', w) in cpp_results['solutions'] and
+        #    ('y', w) in cpp_results['solutions'] and
+        #    ('z', w) in cpp_results['solutions'],
+        #    f'get_cpp_property_densities: Could not find frequency {w} in ' +
+        #    'CPP results')
 
-        # solution vectors
-        cpp_solution_vector_x = self.get_full_solution_vector(
-            cpp_results['solutions'][('x', w)])
-        cpp_solution_vector_y = self.get_full_solution_vector(
-            cpp_results['solutions'][('y', w)])
-        cpp_solution_vector_z = self.get_full_solution_vector(
-            cpp_results['solutions'][('z', w)])
+        ## solution vectors
+        #cpp_solution_vector_x = self.get_full_solution_vector(
+        #    cpp_results['solutions'][('x', w)])
+        #cpp_solution_vector_y = self.get_full_solution_vector(
+        #    cpp_results['solutions'][('y', w)])
+        #cpp_solution_vector_z = self.get_full_solution_vector(
+        #for     cpp_results['solutions'][('z', w)])
+
+        if 'solutions' in cpp_results:
+            assert_msg_critical(
+                ('x', w) in cpp_results['solutions'] and
+                ('y', w) in cpp_results['solutions'] and
+                ('z', w) in cpp_results['solutions'],
+                f'get_cpp_property_densities: Could not find frequency {w} in ' +
+                'CPP results')
+
+            # solution vectors
+            cpp_solution_vector_x = self.get_full_solution_vector(
+                cpp_results['solutions'][('x', w)])
+            cpp_solution_vector_y = self.get_full_solution_vector(
+                cpp_results['solutions'][('y', w)])
+            cpp_solution_vector_z = self.get_full_solution_vector(
+                cpp_results['solutions'][('z', w)])
+
+        else:
+            if self.rank == mpi_master():
+                assert_msg_critical(
+                    f'x_x_{w:.8f}' in cpp_results and
+                    f'y_y_{w:.8f}' in cpp_results and
+                    f'z_z_{w:.8f}' in cpp_results,
+                    f'get_cpp_property_densities: Could not find frequency {w} in ' +
+                    'CPP results')
+
+                # solution vectors
+                cpp_solution_vector_x = cpp_results[f'x_x_{w:.8f}']
+                cpp_solution_vector_y = cpp_results[f'y_y_{w:.8f}']
+                cpp_solution_vector_z = cpp_results[f'z_z_{w:.8f}']
+            else:
+                cpp_solution_vector_x = None
+                cpp_solution_vector_y = None
+                cpp_solution_vector_z = None
+
 
         # property gradient for a operator
         a_prop_grad = self.get_complex_prop_grad(self.a_operator,
