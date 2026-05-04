@@ -637,17 +637,321 @@ class InterpolationDriver():
 
         return d2_total, grad_total
     
-    def _evaluate_masked_cluster_state(self, cluster_id, datapoint, projector, org_int_coords, base_cache=None):
-        masks = datapoint.mapping_masks
-        if masks is None or len(masks) == 0:
-            masks = [np.arange(len(datapoint.internal_coordinates_values), dtype=np.int64)]
-
+    def _evaluate_masked_core_state(self, core_dp, core_projector, org_int_coords, base_cache=None):
         masked_E = []
         masked_G = []
         raw = []
         raw_grad = []
 
+        natm = self.impes_coordinate.cartesian_coordinates.shape[0]
+
+        for mask in self._coerce_mapping_masks(core_dp):
+            mask_arr = np.asarray(mask, dtype=np.int64)
+
+            org_eval_m, b_eval_m = self._candidate_current_chart(
+                symmetry_data_point=core_dp,
+                mask=mask_arr,
+                org_int_coords=org_int_coords,
+                b_matrix=self.impes_coordinate.b_matrix,
+                base_cache=base_cache,
+            )
+
+            E_m, G_m = self._restricted_taylor_eval_for_mask(
+                datapoint=core_dp,
+                mask=mask_arr,
+                projector=core_projector,
+                org_int_coords=org_int_coords,
+                base_cache=base_cache,
+                precomputed_current=(org_eval_m, b_eval_m),
+            )
+
+            d2_m, grad_d2_m = self._all_rotor_mask_signature_distance_and_gradient(
+                datapoint=core_dp,
+                mask=mask_arr,
+                org_int_coords=org_int_coords,
+                b_matrix=b_eval_m,
+                base_cache=base_cache,
+                precomputed_current=(org_eval_m, b_eval_m),
+            )
+
+            if d2_m <= 1.0e-10:
+                w_m = 1.0e30
+                grad_w_m = np.zeros((natm, 3), dtype=np.float64)
+            else:
+                w_m, grad_w_m = self._normalize_symmetry_candidate_weight(d2_m, grad_d2_m)
+
+            masked_E.append(E_m)
+            masked_G.append(G_m)
+            raw.append(w_m)
+            raw_grad.append(grad_w_m)
+
+        weights, grad_weights = self._normalize_mask_weight_pool(raw, raw_grad)
+
+        masked_E = np.asarray(masked_E, dtype=np.float64)
+        masked_G = np.asarray(masked_G, dtype=np.float64)
+
+        E = float(np.dot(weights, masked_E))
+        G = (
+            np.tensordot(weights, masked_G, axes=1)
+            + np.tensordot(masked_E - E, grad_weights, axes=1)
+        )
+
+        return E, G
+
+    def _all_rotor_mask_signature_distance_and_gradient(
+        self,
+        *,
+        datapoint,
+        mask,
+        org_int_coords,
+        b_matrix=None,
+        base_cache=None,
+        precomputed_current=None,
+    ):
+        mask = np.asarray(mask, dtype=np.int64)
+
+        if precomputed_current is None:
+            org_eval, b_eval = self._candidate_current_chart(
+                symmetry_data_point=datapoint,
+                mask=mask,
+                org_int_coords=org_int_coords,
+                b_matrix=self.impes_coordinate.b_matrix if b_matrix is None else b_matrix,
+                base_cache=base_cache,
+            )
+        else:
+            org_eval, b_eval = precomputed_current
+
+        ref_masked = np.asarray(datapoint.internal_coordinates_values, dtype=np.float64)[mask]
+        b_eval = np.asarray(b_eval, dtype=np.float64)
+
+        d2_total = 0.0
+        grad_total = np.zeros(b_eval.shape[1], dtype=np.float64)
+        n_groups = 0
+
+        for rotor in self.rotor_cluster_information.rotors.values():
+            rows = np.asarray(rotor.torsion_rows, dtype=np.int64)
+            delta = np.asarray(org_eval, dtype=np.float64)[rows] - ref_masked[rows]
+
+            d2_total += float(np.mean(2.0 * (1.0 - np.cos(delta))))
+            grad_total += np.mean(
+                2.0 * np.sin(delta)[:, None] * b_eval[rows, :],
+                axis=0,
+            )
+            n_groups += 1
+
+        if n_groups > 0:
+            d2_total /= n_groups
+            grad_total /= n_groups
+
+        return d2_total, grad_total
+
+    
+    def _coerce_mapping_masks(self, datapoint, masks=None):
+        if masks is None:
+            masks = getattr(datapoint, "mapping_masks", None)
+
+        n_ic = len(datapoint.internal_coordinates_values)
+        if masks is None or len(masks) == 0:
+            return np.arange(n_ic, dtype=np.int64).reshape(1, -1)
+
+        masks_arr = np.asarray(masks, dtype=np.int64)
+        if masks_arr.ndim == 1:
+            masks_arr = masks_arr.reshape(1, -1)
+        return masks_arr
+    
+    def _evaluate_projected_datapoint_on_mask(
+        self,
+        *,
+        datapoint,
+        projector,
+        org_int_coords,
+        mask,
+        base_cache=None,
+    ):
+        """
+        Evaluate one datapoint Taylor model in one fixed symmetry chart.
+
+        The mask may be a full-product rotor mask from the core datapoint.
+        This is intentional: independent cluster states must be evaluated in
+        the same global chart as every other cluster and the core.
+        """
+        mask_arr = np.asarray(mask, dtype=np.int64)
+
+        org_eval_m, b_eval_m = self._candidate_current_chart(
+            symmetry_data_point=datapoint,
+            mask=mask_arr,
+            org_int_coords=org_int_coords,
+            b_matrix=self.impes_coordinate.b_matrix,
+            base_cache=base_cache,
+        )
+
+        return self._restricted_taylor_eval_for_mask(
+            datapoint=datapoint,
+            mask=mask_arr,
+            projector=projector,
+            org_int_coords=org_int_coords,
+            base_cache=base_cache,
+            precomputed_current=(org_eval_m, b_eval_m),
+        )
+
+
+    def _global_symmetry_mask_weights(
+        self,
+        *,
+        core_dp,
+        org_int_coords,
+        base_cache=None,
+        exact_tol=1.0e-10,
+    ):
+        """
+        Build normalized weights over the full-product rotor symmetry masks.
+
+        These weights define the global symmetry gauge. They must be shared by
+        the core and every independent/coupled cluster model during assembly.
+        """
+        masks = self._coerce_mapping_masks(core_dp)
+        natm = self.impes_coordinate.cartesian_coordinates.shape[0]
+
+        raw = []
+        raw_grad = []
+        exact = []
+
         for mask in masks:
+            mask_arr = np.asarray(mask, dtype=np.int64)
+
+            org_eval_m, b_eval_m = self._candidate_current_chart(
+                symmetry_data_point=core_dp,
+                mask=mask_arr,
+                org_int_coords=org_int_coords,
+                b_matrix=self.impes_coordinate.b_matrix,
+                base_cache=base_cache,
+            )
+
+            d2_m, grad_d2_m = self._all_rotor_mask_signature_distance_and_gradient(
+                datapoint=core_dp,
+                mask=mask_arr,
+                org_int_coords=org_int_coords,
+                b_matrix=b_eval_m,
+                base_cache=base_cache,
+                precomputed_current=(org_eval_m, b_eval_m),
+            )
+
+            if d2_m <= exact_tol:
+                exact.append(True)
+                raw.append(0.0)
+                raw_grad.append(np.zeros((natm, 3), dtype=np.float64))
+            else:
+                exact.append(False)
+                w_m, grad_w_m = self._normalize_symmetry_candidate_weight(
+                    d2_m,
+                    grad_d2_m,
+                )
+                raw.append(w_m)
+                raw_grad.append(grad_w_m)
+
+        exact_idx = np.where(np.asarray(exact, dtype=bool))[0]
+        if exact_idx.size > 0:
+            weights = np.zeros(len(masks), dtype=np.float64)
+            weights[exact_idx] = 1.0 / exact_idx.size
+            grad_weights = np.zeros((len(masks), natm, 3), dtype=np.float64)
+            return masks, weights, grad_weights
+
+        weights, grad_weights = self._normalize_mask_weight_pool(raw, raw_grad)
+        return masks, weights, grad_weights
+
+
+    def _evaluate_masked_cluster_correction(
+        self,
+        *,
+        cluster_id,
+        state_dp,
+        core_dp,
+        cluster_projector,
+        core_projector,
+        org_int_coords,
+        base_cache=None,
+    ):
+        masked_dE = []
+        masked_dG = []
+        raw = []
+        raw_grad = []
+
+        for mask in self._coerce_mapping_masks(state_dp):
+            mask_arr = np.asarray(mask, dtype=np.int64)
+
+            org_eval_m, b_eval_m = self._candidate_current_chart(
+                symmetry_data_point=state_dp,
+                mask=mask_arr,
+                org_int_coords=org_int_coords,
+                b_matrix=self.impes_coordinate.b_matrix,
+                base_cache=base_cache,
+            )
+
+            state_E_m, state_G_m = self._restricted_taylor_eval_for_mask(
+                datapoint=state_dp,
+                mask=mask_arr,
+                projector=cluster_projector,
+                org_int_coords=org_int_coords,
+                base_cache=base_cache,
+                precomputed_current=(org_eval_m, b_eval_m),
+            )
+
+            core_E_m, core_G_m = self._restricted_taylor_eval_for_mask(
+                datapoint=core_dp,
+                mask=mask_arr,
+                projector=core_projector,
+                org_int_coords=org_int_coords,
+                base_cache=base_cache,
+                precomputed_current=(org_eval_m, b_eval_m),
+            )
+
+            d2_m, grad_d2_m = self._cluster_mask_signature_distance_and_gradient(
+                cluster_id=cluster_id,
+                datapoint=state_dp,
+                mask=mask_arr,
+                org_int_coords=org_int_coords,
+                b_matrix=b_eval_m,
+                base_cache=base_cache,
+                precomputed_current=(org_eval_m, b_eval_m),
+            )
+
+            w_m, grad_w_m = self._normalize_symmetry_candidate_weight(d2_m, grad_d2_m)
+
+            masked_dE.append(state_E_m - core_E_m)
+            masked_dG.append(state_G_m - core_G_m)
+            raw.append(w_m)
+            raw_grad.append(grad_w_m)
+
+        weights, grad_weights = self._normalize_mask_weight_pool(raw, raw_grad)
+        print('masked_weights', weights)
+        masked_dE = np.asarray(masked_dE, dtype=np.float64)
+        masked_dG = np.asarray(masked_dG, dtype=np.float64)
+
+        dE = float(np.dot(weights, masked_dE))
+        dG = (
+            np.tensordot(weights, masked_dG, axes=1)
+            + np.tensordot(masked_dE, grad_weights, axes=1)
+        )
+        return dE, dG
+
+    def _evaluate_masked_cluster_state(
+        self,
+        cluster_id,
+        datapoint,
+        projector,
+        org_int_coords,
+        base_cache=None,
+        exact_tol=1.0e-10,
+    ):
+        masked_E = []
+        masked_G = []
+        raw = []
+        raw_grad = []
+        exact_flags = []
+
+        natm = self.impes_coordinate.cartesian_coordinates.shape[0]
+
+        for mask in self._coerce_mapping_masks(datapoint):
             mask_arr = np.asarray(mask, dtype=np.int64)
 
             org_eval_m, b_eval_m = self._candidate_current_chart(
@@ -677,21 +981,38 @@ class InterpolationDriver():
                 precomputed_current=(org_eval_m, b_eval_m),
             )
 
-            w_m, grad_w_m = self._normalize_symmetry_candidate_weight(d2_m, grad_d2_m)
-
             masked_E.append(E_m)
             masked_G.append(G_m)
-            raw.append(w_m)
-            raw_grad.append(grad_w_m)
 
-        weights, grad_weights = self._normalize_mask_weight_pool(raw, raw_grad)
+            if d2_m <= exact_tol:
+                exact_flags.append(True)
+                raw.append(0.0)
+                raw_grad.append(np.zeros((natm, 3), dtype=np.float64))
+            else:
+                exact_flags.append(False)
+                w_m, grad_w_m = self._normalize_symmetry_candidate_weight(d2_m, grad_d2_m)
+                raw.append(w_m)
+                raw_grad.append(grad_w_m)
 
-        state_E = np.dot(weights, np.asarray(masked_E, dtype=np.float64))
+        masked_E = np.asarray(masked_E, dtype=np.float64)
+        masked_G = np.asarray(masked_G, dtype=np.float64)
+
+        exact_idx = np.where(np.asarray(exact_flags, dtype=bool))[0]
+        if exact_idx.size > 0:
+            weights = np.zeros(masked_E.size, dtype=np.float64)
+            weights[exact_idx] = 1.0 / exact_idx.size
+            grad_weights = np.zeros((masked_E.size, natm, 3), dtype=np.float64)
+        else:
+            weights, grad_weights = self._normalize_mask_weight_pool(raw, raw_grad)
+
+        state_E = float(np.dot(weights, masked_E))
         state_G = (
-            np.tensordot(weights, np.asarray(masked_G, dtype=np.float64), axes=1)
-            + np.tensordot(np.asarray(masked_E, dtype=np.float64), grad_weights, axes=1)
+            np.tensordot(weights, masked_G, axes=1)
+            + np.tensordot(masked_E - state_E, grad_weights, axes=1)
         )
+
         return state_E, state_G
+
     
     def _cluster_mask_signature_distance_and_gradient(
         self,
@@ -872,7 +1193,7 @@ class InterpolationDriver():
         natm = b_matrix.shape[1] // 3
         grad_cart = (b_matrix.T @ grad_internal).reshape(natm, 3)
         return U, grad_cart
-
+    
     def _assemble_clustered_family_model(self, family_label, org_int_coords):
         family_bank = self.qm_rotor_cluster_banks[family_label]
         family_cluster_info = family_bank.get("cluster_info")
@@ -883,90 +1204,80 @@ class InterpolationDriver():
                 self.rotor_cluster_runtime = None
 
         core_dp = family_bank["core"]
-        bmat = self.impes_coordinate.b_matrix
-        bounds = self._get_internal_coordinate_partitions()
-        bend = int(bounds['bond_end'])
-        aend = int(bounds['angle_end'])
-        dstart = int(bounds["dihedral_start"])
-        dend = int(bounds["dihedral_end"])
+        org_coords = np.asarray(org_int_coords, dtype=np.float64)
 
-        eq_mode = None
         candidate_base_cache = None
         if self.impes_coordinate.use_eq_bond_length:
-            eq_mode = self._get_eq_symmetry_mode()
-            if eq_mode == 'masked_exact':
+            if self._get_eq_symmetry_mode() == "masked_exact":
                 candidate_base_cache = self.impes_coordinate.prepare_eq_candidate_base_cache()
- 
-        P0 = self._get_core_projector()
 
-        core_E, core_G = self._restricted_taylor_eval(
-            energy=float(core_dp.energy),
-            grad=np.asarray(core_dp.internal_gradient, dtype=np.float64),
-            hess=np.asarray(core_dp.internal_hessian, dtype=np.float64),
-            ref_coords=np.asarray(core_dp.internal_coordinates_values, dtype=np.float64),
-            org_int_coords=np.asarray(org_int_coords, dtype=np.float64),
-            b_matrix=bmat,
-            projector=P0,
-            dihedral_start=dstart,
-            dihedral_end=dend,
-            angle_end=aend,
-            bond_end=bend,
+        core_projector = self._get_core_projector()
+        core_E, core_G = self._evaluate_masked_core_state(
+            core_dp,
+            core_projector,
+            org_coords,
+            base_cache=candidate_base_cache,
         )
 
-        local_E = core_E
-        local_G = core_G.copy()
-        org_coords = np.asarray(org_int_coords, dtype=np.float64)
+        cluster_E_terms = []
+        cluster_G_terms = []
 
         for cid, cluster_bank in family_bank["clusters"].items():
             projector = self._get_cluster_projector(cid)
-  
+
             weights, grad_weights, states = self._compute_cluster_weights(
                 cid,
                 cluster_bank,
                 org_coords,
                 base_cache=candidate_base_cache,
-                # executor=executor,
-                eq_mode=eq_mode,
             )
-
             if len(states) == 0:
                 continue
 
-            dE_list = []
-            dG_list = []
+            state_E = []
+            state_G = []
 
-            t0 = time()
             for _, dp in states:
-                E_state, G_state = self._evaluate_masked_cluster_state(
-                    cluster_id=cid,
-                    datapoint=dp,
-                    projector=projector,
-                    org_int_coords=org_coords,
+                E_s, G_s = self._evaluate_masked_cluster_state(
+                    cid,
+                    dp,
+                    projector,
+                    org_coords,
                     base_cache=candidate_base_cache,
                 )
-                dE_list.append(E_state - core_E)
-                dG_list.append(G_state - core_G)
-            self._add_runtime_timing('compute.cluster.state_eval_serial', time() - t0)
+                state_E.append(E_s)
+                state_G.append(G_s)
 
-            dE = np.asarray(dE_list, dtype=np.float64)
-            dG = np.asarray(dG_list, dtype=np.float64)
+            state_E = np.asarray(state_E, dtype=np.float64)
+            state_G = np.asarray(state_G, dtype=np.float64)
 
-            local_E += np.dot(weights, dE)
-            local_G += (
-                np.tensordot(weights, dG, axes=1)
-                + np.tensordot(dE, grad_weights, axes=1)
+            cluster_E = float(np.dot(weights, state_E))
+            cluster_G = (
+                np.tensordot(weights, state_G, axes=1)
+                + np.tensordot(state_E - cluster_E, grad_weights, axes=1)
             )
 
-        return local_E, local_G
+            cluster_E_terms.append(cluster_E)
+            cluster_G_terms.append(cluster_G)
 
-    
+        if len(cluster_E_terms) == 0:
+            return core_E, core_G
+
+        n_clusters = len(cluster_E_terms)
+        total_E = float(np.sum(cluster_E_terms) - (n_clusters - 1) * core_E)
+        total_G = (
+            np.sum(np.asarray(cluster_G_terms, dtype=np.float64), axis=0)
+            - (n_clusters - 1) * core_G
+        )
+
+        return total_E, total_G
+
     def _compute_cluster_weights(
         self,
         cluster_id,
         cluster_bank,
         org_int_coords,
         base_cache=None,
-        # executor=None,
         eq_mode=None,
     ):
         populated = [
@@ -981,30 +1292,33 @@ class InterpolationDriver():
                 np.zeros((0, natm, 3), dtype=np.float64),
                 [],
             )
+
         t0 = time()
         metric_results = [
-            self._cluster_weight_metric_worker((cluster_id, dp, org_int_coords, base_cache))
+            self._cluster_weight_metric_worker(
+                (cluster_id, dp, org_int_coords, base_cache)
+            )
             for _, dp in populated
         ]
         self._add_runtime_timing('compute.cluster.weight_eval_serial', time() - t0)
 
+        d2_values = np.asarray([item[0] for item in metric_results], dtype=np.float64)
+        exact_idx = np.where(d2_values <= 1.0e-10)[0]
+
+        if exact_idx.size > 0:
+            weights = np.zeros(len(populated), dtype=np.float64)
+            weights[exact_idx] = 1.0 / exact_idx.size
+            grad_weights = np.zeros((len(populated), natm, 3), dtype=np.float64)
+            return weights, grad_weights, populated
+
         raw = []
         raw_grad = []
-
-        # for (_, _dp), (d2_i, grad_d2_i) in zip(populated, metric_results):
-        #     rho2 = 1.0
-        #     x = d2_i / rho2 + 1.0e-12
-        #     w_i = 1.0 / (2.0 * x**2)
-        #     dw_dd2 = -(2.0 / (2.0 * rho2)) * x**(-3)
-        #     grad_w_i = dw_dd2 * grad_d2_i
-
-        #     raw.append(w_i)
-        #     raw_grad.append(grad_w_i.reshape(natm, 3))
 
         for (_, dp), (d2_i, grad_d2_i) in zip(populated, metric_results):
             R = getattr(dp, "confidence_radius", 1.0)
             if R is None:
                 R = 1.0
+
             R = float(np.asarray(R, dtype=np.float64).reshape(-1)[0])
             R = max(R, 1.0e-8)
 
@@ -1021,14 +1335,14 @@ class InterpolationDriver():
             du_dd2 = 1.0 / rho2
             dw_dd2 = -(ddenom_du * du_dd2) / (denom * denom)
 
-            grad_w_i = dw_dd2 * grad_d2_i
+            grad_w_i = dw_dd2 * np.asarray(grad_d2_i, dtype=np.float64)
 
             raw.append(w_i)
             raw_grad.append(grad_w_i.reshape(natm, 3))
 
         raw = np.asarray(raw, dtype=np.float64)
         raw_grad = np.asarray(raw_grad, dtype=np.float64)
-        
+
         S = raw.sum()
         if S < 1.0e-14:
             idx = int(np.argmax(raw))
@@ -1039,9 +1353,10 @@ class InterpolationDriver():
 
         sum_grad = raw_grad.sum(axis=0)
         weights = raw / S
-
         grad_weights = (raw_grad * S - raw[:, None, None] * sum_grad) / (S**2)
+
         return weights, grad_weights, populated
+
     
     def _compute_potential_clustered(self, data_point, org_int_coords):
         family_label = data_point.family_label or data_point.point_label
@@ -1083,7 +1398,7 @@ class InterpolationDriver():
         self.bond_rmsd = []
         self.angle_rmsd = []
         self.dihedral_rmsd = []
-
+        
         self.molecule = molecule 
 
         # self.distance_molecule = Molecule.from_xyz_string(xyz_string)
@@ -1171,7 +1486,7 @@ class InterpolationDriver():
                 
                 if abs(distance) < min_distance:
                     min_distance = abs(distance)
-                distances_and_gradients.append((distance, dihedral_dist, i, denominator, weight_gradient, distance_vec))
+                distances_and_gradients.append((distance, dihedral_dist, self.qm_data_points.index(data_point), denominator, weight_gradient, distance_vec))
 
         elif self.weightfunction_type == 'internal':
             for i, data_point in enumerate(self.qm_data_points[:]):
@@ -1179,7 +1494,7 @@ class InterpolationDriver():
 
                 if abs(distance) < min_distance:
                     min_distance = abs(distance)
-                distances_and_gradients.append((distance, dihedral_dist, i, denominator, weight_gradient, distance_vec))
+                distances_and_gradients.append((distance, dihedral_dist, self.qm_data_points.index(data_point), denominator, weight_gradient, distance_vec))
 
         else:
             errtxt = "Unrecognized weight function type: "
@@ -1297,7 +1612,6 @@ class InterpolationDriver():
         self.qm_data_points = qm_data_points
 
         return qm_data_points
-
 
     def _get_symmetry_torsion_meta(self):
         """

@@ -1948,11 +1948,10 @@ class IMDatabasePointCollecter:
                 self.qm_data_point_dict[root].append(qm_data_point)
                 self.qm_energies_dict[root].append(qm_data_point.energy)
                 self.sorted_state_spec_im_labels[root].append(label)
-                # if "point_1_core" in label:
-                #     print(label)
-                #     opt_mol = Molecule(self.molecule.get_labels(), qm_data_point.cartesian_coordinates, 'bohr')
-                #     print(opt_mol.get_xyz_string())
-                #     exit()
+                
+                opt_mol = Molecule(self.molecule.get_labels(), qm_data_point.cartesian_coordinates, 'bohr')
+                print(opt_mol.get_xyz_string())
+
                 old_label = qm_data_point.point_label
                 self.qm_symmetry_datapoint_dict[root][old_label] = [qm_data_point]
             
@@ -4121,7 +4120,7 @@ class IMDatabasePointCollecter:
 
         if self.sampling_enabled:
             samp_drv = self.sampling_impes_drivers[root]
-            samp_drv.qm_sampling_rotor_cluster_banks = self._load_rotor_cluster_bank_for_root(root, sampling_mode=True)
+            samp_drv.qm_rotor_cluster_banks = self._load_rotor_cluster_bank_for_root(root, sampling_mode=True)
             if samp_drv.qm_rotor_cluster_banks:
                 first_family = next(iter(samp_drv.qm_rotor_cluster_banks.values()))
                 samp_drv.rotor_cluster_information = first_family.get("cluster_info")
@@ -4132,6 +4131,76 @@ class IMDatabasePointCollecter:
             samp_drv.rotor_cluster_runtime = None
 
         self._refresh_interpolation_driver_caches(root)
+
+    def _build_rotor_mapping_masks(self, reference_molecule, z_matrix, rotor_ids):
+        ident = list(range(len(z_matrix)))
+        if not (self.use_symmetry and self.symmetry_rotors and rotor_ids):
+            return [ident]
+
+        rotor_ids = tuple(int(rid) for rid in rotor_ids)
+        labels = reference_molecule.get_labels()
+        ref_xyz = np.asarray(reference_molecule.get_coordinates_in_bohr(), dtype=np.float64)
+        atom_map = list(range(len(labels)))
+        z_lookup = {}
+        for i, row in enumerate(z_matrix):
+            row_key = tuple(int(x) for x in row)
+            z_lookup[row_key] = i
+            z_lookup[tuple(reversed(row_key))] = i
+
+        groups = [tuple(self.symmetry_rotors[rid].atom_group) for rid in rotor_ids]
+        dihedrals = [self.symmetry_rotors[rid].torsion_coords[0] for rid in rotor_ids]
+
+        masks = [ident]
+        seen = {tuple(ident)}
+        rotations = (0.0, 2.0 * np.pi / 3.0, 4.0 * np.pi / 3.0)
+
+        for combo in itertools.product(rotations, repeat=len(dihedrals)):
+
+            if all(abs(x) < 1.0e-14 for x in combo):
+                continue
+
+            rot_mol = Molecule(labels, ref_xyz.copy(), "bohr")
+            rot_mol.set_charge(reference_molecule.get_charge())
+            rot_mol.set_multiplicity(reference_molecule.get_multiplicity())
+
+            for angle, dihedral in zip(combo, dihedrals):
+                dih = tuple(dihedral[::-1]) if dihedral[0] > dihedral[3] else tuple(dihedral)
+                dih1 = tuple(x + 1 for x in dih)
+                rot_mol.set_dihedral(dih1, rot_mol.get_dihedral(dih1, "radian") + angle, "radian")
+
+            # ref = self._calculate_translation_coordinates(ref_xyz)
+            # target = self._calculate_translation_coordinates(rot_mol.get_coordinates_in_bohr())
+
+            # if fit_atoms:
+            #     R = geometric.rotate.get_rot(target[fit_atoms], ref[fit_atoms])
+            #     target = np.dot(R, target.T).T
+
+            mapping = {}
+            for group in groups:
+                g = list(group)
+                mapping.update(self._perform_symmetry_assignment(atom_map, g, reference_molecule.get_coordinates_in_bohr()[g], rot_mol.get_coordinates_in_bohr()[g]))
+
+            if not mapping:
+                continue
+    
+            mask = []
+            for row in z_matrix:
+                mapped = tuple(mapping.get(int(atom), int(atom)) for atom in row)
+                idx = z_lookup.get(mapped)
+                if idx is None:
+                    raise RuntimeError(
+                        f"IMForceFieldGenerator: rotor mask maps row {tuple(row)} "
+                        f"to missing oriented row {mapped}."
+                    )
+                mask.append(idx)
+
+            key = tuple(mask)
+
+            if key not in seen:
+                seen.add(key)
+                masks.append(mask)
+
+        return masks
     
     def _finalize_mapping_masks_and_eq_mode(self, impes_coordinate, masks):
         impes_coordinate.mapping_masks = masks
@@ -4144,6 +4213,64 @@ class IMDatabasePointCollecter:
             impes_coordinate.symmetrize_eq_bond_lengths_from_masks(masks)
             impes_coordinate.transform_gradient_and_hessian()
 
+    def _build_rotor_owned_rows(self, z_matrix, rotors):
+        if isinstance(z_matrix, dict):
+            flat_z = (
+                list(z_matrix.get("bonds", []))
+                + list(z_matrix.get("angles", []))
+                + list(z_matrix.get("dihedrals", []))
+                + list(z_matrix.get("impropers", []))
+            )
+        else:
+            flat_z = list(z_matrix)
+
+        atom_sets = {
+            rid: set(int(a) for a in rotor.atom_group)
+            for rid, rotor in rotors.items()
+        }
+        
+        owned = {rid: set(rotor.torsion_rows) for rid, rotor in rotors.items()}
+        forced_couplings = set()
+
+        for row_idx, row in enumerate(flat_z):
+
+            row_atoms = set(int(a) for a in row)
+            owners = [
+                rid for rid, atoms in atom_sets.items()
+                if row_atoms & atoms
+            ]
+
+            if len(owners) == 1:
+                owned[owners[0]].add(row_idx)
+            elif len(owners) > 1:
+                for rid in owners:
+                    owned[rid].add(row_idx)
+                for i, a in enumerate(owners):
+                    for b in owners[i + 1:]:
+                        forced_couplings.add(tuple(sorted((a, b))))
+
+        return {
+            rid: tuple(sorted(rows))
+            for rid, rows in owned.items()
+        }, forced_couplings
+    
+    def _clone_core_datapoint_as_cluster_anchor(self, core_dp, target_root, label, job):
+        anchor_dp = deepcopy(core_dp)
+        anchor_dp.update_settings(self.interpolation_settings[target_root])
+
+        anchor_dp.family_label = core_dp.family_label
+        anchor_dp.point_label = label
+        anchor_dp.bank_role = "cluster"
+        anchor_dp.cluster_id = job["cluster_id"]
+        anchor_dp.cluster_type = job["cluster_type"]
+        anchor_dp.dihedrals_to_rotate = job["dihedrals_to_rotate"]
+        anchor_dp.cluster_rotor_ids = job["cluster_rotor_ids"]
+        anchor_dp.cluster_state_id = job["state_id"]
+        anchor_dp.phase_signature = job["phase_signature"]
+        anchor_dp.mapping_masks = None
+
+        return anchor_dp
+    
     def add_point_rotor(self, molecule_specific_information, symmetry_information={}):
         """ Adds a new point to the database.
 
@@ -4162,23 +4289,32 @@ class IMDatabasePointCollecter:
             "cluster_run": bool(self.cluster_run),
         })
 
-        def build_rotor_cluster_information(rotors, cluster_components, coupling, dihedral_start, dihedral_end):
-            
+        def build_rotor_cluster_information(
+            rotors,
+            cluster_components,
+            coupling,
+            dihedral_start,
+            dihedral_end,
+            rotor_owned_rows=None,
+        ):
             clusters = {}
             rotor_to_clusters = {}
 
             for cluster_id, rotor_ids in enumerate(cluster_components):
-                rows = []
+                rows = set()
                 for rotor_id in rotor_ids:
-                    rows.extend(rotors[rotor_id].torsion_rows)
                     rotor_to_clusters[rotor_id] = cluster_id
+                    if rotor_owned_rows is None:
+                        rows.update(rotors[rotor_id].torsion_rows)
+                    else:
+                        rows.update(rotor_owned_rows[rotor_id])
 
                 cluster_type = "independent" if len(rotor_ids) == 1 else "coupled"
                 clusters[cluster_id] = RotorClusterDefinition(
                     cluster_id=cluster_id,
                     rotor_ids=tuple(rotor_ids),
                     cluster_type=cluster_type,
-                    torsion_rows=tuple(sorted(rows)),
+                    torsion_rows=tuple(sorted(rows)),  # now owned/projector rows
                 )
 
             return RotorClusterInformation(
@@ -4261,7 +4397,7 @@ class IMDatabasePointCollecter:
                                 rotor_ids=rotor_ids,
                                 angle_assignment=angle_assignment,
                                 dihedrals_to_rotate=dihedrals_to_rotate,
-                                phase_signature=None,
+                                phase_signature=[phase],
                             )
                         )
 
@@ -4277,7 +4413,9 @@ class IMDatabasePointCollecter:
                             continue
                         angle_assignment = {}
                         dihedrals_to_rotate = []
+                        current_phase_signiture = []
                         for rotor_id, phase in zip(rotor_ids, phase_tuple):
+                            current_phase_signiture.append(phase)
                             rotor = cluster_info.rotors[rotor_id]
                             dihedrals_to_rotate.append(rotor.torsion_coords[0])
                             for torsion in rotor.torsion_coords:
@@ -4291,7 +4429,7 @@ class IMDatabasePointCollecter:
                                 rotor_ids=rotor_ids,
                                 angle_assignment=angle_assignment,
                                 dihedrals_to_rotate=dihedrals_to_rotate,
-                                phase_signature=None,
+                                phase_signature=current_phase_signiture,
                                 # label_suffix=f"state_{state_id}",
                             )
                         )
@@ -4352,7 +4490,7 @@ class IMDatabasePointCollecter:
 
         for entries in molecule_specific_information:
             molecule = entries[0]
-            basis = entries[1]
+            bexitasis = entries[1]
             states = entries[2]
             symmetry_point = False
 
@@ -4448,71 +4586,83 @@ class IMDatabasePointCollecter:
                     trust_radius = self.use_opt_confidence_radius[2]
                     impes_coordinate.confidence_radius = trust_radius
                     
-                    if self.use_symmetry and len(self.symmetry_rotors) > 0:
-                        rotation_combinations = None
-                        dihedral_list = [rotor.torsion_coords[0] for _, rotor in self.symmetry_rotors.items()]
+                    # if self.use_symmetry and len(self.symmetry_rotors) > 0:
+                    #     rotation_combinations = None
+                    #     dihedral_list = [rotor.torsion_coords[0] for _, rotor in self.symmetry_rotors.items()]
                         
-                        from itertools import product
-                        rotations = [0.0, 2.0*np.pi/3.0, 4.0*np.pi/3.0]
-                        dihedrals = dihedral_list  # your list of rotatable dihedrals
-                        rotation_combinations = list(product(rotations, repeat=len(dihedrals)))
+                    #     from itertools import product
+                    #     rotations = [0.0, 2.0*np.pi/3.0, 4.0*np.pi/3.0]
+                    #     dihedrals = dihedral_list  # your list of rotatable dihedrals
+                    #     rotation_combinations = list(product(rotations, repeat=len(dihedrals)))
                         
                         
-                        org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
-                        masks = [org_mask]
-                        for combo in rotation_combinations:
-                            if all(r == 0 for r in combo):
-                                continue  # skip the base geometry if desired
+                    #     org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
+                    #     masks = [org_mask]
+                    #     for combo in rotation_combinations:
+                    #         if all(r == 0 for r in combo):
+                    #             continue  # skip the base geometry if desired
                             
                                 
-                            rot_mol = Molecule(self.molecule.get_labels(), mol_basis[0].get_coordinates_in_bohr(), 'bohr')
-                            for angle, dihedral in zip(combo, dihedrals):
-                                dihedral_p_1 = (dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1)
-                                rot_mol.set_dihedral(dihedral_p_1, mol_basis[0].get_dihedral(dihedral_p_1, 'radian') - angle, 'radian')
-                            target_coordinates = self.calculate_translation_coordinates(rot_mol.get_coordinates_in_bohr())
-                            reference_coordinates = self.calculate_translation_coordinates(mol_basis[0].get_coordinates_in_bohr())
+                    #         rot_mol = Molecule(self.molecule.get_labels(), mol_basis[0].get_coordinates_in_bohr(), 'bohr')
+                    #         for angle, dihedral in zip(combo, dihedrals):
+                    #             dihedral_p_1 = (dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1)
+                    #             rot_mol.set_dihedral(dihedral_p_1, mol_basis[0].get_dihedral(dihedral_p_1, 'radian') - angle, 'radian')
+                    #         target_coordinates = self.calculate_translation_coordinates(rot_mol.get_coordinates_in_bohr())
+                    #         reference_coordinates = self.calculate_translation_coordinates(mol_basis[0].get_coordinates_in_bohr())
                             
-                            target_coordinates_core = target_coordinates.copy()
-                            reference_coordinates_core = reference_coordinates.copy()
+                    #         target_coordinates_core = target_coordinates.copy()
+                    #         reference_coordinates_core = reference_coordinates.copy()
                                 
-                            target_coordinates_core = np.delete(target_coordinates, symmetry_exclusion_groups, axis=0)
-                            reference_coordinates_core = np.delete(reference_coordinates, symmetry_exclusion_groups, axis=0)
-                            rotation_matrix = geometric.rotate.get_rot(target_coordinates_core,
-                                                                    reference_coordinates_core)
-                            # Rotate the data point
-                            rotated_coordinates = np.dot(rotation_matrix, target_coordinates.T).T
-                            rotated_coordinates = np.ascontiguousarray(rotated_coordinates)
+                    #         target_coordinates_core = np.delete(target_coordinates, symmetry_exclusion_groups, axis=0)
+                    #         reference_coordinates_core = np.delete(reference_coordinates, symmetry_exclusion_groups, axis=0)
+                    #         rotation_matrix = geometric.rotate.get_rot(target_coordinates_core,
+                    #                                                 reference_coordinates_core)
+                    #         # Rotate the data point
+                    #         rotated_coordinates = np.dot(rotation_matrix, target_coordinates.T).T
+                    #         rotated_coordinates = np.ascontiguousarray(rotated_coordinates)
                             
-                            mapping_dict_12 = self.perform_symmetry_assignment(symmetry_mapping_groups, symmetry_exclusion_groups, 
-                                                                                mol_basis[0].get_coordinates_in_bohr()[symmetry_exclusion_groups], rotated_coordinates[symmetry_exclusion_groups])
+                    #         mapping_dict_12 = self.perform_symmetry_assignment(symmetry_mapping_groups, symmetry_exclusion_groups, 
+                    #                                                             mol_basis[0].get_coordinates_in_bohr()[symmetry_exclusion_groups], rotated_coordinates[symmetry_exclusion_groups])
                             
                             
-                            z_matrix_dict = {tuple(sorted(element)): i 
-                                for i, element in enumerate(impes_coordinate.z_matrix)}
+                    #         z_matrix_dict = {tuple(sorted(element)): i 
+                    #             for i, element in enumerate(impes_coordinate.z_matrix)}
                             
-                            mapping_dict = [mapping_dict_12]
-                            reorded_int_coords = [impes_coordinate.internal_coordinates_values.copy()]
+                    #         mapping_dict = [mapping_dict_12]
+                    #         reorded_int_coords = [impes_coordinate.internal_coordinates_values.copy()]
 
-                            for ord in range(len(mapping_dict)):
-                                mask = []
-                                # inverse_mapping = {v: k for k, v in mapping_dict[ord].items()}
-                                reorded_int_coord = np.zeros_like(impes_coordinate.internal_coordinates_values)
-                                for i, element in enumerate(impes_coordinate.z_matrix):
-                                    # Otherwise, reorder the element
-                                    reordered_element = [mapping_dict[ord].get(x, x) for x in element]
-                                    key = tuple(sorted(reordered_element))
-                                    z_mat_index = z_matrix_dict.get(key)
-                                    mask.append(z_mat_index)
-                                    reorded_int_coord[i] = (float(reorded_int_coords[0][z_mat_index]))
-                                reorded_int_coords.append(reorded_int_coord)
+                    #         for ord in range(len(mapping_dict)):
+                    #             mask = []
+                    #             # inverse_mapping = {v: k for k, v in mapping_dict[ord].items()}
+                    #             reorded_int_coord = np.zeros_like(impes_coordinate.internal_coordinates_values)
+                    #             for i, element in enumerate(impes_coordinate.z_matrix):
+                    #                 # Otherwise, reorder the element
+                    #                 reordered_element = [mapping_dict[ord].get(x, x) for x in element]
+                    #                 key = tuple(sorted(reordered_element))
+                    #                 z_mat_index = z_matrix_dict.get(key)
+                    #                 mask.append(z_mat_index)
+                    #                 reorded_int_coord[i] = (float(reorded_int_coords[0][z_mat_index]))
+                    #             reorded_int_coords.append(reorded_int_coord)
         
-                                masks.append(mask)
-                        self._finalize_mapping_masks_and_eq_mode(impes_coordinate, masks)
-                    else:        
-                        org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
-                        masks = [org_mask]
-                        self._finalize_mapping_masks_and_eq_mode(impes_coordinate, masks)
+                    #             masks.append(mask)
+                    #     self._finalize_mapping_masks_and_eq_mode(impes_coordinate, masks)
+                    # else:        
+                    #     org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
+                    #     masks = [org_mask]
+                    #     self._finalize_mapping_masks_and_eq_mode(impes_coordinate, masks)
+                    core_rotor_ids = (
+                        tuple(sorted(self.symmetry_rotors))
+                        if self.symmetry_rotors else ()
+                    )
+                    masks = self._build_rotor_mapping_masks(
+                        mol_basis[0],
+                        impes_coordinate.z_matrix,
+                        core_rotor_ids,
+                    )
+                    self._finalize_mapping_masks_and_eq_mode(impes_coordinate, masks)
+
                     impes_coordinate.write_hdf5(self.interpolation_settings[mol_basis[4][number]]['imforcefield_file'], label)
+                    state_spec_dp[target_root] = impes_coordinate
                     if self.sampling_enabled:
                         self._write_sampling_point_from_geometry(
                             root=mol_basis[4][number],
@@ -4547,6 +4697,7 @@ class IMDatabasePointCollecter:
                 # if rank == root:
                 state_spec_payload = {
                     int(state): {
+                        "z_matrix": dp.z_matrix,
                         "point_label": dp.point_label,
                         "family_label": dp.family_label,
                         "eq_bond_lengths": np.array(dp.eq_bond_lengths, copy=True),
@@ -4575,6 +4726,7 @@ class IMDatabasePointCollecter:
 
                 for state, cur_dp_payload in state_spec_payload.items():
                     cur_dp = type("CorePointMeta", (), {})()
+                    cur_dp.z_matrix = cur_dp_payload["z_matrix"]
                     cur_dp.point_label = cur_dp_payload["point_label"]
                     cur_dp.family_label = cur_dp_payload["family_label"]
                     cur_dp.eq_bond_lengths = cur_dp_payload["eq_bond_lengths"]
@@ -4603,16 +4755,29 @@ class IMDatabasePointCollecter:
                             rotor_coupling = rotor_coupling_score(cur_dp.internal_hessian, a.torsion_rows, b.torsion_rows)
                             coupling_map[a.rotor_id, b.rotor_id] = rotor_coupling
                             coupling_map[b.rotor_id, a.rotor_id] = rotor_coupling
+                    
+                    rotor_owned_rows, forced_edges = self._build_rotor_owned_rows(
+                                                        self.root_z_matrix[state],
+                                                        self.symmetry_rotors,
+                                                    )
+
+                    for rid_i, rid_j in forced_edges:
+                        coupling_map[rid_i, rid_j] = max(
+                            coupling_map[rid_i, rid_j],
+                            self.rotor_corr_threshold,
+                        )
+                        coupling_map[rid_j, rid_i] = coupling_map[rid_i, rid_j]
 
                     clusters = build_rotor_clusters(self.symmetry_rotors, coupling_map, self.rotor_corr_threshold)
 
                     rotor_to_cluster_inf[state_key] = build_rotor_cluster_information(
-                        self.symmetry_rotors,
-                        clusters,
-                        coupling_map,
-                        symmetry_information[state_key][-1][0],
-                        symmetry_information[state_key][-1][1],
-                        )
+                                                        self.symmetry_rotors,
+                                                        clusters,
+                                                        coupling_map,
+                                                        symmetry_information[state_key][-1][0],
+                                                        symmetry_information[state_key][-1][1],
+                                                        rotor_owned_rows=rotor_owned_rows,
+                                                    )
 
                     angle_phases = _get_rotor_phase_library(rotor_to_cluster_inf[state_key])
                     final_clusters_angle_lib = _build_cluster_angle_library(  rotor_to_cluster_inf[state_key], 
@@ -4622,8 +4787,67 @@ class IMDatabasePointCollecter:
                     
 
                     for job in cluster_jobs:
-                        if job['is_anchor']:
+                        if job["is_anchor"]:
+                            target_root = int(state)
+   
+                            core_dp_full = state_spec_dp[target_root]
+
+                            label = (
+                                f"{cur_dp.point_label}_cluster_"
+                                f"{job['cluster_id']}_state_{job['state_id']}"
+                            )
+                            if job["label_suffix"]:
+                                label += f"_{job['label_suffix']}"
+
+                            core_molecule = Molecule(
+                                self.molecule.get_labels(),
+                                core_dp_full.cartesian_coordinates,
+                                "bohr",
+                            )
+                            core_molecule.set_charge(self.molecule.get_charge())
+                            core_molecule.set_multiplicity(self.molecule.get_multiplicity())
+
+                            anchor_dp = self._clone_core_datapoint_as_cluster_anchor(
+                                core_dp_full,
+                                target_root,
+                                label,
+                                job,
+                            )
+
+                            masks = self._build_rotor_mapping_masks(
+                                core_molecule,
+                                anchor_dp.z_matrix,
+                                tuple(job["cluster_rotor_ids"]),
+                            )
+                            self._finalize_mapping_masks_and_eq_mode(anchor_dp, masks)
+
+                            anchor_dp.write_hdf5(
+                                self.interpolation_settings[target_root]["imforcefield_file"],
+                                label,
+                            )
+                            if self.sampling_enabled:
+                                self._write_sampling_point_from_geometry(
+                                    root=target_root,
+                                    molecule=core_molecule,
+                                    label=label,
+                                    template_point=anchor_dp,
+                                )
+
+                            point_index["cluster_state_labels"].setdefault(int(job["cluster_id"]), {})
+                            point_index["cluster_state_labels"][int(job["cluster_id"])][
+                                int(job["state_id"])
+                            ] = label
+
+                            self._emit_test_hook("datapoint_written", {
+                                "root": int(target_root),
+                                "label": str(label),
+                                "energy_hartree": float(anchor_dp.energy),
+                                "confidence_radius": float(anchor_dp.confidence_radius),
+                                "bank_role": str(getattr(anchor_dp, "bank_role", "cluster")),
+                            })
+
                             continue
+                        
                         cur_molecule = Molecule(self.molecule.get_labels(), current_cartesian_coordinates, 'bohr')
                         cur_molecule.set_charge(self.molecule.get_charge())
                         cur_molecule.set_multiplicity(self.molecule.get_multiplicity())
@@ -4644,20 +4868,13 @@ class IMDatabasePointCollecter:
                                     dihedral[2] + 1,
                                     dihedral[3] + 1,
                                 ],
-                                cur_molecule.get_dihedral(
-                                    (
-                                        dihedral[0] + 1,
-                                        dihedral[1] + 1,
-                                        dihedral[2] + 1,
-                                        dihedral[3] + 1,
-                                    ), "radian"
-                                    ) + angle,
+                                angle,
                                 "radian",
                             )
                             current_angles_setting.append(angle)
                             constraints.append(dihedral)
                         
-                        current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
+                        current_basis = MolecularBasis.read(cur_molecule, mol_basis[1].get_main_basis_label())
                         opt_results = None
                         if isinstance(drivers[0], ScfRestrictedDriver):
 
@@ -4677,7 +4894,7 @@ class IMDatabasePointCollecter:
                         # cur_molecule = optimized_molecule
                         
                         
-                        current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
+                        current_basis = MolecularBasis.read(cur_molecule, mol_basis[1].get_main_basis_label())
                         energies, scf_results, rsp_results = self._compute_energy(drivers[0], cur_molecule, current_basis)
                 
                         if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
@@ -4694,72 +4911,72 @@ class IMDatabasePointCollecter:
                         #     state_mask=[state],
                         # )
 
-                        state_spec_dp = {}
+                        # state_spec_dp = {}
                         # if rank == root:
-                        masks = []
-                        if self.use_symmetry and len(self.symmetry_rotors) > 0:
-                            rotation_combinations = None
-                            dihedral_list = [rotor.torsion_coords[0] for _, rotor in self.symmetry_rotors.items()]
+                        # masks = []
+                        # if self.use_symmetry and len(self.symmetry_rotors) > 0:
+                        #     rotation_combinations = None
+                        #     dihedral_list = [rotor.torsion_coords[0] for _, rotor in self.symmetry_rotors.items()]
                             
-                            from itertools import product
-                            rotations = [0.0, 2.0*np.pi/3.0, 4.0*np.pi/3.0]
-                            dihedrals = dihedral_list  # your list of rotatable dihedrals
-                            rotation_combinations = list(product(rotations, repeat=len(dihedrals)))
+                        #     from itertools import product
+                        #     rotations = [0.0, 2.0*np.pi/3.0, 4.0*np.pi/3.0]
+                        #     dihedrals = dihedral_list  # your list of rotatable dihedrals
+                        #     rotation_combinations = list(product(rotations, repeat=len(dihedrals)))
                             
-                            org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
-                            masks = [org_mask]
-                            for combo in rotation_combinations:
-                                if all(r == 0 for r in combo):
-                                    continue  # skip the base geometry if desired
+                        #     org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
+                        #     masks = [org_mask]
+                        #     for combo in rotation_combinations:
+                        #         if all(r == 0 for r in combo):
+                        #             continue  # skip the base geometry if desired
                                 
                                     
-                                rot_mol = Molecule(self.molecule.get_labels(), cur_molecule.get_coordinates_in_bohr(), 'bohr')
-                                for angle, dihedral in zip(combo, dihedrals):
+                        #         rot_mol = Molecule(self.molecule.get_labels(), cur_molecule.get_coordinates_in_bohr(), 'bohr')
+                        #         for angle, dihedral in zip(combo, dihedrals):
             
-                                    dihedral_p_1 = (dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1)
-                                    rot_mol.set_dihedral(dihedral_p_1, cur_molecule.get_dihedral(dihedral_p_1, 'radian') - angle, 'radian')
-                                target_coordinates = self.calculate_translation_coordinates(rot_mol.get_coordinates_in_bohr())
-                                reference_coordinates = self.calculate_translation_coordinates(cur_molecule.get_coordinates_in_bohr())
+                        #             dihedral_p_1 = (dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1)
+                        #             rot_mol.set_dihedral(dihedral_p_1, cur_molecule.get_dihedral(dihedral_p_1, 'radian') - angle, 'radian')
+                        #         target_coordinates = self.calculate_translation_coordinates(rot_mol.get_coordinates_in_bohr())
+                        #         reference_coordinates = self.calculate_translation_coordinates(cur_molecule.get_coordinates_in_bohr())
                                 
-                                target_coordinates_core = target_coordinates.copy()
-                                reference_coordinates_core = reference_coordinates.copy()
+                        #         target_coordinates_core = target_coordinates.copy()
+                        #         reference_coordinates_core = reference_coordinates.copy()
                                     
-                                target_coordinates_core = np.delete(target_coordinates, symmetry_exclusion_groups, axis=0)
-                                reference_coordinates_core = np.delete(reference_coordinates, symmetry_exclusion_groups, axis=0)
-                                rotation_matrix = geometric.rotate.get_rot(target_coordinates_core,
-                                                                        reference_coordinates_core)
-                                # Rotate the data point
-                                rotated_coordinates = np.dot(rotation_matrix, target_coordinates.T).T
-                                rotated_coordinates = np.ascontiguousarray(rotated_coordinates)
+                        #         target_coordinates_core = np.delete(target_coordinates, symmetry_exclusion_groups, axis=0)
+                        #         reference_coordinates_core = np.delete(reference_coordinates, symmetry_exclusion_groups, axis=0)
+                        #         rotation_matrix = geometric.rotate.get_rot(target_coordinates_core,
+                        #                                                 reference_coordinates_core)
+                        #         # Rotate the data point
+                        #         rotated_coordinates = np.dot(rotation_matrix, target_coordinates.T).T
+                        #         rotated_coordinates = np.ascontiguousarray(rotated_coordinates)
                                 
-                                mapping_dict_12 = self.perform_symmetry_assignment(symmetry_mapping_groups, symmetry_exclusion_groups, 
-                                                                                    cur_molecule.get_coordinates_in_bohr()[symmetry_exclusion_groups], rotated_coordinates[symmetry_exclusion_groups])
+                        #         mapping_dict_12 = self.perform_symmetry_assignment(symmetry_mapping_groups, symmetry_exclusion_groups, 
+                        #                                                             cur_molecule.get_coordinates_in_bohr()[symmetry_exclusion_groups], rotated_coordinates[symmetry_exclusion_groups])
                                 
                                 
-                                z_matrix_dict = {tuple(sorted(element)): i 
-                                    for i, element in enumerate(impes_coordinate.z_matrix)}
+                        #         z_matrix_dict = {tuple(sorted(element)): i 
+                        #             for i, element in enumerate(impes_coordinate.z_matrix)}
                                 
-                                mapping_dict = [mapping_dict_12]
-                                reorded_int_coords = [impes_coordinate.internal_coordinates_values.copy()]
+                        #         mapping_dict = [mapping_dict_12]
+                        #         reorded_int_coords = [impes_coordinate.internal_coordinates_values.copy()]
 
-                                for ord in range(len(mapping_dict)):
-                                    mask = []
-                                    # inverse_mapping = {v: k for k, v in mapping_dict[ord].items()}
-                                    reorded_int_coord = np.zeros_like(impes_coordinate.internal_coordinates_values)
-                                    for i, element in enumerate(impes_coordinate.z_matrix):
-                                        # Otherwise, reorder the element
-                                        reordered_element = [mapping_dict[ord].get(x, x) for x in element]
-                                        key = tuple(sorted(reordered_element))
-                                        z_mat_index = z_matrix_dict.get(key)
-                                        mask.append(z_mat_index)
-                                        reorded_int_coord[i] = (float(reorded_int_coords[0][z_mat_index]))
-                                    reorded_int_coords.append(reorded_int_coord)
+                        #         for ord in range(len(mapping_dict)):
+                        #             mask = []
+                        #             # inverse_mapping = {v: k for k, v in mapping_dict[ord].items()}
+                        #             reorded_int_coord = np.zeros_like(impes_coordinate.internal_coordinates_values)
+                        #             for i, element in enumerate(impes_coordinate.z_matrix):
+                        #                 # Otherwise, reorder the element
+                        #                 reordered_element = [mapping_dict[ord].get(x, x) for x in element]
+                        #                 key = tuple(sorted(reordered_element))
+                        #                 z_mat_index = z_matrix_dict.get(key)
+                        #                 mask.append(z_mat_index)
+                        #                 reorded_int_coord[i] = (float(reorded_int_coords[0][z_mat_index]))
+                        #             reorded_int_coords.append(reorded_int_coord)
         
-                                    masks.append(mask)
+                        #             masks.append(mask)
                             
-                        else:        
-                            org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
-                            masks = [org_mask]
+                        # else:        
+                        #     org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
+                        #     masks = [org_mask]
         
                         for number in range(len(energies)):
                             target_root = mol_basis[4][number]
@@ -4780,9 +4997,12 @@ class IMDatabasePointCollecter:
                             impes_coordinate.hessian = mw_hess_mat.reshape(hess.shape)
                             impes_coordinate.transform_gradient_and_hessian()
                             
-                            label = f"{cur_dp.point_label}_cluster_{job["cluster_id"]}_state_{job["state_id"]}"
+                            label = (
+                                f"{cur_dp.point_label}_cluster_"
+                                f"{job['cluster_id']}_state_{job['state_id']}"
+                            )
                             if job["label_suffix"]:
-                                label += f"_{job["label_suffix"]}"
+                                label += f"_{job['label_suffix']}"
                             print('here is the label', label)
                             impes_coordinate.family_label = cur_dp.family_label
                             impes_coordinate.point_label = label
@@ -4795,7 +5015,23 @@ class IMDatabasePointCollecter:
                             trust_radius = self.use_opt_confidence_radius[2]
                             impes_coordinate.confidence_radius = trust_radius
                             
+                            impes_coordinate.phase_signature = job["phase_signature"]
+
+                            for phase in job["phase_signature"]:
+                                print('statements', abs(abs(phase) - np.pi/6) <= 1e-3, abs(abs(phase) - np.pi/2) <= 1e-3)
+                                if abs(abs(phase) - np.pi/6) <= 1e-3 or abs(abs(phase) - np.pi/2) <= 1e-3:
+                                    trust_radius = 0.45
+                                    break
+
+                            masks = self._build_rotor_mapping_masks(
+                                cur_molecule,
+                                impes_coordinate.z_matrix,
+                                tuple(job["cluster_rotor_ids"]),
+                            )
+
+                            
                             self._finalize_mapping_masks_and_eq_mode(impes_coordinate, masks)
+
                             impes_coordinate.write_hdf5(self.interpolation_settings[target_root]['imforcefield_file'], label)
                             if self.sampling_enabled:
                                     self._write_sampling_point_from_geometry(
@@ -5351,7 +5587,12 @@ class IMDatabasePointCollecter:
             for cid, cbank in fam["clusters"].items():
                 expected = cbank["expected_states"]
                 if 0 in expected and expected[0] is None:
-                    expected[0] = fam["core"]
+                    raise RuntimeError(
+                        "IMForceFieldGenerator: rotor-cluster anchor state 0 "
+                        f"is missing for root {root}, family {family}, cluster {cid}. "
+                        "Regenerate the rotor-cluster database with explicit "
+                        "cluster anchor datapoints."
+                    )
 
             out[family] = fam
 
@@ -6185,7 +6426,7 @@ class IMDatabasePointCollecter:
 
         return final_alphas
     
-    def perform_symmetry_assignment(self, atom_map, sym_group, reference_group, datapoint_group):
+    def _perform_symmetry_assignment(self, atom_map, sym_group, reference_group, datapoint_group):
         """ Performs the atom mapping. """
         from scipy.optimize import linear_sum_assignment
         new_map = np.array(atom_map.copy())

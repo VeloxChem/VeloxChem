@@ -367,10 +367,13 @@ class OpenMMDynamics:
     def create_system_from_molecule(self, 
                              molecule, 
                              ff_gen, 
-                             solvent='gas', 
+                             solvent='gas',
+                             solvent_molecule=None,
+                             target_density=None,
                              qm_atoms=None, 
                              filename='residue', 
                              residue_name='MOL'):
+        
         """
         Creates an OpenMM system from a VeloxChem molecule and a forcefield generator.
         
@@ -443,8 +446,10 @@ class OpenMMDynamics:
             sol_builder.steps = 10000
             sol_builder.solvate(solute=molecule, 
                                 solvent=solvent,
+                                solvent_molecule=solvent_molecule,
+                                target_density=target_density,
                                 padding=self.padding,
-                                equilibrate=True,
+                                equilibrate=False,
                                 )
             
             sol_builder.write_openmm_files(solute_ff=ff_gen)
@@ -464,7 +469,10 @@ class OpenMMDynamics:
                 forcefield_files = [f'{filename}.xml', self.parent_ff, solvent_ff]
 
             # Load the PDB from the SolvationBuilder
-            self.pdb = app.PDBFile('system.pdb')
+            if solvent == 'itself':
+                self.pdb = app.PDBFile('liquid.pdb')
+            else:
+                self.pdb = app.PDBFile('system.pdb')
 
         # Create the ForceField object        
         forcefield = app.ForceField(*forcefield_files)

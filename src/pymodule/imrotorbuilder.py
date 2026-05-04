@@ -256,23 +256,35 @@ def build_runtime_cluster_set(cluster_info: RotorClusterInformation, n_ic: int):
         clusters={},
     )
 
-    for cluster_id, cluster in cluster_info.clusters.items():
-        # Per-rotor grouped row sets used by cluster phase-signature distances.
-        grouped_signature_rows = []
-        # Flattened row list for all rotors in this cluster.
-        cluster_rows = []
-        for rotor_id in sorted(cluster.rotor_ids):
-            # Rows associated with this single rotor.
-            rows_r = tuple(cluster_info.rotors[rotor_id].torsion_rows)
-            grouped_signature_rows.append(rows_r)
-            cluster_rows.extend(rows_r)
+    # for cluster_id, cluster in cluster_info.clusters.items():
+    #     # Per-rotor grouped row sets used by cluster phase-signature distances.
+    #     grouped_signature_rows = []
+    #     # Flattened row list for all rotors in this cluster.
+    #     cluster_rows = []
+    #     for rotor_id in sorted(cluster.rotor_ids):
+    #         # Rows associated with this single rotor.
+    #         rows_r = tuple(cluster_info.rotors[rotor_id].torsion_rows)
+    #         grouped_signature_rows.append(rows_r)
+    #         cluster_rows.extend(rows_r)
 
-        # Stable tuple view of all rows belonging to the cluster.
-        cluster_rows = tuple(cluster_rows)
-        # Rows retained during restricted evaluation: core rows + cluster rows.
+    #     # Stable tuple view of all rows belonging to the cluster.
+    #     cluster_rows = tuple(cluster_rows)
+    #     # Rows retained during restricted evaluation: core rows + cluster rows.
+    #     projector_rows = tuple(sorted(set(core_rows).union(cluster_rows)))
+    #     # Rows used when building periodic signatures for this cluster.
+    #     signature_rows = cluster_rows
+    for cluster_id, cluster in cluster_info.clusters.items():
+        grouped_signature_rows = []
+        for rotor_id in sorted(cluster.rotor_ids):
+            grouped_signature_rows.append(
+                tuple(cluster_info.rotors[rotor_id].torsion_rows)
+            )
+
+        cluster_rows = tuple(sorted(set(cluster.torsion_rows)))
         projector_rows = tuple(sorted(set(core_rows).union(cluster_rows)))
-        # Rows used when building periodic signatures for this cluster.
-        signature_rows = cluster_rows
+        signature_rows = tuple(
+            row for rows in grouped_signature_rows for row in rows
+        )
 
         # Dense projector mask selecting core + cluster rows.
         projector_mask = np.zeros(n_ic, dtype=np.float64)
