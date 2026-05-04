@@ -40,6 +40,7 @@ First-row TM complexes -> warning emitted; verify manually.
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import logging
 import os
@@ -49,6 +50,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import h5py
+import re
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -380,7 +382,262 @@ class RedoxProfile:
                 )
 
         return new
+    
+def _text_from_h5(value) -> str:
+    """Decode HDF5 bytes/scalars to plain text."""
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    return str(value)
 
+
+def _formula_from_labels(labels: list[str]) -> str:
+    """Hill formula from a list of element symbols."""
+    counts = Counter(labels)
+    order = [el for el in ("C", "H") if el in counts]
+    order += sorted(k for k in counts if k not in ("C", "H"))
+    return "".join(
+        f"{el}{counts[el] if counts[el] > 1 else ''}" for el in order
+    )
+
+
+def _all_atom_graph(mol_obj) -> nx.Graph:
+    """
+    Build a full atom graph (including hydrogens) from a VeloxChem molecule.
+    This is stricter than the current heavy-atom graph and is better for
+    distinguishing many isomers/protomers/tautomers.
+    """
+    labels = list(mol_obj.get_labels())
+    bonds = sorted(_geometry_bonds(mol_obj))
+
+    G = nx.Graph()
+    for i, sym in enumerate(labels):
+        G.add_node(i, element=sym)
+    for i, j in bonds:
+        G.add_edge(i, j)
+    return G
+
+
+def _graph_from_atom_symbols_and_bond_edges(
+    atom_symbols: str,
+    bond_edges: str,
+) -> tuple[nx.Graph, str]:
+    """
+    Rebuild a full atom graph from the HDF5 datasets:
+        atom_symbols = "C,C,O,H,H,..."
+        bond_edges   = "[(0, 1), (1, 2), ...]"
+    """
+    labels = [x.strip() for x in atom_symbols.split(",") if x.strip()]
+    edges = ast.literal_eval(bond_edges)
+
+    G = nx.Graph()
+    for i, sym in enumerate(labels):
+        G.add_node(i, element=sym)
+    for i, j in edges:
+        G.add_edge(int(i), int(j))
+
+    formula = _formula_from_labels(labels)
+    return G, formula
+
+
+def _load_completed_records(output_folder: str) -> list[dict]:
+    """
+    Load all completed .h5 files into a structural record list.
+
+    Each record has:
+        {
+            "graph": nx.Graph (all atoms, including H),
+            "formula": str,
+            "label": str,
+            "charge": int,
+            "multiplicity": int,
+            "filename": str,
+        }
+
+    Prefers stored atom_symbols + bond_edges. Falls back to geometry_xyz.
+    """
+    records: list[dict] = []
+
+    if not os.path.exists(output_folder):
+        return records
+
+    log.info("Building completed-record database from %s ...", output_folder)
+
+    for fname in os.listdir(output_folder):
+        if not fname.endswith(".h5"):
+            continue
+
+        path = os.path.join(output_folder, fname)
+
+        try:
+            with h5py.File(path, "r") as f:
+                if "label" not in f:
+                    continue
+
+                label = _text_from_h5(f["label"][()])
+                charge = int(f["charge"][()]) if "charge" in f else 0
+                mult = int(f["multiplicity"][()]) if "multiplicity" in f else 1
+
+                graph = None
+                formula = None
+
+                if "atom_symbols" in f and "bond_edges" in f:
+                    atom_symbols = _text_from_h5(f["atom_symbols"][()])
+                    bond_edges = _text_from_h5(f["bond_edges"][()])
+                    graph, formula = _graph_from_atom_symbols_and_bond_edges(
+                        atom_symbols, bond_edges
+                    )
+                elif "geometry_xyz" in f:
+                    xyz = _text_from_h5(f["geometry_xyz"][()])
+                    mol = vlx.Molecule.read_xyz_string(xyz)
+                    graph = _all_atom_graph(mol)
+                    formula = _mol_formula(mol)
+
+            if graph is None or formula is None:
+                continue
+
+            records.append({
+                "graph": graph,
+                "formula": formula,
+                "label": label,
+                "charge": charge,
+                "multiplicity": mult,
+                "filename": fname,
+            })
+
+        except Exception as exc:
+            log.debug("Could not read %s: %s", fname, exc)
+
+    log.info("Completed-record database: %d record(s).", len(records))
+    return records
+
+
+def existing_states_for_molecule(mol_obj, records: list[dict]) -> dict[str, list[dict]]:
+    """
+    Return all matching saved states for this molecule, keyed by state label.
+
+    Matching is based on:
+      1) full formula
+      2) all-atom graph isomorphism (includes hydrogens)
+
+    This is intentionally independent of filename, SMILES text, or CSV labels.
+    """
+    query_g = _all_atom_graph(mol_obj)
+    query_formula = _mol_formula(mol_obj)
+
+    nm = isomorphism.categorical_node_match("element", None)
+    state_map: dict[str, list[dict]] = {}
+
+    for rec in records:
+        if rec["formula"] != query_formula:
+            continue
+        if len(rec["graph"]) != len(query_g):
+            continue
+        if isomorphism.GraphMatcher(
+            rec["graph"], query_g, node_match=nm
+        ).is_isomorphic():
+            state_map.setdefault(rec["label"], []).append(rec)
+
+    return state_map
+
+
+def molecule_already_done(
+    mol_obj,
+    records: list[dict],
+    required_labels: tuple[str, ...] = ("M",),
+) -> bool:
+    """
+    True if the requested labels already exist for this molecule.
+
+    Examples
+    --------
+    Only skip if the anchor state exists:
+        molecule_already_done(mol, records, ("M",))
+
+    Only skip if all core ET states exist:
+        molecule_already_done(mol, records, ("M", "M+", "M-"))
+    """
+    state_map = existing_states_for_molecule(mol_obj, records)
+    return all(lbl in state_map for lbl in required_labels)
+
+
+def register_profile_records(profile: RedoxProfile, records: list[dict]) -> None:
+    """
+    Add all successfully computed states from a profile into the in-memory
+    completed-record database so later rows in the same process_csv() call
+    can be skipped correctly.
+    """
+    for attr in (
+        "M", "M_ox", "M_red",
+        "MH_plus", "MH_rad",
+        "M_deprot", "M_deprot_rad",
+    ):
+        res = getattr(profile, attr)
+        if res is None:
+            continue
+
+        try:
+            mol = vlx.Molecule.read_xyz_string(res.geometry_xyz)
+            records.append({
+                "graph": _all_atom_graph(mol),
+                "formula": _mol_formula(mol),
+                "label": res.label,
+                "charge": int(res.charge),
+                "multiplicity": int(res.multiplicity),
+                "filename": "",
+            })
+        except Exception as exc:
+            log.debug("Could not register state %s in memory: %s", attr, exc)
+
+def _next_formula_iso_tag(output_folder: str, formula: str) -> str:
+    """
+    Examples
+    --------
+    If output_folder already contains:
+        C3H8O_q0_m1_M.h5
+        C3H8O_q1_m2_M+_iso1.h5
+    then this returns:
+        iso2
+
+    Notes
+    -----
+    - Looks only at filenames, not HDF5 contents.
+    - Safe for serial runs.
+    - Not race-safe for parallel jobs writing to the same folder.
+    """
+    if not os.path.exists(output_folder):
+        return "iso0"
+
+    same_formula_seen = False
+    max_idx = -1
+
+    # matches filenames like:
+    #   C3H8O_q0_m1_M_iso2.h5
+    #   C3H8O_q1_m2_M+_iso7.h5
+    rx = re.compile(
+        rf"^{re.escape(formula)}_q.*?_iso(\d+)\.h5$"
+    )
+
+    prefix = f"{formula}_q"
+
+    for fname in os.listdir(output_folder):
+        if not fname.endswith(".h5"):
+            continue
+        if not fname.startswith(prefix):
+            continue
+
+        same_formula_seen = True
+        m = rx.match(fname)
+
+        if m:
+            max_idx = max(max_idx, int(m.group(1)))
+        else:
+            # legacy untagged same-formula file counts as occupying iso0
+            max_idx = max(max_idx, 0)
+
+    if not same_formula_seen:
+        return "iso0"
+
+    return f"iso{max_idx + 1}"
 
 def _mol_formula(mol_obj) -> str:
     """Hill-ordered molecular formula from a VeloxChem Molecule."""
@@ -1263,8 +1520,7 @@ class RedoxCalculator:
     # ------------------------------------------------------------------
     # Core QC: composite Gibbs energy for one state
     # ------------------------------------------------------------------
-
-    def compute_gibbs(self, mol_obj, label: str = "",) -> Optional[GibbsResult]:
+    def compute_gibbs(self, mol_obj, label: str = "", file_tag: str = "",) -> Optional[GibbsResult]:
         """
         Compute the composite Gibbs free energy for one electronic state.
 
@@ -1305,7 +1561,8 @@ class RedoxCalculator:
         mol_obj.set_multiplicity(mult)
 
         formula        = _mol_formula(mol_obj)
-        file_name_base = f"{formula}_q{charge}_m{mult}_{label}"
+        suffix = f"_{file_tag}" if file_tag else ""
+        file_name_base = f"{formula}_q{charge}_m{mult}_{label}{suffix}"
 
         log.info("compute_gibbs start: %s", file_name_base)
 
@@ -1605,6 +1862,10 @@ class RedoxCalculator:
         init_xyz    = _xyz_block(mol_obj)
         profile     = RedoxProfile()
 
+        run_formula = _mol_formula(mol_obj)
+        run_tag = _next_formula_iso_tag(self.output_folder, run_formula)
+        log.info("Using file tag %s for formula %s", run_tag, run_formula)
+
         # ---- neutral, oxidised, reduced --------------------------------
         for attr, lbl, dq in [
             ("M",     "M",  0),
@@ -1618,7 +1879,7 @@ class RedoxCalculator:
             )
             setattr(
                 profile, attr,
-                self.compute_gibbs(m_tmp, lbl)
+                self.compute_gibbs(m_tmp, lbl, file_tag=run_tag)
             )
 
         acidic_H, basic_atoms = self.find_protic_sites(mol_obj)
@@ -1636,6 +1897,7 @@ class RedoxCalculator:
                 res_p = self.compute_gibbs(
                     self.protonate(mol_obj, idx, init_charge + 1),
                     f"MH+_site{idx}",
+                    file_tag=run_tag,
                 )
                 if res_p and res_p.g_total < min_gp:
                     min_gp, best_plus = res_p.g_total, res_p
@@ -1643,6 +1905,7 @@ class RedoxCalculator:
                 res_r = self.compute_gibbs(
                     self.protonate(mol_obj, idx, init_charge),
                     f"MH_rad_site{idx}",
+                    file_tag=run_tag,
                 )
                 if res_r and res_r.g_total < min_gr:
                     min_gr, best_rad = res_r.g_total, res_r
@@ -1665,6 +1928,7 @@ class RedoxCalculator:
                 res_d = self.compute_gibbs(
                     self.deprotonate(mol_obj, h_idx, init_charge - 1),
                     f"M_deprot_site{h_idx}",
+                    file_tag=run_tag,
                 )
                 if res_d and res_d.g_total < min_gd:
                     min_gd, best_dep = res_d.g_total, res_d
@@ -1672,6 +1936,7 @@ class RedoxCalculator:
                 res_dr = self.compute_gibbs(
                     self.deprotonate(mol_obj, h_idx, init_charge),
                     f"M_deprot_rad_site{h_idx}",
+                    file_tag=run_tag,
                 )
                 if res_dr and res_dr.g_total < min_gdr:
                     min_gdr, best_dep_rad = res_dr.g_total, res_dr
@@ -1869,6 +2134,78 @@ class RedoxCalculator:
         print(sep + "\n")
 
 
+'''Redox calc only (no pKa) convenience subclass.'''
+
+class ETCalculator(RedoxCalculator):
+    """
+    Electron-transfer-only calculator.
+    Computes only M, M+, and M- and derives E_ox / E_red.
+    Skips all protonation/deprotonation scans.
+    """
+
+    def run(self, input_data) -> RedoxProfile:   # type: ignore[override]
+        if isinstance(input_data, str):
+            mol_obj = _mol_from_smiles(input_data)
+            mol_label = input_data
+        else:
+            mol_obj = input_data
+            mol_label = (
+                f"{_mol_formula(mol_obj)} "
+                f"(q={mol_obj.get_charge()}, m={mol_obj.get_multiplicity()})"
+            )
+
+        init_charge = int(mol_obj.get_charge())
+        init_xyz = _xyz_block(mol_obj)
+        profile = RedoxProfile()
+
+        run_formula = _mol_formula(mol_obj)
+        run_tag = _next_formula_iso_tag(self.output_folder, run_formula)
+        log.info("Using file tag %s for formula %s", run_tag, run_formula)
+
+        for attr, lbl, dq in [
+            ("M",    "M",  0),
+            ("M_ox", "M+", 1),
+            ("M_red","M-", -1),
+        ]:
+            m_tmp = vlx.Molecule.read_xyz_string(init_xyz)
+            m_tmp.set_charge(init_charge + dq)
+            m_tmp.set_multiplicity(
+                _valid_multiplicity(m_tmp, init_charge + dq)
+            )
+            setattr(
+                profile,
+                attr,
+                self.compute_gibbs(m_tmp, lbl, file_tag=run_tag)
+            )
+
+        def _normalise_pair(
+            res_a: Optional[GibbsResult],
+            res_b: Optional[GibbsResult],
+        ) -> tuple:
+            if res_a is None or res_b is None:
+                return None, None
+            g_a = res_a.g_total
+            g_b = res_b.g_total
+            if res_a.mm_corr_available and not res_b.mm_corr_available:
+                g_a -= res_a.g_corr
+            elif res_b.mm_corr_available and not res_a.mm_corr_available:
+                g_b -= res_b.g_corr
+            return g_a, g_b
+
+        if profile.M and profile.M_ox:
+            g_ox, g_M = _normalise_pair(profile.M_ox, profile.M)
+            if g_ox is not None:
+                profile.E_ox = self.reduction_potential(g_ox=g_ox, g_red=g_M)
+
+        if profile.M and profile.M_red:
+            g_M, g_red = _normalise_pair(profile.M, profile.M_red)
+            if g_M is not None:
+                profile.E_red = self.reduction_potential(g_ox=g_M, g_red=g_red)
+
+        self._print_summary(profile, label=mol_label)
+        return profile
+
+
 # ---------------------------------------------------------------------------
 # pKa-only convenience subclass
 # ---------------------------------------------------------------------------
@@ -1902,8 +2239,11 @@ class pKaCalculator(RedoxCalculator):
 
         init_charge = int(mol_obj.get_charge())
         profile     = RedoxProfile()
+        run_formula = _mol_formula(mol_obj)
+        run_tag = _next_formula_iso_tag(self.output_folder, run_formula)
+        log.info("Using file tag %s for formula %s", run_tag, run_formula)
 
-        profile.M = self.compute_gibbs(mol_obj, "M")
+        profile.M = self.compute_gibbs(mol_obj, "M", file_tag=run_tag)
 
         acidic_H, basic_atoms = self.find_protic_sites(mol_obj)
 
@@ -1913,6 +2253,7 @@ class pKaCalculator(RedoxCalculator):
                 res = self.compute_gibbs(
                     self.protonate(mol_obj, idx, init_charge + 1),
                     f"MH+_site{idx}",
+                    file_tag=run_tag,
                 )
                 if res and res.g_total < min_g:
                     min_g, best_plus = res.g_total, res
@@ -1929,6 +2270,7 @@ class pKaCalculator(RedoxCalculator):
                 res = self.compute_gibbs(
                     self.deprotonate(mol_obj, h_idx, init_charge - 1),
                     f"M_deprot_site{h_idx}",
+                    file_tag=run_tag,
                 )
                 if res and res.g_total < min_g:
                     min_g, best_dep = res.g_total, res
@@ -2003,7 +2345,7 @@ def _load_completed_graphs(output_folder: str) -> list:
     log.info("Building graph database from %s ...", output_folder)
 
     for fname in os.listdir(output_folder):
-        if not fname.endswith("_M.h5"):
+        if not re.search(r"_M(?:_iso\d+)?\.h5$", fname):
             continue
         try:
             with h5py.File(os.path.join(output_folder, fname), "r") as f:
@@ -2052,22 +2394,11 @@ def _is_isomorphic(
 
 def process_csv(df: pd.DataFrame, calc: RedoxCalculator) -> None:
     """
-    Process a DataFrame of molecules using stricter deduplication based on:
-      - heavy-atom graph,
-      - total H count,
-      - full molecular formula.
-
-    Expected columns
-    ----------------
-    smiles       : SMILES string (required).
-    charge       : integer formal charge (optional, default 0).
-    multiplicity : spin multiplicity of the neutral reference state
-                   (optional, default inferred from electron count).
-                   Set this explicitly for radical ground states, e.g.
-                   doublet radical cations or triplet biradicals.
-    force_run    : "true"/"1"/"yes" to recompute known scaffolds (optional).
+    Process a DataFrame of molecules using exact all-atom connectivity
+    matching from HDF5 records.
     """
-    existing = _load_completed_graphs(calc.output_folder)
+    
+    records = _load_completed_records(calc.output_folder)
 
     for _, row in df.iterrows():
         smiles = str(row.get("smiles", "")).strip()
@@ -2082,18 +2413,22 @@ def process_csv(df: pd.DataFrame, calc: RedoxCalculator) -> None:
         )
 
         reason = "[FORCE]" if force_run else "[NEW]"
+
         try:
             mol = _mol_from_smiles(smiles, charge=charge, mult=mult)
         except Exception as exc:
             log.warning("Could not build molecule for %s: %s", smiles, exc)
             continue
 
-        query_g = _mol_to_graph(mol)
-        query_formula = _mol_formula(mol)
-        query_h = sum(1 for sym in mol.get_labels() if sym == "H")
+        # Choose one of these policies:
+        # 1) Skip only if M already exists:
+        # already_done = molecule_already_done(mol, records, ("M",))
+        #
+        # 2) Skip only if M, M+, and M- all exist:
+        already_done = molecule_already_done(mol, records, ("M", "M+", "M-"))
 
-        if _is_isomorphic(query_g, query_h, query_formula, existing) and not force_run:
-            log.info("Skip (graph exists): %.40s", smiles)
+        if already_done and not force_run:
+            log.info("Skip (already completed): %.40s", smiles)
             continue
 
         log.info(
@@ -2103,13 +2438,14 @@ def process_csv(df: pd.DataFrame, calc: RedoxCalculator) -> None:
             charge,
             mult if mult is not None else "auto",
         )
+
         try:
             profile = calc.run(mol)
             if profile is not None and profile.M is not None:
-                existing.append((query_g, query_h, query_formula))
+                register_profile_records(profile, records)
             else:
                 log.warning(
-                    "Run returned no anchor state for %s; not adding to existing.",
+                    "Run returned no anchor state for %s; not adding to completed records.",
                     smiles,
                 )
         except Exception as exc:
