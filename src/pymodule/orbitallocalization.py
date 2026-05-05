@@ -84,12 +84,20 @@ class OrbitalLocalizationDriver:
         self.C[:, j] = -s * Ci + c * Cj
 
         if method == "pm":
-            # rotate transformed MOs
-            Ci = self.C_eff[:, i].copy()
-            Cj = self.C_eff[:, j].copy()
+            if self.C_eff is not None:
+                # rotate transformed MOs
+                Ci = self.C_eff[:, i].copy()
+                Cj = self.C_eff[:, j].copy()
 
-            self.C_eff[:, i] = c * Ci + s * Cj
-            self.C_eff[:, j] = -s * Ci + c * Cj
+                self.C_eff[:, i] = c * Ci + s * Cj
+                self.C_eff[:, j] = -s * Ci + c * Cj
+            if self.SC is not None:
+                # rotate overlap-weighted MOs
+                SCi = self.SC[:, i].copy()
+                SCj = self.SC[:, j].copy()
+
+                self.SC[:, i] = c * SCi + s * SCj
+                self.SC[:, j] = -s * SCi + c * SCj
 
         elif method == "boys":
             # rotate dipole integrals
@@ -124,16 +132,38 @@ class OrbitalLocalizationDriver:
 
     def _pm_pair(self, i, j):
         """
-        Compute prerequesites for analytical Jacobian
+        Compute prerequisites for analytical Jacobian
         """
-        Ci = self.C_eff[:, i].copy()
-        Cj = self.C_eff[:, j].copy()
+        if self.pm_projector == "lowdin":
+            Ci = self.C_eff[:, i]
+            Cj = self.C_eff[:, j]
 
-        return (
-            np.matmul(self.P_atom, (Ci * Ci)),
-            np.matmul(self.P_atom, (Cj * Cj)),
-            np.matmul(self.P_atom, (Ci * Cj)),
-        )
+            return (
+                np.matmul(self.P_atom, (Ci * Ci)),
+                np.matmul(self.P_atom, (Cj * Cj)),
+                np.matmul(self.P_atom, (Ci * Cj)),
+            )
+
+        elif self.pm_projector == "mulliken":
+            Ci = self.C[:, i]
+            Cj = self.C[:, j]
+
+            SCi = self.SC[:, i]
+            SCj = self.SC[:, j]
+
+            # Symmetrized transition population keeps the pair-rotation
+            # formulas in _pm_optimal_theta in the same 2*sin*cos*Pij form.
+            Pij = 0.5 * np.matmul(self.P_atom, (Ci * SCj + Cj * SCi))
+
+            return (
+                np.matmul(self.P_atom, (Ci * SCi)),
+                np.matmul(self.P_atom, (Cj * SCj)),
+                Pij,
+            )
+
+        else:
+            raise NotImplementedError(
+                f"Requested projector {self.pm_projector} not implemented")
 
     def _pm_optimal_theta(self, Qi, Qj, Pij):
         """
@@ -247,27 +277,24 @@ class OrbitalLocalizationDriver:
         norb = self.C.shape[1]
         S = compute_overlap_integrals(molecule, basis)
 
-        # transform MOs according to projector
+        # check the validity of the overlap matrix
         eigs = np.linalg.eigvalsh(S)
         min_eig = np.min(eigs)
-        # TODO: Double-check whether -1.0e-10 is the right cutoff for
-        # treating negative overlap eigenvalues as a hard error here.
         if min_eig < -1.0e-10:
             raise ValueError("Overlap matrix is not positive semidefinite; "
                              f"minimum eigenvalue = {min_eig:.3e}")
+
+        # transform MOs according to projector
+        self.C_eff = None
+        self.SC = None
         if self.pm_projector == "lowdin":
-            # TODO: Double-check whether 1.0e-8 is the right screening
-            # threshold for the overlap matrix function in PM localization.
-            X_mat = symmetric_matrix_function(S,
-                                              lambda x: 1.0 / np.sqrt(x),
-                                              thresh=1.0e-8)
+            sqrt_S = symmetric_matrix_function(S, np.sqrt, thresh=1.0e-12)
+            self.C_eff = np.matmul(sqrt_S, self.C)
         elif self.pm_projector == "mulliken":
-            X_mat = symmetric_matrix_function(S, np.sqrt, thresh=1.0e-8)
+            self.SC = np.matmul(S, self.C)
         else:
             raise NotImplementedError(
                 f"Requested projector {self.pm_projector} not implemented")
-
-        self.C_eff = np.matmul(X_mat.T, self.C)
 
         # Map atoms to AOs
         vis_drv = VisualizationDriver()
