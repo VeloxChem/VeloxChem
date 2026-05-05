@@ -59,7 +59,7 @@ class OrbitalLocalizationDriver:
 
         if ostream is None:
             ostream = OutputStream(sys.stdout)
-        self.silent = False
+        self.ostream = ostream
 
         self.max_iter = 100
         self.thresh = 1e-6
@@ -125,12 +125,14 @@ class OrbitalLocalizationDriver:
         """
         Compute prerequesites for analytical Jacobian
         """
-        Ci = self.C_eff[:, i]
-        Cj = self.C_eff[:, j]
+        Ci = self.C_eff[:, i].copy()
+        Cj = self.C_eff[:, j].copy()
 
-        return (np.matmul(self.P_atom,
-                          (Ci * Ci)), np.matmul(self.P_atom, (Cj * Cj)),
-                np.matmul(self.P_atom, (Ci * Cj)))
+        return (
+            np.matmul(self.P_atom, (Ci * Ci)),
+            np.matmul(self.P_atom, (Cj * Cj)),
+            np.matmul(self.P_atom, (Ci * Cj)),
+        )
 
     def _pm_optimal_theta(self, Qi, Qj, Pij):
         """
@@ -172,20 +174,32 @@ class OrbitalLocalizationDriver:
         Wrap the localized orbitals into MolecularOrbitals container
         """
 
+        zero_energies = np.zeros(scf_res["E_alpha"].shape)
+
         if scf_res["scf_type"] == "restricted":
-            return MolecularOrbitals(orbs=loc_orbs, enes=[scf_res["E_alpha"]],
-                                     occs=[scf_res["occ_alpha"]],
-                                     orbs_type=molorb.rest)
+            return MolecularOrbitals(
+                orbs=loc_orbs,
+                enes=[zero_energies],
+                occs=[scf_res["occ_alpha"]],
+                orbs_type=molorb.rest,
+            )
+
         elif scf_res["scf_type"] == "unrestricted":
-            return MolecularOrbitals(orbs=loc_orbs,
-                                     enes=[scf_res["E_alpha"], scf_res["E_beta"]],
-                                     occs=[scf_res["occ_alpha"], scf_res["occ_beta"]],
-                                     orbs_type=molorb.unrest)
+            return MolecularOrbitals(
+                orbs=loc_orbs,
+                enes=[zero_energies, zero_energies],
+                occs=[scf_res["occ_alpha"], scf_res["occ_beta"]],
+                orbs_type=molorb.unrest,
+            )
+
         elif scf_res["scf_type"] == "restricted_openshell":
-            return MolecularOrbitals(orbs=loc_orbs,
-                                     enes=[scf_res["E_alpha"]],
-                                     occs=[scf_res["occ_alpha"], scf_res["occ_beta"]],
-                                     orbs_type=molorb.restopen)
+            return MolecularOrbitals(
+                orbs=loc_orbs,
+                enes=[zero_energies],
+                occs=[scf_res["occ_alpha"], scf_res["occ_beta"]],
+                orbs_type=molorb.restopen,
+            )
+
         else:
             raise ValueError(f"scf type {scf_res["scf_type"]} unknown")
 
@@ -214,11 +228,11 @@ class OrbitalLocalizationDriver:
             Localized MOs
         """
 
-        self.C = mos
+        self.C = mos.copy()
         # localize only user defined MOs
         if mo_range:
-            self.C = self.C[:, mo_range[0]-1:mo_range[1]]
-        self.nao, self.norb = self.C.shape
+            self.C = self.C[:, mo_range[0]-1:mo_range[1]].copy()
+        nao, norb = self.C.shape
         self.S = compute_overlap_integrals(molecule, basis)
         # AO -> atom mapping
         atom_map_raw = basis.get_ao_basis_map(molecule)
@@ -260,8 +274,8 @@ class OrbitalLocalizationDriver:
 
             delta = 0.0
 
-            for i in range(self.norb):
-                for j in range(i + 1, self.norb):
+            for i in range(norb):
+                for j in range(i + 1, norb):
 
                     Qi, Qj, Pij = self._pm_pair(i, j)
 
@@ -278,19 +292,21 @@ class OrbitalLocalizationDriver:
                     delta += abs(theta)
 
             if delta < self.thresh:
-                if not self.silent:
-                    print(f"PM converged after {it:3d}  iterations")
+                self.ostream.print_info(
+                    f"PM converged after {it:3d}  iterations")
+                self.ostream.flush()
                 break
 
             if it == self.max_iter - 1:
                 # return the object anyway, since unlike for SCF,
                 # reaching the convergence threshold is not necessarily
                 # required, as the physics are unchanged.
-                if not self.silent:
-                    print(f"PM only converged to delta = {delta:.6e} , "
-                          f"instead of {self.thresh:.2e}")
+                self.ostream.print_info(
+                    f"PM only converged to delta = {delta:.6e} , "
+                    f"instead of {self.thresh:.2e}")
+                self.ostream.flush()
 
-        return self.C
+        return self.C.copy()
 
     def boys(self, molecule, basis, mos, mo_range=None):
         """
@@ -316,11 +332,11 @@ class OrbitalLocalizationDriver:
             Localized MOs
         """
 
-        self.C = mos
+        self.C = mos.copy()
         # localize only user defined MOs
         if mo_range:
-            self.C = self.C[:, mo_range[0]-1:mo_range[1]]
-        self.nao, self.norb = self.C.shape
+            self.C = self.C[:, mo_range[0]-1:mo_range[1]].copy()
+        nao, norb = self.C.shape
         mu = compute_electric_dipole_integrals(molecule, basis)
 
         self.r = np.array(
@@ -330,8 +346,8 @@ class OrbitalLocalizationDriver:
 
             delta = 0.0
 
-            for i in range(self.norb):
-                for j in range(i + 1, self.norb):
+            for i in range(norb):
+                for j in range(i + 1, norb):
 
                     ri = self.r[:, i, i]
                     rj = self.r[:, j, j]
@@ -347,19 +363,21 @@ class OrbitalLocalizationDriver:
                     delta += abs(theta)
 
             if delta < self.thresh:
-                if not self.silent:
-                    print(f"Boys converged after {it:3d}  iterations")
+                self.ostream.print_info(
+                    f"Boys converged after {it:3d}  iterations")
+                self.ostream.flush()
                 break
 
             if it == self.max_iter - 1:
                 # return the object anyway, since unlike for SCF,
                 # reaching the convergence threshold is not necessarily
                 # required, as the physics are unchanged.
-                if not self.silent:
-                    print(f"Boys only converged to delta = {delta:.6e} , "
-                          f"instead of {self.thresh:.2e}")
+                self.ostream.print_info(
+                    f"Boys only converged to delta = {delta:.6e} , "
+                    f"instead of {self.thresh:.2e}")
+                self.ostream.flush()
 
-        return self.C
+        return self.C.copy()
 
     def edmiston_ruedenberg(self, molecule, basis, scf_res, mo_range=None):
         """

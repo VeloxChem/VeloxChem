@@ -5,6 +5,7 @@ from pathlib import Path
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.orbitallocalization import OrbitalLocalizationDriver
+from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 
@@ -70,7 +71,7 @@ class TestOrbitalLocalization:
 
         loc = OrbitalLocalizationDriver()
         loc.method = "boys"
-        loc.silent = True
+        loc.ostream.mute()
         C_loc = loc.compute(molecule, basis, scf_res, mo_range=(1, n_occ))
         C_loc = C_loc["loc_orbs"].alpha_to_numpy()
 
@@ -90,7 +91,7 @@ class TestOrbitalLocalization:
         loc = OrbitalLocalizationDriver()
         loc.method = "pm"
         loc.pm_projector = "mulliken"
-        loc.silent = True
+        loc.ostream.mute()
         C_loc = loc.compute(molecule, basis, scf_res, mo_range=(1, n_occ))
         C_loc = C_loc["loc_orbs"].alpha_to_numpy()
 
@@ -110,7 +111,7 @@ class TestOrbitalLocalization:
         loc = OrbitalLocalizationDriver()
         loc.method = "pm"
         loc.pm_projector = "lowdin"
-        loc.silent = True
+        loc.ostream.mute()
         C_loc = loc.compute(molecule, basis, scf_res, mo_range=(1, n_occ))
         C_loc = C_loc["loc_orbs"].alpha_to_numpy()
 
@@ -123,3 +124,26 @@ class TestOrbitalLocalization:
 
         # Compare
         np.testing.assert_allclose(C_loc, C_ref, atol=1e-6)
+
+    @pytest.mark.parametrize("method", ["boys", "pm"])
+    def test_compute_does_not_mutate_scf_orbitals(self, method):
+        molecule, basis, scf_res, n_occ = self._build_system()
+        C_alpha = scf_res["C_alpha"].copy()
+
+        loc = OrbitalLocalizationDriver()
+        loc.method = method
+        loc.ostream.mute()
+        loc.compute(molecule, basis, scf_res, mo_range=(1, n_occ))
+
+        np.testing.assert_allclose(scf_res["C_alpha"], C_alpha, atol=0.0)
+
+    @pytest.mark.parametrize("method", ["boys", "pm"])
+    def test_compute_uses_configured_ostream(self, method, capsys):
+        molecule, basis, scf_res, n_occ = self._build_system()
+
+        loc = OrbitalLocalizationDriver(OutputStream(None))
+        loc.method = method
+        loc.compute(molecule, basis, scf_res, mo_range=(1, n_occ))
+
+        captured = capsys.readouterr()
+        assert captured.out == ""
