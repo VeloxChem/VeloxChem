@@ -1347,9 +1347,8 @@ class RedoxCalculator:
                 scf_drv.xcfun = "blyp"
                 scf_drv.ri_coulomb = True
                 scf_drv.max_iter = 100
-                scf_drv.conv_thresh = 1.0e-5
+                scf_drv.conv_thresh = 1.0e-4
                 scf_drv.ostream.mute()
-                print('does this shit work?')
                 if use_solvent:
                     scf_drv.solvation_model = "cpcm"
                     scf_drv.cpcm_epsilon = solvent_epsilon
