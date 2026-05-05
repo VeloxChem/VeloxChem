@@ -205,6 +205,7 @@ class TestFirstOrderPropertyDriver:
 
         excited_state_dipoles = np.vstack([dipole_moment, 2.0 * dipole_moment])
         scf_prop.properties['dipole moment'] = excited_state_dipoles
+        # set net charge to trigger the warning message for testing purposes
         mol.set_charge(1)
         scf_prop.print_properties(mol,
                                   title='Excited State Test',
@@ -227,3 +228,59 @@ class TestFirstOrderPropertyDriver:
                            scf_prop.get_property('dipole moment'))
         assert scf_prop_copy.comm is scf_prop.comm
         assert scf_prop_copy.ostream is scf_prop.ostream
+
+    def test_first_order_property_driver_print_property(self, tmp_path):
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        basis_label = 'def2-svp'
+
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, basis_label, ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = 'hf'
+        scf_results = scf_drv.compute(mol, bas)
+
+        ostream = OutputStream(tmp_path / 'prop_drv_print.out')
+        prop_drv = FirstOrderPropertyDriver(ostream=ostream)
+        prop_drv.property = 'electric dipole moment'
+        prop = prop_drv.compute(mol, bas, scf_results)
+
+        # Test single-state print
+        prop_drv.print_property(prop, title='Ground State Test')
+
+        # Build multi-state density and test print with charged molecule
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            total_density = np.stack([
+                scf_results['D_alpha'] + scf_results['D_beta'],
+                scf_results['D_alpha'] + scf_results['D_beta'],
+            ])
+        else:
+            total_density = None
+
+        # set net charge to trigger the warning message for testing purposes;
+        # the total density from the neutral SCF is re-used intentionally
+        mol.set_charge(1)
+        multistate_dict = prop_drv.compute_electric_dipole_moment(
+            mol, bas, total_density)
+
+        multistate_prop = {'electric dipole moment': multistate_dict}
+        prop_drv.print_property(multistate_prop, title='Excited State Test')
+
+        ostream.close()
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            output_text = (tmp_path / 'prop_drv_print.out').read_text()
+
+            assert 'Ground State Test' in output_text
+            assert 'Excited State Test' in output_text
+            assert 'Excited State 1' in output_text
+            assert 'Excited State 2' in output_text
+            assert 'Center of nuclear charge is chosen as the origin.' in output_text
+            assert 'Debye' in output_text
