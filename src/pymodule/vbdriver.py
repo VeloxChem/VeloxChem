@@ -69,6 +69,8 @@ class VbComputeOptions:
 	active_pi_atoms: optional atom-index tuple for a fixed-orbital multi-center pi active space
 	active_electron_count: optional number of active electrons for generated pi active spaces
 	active_spin: optional spin label for generated pi active spaces, currently 'singlet'
+	orbital_amplitude_bound: optional absolute bound for center-local orbital breathing amplitudes
+	orbital_relaxation_symmetry: optional orbital-relaxation pattern, e.g. 'independent' or 'equivalent-centers'
 	freeze_inactive_orbitals: embed the active pair in the frozen RHF density
 	use_active_space: whether automatic generated active spaces are enabled
 	"""
@@ -87,6 +89,8 @@ class VbComputeOptions:
 	active_pi_atoms: Optional[Tuple[int, ...]] = None
 	active_electron_count: Optional[int] = None
 	active_spin: str = "singlet"
+	orbital_amplitude_bound: Optional[float] = None
+	orbital_relaxation_symmetry: Optional[str] = None
 	freeze_inactive_orbitals: bool = True
 	use_active_space: bool = True
 
@@ -189,19 +193,27 @@ class VbDriver:
 			)
 			if bool(getattr(options, 'include_bovb', False)) or options.mode in ('bovb', 'metal-ligand-bovb', 'ml-bovb'):
 				if active_space.metadata.get("determinant_ci", False):
-					if active_space.metadata.get("metal_ligand_model") is None:
-						raise NotImplementedError(
-							"BOVB determinant-CI relaxation is currently implemented only for metal-ligand active spaces.")
-					active_result = self._compute_metal_ligand_bovb(
-						molecule,
-						basis,
-						list(active_space.structures),
-						list(active_space.active_orbitals),
-						options,
-						active_space=active_space,
-						analysis=analysis,
-						freeze_inactive=bool(options.freeze_inactive_orbitals),
-					)
+					if active_space.metadata.get("metal_ligand_model") is not None:
+						active_result = self._compute_metal_ligand_bovb(
+							molecule,
+							basis,
+							list(active_space.structures),
+							list(active_space.active_orbitals),
+							options,
+							active_space=active_space,
+							analysis=analysis,
+							freeze_inactive=bool(options.freeze_inactive_orbitals),
+						)
+					else:
+						active_result = self._compute_organic_pi_bovb_determinant_fixed_limit(
+							molecule,
+							basis,
+							list(active_space.structures),
+							list(active_space.active_orbitals),
+							active_space=active_space,
+							analysis=analysis,
+							freeze_inactive=bool(options.freeze_inactive_orbitals),
+						)
 				elif len(active_space.active_orbitals) != 2:
 					raise NotImplementedError(
 						"BOVB is currently implemented only for two-orbital two-electron singlet and metal-ligand determinant active spaces.")
@@ -239,20 +251,41 @@ class VbDriver:
 					freeze_inactive=bool(options.freeze_inactive_orbitals),
 				)
 			elif options.mode == 'vbscf' and options.optimize_orbitals:
-				if (active_space.metadata.get("determinant_ci", False) and
-						active_space.metadata.get("metal_ligand_model") is not None):
-					active_result = self._compute_metal_ligand_vbscf_determinant(
+				if active_space.metadata.get("model") == "fixed-orbital-multicenter-pi":
+					active_result = self._compute_organic_pi_vbscf_common_breathing(
 						molecule,
 						basis,
 						list(active_space.structures),
 						list(active_space.active_orbitals),
+						options,
 						active_space=active_space,
 						analysis=analysis,
 						freeze_inactive=bool(options.freeze_inactive_orbitals),
 					)
+				elif active_space.metadata.get("determinant_ci", False):
+					if active_space.metadata.get("metal_ligand_model") is not None:
+						active_result = self._compute_metal_ligand_vbscf_determinant(
+							molecule,
+							basis,
+							list(active_space.structures),
+							list(active_space.active_orbitals),
+							active_space=active_space,
+							analysis=analysis,
+							freeze_inactive=bool(options.freeze_inactive_orbitals),
+						)
+					else:
+						active_result = self._compute_organic_pi_vbscf_determinant_fixed_limit(
+							molecule,
+							basis,
+							list(active_space.structures),
+							list(active_space.active_orbitals),
+							active_space=active_space,
+							analysis=analysis,
+							freeze_inactive=bool(options.freeze_inactive_orbitals),
+						)
 				else:
 					if len(active_space.active_orbitals) != 2:
-						raise RuntimeError("VB-SCF orbital optimization is currently only available for two active orbitals or metal-ligand determinant active spaces.")
+						raise RuntimeError("VB-SCF orbital optimization is currently only available for two active orbitals or determinant active spaces.")
 					vbscf_active_space = active_space
 					if active_space.metadata.get("metal_ligand_model") == "sigma-only":
 						vbscf_active_space = self._spin_adapted_metal_ligand_sigma_space(
@@ -361,9 +394,9 @@ class VbDriver:
 					 analysis=None,
 					 freeze_inactive=False):
 		"""
-		VB-SCF for H2: optimize two active orbitals by a mixing angle.
+		VB-SCF for H2: optimize a common, symmetry-preserving active-orbital pair.
 		"""
-		from scipy.optimize import minimize_scalar
+		from scipy.optimize import minimize
 
 		H_ao, S_ao, eri_ao, e_nuc = self._ao_integrals(molecule, basis)
 		embedding = None
@@ -385,21 +418,46 @@ class VbDriver:
 					embedding.get("frozen_density"),
 				)
 
-		# Assume orbitals[0] and orbitals[1] are initial guesses for 1s_A and 1s_B
+		# Assume orbitals[0] and orbitals[1] are initial guesses for 1s_A and 1s_B.
+		# A pure two-orbital rotation is only a gauge change in the complete H2
+		# covalent/ionic structure space. Use a common, symmetry-preserving breathing
+		# component when split-valence functions are available so VBSCF is a real
+		# variational relaxation rather than only a representation diagnostic.
 		ao1 = orbitals[0].coefficients
 		ao2 = orbitals[1].coefficients
+		breath1 = self._center_breathing_vector(
+			molecule,
+			basis,
+			orbitals[0].center,
+			ao1,
+			(ao1, ao2),
+			S_ao,
+		)
+		breath2 = self._center_breathing_vector(
+			molecule,
+			basis,
+			orbitals[1].center,
+			ao2,
+			(ao1, ao2),
+			S_ao,
+		)
+		has_external_breathing = breath1 is not None and breath2 is not None
+		if not has_external_breathing:
+			breath1 = np.zeros_like(ao1)
+			breath2 = np.zeros_like(ao2)
 
-		def rotated_orbitals(theta):
+		def common_orbitals(theta, breathing_amplitude):
 			c1 = np.cos(theta)
 			c2 = np.sin(theta)
-			orbA = c1 * ao1 + c2 * ao2
-			orbB = -c2 * ao1 + c1 * ao2
+			orbA = c1 * ao1 + c2 * ao2 + breathing_amplitude * breath1
+			orbB = c1 * ao2 + c2 * ao1 + breathing_amplitude * breath2
 			orbA = self._s_normalize(orbA, S_ao)
 			orbB = self._s_normalize(orbB, S_ao)
 			return orbA, orbB
 
-		def energy_for_theta(theta):
-			orbA, orbB = rotated_orbitals(theta)
+		def energy_for_parameters(parameters):
+			theta, breathing_amplitude = parameters
+			orbA, orbB = common_orbitals(theta, breathing_amplitude)
 			C = np.column_stack([orbA, orbB])
 			try:
 				S, H = self._build_two_orbital_singlet_matrices(
@@ -409,18 +467,55 @@ class VbDriver:
 				energy = 1e6
 			return energy
 
-		res = minimize_scalar(energy_for_theta, bounds=(0, np.pi), method='bounded', options={'xatol': options.conv_thresh if options else 1e-8})
-		theta_opt = res.x
-		energy_opt = res.fun
-		orbA, orbB = rotated_orbitals(theta_opt)
+		initial_parameters = np.array([0.0, 0.0])
+		initial_energy = energy_for_parameters(initial_parameters)
+		if has_external_breathing:
+			res = minimize(
+				energy_for_parameters,
+				x0=initial_parameters,
+				method='L-BFGS-B',
+				bounds=[(-0.70, 0.70), (-1.50, 1.50)],
+				options={
+					'ftol': options.conv_thresh if options else 1.0e-8,
+					'gtol': options.conv_thresh if options else 1.0e-8,
+					'maxiter': options.max_iter if options else 50,
+				},
+			)
+			optimizer_energy = float(res.fun) if np.isfinite(res.fun) else 1.0e6
+		else:
+			class FixedLimitResult:
+				success = True
+				message = "no external center-local breathing space; VBSCF uses fixed-orbital limit"
+
+			res = FixedLimitResult()
+			optimizer_energy = initial_energy
+		used_fixed_limit = (
+			optimizer_energy > initial_energy + 1.0e-10 or
+			not has_external_breathing
+		)
+		parameters = initial_parameters if used_fixed_limit else np.array(res.x, dtype=float)
+		theta_opt = float(parameters[0])
+		breathing_opt = float(parameters[1])
+		orbA, orbB = common_orbitals(theta_opt, breathing_opt)
 		C = np.column_stack([orbA, orbB])
 		S, H = self._build_two_orbital_singlet_matrices(
 			structures, C, H_ao, S_ao, eri_ao, e_nuc)
 		energy, coeffs, weights, kept, lowdin_weights = self._solve_generalized_vb(
 			H, S, return_lowdin=True)
+		structure_labels = [structure.label for structure in structures]
 		diagnostics = {
-			"message": "H2 VB-SCF result (spin-adapted two-electron algebra)",
+			"message": "H2 VB-SCF result with common symmetry-preserving breathing orbitals",
+			"vbscf_model": "h2-common-center-local-breathing-orbitals",
 			"theta_opt": theta_opt,
+			"vbscf_breathing": breathing_opt,
+			"vbscf_has_external_breathing_space": bool(has_external_breathing),
+			"vbscf_initial_energy": float(initial_energy),
+			"vbscf_optimizer_energy": float(optimizer_energy),
+			"vbscf_energy_lowering": float(initial_energy - energy),
+			"vbscf_optimizer_success": bool(res.success),
+			"vbscf_optimizer_message": str(res.message),
+			"vbscf_used_fixed_orbital_limit": bool(used_fixed_limit),
+			"common_orbitals": True,
 			"overlap_condition": float(np.linalg.cond(S)),
 			"overlap_eigenvalues": np.linalg.eigvalsh(S).tolist(),
 			"retained_overlap_rank": int(len(kept)),
@@ -428,6 +523,12 @@ class VbDriver:
 			"available_weight_schemes": ["Chirgwin-Coulson", "Lowdin"],
 			"optimizer": res,
 		}
+		diagnostics.update(self._localized_template_energy_diagnostics(
+			H,
+			S,
+			labels=structure_labels,
+			total_energy=energy,
+		))
 		if embedding is not None:
 			diagnostics.update({
 				"frozen_hf_embedding": True,
@@ -606,6 +707,7 @@ class VbDriver:
 		)
 		energy, coeffs, weights, kept, lowdin_weights = self._solve_generalized_vb(
 			H, S, return_lowdin=True)
+		structure_labels = [structure.label for structure in structures]
 		model_prefix = "h2" if self._is_h2_molecule(molecule) else "two-orbital"
 		message_prefix = "H2" if self._is_h2_molecule(molecule) else "Two-orbital"
 		diagnostics = {
@@ -630,6 +732,12 @@ class VbDriver:
 			"available_weight_schemes": ["Chirgwin-Coulson", "Lowdin"],
 			"structure_specific_orbitals": True,
 		}
+		diagnostics.update(self._localized_template_energy_diagnostics(
+			H,
+			S,
+			labels=structure_labels,
+			total_energy=energy,
+		))
 		if embedding is not None:
 			diagnostics.update({
 				"frozen_hf_embedding": True,
@@ -1939,6 +2047,64 @@ class VbDriver:
 			"orbital_analysis_source": active_space.metadata.get("source"),
 		}
 
+	def _localized_template_energy_diagnostics(self,
+									 hamiltonian,
+									 overlap,
+									 labels=None,
+									 total_energy=None):
+		"""Return single-template Rayleigh quotient diagnostics.
+
+		The existing VB Hamiltonian/overlap matrices already contain the localized
+		structure or determinant basis used for a calculation.  The diagonal
+		Rayleigh quotients H_ii / S_ii provide a conservative same-model localized
+		template reference for resonance-energy reporting.
+		"""
+		hamiltonian = np.asarray(hamiltonian, dtype=float)
+		overlap = np.asarray(overlap, dtype=float)
+		count = int(min(hamiltonian.shape[0], overlap.shape[0]))
+		if labels is None:
+			labels = [f"template_{index + 1}" for index in range(count)]
+		else:
+			labels = [str(label) for label in labels[:count]]
+			if len(labels) < count:
+				labels.extend(
+					f"template_{index + 1}" for index in range(len(labels), count)
+				)
+
+		energies = []
+		for index in range(count):
+			norm = float(overlap[index, index])
+			if abs(norm) <= 1.0e-14:
+				energies.append(float("nan"))
+			else:
+				energies.append(float(hamiltonian[index, index] / norm))
+
+		finite_indices = [
+			index for index, value in enumerate(energies) if np.isfinite(value)
+		]
+		if finite_indices:
+			best_index = min(finite_indices, key=lambda index: energies[index])
+			best_energy = float(energies[best_index])
+			best_label = labels[best_index]
+		else:
+			best_index = None
+			best_energy = float("nan")
+			best_label = None
+
+		resonance_energy = float("nan")
+		if total_energy is not None and np.isfinite(best_energy):
+			resonance_energy = float(best_energy - float(total_energy))
+
+		return {
+			"localized_template_energy_model": "single-basis-vector Rayleigh quotient H_ii/S_ii in the reported VB basis",
+			"localized_template_labels": labels,
+			"localized_template_energies": energies,
+			"best_localized_template_index": best_index,
+			"best_localized_template_label": best_label,
+			"best_localized_template_energy": best_energy,
+			"resonance_energy": resonance_energy,
+		}
+
 	def _compute_two_orbital_vbci(self,
 							   molecule,
 							   basis,
@@ -1971,6 +2137,7 @@ class VbDriver:
 			structures, C, H_ao, S_ao, eri_ao, e_nuc)
 		energy, coeffs, weights, kept, lowdin_weights = self._solve_generalized_vb(
 			H, S, return_lowdin=True)
+		structure_labels = [structure.label for structure in structures]
 		diagnostics = {
 			"message": "Two-electron VB-CI result from spin-adapted singlet structures.",
 			"overlap_condition": float(np.linalg.cond(S)),
@@ -1979,6 +2146,12 @@ class VbDriver:
 			"weight_scheme": "Chirgwin-Coulson",
 			"available_weight_schemes": ["Chirgwin-Coulson", "Lowdin"],
 		}
+		diagnostics.update(self._localized_template_energy_diagnostics(
+			H,
+			S,
+			labels=structure_labels,
+			total_energy=energy,
+		))
 		if embedding is not None:
 			diagnostics.update({
 				"frozen_hf_embedding": True,
@@ -2013,8 +2186,15 @@ class VbDriver:
 		spin = str(active_space.metadata.get("spin") or "singlet")
 		active_pi_atoms = tuple(active_space.metadata.get("active_pi_atoms", ()))
 		if electron_count != 2 or spin != "singlet" or len(active_pi_atoms) < 3:
-			raise NotImplementedError(
-				"Compact CSF Hamiltonians are currently implemented only for two-electron singlet multicenter pi active spaces.")
+			return self._compute_compact_csf_from_determinant_templates(
+				molecule,
+				basis,
+				structures,
+				orbitals,
+				active_space=active_space,
+				analysis=analysis,
+				freeze_inactive=freeze_inactive,
+			)
 
 		H_ao, S_ao, eri_ao, e_nuc = self._ao_integrals(molecule, basis)
 		embedding = None
@@ -2030,6 +2210,11 @@ class VbDriver:
 			if embedding is not None:
 				H_ao = embedding["h_effective"]
 				e_nuc = embedding["constant_energy"]
+				orbitals = self._project_active_orbitals_out_of_frozen_density(
+					orbitals,
+					S_ao,
+					embedding.get("frozen_density"),
+				)
 
 		coefficients = np.column_stack([orb.coefficients for orb in orbitals])
 		S_full, H_full = self._build_two_orbital_singlet_matrices(
@@ -2103,14 +2288,138 @@ class VbDriver:
 			"weight_scheme": "Chirgwin-Coulson compact CSF weights",
 			"available_weight_schemes": ["Chirgwin-Coulson", "Lowdin"],
 		}
+		diagnostics.update(self._localized_template_energy_diagnostics(
+			H_compact,
+			S_compact,
+			labels=[record["label"] for record in template_records],
+			total_energy=energy,
+		))
 		if embedding is not None:
 			diagnostics.update({
 				"frozen_hf_embedding": True,
+				"active_orbitals_orthogonalized_to_frozen_space": True,
 				"frozen_electron_count": embedding["frozen_electron_count"],
 				"active_reference_electron_count": embedding["active_electron_count"],
 				"frozen_constant_energy": embedding["constant_energy"],
 				"embedding_model": "inactive HF density = total RHF density minus active reference density",
 			})
+		return {
+			"energy": float(energy),
+			"structure_coefficients": compact_coeffs,
+			"overlap": S_compact,
+			"Hamiltonian": H_compact,
+			"weights": compact_weights,
+			"lowdin_weights": lowdin_weights,
+			"orbitals": [orb.coefficients for orb in orbitals],
+			"diagnostics": diagnostics,
+		}
+
+	def _compute_compact_csf_from_determinant_templates(self,
+										  molecule,
+										  basis,
+										  structures,
+										  orbitals,
+										  active_space=None,
+										  analysis=None,
+										  freeze_inactive=False):
+		"""Compact CSF Hamiltonian from graph templates in determinant-CI spaces."""
+		if active_space is None:
+			raise RuntimeError("Compact CSF determinant-template mode requires a generated active space.")
+		if not active_space.metadata.get("determinant_ci", False):
+			raise NotImplementedError(
+				"Compact CSF determinant-template mode requires a determinant active space.")
+
+		full_result = self._compute_active_determinant_ci(
+			molecule,
+			basis,
+			structures,
+			orbitals,
+			active_space=active_space,
+			analysis=analysis,
+			freeze_inactive=freeze_inactive,
+		)
+		H_full = np.asarray(full_result["Hamiltonian"], dtype=float)
+		S_full = np.asarray(full_result["overlap"], dtype=float)
+		full_coeffs = np.asarray(full_result["structure_coefficients"], dtype=float)
+		full_energy = float(full_result["energy"])
+		full_diag = full_result.get("diagnostics", {})
+
+		template_records = self._chemical_resonance_template_records(
+			structures,
+			active_space,
+		)
+		if not template_records:
+			raise NotImplementedError(
+				"No compact CSF templates are available for this determinant active space.")
+
+		template_matrix = np.column_stack([record["vector"] for record in template_records])
+		S_compact = template_matrix.T @ S_full @ template_matrix
+		H_compact = template_matrix.T @ H_full @ template_matrix
+		S_compact = 0.5 * (S_compact + S_compact.T)
+		H_compact = 0.5 * (H_compact + H_compact.T)
+		energy, compact_coeffs, compact_weights, kept, lowdin_weights = self._solve_generalized_vb(
+			H_compact,
+			S_compact,
+			return_lowdin=True,
+		)
+
+		full_metric_rhs = template_matrix.T @ S_full @ full_coeffs
+		try:
+			projection_coeffs = np.linalg.pinv(S_compact) @ full_metric_rhs
+		except np.linalg.LinAlgError:
+			projection_coeffs = np.zeros(len(template_records))
+		projected_full = template_matrix @ projection_coeffs
+		captured_weight = float(projected_full.T @ S_full @ projected_full)
+		captured_weight = max(0.0, min(captured_weight, 1.0 + 1.0e-8))
+
+		details = []
+		for index, record in enumerate(template_records):
+			details.append({
+				"label": record["label"],
+				"type": record["type"],
+				"bond_pairs": record.get("bond_pairs", ()),
+				"special_atom": record.get("special_atom"),
+				"coefficient": float(compact_coeffs[index]),
+				"weight": float(compact_weights[index]),
+				"lowdin_weight": float(lowdin_weights[index]),
+				"determinant_expansion": record["determinant_expansion"],
+			})
+
+		diagnostics = {
+			"message": "Compact spin-adapted CSF Hamiltonian result from determinant-CI graph templates.",
+			"compact_csf_model": "graph-template-determinant-ci-subspace",
+			"compact_csf_labels": [record["label"] for record in template_records],
+			"compact_csf_types": [record["type"] for record in template_records],
+			"compact_csf_count": len(template_records),
+			"compact_csf_details": details,
+			"compact_csf_overlap_eigenvalues": np.linalg.eigvalsh(S_compact).tolist(),
+			"compact_csf_retained_rank": int(len(kept)),
+			"compact_csf_captured_subspace_weight": captured_weight,
+			"compact_csf_full_reference_energy": full_energy,
+			"compact_csf_energy_error_to_full_reference": float(energy - full_energy),
+			"full_reference_retained_overlap_rank": full_diag.get("retained_overlap_rank"),
+			"full_reference_determinant_count": full_diag.get("determinant_count"),
+			"overlap_condition": float(np.linalg.cond(S_compact)),
+			"overlap_eigenvalues": np.linalg.eigvalsh(S_compact).tolist(),
+			"retained_overlap_rank": int(len(kept)),
+			"weight_scheme": "Chirgwin-Coulson compact CSF weights",
+			"available_weight_schemes": ["Chirgwin-Coulson", "Lowdin"],
+		}
+		for key in (
+			"frozen_hf_embedding",
+			"frozen_electron_count",
+			"active_reference_electron_count",
+			"frozen_constant_energy",
+			"embedding_model",
+		):
+			if key in full_diag:
+				diagnostics[key] = full_diag[key]
+		diagnostics.update(self._localized_template_energy_diagnostics(
+			H_compact,
+			S_compact,
+			labels=[record["label"] for record in template_records],
+			total_energy=energy,
+		))
 		return {
 			"energy": float(energy),
 			"structure_coefficients": compact_coeffs,
@@ -2156,6 +2465,11 @@ class VbDriver:
 			if embedding is not None:
 				H_ao = embedding["h_effective"]
 				e_nuc = embedding["constant_energy"]
+				orbitals = self._project_active_orbitals_out_of_frozen_density(
+					orbitals,
+					S_ao,
+					embedding.get("frozen_density"),
+				)
 
 		coefficients = np.column_stack([orb.coefficients for orb in orbitals])
 		active_vectors = tuple(coefficients[:, index] for index in range(coefficients.shape[1]))
@@ -2327,9 +2641,16 @@ class VbDriver:
 			"available_weight_schemes": ["Chirgwin-Coulson", "Lowdin"],
 			"structure_specific_orbitals": True,
 		}
+		diagnostics.update(self._localized_template_energy_diagnostics(
+			H_compact,
+			S_compact,
+			labels=[record["label"] for record in template_records],
+			total_energy=energy,
+		))
 		if embedding is not None:
 			diagnostics.update({
 				"frozen_hf_embedding": True,
+				"active_orbitals_orthogonalized_to_frozen_space": True,
 				"frozen_electron_count": embedding["frozen_electron_count"],
 				"active_reference_electron_count": embedding["active_electron_count"],
 				"frozen_constant_energy": embedding["constant_energy"],
@@ -2476,6 +2797,12 @@ class VbDriver:
 			"chemical_resonance_symmetry_orbits": chemical_resonance_analysis["symmetry_orbits"],
 			"chemical_resonance_details": chemical_resonance_analysis["details"],
 		}
+		diagnostics.update(self._localized_template_energy_diagnostics(
+			H,
+			S,
+			labels=[structure.label for structure in structures],
+			total_energy=energy,
+		))
 		if embedding is not None:
 			total_energy = (
 				float(embedding["reference_total_energy"]) +
@@ -2549,6 +2876,225 @@ class VbDriver:
 			"metal_ligand_vbscf_has_external_relaxation_space": False,
 			"metal_ligand_vbscf_orbital_amplitudes": [0.0] * len(orbitals),
 			"metal_ligand_orbital_relaxation_method": "vbscf",
+			"structure_specific_orbitals": False,
+		})
+		return result
+
+	def _compute_organic_pi_vbscf_common_breathing(self,
+									 molecule,
+									 basis,
+									 structures,
+									 orbitals,
+									 options,
+									 active_space=None,
+									 analysis=None,
+									 freeze_inactive=False):
+		"""Common-orbital VBSCF relaxation for organic multicenter pi spaces."""
+		from scipy.optimize import minimize
+
+		if active_space is None:
+			raise RuntimeError("Organic pi VBSCF relaxation requires a generated active space.")
+
+		H_ao, S_ao, eri_ao, e_nuc = self._ao_integrals(molecule, basis)
+		base_coefficients = np.column_stack([orb.coefficients for orb in orbitals])
+		active_vectors = tuple(base_coefficients[:, index] for index in range(base_coefficients.shape[1]))
+		breathing_vectors = []
+		for orbital in orbitals:
+			breathing_vectors.append(
+				self._center_breathing_vector(
+					molecule,
+					basis,
+					orbital.center,
+					orbital.coefficients,
+					active_vectors,
+					S_ao,
+				)
+			)
+		has_external_breathing = all(vector is not None for vector in breathing_vectors)
+		breathing_vectors = [
+			vector if vector is not None else np.zeros(base_coefficients.shape[0])
+			for vector in breathing_vectors
+		]
+
+		relaxation_symmetry = str(
+			getattr(options, 'orbital_relaxation_symmetry', None) or "independent"
+		).lower().replace("_", "-")
+		use_equivalent_center_amplitude = relaxation_symmetry in {
+			"common",
+			"uniform",
+			"equivalent",
+			"equivalent-centers",
+			"symmetry-preserving",
+		}
+
+		def orbital_amplitudes(parameters):
+			parameters = np.asarray(parameters, dtype=float)
+			if use_equivalent_center_amplitude:
+				value = float(parameters[0]) if len(parameters) else 0.0
+				return np.full(len(orbitals), value, dtype=float)
+			return parameters
+
+		def relaxed_orbitals(parameters):
+			amplitudes = orbital_amplitudes(parameters)
+			relaxed = []
+			for index, orbital in enumerate(orbitals):
+				coefficients = (
+					orbital.coefficients +
+					float(amplitudes[index]) * breathing_vectors[index]
+				)
+				try:
+					coefficients = self._s_normalize(coefficients, S_ao)
+				except RuntimeError:
+					coefficients = orbital.coefficients
+				relaxed.append(
+					VbOrbital(
+						label=orbital.label,
+						coefficients=coefficients,
+						center=orbital.center,
+						kind=orbital.kind,
+					)
+				)
+			return relaxed
+
+		def compute_for_parameters(parameters):
+			relaxed = relaxed_orbitals(parameters)
+			if active_space.metadata.get("determinant_ci", False):
+				return self._compute_active_determinant_ci(
+					molecule,
+					basis,
+					structures,
+					relaxed,
+					active_space=active_space,
+					analysis=analysis,
+					freeze_inactive=freeze_inactive,
+				)
+			return self._compute_two_orbital_vbci(
+				molecule,
+				basis,
+				structures,
+				relaxed,
+				active_space=active_space,
+				analysis=analysis,
+				freeze_inactive=freeze_inactive,
+			)
+
+		parameter_count = 1 if use_equivalent_center_amplitude else len(orbitals)
+		initial_parameters = np.zeros(parameter_count)
+		initial_result = compute_for_parameters(initial_parameters)
+		initial_energy = float(initial_result["energy"])
+		amplitude_bound = float(getattr(options, 'orbital_amplitude_bound', None) or 0.35)
+		if amplitude_bound <= 0.0:
+			amplitude_bound = 0.35
+		if has_external_breathing:
+			result = minimize(
+				lambda parameters: float(compute_for_parameters(parameters)["energy"]),
+				x0=initial_parameters,
+				method='L-BFGS-B',
+				bounds=[(-amplitude_bound, amplitude_bound)] * parameter_count,
+				options={
+					'ftol': options.conv_thresh if options else 1.0e-8,
+					'gtol': options.conv_thresh if options else 1.0e-8,
+					'maxiter': options.max_iter if options else 50,
+				},
+			)
+			optimizer_energy = float(result.fun) if np.isfinite(result.fun) else 1.0e6
+		else:
+			class FixedLimitResult:
+				success = True
+				message = "no external center-local pi breathing space; VBSCF uses fixed-orbital limit"
+
+			result = FixedLimitResult()
+			optimizer_energy = initial_energy
+		used_fixed_limit = optimizer_energy > initial_energy + 1.0e-10 or not has_external_breathing
+		parameters = initial_parameters if used_fixed_limit else np.array(result.x, dtype=float)
+		per_orbital_amplitudes = orbital_amplitudes(parameters)
+		max_abs_amplitude = float(np.max(np.abs(per_orbital_amplitudes))) if len(per_orbital_amplitudes) else 0.0
+		hit_amplitude_bound = bool(
+			has_external_breathing and
+			max_abs_amplitude >= amplitude_bound - 1.0e-8
+		)
+		final_result = compute_for_parameters(parameters)
+		diagnostics = final_result.setdefault("diagnostics", {})
+		diagnostics.update({
+			"message": "Organic pi VB-SCF result with common center-local breathing active orbitals.",
+			"organic_pi_vbscf_model": "common-center-local-pi-breathing-orbitals",
+			"organic_pi_vbscf_relaxation_symmetry": relaxation_symmetry,
+			"organic_pi_vbscf_equivalent_center_amplitude": bool(use_equivalent_center_amplitude),
+			"organic_pi_vbscf_initial_energy": initial_energy,
+			"organic_pi_vbscf_optimizer_energy": optimizer_energy,
+			"organic_pi_vbscf_energy_lowering": float(initial_energy - float(final_result["energy"])),
+			"organic_pi_vbscf_has_external_relaxation_space": bool(has_external_breathing),
+			"organic_pi_vbscf_optimizer_parameters": [float(value) for value in parameters],
+			"organic_pi_vbscf_orbital_amplitudes": [float(value) for value in per_orbital_amplitudes],
+			"organic_pi_vbscf_orbital_amplitude_bound": float(amplitude_bound),
+			"organic_pi_vbscf_max_abs_orbital_amplitude": max_abs_amplitude,
+			"organic_pi_vbscf_hit_amplitude_bound": hit_amplitude_bound,
+			"organic_pi_vbscf_used_fixed_orbital_limit": bool(used_fixed_limit),
+			"organic_pi_vbscf_optimizer_success": bool(result.success),
+			"organic_pi_vbscf_optimizer_message": str(result.message),
+			"organic_pi_orbital_relaxation_method": "vbscf-common-center-local-pi-breathing",
+			"structure_specific_orbitals": False,
+		})
+		return final_result
+
+	def _compute_organic_pi_vbscf_determinant_fixed_limit(self,
+										 molecule,
+										 basis,
+										 structures,
+										 orbitals,
+										 active_space=None,
+										 analysis=None,
+										 freeze_inactive=False):
+		result = self._compute_active_determinant_ci(
+			molecule,
+			basis,
+			structures,
+			orbitals,
+			active_space=active_space,
+			analysis=analysis,
+			freeze_inactive=freeze_inactive,
+		)
+		diagnostics = result.setdefault("diagnostics", {})
+		diagnostics.update({
+			"message": "Organic pi VB-SCF determinant-space result at the common-active-orbital fixed limit.",
+			"organic_pi_vbscf_model": "common-active-orbital-determinant-ci-fixed-limit",
+			"organic_pi_vbscf_initial_energy": float(result["energy"]),
+			"organic_pi_vbscf_energy_lowering": 0.0,
+			"organic_pi_vbscf_has_external_relaxation_space": False,
+			"organic_pi_vbscf_orbital_amplitudes": [0.0] * len(orbitals),
+			"organic_pi_orbital_relaxation_method": "vbscf-fixed-limit",
+			"structure_specific_orbitals": False,
+		})
+		return result
+
+	def _compute_organic_pi_bovb_determinant_fixed_limit(self,
+										 molecule,
+										 basis,
+										 structures,
+										 orbitals,
+										 active_space=None,
+										 analysis=None,
+										 freeze_inactive=False):
+		result = self._compute_active_determinant_ci(
+			molecule,
+			basis,
+			structures,
+			orbitals,
+			active_space=active_space,
+			analysis=analysis,
+			freeze_inactive=freeze_inactive,
+		)
+		diagnostics = result.setdefault("diagnostics", {})
+		diagnostics.update({
+			"message": "Organic pi BOVB determinant-space result at the fixed-orbital zero-amplitude limit.",
+			"organic_pi_bovb_model": "determinant-ci-fixed-orbital-zero-amplitude-limit",
+			"organic_pi_bovb_initial_energy": float(result["energy"]),
+			"organic_pi_bovb_optimizer_energy": float(result["energy"]),
+			"organic_pi_bovb_energy_lowering": 0.0,
+			"organic_pi_bovb_has_external_breathing_space": False,
+			"organic_pi_bovb_orbital_amplitudes": [0.0] * len(orbitals),
+			"bovb_used_fixed_orbital_limit": True,
+			"bovb_conservative_organic_pi_limit": True,
 			"structure_specific_orbitals": False,
 		})
 		return result
@@ -2921,24 +3467,23 @@ class VbDriver:
 			"details": ordered,
 		}
 
-	def _chemical_resonance_analysis(self, structures, coeffs, active_space):
+	def _chemical_resonance_template_records(self, structures, active_space):
 		if active_space is None:
-			return self._empty_chemical_resonance_analysis("no active space")
+			return []
 		active_pi_atoms = tuple(active_space.metadata.get("active_pi_atoms", ()))
 		electron_count = active_space.metadata.get("electron_count")
 		spin = active_space.metadata.get("spin", "singlet")
 		try:
 			electron_count = int(electron_count)
 		except Exception:
-			return self._empty_chemical_resonance_analysis("missing active electron count")
+			return []
 		templates = self._chemical_resonance_templates(
 			active_pi_atoms,
 			electron_count,
 			spin,
 		)
 		if not templates:
-			return self._empty_chemical_resonance_analysis(
-				"no graph resonance templates for this active space")
+			return []
 
 		index_by_occupation = {
 			self._structure_occupation_key(structure): index
@@ -2973,6 +3518,16 @@ class VbDriver:
 				"vector": vector,
 				"determinant_expansion": expansion,
 			})
+		return template_records
+
+	def _chemical_resonance_analysis(self, structures, coeffs, active_space):
+		if active_space is None:
+			return self._empty_chemical_resonance_analysis("no active space")
+		active_pi_atoms = tuple(active_space.metadata.get("active_pi_atoms", ()))
+		template_records = self._chemical_resonance_template_records(
+			structures,
+			active_space,
+		)
 		if not template_records:
 			return self._empty_chemical_resonance_analysis(
 				"no graph resonance templates with determinant support")

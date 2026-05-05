@@ -44,6 +44,14 @@ For metal-ligand systems, the analyzer records are intentionally diagnostic: `ML
 
 `VbDriver` is currently a fixed-orbital VB development driver with shared analyzer input, validated two-electron spin-adapted algebra, frozen-HF embedding, and a determinant-CI fallback for larger π active spaces.
 
+Handoff status for the current `nbo` branch work:
+
+- H2 is currently the only fully accepted VBCI/VBSCF/BOVB method ladder in this stabilization phase.
+- Allyl cation/radical/anion VBCI, compact-CSF, and common-orbital VBSCF routes have been implemented or updated, but the latest split-valence rows still need a clean rerun before replacing the `rerun pending` table entries below.
+- Benzene fixed-orbital VBCI and compact-CSF gates are present in the notebook. Benzene independent-amplitude VBSCF is explicitly box-limited and must not be promoted to a final reference.
+- Benzene equivalent-center VBSCF support and the corresponding notebook scan are present. Treat this as the next checkpoint to review and document, not an accepted final benzene VBSCF reference yet.
+- Benzene determinant-space BOVB is not implemented. The current organic π BOVB route for larger determinant spaces is still the conservative fixed-orbital zero-amplitude wrapper and should not be described as final benzene BOVB.
+
 Current organic bond-breaking progress:
 
 - H2 is the strict two-electron validation gate. VBCI, VBSCF, and H2 BOVB now approach the UHF 5.0 Angstrom asymptote, while RHF correctly fails at dissociation.
@@ -59,7 +67,7 @@ Implemented and validated:
 
 - Shared `OrbitalAnalyzer` consumption for active-orbital selection and active/inactive/frozen candidate diagnostics.
 - H₂ one-active-bond VB-CI with covalent/ionic structures, spin-adapted two-electron algebra, generalized overlap metric pruning, and Chirgwin-Coulson/Löwdin weights.
-- H₂ one-angle VB-SCF diagnostic path retained as a prototype, while fixed-orbital VB-CI remains the validated baseline.
+- H₂ VB-SCF now uses a common, symmetry-preserving center-local breathing-orbital relaxation in split-valence bases, while fixed-orbital VB-CI remains the baseline.
 - H₂ two-orbital BOVB with structure-specific, center-local breathing active orbitals and regression coverage against the fixed-orbital VB-CI baseline.
 - Stable automatic H₂ active-space selection: H₂ scans now use an atom-centered H-H active pair instead of independently selected analyzer `BD_sigma_*` candidates, avoiding active-label switches along dissociation curves.
 - Allyl-cation compact-CSF BOVB for the two-electron three-center π singlet checkpoint, using center-local π breathing directions in split-valence bases.
@@ -91,6 +99,185 @@ Immediate next method work:
 - Implement a real VBSCF orbital-optimization path for embedded organic active bonds; the current ethane VBSCF trace is effectively VBCI.
 - Implement constrained non-H2 BOVB breathing orbitals that vary continuously along dissociation and do not over-stabilize separated radical limits.
 - Add a four-electron sigma+pi active space for ethylene C=C cleavage.
+
+## VB branch stabilization phase: H2, allyls, and benzene
+
+The immediate branch goal is no longer broad feature expansion. The priority is to stabilize a compact, reproducible validation ladder for fixed-orbital VBCI, VBSCF, and BOVB before resuming general sigma/pi active-space generalization.
+
+The working workflow for this phase is:
+
+1. Update `VbDriver` with one narrow method or diagnostic change.
+2. Update `docs/test_vbdriver.ipynb` so the change is exercised on the stabilization ladder.
+3. Update this implementation plan to record the change, current interpretation, and remaining open issues.
+4. Compile and run the notebook/tests outside this document.
+5. Use the reported numerical results or failures to drive the next narrow driver/notebook/documentation update.
+
+### Stabilization validation ladder
+
+The branch is considered stable only when the following systems give consistent and reproducible results for all three method levels:
+
+| System | Active space | Spin | Required methods | Purpose |
+| --- | --- | --- | --- | --- |
+| H2 | 2e/2orb | singlet | VBCI, VBSCF, BOVB | strict two-electron dissociation and ionic/covalent gate |
+| allyl cation | 2e/3pi | singlet | VBCI, VBSCF, BOVB | compact closed-shell three-center resonance gate |
+| allyl radical | 3e/3pi | doublet | VBCI, VBSCF, BOVB | open-shell/root-selection and radical-delocalization gate |
+| allyl anion | 4e/3pi | singlet | VBCI, VBSCF, BOVB | charge-delocalization and excess-electron resonance gate |
+| benzene | 6e/6pi | singlet | VBCI, VBSCF, BOVB | aromatic Kekule/Dewar symmetry and larger pi-space gate |
+
+Butadiene remains useful as an intermediate diagnostic between allyl and benzene, but it is not part of the minimal stabilization gate unless benzene failures require a smaller debug target.
+
+### Required energy and resonance reporting
+
+Every stabilization run must report the same energy quantities so VBCI, VBSCF, and BOVB can be compared without changing definitions between systems:
+
+- `E_SCF`: Hartree-Fock reference total energy for the same molecule, geometry, charge, multiplicity, and basis. Use RHF for closed-shell singlets and ROHF/UHF-style unrestricted references for radicals or stretched-bond checks when appropriate.
+- `E_VB`: total energy from the selected VB method.
+- `E_corr(VB) = E_VB - E_SCF`: VB energy lowering relative to the HF reference.
+- `E_best_template`: lowest localized single-template or single-structure energy inside the same active-space and embedding model.
+- `E_res = E_best_template - E_VB`: resonance stabilization energy within the same VB model.
+- `chemical_resonance_subspace_weight`: fraction of the determinant-CI root captured by the compact chemically labeled CSF/template subspace.
+- Normalized `chemical_resonance_weights`, with graph-automorphism averaged displayed weights and raw unsymmetrized weights retained for diagnostics.
+
+Interpretation rules:
+
+- `E_corr(VB)` is not the same as resonance energy. It mixes active-space/static correlation, resonance, and any orbital-relaxation effect included in the chosen VB model.
+- For frozen-pi VBCI, `E_corr(VB)` should be described as active-space/static-correlation lowering relative to HF, not as full dynamic correlation.
+- `E_res` is the cleaner resonance diagnostic because it compares the full VB wavefunction against the best localized template in the same orbital and embedding model.
+- Dynamic correlation outside the selected active space remains absent unless a later method explicitly adds it. This must be stated whenever VB energies are compared to SCF.
+
+### Definition of compact CSF in this stabilization phase
+
+`compact-CSF` is a chemically compressed projection of the same active-space Hamiltonian, not a replacement for the full VBCI reference. The driver first has a full VB/determinant basis with Hamiltonian `H` and overlap `S`. It then builds a small template matrix `T` whose columns are chemically labeled CSFs or graph templates expanded in that full basis, and solves the projected generalized eigenvalue problem:
+
+- `H_compact = T^T H T`
+- `S_compact = T^T S T`
+
+For the allyl cation, this compact basis is the two symmetry-related spin-adapted allyl resonance CSFs corresponding to the two terminal C=C pi bond placements. For allyl radical and allyl anion, it is the graph-generated set of chemically recognizable radical or charge-delocalized templates.
+
+The compact-CSF energy is therefore a subspace variational energy. Its strict ordering check is against `compact_csf_full_reference_energy`, the same-orbital full reference used internally to build the compact Hamiltonian. It should satisfy `E(compact-CSF) >= E(full same-orbital reference)` within numerical tolerance. A separately printed VBCI row is still useful for comparison, but it can be generated by a separate driver call with a different analyzer/SCF gauge; it is not the strict variational reference unless it is guaranteed to be the identical Hamiltonian/orbital object.
+
+The purpose of compact-CSF is chemical interpretation: captured-subspace weight, resonance weights, and a compact resonance-template energy. `compact-CSF-BOVB` means the same compact CSF/template model after structure- or template-specific breathing relaxation; at present this relaxed compact BOVB path is implemented for allyl cation, while radical/anion determinant-space BOVB remains fixed-limit.
+
+### Stabilization result table to fill from the notebook
+
+| System | Method | E_SCF | E_VB | E_corr(VB) | E_best_template | E_res | captured weight | Status |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| H2 | VBCI | -1.1267553135 | -1.1053297868 | 2.143e-02 | -1.1040444070 | 1.285e-03 | n/a | finite; above RHF at equilibrium |
+| H2 | VBSCF | -1.1267553135 | -1.1454799073 | -1.872e-02 | -1.1237346456 | 2.175e-02 | n/a | passing; common breathing lowers below VBCI/RHF |
+| H2 | BOVB | -1.1267553135 | -1.1461071080 | -1.935e-02 | -1.1363736780 | 9.733e-03 | n/a | passing; below RHF and below VBSCF |
+| allyl cation | VBCI | -116.0024522142 | -115.5723501546 | 4.301e-01 | -115.3966926015 | 1.757e-01 | n/a | finite fixed-orbital split-valence baseline |
+| allyl cation | VBSCF | rerun pending | rerun pending | rerun pending | rerun pending | rerun pending | rerun pending | common center-local pi breathing implemented; rerun required |
+| allyl cation | compact-CSF | rerun pending | rerun pending | rerun pending | rerun pending | rerun pending | rerun pending | compact/full-reference orbital mismatch fixed; rerun required |
+| allyl cation | compact-CSF-BOVB | rerun pending | rerun pending | rerun pending | rerun pending | rerun pending | rerun pending | compact/full-reference orbital mismatch fixed; rerun required |
+| allyl radical | VBCI | -114.9108292016 | -114.2734241819 | 6.374e-01 | -113.7917019908 | 4.817e-01 | 8.640e-02 | finite fixed-orbital determinant-CI baseline |
+| allyl radical | VBSCF | rerun pending | rerun pending | rerun pending | rerun pending | rerun pending | rerun pending | common center-local pi breathing implemented; rerun required |
+| allyl radical | BOVB-fixed | -114.9108292016 | -114.2734241819 | 6.374e-01 | -113.8219481851 | 4.515e-01 | 1.413e-01 | fixed-limit wrapper; zero BOVB lowering |
+| allyl radical | compact-CSF | -114.9108292016 | -114.1647793047 | 7.460e-01 | -113.9857694228 | 1.790e-01 | 7.402e-02 | finite compact determinant-template diagnostic; 1.086e-01 a.u. above VBCI |
+| allyl anion | VBCI | -114.7309008412 | -112.6244915370 | 2.106e+00 | -112.3297891023 | 2.947e-01 | 2.069e-01 | finite fixed-orbital determinant-CI baseline |
+| allyl anion | VBSCF | rerun pending | rerun pending | rerun pending | rerun pending | rerun pending | rerun pending | common center-local pi breathing implemented; rerun required |
+| allyl anion | BOVB-fixed | -114.7309008412 | -112.6244915370 | 2.106e+00 | -112.3368091531 | 2.877e-01 | 1.999e-01 | fixed-limit wrapper; zero BOVB lowering |
+| allyl anion | compact-CSF | -114.7309008412 | -111.9887113601 | 2.742e+00 | -111.8441136782 | 1.446e-01 | 2.069e-01 | finite compact determinant-template diagnostic; 6.358e-01 a.u. above VBCI |
+| benzene | VBCI | rerun pending | rerun pending | rerun pending | rerun pending | rerun pending | rerun pending | fixed-orbital 6e/6pi reference gate added to notebook |
+| benzene | compact-CSF | rerun pending | rerun pending | rerun pending | rerun pending | rerun pending | rerun pending | Kekule/Dewar compact projection gate added to notebook |
+| benzene | VBSCF | -230.6235016817 | -229.0714117103 | 1.552e+00 | -228.7087946074 | 3.626e-01 | 1.472e-28 | constrained common-pi-breathing checkpoint; all amplitudes at +/-0.35 bounds |
+| benzene | BOVB | TBD | TBD | TBD | TBD | TBD | TBD | open |
+
+### Acceptance criteria for the stabilization ladder
+
+- All reported energies are finite and reproducible after restarting the notebook kernel.
+- Structure weights, Löwdin weights, and normalized chemical resonance weights sum to one within numerical tolerance.
+- Captured-subspace weight is reported separately from normalized resonance weights.
+- Singlet determinant-CI roots use the lowest alpha/beta exchange-symmetric root before CSF-template projection.
+- Symmetry-equivalent resonance templates have equal displayed weights after graph-automorphism averaging.
+- H2 dissociation keeps a continuous atom-centered H-H active pair and approaches the broken-symmetry UHF asymptote while RHF correctly fails at stretched distance.
+- Allyl cation has symmetric terminal resonance weights at symmetric geometry.
+- Allyl radical keeps a stable doublet root and chemically sensible terminal radical delocalization.
+- Allyl anion keeps symmetric terminal charge-delocalized resonance forms.
+- Benzene reports symmetry-consistent Kekule and Dewar template families; Kekule-equivalent structures must be degenerate/equally weighted in the displayed diagnostics.
+- VBSCF must not lie above the corresponding fixed-orbital VBCI result unless an explicit constraint explains the increase.
+- BOVB must not lie above the corresponding VBCI/VBSCF result when the relevant breathing relaxations are enabled and no stabilizing constraint is disabled.
+
+### Driver diagnostics required for this phase
+
+`VbDriver` should expose the following diagnostics for every method path as soon as the needed internal quantities are available:
+
+- `vb_method`: explicit method label such as `vbci`, `vbscf`, `bovb`, `compact-csf`, or `compact-csf-bovb`.
+- `scf_reference_energy`: the HF total energy used for comparison when computed by the driver or notebook helper.
+- `vb_correlation_energy`: `E_VB - E_SCF` when `E_SCF` is available.
+- `localized_template_energies`: single-template/localized-structure energies in the same active-space and embedding model.
+- `best_localized_template_energy`: the minimum of `localized_template_energies`.
+- `resonance_energy`: `best_localized_template_energy - E_VB`.
+- `chemical_resonance_subspace_weight`, `chemical_resonance_weights`, and `chemical_resonance_unsymmetrized_weights`.
+- Method-specific orbital-relaxation metadata for VBSCF and BOVB, including active-orbital rotation/breathing amplitudes, convergence status, and fixed-orbital zero-amplitude baseline energy where applicable.
+
+Current stabilization implementation note:
+
+- First driver update in this phase adds a shared localized-template energy diagnostic built from the existing reported Hamiltonian and overlap matrices. It does not change the wavefunction model or reinvents the Hamiltonian; it reports single-basis-vector Rayleigh quotients `H_ii/S_ii` for the already constructed VB basis.
+- The diagnostic keys are `localized_template_energy_model`, `localized_template_labels`, `localized_template_energies`, `best_localized_template_index`, `best_localized_template_label`, `best_localized_template_energy`, and `resonance_energy`.
+- The same helper is now attached to two-orbital VBCI, H2/VBSCF, two-orbital BOVB, compact CSF, compact-CSF BOVB, and determinant-CI pi active-space results.
+- Organic pi determinant spaces, including allyl radical and allyl anion, now have generalized method routes for `mode="vbscf"`, `mode="bovb"`, and `mode="compact-csf"`.
+- Organic pi VBSCF now has a real common-orbital relaxation route for allyl cation, allyl radical, and allyl anion. It optimizes one center-local pi breathing amplitude per active orbital in a common active-orbital set shared by all structures/determinants. This is not BOVB because structures do not get separate orbital sets, but it is no longer a fixed-limit wrapper. The diagnostics include `organic_pi_vbscf_model="common-center-local-pi-breathing-orbitals"`, the initial VBCI-limit energy, optimized energy, relaxation amplitudes, and whether external breathing space was available.
+- The radical/anion BOVB route is currently an explicit zero-amplitude fixed-orbital limit around the same determinant-CI solver. Fixed here also means no structure-specific breathing or other orbital relaxation: it reports `organic_pi_bovb_model="determinant-ci-fixed-orbital-zero-amplitude-limit"`, `bovb_used_fixed_orbital_limit=True`, and zero energy lowering. This keeps the method ladder executable while preventing over-interpretation as real BOVB relaxation.
+- The radical/anion compact-CSF route now reuses the existing graph-generated chemical resonance templates as a working compact Hamiltonian subspace over the determinant-CI Hamiltonian. It reports the full determinant-CI reference energy, compact-basis error, captured-subspace weight, and localized-template resonance diagnostics.
+- The allyl-cation compact-CSF row exposed a real consistency problem before the benzene gate: compact-CSF built its internal full reference with the frozen-HF effective Hamiltonian but did not apply the same frozen-space projection to the active orbitals that the VBCI route applies. That made the compact internal full reference lower than the displayed VBCI row, so compact-CSF could appear below VBCI in the method table.
+- The compact-CSF and compact-CSF-BOVB allyl-cation paths now project active orbitals out of the frozen inactive density after building the frozen-HF embedding, matching the VBCI route internally. The allyl notebook no longer requires a separately computed VBCI row to be bitwise identical to the compact internal reference because separate `compute()` calls can regenerate SCF/analyzer gauges. Instead it reports the displayed-VBCI offset and enforces the variational ordering against the compact route's same-orbital internal full reference. The previous split-valence compact-CSF and compact-CSF-BOVB numbers are superseded and must be regenerated after rebuild.
+- The allyl method-ladder assertions now apply the same-reference rule consistently: real VBSCF is checked against its same-call fixed-orbital initial energy, compact-CSF is checked against `compact_csf_full_reference_energy`, and radical/anion BOVB-fixed is checked against its same-call zero-amplitude initial energy rather than against a separately generated displayed VBCI row.
+- A first benzene gate has been added to the notebook. It runs fixed-orbital benzene VBCI and compact-CSF in the 6e/6pi active space, verifies 400 determinant structures for the full reference, verifies the 15 compact templates split into two Kekule and thirteen Dewar pairings, reports captured-subspace weight, and enforces compact-CSF variational ordering against the internal same-orbital full reference.
+- After the fixed-orbital benzene compact-CSF gate passed, a benzene VBSCF gate was added in 6-31G. It reuses the organic pi common-orbital center-local breathing optimizer, keeps one common active-orbital set for all 400 determinants, and checks the optimized VBSCF energy against the same-call fixed-orbital initial energy. This is a real VBSCF relaxation gate, not BOVB, because no structure/template gets its own orbital set.
+- Benzene VBSCF reruns confirm that the independent per-center common-pi-breathing optimizer is box-limited at the default +/-0.35 amplitude bound. The latest 6-31G gate gives fixed-orbital VBCI -227.9017419716 a.u. and common-pi-breathing VBSCF -229.0714117103 a.u.; all six breathing amplitudes sit at +/-0.35 and the compact Kekule/Dewar captured weight collapses to 1.472e-28. This is a constrained-relaxation checkpoint, not yet a final benzene VBSCF reference.
+- The independent-amplitude benzene bound scan remains active at every tested box. In 6-31G, bounds 0.05, 0.10, 0.20, and 0.35 give E_VB values -227.8892858027, -228.2042369878, -228.4454626817, and -229.2606545225 a.u.; every row reaches max|amplitude| equal to its bound. This is monotonic box-driven lowering and should not be promoted to a final VBSCF reference.
+- `VbComputeOptions.orbital_amplitude_bound` now exposes the organic pi VBSCF breathing-amplitude box. `VbComputeOptions.orbital_relaxation_symmetry="equivalent-centers"` now provides a one-parameter, symmetry-preserving common-amplitude path for benzene-like equivalent pi centers. The notebook includes a new benzene symmetry-preserving scan cell; run it before any determinant-space BOVB implementation.
+- Source tests were updated to require finite localized-template and resonance-energy diagnostics for H2 VBCI, allyl-cation compact CSF/BOVB, and the fixed-orbital pi resonance cases.
+- Source tests were also added for allyl radical/anion VBCI, relaxed VBSCF, fixed-limit BOVB, compact-CSF method routes, and the benzene compact-CSF projection gate.
+- The H2 VBSCF route was changed from a pure two-orbital rotation to a common, symmetry-preserving center-local breathing-orbital optimization. This removes the gauge-only behavior in split-valence bases while keeping one common active-orbital pair for all H2 structures.
+- The updated H2 method-ladder notebook run gives finite VBCI, VBSCF, and BOVB rows. VBSCF now lowers from VBCI (-1.1053297868) to -1.1454799073 a.u. and below the RHF reference; BOVB remains slightly lower at -1.1461071080 a.u. because it allows structure-specific breathing. This satisfies the intended ordering `E(BOVB) <= E(VBSCF) <= E(VBCI)` for H2.
+- H2 VBSCF still reports localized-template and ionic-pair diagnostics in the optimized orbital basis. The stable method diagnostics are total energy, energy lowering from the fixed-orbital baseline, resonance energy in the same optimized basis, and normalized structure-weight sums.
+
+### Notebook requirements for `docs/test_vbdriver.ipynb`
+
+The validation notebook should be reorganized around the stabilization table rather than isolated demonstrations:
+
+1. Define helper functions to compute the SCF reference and summarize `E_SCF`, `E_VB`, `E_corr(VB)`, `E_best_template`, `E_res`, captured-subspace weight, and weight sums.
+2. Run the fixed-orbital VBCI baseline for H2, allyl cation, allyl radical, allyl anion, and benzene first.
+3. Add VBSCF rows only after the fixed-orbital VBCI row is stable for the same system.
+4. Add BOVB rows only after the corresponding VBCI/VBSCF row is stable and the fixed-orbital zero-amplitude baseline is printed.
+5. Print concise result rows that can be copied into this document.
+6. Keep larger scans or pedagogical plots secondary to the stabilization table.
+
+Current notebook update:
+
+- Added a branch-stabilization table cell for fixed-orbital VBCI on H2, allyl cation, allyl radical, allyl anion, and benzene.
+- The table computes an HF reference, `E_VB`, `E_corr(VB) = E_VB - E_SCF`, `E_best_template`, `E_res`, captured chemical-resonance weight where available, and structure/Lowdin weight sums.
+- Added a dedicated H2 method-ladder cell for VBCI, VBSCF, and BOVB. It uses the same H2 geometry, basis, SCF reference, localized-template diagnostics, and monotonic energy checks `E(VBSCF) <= E(VBCI)` and `E(BOVB) <= E(VBSCF)`.
+- Added an allyl method-ladder cell. It tests allyl cation VBCI, compact-CSF, and compact-CSF-BOVB in a split-valence basis. It now also tests allyl radical/anion VBCI, fixed-limit VBSCF, fixed-limit BOVB, and determinant-template compact-CSF routes.
+- The allyl method-ladder cell now includes real common-orbital VBSCF rows for cation, radical, and anion in 6-31G. After rebuild, rerun this cell before any benzene work; it should verify that VBSCF is no higher than VBCI and that compact-CSF is no lower than its same-orbital internal full reference.
+- The allyl method-ladder cell now uses same-call/internal reference checks for fixed-limit and compact rows so separate driver-call gauge changes do not create false failures.
+- Added a benzene fixed-orbital compact-CSF gate. It first validates benzene VBCI and the Kekule/Dewar resonance projection before any benzene orbital relaxation is attempted.
+- Added a benzene VBSCF common-orbital relaxation gate in 6-31G. It should be run after the benzene fixed-orbital compact-CSF gate and before any determinant-space BOVB implementation.
+- Added a benzene VBSCF amplitude-bound scan. If every scanned bound remains active and the compact captured weight remains collapsed, the next driver task is a symmetry-preserving or trust-region benzene VBSCF parameterization, not BOVB yet.
+- Added a benzene symmetry-preserving VBSCF scan using `orbital_relaxation_symmetry="equivalent-centers"`. This keeps all six center-local pi breathing amplitudes equal and is the next checkpoint to rerun after rebuild.
+
+### Development order for this phase
+
+1. Lock down fixed-orbital VBCI diagnostics for H2, allyl cation, allyl radical, allyl anion, and benzene.
+2. Add SCF comparison and resonance-energy reporting to the notebook and then to `VbDriver` diagnostics where appropriate.
+3. Stabilize real VBSCF on H2, with reproducible orbital optimization and an energy no higher than fixed-orbital VBCI unless constrained.
+4. Extend VBSCF to allyl cation, then allyl radical, allyl anion, and benzene.
+5. Treat BOVB as a separate method path, not as an ambiguous VBSCF option.
+6. Validate BOVB first on H2, then allyl cation, then allyl radical, allyl anion, and benzene.
+7. Only after the full table is green, resume general sigma/pi separation and frozen-versus-relaxed inactive-orbital options.
+
+### Post-stabilization generalization strategy
+
+After the stabilization ladder is green, generalize in controlled layers:
+
+1. Keep pi-only active spaces as the validated core.
+2. Use `OrbitalAnalyzer` only to identify sigma and pi candidate classes and atom assignments; `VbDriver` remains responsible for the active/inactive/frozen partition and wavefunction model.
+3. Add explicit frozen-HF sigma/core embedding mode first.
+4. Add optional relaxed inactive orbitals only after frozen-HF results remain reproducible.
+5. Add structure-specific BOVB active-orbital relaxation before relaxing inactive sigma/core orbitals.
+6. Expose explicit user options for pi-only active spaces, mixed sigma/pi active spaces, frozen HF sigma/core orbitals, and relaxed inactive orbitals.
+7. Keep VBB as a later Linares et al. Valence Bond BOND method layer, separate from generic active-space construction and separate from BOVB.
 
 ## Metal-ligand scan checkpoint: 2026-05-04
 

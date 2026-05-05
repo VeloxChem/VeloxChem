@@ -282,7 +282,29 @@ def _run_pi_case(case):
     return VbDriver().compute(molecule, basis, options=options)
 
 
-def _run_allyl_cation_pi(mode="vbci", basis_name="sto-3g"):
+def _run_pi_case_with_mode(case, mode, basis_name="sto-3g", orbital_amplitude_bound=None,
+                           orbital_relaxation_symmetry=None):
+    molecule = Molecule.read_str(case["xyz"])
+    molecule.set_charge(case["charge"])
+    molecule.set_multiplicity(case["multiplicity"])
+    basis = MolecularBasis.read(molecule, basis_name, ostream=None)
+    options = VbComputeOptions(
+        mode=mode,
+        optimize_orbitals=(mode == "vbscf"),
+        include_bovb=(mode == "bovb"),
+        active_pi_atoms=case["active_pi_atoms"],
+        active_electron_count=case["active_electron_count"],
+        active_spin=case["active_spin"],
+        orbital_amplitude_bound=orbital_amplitude_bound,
+        orbital_relaxation_symmetry=orbital_relaxation_symmetry,
+        include_ionic=True,
+        freeze_inactive_orbitals=True,
+    )
+    return VbDriver().compute(molecule, basis, options=options)
+
+
+def _run_allyl_cation_pi(mode="vbci", basis_name="sto-3g", orbital_amplitude_bound=None,
+                         orbital_relaxation_symmetry=None):
     case = ALLYL_CATION_CASE
     molecule = Molecule.read_str(case["xyz"])
     molecule.set_charge(case["charge"])
@@ -290,10 +312,12 @@ def _run_allyl_cation_pi(mode="vbci", basis_name="sto-3g"):
     basis = MolecularBasis.read(molecule, basis_name, ostream=None)
     options = VbComputeOptions(
         mode=mode,
-        optimize_orbitals=False,
+        optimize_orbitals=(mode == "vbscf"),
         active_pi_atoms=case["active_pi_atoms"],
         active_electron_count=case["active_electron_count"],
         active_spin=case["active_spin"],
+        orbital_amplitude_bound=orbital_amplitude_bound,
+        orbital_relaxation_symmetry=orbital_relaxation_symmetry,
         include_ionic=True,
         freeze_inactive_orbitals=True,
     )
@@ -327,6 +351,12 @@ def test_h2_stretched_vbci_vbscf_are_benchmarked_against_rhf_uhf():
         "ionic_A_minus_B_plus",
         "ionic_A_plus_B_minus",
     ]
+    assert diagnostics["localized_template_labels"] == diagnostics[
+        "generated_structure_labels"
+    ]
+    assert np.isfinite(diagnostics["best_localized_template_energy"])
+    assert np.isfinite(diagnostics["resonance_energy"])
+    assert diagnostics["resonance_energy"] >= -1.0e-8
     assert np.isclose(np.sum(vbci["weights"]), 1.0, atol=1.0e-8)
     assert np.isclose(np.sum(vbci["lowdin_weights"]), 1.0, atol=1.0e-8)
 
@@ -359,6 +389,24 @@ def test_h2_bovb_uses_center_local_breathing_space_in_split_valence_basis():
     assert diagnostics["bovb_model"] == (
         "h2-center-local-structure-specific-breathing-orbitals"
     )
+
+
+def test_h2_vbscf_uses_common_breathing_space_in_split_valence_basis():
+    _, _, vbscf = _run_h2_vb(
+        0.74,
+        mode="vbscf",
+        basis_name="6-31g",
+    )
+    diagnostics = vbscf["diagnostics"]
+
+    assert np.isfinite(vbscf["energy"])
+    assert diagnostics["vbscf_model"] == "h2-common-center-local-breathing-orbitals"
+    assert diagnostics["vbscf_has_external_breathing_space"] is True
+    assert diagnostics["vbscf_used_fixed_orbital_limit"] is False
+    assert vbscf["energy"] < diagnostics["vbscf_initial_energy"] - 1.0e-4
+    assert abs(diagnostics["vbscf_breathing"]) > 1.0e-4
+    assert np.isclose(np.sum(vbscf["weights"]), 1.0, atol=1.0e-8)
+    assert np.isclose(np.sum(vbscf["lowdin_weights"]), 1.0, atol=1.0e-8)
 
 
 def test_h2_split_valence_scan_keeps_stable_atom_centered_active_space():
@@ -682,6 +730,7 @@ def test_allyl_cation_compact_csf_hamiltonian_tracks_full_vbci_reference():
 
     assert np.isfinite(compact["energy"])
     assert np.isfinite(reference_energy)
+    assert np.isfinite(energy_error)
     assert compact["energy"] >= reference_energy - 1.0e-8
     assert energy_error >= -1.0e-8
     assert np.isclose(compact["energy"] - reference_energy, energy_error, atol=1.0e-8)
@@ -693,11 +742,18 @@ def test_allyl_cation_compact_csf_hamiltonian_tracks_full_vbci_reference():
     )
     assert compact_diag["compact_csf_count"] == 2
     assert compact_diag["compact_csf_types"] == ["allyl_cation", "allyl_cation"]
+    assert compact_diag["localized_template_labels"] == compact_diag[
+        "compact_csf_labels"
+    ]
+    assert np.isfinite(compact_diag["best_localized_template_energy"])
+    assert np.isfinite(compact_diag["resonance_energy"])
+    assert compact_diag["resonance_energy"] >= -1.0e-8
     assert compact_diag["compact_csf_retained_rank"] == 2
     assert compact_diag["compact_csf_captured_subspace_weight"] > 0.45
     assert np.isclose(np.sum(compact["lowdin_weights"]), 1.0, atol=1.0e-8)
     assert np.all(np.asarray(compact["lowdin_weights"]) > 0.1)
     assert compact_diag["frozen_hf_embedding"] is True
+    assert compact_diag["active_orbitals_orthogonalized_to_frozen_space"] is True
 
 
 def test_allyl_cation_compact_csf_bovb_lowers_split_valence_compact_limit():
@@ -711,6 +767,13 @@ def test_allyl_cation_compact_csf_bovb_lowers_split_valence_compact_limit():
         "allyl-cation-two-electron-pi-center-local-breathing"
     )
     assert diagnostics["compact_csf_bovb_has_external_breathing_space"] is True
+    assert diagnostics["active_orbitals_orthogonalized_to_frozen_space"] is True
+    assert diagnostics["localized_template_labels"] == diagnostics[
+        "compact_csf_labels"
+    ]
+    assert np.isfinite(diagnostics["best_localized_template_energy"])
+    assert np.isfinite(diagnostics["resonance_energy"])
+    assert diagnostics["resonance_energy"] >= -1.0e-8
     assert np.isfinite(diagnostics["compact_csf_bovb_initial_energy"])
     assert bovb["energy"] < diagnostics["compact_csf_bovb_initial_energy"] - 1.0e-4
     assert diagnostics["compact_csf_bovb_energy_lowering"] > 1.0e-4
@@ -721,6 +784,150 @@ def test_allyl_cation_compact_csf_bovb_lowers_split_valence_compact_limit():
         for value in diagnostics["compact_csf_bovb_breathing_amplitudes"]
     )
     assert np.isclose(np.sum(bovb["lowdin_weights"]), 1.0, atol=1.0e-8)
+
+
+@pytest.mark.timeconsuming
+def test_allyl_cation_vbscf_uses_common_pi_breathing_space():
+    vbci = _run_allyl_cation_pi(mode="vbci", basis_name="6-31g")
+    vbscf = _run_allyl_cation_pi(mode="vbscf", basis_name="6-31g")
+    diagnostics = vbscf["diagnostics"]
+
+    assert np.isfinite(vbci["energy"])
+    assert np.isfinite(vbscf["energy"])
+    assert diagnostics["organic_pi_vbscf_model"] == (
+        "common-center-local-pi-breathing-orbitals"
+    )
+    assert diagnostics["organic_pi_vbscf_has_external_relaxation_space"] is True
+    assert diagnostics["organic_pi_vbscf_used_fixed_orbital_limit"] is False
+    assert diagnostics["organic_pi_vbscf_energy_lowering"] >= -1.0e-8
+    assert vbscf["energy"] <= diagnostics["organic_pi_vbscf_initial_energy"] + 1.0e-8
+    assert np.isclose(np.sum(vbscf["lowdin_weights"]), 1.0, atol=1.0e-8)
+
+
+def test_organic_pi_vbscf_reports_configured_amplitude_bound():
+    vbscf = _run_allyl_cation_pi(
+        mode="vbscf",
+        basis_name="6-31g",
+        orbital_amplitude_bound=0.05,
+    )
+    diagnostics = vbscf["diagnostics"]
+    max_abs_amplitude = diagnostics["organic_pi_vbscf_max_abs_orbital_amplitude"]
+
+    assert diagnostics["organic_pi_vbscf_orbital_amplitude_bound"] == pytest.approx(0.05)
+    assert max_abs_amplitude <= 0.05 + 1.0e-8
+    assert diagnostics["organic_pi_vbscf_hit_amplitude_bound"] is (max_abs_amplitude >= 0.05 - 1.0e-8)
+
+
+def test_organic_pi_vbscf_equivalent_center_amplitude_mode():
+    vbscf = _run_allyl_cation_pi(
+        mode="vbscf",
+        basis_name="6-31g",
+        orbital_amplitude_bound=0.05,
+        orbital_relaxation_symmetry="equivalent-centers",
+    )
+    diagnostics = vbscf["diagnostics"]
+    amplitudes = np.asarray(diagnostics["organic_pi_vbscf_orbital_amplitudes"])
+
+    assert diagnostics["organic_pi_vbscf_relaxation_symmetry"] == "equivalent-centers"
+    assert diagnostics["organic_pi_vbscf_equivalent_center_amplitude"] is True
+    assert len(diagnostics["organic_pi_vbscf_optimizer_parameters"]) == 1
+    assert amplitudes.size == 3
+    assert np.allclose(amplitudes, amplitudes[0])
+    assert np.max(np.abs(amplitudes)) <= 0.05 + 1.0e-8
+
+
+@pytest.mark.timeconsuming
+@pytest.mark.parametrize(
+    "case",
+    [item for item in PI_CASES if item["name"] in {"allyl_radical", "allyl_anion"}],
+    ids=[
+        item["name"]
+        for item in PI_CASES
+        if item["name"] in {"allyl_radical", "allyl_anion"}
+    ],
+)
+def test_allyl_radical_anion_generalized_method_routes(case):
+    vbci = _run_pi_case_with_mode(case, "vbci", basis_name="6-31g")
+    vbscf = _run_pi_case_with_mode(case, "vbscf", basis_name="6-31g")
+    bovb = _run_pi_case_with_mode(case, "bovb", basis_name="6-31g")
+    compact = _run_pi_case_with_mode(case, "compact-csf", basis_name="6-31g")
+
+    assert np.isfinite(vbci["energy"])
+    assert np.isfinite(vbscf["energy"])
+    assert np.isfinite(bovb["energy"])
+    assert np.isfinite(compact["energy"])
+
+    vbscf_diag = vbscf["diagnostics"]
+    bovb_diag = bovb["diagnostics"]
+    compact_diag = compact["diagnostics"]
+
+    assert vbscf_diag["organic_pi_vbscf_model"] == (
+        "common-center-local-pi-breathing-orbitals"
+    )
+    assert vbscf_diag["organic_pi_vbscf_has_external_relaxation_space"] is True
+    assert vbscf_diag["organic_pi_vbscf_used_fixed_orbital_limit"] is False
+    assert vbscf_diag["organic_pi_vbscf_energy_lowering"] >= -1.0e-8
+    assert vbscf["energy"] <= vbscf_diag["organic_pi_vbscf_initial_energy"] + 1.0e-8
+    assert bovb_diag["organic_pi_bovb_model"] == (
+        "determinant-ci-fixed-orbital-zero-amplitude-limit"
+    )
+    assert bovb_diag["bovb_used_fixed_orbital_limit"] is True
+    assert bovb_diag["organic_pi_bovb_energy_lowering"] == 0.0
+    assert np.isclose(
+        bovb["energy"],
+        bovb_diag["organic_pi_bovb_initial_energy"],
+        atol=1.0e-10,
+    )
+
+    assert compact_diag["compact_csf_model"] == (
+        "graph-template-determinant-ci-subspace"
+    )
+    assert compact_diag["compact_csf_count"] == case["expected_templates"]
+    assert np.isfinite(compact_diag["compact_csf_full_reference_energy"])
+    assert np.isfinite(compact_diag["compact_csf_energy_error_to_full_reference"])
+    assert compact_diag["compact_csf_energy_error_to_full_reference"] >= -1.0e-8
+    assert np.isclose(
+        compact["energy"] - compact_diag["compact_csf_full_reference_energy"],
+        compact_diag["compact_csf_energy_error_to_full_reference"],
+        atol=1.0e-8,
+    )
+    assert compact_diag["compact_csf_captured_subspace_weight"] >= 0.0
+    assert compact_diag["compact_csf_captured_subspace_weight"] <= 1.0 + 1.0e-8
+    assert np.isfinite(compact_diag["best_localized_template_energy"])
+    assert np.isfinite(compact_diag["resonance_energy"])
+    assert compact_diag["resonance_energy"] >= -1.0e-8
+    assert np.isclose(np.sum(compact["lowdin_weights"]), 1.0, atol=1.0e-8)
+
+
+@pytest.mark.timeconsuming
+def test_benzene_compact_csf_projection_tracks_full_reference():
+    case = next(item for item in PI_CASES if item["name"] == "benzene")
+    vbci = _run_pi_case_with_mode(case, "vbci", basis_name="sto-3g")
+    compact = _run_pi_case_with_mode(case, "compact-csf", basis_name="sto-3g")
+    compact_diag = compact["diagnostics"]
+
+    assert np.isfinite(vbci["energy"])
+    assert np.isfinite(compact["energy"])
+    assert compact_diag["compact_csf_model"] == (
+        "graph-template-determinant-ci-subspace"
+    )
+    assert compact_diag["compact_csf_count"] == 15
+    assert compact_diag["compact_csf_types"].count("benzene_kekule") == 2
+    assert compact_diag["compact_csf_types"].count("benzene_dewar") == 13
+    assert np.isfinite(compact_diag["compact_csf_full_reference_energy"])
+    assert np.isfinite(compact_diag["compact_csf_energy_error_to_full_reference"])
+    assert compact_diag["compact_csf_energy_error_to_full_reference"] >= -1.0e-8
+    assert np.isclose(
+        compact["energy"] - compact_diag["compact_csf_full_reference_energy"],
+        compact_diag["compact_csf_energy_error_to_full_reference"],
+        atol=1.0e-8,
+    )
+    assert compact_diag["compact_csf_captured_subspace_weight"] >= 0.0
+    assert compact_diag["compact_csf_captured_subspace_weight"] <= 1.0 + 1.0e-8
+    assert np.isfinite(compact_diag["best_localized_template_energy"])
+    assert np.isfinite(compact_diag["resonance_energy"])
+    assert compact_diag["resonance_energy"] >= -1.0e-8
+    assert np.isclose(np.sum(compact["lowdin_weights"]), 1.0, atol=1.0e-8)
 
 
 @pytest.mark.timeconsuming
@@ -743,6 +950,15 @@ def test_fixed_orbital_pi_chemical_resonance_diagnostics(case):
     assert diagnostics["chemical_resonance_count"] == case["expected_templates"]
     assert diagnostics["chemical_resonance_retained_rank"] > 0
     assert case["expected_types"].issubset(chemical_types)
+    assert diagnostics["localized_template_energy_model"].startswith(
+        "single-basis-vector Rayleigh quotient"
+    )
+    assert len(diagnostics["localized_template_energies"]) == case[
+        "expected_determinants"
+    ]
+    assert np.isfinite(diagnostics["best_localized_template_energy"])
+    assert np.isfinite(diagnostics["resonance_energy"])
+    assert diagnostics["resonance_energy"] >= -1.0e-8
 
     assert np.isfinite(result["energy"])
     assert np.all(np.isfinite(weights))
