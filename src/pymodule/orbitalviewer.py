@@ -401,6 +401,21 @@ class OrbitalViewer:
 
         return np_orb
 
+    def visualize(self, molecule, basis, mo_inp, label='', width=600, height=450):
+        """
+        Visualizes the orbitals, with a widget to choose which.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param mo_inp:
+            The MolecularOrbitals input (filename of h5 file storing the
+            MolecularOrbitals, or a MolecularOrbitals object).
+        """
+
+        self._plot_using_py3dmol(molecule, basis, mo_inp, label, width, height)
+
     def plot(self, molecule, basis, mo_inp, label='', width=600, height=450):
         """
         Plots the orbitals, with a widget to choose which.
