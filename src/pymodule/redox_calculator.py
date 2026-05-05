@@ -1312,6 +1312,82 @@ class RedoxCalculator:
     # Named solvation interface
     # ------------------------------------------------------------------
 
+    def _conformer_search(self, input_data, max_conformers: int = 5,
+                        basis_label: str = "def2-svp",
+                        use_solvent: bool = True,
+                        solvent_epsilon: float = 78.39):
+
+        conf = vlx.ConformerGenerator()
+        conf.implicit_solvent_model='gbn'
+
+        n = conf.count_conformer_combinations(input_data)
+        if n < 10000:
+            conformers_dict = conf.generate(input_data)
+            opt_results = {}
+            all_opt_results = []
+        else:
+            print('Too many conformer combinations, using OpenMM for conformational sampling...')
+            ff_gen = vlx.MMForceFieldGenerator()
+            ff_gen.partial_charges = input_data.get_partial_charges(input_data.get_charge())
+            ff_gen.create_topology(input_data)
+            omm = vlx.OpenMMDynamics()
+            omm.create_system_from_molecule(input_data,ff_gen, solvent='implicit')
+            conformers_dict = omm.conformational_sampling(nsteps=10000,snapshots=100)
+            
+            
+        for i, xyz in enumerate(conformers_dict["geometries"][:max_conformers], start=1):
+                print(f"Optimizing conformer {i}...")
+
+                molecule=vlx.Molecule.read_xyz_string(xyz)
+                molecule.set_charge(input_data.get_charge())
+                molecule.set_multiplicity(input_data.get_multiplicity())
+                
+                basis = vlx.MolecularBasis.read(molecule, basis_label)
+                scf_drv = (vlx.ScfUnrestrictedDriver() if input_data.get_multiplicity() > 1 else vlx.ScfRestrictedDriver())
+                scf_drv.xcfun = "blyp"
+                scf_drv.ri_coulomb = True
+                scf_drv.max_iter = 100
+                scf_drv.conv_thresh = 1.0e-5
+                scf_drv.ostream.mute()
+                print('does this shit work?')
+                if use_solvent:
+                    scf_drv.solvation_model = "cpcm"
+                    scf_drv.cpcm_epsilon = solvent_epsilon
+
+                scf_results = scf_drv.compute(input_data, basis)
+
+                opt_drv = vlx.OptimizationDriver(scf_drv)
+                opt_drv.conv_energy = 1.0e-3
+                opt_drv.conv_grms = 3.0e-4
+                opt_drv.conv_gmax = 1.2e-3
+                opt_drv.max_iter = 50
+                opt_drv.conv_maxiter = True
+                opt_drv.restart = False
+                opt_drv.ostream.mute()
+
+                result = opt_drv.compute(input_data, basis, scf_results)
+
+                final_energy = result["opt_energies"][-1]
+                final_geometry = result["final_geometry"]
+                final_molecule = result["final_molecule"]
+
+                opt_results[i] = result
+
+                all_opt_results.append({
+                    "conformer_index": i,
+                    "energy_au": final_energy,
+                    "final_geometry": final_geometry,
+                    "final_molecule": final_molecule,
+                    "opt_results": result,
+                })
+
+        all_opt_results.sort(key=lambda x: x["energy_au"])
+
+        mol = vlx.Molecule.read_xyz_string(result['geometries'][0])
+        mol.set_charge(input_data.get_charge())
+        mol.set_multiplicity(input_data.get_multiplicity())
+        return mol
+        
     def register_solvation(
         self,
         name: str,
@@ -1625,11 +1701,13 @@ class RedoxCalculator:
                     if u in mapping and v in mapping:
                         H.add_edge(mapping[u], mapping[v])
                 return H
-
+        
+   
         scf_opt = (
             vlx.ScfUnrestrictedDriver() if mult > 1
             else vlx.ScfRestrictedDriver()
         )
+
         scf_opt.xcfun       = self.xcfun_opt
         scf_opt.ri_jk       = False
         scf_opt.max_iter    = 200
@@ -1877,9 +1955,11 @@ class RedoxCalculator:
             m_tmp.set_multiplicity(
                 _valid_multiplicity(m_tmp, init_charge + dq)
             )
+
+            m_seed = self._conformer_search(m_tmp)
             setattr(
                 profile, attr,
-                self.compute_gibbs(m_tmp, lbl, file_tag=run_tag)
+                self.compute_gibbs(m_seed, lbl, file_tag=run_tag)
             )
 
         acidic_H, basic_atoms = self.find_protic_sites(mol_obj)
@@ -2163,20 +2243,18 @@ class ETCalculator(RedoxCalculator):
         log.info("Using file tag %s for formula %s", run_tag, run_formula)
 
         for attr, lbl, dq in [
-            ("M",    "M",  0),
+            ("M", "M", 0),
             ("M_ox", "M+", 1),
-            ("M_red","M-", -1),
+            ("M_red", "M-", -1),
         ]:
             m_tmp = vlx.Molecule.read_xyz_string(init_xyz)
             m_tmp.set_charge(init_charge + dq)
-            m_tmp.set_multiplicity(
-                _valid_multiplicity(m_tmp, init_charge + dq)
-            )
-            setattr(
-                profile,
-                attr,
-                self.compute_gibbs(m_tmp, lbl, file_tag=run_tag)
-            )
+            m_tmp.set_multiplicity(_valid_multiplicity(m_tmp, init_charge + dq))
+
+            # Conformer search for M / M+ / M-
+            m_seed = self._conformer_search(m_tmp)
+
+            setattr(profile, attr, self.compute_gibbs(m_seed, lbl, file_tag=run_tag))
 
         def _normalise_pair(
             res_a: Optional[GibbsResult],
