@@ -73,7 +73,9 @@ class TestOrbitalLocalization:
 
         # Load reference
         ref_path = Path(__file__).parent / "data" / "orbloc_boys_C.npy"
-        C_ref = np.load(ref_path)
+        C_ref_occ = np.load(ref_path)
+        C_ref = np.zeros(C_loc.shape)
+        C_ref[:, :n_occ] = C_ref_occ[:, :]
 
         # Align phases
         C_loc = self._align_phases(C_ref, C_loc)
@@ -93,7 +95,9 @@ class TestOrbitalLocalization:
 
         # Load reference
         ref_path = Path(__file__).parent / "data" / "orbloc_pm_mulliken_C.npy"
-        C_ref = np.load(ref_path)
+        C_ref_occ = np.load(ref_path)
+        C_ref = np.zeros(C_loc.shape)
+        C_ref[:, :n_occ] = C_ref_occ[:, :]
 
         # Align phases
         C_loc = self._align_phases(C_ref, C_loc)
@@ -113,7 +117,9 @@ class TestOrbitalLocalization:
 
         # Load reference
         ref_path = Path(__file__).parent / "data" / "orbloc_pm_lowdin_C.npy"
-        C_ref = np.load(ref_path)
+        C_ref_occ = np.load(ref_path)
+        C_ref = np.zeros(C_loc.shape)
+        C_ref[:, :n_occ] = C_ref_occ[:, :]
 
         # Align phases
         C_loc = self._align_phases(C_ref, C_loc)

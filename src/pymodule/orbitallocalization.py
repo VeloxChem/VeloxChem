@@ -170,16 +170,26 @@ class OrbitalLocalizationDriver:
 
         return 0.25 * np.arctan2(g, h)
     
-    def _mol_orbs_wrapper(self, loc_orbs, scf_res):
+    def _mol_orbs_wrapper(self, loc_orbs, scf_res, mo_range):
         """
         Wrap the localized orbitals into MolecularOrbitals container
         """
 
-        zero_energies = np.zeros(scf_res["E_alpha"].shape)
+        # get 0-based indices from 1-based inclusive mo_range
+        mo_start = mo_range[0] - 1
+        mo_end = mo_range[1]
+
+        zero_energies = np.zeros(scf_res["E_alpha"].shape)[mo_start:mo_end]
+
+        C_alpha_loc = np.zeros(scf_res["C_alpha"].shape)
+        C_alpha_loc[:, mo_start:mo_end] = loc_orbs[0][:, :]
+        if len(loc_orbs) == 2:
+            C_beta_loc = np.zeros(scf_res["C_beta"].shape)
+            C_beta_loc[:, mo_start:mo_end] = loc_orbs[1][:, :]
 
         if scf_res["scf_type"] == "restricted":
             return MolecularOrbitals(
-                orbs=loc_orbs,
+                orbs=[C_alpha_loc],
                 enes=[zero_energies],
                 occs=[scf_res["occ_alpha"]],
                 orbs_type=molorb.rest,
@@ -187,7 +197,7 @@ class OrbitalLocalizationDriver:
 
         elif scf_res["scf_type"] == "unrestricted":
             return MolecularOrbitals(
-                orbs=loc_orbs,
+                orbs=[C_alpha_loc, C_beta_loc],
                 enes=[zero_energies, zero_energies],
                 occs=[scf_res["occ_alpha"], scf_res["occ_beta"]],
                 orbs_type=molorb.unrest,
@@ -195,7 +205,7 @@ class OrbitalLocalizationDriver:
 
         elif scf_res["scf_type"] == "restricted_openshell":
             return MolecularOrbitals(
-                orbs=loc_orbs,
+                orbs=[C_alpha_loc],
                 enes=[zero_energies],
                 occs=[scf_res["occ_alpha"], scf_res["occ_beta"]],
                 orbs_type=molorb.restopen,
@@ -431,16 +441,20 @@ class OrbitalLocalizationDriver:
             # localize alpha and beta independently
             alpha = compute_func(
                 molecule, basis, scf_res["C_alpha"],
-                mo_range=mo_range
+                mo_range=mo_range,
             )
             beta = compute_func(
                 molecule, basis, scf_res["C_beta"],
-                mo_range=mo_range
+                mo_range=mo_range,
             )
-            return {"loc_orbs": self._mol_orbs_wrapper([alpha, beta], scf_res)}
+            return {
+                "loc_orbs": self._mol_orbs_wrapper([alpha, beta], scf_res, mo_range),
+            }
         else:
             alpha = compute_func(
                 molecule, basis, scf_res["C_alpha"],
-                mo_range=mo_range
+                mo_range=mo_range,
             )
-            return {"loc_orbs": self._mol_orbs_wrapper([alpha], scf_res)}
+            return {
+                "loc_orbs": self._mol_orbs_wrapper([alpha], scf_res, mo_range),
+            }
