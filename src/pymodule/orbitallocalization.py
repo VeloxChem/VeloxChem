@@ -31,13 +31,20 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
+import sys
 
 from .mathutils import symmetric_matrix_function
+from .oneeints import compute_electric_dipole_integrals, compute_overlap_integrals
+from .molecularorbitals import MolecularOrbitals, molorb
+from .outputstream import OutputStream
 
 
-class OrbitalLocalization:
+class OrbitalLocalizationDriver:
     """
     Orbital localization driver
+
+    :param ostream:
+        The output stream.
 
     Methods:
         - pipek_mezey(projector="lowdin" | "mulliken")
@@ -45,16 +52,20 @@ class OrbitalLocalization:
         - edmiston_ruedenberg(eri)  # placeholder
     """
 
-    def __init__(self):
+    def __init__(self, ostream=None):
         """
         Initializes the orbital localization driver
         """
 
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
+        self.silent = False
+
         self.max_iter = 100
         self.thresh = 1e-6
 
-        # TODO: use ostream
-        self.silent = False
+        self.method = "pm"
+        self.pm_projector = "mulliken"
 
     def _rotate(self, i, j, theta, method="boys"):
         """
@@ -155,35 +166,63 @@ class OrbitalLocalization:
             return 0.0
 
         return 0.25 * np.arctan2(g, h)
+    
+    def _mol_orbs_wrapper(self, loc_orbs, scf_res):
+        """
+        Wrap the localized orbitals into MolecularOrbitals container
+        """
 
-    def pipek_mezey(self, C, S, atom_map, projector="lowdin"):
+        if scf_res["scf_type"] == "restricted":
+            return MolecularOrbitals(orbs=loc_orbs, enes=[scf_res["E_alpha"]],
+                                     occs=[scf_res["occ_alpha"]],
+                                     orbs_type=molorb.rest)
+        elif scf_res["scf_type"] == "unrestricted":
+            return MolecularOrbitals(orbs=loc_orbs,
+                                     enes=[scf_res["E_alpha"], scf_res["E_beta"]],
+                                     occs=[scf_res["occ_alpha"], scf_res["occ_beta"]],
+                                     orbs_type=molorb.unrest)
+        elif scf_res["scf_type"] == "restricted_openshell":
+            return MolecularOrbitals(orbs=loc_orbs,
+                                     enes=[scf_res["E_alpha"]],
+                                     occs=[scf_res["occ_alpha"], scf_res["occ_beta"]],
+                                     orbs_type=molorb.restopen)
+        else:
+            raise ValueError(f"scf type {scf_res["scf_type"]} unknown")
+
+    def pipek_mezey(self, molecule, basis, mos,
+                    mo_range=None):
         """
         Pipek–Mezey orbital localization
 
         Parameters
         ----------
-        C : np.ndarray
-            MO coefficients
+        molecule : Molecule
+            The molecule
 
-        projector : str
-            "lowdin"
-            "mulliken"
+        basis : MolecularBasis
+            AO basis set
 
-        S : np.ndarray, optional
-            Overlap matrix
+        mos: np.ndarray
+            MOs to localize
 
-        atom_map : list[int]
-            AO -> atom mapping
+        mo_range: tuple, list
+            start and end of MOs to be localized (starts from 1)
 
         Returns
         -------
         C : np.ndarray
-            Localized MO coefficients
+            Localized MOs
         """
 
-        self.C = np.array(C, copy=True)
+        self.C = mos
+        # localize only user defined MOs
+        if mo_range:
+            self.C = self.C[:, mo_range[0]-1:mo_range[1]]
         self.nao, self.norb = self.C.shape
-        self.S = np.array(S)
+        self.S = compute_overlap_integrals(molecule, basis)
+        # AO -> atom mapping
+        atom_map_raw = basis.get_ao_basis_map(molecule)
+        atom_map = [int(atom_map_raw[i].split()[0]) for i in range(len(atom_map_raw))]
 
         # transform MOs according to projector
         eigs = np.linalg.eigvalsh(self.S)
@@ -193,17 +232,17 @@ class OrbitalLocalization:
         if min_eig < -1.0e-10:
             raise ValueError("Overlap matrix is not positive semidefinite; "
                              f"minimum eigenvalue = {min_eig:.3e}")
-        if projector == "lowdin":
+        if self.pm_projector == "lowdin":
             # TODO: Double-check whether 1.0e-8 is the right screening
             # threshold for the overlap matrix function in PM localization.
             self.X = symmetric_matrix_function(self.S,
                                                lambda x: 1.0 / np.sqrt(x),
                                                thresh=1.0e-8)
-        elif projector == "mulliken":
+        elif self.pm_projector == "mulliken":
             self.X = symmetric_matrix_function(self.S, np.sqrt, thresh=1.0e-8)
         else:
             raise NotImplementedError(
-                f"Requested projector {projector} not implemented")
+                f"Requested projector {self.pm_projector} not implemented")
 
         self.C_eff = np.matmul(self.X.T, self.C)
 
@@ -253,26 +292,36 @@ class OrbitalLocalization:
 
         return self.C
 
-    def boys(self, C, dipole_integrals):
+    def boys(self, molecule, basis, mos, mo_range=None):
         """
         Boys orbital localization
 
         Parameters
         ----------
-        C : np.ndarray
-            MO coefficients
+        molecule : Molecule
+            The molecule
 
-        dipole integrals : np.ndarray, tuple(np.ndarray), list(np.ndarray)
+        basis : MolecularBasis
+            AO basis set
+
+        mos: np.ndarray
+            MOs to localize
+
+        mo_range: tuple, list
+            start and end of MOs to be localized (starts from 1)
 
         Returns
         -------
         C : np.ndarray
-            Localized MO coefficients
+            Localized MOs
         """
 
-        self.C = np.array(C, copy=True)
+        self.C = mos
+        # localize only user defined MOs
+        if mo_range:
+            self.C = self.C[:, mo_range[0]-1:mo_range[1]]
         self.nao, self.norb = self.C.shape
-        mu = dipole_integrals
+        mu = compute_electric_dipole_integrals(molecule, basis)
 
         self.r = np.array(
             [np.matmul(self.C.T, np.matmul(mu[k], self.C)) for k in range(3)])
@@ -312,7 +361,7 @@ class OrbitalLocalization:
 
         return self.C
 
-    def edmiston_ruedenberg(self, eri):
+    def edmiston_ruedenberg(self, molecule, basis, scf_res, mo_range=None):
         """
         Placeholder for ER localization scheme
         """
@@ -320,3 +369,63 @@ class OrbitalLocalization:
         raise NotImplementedError(
             "ER localization requires AO->MO 2e integral transformation " +
             "and is not implemented.")
+    
+    def compute(self, molecule, basis, scf_res, mo_range=None):
+        """
+        Top level compute function for orbital localization
+
+        Parameters
+        ----------
+        molecule : Molecule
+            The molecule
+
+        basis : MolecularBasis
+            AO basis set
+
+        scf_res: result dict from scfdriver
+            SCF result
+
+        mo_range: tuple, list
+            start and end of MOs to be localized (starts from 1)
+
+        Returns
+        -------
+        C : {"loc_orbs": MolecularOrbitals}
+            Localized MOs
+        """
+
+        if self.method == "boys":
+            compute_method = self.boys
+        elif self.method == "pm":
+            compute_method = self.pipek_mezey
+            if self.pm_projector not in ["mulliken", "lowdin"]:
+                raise NotImplementedError(f"only mulliken and lowdin projectors "
+                                          f"are currently implemented, "
+                                          f"not {self.pm_projector}")
+        else:
+            raise NotImplementedError(f"only boys and pm are currently "
+                                      f"supported, not {self.method}")
+        
+        if mo_range:
+            if len(mo_range) != 2:
+                raise ValueError("mo_range object should be of length 2")
+            if mo_range[0] == 0:
+                raise ValueError("mo_range starts counting from 1 not 0")
+        
+        if scf_res["scf_type"] == "unrestricted":
+            # localize alpha and beta independently
+            alpha = compute_method(
+                molecule, basis, scf_res["C_alpha"],
+                mo_range=mo_range
+            )
+            beta = compute_method(
+                molecule, basis, scf_res["C_beta"],
+                mo_range=mo_range
+            )
+            return {"loc_orbs": self._mol_orbs_wrapper([alpha, beta], scf_res)}
+        else:
+            alpha = compute_method(
+                molecule, basis, scf_res["C_alpha"],
+                mo_range=mo_range
+            )
+            return {"loc_orbs": self._mol_orbs_wrapper([alpha], scf_res)}
