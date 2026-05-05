@@ -85,6 +85,8 @@ monkey:cmake_build:
     - CC=gcc MPICC=mpicc python -m pip install mpi4py --no-binary=mpi4py
     - git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
     - git clone -b boost-1.90.0 https://github.com/boostorg/math.git boost-math
+    - cd eigen && test "$(git rev-parse HEAD)" = "3147391d946bb4b6c68edd901f2add6ac1f31f8c" && cd ..
+    - cd boost-math && test "$(git rev-parse HEAD)" = "e0fcd19f7227d81391770ea46015acc3c80af810" && cd ..
     - export EIGEN_INCLUDE_DIR=$(pwd)/eigen
     - export BOOST_INCLUDE_DIR=$(pwd)/boost-math/include
     - cmake
@@ -108,6 +110,8 @@ monkey:pip_install:
         MDAnalysis
     - git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
     - git clone -b boost-1.90.0 https://github.com/boostorg/math.git boost-math
+    - cd eigen && test "$(git rev-parse HEAD)" = "3147391d946bb4b6c68edd901f2add6ac1f31f8c" && cd ..
+    - cd boost-math && test "$(git rev-parse HEAD)" = "e0fcd19f7227d81391770ea46015acc3c80af810" && cd ..
     - export EIGEN_INCLUDE_DIR=$(pwd)/eigen
     - export BOOST_INCLUDE_DIR=$(pwd)/boost-math/include
     - SKBUILD_CONFIGURE_OPTIONS="-DCMAKE_CXX_COMPILER=g++"
