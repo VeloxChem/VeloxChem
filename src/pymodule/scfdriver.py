@@ -1586,7 +1586,7 @@ class ScfDriver:
         self._density_matrices_alpha.clear()
         self._density_matrices_beta.clear()
 
-        ovl_mat, kin_mat, npot_mat, dipole_mats = self._comp_one_ints(
+        ovl_mat, kin_mat, npot_mat, dipole_mats, ecp_mat = self._comp_one_ints(
             molecule, ao_basis)
 
         if self.rank == mpi_master() and self.electric_field is not None:
@@ -1690,32 +1690,6 @@ class ScfDriver:
                                                      self.ri_auxiliary_basis,
                                                      thresh_int,
                                                      verbose=False)
-
-        if ao_basis.has_ecp():
-            ecp_drv = EcpDriver()
-            core_electrons = ao_basis.get_number_of_ecp_core_electrons()
-            ecp_atom_inds = [
-                idx for idx, nelec in enumerate(core_electrons) if nelec > 0
-            ]
-
-            ave, res = divmod(len(ecp_atom_inds), self.nodes)
-            counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
-            start = sum(counts[:self.rank])
-            end = sum(counts[:self.rank + 1])
-            local_ecp_atom_inds = ecp_atom_inds[start:end]
-
-            ecp_t0 = tm.time()
-            ecp_mat = ecp_drv.compute(molecule, ao_basis, local_ecp_atom_inds)
-            ecp_mat = self.comm.reduce(ecp_mat.to_numpy(), root=mpi_master())
-
-            if self.print_level > 1:
-                self.ostream.print_info(
-                    'Effective core potential matrix computed in ' +
-                    f'{(tm.time() - ecp_t0):.2f} sec.')
-                self.ostream.print_blank()
-                self.ostream.flush()
-        else:
-            ecp_mat = None
 
         e_grad = None
 
@@ -2225,16 +2199,17 @@ class ScfDriver:
 
     def _comp_one_ints(self, molecule, basis):
         """
-        Computes one-electron integrals (overlap, kinetic energy and nuclear
-        potential) using molecular data.
+        Computes one-electron integrals (overlap, kinetic energy, nuclear
+        potential and effective core potential) using molecular data.
 
         :param molecule:
             The molecule.
-        :param ao_basis:
+        :param basis:
             The AO basis set.
 
         :return:
-            The one-electron integrals.
+            The one-electron integrals: overlap, kinetic energy,
+            nuclear potential, electric dipole (if any), and ECP matrices.
         """
 
         if self.rank == mpi_master():
@@ -2291,6 +2266,29 @@ class ScfDriver:
 
         dipole_dt = tm.time() - t0
 
+        if basis.has_ecp():
+            ecp_t0 = tm.time()
+
+            ecp_drv = EcpDriver()
+            core_electrons = basis.get_number_of_ecp_core_electrons()
+            ecp_atom_inds = [
+                idx for idx, nelec in enumerate(core_electrons) if nelec > 0
+            ]
+
+            ave, res = divmod(len(ecp_atom_inds), self.nodes)
+            counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+            start = sum(counts[:self.rank])
+            end = sum(counts[:self.rank + 1])
+            local_ecp_atom_inds = ecp_atom_inds[start:end]
+
+            ecp_mat = ecp_drv.compute(molecule, basis, local_ecp_atom_inds)
+            ecp_mat = self.comm.reduce(ecp_mat.to_numpy(), root=mpi_master())
+
+            ecp_dt = tm.time() - ecp_t0
+        else:
+            ecp_mat = None
+            ecp_dt = 0.0
+
         if self.rank == mpi_master() and self.print_level > 1:
 
             self.ostream.print_info('Overlap matrix computed in' +
@@ -2310,9 +2308,15 @@ class ScfDriver:
                                         ' {:.2f} sec.'.format(dipole_dt))
                 self.ostream.print_blank()
 
+            if basis.has_ecp():
+                self.ostream.print_info(
+                    'Effective core potential matrix computed in ' +
+                    '{:.2f} sec.'.format(ecp_dt))
+                self.ostream.print_blank()
+
             self.ostream.flush()
 
-        return ovl_mat, kin_mat, npot_mat, dipole_mats
+        return ovl_mat, kin_mat, npot_mat, dipole_mats, ecp_mat
 
     def _comp_npot_mat_parallel(self, molecule, basis):
         """
