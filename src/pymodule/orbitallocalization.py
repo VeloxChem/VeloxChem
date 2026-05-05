@@ -36,6 +36,7 @@ import sys
 from .mathutils import symmetric_matrix_function
 from .oneeints import compute_electric_dipole_integrals, compute_overlap_integrals
 from .molecularorbitals import MolecularOrbitals, molorb
+from .visualizationdriver import VisualizationDriver
 from .outputstream import OutputStream
 
 
@@ -203,8 +204,7 @@ class OrbitalLocalizationDriver:
         else:
             raise ValueError(f"scf type {scf_res["scf_type"]} unknown")
 
-    def pipek_mezey(self, molecule, basis, mos,
-                    mo_range=None):
+    def pipek_mezey(self, molecule, basis, mos, mo_range=None):
         """
         Pipek–Mezey orbital localization
 
@@ -228,18 +228,17 @@ class OrbitalLocalizationDriver:
             Localized MOs
         """
 
-        self.C = mos.copy()
-        # localize only user defined MOs
+        # localize only user defined MOs, using one-based inclusive mo_range
         if mo_range:
-            self.C = self.C[:, mo_range[0]-1:mo_range[1]].copy()
-        nao, norb = self.C.shape
-        self.S = compute_overlap_integrals(molecule, basis)
-        # AO -> atom mapping
-        atom_map_raw = basis.get_ao_basis_map(molecule)
-        atom_map = [int(atom_map_raw[i].split()[0]) for i in range(len(atom_map_raw))]
+            self.C = mos[:, mo_range[0]-1:mo_range[1]].copy()
+        else:
+            self.C = mos.copy()
+
+        norb = self.C.shape[1]
+        S = compute_overlap_integrals(molecule, basis)
 
         # transform MOs according to projector
-        eigs = np.linalg.eigvalsh(self.S)
+        eigs = np.linalg.eigvalsh(S)
         min_eig = np.min(eigs)
         # TODO: Double-check whether -1.0e-10 is the right cutoff for
         # treating negative overlap eigenvalues as a hard error here.
@@ -249,24 +248,20 @@ class OrbitalLocalizationDriver:
         if self.pm_projector == "lowdin":
             # TODO: Double-check whether 1.0e-8 is the right screening
             # threshold for the overlap matrix function in PM localization.
-            self.X = symmetric_matrix_function(self.S,
-                                               lambda x: 1.0 / np.sqrt(x),
-                                               thresh=1.0e-8)
+            X_mat = symmetric_matrix_function(S,
+                                              lambda x: 1.0 / np.sqrt(x),
+                                              thresh=1.0e-8)
         elif self.pm_projector == "mulliken":
-            self.X = symmetric_matrix_function(self.S, np.sqrt, thresh=1.0e-8)
+            X_mat = symmetric_matrix_function(S, np.sqrt, thresh=1.0e-8)
         else:
             raise NotImplementedError(
                 f"Requested projector {self.pm_projector} not implemented")
 
-        self.C_eff = np.matmul(self.X.T, self.C)
+        self.C_eff = np.matmul(X_mat.T, self.C)
 
-        self.atom_map = np.array(atom_map)
-        self.n_atoms = np.max(atom_map) + 1
-
-        # masks for AO to atom map
-        self.atom_indices = [
-            np.where(self.atom_map == A)[0] for A in range(self.n_atoms)
-        ]
+        # Map atoms to AOs
+        vis_drv = VisualizationDriver()
+        self.atom_indices = vis_drv.map_atom_to_atomic_orbitals(molecule, basis)
 
         self._build_atom_projector()
 
@@ -332,11 +327,13 @@ class OrbitalLocalizationDriver:
             Localized MOs
         """
 
-        self.C = mos.copy()
-        # localize only user defined MOs
+        # localize only user defined MOs, using one-based inclusive mo_range
         if mo_range:
-            self.C = self.C[:, mo_range[0]-1:mo_range[1]].copy()
-        nao, norb = self.C.shape
+            self.C = mos[:, mo_range[0]-1:mo_range[1]].copy()
+        else:
+            self.C = mos.copy()
+
+        norb = self.C.shape[1]
         mu = compute_electric_dipole_integrals(molecule, basis)
 
         self.r = np.array(
@@ -413,9 +410,9 @@ class OrbitalLocalizationDriver:
         """
 
         if self.method == "boys":
-            compute_method = self.boys
+            compute_func = self.boys
         elif self.method == "pm":
-            compute_method = self.pipek_mezey
+            compute_func = self.pipek_mezey
             if self.pm_projector not in ["mulliken", "lowdin"]:
                 raise NotImplementedError(f"only mulliken and lowdin projectors "
                                           f"are currently implemented, "
@@ -428,21 +425,21 @@ class OrbitalLocalizationDriver:
             if len(mo_range) != 2:
                 raise ValueError("mo_range object should be of length 2")
             if mo_range[0] == 0:
-                raise ValueError("mo_range starts counting from 1 not 0")
+                raise ValueError("mo_range starts counting from 1")
         
         if scf_res["scf_type"] == "unrestricted":
             # localize alpha and beta independently
-            alpha = compute_method(
+            alpha = compute_func(
                 molecule, basis, scf_res["C_alpha"],
                 mo_range=mo_range
             )
-            beta = compute_method(
+            beta = compute_func(
                 molecule, basis, scf_res["C_beta"],
                 mo_range=mo_range
             )
             return {"loc_orbs": self._mol_orbs_wrapper([alpha, beta], scf_res)}
         else:
-            alpha = compute_method(
+            alpha = compute_func(
                 molecule, basis, scf_res["C_alpha"],
                 mo_range=mo_range
             )

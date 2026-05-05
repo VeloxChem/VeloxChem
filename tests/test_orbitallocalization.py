@@ -1,6 +1,6 @@
+from pathlib import Path
 import numpy as np
 import pytest
-from pathlib import Path
 
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -9,7 +9,6 @@ from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 
-@pytest.mark.solvers
 class TestOrbitalLocalization:
 
     @staticmethod
@@ -30,8 +29,7 @@ class TestOrbitalLocalization:
 
         return molecule, basis, scf_res, n_occ
 
-    @staticmethod
-    def _align_phases(C_ref, C_test):
+    def _align_phases(self, C_ref, C_test):
         # This is indeed necessary, since even though the representation
         # between the MOs is "identical", there can still be a global phase
         # for each individual MO.
@@ -39,20 +37,17 @@ class TestOrbitalLocalization:
         mos_to_swap = {}
 
         for i in range(C_ref.shape[1]):
-            overlap = np.dot(C_ref[:, i], C_test[:, i])
-            test_squared = np.dot(C_test[:, i], C_test[:, i])
-            if abs(overlap - test_squared) < 1e-6:
+            if np.max(np.abs(C_ref[:, i] - C_test[:, i])) < 1e-6:
                 continue
-            elif abs(overlap + test_squared) < 1e-6:
+            elif np.max(np.abs(C_ref[:, i] + C_test[:, i])) < 1e-6:
                 C_aligned[:, i] *= -1.0
             else:
                 # check if degenerate MOs got swapped
                 for j in range(i+1, C_ref.shape[1]):
-                    overlap_ij = np.dot(C_ref[:, j], C_test[:, i])
-                    if abs(overlap_ij - test_squared) < 1e-6:
+                    if np.max(np.abs(C_ref[:, j] - C_test[:, i])) < 1e-6:
                         mos_to_swap[(i, j)] = 1
                         break
-                    elif abs(overlap_ij + test_squared) < 1e-6:
+                    elif np.max(np.abs(C_ref[:, j] + C_test[:, i])) < 1e-6:
                         mos_to_swap[(i, j)] = 1
                         C_aligned[:, i] *= -1.0
                         break
@@ -63,7 +58,8 @@ class TestOrbitalLocalization:
             for pair in mos_to_swap:
                 C_aligned[:, [pair[0], pair[1]]] = C_aligned[:, [pair[1], pair[0]]]
             # catch remaining phase conventions from swapped MOs
-            TestOrbitalLocalization._align_phases(C_ref, C_aligned)
+            C_aligned = self._align_phases(C_ref, C_aligned)
+
         return C_aligned
 
     def test_boys(self):
