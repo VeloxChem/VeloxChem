@@ -1119,7 +1119,6 @@ class IMForceFieldGenerator:
                         reaction_structures=self.reaction_structures,
                         root=self.roots_to_follow[0],
                         include_existing_root_zmat=True,
-                        forced_coordinates=self.reaction_forced_coordinates if hasattr(self, "reaction_forced_coordinates") else None,
                     )
 
                     if self.use_eq_bond_length:
@@ -1160,8 +1159,6 @@ class IMForceFieldGenerator:
             ff_gen.create_topology(molecule)
 
             rotatable_bonds = deepcopy(ff_gen.rotatable_bonds)
-            org_rotatable_bonds = deepcopy(ff_gen.rotatable_bonds)
-            
             
             # Work in zero-based indexing (same convention as z-matrix dihedrals)
             # and remove all symmetry-related rotatable bonds from the scan list.
@@ -1344,6 +1341,9 @@ class IMForceFieldGenerator:
                                 f"Failed to set dihedral {dih_key} to {target_deg:.2f} deg "
                                 f"(actual {actual:.2f} deg)."
                             )
+                        if abs(abs(mol_i.get_dihedral_in_degrees(dih_key)) - 180) < 5 or abs(mol_i.get_dihedral_in_degrees(dih_key)) < 3:
+                            mol_i.set_dihedral_in_degrees(dih_key,mol_i.get_dihedral_in_degrees(dih_key) + 10, verbose=False)
+
                         conformers_plus_ts[0][dih_key].append((mol_i, mode))
             else:
                 if len(conformal_structures['molecules']) == 0:

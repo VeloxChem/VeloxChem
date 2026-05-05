@@ -211,6 +211,7 @@ from .evbdataprocessing import EvbDataProcessing
 from .evbreporter import EvbReporter
 from .imforcefieldgenerator import IMForceFieldGenerator
 from .imdatabasepointcollecter import IMDatabasePointCollecter
+from .openmmimdynamics import OpenMMIMDynamics
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
 from .imtrustradiusoptimizer import IMTrustRadiusOptimizer

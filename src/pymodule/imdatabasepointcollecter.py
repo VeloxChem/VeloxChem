@@ -2282,10 +2282,10 @@ class IMDatabasePointCollecter:
             force_t0 = time()
 
             # if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root():
-            qm_positions_nm = np.array([
-                p.value_in_unit(unit.nanometer)
-                for p in self.simulation.context.getState(getPositions=True).getPositions()
-            ])[self.qm_atoms]
+            # qm_positions_nm = np.array([
+            #     p.value_in_unit(unit.nanometer)
+            #     for p in self.simulation.context.getState(getPositions=True).getPositions()
+            # ])[self.qm_atoms]
 
                 # sync_roots = sorted(self._mpi_pending_sync_roots)
                 # self._mpi_pending_sync_roots.clear()

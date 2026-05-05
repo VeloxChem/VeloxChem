@@ -2707,6 +2707,14 @@ class InterpolationDriver():
 
         return distance, dihedral_dist, denominator_imp_coord, weight_gradient, distance_vector_sub, grad_s, dw_dalhpa_i, dw_dX_dalpha_i
 
+    def _effective_dimension(self, scores, eps=1e-12):
+        scores = np.asarray(scores, dtype=float)
+        scores = np.maximum(scores, 0.0)
+        s = scores.sum()
+        if s < eps:
+            return 0.0
+        p = scores / s
+        return 1.0 / (np.sum(p * p) + eps)
 
     def determine_important_internal_coordinates(
         self,
@@ -2764,8 +2772,14 @@ z
         pair_weight = 0.35
         support_weight = 0.25
 
+        component_score_z = 2.0
+        component_pair_z = 1.5
+        component_coverage_mass = 0.90
+        component_size_penalty = 0.01
+        max_component_size = None
+
         # final selection from best block
-        max_constraints_to_return = max(1, int(len(molecule.get_labels()) / 3))
+        max_constraints_to_return = None
         singleton_dominance = 1.35
         singleton_source_frac = 0.85
         singleton_response_frac = 0.85
@@ -2776,6 +2790,8 @@ z
 
         coords_flat, kinds_flat = self._flatten_internal_coordinates(z_matrix)
         N = len(coords_flat)
+        if max_component_size is None:
+            max_component_size = min(20, max(5, int(np.ceil(np.sqrt(N)))))
 
         if N == 0:
             return [], [], []
@@ -2964,32 +2980,157 @@ z
         # ------------------------------------------------------------------
         # Build and rank coupled repair blocks
         # ------------------------------------------------------------------
+        N_coords = N
+
+        d_eff = self._effective_dimension(global_coord_score)
+
+        max_constraints_to_return = int(
+            np.clip(
+                np.ceil(1.25 * d_eff),
+                1,
+                min(12, max(3, int(np.ceil(np.sqrt(N_coords)))))
+            )
+        )
+
+        # for anchor_idx in candidate_anchor_indices:
+        #     anchor_coord = tuple(int(x) for x in coords_flat[anchor_idx])
+
+        #     if anchor_coord in constraints_to_exclude:
+        #         continue
+
+        #     if (
+        #         kinds_flat[anchor_idx] == "dihedral"
+        #         and tuple(anchor_coord[1:3]) in self._get_symmetric_dihedral_centers(self.symmetry_information)
+        #     ):
+        #         continue
+
+        #     block_indices = self._build_candidate_block(
+        #         anchor_idx=anchor_idx,
+        #         global_coord_score=global_coord_score,
+        #         global_pair=global_pair,
+        #         z_matrix=coords_flat,
+        #         coord_kinds=kinds_flat,
+        #         constraints_to_exclude=constraints_to_exclude,
+        #         max_partners=max_block_partners,
+        #         min_partner_pair_frac=min_partner_pair_frac,
+        #         min_partner_coord_frac=min_partner_coord_frac,
+        #     )
+
+        #     key = tuple(sorted(block_indices))
+        #     if key in seen_blocks:
+        #         continue
+        #     seen_blocks.add(key)
+
+        #     coord_mass = float(np.sum(global_coord_score[block_indices]))
+        #     support_mass = float(np.mean(global_support[block_indices])) if block_indices else 0.0
+
+        #     pair_mass = 0.0
+        #     for a in range(len(block_indices)):
+        #         for b in range(a + 1, len(block_indices)):
+        #             i = block_indices[a]
+        #             j = block_indices[b]
+        #             pair_mass += global_pair[i, j]
+
+        #     acq_score = coord_mass + pair_weight * pair_mass + support_weight * support_mass
+
+        #     block_coords = [tuple(int(x) for x in coords_flat[i]) for i in block_indices]
+        #     block_types = [kinds_flat[i] for i in block_indices]
+
+        #     ranked_blocks.append({
+        #         "anchor_idx": int(anchor_idx),
+        #         "anchor_coord": anchor_coord,
+        #         "anchor_type": kinds_flat[anchor_idx],
+        #         "block_indices": [int(i) for i in block_indices],
+        #         "block_coords": block_coords,
+        #         "block_types": block_types,
+        #         "coord_mass": float(coord_mass),
+        #         "pair_mass": float(pair_mass),
+        #         "support_mass": float(support_mass),
+        #         "acq_score": float(acq_score),
+        #     })
+
+        # ranked_blocks = sorted(ranked_blocks, key=lambda x: x["acq_score"], reverse=True)
+
+        # if not ranked_blocks:
+        #     return [], [], []
+
+        # best_block = ranked_blocks[0]
         ranked_blocks = []
         seen_blocks = set()
 
-        for anchor_idx in candidate_anchor_indices:
+        components = self._build_faulty_components(
+            global_coord_score=global_coord_score,
+            global_pair=global_pair,
+            coords_flat=coords_flat,
+            kinds_flat=kinds_flat,
+            constraints_to_exclude=constraints_to_exclude,
+            score_z=component_score_z,
+            pair_z=component_pair_z,
+        )
+
+        # Fallback: if the graph builder finds nothing, use the best coordinate.
+        if not components:
+            best_idx = int(np.argmax(global_coord_score))
+            components = [[best_idx]]
+
+        for component in components:
+            # Defensive filtering.
+            component = [
+                int(i) for i in component
+                if tuple(int(x) for x in coords_flat[i]) not in constraints_to_exclude
+            ]
+
+            component = [
+                int(i) for i in component
+                if not (
+                    kinds_flat[i] == "dihedral"
+                    and tuple(coords_flat[i][1:3]) in self._get_symmetric_dihedral_centers(self.symmetry_information)
+                )
+            ]
+
+            if not component:
+                continue
+
+            # Steering score chooses the anchor inside the component.
+            steering_score = {
+                i: float(0.5 * global_source_blame[i] + 0.5 * global_response[i])
+                for i in component
+            }
+
+            anchor_idx = max(component, key=lambda i: steering_score[i])
             anchor_coord = tuple(int(x) for x in coords_flat[anchor_idx])
 
-            if anchor_coord in constraints_to_exclude:
-                continue
+            # Sort component coordinates by a mixture of individual score and coupling to anchor.
+            pair_to_anchor = np.asarray(global_pair[anchor_idx], dtype=float)
 
-            if (
-                kinds_flat[anchor_idx] == "dihedral"
-                and tuple(anchor_coord[1:3]) in self._get_symmetric_dihedral_centers(self.symmetry_information)
-            ):
-                continue
-
-            block_indices = self._build_candidate_block(
-                anchor_idx=anchor_idx,
-                global_coord_score=global_coord_score,
-                global_pair=global_pair,
-                z_matrix=coords_flat,
-                coord_kinds=kinds_flat,
-                constraints_to_exclude=constraints_to_exclude,
-                max_partners=max_block_partners,
-                min_partner_pair_frac=min_partner_pair_frac,
-                min_partner_coord_frac=min_partner_coord_frac,
+            component_sorted = sorted(
+                component,
+                key=lambda i: (
+                    0.55 * float(global_coord_score[i])
+                    + 0.30 * float(steering_score[i])
+                    + 0.15 * float(pair_to_anchor[i])
+                ),
+                reverse=True,
             )
+
+            # Trim oversized components by score coverage.
+            total_component_score = float(np.sum(global_coord_score[component_sorted]))
+            block_indices = []
+            cumulative_score = 0.0
+
+            for i in component_sorted:
+                block_indices.append(int(i))
+                cumulative_score += float(global_coord_score[i])
+
+                if len(block_indices) >= max_component_size:
+                    break
+
+                if (
+                    total_component_score > eps
+                    and cumulative_score >= component_coverage_mass * total_component_score
+                    and len(block_indices) >= 1
+                ):
+                    break
 
             key = tuple(sorted(block_indices))
             if key in seen_blocks:
@@ -2999,14 +3140,26 @@ z
             coord_mass = float(np.sum(global_coord_score[block_indices]))
             support_mass = float(np.mean(global_support[block_indices])) if block_indices else 0.0
 
-            pair_mass = 0.0
+            # Use pair density, not raw pair sum.
+            # Raw pair sum grows approximately as |block|^2 and would bias toward large components.
+            pair_sum = 0.0
+            n_pairs = 0
+
             for a in range(len(block_indices)):
                 for b in range(a + 1, len(block_indices)):
                     i = block_indices[a]
                     j = block_indices[b]
-                    pair_mass += global_pair[i, j]
+                    pair_sum += float(global_pair[i, j])
+                    n_pairs += 1
 
-            acq_score = coord_mass + pair_weight * pair_mass + support_weight * support_mass
+            pair_density = pair_sum / max(1, n_pairs)
+
+            acq_score = (
+                coord_mass
+                + pair_weight * pair_density
+                + support_weight * support_mass
+                - component_size_penalty * len(block_indices)
+            )
 
             block_coords = [tuple(int(x) for x in coords_flat[i]) for i in block_indices]
             block_types = [kinds_flat[i] for i in block_indices]
@@ -3019,7 +3172,8 @@ z
                 "block_coords": block_coords,
                 "block_types": block_types,
                 "coord_mass": float(coord_mass),
-                "pair_mass": float(pair_mass),
+                "pair_mass": float(pair_density),   # now normalized pair density
+                "pair_sum": float(pair_sum),
                 "support_mass": float(support_mass),
                 "acq_score": float(acq_score),
             })
@@ -3098,6 +3252,206 @@ z
     # ======================================================================
     # Helper methods
     # ======================================================================
+    def _robust_positive_threshold(
+        self,
+        values: np.ndarray,
+        z: float = 2.0,
+        eps: float = 1e-12,
+    ) -> float:
+        """
+        Robust threshold for positive values using median + z * MAD.
+
+        This is more size-consistent than fixed fractions because the threshold
+        adapts to the actual score distribution.
+        """
+        values = np.asarray(values, dtype=float)
+        positive = values[values > eps]
+
+        if positive.size == 0:
+            return np.inf
+
+        med = np.median(positive)
+        mad = np.median(np.abs(positive - med)) + eps
+
+        return float(med + z * 1.4826 * mad)
+
+
+    def _is_coord_excluded_for_constraint(
+        self,
+        idx: int,
+        coords_flat: List[Tuple[int, ...]],
+        kinds_flat: List[str],
+        constraints_to_exclude: List[Tuple[int, ...]],
+    ) -> bool:
+        """
+        Centralized exclusion logic for direct constraint coordinates.
+        """
+        coord = tuple(int(x) for x in coords_flat[idx])
+
+        if coord in constraints_to_exclude:
+            return True
+
+        if (
+            kinds_flat[idx] == "dihedral"
+            and tuple(coord[1:3]) in self._get_symmetric_dihedral_centers(self.symmetry_information)
+        ):
+            return True
+
+        return False
+
+
+    def _build_faulty_components(
+        self,
+        *,
+        global_coord_score: np.ndarray,
+        global_pair: np.ndarray,
+        coords_flat: List[Tuple[int, ...]],
+        kinds_flat: List[str],
+        constraints_to_exclude: List[Tuple[int, ...]],
+        score_z: float = 2.0,
+        pair_z: float = 1.5,
+        min_atom_overlap: float = 0.25,
+        eps: float = 1e-12,
+    ) -> List[List[int]]:
+        """
+        Build connected faulty coordinate components.
+
+        Nodes:
+            coordinates with unusually high global_coord_score.
+
+        Edges:
+            coordinates connected by high pair blame,
+            or by chemically local atom overlap if both are relevant.
+
+        Returns
+        -------
+        components:
+            list of index lists. Each component is a candidate repair subspace.
+        """
+        global_coord_score = np.asarray(global_coord_score, dtype=float)
+        global_pair = np.asarray(global_pair, dtype=float)
+
+        N = len(global_coord_score)
+
+        if N == 0:
+            return []
+
+        # ------------------------------------------------------------
+        # Node threshold
+        # ------------------------------------------------------------
+        score_threshold = self._robust_positive_threshold(
+            global_coord_score,
+            z=score_z,
+            eps=eps,
+        )
+
+        nodes = []
+        for i in range(N):
+            if self._is_coord_excluded_for_constraint(
+                i,
+                coords_flat,
+                kinds_flat,
+                constraints_to_exclude,
+            ):
+                continue
+
+            if global_coord_score[i] >= score_threshold:
+                nodes.append(int(i))
+
+        # Always keep at least the best coordinate.
+        if not nodes:
+            best_idx = int(np.argmax(global_coord_score))
+            if not self._is_coord_excluded_for_constraint(
+                best_idx,
+                coords_flat,
+                kinds_flat,
+                constraints_to_exclude,
+            ):
+                nodes = [best_idx]
+
+        nodes = set(nodes)
+
+        if not nodes:
+            return []
+
+        # ------------------------------------------------------------
+        # Pair threshold
+        # ------------------------------------------------------------
+        upper = global_pair[np.triu_indices(N, k=1)]
+        pair_threshold = self._robust_positive_threshold(
+            upper,
+            z=pair_z,
+            eps=eps,
+        )
+
+        adjacency = {i: set() for i in nodes}
+
+        # ------------------------------------------------------------
+        # Build graph
+        # ------------------------------------------------------------
+        node_list = sorted(nodes)
+
+        for a, i in enumerate(node_list):
+            atoms_i = set(coords_flat[i])
+
+            for j in node_list[a + 1:]:
+                atoms_j = set(coords_flat[j])
+
+                pair_ij = float(global_pair[i, j])
+
+                atom_overlap = len(atoms_i.intersection(atoms_j)) / max(
+                    1,
+                    len(atoms_i.union(atoms_j)),
+                )
+
+                pair_ok = pair_ij >= pair_threshold
+
+                # Chemical locality fallback:
+                # If both coordinates are relevant and share atoms, connect them
+                # even if the blame-pair score is not extremely high.
+                local_overlap_ok = (
+                    atom_overlap >= min_atom_overlap
+                    and min(global_coord_score[i], global_coord_score[j])
+                    >= 0.25 * max(global_coord_score[i], global_coord_score[j], eps)
+                )
+
+                if pair_ok or local_overlap_ok:
+                    adjacency[i].add(j)
+                    adjacency[j].add(i)
+
+        # ------------------------------------------------------------
+        # Connected components
+        # ------------------------------------------------------------
+        components = []
+        visited = set()
+
+        for start in node_list:
+            if start in visited:
+                continue
+
+            stack = [start]
+            visited.add(start)
+            component = []
+
+            while stack:
+                u = stack.pop()
+                component.append(int(u))
+
+                for v in adjacency[u]:
+                    if v not in visited:
+                        visited.add(v)
+                        stack.append(v)
+
+            components.append(sorted(component))
+
+        # Rank roughly by coordinate mass before returning.
+        components = sorted(
+            components,
+            key=lambda comp: float(np.sum(global_coord_score[comp])),
+            reverse=True,
+        )
+
+        return components
 
     def _flatten_internal_coordinates(
         self,
