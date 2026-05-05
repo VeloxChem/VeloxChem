@@ -40,6 +40,7 @@ from .visualizationdriver import VisualizationDriver
 from .lreigensolver import LinearResponseEigenSolver
 from .densityviewer import DensityViewer
 from .errorhandler import assert_msg_critical
+from .mathutils import symmetric_matrix_function
 from .resultsio import read_results
 
 
@@ -465,12 +466,8 @@ class ExcitedStateAnalysisDriver:
 
         S = scf_results["S"]
 
-        # Diagonalize S
-        lam, U = np.linalg.eigh(S)
-        sqrt_lam_mat = np.diag(np.sqrt(lam))
-
-        # Calculate S^1/2
-        sqrt_S = np.linalg.multi_dot([U, sqrt_lam_mat, U.T])
+        # Calculate S^1/2 with threshold to avoid sqrt of negative eigenvalues
+        sqrt_S = symmetric_matrix_function(S, np.sqrt, thresh=1.0e-12)
 
         # Calculate tilde_T as S^1/2 T S^1/2
         tilde_T = np.linalg.multi_dot([sqrt_S, T, sqrt_S])
