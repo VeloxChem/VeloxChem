@@ -197,7 +197,7 @@ class OrbitalLocalizationDriver:
             SCF result
 
         mo_range: tuple, list
-            start and end of MOs to be localized
+            start and end of MOs to be localized (starts from 1)
 
         projector : str
             "lowdin"
@@ -235,7 +235,9 @@ class OrbitalLocalizationDriver:
         if mo_range:
             if len(mo_range) != 2:
                 raise ValueError("mo_range object should be of length 2")
-            self.C = self.C[:, mo_range[0]:mo_range[1]]
+            if mo_range[0] == 0:
+                raise ValueError("mo_range starts counting from 1 not 0")
+            self.C = self.C[:, mo_range[0]-1:mo_range[1]]
         self.nao, self.norb = self.C.shape
         self.S = compute_overlap_integrals(molecule, basis)
         # AO -> atom mapping
@@ -326,7 +328,7 @@ class OrbitalLocalizationDriver:
             SCF result
 
         mo_range: tuple, list
-            start and end of MOs to be localized
+            start and end of MOs to be localized (starts from 1)
 
         Returns
         -------
@@ -354,7 +356,9 @@ class OrbitalLocalizationDriver:
         if mo_range:
             if len(mo_range) != 2:
                 raise ValueError("mo_range object should be of length 2")
-            self.C = self.C[:, mo_range[0]:mo_range[1]]
+            if mo_range[0] == 0:
+                raise ValueError("mo_range starts counting from 1 not 0")
+            self.C = self.C[:, mo_range[0]-1:mo_range[1]]
         self.nao, self.norb = self.C.shape
         mu = compute_electric_dipole_integrals(molecule, basis)
 
