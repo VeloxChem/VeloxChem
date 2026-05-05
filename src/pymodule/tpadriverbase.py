@@ -49,7 +49,7 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
 from .errorhandler import assert_msg_critical
 
 
-class TpaDriver(NonlinearSolver):
+class TpaDriverBase(NonlinearSolver):
     """
     Implements the isotropic cubic response driver for two-photon absorption
     (TPA)
@@ -433,13 +433,24 @@ class TpaDriver(NonlinearSolver):
                     sum_val += val[(w, -w, w)]
                 gamma[(w, -w, w)] = sum_val
 
-            ret_dict.update(other_dict)
-
             ret_dict.update({
-                't4_dict': t4_dict,
-                't3_dict': t3_dict,
+                'tpa_terms': {},
                 'gamma': gamma,
                 'frequencies': list(self.frequencies),
+            })
+
+            ret_dict['tpa_terms'].update(other_dict)
+            ret_dict['tpa_terms'].update({
+                't4_dict': t4_dict,
+                't3_dict': t3_dict,
+            })
+
+            tpa_spectrum = self.get_spectrum(ret_dict, 'au')
+            assert_msg_critical(
+                '[GM]' in tpa_spectrum['y_label'],
+                'TpaDriverBase: In valid unit in TPA spectrum y_label')
+            ret_dict.update({
+                'cross_sections': list(tpa_spectrum['y_data'])
             })
 
             self._print_results(ret_dict)
@@ -925,7 +936,7 @@ class TpaDriver(NonlinearSolver):
 
         assert_msg_critical(
             x_unit.lower() in ['au', 'ev', 'nm'],
-            'TpaDriver.get_spectrum: x_unit should be au, ev or nm')
+            'TpaDriverBase.get_spectrum: x_unit should be au, ev or nm')
 
         au2ev = hartree_in_ev()
         auxnm = 1.0 / hartree_in_inverse_nm()
@@ -996,19 +1007,19 @@ class TpaDriver(NonlinearSolver):
 
         assert_msg_critical(
             '[a.u.]' in spectrum['x_label'],
-            'TpaDriver._print_spectrum: In valid unit in x_label')
+            'TpaDriverBase._print_spectrum: In valid unit in x_label')
         assert_msg_critical(
             '[GM]' in spectrum['y_label'],
-            'TpaDriver._print_spectrum: In valid unit in y_label')
+            'TpaDriverBase._print_spectrum: In valid unit in y_label')
 
-        title = '{:<20s}{:<20s}{:>15s}'.format('Frequency[a.u.]',
-                                               'Frequency[eV]',
+        title = '{:<22s}{:<22s}{:>18s}'.format('Photon Energy[a.u.]',
+                                               'Photon Energy[eV]',
                                                'TPA cross-section[GM]')
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_header(('-' * len(title)).ljust(width))
 
         for w, cross_section in zip(spectrum['x_data'], spectrum['y_data']):
-            output = '{:<20.4f}{:<20.5f}{:>13.8f}'.format(
+            output = '{:<22.4f}{:<22.5f}{:>13.8f}'.format(
                 w, w * hartree_in_ev(), cross_section)
             self.ostream.print_header(output.ljust(width))
 

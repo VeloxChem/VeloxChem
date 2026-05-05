@@ -277,7 +277,7 @@ class ThgReducedDriver(NonlinearSolver):
                                                scf_tensors, molecule, ao_basis,
                                                profiler, eri_dict, dft_dict)
 
-        valstr = '*** Time spent in thg calculation: {:.2f} sec ***'.format(
+        valstr = '*** Time spent in THG calculation: {:.2f} sec ***'.format(
             time.time() - start_time)
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
@@ -2116,7 +2116,7 @@ class ThgReducedDriver(NonlinearSolver):
         for printing purposes and for the contraction of X[3],X[2],A[3],A[2]
 
         :param freqs:
-            A list of all the frequencies for the thg calculation
+            A list of all the frequencies for the THG calculation
 
         :return:
             A list of gamma tensors components inlcuded in the isotropic cubic
@@ -2177,109 +2177,3 @@ class ThgReducedDriver(NonlinearSolver):
         w_str = '{:<9s} {:12.4f} {:20.8f} {:20.8f}j'.format(
             label, freq, value.real, value.imag)
         self.ostream.print_header(w_str.ljust(width))
-
-    @staticmethod
-    def get_spectrum(rsp_results, x_unit):
-        """
-        Gets Third-harmonic gerneration spectrum.
-
-        :param rsp_results:
-            A dictonary containing the results of response calculation.
-        :param x_unit:
-            The unit of x-axis.
-
-        :return:
-            A dictionary containing photon energies and thg cross-sections.
-        """
-
-        assert_msg_critical(
-            x_unit.lower() in ['au', 'ev', 'nm'],
-            'TpaDriver.get_spectrum: x_unit should be au, ev or nm')
-
-        au2ev = hartree_in_ev()
-        auxnm = 1.0 / hartree_in_inverse_nm()
-
-        # conversion factor for thg cross-sections in GM
-        # * a0 in cm
-        # * c in cm/s
-        # * broadening parameter not included in au2gm
-        alpha = fine_structure_constant()
-        a0_in_cm = bohr_in_angstrom() * 1.0e-8
-        c_in_cm_per_s = speed_of_light_in_vacuum_in_SI() * 100.0
-        au2gm = (8.0 * np.pi**2 * alpha * a0_in_cm**5) / c_in_cm_per_s * 1.0e+50
-
-        gamma = rsp_results['gamma']
-
-        spectrum = {'x_data': [], 'y_data': []}
-
-        if x_unit.lower() == 'au':
-            spectrum['x_label'] = 'Photon energy [a.u.]'
-        elif x_unit.lower() == 'ev':
-            spectrum['x_label'] = 'Photon energy [eV]'
-        elif x_unit.lower() == 'nm':
-            spectrum['x_label'] = 'Wavelength [nm]'
-
-        spectrum['y_label'] = 'thg cross-section [GM]'
-
-        freqs = rsp_results['frequencies']
-
-        for w in freqs:
-            if w == 0.0:
-                continue
-
-            if x_unit.lower() == 'au':
-                spectrum['x_data'].append(w)
-            elif x_unit.lower() == 'ev':
-                spectrum['x_data'].append(au2ev * w)
-            elif x_unit.lower() == 'nm':
-                spectrum['x_data'].append(auxnm / w)
-
-            cross_section_in_GM = gamma[(w, -w, w)].imag * w**2 * au2gm
-
-            spectrum['y_data'].append(cross_section_in_GM)
-
-        return spectrum
-
-    def _print_spectrum(self, spectrum, width):
-        """
-        Prints Third-harmonic gerneration spectrum.
-
-        :param spectrum:
-            The spectrum.
-        :param width:
-            The width of the output.
-        """
-
-        self.ostream.print_blank()
-
-        title = 'Third-harmonic gerneration Spectrum'
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
-
-        if len(self.frequencies) == 1 and self.frequencies[0] == 0.0:
-            text = '*** No Third-harmonic gerneration spectrum at zero frequency.'
-            self.ostream.print_header(text.ljust(width))
-            self.ostream.print_blank()
-            return
-
-        assert_msg_critical(
-            '[a.u.]' in spectrum['x_label'],
-            'TpaDriver._print_spectrum: In valid unit in x_label')
-        assert_msg_critical(
-            '[GM]' in spectrum['y_label'],
-            'TpaDriver._print_spectrum: In valid unit in y_label')
-
-        title = '{:<20s}{:<20s}{:>15s}'.format('Frequency[a.u.]',
-                                               'Frequency[eV]',
-                                               'thg cross-section[GM]')
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header(('-' * len(title)).ljust(width))
-
-        for w, cross_section in zip(spectrum['x_data'], spectrum['y_data']):
-            output = '{:<20.4f}{:<20.5f}{:>13.8f}'.format(
-                w, w * hartree_in_ev(), cross_section)
-            self.ostream.print_header(output.ljust(width))
-
-        self.ostream.print_blank()
-        self.ostream.flush()

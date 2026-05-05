@@ -1,5 +1,6 @@
 from mpi4py import MPI
 from pathlib import Path
+import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import (mpi_master, bohr_in_angstrom,
@@ -7,7 +8,7 @@ from veloxchem.veloxchemlib import (mpi_master, bohr_in_angstrom,
                                     fine_structure_constant,
                                     speed_of_light_in_vacuum_in_SI)
 from veloxchem.outputstream import OutputStream
-from veloxchem.tpadriver import TpaDriver
+from veloxchem.tpadriverbase import TpaDriverBase
 from veloxchem.tpafulldriver import TpaFullDriver
 from veloxchem.tpareddriver import TpaReducedDriver
 from veloxchem.mpitask import MpiTask
@@ -61,11 +62,20 @@ class TestTPA:
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             tpa_result = tpa_prop.rsp_property
 
-            for key in ref_result:
-                assert abs(tpa_result[key][(w, -w, w)].real /
-                           ref_result[key].real - 1.0) < 1.0e-6
-                assert abs(tpa_result[key][(w, -w, w)].imag /
-                           ref_result[key].imag - 1.0) < 1.0e-6
+            for key, ref_val in ref_result['tpa_terms'].items():
+                calc_val = tpa_result['tpa_terms'][key][(w, -w, w)]
+                assert abs(calc_val.real / ref_val.real - 1.0) < 1.0e-6
+                assert abs(calc_val.imag / ref_val.imag - 1.0) < 1.0e-6
+
+            ref_val = ref_result['gamma']
+            calc_val = tpa_result['gamma'][(w, -w, w)]
+            assert abs(calc_val.real / ref_val.real - 1.0) < 1.0e-6
+            assert abs(calc_val.imag / ref_val.imag - 1.0) < 1.0e-6
+
+            ref_sigma = ref_result['cross_sections']
+            calc_sigma = tpa_result['cross_sections']
+            assert np.max(np.abs(
+                np.array(calc_sigma) - np.array(ref_sigma))) < 1.0e-8
 
     def test_tpa_full(self):
 
@@ -74,13 +84,16 @@ class TestTPA:
         w = 0.05
 
         ref_result = {
-            't4_dict': 11.43071305 + 0.04957732j,
-            't3_dict': -42.19841751 - 0.28695214j,
-            'NaX3NyNz': -81.62345190 - 0.35812832j,
-            'NaA3NxNy': -27.21320341 - 0.03029788j,
-            'NaX2Nyz': 270.69041328 + 2.67837597j,
-            'NxA2Nyz': 270.83461366 + 0.52758094j,
+            'tpa_terms': {
+                't4_dict': 11.43071305 + 0.04957732j,
+                't3_dict': -42.19841751 - 0.28695214j,
+                'NaX3NyNz': -81.62345190 - 0.35812832j,
+                'NaA3NxNy': -27.21320341 - 0.03029788j,
+                'NaX2Nyz': 270.69041328 + 2.67837597j,
+                'NxA2Nyz': 270.83461366 + 0.52758094j,
+            },
             'gamma': 401.92066716 + 2.58015589j,
+            'cross_sections': [0.000025721482],
         }
 
         here = Path(__file__).parent
@@ -95,10 +108,13 @@ class TestTPA:
         w = 0.05
 
         ref_result = {
-            't3_dict': -15.12982062 - 0.19793495j,
-            'NaX2Nyz': 96.30910639 + 1.72679037j,
-            'NxA2Nyz': 96.36431088 + 0.51886895j,
+            'tpa_terms': {
+                't3_dict': -15.12982062 - 0.19793495j,
+                'NaX2Nyz': 96.30910639 + 1.72679037j,
+                'NxA2Nyz': 96.36431088 + 0.51886895j,
+            },
             'gamma': 177.54359664 + 2.04772438j,
+            'cross_sections': [0.000020413691],
         }
 
         here = Path(__file__).parent
@@ -123,7 +139,7 @@ class TestTPA:
             'memory_tracing': True,
         }
 
-        tpa_drv = TpaDriver(MPI.COMM_WORLD, OutputStream(None))
+        tpa_drv = TpaDriverBase(MPI.COMM_WORLD, OutputStream(None))
 
         for key, val in tpa_dict.items():
             assert getattr(tpa_drv, key) != val
@@ -150,9 +166,9 @@ class TestTPA:
             'frequencies': [0.0, 0.05, 0.10],
         }
 
-        spectrum_au = TpaDriver.get_spectrum(rsp_results, 'au')
-        spectrum_ev = TpaDriver.get_spectrum(rsp_results, 'ev')
-        spectrum_nm = TpaDriver.get_spectrum(rsp_results, 'nm')
+        spectrum_au = TpaDriverBase.get_spectrum(rsp_results, 'au')
+        spectrum_ev = TpaDriverBase.get_spectrum(rsp_results, 'ev')
+        spectrum_nm = TpaDriverBase.get_spectrum(rsp_results, 'nm')
 
         assert spectrum_au['x_label'] == 'Photon energy [a.u.]'
         assert spectrum_ev['x_label'] == 'Photon energy [eV]'
@@ -221,11 +237,24 @@ class TestTPA:
             key = (0.05, -0.05, 0.05)
 
             for result_key in ['t4_dict', 't3_dict', 'NaX3NyNz', 'NaA3NxNy',
-                               'NaX2Nyz', 'NxA2Nyz', 'gamma']:
-                assert restarted_results[result_key][key] == pytest.approx(
-                    fresh_results[result_key][key], abs=1.0e-7)
-                assert first_results[result_key][key] == pytest.approx(
-                    fresh_results[result_key][key], abs=1.0e-7)
+                               'NaX2Nyz', 'NxA2Nyz']:
+                assert restarted_results['tpa_terms'][result_key][
+                    key] == pytest.approx(
+                        fresh_results['tpa_terms'][result_key][key],
+                        abs=1.0e-7)
+                assert first_results['tpa_terms'][result_key][
+                    key] == pytest.approx(
+                        fresh_results['tpa_terms'][result_key][key],
+                        abs=1.0e-7)
+
+            assert restarted_results['gamma'][key] == pytest.approx(
+                fresh_results['gamma'][key], abs=1.0e-7)
+            assert first_results['gamma'][key] == pytest.approx(
+                fresh_results['gamma'][key], abs=1.0e-7)
+            assert restarted_results['cross_sections'] == pytest.approx(
+                fresh_results['cross_sections'], abs=1.0e-7)
+            assert first_results['cross_sections'] == pytest.approx(
+                fresh_results['cross_sections'], abs=1.0e-7)
 
             for suffix in [
                     '.h5',
@@ -280,11 +309,24 @@ class TestTPA:
         if task.mpi_rank == mpi_master():
             key = (0.05, -0.05, 0.05)
 
-            for result_key in ['t3_dict', 'NaX2Nyz', 'NxA2Nyz', 'gamma']:
-                assert restarted_results[result_key][key] == pytest.approx(
-                    fresh_results[result_key][key], abs=1.0e-7)
-                assert first_results[result_key][key] == pytest.approx(
-                    fresh_results[result_key][key], abs=1.0e-7)
+            for result_key in ['t3_dict', 'NaX2Nyz', 'NxA2Nyz']:
+                assert restarted_results['tpa_terms'][result_key][
+                    key] == pytest.approx(
+                        fresh_results['tpa_terms'][result_key][key],
+                        abs=1.0e-7)
+                assert first_results['tpa_terms'][result_key][
+                    key] == pytest.approx(
+                        fresh_results['tpa_terms'][result_key][key],
+                        abs=1.0e-7)
+
+            assert restarted_results['gamma'][key] == pytest.approx(
+                fresh_results['gamma'][key], abs=1.0e-7)
+            assert first_results['gamma'][key] == pytest.approx(
+                fresh_results['gamma'][key], abs=1.0e-7)
+            assert restarted_results['cross_sections'] == pytest.approx(
+                fresh_results['cross_sections'], abs=1.0e-7)
+            assert first_results['cross_sections'] == pytest.approx(
+                fresh_results['cross_sections'], abs=1.0e-7)
 
             for suffix in [
                     '.h5',
