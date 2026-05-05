@@ -29,6 +29,8 @@ VBDRIVER_SPEC.loader.exec_module(VBDRIVER_MODULE)
 VbComputeOptions = VBDRIVER_MODULE.VbComputeOptions
 VbDriver = VBDRIVER_MODULE.VbDriver
 
+HARTREE_TO_KJMOL = 2625.499638
+
 
 def _h2_molecule(distance):
     molecule = Molecule.read_str(
@@ -52,6 +54,15 @@ def _run_h2_hf_reference(molecule, basis, unrestricted=False):
     return float(driver.get_scf_energy())
 
 
+def _run_hf_reference(molecule, basis, unrestricted=False):
+    return _run_h2_hf_reference(molecule, basis, unrestricted=unrestricted)
+
+
+def _relative_potential_curve(energies):
+    energies = np.asarray(energies, dtype=float)
+    return (energies - energies[-1]) * HARTREE_TO_KJMOL
+
+
 def _run_h2_vb(distance, mode="vbci", include_bovb=False, basis_name="sto-3g"):
     molecule = _h2_molecule(distance)
     basis = MolecularBasis.read(molecule, basis_name, ostream=None)
@@ -67,14 +78,32 @@ def _run_h2_vb(distance, mode="vbci", include_bovb=False, basis_name="sto-3g"):
     return molecule, basis, result
 
 
-def _ethylene_molecule():
-    molecule = Molecule.read_str("""
-C -0.6695  0.0000  0.0000
-C  0.6695  0.0000  0.0000
-H -1.2321  0.9289  0.0000
-H -1.2321 -0.9289  0.0000
-H  1.2321  0.9289  0.0000
-H  1.2321 -0.9289  0.0000
+def _ethylene_molecule(distance=1.339):
+    half_distance = 0.5 * float(distance)
+    molecule = Molecule.read_str(f"""
+C {-half_distance:.8f}  0.0000  0.0000
+C  {half_distance:.8f}  0.0000  0.0000
+H {-half_distance - 0.5626:.8f}  0.9289  0.0000
+H {-half_distance - 0.5626:.8f} -0.9289  0.0000
+H  {half_distance + 0.5626:.8f}  0.9289  0.0000
+H  {half_distance + 0.5626:.8f} -0.9289  0.0000
+""")
+    molecule.set_charge(0)
+    molecule.set_multiplicity(1)
+    return molecule
+
+
+def _ethane_molecule(distance=1.54):
+    half_distance = 0.5 * float(distance)
+    molecule = Molecule.read_str(f"""
+C {-half_distance:.8f}  0.0000  0.0000
+C  {half_distance:.8f}  0.0000  0.0000
+H {-half_distance - 0.6300:.8f}  0.9000  0.0000
+H {-half_distance - 0.6300:.8f} -0.4500  0.77942286
+H {-half_distance - 0.6300:.8f} -0.4500 -0.77942286
+H  {half_distance + 0.6300:.8f} -0.9000  0.0000
+H  {half_distance + 0.6300:.8f}  0.4500  0.77942286
+H  {half_distance + 0.6300:.8f}  0.4500 -0.77942286
 """)
     molecule.set_charge(0)
     molecule.set_multiplicity(1)
@@ -97,6 +126,27 @@ def _run_ethylene_pi_vb(mode="vbci", include_bovb=False):
         ),
     )
     return molecule, basis, result
+
+
+def _run_one_bond_vb(molecule,
+                     basis,
+                     mode="vbci",
+                     active_subtype="sigma",
+                     reference_orbitals=None):
+    return VbDriver().compute(
+        molecule,
+        basis,
+        options=VbComputeOptions(
+            mode=mode,
+            optimize_orbitals=(mode == "vbscf"),
+            include_bovb=(mode == "bovb"),
+            active_bond=(0, 1),
+            active_candidate_subtype=active_subtype,
+            active_bond_reference_orbitals=reference_orbitals,
+            include_ionic=True,
+            freeze_inactive_orbitals=True,
+        ),
+    )
 
 
 ALLYL_CATION_CASE = {
@@ -326,6 +376,245 @@ def test_h2_split_valence_scan_keeps_stable_atom_centered_active_space():
     assert labels == ["H2_atom_centered_sigma"] * len(labels)
 
 
+def test_h2_split_valence_vb_methods_reach_uhf_asymptote():
+    molecule, basis, vbci = _run_h2_vb(5.0, mode="vbci", basis_name="6-31g")
+    _, _, vbscf = _run_h2_vb(5.0, mode="vbscf", basis_name="6-31g")
+    _, _, bovb = _run_h2_vb(
+        5.0,
+        mode="bovb",
+        include_bovb=True,
+        basis_name="6-31g",
+    )
+    uhf_energy = _run_h2_hf_reference(molecule, basis, unrestricted=True)
+
+    for result in (vbci, vbscf, bovb):
+        assert abs(float(result["energy"]) - uhf_energy) * HARTREE_TO_KJMOL < 10.0
+
+
+def test_h2_dissociation_curve_compares_rhf_uhf_vb_methods():
+    distances = (0.74, 4.0)
+    curves = {key: [] for key in ("rhf", "uhf", "vbci", "vbscf", "bovb")}
+    labels = []
+
+    for distance in distances:
+        molecule, basis, vbci = _run_h2_vb(distance, mode="vbci")
+        _, _, vbscf = _run_h2_vb(distance, mode="vbscf")
+        _, _, bovb = _run_h2_vb(distance, mode="bovb", include_bovb=True)
+        curves["rhf"].append(_run_hf_reference(molecule, basis, unrestricted=False))
+        curves["uhf"].append(_run_hf_reference(molecule, basis, unrestricted=True))
+        curves["vbci"].append(float(vbci["energy"]))
+        curves["vbscf"].append(float(vbscf["energy"]))
+        curves["bovb"].append(float(bovb["energy"]))
+        labels.append(vbci["active_space"].active_candidate_label)
+
+    relative_curves = {
+        method: _relative_potential_curve(energies)
+        for method, energies in curves.items()
+    }
+
+    assert labels == ["H2_atom_centered_sigma"] * len(distances)
+    assert relative_curves["rhf"][-1] == pytest.approx(0.0, abs=1.0e-10)
+    assert relative_curves["uhf"][-1] == pytest.approx(0.0, abs=1.0e-10)
+    assert relative_curves["vbci"][-1] == pytest.approx(0.0, abs=1.0e-10)
+    assert relative_curves["rhf"][0] < -100.0
+    assert relative_curves["uhf"][0] < -100.0
+    assert relative_curves["vbci"][0] < -100.0
+    assert curves["uhf"][-1] < curves["rhf"][-1] - 0.1
+    assert curves["vbscf"][-1] <= curves["vbci"][-1] + 1.0e-8
+    assert curves["bovb"][-1] <= curves["vbscf"][-1] + 1.0e-8
+
+
+def test_ethane_cc_dissociation_keeps_requested_sigma_active_bond():
+    distances = (1.54, 4.0)
+    anchor_molecule = _ethane_molecule(distances[0])
+    anchor_basis = MolecularBasis.read(anchor_molecule, "sto-3g", ostream=None)
+    anchor = _run_one_bond_vb(
+        anchor_molecule,
+        anchor_basis,
+        mode="vbci",
+        active_subtype="sigma",
+    )
+    reference_orbitals = tuple(anchor["active_space"].active_orbitals)
+    curves = {key: [] for key in ("rhf", "uhf", "vbci", "vbscf", "bovb")}
+    fallback_seen = False
+
+    for distance in distances:
+        molecule = _ethane_molecule(distance)
+        basis = MolecularBasis.read(molecule, "sto-3g", ostream=None)
+        curves["rhf"].append(_run_hf_reference(molecule, basis, unrestricted=False))
+        curves["uhf"].append(_run_hf_reference(molecule, basis, unrestricted=True))
+        for mode in ("vbci", "vbscf", "bovb"):
+            result = _run_one_bond_vb(
+                molecule,
+                basis,
+                mode=mode,
+                active_subtype="sigma",
+                reference_orbitals=reference_orbitals,
+            )
+            diagnostics = result["diagnostics"]
+            curves[mode].append(float(result["energy"]))
+            assert diagnostics["active_space_model"] == "one-active-bond"
+            assert diagnostics["active_candidate_subtype"] == "sigma"
+            assert diagnostics["active_bond_state_tracked"] is True
+            assert diagnostics["active_orbitals_orthogonalized_to_frozen_space"] is True
+            if distance >= 3.0:
+                assert diagnostics["active_uhf_frontier_orbitals"] is True
+                assert diagnostics["active_stretched_orbital_source"] == "uhf_frontier"
+            assert np.isclose(np.sum(result["lowdin_weights"]), 1.0, atol=1.0e-8)
+            fallback_seen = fallback_seen or diagnostics["active_candidate_fallback"]
+
+    for energies in curves.values():
+        assert np.all(np.isfinite(energies))
+
+    assert fallback_seen is True
+    assert curves["uhf"][-1] < curves["rhf"][-1] - 0.1
+    assert _relative_potential_curve(curves["uhf"])[0] < -100.0
+    assert np.isfinite(_relative_potential_curve(curves["vbci"])[0])
+    assert _relative_potential_curve(curves["vbci"])[-1] == pytest.approx(0.0, abs=1.0e-10)
+    for mode in ("vbci", "vbscf", "bovb"):
+        asymptote_error = (curves[mode][-1] - curves["uhf"][-1]) * HARTREE_TO_KJMOL
+        assert asymptote_error > -10.0
+        assert asymptote_error < 200.0
+    assert curves["vbscf"][-1] <= curves["vbci"][-1] + 1.0e-8
+    assert curves["bovb"][-1] <= curves["vbscf"][-1] + 1.0e-8
+
+
+def test_ethane_split_valence_sigma_vb_methods_reach_uhf_asymptote():
+    anchor_molecule = _ethane_molecule(1.54)
+    anchor_basis = MolecularBasis.read(anchor_molecule, "6-31g", ostream=None)
+    anchor = _run_one_bond_vb(
+        anchor_molecule,
+        anchor_basis,
+        mode="vbci",
+        active_subtype="sigma",
+    )
+    reference_orbitals = tuple(anchor["active_space"].active_orbitals)
+    molecule = _ethane_molecule(5.0)
+    basis = MolecularBasis.read(molecule, "6-31g", ostream=None)
+    uhf_energy = _run_hf_reference(molecule, basis, unrestricted=True)
+
+    for mode in ("vbci", "vbscf", "bovb"):
+        result = _run_one_bond_vb(
+            molecule,
+            basis,
+            mode=mode,
+            active_subtype="sigma",
+            reference_orbitals=reference_orbitals,
+        )
+        diagnostics = result["diagnostics"]
+        asymptote_error = (float(result["energy"]) - uhf_energy) * HARTREE_TO_KJMOL
+        assert diagnostics["active_uhf_frontier_orbitals"] is True
+        assert diagnostics["active_stretched_orbital_source"] == "uhf_frontier"
+        if mode == "bovb":
+            assert diagnostics["bovb_conservative_non_h2_limit"] is True
+            assert diagnostics["bovb_used_fixed_orbital_limit"] is True
+        assert -10.0 <= asymptote_error <= 120.0
+
+
+def test_ethane_split_valence_sigma_curve_has_no_switch_spike():
+    anchor_molecule = _ethane_molecule(1.54)
+    anchor_basis = MolecularBasis.read(anchor_molecule, "6-31g", ostream=None)
+    anchor = _run_one_bond_vb(
+        anchor_molecule,
+        anchor_basis,
+        mode="vbci",
+        active_subtype="sigma",
+    )
+    reference_orbitals = tuple(anchor["active_space"].active_orbitals)
+    distances = (2.04, 2.47, 2.89, 3.31, 5.0)
+    curves = {key: [] for key in ("uhf", "vbci", "bovb")}
+    stretched_sources = []
+    bovb_fixed_limits = []
+
+    for distance in distances:
+        molecule = _ethane_molecule(distance)
+        basis = MolecularBasis.read(molecule, "6-31g", ostream=None)
+        curves["uhf"].append(_run_hf_reference(molecule, basis, unrestricted=True))
+        result = _run_one_bond_vb(
+            molecule,
+            basis,
+            mode="vbci",
+            active_subtype="sigma",
+            reference_orbitals=reference_orbitals,
+        )
+        curves["vbci"].append(float(result["energy"]))
+        stretched_sources.append(result["diagnostics"].get("active_stretched_orbital_source"))
+        bovb = _run_one_bond_vb(
+            molecule,
+            basis,
+            mode="bovb",
+            active_subtype="sigma",
+            reference_orbitals=reference_orbitals,
+        )
+        curves["bovb"].append(float(bovb["energy"]))
+        bovb_fixed_limits.append(bovb["diagnostics"].get("bovb_used_fixed_orbital_limit"))
+
+    relative_vbci = _relative_potential_curve(curves["vbci"])
+    relative_bovb = _relative_potential_curve(curves["bovb"])
+    relative_uhf = _relative_potential_curve(curves["uhf"])
+    vbci_jumps = np.abs(np.diff(relative_vbci))
+    bovb_jumps = np.abs(np.diff(relative_bovb))
+
+    assert stretched_sources == ["uhf_frontier"] * len(distances)
+    assert bovb_fixed_limits == [True] * len(distances)
+    assert np.max(vbci_jumps) < 175.0
+    assert np.max(bovb_jumps) < 175.0
+    assert np.allclose(relative_bovb, relative_vbci, atol=1.0e-8)
+    assert relative_vbci[-1] == pytest.approx(0.0, abs=1.0e-10)
+    assert relative_uhf[-1] == pytest.approx(0.0, abs=1.0e-10)
+    assert relative_vbci[0] < relative_vbci[-1] - 100.0
+
+
+def test_ethylene_cc_dissociation_keeps_requested_pi_active_bond():
+    distances = (1.339, 4.0)
+    anchor_molecule = _ethylene_molecule(distances[0])
+    anchor_basis = MolecularBasis.read(anchor_molecule, "sto-3g", ostream=None)
+    anchor = _run_one_bond_vb(
+        anchor_molecule,
+        anchor_basis,
+        mode="vbci",
+        active_subtype="pi",
+    )
+    reference_orbitals = tuple(anchor["active_space"].active_orbitals)
+    curves = {key: [] for key in ("rhf", "uhf", "vbci", "vbscf", "bovb")}
+    fallback_seen = False
+
+    for distance in distances:
+        molecule = _ethylene_molecule(distance)
+        basis = MolecularBasis.read(molecule, "sto-3g", ostream=None)
+        curves["rhf"].append(_run_hf_reference(molecule, basis, unrestricted=False))
+        curves["uhf"].append(_run_hf_reference(molecule, basis, unrestricted=True))
+        for mode in ("vbci", "vbscf", "bovb"):
+            result = _run_one_bond_vb(
+                molecule,
+                basis,
+                mode=mode,
+                active_subtype="pi",
+                reference_orbitals=reference_orbitals,
+            )
+            diagnostics = result["diagnostics"]
+            curves[mode].append(float(result["energy"]))
+            assert diagnostics["active_space_model"] == "one-active-pi-bond"
+            assert diagnostics["active_candidate_subtype"] == "pi"
+            assert diagnostics["active_bond_state_tracked"] is True
+            assert diagnostics["active_orbitals_orthogonalized_to_frozen_space"] is True
+            assert np.isclose(np.sum(result["lowdin_weights"]), 1.0, atol=1.0e-8)
+            fallback_seen = fallback_seen or diagnostics["active_candidate_fallback"]
+
+    for energies in curves.values():
+        assert np.all(np.isfinite(energies))
+
+    assert fallback_seen is True
+    assert curves["uhf"][-1] < curves["rhf"][-1] - 0.1
+    assert _relative_potential_curve(curves["uhf"])[0] < -100.0
+    assert np.isfinite(_relative_potential_curve(curves["vbci"])[0])
+    assert _relative_potential_curve(curves["vbci"])[-1] == pytest.approx(0.0, abs=1.0e-10)
+    # This is a state-tracking/finite-value regression only. A physical ethylene
+    # C-C dissociation curve needs a four-electron sigma+pi active space.
+    assert curves["vbscf"][-1] <= curves["vbci"][-1] + 1.0e-8
+    assert curves["bovb"][-1] <= curves["vbscf"][-1] + 1.0e-8
+
+
 def test_ethylene_two_orbital_pi_bovb_uses_frozen_sigma_embedding():
     _, _, bovb = _run_ethylene_pi_vb(mode="bovb", include_bovb=True)
     diagnostics = bovb["diagnostics"]
@@ -341,6 +630,8 @@ def test_ethylene_two_orbital_pi_bovb_uses_frozen_sigma_embedding():
     assert diagnostics["active_space_model"] == "one-active-pi-bond"
     assert diagnostics["active_candidate_subtype"] == "pi"
     assert diagnostics["structure_specific_orbitals"] is True
+    assert diagnostics["bovb_conservative_non_h2_limit"] is True
+    assert diagnostics["bovb_used_fixed_orbital_limit"] is True
     assert diagnostics["frozen_hf_embedding"] is True
     assert np.isclose(diagnostics["active_reference_electron_count"], 2.0, atol=1.0e-8)
     assert diagnostics["frozen_electron_count"] > 10.0

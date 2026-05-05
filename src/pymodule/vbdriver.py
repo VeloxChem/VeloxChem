@@ -65,6 +65,7 @@ class VbComputeOptions:
 	active_candidate_subtype: optional bond subtype filter, currently 'sigma' or 'pi'
 	active_metal_ligand_channels: optional tuple of metal-ligand channels to activate
 	active_metal_ligand_reference_orbitals: optional bound-geometry orbitals used to state-track metal-ligand scans
+	active_bond_reference_orbitals: optional bound-geometry active orbitals used to state-track organic bond scans
 	active_pi_atoms: optional atom-index tuple for a fixed-orbital multi-center pi active space
 	active_electron_count: optional number of active electrons for generated pi active spaces
 	active_spin: optional spin label for generated pi active spaces, currently 'singlet'
@@ -82,6 +83,7 @@ class VbComputeOptions:
 	active_candidate_subtype: Optional[str] = None
 	active_metal_ligand_channels: Optional[Tuple[str, ...]] = None
 	active_metal_ligand_reference_orbitals: Optional[Tuple[Any, ...]] = None
+	active_bond_reference_orbitals: Optional[Tuple[Any, ...]] = None
 	active_pi_atoms: Optional[Tuple[int, ...]] = None
 	active_electron_count: Optional[int] = None
 	active_spin: str = "singlet"
@@ -377,6 +379,11 @@ class VbDriver:
 			if embedding is not None:
 				H_ao = embedding["h_effective"]
 				e_nuc = embedding["constant_energy"]
+				orbitals = self._project_active_orbitals_out_of_frozen_density(
+					orbitals,
+					S_ao,
+					embedding.get("frozen_density"),
+				)
 
 		# Assume orbitals[0] and orbitals[1] are initial guesses for 1s_A and 1s_B
 		ao1 = orbitals[0].coefficients
@@ -424,6 +431,7 @@ class VbDriver:
 		if embedding is not None:
 			diagnostics.update({
 				"frozen_hf_embedding": True,
+				"active_orbitals_orthogonalized_to_frozen_space": True,
 				"frozen_electron_count": embedding["frozen_electron_count"],
 				"active_reference_electron_count": embedding["active_electron_count"],
 				"frozen_constant_energy": embedding["constant_energy"],
@@ -493,6 +501,11 @@ class VbDriver:
 			if embedding is not None:
 				H_ao = embedding["h_effective"]
 				e_nuc = embedding["constant_energy"]
+				orbitals = self._project_active_orbitals_out_of_frozen_density(
+					orbitals,
+					S_ao,
+					embedding.get("frozen_density"),
+				)
 		ao1 = orbitals[0].coefficients
 		ao2 = orbitals[1].coefficients
 		breath1 = self._center_breathing_vector(
@@ -550,19 +563,37 @@ class VbDriver:
 
 		initial_parameters = np.array([0.0, 0.0, 0.0, 0.0])
 		initial_energy = energy_for_parameters(initial_parameters)
-		result = minimize(
-			energy_for_parameters,
-			x0=initial_parameters,
-			method='L-BFGS-B',
-			bounds=[(-0.70, 0.70), (-0.70, 0.70), (-1.50, 1.50), (-1.50, 1.50)],
-			options={
-				'ftol': options.conv_thresh if options else 1.0e-8,
-				'gtol': options.conv_thresh if options else 1.0e-8,
-				'maxiter': options.max_iter if options else 50,
-			},
+		conservative_non_h2_limit = not self._is_h2_molecule(molecule)
+		if conservative_non_h2_limit:
+			class FixedLimitResult:
+				success = True
+				message = "non-H2 two-orbital BOVB uses fixed-orbital limit pending constrained breathing model"
+
+			result = FixedLimitResult()
+			optimizer_energy = initial_energy
+		else:
+			result = minimize(
+				energy_for_parameters,
+				x0=initial_parameters,
+				method='L-BFGS-B',
+				bounds=[(-0.70, 0.70), (-0.70, 0.70), (-1.50, 1.50), (-1.50, 1.50)],
+				options={
+					'ftol': options.conv_thresh if options else 1.0e-8,
+					'gtol': options.conv_thresh if options else 1.0e-8,
+					'maxiter': options.max_iter if options else 50,
+				},
+			)
+			optimizer_energy = float(result.fun) if np.isfinite(result.fun) else 1.0e6
+		unphysical_non_h2_lowering = (
+			not conservative_non_h2_limit and
+			not self._is_h2_molecule(molecule) and
+			initial_energy - optimizer_energy > 0.50
 		)
-		optimizer_energy = float(result.fun) if np.isfinite(result.fun) else 1.0e6
-		used_fixed_limit = optimizer_energy > initial_energy + 1.0e-10
+		used_fixed_limit = (
+			conservative_non_h2_limit or
+			optimizer_energy > initial_energy + 1.0e-10 or
+			unphysical_non_h2_lowering
+		)
 		parameters = initial_parameters if used_fixed_limit else np.array(result.x, dtype=float)
 		structure_orbitals = structure_coefficients(parameters)
 		S, H = self._build_structure_specific_two_orbital_singlet_matrices(
@@ -590,6 +621,8 @@ class VbDriver:
 			"bovb_initial_energy": float(initial_energy),
 			"bovb_optimizer_energy": float(optimizer_energy),
 			"bovb_used_fixed_orbital_limit": bool(used_fixed_limit),
+			"bovb_conservative_non_h2_limit": bool(conservative_non_h2_limit),
+			"bovb_rejected_unphysical_non_h2_lowering": bool(unphysical_non_h2_lowering),
 			"overlap_condition": float(np.linalg.cond(S)),
 			"overlap_eigenvalues": np.linalg.eigvalsh(S).tolist(),
 			"retained_overlap_rank": int(len(kept)),
@@ -600,6 +633,7 @@ class VbDriver:
 		if embedding is not None:
 			diagnostics.update({
 				"frozen_hf_embedding": True,
+				"active_orbitals_orthogonalized_to_frozen_space": True,
 				"frozen_electron_count": embedding["frozen_electron_count"],
 				"active_reference_electron_count": embedding["active_electron_count"],
 				"frozen_constant_energy": embedding["constant_energy"],
@@ -825,24 +859,66 @@ class VbDriver:
 				'source': 'H2 stable atom-centered active bond',
 			}
 		if active_candidate is None:
-			if not self._is_h2_molecule(molecule):
+			requested_bond = getattr(options, 'active_bond', None)
+			if requested_bond is not None:
+				active_candidate = {
+					'index': -1,
+					'type': 'BD',
+					'subtype': getattr(options, 'active_candidate_subtype', None) or 'sigma',
+					'atoms': tuple(int(atom) for atom in requested_bond),
+					'occupation': 0.0,
+					'coefficients': [],
+					'source': 'explicit active_bond fallback for dissociation scan',
+				}
+			elif not self._is_h2_molecule(molecule):
 				raise RuntimeError("VB active-space builder could not find a two-center bond candidate.")
-			active_candidate = {
-				'index': 0,
-				'type': 'BD',
-				'subtype': 'sigma',
-				'atoms': (0, 1),
-				'occupation': 2.0,
-				'coefficients': [],
-				'source': 'H2 fallback active bond',
-			}
+			else:
+				active_candidate = {
+					'index': 0,
+					'type': 'BD',
+					'subtype': 'sigma',
+					'atoms': (0, 1),
+					'occupation': 2.0,
+					'coefficients': [],
+					'source': 'H2 fallback active bond',
+				}
 
 		active_bond = tuple(int(atom) for atom in active_candidate.get('atoms', ()))
 		if len(active_bond) != 2:
 			raise RuntimeError("VB active-space builder requires a two-center active bond.")
 
-		if stable_h2_active_space:
+		reference_active_orbitals = self._reference_active_bond_orbitals(
+			getattr(options, 'active_bond_reference_orbitals', None),
+			active_bond,
+		)
+		active_index = int(active_candidate.get('index', -1))
+		active_subtype = 'sigma' if stable_h2_active_space else active_candidate.get('subtype')
+		stretched_active_orbitals = None
+		stretched_active_orbital_source = None
+		if (active_index < 0 and active_subtype == 'sigma' and
+				self._active_bond_distance_angstrom(molecule, active_bond) >= 1.8):
+			stretched_active_orbitals = self._uhf_frontier_active_orbitals(
+				molecule,
+				basis,
+				active_bond,
+			)
+			if stretched_active_orbitals is not None:
+				stretched_active_orbital_source = 'uhf_frontier'
+			else:
+				stretched_active_orbitals = self._fragment_radical_active_orbitals(
+					molecule,
+					basis,
+					active_bond,
+				)
+				if stretched_active_orbitals is not None:
+					stretched_active_orbital_source = 'fragment_radical'
+		if stretched_active_orbitals is not None:
+			active_orbitals = stretched_active_orbitals
+		elif reference_active_orbitals is not None:
+			active_orbitals = reference_active_orbitals
+		elif stable_h2_active_space:
 			active_orbitals = tuple(
+				self._h2_fragment_active_orbitals(molecule, basis, active_bond) or
 				self._atom_centered_active_orbitals(molecule, basis, active_bond))
 		else:
 			active_orbitals = tuple(
@@ -853,9 +929,12 @@ class VbDriver:
 					nao_data,
 				) or self._atom_centered_active_orbitals(molecule, basis, active_bond))
 		structures = tuple(self._default_one_bond_structures(active_bond, options))
-		active_label = "H2_atom_centered_sigma" if stable_h2_active_space else self._candidate_label(active_candidate)
-		active_index = int(active_candidate.get('index', -1))
-		active_subtype = 'sigma' if stable_h2_active_space else active_candidate.get('subtype')
+		if stable_h2_active_space:
+			active_label = "H2_atom_centered_sigma"
+		elif active_index < 0:
+			active_label = f"explicit_{active_subtype}_bond_{active_bond[0] + 1}_{active_bond[1] + 1}"
+		else:
+			active_label = self._candidate_label(active_candidate)
 
 		frozen = []
 		inactive = []
@@ -888,8 +967,35 @@ class VbDriver:
 				"include_ionic": bool(options.include_ionic),
 				"frozen_hf_reference": bool(options.freeze_inactive_orbitals),
 				"h2_stable_atom_centered_active_space": bool(stable_h2_active_space),
+				"active_bond_state_tracked": reference_active_orbitals is not None,
+				"active_candidate_fallback": active_index < 0,
+				"active_uhf_frontier_orbitals": stretched_active_orbital_source == 'uhf_frontier',
+				"active_fragment_radical_orbitals": stretched_active_orbital_source == 'fragment_radical',
+				"active_stretched_orbital_source": stretched_active_orbital_source,
 			},
 		)
+
+	def _reference_active_bond_orbitals(self, reference_orbitals, active_bond):
+		if reference_orbitals is None:
+			return None
+		if len(reference_orbitals) != 2:
+			raise RuntimeError("State-tracked organic bond scans require exactly two reference active orbitals.")
+		tracked_orbitals = []
+		for index, orbital in enumerate(reference_orbitals):
+			coefficients = np.array(getattr(orbital, 'coefficients', orbital), dtype=float)
+			center = getattr(orbital, 'center', None)
+			if center is not None and int(center) not in set(active_bond):
+				raise RuntimeError("Reference active orbital center is not part of the requested active bond.")
+			label = getattr(orbital, 'label', f'state_tracked_active_{index + 1}')
+			tracked_orbitals.append(
+				VbOrbital(
+					label=f"tracked_{label}",
+					coefficients=coefficients,
+					center=None if center is None else int(center),
+					kind=getattr(orbital, 'kind', 'active'),
+				)
+			)
+		return tuple(tracked_orbitals)
 
 	def _build_multi_center_pi_space(self,
 								   molecule,
@@ -1500,6 +1606,213 @@ class VbDriver:
 			)
 		return orbitals
 
+	def _h2_fragment_active_orbitals(self, molecule, basis, active_bond):
+		if not self._is_h2_molecule(molecule):
+			return None
+		try:
+			from .molecule import Molecule
+			from .molecularbasis import MolecularBasis
+			from .scfunrestdriver import ScfUnrestrictedDriver
+			import veloxchem as vlx
+
+			basis_label = basis.get_label()
+			if not basis_label:
+				basis_label = basis.get_main_basis_label()
+			h_atom = Molecule.read_str("H 0.0 0.0 0.0")
+			h_atom.set_charge(0)
+			h_atom.set_multiplicity(2)
+			h_basis = MolecularBasis.read(h_atom, basis_label, ostream=None)
+			scf_driver = ScfUnrestrictedDriver()
+			scf_driver.ostream.mute()
+			scf_driver.xcfun = "hf"
+			scf_driver.guess_unpaired_electrons = "1(1)"
+			scf_driver.compute(h_atom, h_basis)
+			fragment_coefficients = np.array(
+				scf_driver.molecular_orbitals._orbitals[0][:, 0],
+				dtype=float,
+			)
+
+			ao_to_atom, _ = OrbitalAnalyzer.ao_shell_map(molecule, basis)
+			S_ao = vlx.OverlapDriver().compute(molecule, basis).to_numpy()
+			orbitals = []
+			for side, atom in zip(('A', 'B'), active_bond):
+				indices = np.where(ao_to_atom == atom)[0]
+				if len(indices) != len(fragment_coefficients):
+					return None
+				coeffs = np.zeros(basis.get_dimensions_of_basis())
+				coeffs[indices] = fragment_coefficients
+				coeffs = self._s_normalize(coeffs, S_ao)
+				orbitals.append(
+					VbOrbital(
+						label=f"active_{side}_atom_{atom + 1}",
+						coefficients=coeffs,
+						center=int(atom),
+						kind="active",
+					)
+				)
+			return orbitals
+		except Exception:
+			return None
+
+	def _uhf_frontier_active_orbitals(self, molecule, basis, active_bond):
+		try:
+			from .scfunrestdriver import ScfUnrestrictedDriver
+			import veloxchem as vlx
+
+			scf_driver = ScfUnrestrictedDriver()
+			scf_driver.ostream.mute()
+			scf_driver.xcfun = "hf"
+			scf_driver.guess_unpaired_electrons = "1(1),2(-1)"
+			scf_driver.compute(molecule, basis)
+			n_electrons = int(molecule.number_of_electrons())
+			try:
+				multiplicity = int(molecule.get_multiplicity())
+			except Exception:
+				multiplicity = 1
+			n_alpha = (n_electrons + multiplicity - 1) // 2
+			n_beta = n_electrons - n_alpha
+			if n_alpha <= 0 or n_beta <= 0:
+				return None
+
+			overlap = vlx.OverlapDriver().compute(molecule, basis).to_numpy()
+			alpha_coefficients = self._s_normalize(
+				np.array(scf_driver.molecular_orbitals._orbitals[0][:, n_alpha - 1], dtype=float),
+				overlap,
+			)
+			beta_coefficients = self._s_normalize(
+				np.array(scf_driver.molecular_orbitals._orbitals[1][:, n_beta - 1], dtype=float),
+				overlap,
+			)
+			ao_to_atom, _ = OrbitalAnalyzer.ao_shell_map(molecule, basis)
+			atom_a, atom_b = (int(active_bond[0]), int(active_bond[1]))
+
+			def atom_weight(coefficients, atom):
+				indices = np.where(ao_to_atom == atom)[0]
+				if len(indices) == 0:
+					return 0.0
+				projector = np.zeros_like(coefficients)
+				projector[indices] = coefficients[indices]
+				return abs(float(projector @ overlap @ coefficients))
+
+			if (atom_weight(alpha_coefficients, atom_b) + atom_weight(beta_coefficients, atom_a) >
+					atom_weight(alpha_coefficients, atom_a) + atom_weight(beta_coefficients, atom_b)):
+				alpha_coefficients, beta_coefficients = beta_coefficients, alpha_coefficients
+
+			return [
+				VbOrbital(
+					label=f"full_uhf_alpha_frontier_atom_{atom_a + 1}",
+					coefficients=alpha_coefficients,
+					center=atom_a,
+					kind="active",
+				),
+				VbOrbital(
+					label=f"full_uhf_beta_frontier_atom_{atom_b + 1}",
+					coefficients=beta_coefficients,
+					center=atom_b,
+					kind="active",
+				),
+			]
+		except Exception:
+			return None
+
+	def _fragment_radical_active_orbitals(self, molecule, basis, active_bond):
+		try:
+			from .molecule import Molecule
+			from .molecularbasis import MolecularBasis
+			from .scfunrestdriver import ScfUnrestrictedDriver
+			import veloxchem as vlx
+
+			fragments = self._active_bond_fragments(molecule, active_bond)
+			if fragments is None or len(fragments) != 2:
+				return None
+			basis_label = basis.get_label()
+			if not basis_label:
+				basis_label = basis.get_main_basis_label()
+			labels = molecule.get_labels()
+			coordinates = molecule.get_coordinates_in_angstrom()
+			parent_ao_to_atom, _ = OrbitalAnalyzer.ao_shell_map(molecule, basis)
+			overlap = vlx.OverlapDriver().compute(molecule, basis).to_numpy()
+			orbitals = []
+			for side, anchor_atom, fragment_atoms in zip(('A', 'B'), active_bond, fragments):
+				fragment_atoms = tuple(int(atom) for atom in fragment_atoms)
+				if int(anchor_atom) not in fragment_atoms:
+					return None
+				fragment_xyz = "\n".join(
+					f"{labels[atom]} {coordinates[atom, 0]:.12f} {coordinates[atom, 1]:.12f} {coordinates[atom, 2]:.12f}"
+					for atom in fragment_atoms
+				)
+				fragment = Molecule.read_str(fragment_xyz)
+				fragment.set_charge(0)
+				fragment.set_multiplicity(2)
+				fragment_basis = MolecularBasis.read(fragment, basis_label, ostream=None)
+				scf_driver = ScfUnrestrictedDriver()
+				scf_driver.ostream.mute()
+				scf_driver.xcfun = "hf"
+				scf_driver.guess_unpaired_electrons = "1(1)"
+				scf_driver.compute(fragment, fragment_basis)
+				n_alpha = int((fragment.number_of_electrons() + 1) // 2)
+				if n_alpha <= 0:
+					return None
+				fragment_coefficients = np.array(
+					scf_driver.molecular_orbitals._orbitals[0][:, n_alpha - 1],
+					dtype=float,
+				)
+				fragment_ao_to_atom, _ = OrbitalAnalyzer.ao_shell_map(fragment, fragment_basis)
+				coefficients = np.zeros(basis.get_dimensions_of_basis())
+				for local_atom, parent_atom in enumerate(fragment_atoms):
+					fragment_indices = np.where(fragment_ao_to_atom == local_atom)[0]
+					parent_indices = np.where(parent_ao_to_atom == parent_atom)[0]
+					if len(fragment_indices) != len(parent_indices):
+						return None
+					coefficients[parent_indices] = fragment_coefficients[fragment_indices]
+				coefficients = self._s_normalize(coefficients, overlap)
+				orbitals.append(
+					VbOrbital(
+						label=f"fragment_{side}_radical_somo_atom_{anchor_atom + 1}",
+						coefficients=coefficients,
+						center=int(anchor_atom),
+						kind="active",
+					)
+				)
+			return orbitals
+		except Exception:
+			return None
+
+	def _active_bond_fragments(self, molecule, active_bond):
+		try:
+			connectivity = np.array(molecule.get_connectivity_matrix(), dtype=int)
+		except Exception:
+			return None
+		atom_a, atom_b = (int(active_bond[0]), int(active_bond[1]))
+		connectivity[atom_a, atom_b] = 0
+		connectivity[atom_b, atom_a] = 0
+
+		def component(start):
+			seen = {int(start)}
+			stack = [int(start)]
+			while stack:
+				atom = stack.pop()
+				for neighbor in np.where(connectivity[atom] != 0)[0]:
+					neighbor = int(neighbor)
+					if neighbor not in seen:
+						seen.add(neighbor)
+						stack.append(neighbor)
+			return tuple(sorted(seen))
+
+		fragment_a = component(atom_a)
+		fragment_b = component(atom_b)
+		if set(fragment_a) & set(fragment_b):
+			return None
+		return fragment_a, fragment_b
+
+	def _active_bond_distance_angstrom(self, molecule, active_bond):
+		try:
+			coordinates = molecule.get_coordinates_in_angstrom()
+			atom_a, atom_b = int(active_bond[0]), int(active_bond[1])
+			return float(np.linalg.norm(coordinates[atom_a] - coordinates[atom_b]))
+		except Exception:
+			return 0.0
+
 	def _candidate_nao_vector(self, candidate, nao_data):
 		if nao_data is None or not candidate.get('coefficients'):
 			return None
@@ -1608,6 +1921,11 @@ class VbDriver:
 			"metal_ligand_backdonation_blocked": active_space.metadata.get("backdonation_blocked"),
 			"selected_metal_ligand_records": active_space.metadata.get("selected_metal_ligand_records", []),
 			"component_pi_candidate_labels": active_space.metadata.get("component_pi_candidate_labels", []),
+			"active_bond_state_tracked": bool(active_space.metadata.get("active_bond_state_tracked", False)),
+			"active_candidate_fallback": bool(active_space.metadata.get("active_candidate_fallback", False)),
+			"active_uhf_frontier_orbitals": bool(active_space.metadata.get("active_uhf_frontier_orbitals", False)),
+			"active_fragment_radical_orbitals": bool(active_space.metadata.get("active_fragment_radical_orbitals", False)),
+			"active_stretched_orbital_source": active_space.metadata.get("active_stretched_orbital_source"),
 			"h2_stable_atom_centered_active_space": bool(
 				active_space.metadata.get("h2_stable_atom_centered_active_space", False)
 			),
@@ -1643,6 +1961,11 @@ class VbDriver:
 			if embedding is not None:
 				H_ao = embedding["h_effective"]
 				e_nuc = embedding["constant_energy"]
+				orbitals = self._project_active_orbitals_out_of_frozen_density(
+					orbitals,
+					S_ao,
+					embedding.get("frozen_density"),
+				)
 		C = np.column_stack([orb.coefficients for orb in orbitals])
 		S, H = self._build_two_orbital_singlet_matrices(
 			structures, C, H_ao, S_ao, eri_ao, e_nuc)
@@ -1659,6 +1982,7 @@ class VbDriver:
 		if embedding is not None:
 			diagnostics.update({
 				"frozen_hf_embedding": True,
+				"active_orbitals_orthogonalized_to_frozen_space": True,
 				"frozen_electron_count": embedding["frozen_electron_count"],
 				"active_reference_electron_count": embedding["active_electron_count"],
 				"frozen_constant_energy": embedding["constant_energy"],
@@ -1925,7 +2249,11 @@ class VbDriver:
 			},
 		)
 		optimizer_energy = float(result.fun) if np.isfinite(result.fun) else 1.0e6
-		used_fixed_limit = optimizer_energy > initial_energy + 1.0e-10
+		unphysical_non_h2_lowering = (
+			not self._is_h2_molecule(molecule) and
+			initial_energy - optimizer_energy > 0.50
+		)
+		used_fixed_limit = optimizer_energy > initial_energy + 1.0e-10 or unphysical_non_h2_lowering
 		parameters = initial_parameters if used_fixed_limit else np.array(result.x, dtype=float)
 		S_compact, H_compact = compact_matrices(parameters)
 		energy, compact_coeffs, compact_weights, kept, lowdin_weights = self._solve_generalized_vb(
@@ -3180,6 +3508,19 @@ class VbDriver:
 		total_density = getattr(analysis, 'density', None)
 		if nao_data is None or total_density is None:
 			return None
+		try:
+			total_electrons = float(np.einsum(
+				'uv,vu->',
+				np.array(total_density, dtype=float),
+				s_ao,
+				optimize=True,
+			))
+			active_target_electrons = float(
+				active_space.metadata.get('electron_count') or 0.0)
+			if active_target_electrons >= total_electrons - 1.0e-8:
+				return None
+		except Exception:
+			pass
 		active_vector = self._candidate_nao_vector(
 			active_space.active_candidate,
 			nao_data,
@@ -3236,7 +3577,30 @@ class VbDriver:
 			"reference_total_energy": reference_total_energy,
 			"active_electron_count": active_electrons,
 			"frozen_electron_count": frozen_electrons,
+			"frozen_density": frozen_density,
 		}
+
+	def _project_active_orbitals_out_of_frozen_density(self, orbitals, overlap, frozen_density):
+		if frozen_density is None:
+			return orbitals
+		projector = 0.5 * np.array(frozen_density, dtype=float) @ overlap
+		projected_orbitals = []
+		for orbital in orbitals:
+			coefficients = np.array(orbital.coefficients, dtype=float)
+			projected = coefficients - projector @ coefficients
+			try:
+				projected = self._s_normalize(projected, overlap)
+			except RuntimeError:
+				projected = coefficients
+			projected_orbitals.append(
+				VbOrbital(
+					label=orbital.label,
+					coefficients=projected,
+					center=orbital.center,
+					kind=orbital.kind,
+				)
+			)
+		return projected_orbitals
 
 	def _active_subspace_reference_density(self, active_space, total_density, s_ao):
 		try:

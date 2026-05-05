@@ -40,16 +40,27 @@ The analyzer identifies orbitals; the VB driver decides how those orbitals becom
 
 For metal-ligand systems, the analyzer records are intentionally diagnostic: `ML/sigma-acceptor` marks ligand-to-metal sigma donation, while `ML/pi-donor` marks metal-to-ligand pi back-donation into ligand pi-type nonbonding/acceptor space. `VbDriver` can now explicitly select these records as fixed-orbital active-space seeds. The analyzer does not activate them automatically, and NBO still keeps them out of the primary Lewis table.
 
-## Current status: 2026-05-04
+## Current status: 2026-05-05
 
 `VbDriver` is currently a fixed-orbital VB development driver with shared analyzer input, validated two-electron spin-adapted algebra, frozen-HF embedding, and a determinant-CI fallback for larger π active spaces.
+
+Current organic bond-breaking progress:
+
+- H2 is the strict two-electron validation gate. VBCI, VBSCF, and H2 BOVB now approach the UHF 5.0 Angstrom asymptote, while RHF correctly fails at dissociation.
+- Ethane C-C is split into two roles:
+   - the rigid scan is an active-space regression test for state tracking, frozen-HF embedding, and stretched-orbital continuity;
+   - the UHF-relaxed constrained scan is the chemically meaningful validation path, using fixed C-C distances from 1.30 to 5.00 Angstrom and evaluating RHF/UHF/VB single points on the same relaxed geometries.
+- Ethane stretched sigma bonds now use full-system UHF frontier active orbitals from 1.8 Angstrom onward. This removes the previous active-orbital branch spike around 1.9-2.5 Angstrom.
+- Ethane VBCI is currently the useful fixed-orbital VB baseline. VBSCF remains diagnostic because it is still numerically identical to VBCI for this model.
+- Non-H2 two-orbital BOVB is deliberately held at the fixed-orbital limit for now. This removes the discontinuous optimized/fixed BOVB branch in ethane, but it is not a completed polyatomic BOVB model.
+- Ethylene C-C remains diagnostic only: the current pi-only two-electron active space cannot describe full C=C cleavage. A four-electron sigma+pi active space is required before interpreting ethylene as a physical dissociation curve.
 
 Implemented and validated:
 
 - Shared `OrbitalAnalyzer` consumption for active-orbital selection and active/inactive/frozen candidate diagnostics.
 - H₂ one-active-bond VB-CI with covalent/ionic structures, spin-adapted two-electron algebra, generalized overlap metric pruning, and Chirgwin-Coulson/Löwdin weights.
 - H₂ one-angle VB-SCF diagnostic path retained as a prototype, while fixed-orbital VB-CI remains the validated baseline.
-- H₂ and ethylene-style two-orbital BOVB with structure-specific, center-local breathing active orbitals, frozen-HF embedding where applicable, and regression coverage against the fixed-orbital VB-CI baseline.
+- H₂ two-orbital BOVB with structure-specific, center-local breathing active orbitals and regression coverage against the fixed-orbital VB-CI baseline.
 - Stable automatic H₂ active-space selection: H₂ scans now use an atom-centered H-H active pair instead of independently selected analyzer `BD_sigma_*` candidates, avoiding active-label switches along dissociation curves.
 - Allyl-cation compact-CSF BOVB for the two-electron three-center π singlet checkpoint, using center-local π breathing directions in split-valence bases.
 - Ethylene one-active-π VB-CI with frozen sigma/core HF embedding.
@@ -73,7 +84,13 @@ Current boundaries:
 
 - The multi-center π engine is still fixed-orbital; it is not BOVB.
 - Larger π systems currently solve a determinant-CI reference and then project chemically compact CSF templates onto that root; only the allyl cation 2e/3π singlet path has been promoted to a compact CSF Hamiltonian so far.
-- BOVB is currently implemented for two-orbital/two-electron singlet active spaces, for the allyl-cation compact-CSF checkpoint, and for metal-ligand determinant-CI channel spaces as a channel-local breathing-orbital relaxation layer. Metal-ligand VB-SCF currently provides the corresponding common-active-orbital determinant reference for the same channel selections, while BOVB adds structure/channel-local breathing freedom. In bases with same-center external functions, H₂ and allyl compact-CSF can lower below their zero-amplitude fixed-orbital limits; minimal bases can still collapse to the fixed-orbital limit because no external breathing direction exists. Automatic H₂ scans use a stable atom-centered active pair to keep dissociation curves on the same active-space branch. Metal-ligand sigma-channel scans now support state-tracked active orbitals and corrected ECP total-energy reporting, but the resulting VB-SCF/BOVB sigma traces remain diagnostics until they produce physically stable Pd--ligand potential curves. The combined sigma+pi back-donation determinant space still needs a size-consistent four-electron total-energy formulation before it should be interpreted as a quantitative dissociation curve. Larger organic π systems beyond the allyl checkpoint are still fixed-orbital.
+- BOVB is currently reliable only for the validated H2 two-orbital path and the allyl-cation compact-CSF checkpoint. For non-H2 two-orbital organic active spaces, BOVB is forced to the fixed-orbital limit until a constrained, continuous, size-consistent breathing-orbital model is implemented. Metal-ligand BOVB channel scans remain diagnostics. Metal-ligand sigma-channel scans now support state-tracked active orbitals and corrected ECP total-energy reporting, but the resulting VB-SCF/BOVB sigma traces are not validated production potential curves. The combined sigma+pi back-donation determinant space still needs a size-consistent four-electron total-energy formulation before it should be interpreted quantitatively. Larger organic π systems beyond the allyl checkpoint are still fixed-orbital.
+
+Immediate next method work:
+
+- Implement a real VBSCF orbital-optimization path for embedded organic active bonds; the current ethane VBSCF trace is effectively VBCI.
+- Implement constrained non-H2 BOVB breathing orbitals that vary continuously along dissociation and do not over-stabilize separated radical limits.
+- Add a four-electron sigma+pi active space for ethylene C=C cleavage.
 
 ## Metal-ligand scan checkpoint: 2026-05-04
 
