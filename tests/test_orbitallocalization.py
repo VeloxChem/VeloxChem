@@ -34,89 +34,42 @@ class TestOrbitalLocalization:
         # between the MOs is "identical", there can still be a global phase
         # for each individual MO.
         C_aligned = C_test.copy()
-        mos_to_swap = {}
+        unmatched = set(range(C_ref.shape[1]))
 
         for i in range(C_ref.shape[1]):
-            if np.max(np.abs(C_ref[:, i] - C_test[:, i])) < 1e-6:
-                continue
-            elif np.max(np.abs(C_ref[:, i] + C_test[:, i])) < 1e-6:
-                C_aligned[:, i] *= -1.0
-            else:
-                # check if degenerate MOs got swapped
-                for j in range(i+1, C_ref.shape[1]):
-                    if np.max(np.abs(C_ref[:, j] - C_test[:, i])) < 1e-6:
-                        mos_to_swap[(i, j)] = 1
-                        break
-                    elif np.max(np.abs(C_ref[:, j] + C_test[:, i])) < 1e-6:
-                        mos_to_swap[(i, j)] = 1
-                        C_aligned[:, i] *= -1.0
-                        break
-                    else:
-                        continue
-        
-        if mos_to_swap:
-            for pair in mos_to_swap:
-                C_aligned[:, [pair[0], pair[1]]] = C_aligned[:, [pair[1], pair[0]]]
-            # catch remaining phase conventions from swapped MOs
-            C_aligned = self._align_phases(C_ref, C_aligned)
+            for j in list(unmatched):
+                if np.max(np.abs(C_ref[:, i] - C_test[:, j])) < 1e-6:
+                    C_aligned[:, i] = C_test[:, j]
+                    unmatched.remove(j)
+                    break
+                elif np.max(np.abs(C_ref[:, i] + C_test[:, j])) < 1e-6:
+                    C_aligned[:, i] = -C_test[:, j]
+                    unmatched.remove(j)
+                    break
 
         return C_aligned
 
-    def test_boys(self):
+    @pytest.mark.parametrize(
+        "method, pm_projector, ref_name",
+        [
+            ("boys", None, "orbloc_boys_C"),
+            ("pm", "mulliken", "orbloc_pm_mulliken_C"),
+            ("pm", "lowdin", "orbloc_pm_lowdin_C"),
+        ],
+    )
+    def test_localization(self, method, pm_projector, ref_name):
         molecule, basis, scf_res, n_occ = self._build_system()
 
         loc = OrbitalLocalizationDriver()
-        loc.method = "boys"
+        loc.method = method
+        if pm_projector is not None:
+            loc.pm_projector = pm_projector
         loc.ostream.mute()
         C_loc = loc.compute(molecule, basis, scf_res, mo_range=(1, n_occ))
         C_loc = C_loc["loc_orbs"].alpha_to_numpy()
 
         # Load reference
-        ref_path = Path(__file__).parent / "data" / "orbloc_boys_C.npy"
-        C_ref_occ = np.load(ref_path)
-        C_ref = np.zeros(C_loc.shape)
-        C_ref[:, :n_occ] = C_ref_occ[:, :]
-
-        # Align phases
-        C_loc = self._align_phases(C_ref, C_loc)
-
-        # Compare
-        np.testing.assert_allclose(C_loc, C_ref, atol=1e-6)
-
-    def test_pipek_mezey_mulliken(self):
-        molecule, basis, scf_res, n_occ = self._build_system()
-
-        loc = OrbitalLocalizationDriver()
-        loc.method = "pm"
-        loc.pm_projector = "mulliken"
-        loc.ostream.mute()
-        C_loc = loc.compute(molecule, basis, scf_res, mo_range=(1, n_occ))
-        C_loc = C_loc["loc_orbs"].alpha_to_numpy()
-
-        # Load reference
-        ref_path = Path(__file__).parent / "data" / "orbloc_pm_mulliken_C.npy"
-        C_ref_occ = np.load(ref_path)
-        C_ref = np.zeros(C_loc.shape)
-        C_ref[:, :n_occ] = C_ref_occ[:, :]
-
-        # Align phases
-        C_loc = self._align_phases(C_ref, C_loc)
-
-        # Compare
-        np.testing.assert_allclose(C_loc, C_ref, atol=1e-6)
-
-    def test_pipek_mezey_lowdin(self):
-        molecule, basis, scf_res, n_occ = self._build_system()
-
-        loc = OrbitalLocalizationDriver()
-        loc.method = "pm"
-        loc.pm_projector = "lowdin"
-        loc.ostream.mute()
-        C_loc = loc.compute(molecule, basis, scf_res, mo_range=(1, n_occ))
-        C_loc = C_loc["loc_orbs"].alpha_to_numpy()
-
-        # Load reference
-        ref_path = Path(__file__).parent / "data" / "orbloc_pm_lowdin_C.npy"
+        ref_path = Path(__file__).parent / "data" / f"{ref_name}.npy"
         C_ref_occ = np.load(ref_path)
         C_ref = np.zeros(C_loc.shape)
         C_ref[:, :n_occ] = C_ref_occ[:, :]
