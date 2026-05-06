@@ -44,7 +44,7 @@ from .molecule import Molecule
 from .atomtypeidentifier import AtomTypeIdentifier
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .errorhandler import assert_msg_critical
-from .mofutils import svd_superimpose
+from .superimpose import svd_superimpose
 from .molecularbasis import MolecularBasis
 from .respchargesdriver import RespChargesDriver
 
