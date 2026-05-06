@@ -249,6 +249,46 @@ class OrbitalLocalizationDriver:
 
         return 0.25 * np.arctan2(g, h)
 
+    def _mo_slice(self, mo_range, ncol, spin_label=""):
+        """
+        Converts an orbital range to Python slice bounds.
+
+        User-facing ``mo_range`` values are one-based and inclusive:
+        ``(1, nocc)`` selects orbitals 1 through nocc. Python slices are
+        zero-based and half-open, so the same range is returned as
+        ``(0, nocc)`` for use in ``array[:, start:end]``.
+
+        :param mo_range:
+            One-based inclusive range (start, end).
+        :param ncol:
+            Number of orbital columns available.
+        :param spin_label:
+            Optional spin label for error messages.
+        :return:
+            Tuple of zero-based half-open Python slice bounds (start, end).
+        """
+
+        assert_msg_critical(
+            mo_range is not None,
+            "OrbitalLocalization: mo_range must be set before creating "
+            "Python slice bounds")
+        mo_start, mo_end = mo_range
+        label = f"{spin_label} " if spin_label else ""
+
+        assert_msg_critical(
+            mo_start > 0,
+            f"OrbitalLocalization: {label}mo_range starts counting from 1")
+        assert_msg_critical(
+            mo_start <= mo_end,
+            f"OrbitalLocalization: {label}mo_range start must be less than "
+            f"or equal to end")
+        assert_msg_critical(
+            mo_end <= ncol,
+            f"OrbitalLocalization: {label}mo_range end is larger than the "
+            f"number of orbitals")
+
+        return mo_start - 1, mo_end
+
     def _mol_orbs_wrapper(self, loc_orbs, scf_res, mo_range_alpha,
                           mo_range_beta=None):
         """
@@ -260,29 +300,24 @@ class OrbitalLocalizationDriver:
             SCF result dictionary providing orbital shapes and occupations.
         :param mo_range_alpha:
             One-based inclusive range (start, end) for spin-alpha
-            localized MOs, or None if all alpha MOs were localized.
+            localized MOs.
         :param mo_range_beta:
             One-based inclusive range (start, end) for spin-beta
-            localized MOs. Defaults to mo_range_alpha.
+            localized MOs.
         :return:
             MolecularOrbitals instance with localized coefficients and zero
             orbital energies.
         """
 
-        def _mo_slice(mo_range, ncol):
-            if mo_range is None:
-                return 0, ncol
-            return mo_range[0] - 1, mo_range[1]
-
-        mo_start_a, mo_end_a = _mo_slice(mo_range_alpha,
-                                         scf_res["C_alpha"].shape[1])
+        mo_start_a, mo_end_a = self._mo_slice(
+            mo_range_alpha, scf_res["C_alpha"].shape[1], "alpha")
         zero_ene_alpha = np.zeros(scf_res["E_alpha"].shape)[mo_start_a:mo_end_a]
         C_alpha_loc = np.zeros(scf_res["C_alpha"].shape)
         C_alpha_loc[:, mo_start_a:mo_end_a] = loc_orbs[0][:, :]
 
         if len(loc_orbs) == 2:
-            mo_start_b, mo_end_b = _mo_slice(
-                mo_range_beta, scf_res["C_beta"].shape[1])
+            mo_start_b, mo_end_b = self._mo_slice(
+                mo_range_beta, scf_res["C_beta"].shape[1], "beta")
             zero_ene_beta = np.zeros(scf_res["E_beta"].shape)[mo_start_b:mo_end_b]
             C_beta_loc = np.zeros(scf_res["C_beta"].shape)
             C_beta_loc[:, mo_start_b:mo_end_b] = loc_orbs[1][:, :]
@@ -322,17 +357,14 @@ class OrbitalLocalizationDriver:
         :param mos:
             Molecular orbital coefficient matrix to localize.
         :param mo_range:
-            One-based inclusive range (start, end) of MOs to localize,
-            or None to localize all MOs.
+            One-based inclusive range (start, end) of MOs to localize.
         :return:
             Localized MO coefficient matrix.
         """
 
         # localize only user defined MOs, using one-based inclusive mo_range
-        if mo_range:
-            self.C = mos[:, mo_range[0]-1:mo_range[1]].copy()
-        else:
-            self.C = mos.copy()
+        mo_start, mo_end = self._mo_slice(mo_range, mos.shape[1])
+        self.C = mos[:, mo_start:mo_end].copy()
 
         norb = self.C.shape[1]
         S = compute_overlap_integrals(molecule, basis)
@@ -412,17 +444,14 @@ class OrbitalLocalizationDriver:
         :param mos:
             Molecular orbital coefficient matrix to localize.
         :param mo_range:
-            One-based inclusive range (start, end) of MOs to localize,
-            or None to localize all MOs.
+            One-based inclusive range (start, end) of MOs to localize.
         :return:
             Localized MO coefficient matrix.
         """
 
         # localize only user defined MOs, using one-based inclusive mo_range
-        if mo_range:
-            self.C = mos[:, mo_range[0]-1:mo_range[1]].copy()
-        else:
-            self.C = mos.copy()
+        mo_start, mo_end = self._mo_slice(mo_range, mos.shape[1])
+        self.C = mos[:, mo_start:mo_end].copy()
 
         norb = self.C.shape[1]
         S = compute_overlap_integrals(molecule, basis)
@@ -532,6 +561,15 @@ class OrbitalLocalizationDriver:
                 f"only 'restricted' and 'unrestricted'")
 
         # check mo_range
+        def _check_mo_range_occupations(mo_range, occupations, spin_label):
+            mo_start, mo_end = self._mo_slice(
+                mo_range, len(occupations), spin_label)
+            occs = np.asarray(occupations)[mo_start:mo_end]
+            assert_msg_critical(
+                np.allclose(occs, occs[0]),
+                f"OrbitalLocalization: all orbitals in {spin_label} "
+                f"mo_range must have the same occupation number")
+
         if mo_range is None:
             mo_range_alpha = (
                 1, molecule.number_of_alpha_occupied_orbitals(basis))
@@ -545,20 +583,20 @@ class OrbitalLocalizationDriver:
                 assert_msg_critical(
                     len(mo_range) == 2,
                     "OrbitalLocalization: mo_range must have length 2 for restricted")
-                assert_msg_critical(
-                    mo_range[0] > 0,
-                    "OrbitalLocalization: mo_range starts counting from 1")
                 mo_range_alpha = mo_range
+                _check_mo_range_occupations(
+                    mo_range_alpha, scf_res["occ_alpha"], "alpha")
                 mo_range_beta = None
             elif scf_res["scf_type"] == "unrestricted":
                 assert_msg_critical(
                     len(mo_range) == 4,
                     "OrbitalLocalization: mo_range must have length 4 for unrestricted")
-                assert_msg_critical(
-                    mo_range[0] > 0 and mo_range[2] > 0,
-                    "OrbitalLocalization: mo_range starts counting from 1")
                 mo_range_alpha = mo_range[:2]
                 mo_range_beta = mo_range[2:]
+                _check_mo_range_occupations(
+                    mo_range_alpha, scf_res["occ_alpha"], "alpha")
+                _check_mo_range_occupations(
+                    mo_range_beta, scf_res["occ_beta"], "beta")
 
         # localize orbitals
         if scf_res["scf_type"] == "restricted":

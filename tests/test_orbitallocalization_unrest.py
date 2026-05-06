@@ -1,6 +1,7 @@
 from pathlib import Path
 import numpy as np
 import pytest
+from mpi4py import MPI
 
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -89,3 +90,19 @@ class TestOrbitalLocalizationUnrestricted:
             # Compare
             np.testing.assert_allclose(C_loc_a, C_ref_a, atol=1e-6)
             np.testing.assert_allclose(C_loc_b, C_ref_b, atol=1e-6)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason="pytest.raises only valid in serial")
+    def test_mo_range_requires_uniform_occupations(self):
+        molecule, basis, scf_res, n_occ_a, n_occ_b = self._build_system()
+
+        loc = OrbitalLocalizationDriver()
+        loc.ostream.mute()
+
+        with pytest.raises(AssertionError, match="same occupation number"):
+            loc.compute(molecule, basis, scf_res,
+                        mo_range=(n_occ_a, n_occ_a + 1, 1, n_occ_b))
+
+        with pytest.raises(AssertionError, match="same occupation number"):
+            loc.compute(molecule, basis, scf_res,
+                        mo_range=(1, n_occ_a, n_occ_b, n_occ_b + 1))
