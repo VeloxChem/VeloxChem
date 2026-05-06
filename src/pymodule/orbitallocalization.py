@@ -37,6 +37,7 @@ from .mathutils import symmetric_matrix_function
 from .oneeints import compute_electric_dipole_integrals, compute_overlap_integrals
 from .molecularorbitals import MolecularOrbitals, molorb
 from .visualizationdriver import VisualizationDriver
+from .errorhandler import assert_msg_critical
 from .outputstream import OutputStream
 
 
@@ -248,7 +249,8 @@ class OrbitalLocalizationDriver:
 
         return 0.25 * np.arctan2(g, h)
 
-    def _mol_orbs_wrapper(self, loc_orbs, scf_res, mo_range):
+    def _mol_orbs_wrapper(self, loc_orbs, scf_res, mo_range_alpha,
+                          mo_range_beta=None):
         """
         Wraps localized orbitals into a MolecularOrbitals container.
 
@@ -256,35 +258,39 @@ class OrbitalLocalizationDriver:
             List of localized orbital coefficient matrices (one per spin).
         :param scf_res:
             SCF result dictionary providing orbital shapes and occupations.
-        :param mo_range:
-            One-based inclusive range (start, end) of localized MOs,
-            or None if all MOs were localized.
+        :param mo_range_alpha:
+            One-based inclusive range (start, end) for spin-alpha
+            localized MOs, or None if all alpha MOs were localized.
+        :param mo_range_beta:
+            One-based inclusive range (start, end) for spin-beta
+            localized MOs. Defaults to mo_range_alpha.
         :return:
             MolecularOrbitals instance with localized coefficients and zero
             orbital energies.
         """
 
-        # get 0-based indices from 1-based inclusive mo_range;
-        # when mo_range is None all MOs were localized
-        if mo_range is None:
-            mo_start = 0
-            mo_end = scf_res["C_alpha"].shape[1]
-        else:
-            mo_start = mo_range[0] - 1
-            mo_end = mo_range[1]
+        def _mo_slice(mo_range, ncol):
+            if mo_range is None:
+                return 0, ncol
+            return mo_range[0] - 1, mo_range[1]
 
-        zero_energies = np.zeros(scf_res["E_alpha"].shape)[mo_start:mo_end]
-
+        mo_start_a, mo_end_a = _mo_slice(mo_range_alpha,
+                                         scf_res["C_alpha"].shape[1])
+        zero_ene_alpha = np.zeros(scf_res["E_alpha"].shape)[mo_start_a:mo_end_a]
         C_alpha_loc = np.zeros(scf_res["C_alpha"].shape)
-        C_alpha_loc[:, mo_start:mo_end] = loc_orbs[0][:, :]
+        C_alpha_loc[:, mo_start_a:mo_end_a] = loc_orbs[0][:, :]
+
         if len(loc_orbs) == 2:
+            mo_start_b, mo_end_b = _mo_slice(
+                mo_range_beta, scf_res["C_beta"].shape[1])
+            zero_ene_beta = np.zeros(scf_res["E_beta"].shape)[mo_start_b:mo_end_b]
             C_beta_loc = np.zeros(scf_res["C_beta"].shape)
-            C_beta_loc[:, mo_start:mo_end] = loc_orbs[1][:, :]
+            C_beta_loc[:, mo_start_b:mo_end_b] = loc_orbs[1][:, :]
 
         if scf_res["scf_type"] == "restricted":
             return MolecularOrbitals(
                 orbs=[C_alpha_loc],
-                enes=[zero_energies],
+                enes=[zero_ene_alpha],
                 occs=[scf_res["occ_alpha"]],
                 orbs_type=molorb.rest,
             )
@@ -292,23 +298,19 @@ class OrbitalLocalizationDriver:
         elif scf_res["scf_type"] == "unrestricted":
             return MolecularOrbitals(
                 orbs=[C_alpha_loc, C_beta_loc],
-                enes=[zero_energies, zero_energies],
+                enes=[zero_ene_alpha, zero_ene_beta],
                 occs=[scf_res["occ_alpha"], scf_res["occ_beta"]],
                 orbs_type=molorb.unrest,
             )
 
-        elif scf_res["scf_type"] == "restricted_openshell":
-            return MolecularOrbitals(
-                orbs=[C_alpha_loc],
-                enes=[zero_energies],
-                occs=[scf_res["occ_alpha"], scf_res["occ_beta"]],
-                orbs_type=molorb.restopen,
-            )
-
         else:
-            raise ValueError(f"scf type {scf_res['scf_type']} unknown")
+            assert_msg_critical(
+                False,
+                f"OrbitalLocalization: scf_type "
+                f"'{scf_res['scf_type']}' is not supported; "
+                f"only 'restricted' and 'unrestricted'")
 
-    def pipek_mezey(self, molecule, basis, mos, mo_range=None):
+    def pipek_mezey(self, molecule, basis, mos, mo_range):
         """
         Performs Pipek–Mezey orbital localization using Jacobi sweeps.
         Uses the projector specified by self.pm_projector.
@@ -338,9 +340,10 @@ class OrbitalLocalizationDriver:
         # check the validity of the overlap matrix
         eigs = np.linalg.eigvalsh(S)
         min_eig = np.min(eigs)
-        if min_eig < -1.0e-10:
-            raise ValueError("Overlap matrix is not positive semidefinite; "
-                             f"minimum eigenvalue = {min_eig:.3e}")
+        assert_msg_critical(
+            min_eig >= -1.0e-10,
+            f"OrbitalLocalization: overlap matrix is not positive "
+            f"semidefinite; minimum eigenvalue = {min_eig:.3e}")
 
         # transform MOs according to projector
         self.C_eff = None
@@ -398,7 +401,7 @@ class OrbitalLocalizationDriver:
 
         return self.C.copy()
 
-    def boys(self, molecule, basis, mos, mo_range=None):
+    def boys(self, molecule, basis, mos, mo_range):
         """
         Performs Boys (Foster–Boys) orbital localization using Jacobi sweeps.
 
@@ -427,9 +430,10 @@ class OrbitalLocalizationDriver:
         # check the validity of the overlap matrix
         eigs = np.linalg.eigvalsh(S)
         min_eig = np.min(eigs)
-        if min_eig < -1.0e-10:
-            raise ValueError("Overlap matrix is not positive semidefinite; "
-                             f"minimum eigenvalue = {min_eig:.3e}")
+        assert_msg_critical(
+            min_eig >= -1.0e-10,
+            f"OrbitalLocalization: overlap matrix is not positive "
+            f"semidefinite; minimum eigenvalue = {min_eig:.3e}")
 
         mu = compute_electric_dipole_integrals(molecule, basis)
 
@@ -495,15 +499,17 @@ class OrbitalLocalizationDriver:
         :param basis:
             AO basis set.
         :param scf_res:
-            SCF result dictionary with keys "C_alpha", "C_beta",
-            "E_alpha", "occ_alpha", "occ_beta", "scf_type".
+            SCF result dictionary.
         :param mo_range:
-            One-based inclusive range (start, end) of MOs to localize,
-            or None to localize all MOs.
+            One-based inclusive range (start, end) of MOs to localize.
+            If None, defaults to occupied orbitals per spin:
+            alpha uses molecule.number_of_alpha_occupied_orbitals(basis),
+            beta uses molecule.number_of_beta_occupied_orbitals(basis).
         :return:
             Dictionary {"loc_orbs": MolecularOrbitals instance}.
         """
 
+        # check method and pm_projector
         if self.method == "boys":
             compute_func = self.boys
         elif self.method == "pm":
@@ -517,30 +523,59 @@ class OrbitalLocalizationDriver:
                 f"only boys and pm are currently supported, "
                 f"not {self.method}")
 
-        if mo_range:
-            if len(mo_range) != 2:
-                raise ValueError("mo_range object should be of length 2")
-            if mo_range[0] == 0:
-                raise ValueError("mo_range starts counting from 1")
+        # check scf_type
+        if scf_res["scf_type"] not in ["restricted", "unrestricted"]:
+            assert_msg_critical(
+                False,
+                f"OrbitalLocalization: scf_type "
+                f"'{scf_res['scf_type']}' is not supported; "
+                f"only 'restricted' and 'unrestricted'")
 
-        if scf_res["scf_type"] == "unrestricted":
-            # localize alpha and beta independently
-            alpha = compute_func(
-                molecule, basis, scf_res["C_alpha"],
-                mo_range=mo_range,
-            )
-            beta = compute_func(
-                molecule, basis, scf_res["C_beta"],
-                mo_range=mo_range,
-            )
-            return {
-                "loc_orbs": self._mol_orbs_wrapper([alpha, beta], scf_res, mo_range),
-            }
+        # check mo_range
+        if mo_range is None:
+            mo_range_alpha = (
+                1, molecule.number_of_alpha_occupied_orbitals(basis))
+            if scf_res["scf_type"] == "unrestricted":
+                mo_range_beta = (
+                    1, molecule.number_of_beta_occupied_orbitals(basis))
+            else:
+                mo_range_beta = None
         else:
-            alpha = compute_func(
-                molecule, basis, scf_res["C_alpha"],
-                mo_range=mo_range,
-            )
+            if scf_res["scf_type"] == "restricted":
+                assert_msg_critical(
+                    len(mo_range) == 2,
+                    "OrbitalLocalization: mo_range must have length 2 for restricted")
+                assert_msg_critical(
+                    mo_range[0] > 0,
+                    "OrbitalLocalization: mo_range starts counting from 1")
+                mo_range_alpha = mo_range
+                mo_range_beta = None
+            elif scf_res["scf_type"] == "unrestricted":
+                assert_msg_critical(
+                    len(mo_range) == 4,
+                    "OrbitalLocalization: mo_range must have length 4 for unrestricted")
+                assert_msg_critical(
+                    mo_range[0] > 0 and mo_range[2] > 0,
+                    "OrbitalLocalization: mo_range starts counting from 1")
+                mo_range_alpha = mo_range[:2]
+                mo_range_beta = mo_range[2:]
+
+        # localize orbitals
+        if scf_res["scf_type"] == "restricted":
+            alpha = compute_func(molecule, basis, scf_res["C_alpha"],
+                                 mo_range=mo_range_alpha)
             return {
-                "loc_orbs": self._mol_orbs_wrapper([alpha], scf_res, mo_range),
+                "loc_orbs": self._mol_orbs_wrapper(
+                    [alpha], scf_res, mo_range_alpha),
+            }
+
+        elif scf_res["scf_type"] == "unrestricted":
+            alpha = compute_func(molecule, basis, scf_res["C_alpha"],
+                                 mo_range=mo_range_alpha)
+            beta = compute_func(molecule, basis, scf_res["C_beta"],
+                                mo_range=mo_range_beta)
+            return {
+                "loc_orbs": self._mol_orbs_wrapper(
+                    [alpha, beta], scf_res,
+                    mo_range_alpha, mo_range_beta),
             }
