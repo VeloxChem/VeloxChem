@@ -66,20 +66,22 @@ class TestOrbitalLocalization:
         if pm_projector is not None:
             loc.pm_projector = pm_projector
         loc.ostream.mute()
-        C_loc = loc.compute(molecule, basis, scf_res, mo_range=(1, n_occ))
-        C_loc = C_loc["loc_orbs"].alpha_to_numpy()
 
-        # Load reference
-        ref_path = Path(__file__).parent / "data" / f"{ref_name}.npy"
-        C_ref_occ = np.load(ref_path)
-        C_ref = np.zeros(C_loc.shape)
-        C_ref[:, :n_occ] = C_ref_occ[:, :]
+        for mo_range in [None, (1, n_occ)]:
+            C_loc = loc.compute(molecule, basis, scf_res, mo_range=mo_range)
+            C_loc = C_loc["loc_orbs"].alpha_to_numpy()
 
-        # Align phases
-        C_loc = self._align_phases(C_ref, C_loc)
+            # Load reference
+            ref_path = Path(__file__).parent / "data" / f"{ref_name}.npy"
+            C_ref_occ = np.load(ref_path)
+            C_ref = np.zeros(C_loc.shape)
+            C_ref[:, :n_occ] = C_ref_occ[:, :]
 
-        # Compare
-        np.testing.assert_allclose(C_loc, C_ref, atol=1e-6)
+            # Align phases
+            C_loc = self._align_phases(C_ref, C_loc)
+
+            # Compare
+            np.testing.assert_allclose(C_loc, C_ref, atol=1e-6)
 
     @pytest.mark.parametrize("method", ["boys", "pm"])
     def test_compute_does_not_mutate_scf_orbitals(self, method):

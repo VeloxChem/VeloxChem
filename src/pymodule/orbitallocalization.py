@@ -409,7 +409,7 @@ class OrbitalLocalizationDriver:
                     if abs(theta) < 1e-12:
                         continue
 
-                    # safeguard
+                    # safeguard (reduce step-size)
                     theta *= 0.5
 
                     self._rotate(i, j, theta, method="pm")
