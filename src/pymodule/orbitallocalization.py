@@ -42,15 +42,16 @@ from .outputstream import OutputStream
 
 class OrbitalLocalizationDriver:
     """
-    Orbital localization driver
+    Implements Pipek–Mezey and Boys orbital localization.
 
     :param ostream:
-        The output stream.
+        Output stream.
 
-    Methods:
-        - pipek_mezey(projector="lowdin" | "mulliken")
-        - boys(dipole_integrals)
-        - edmiston_ruedenberg(eri)  # placeholder
+    Instance variables
+        - max_iter: Maximum number of Jacobi sweeps.
+        - thresh: Convergence threshold for rotation angle sum.
+        - method: Localization scheme ("pm" or "boys").
+        - pm_projector: Population projector for PM ("mulliken" or "lowdin").
     """
 
     def __init__(self, ostream=None):
@@ -66,11 +67,30 @@ class OrbitalLocalizationDriver:
         self.thresh = 1e-6
 
         self.method = "pm"
-        self.pm_projector = "mulliken"
+        self.pm_projector = "lowdin"
+
+        # Working arrays populated by localization routines
+        self.C = None
+        self.SC = None
+        self.C_eff = None
+        self.r = None
+        self.P_atom = None
+        self.atom_indices = None
 
     def _rotate(self, i, j, theta, method="boys"):
         """
-        Rotate MO pair around theta
+        Rotates MO pair (i, j) by angle theta and updates associated
+        auxiliary arrays.
+
+        :param i:
+            Index of first MO.
+        :param j:
+            Index of second MO.
+        :param theta:
+            Rotation angle in radians.
+        :param method:
+            Localization method ("pm" or "boys"); determines which auxiliary
+            arrays are rotated alongside the MO coefficients.
         """
 
         c = np.cos(theta)
@@ -84,14 +104,14 @@ class OrbitalLocalizationDriver:
         self.C[:, j] = -s * Ci + c * Cj
 
         if method == "pm":
-            if self.C_eff is not None:
-                # rotate transformed MOs
+            if self.pm_projector == "lowdin":
+                # rotate Lowdin-transformed MOs
                 Ci = self.C_eff[:, i].copy()
                 Cj = self.C_eff[:, j].copy()
 
                 self.C_eff[:, i] = c * Ci + s * Cj
                 self.C_eff[:, j] = -s * Ci + c * Cj
-            if self.SC is not None:
+            elif self.pm_projector == "mulliken":
                 # rotate overlap-weighted MOs
                 SCi = self.SC[:, i].copy()
                 SCj = self.SC[:, j].copy()
@@ -118,7 +138,11 @@ class OrbitalLocalizationDriver:
 
     def _build_atom_projector(self):
         """
-        Compute AO to atom projector
+        Builds the AO-to-atom projector from atom indices.
+
+        Sets self.P_atom to a (n_atoms, n_basis) matrix where each row
+        corresponds to one atom and entries are 1.0 for AOs belonging to
+        that atom.
         """
         n_atoms = len(self.atom_indices)
         n_basis = self.C.shape[0]
@@ -132,7 +156,16 @@ class OrbitalLocalizationDriver:
 
     def _pm_pair(self, i, j):
         """
-        Compute prerequisites for analytical Jacobian
+        Computes per-atom populations and transition population for
+        MO pair (i, j).
+
+        :param i:
+            Index of first MO.
+        :param j:
+            Index of second MO.
+        :return:
+            Tuple (Qi, Qj, Pij) where Qi/Qj are per-atom population
+            vectors and Pij is the symmetrized transition population.
         """
         if self.pm_projector == "lowdin":
             Ci = self.C_eff[:, i]
@@ -167,10 +200,17 @@ class OrbitalLocalizationDriver:
 
     def _pm_optimal_theta(self, Qi, Qj, Pij):
         """
-        Approximate analytical angle for PM rotation
-        (neglecting quartic terms)
+        Returns the approximate optimal Pipek–Mezey rotation angle,
+        neglecting quartic terms (DOI: 10.1021/ct401016x).
 
-        DOI: 10.1021/ct401016x
+        :param Qi:
+            Per-atom population vector for MO i.
+        :param Qj:
+            Per-atom population vector for MO j.
+        :param Pij:
+            Symmetrized transition population vector.
+        :return:
+            Rotation angle in radians.
         """
 
         dQ = Qi - Qj
@@ -185,9 +225,17 @@ class OrbitalLocalizationDriver:
 
     def _boys_optimal_theta(self, ri, rj, dij):
         """
-        Exact boys rotation angle
+        Returns the exact Boys rotation angle
+        (DOI: 10.1063/1.1681683).
 
-        DOI: 10.1063/1.1681683
+        :param ri:
+            Dipole expectation value vector for MO i (length 3).
+        :param rj:
+            Dipole expectation value vector for MO j (length 3).
+        :param dij:
+            Transition dipole vector between MOs i and j (length 3).
+        :return:
+            Rotation angle in radians.
         """
 
         rij = ri - rj
@@ -199,15 +247,31 @@ class OrbitalLocalizationDriver:
             return 0.0
 
         return 0.25 * np.arctan2(g, h)
-    
+
     def _mol_orbs_wrapper(self, loc_orbs, scf_res, mo_range):
         """
-        Wrap the localized orbitals into MolecularOrbitals container
+        Wraps localized orbitals into a MolecularOrbitals container.
+
+        :param loc_orbs:
+            List of localized orbital coefficient matrices (one per spin).
+        :param scf_res:
+            SCF result dictionary providing orbital shapes and occupations.
+        :param mo_range:
+            One-based inclusive range (start, end) of localized MOs,
+            or None if all MOs were localized.
+        :return:
+            MolecularOrbitals instance with localized coefficients and zero
+            orbital energies.
         """
 
-        # get 0-based indices from 1-based inclusive mo_range
-        mo_start = mo_range[0] - 1
-        mo_end = mo_range[1]
+        # get 0-based indices from 1-based inclusive mo_range;
+        # when mo_range is None all MOs were localized
+        if mo_range is None:
+            mo_start = 0
+            mo_end = scf_res["C_alpha"].shape[1]
+        else:
+            mo_start = mo_range[0] - 1
+            mo_end = mo_range[1]
 
         zero_energies = np.zeros(scf_res["E_alpha"].shape)[mo_start:mo_end]
 
@@ -242,30 +306,24 @@ class OrbitalLocalizationDriver:
             )
 
         else:
-            raise ValueError(f"scf type {scf_res["scf_type"]} unknown")
+            raise ValueError(f"scf type {scf_res['scf_type']} unknown")
 
     def pipek_mezey(self, molecule, basis, mos, mo_range=None):
         """
-        Pipek–Mezey orbital localization
+        Performs Pipek–Mezey orbital localization using Jacobi sweeps.
+        Uses the projector specified by self.pm_projector.
 
-        Parameters
-        ----------
-        molecule : Molecule
-            The molecule
-
-        basis : MolecularBasis
-            AO basis set
-
-        mos: np.ndarray
-            MOs to localize
-
-        mo_range: tuple, list
-            start and end of MOs to be localized (starts from 1)
-
-        Returns
-        -------
-        C : np.ndarray
-            Localized MOs
+        :param molecule:
+            Molecule object.
+        :param basis:
+            AO basis set.
+        :param mos:
+            Molecular orbital coefficient matrix to localize.
+        :param mo_range:
+            One-based inclusive range (start, end) of MOs to localize,
+            or None to localize all MOs.
+        :return:
+            Localized MO coefficient matrix.
         """
 
         # localize only user defined MOs, using one-based inclusive mo_range
@@ -342,26 +400,19 @@ class OrbitalLocalizationDriver:
 
     def boys(self, molecule, basis, mos, mo_range=None):
         """
-        Boys orbital localization
+        Performs Boys (Foster–Boys) orbital localization using Jacobi sweeps.
 
-        Parameters
-        ----------
-        molecule : Molecule
-            The molecule
-
-        basis : MolecularBasis
-            AO basis set
-
-        mos: np.ndarray
-            MOs to localize
-
-        mo_range: tuple, list
-            start and end of MOs to be localized (starts from 1)
-
-        Returns
-        -------
-        C : np.ndarray
-            Localized MOs
+        :param molecule:
+            Molecule object.
+        :param basis:
+            AO basis set.
+        :param mos:
+            Molecular orbital coefficient matrix to localize.
+        :param mo_range:
+            One-based inclusive range (start, end) of MOs to localize,
+            or None to localize all MOs.
+        :return:
+            Localized MO coefficient matrix.
         """
 
         # localize only user defined MOs, using one-based inclusive mo_range
@@ -371,6 +422,15 @@ class OrbitalLocalizationDriver:
             self.C = mos.copy()
 
         norb = self.C.shape[1]
+        S = compute_overlap_integrals(molecule, basis)
+
+        # check the validity of the overlap matrix
+        eigs = np.linalg.eigvalsh(S)
+        min_eig = np.min(eigs)
+        if min_eig < -1.0e-10:
+            raise ValueError("Overlap matrix is not positive semidefinite; "
+                             f"minimum eigenvalue = {min_eig:.3e}")
+
         mu = compute_electric_dipole_integrals(molecule, basis)
 
         self.r = np.array(
@@ -421,29 +481,27 @@ class OrbitalLocalizationDriver:
         raise NotImplementedError(
             "ER localization requires AO->MO 2e integral transformation " +
             "and is not implemented.")
-    
+
     def compute(self, molecule, basis, scf_res, mo_range=None):
         """
-        Top level compute function for orbital localization
+        Top-level entry point for orbital localization.
 
-        Parameters
-        ----------
-        molecule : Molecule
-            The molecule
+        Dispatches to the method indicated by self.method, handles
+        unrestricted spin cases, and wraps results in a
+        MolecularOrbitals container.
 
-        basis : MolecularBasis
-            AO basis set
-
-        scf_res: result dict from scfdriver
-            SCF result
-
-        mo_range: tuple, list
-            start and end of MOs to be localized (starts from 1)
-
-        Returns
-        -------
-        C : {"loc_orbs": MolecularOrbitals}
-            Localized MOs
+        :param molecule:
+            Molecule object.
+        :param basis:
+            AO basis set.
+        :param scf_res:
+            SCF result dictionary with keys "C_alpha", "C_beta",
+            "E_alpha", "occ_alpha", "occ_beta", "scf_type".
+        :param mo_range:
+            One-based inclusive range (start, end) of MOs to localize,
+            or None to localize all MOs.
+        :return:
+            Dictionary {"loc_orbs": MolecularOrbitals instance}.
         """
 
         if self.method == "boys":
@@ -451,19 +509,20 @@ class OrbitalLocalizationDriver:
         elif self.method == "pm":
             compute_func = self.pipek_mezey
             if self.pm_projector not in ["mulliken", "lowdin"]:
-                raise NotImplementedError(f"only mulliken and lowdin projectors "
-                                          f"are currently implemented, "
-                                          f"not {self.pm_projector}")
+                raise NotImplementedError(
+                    f"only mulliken and lowdin projectors are currently "
+                    f"implemented, not {self.pm_projector}")
         else:
-            raise NotImplementedError(f"only boys and pm are currently "
-                                      f"supported, not {self.method}")
-        
+            raise NotImplementedError(
+                f"only boys and pm are currently supported, "
+                f"not {self.method}")
+
         if mo_range:
             if len(mo_range) != 2:
                 raise ValueError("mo_range object should be of length 2")
             if mo_range[0] == 0:
                 raise ValueError("mo_range starts counting from 1")
-        
+
         if scf_res["scf_type"] == "unrestricted":
             # localize alpha and beta independently
             alpha = compute_func(
