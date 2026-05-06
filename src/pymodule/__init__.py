@@ -216,7 +216,7 @@ from .imforcefieldgenerator import IMForceFieldGenerator
 from .imdatabasepointcollecter import IMDatabasePointCollecter
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
-from .mofbuilder import MofBuilder
+from .mofbuilder.core.builder import MetalOrganicFrameworkBuilder as MofBuilder
 from .conformergenerator import ConformerGenerator
 from .tsguesser import TransitionStateGuesser
 from .reactionmatcher import ReactionMatcher
