@@ -40,11 +40,6 @@ from ...veloxchemlib import mpi_master
 from ...errorhandler import assert_msg_critical
 from mpi4py import MPI
 import sys
-"""
-atom_type, atom_label, atom_number, residue_name, residue_number, x, y, z, spin, charge, note
-"""
-# This reader will read a cif file and create a Topology object
-
 
 class CifReader:
     """
