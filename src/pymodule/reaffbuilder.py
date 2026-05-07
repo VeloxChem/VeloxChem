@@ -104,6 +104,8 @@ class ReactionForceFieldBuilder():
         self.hessian_xc_fun: str = 'B3LYP'
         self.hessian_basis = 'def2-SV_P_'
 
+        self._reaction_matcher_assist_min_depth = None
+
     def build_forcefields(
         self,
         reactant: Molecule | list[Molecule],
@@ -525,6 +527,8 @@ class ReactionForceFieldBuilder():
         # Turn the reactand and product into graphs
 
         rm = ReactionMatcher(ostream=self.ostream)
+        if self._reaction_matcher_assist_min_depth is not None:
+            rm._assist_min_depth = int(self._reaction_matcher_assist_min_depth)
         total_mapping, breaking_bonds, forming_bonds = rm.get_mapping(
             reactant,
             product,
@@ -701,6 +705,9 @@ class ReactionForceFieldBuilder():
         #merging of systems through openmm files is shaky, as it depends on the atom naming working. See atom renaming in combine_forcefield
         #todo find a better way to do this
         forcefield.write_openmm_files(name, name)
+
+        # in case one wants to inspect reactant.itp and product.itp
+        # forcefield.write_gromacs_files(note, name)
 
         # for bond in changing_bonds:
         #     forcefield.bonds.pop(bond)
