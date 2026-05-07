@@ -1283,7 +1283,7 @@ class IMForceFieldGenerator:
                 seed_molecule = conformal_structures['molecules'][0]
                 rot_bond_set = {
                     tuple(sorted((int(a), int(b))))
-                    for a, b in org_rotatable_bonds
+                    for a, b in rotatable_bonds
                 }
                 def _circ_err_deg(actual, target):
                     return abs(((actual - target + 180.0) % 360.0) - 180.0)
