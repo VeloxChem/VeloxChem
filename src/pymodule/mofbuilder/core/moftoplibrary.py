@@ -36,7 +36,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 import networkx as nx
-import mpi4py.MPI as MPI
+from mpi4py import MPI
 
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master

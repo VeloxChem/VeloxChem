@@ -37,7 +37,7 @@ from typing import Optional, Any, Sequence
 from .basic import nn, nl
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
-import mpi4py.MPI as MPI
+from mpi4py import MPI
 from ...errorhandler import assert_msg_critical
 
 

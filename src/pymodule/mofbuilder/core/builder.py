@@ -38,7 +38,7 @@ from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
 from ...errorhandler import assert_msg_critical
 from ...molecule import Molecule
-import mpi4py.MPI as MPI
+from mpi4py import MPI
 import sys
 import time
 

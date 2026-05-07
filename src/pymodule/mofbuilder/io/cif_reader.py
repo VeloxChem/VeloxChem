@@ -38,7 +38,7 @@ from .basic import find_keyword, extract_xyz_lines
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
 from ...errorhandler import assert_msg_critical
-import mpi4py.MPI as MPI
+from mpi4py import MPI
 import sys
 """
 atom_type, atom_label, atom_number, residue_name, residue_number, x, y, z, spin, charge, note

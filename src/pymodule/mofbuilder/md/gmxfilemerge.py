@@ -43,7 +43,7 @@ from ...optimizationdriver import OptimizationDriver
 from ...mmforcefieldgenerator import MMForceFieldGenerator
 from ...veloxchemlib import mpi_master, hartree_in_kcalpermol, hartree_in_kjpermol
 from ...errorhandler import assert_msg_critical
-import mpi4py.MPI as MPI
+from mpi4py import MPI
 
 
 class GromacsForcefieldMerger:

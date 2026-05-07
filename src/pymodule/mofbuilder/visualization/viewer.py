@@ -31,7 +31,7 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
-import mpi4py.MPI as MPI
+from mpi4py import MPI
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
 from typing import Optional, Any, Dict

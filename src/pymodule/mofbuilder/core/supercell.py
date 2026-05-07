@@ -35,7 +35,7 @@ from pathlib import Path
 
 import numpy as np
 import networkx as nx
-import mpi4py.MPI as MPI
+from mpi4py import MPI
 import h5py
 import re
 

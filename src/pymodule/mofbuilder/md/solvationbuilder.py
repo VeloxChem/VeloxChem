@@ -49,7 +49,7 @@ from ..core.other import safe_dict_copy
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master, hartree_in_kcalpermol, hartree_in_kjpermol
 from ...errorhandler import assert_msg_critical
-import mpi4py.MPI as MPI
+from mpi4py import MPI
 import sys
 import math
 from typing import Any, Dict, List, Optional, Tuple, Union
