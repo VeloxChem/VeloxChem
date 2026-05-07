@@ -45,9 +45,7 @@ from .veloxchemlib import mpi_master, hartree_in_kjpermol, bohr_in_angstrom
 from .outputstream import OutputStream
 from .openmmdynamics import OpenMMDynamics
 from .errorhandler import assert_msg_critical
-from .sanitychecks import molecule_sanity_check
 from .mmforcefieldgenerator import MMForceFieldGenerator
-from .evbdriver import EvbDriver
 from .molecule import Molecule
 from .scfrestdriver import ScfRestrictedDriver
 from .molecularbasis import MolecularBasis
@@ -261,7 +259,6 @@ class TransitionStateGuesser():
         self.folder = Path().cwd() / self.folder_name
 
         # pdbs are saved in angstrom
-        exception = None
 
         rea_int = mm.VerletIntegrator(1)
         rea_sim = mmapp.Simulation(
@@ -472,7 +469,7 @@ class TransitionStateGuesser():
             e1 = result[arg]['e1']
             e2 = result[arg]['e2']
             v = result[arg]['v']
-            e_int = result[arg]['e_int']
+            # e_int = result[arg]['e_int']
             pos = result[arg]['pos']
             n_conf = len(result)
 
@@ -501,7 +498,7 @@ class TransitionStateGuesser():
                 e1 = result[arg]['e1']
                 e2 = result[arg]['e2']
                 v = result[arg]['v']
-                e_int = result[arg]['e_int']
+                # e_int = result[arg]['e_int']
                 pos = result[arg]['pos']
                 n_conf = len(result)
                 self._print_mm_iter(l, e1, e2, v, n_conf)
@@ -555,11 +552,11 @@ class TransitionStateGuesser():
         else:
             pdb_name = f'topology_{getrandbits(32):08x}.pdb'
 
-        pdb = mmapp.PDBFile.writeFile(
-            topology,
-            init_pos * mmunit.angstrom,
-            pdb_name,
-        )
+        # pdb = mmapp.PDBFile.writeFile(
+        #     topology,
+        #     init_pos * mmunit.angstrom,
+        #     pdb_name,
+        # )
         opm_dyn.pdb = mmapp.PDBFile(pdb_name)
         opm_dyn.system = system
 
@@ -630,7 +627,7 @@ class TransitionStateGuesser():
             for l in results['scan'].keys():
 
                 min_qm_conf_E = None
-                min_conf_index = 0
+                # min_conf_index = 0
                 scan = sorted(results['scan'][l], key=lambda x: x['v'])
                 results['scan'][l] = scan
                 # Pick out lowest 5 conformers from scan
@@ -644,7 +641,7 @@ class TransitionStateGuesser():
                         continue
                     if min_qm_conf_E is None or qm_E < min_qm_conf_E:
                         min_qm_conf_E = qm_E
-                        min_conf_index = i
+                        # min_conf_index = i
 
                     if ref is None:
                         ref = qm_E
@@ -1356,8 +1353,8 @@ class TransitionStateGuesser():
         self.ostream.print_header(valstr)
         self.ostream.flush()
 
-    #todo add option for reading geometry (bond distances, angles, etc.) from transition state instead of averaging them
-    #todo add option for recalculating charges from ts_mol
+    # todo add option for reading geometry (bond distances, angles, etc.) from transition state instead of averaging them
+    # todo add option for recalculating charges from ts_mol
     def get_ts_ffgen(self,
                      reaffgen=None,
                      proffgen=None,
@@ -1415,7 +1412,7 @@ class TransitionStateGuesser():
             if id in reaparams.keys() and id in proparams.keys():
                 reaparam = reaparams[id]
                 proparam = proparams[id]
-                #todo change this to measurement from molecule
+                # todo change this to measurement from molecule
                 eq = (1 -
                       l) * reaparam['equilibrium'] + l * proparam['equilibrium']
                 fc = (1 - l) * reaparam['force_constant'] + l * proparam[
@@ -1444,7 +1441,7 @@ class TransitionStateGuesser():
         ts_params = {}
         for dict, scaling in zip([rea_dihedrals, pro_dihedrals], [1 - l, l]):
             for id, param in dict.items():
-                #todo reassign value of phase?
+                # todo reassign value of phase?
                 new_param = copy.copy(param)
                 if new_param.get('multiple'):
                     new_param['barrier'] = [
