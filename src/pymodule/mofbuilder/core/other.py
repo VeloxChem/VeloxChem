@@ -82,7 +82,7 @@ def find_pair_x_edge_fc(
     """
     assert_msg_critical(
         "scipy" in sys.modules,
-        "scipy is required for find_pair_x_edge_fc.")
+        "SciPy is required for MofBuilder.")
     dist_matrix = np.zeros((len(x_matrix), len(edge_matrix)))
     x_matrix = fractional_to_cartesian(x_matrix, sc_unit_cell)
     edge_matrix = fractional_to_cartesian(edge_matrix, sc_unit_cell)

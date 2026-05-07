@@ -391,11 +391,16 @@ class Framework:
         try:
             from openmm.app import Simulation, PDBFile
             from openmm import LangevinIntegrator, unit
-            from openmmml import MLPotential
-            from pathlib import Path
         except ImportError:
             assert_msg_critical(
-                False, "openmmml is required for Framework.")
+                False, "OpenMM is required for MofBuilder.")
+        try:
+            from openmmml import MLPotential
+        except ImportError:
+            assert_msg_critical(
+                False, "OpenMM-ML is required for MofBuilder.")
+        from pathlib import Path
+
         #write a pdb file #with a random name
         self.write(format='pdb')
         pdb = PDBFile(f"{self.filename}.pdb")

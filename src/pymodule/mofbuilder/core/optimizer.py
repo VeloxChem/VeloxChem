@@ -906,7 +906,7 @@ class OptimizationDriver:
         """
 
         assert_msg_critical("scipy" in sys.modules,
-                            "scipy is required for optimize_rotations_pre.")
+                            "SciPy is required for MofBuilder.")
 
         self.ostream.print_info(f"Rotations optimization information:")
         self.ostream.print_info(f"opt_method:, {self.opt_method}")
@@ -959,7 +959,7 @@ class OptimizationDriver:
         """
 
         assert_msg_critical("scipy" in sys.modules,
-                            "scipy is required for optimize_rotations_after.")
+                            "SciPy is required for MofBuilder.")
         self.ostream.print_info('-' * 20)
         self.ostream.print_info(f"Rotation Optimization (stage 2)")
         self.ostream.print_separator()
@@ -1031,8 +1031,9 @@ class OptimizationDriver:
     def _optimize_cell_params(self, cell_info, original_ccoords,
                               updated_ccoords):
         """Minimize fractional coordinate change when scaling cell to fit updated_ccoords; returns (a, b, c, alpha, beta, gamma)."""
-        assert_msg_critical("scipy" in sys.modules,
-                            "scipy is required for optimize_cell_parameters.")
+        assert_msg_critical(
+            "scipy" in sys.modules,
+            "SciPy is required for MofBuilder.")
 
         # Old cell parameters (example values)
         old_cell_params = cell_info  # [a, b, c, alpha, beta, gamma]

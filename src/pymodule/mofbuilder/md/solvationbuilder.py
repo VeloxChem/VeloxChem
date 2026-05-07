@@ -253,10 +253,7 @@ class SolvationBuilder:
         # === Round 1: overlap with existing atoms ===
         assert_msg_critical(
             "scipy" in sys.modules,
-            "scipy is required for SolvationBuilder.")
-        assert_msg_critical(
-            "scipy" in sys.modules,
-            "scipy is required for SolvationBuilder.")
+            "SciPy is required for MofBuilder.")
         tree_existing = cKDTree(existing_coords)
         dists, _ = tree_existing.query(candidate_coords, k=1, distance_upper_bound=self.buffer)
         mask_overlap_existing = np.isfinite(dists)
@@ -298,6 +295,9 @@ class SolvationBuilder:
         candidate_residues = candidate_residues.reshape(-1)
 
         # === Round 1: overlaps with existing atoms ===
+        assert_msg_critical(
+            "scipy" in sys.modules,
+            "SciPy is required for MofBuilder.")
         tree_existing = cKDTree(existing_coords)
         dists, _ = tree_existing.query(candidate_coords, k=1, distance_upper_bound=self.buffer)
         mask_overlap_existing = np.isfinite(dists)

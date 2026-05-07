@@ -109,7 +109,7 @@ class OpenmmSetup:
         """
         assert_msg_critical(
             "openmm" in sys.modules,
-            "OpenMM is required for OpenmmSetup.")
+            "OpenMM is required for MofBuilder.")
 
         self.comm = comm or MPI.COMM_WORLD
         self.rank = self.comm.Get_rank()
