@@ -2916,8 +2916,19 @@ class VbDriver:
 			for vector in breathing_vectors
 		]
 
+		active_pi_atoms = tuple(active_space.metadata.get("active_pi_atoms", ()))
+		electron_count = int(active_space.metadata.get("electron_count") or 0)
+		spin = str(active_space.metadata.get("spin") or "singlet").lower()
+		relaxation_symmetry_option = getattr(options, 'orbital_relaxation_symmetry', None)
+		auto_equivalent_center_relaxation = (
+			relaxation_symmetry_option is None and
+			len(active_pi_atoms) == 6 and
+			electron_count == 6 and
+			spin == "singlet"
+		)
 		relaxation_symmetry = str(
-			getattr(options, 'orbital_relaxation_symmetry', None) or "independent"
+			relaxation_symmetry_option or
+			("equivalent-centers" if auto_equivalent_center_relaxation else "independent")
 		).lower().replace("_", "-")
 		use_equivalent_center_amplitude = relaxation_symmetry in {
 			"common",
@@ -2982,7 +2993,9 @@ class VbDriver:
 		initial_parameters = np.zeros(parameter_count)
 		initial_result = compute_for_parameters(initial_parameters)
 		initial_energy = float(initial_result["energy"])
-		amplitude_bound = float(getattr(options, 'orbital_amplitude_bound', None) or 0.35)
+		amplitude_bound_option = getattr(options, 'orbital_amplitude_bound', None)
+		default_amplitude_bound = 0.05 if auto_equivalent_center_relaxation else 0.35
+		amplitude_bound = float(amplitude_bound_option or default_amplitude_bound)
 		if amplitude_bound <= 0.0:
 			amplitude_bound = 0.35
 		if has_external_breathing:
@@ -3019,6 +3032,7 @@ class VbDriver:
 			"message": "Organic pi VB-SCF result with common center-local breathing active orbitals.",
 			"organic_pi_vbscf_model": "common-center-local-pi-breathing-orbitals",
 			"organic_pi_vbscf_relaxation_symmetry": relaxation_symmetry,
+			"organic_pi_vbscf_auto_equivalent_center_relaxation": bool(auto_equivalent_center_relaxation),
 			"organic_pi_vbscf_equivalent_center_amplitude": bool(use_equivalent_center_amplitude),
 			"organic_pi_vbscf_initial_energy": initial_energy,
 			"organic_pi_vbscf_optimizer_energy": optimizer_energy,

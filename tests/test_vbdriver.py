@@ -931,6 +931,30 @@ def test_benzene_compact_csf_projection_tracks_full_reference():
 
 
 @pytest.mark.timeconsuming
+def test_benzene_vbscf_defaults_to_equivalent_center_stabilization():
+    case = next(item for item in PI_CASES if item["name"] == "benzene")
+    vbscf = _run_pi_case_with_mode(case, "vbscf", basis_name="sto-3g")
+    diagnostics = vbscf["diagnostics"]
+    amplitudes = np.asarray(diagnostics["organic_pi_vbscf_orbital_amplitudes"])
+
+    assert np.isfinite(vbscf["energy"])
+    assert diagnostics["organic_pi_vbscf_model"] == (
+        "common-center-local-pi-breathing-orbitals"
+    )
+    assert diagnostics["organic_pi_vbscf_auto_equivalent_center_relaxation"] is True
+    assert diagnostics["organic_pi_vbscf_relaxation_symmetry"] == "equivalent-centers"
+    assert diagnostics["organic_pi_vbscf_equivalent_center_amplitude"] is True
+    assert len(diagnostics["organic_pi_vbscf_optimizer_parameters"]) == 1
+    assert amplitudes.size == 6
+    assert np.allclose(amplitudes, amplitudes[0])
+    assert diagnostics["organic_pi_vbscf_orbital_amplitude_bound"] == pytest.approx(0.05)
+    assert np.max(np.abs(amplitudes)) <= 0.05 + 1.0e-8
+    assert diagnostics["organic_pi_vbscf_energy_lowering"] >= -1.0e-8
+    assert vbscf["energy"] <= diagnostics["organic_pi_vbscf_initial_energy"] + 1.0e-8
+    assert np.isclose(np.sum(vbscf["lowdin_weights"]), 1.0, atol=1.0e-8)
+
+
+@pytest.mark.timeconsuming
 @pytest.mark.parametrize("case", PI_CASES, ids=[case["name"] for case in PI_CASES])
 def test_fixed_orbital_pi_chemical_resonance_diagnostics(case):
     result = _run_pi_case(case)
