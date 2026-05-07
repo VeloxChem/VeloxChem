@@ -98,7 +98,7 @@ class XyzWriter:
         self,
         filepath: Optional[str] = None,
         header: str = '',
-        lines: Sequence[Sequence[Any]] = [],
+        lines: Optional[Sequence[Sequence[Any]]] = None,
     ) -> None:
         """Write atom coordinate lines to an XYZ file.
 
@@ -118,6 +118,8 @@ class XyzWriter:
             XYZ file will be written only by the master MPI rank.
             If the file extension is not '.xyz', it is automatically added.
         """
+        lines = [] if lines is None else lines
+
         filepath_final = Path(filepath) if filepath is not None else Path(self.filepath)
         assert_msg_critical(filepath_final is not None, "xyz filepath is not specified")
 
@@ -151,7 +153,7 @@ class XyzWriter:
     def get_xyzlines(
         self,
         header: str = '',
-        lines: Sequence[Sequence[Any]] = [],
+        lines: Optional[Sequence[Sequence[Any]]] = None,
     ) -> List[str]:
         """Return formatted XYZ contents as a list of strings.
 
@@ -169,6 +171,8 @@ class XyzWriter:
             xyz_lines = writer.get_xyzlines(header="Example molecule", lines=my_atomlist)
             # '\n'.join(xyz_lines) is a complete XYZ file or block.
         """
+        lines = [] if lines is None else lines
+
         newxyz: List[str] = []
         newxyz.append(f"{len(lines)}\n")
         newxyz.append(header.strip('\n') + '\n')

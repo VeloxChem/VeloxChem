@@ -32,7 +32,7 @@
 
 from pathlib import Path
 import sys
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Sequence
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
 from mpi4py import MPI
@@ -106,7 +106,7 @@ class CifWriter:
         self,
         filepath: Optional[str] = None,
         header: str = '',
-        lines: List[List[Any]] = [],
+        lines: Optional[Sequence[Sequence[Any]]] = None,
         supercell_boundary: Optional[List[float]] = None,
         cell_info: Optional[List[float]] = None,
     ) -> None:
@@ -138,6 +138,8 @@ class CifWriter:
             ...     cell_info=[10.0,10.0,10.0,90.0,90.0,90.0]
             ... )
         """
+        lines = [] if lines is None else lines
+
         filepath = Path(filepath) if filepath is not None else Path(self.filepath)
         assert_msg_critical(filepath is not None, "ciffilepath is not specified")
 

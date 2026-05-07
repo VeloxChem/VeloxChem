@@ -520,9 +520,9 @@ class SolvationBuilder:
 
     def _initialize_solvents_dict(
         self,
-        solvents_files: Optional[List[str]] = [],
-        proportion: Optional[List[float]] = [],
-        quantities: Optional[List[int]] = [],
+        solvents_files: Optional[List[str]] = None,
+        proportion: Optional[List[float]] = None,
+        quantities: Optional[List[int]] = None,
     ) -> Optional[Dict[str, dict]]:
         """Prepare solvent input dictionary for later use in the simulation.
 
@@ -534,6 +534,10 @@ class SolvationBuilder:
         Returns:
             dict or None: Solvent definition dictionary, or None if invalid input.
         """
+        solvents_files = [] if solvents_files is None else solvents_files
+        proportion = [] if proportion is None else proportion
+        quantities = [] if quantities is None else quantities
+
         if proportion:
             total_prop = sum(proportion)
             proportion = [p / total_prop for p in proportion]
@@ -1074,13 +1078,15 @@ class SolvationBuilder:
         self.solvents_datalines = solvents_datalines
         return self.solute_data, self.solvents_datalines
 
-    def write_output(self, output_file: str = "solvated_structure", format: Union[str, List[str]] = []) -> None:
+    def write_output(self, output_file: str = "solvated_structure", format: Optional[Union[str, List[str]]] = None) -> None:
         """Write the solvated system to file(s) in various formats.
 
         Args:
             output_file (str, optional): Base target name (suffix added per format).
             format (str | list of str, optional): Output format(s): xyz, pdb, gro.
         """
+        format = [] if format is None else format
+
         if self.target_directory is not None:
             output_file = Path(self.target_directory) / output_file
         if not format:

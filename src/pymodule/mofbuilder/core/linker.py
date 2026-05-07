@@ -32,7 +32,7 @@
 
 import sys
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Sequence
 
 import numpy as np
 import networkx as nx
@@ -351,7 +351,7 @@ class FrameLinker:
         return rows, Xs
 
     @staticmethod
-    def _find_boundary_atom(G, boundary_labels=["O"]):
+    def _find_boundary_atom(G, boundary_labels: Sequence[str] = ("O",)):
         boundary_atoms = []
         for n in G.nodes:
             if G.nodes[n]["label"] in boundary_labels:
@@ -372,8 +372,8 @@ class FrameLinker:
     @staticmethod
     def _find_boundary_frag(G,
                             center_nodes,
-                            frag_labels=[["C", "O", "O"], ["C", "O", "O",
-                                                           "H"]]):
+                            frag_labels: Sequence[Sequence[str]] = (("C", "O", "O"),
+                                                                    ("C", "O", "O", "H"))):
         boundary_nodes = FrameLinker._find_boundary_atom(G,
                                                          boundary_labels=["O"])
         center_labels = list(

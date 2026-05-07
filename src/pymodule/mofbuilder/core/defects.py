@@ -32,7 +32,7 @@
 
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import networkx as nx
@@ -382,11 +382,14 @@ class TerminationDefectGenerator:
 
     def _add_terminations_to_unsaturated_nodes(self,
                                                eG,
-                                               unsaturated_nodes=[],
-                                               matched_vnode_xind=[]):
+                                               unsaturated_nodes: Optional[Sequence[Any]] = None,
+                                               matched_vnode_xind: Optional[Sequence[Any]] = None):
         """
         use the node terminations to add terminations to the unsaturated nodes
         """
+        unsaturated_nodes = [] if unsaturated_nodes is None else unsaturated_nodes
+        matched_vnode_xind = [] if matched_vnode_xind is None else matched_vnode_xind
+
         #generate term_xoovecs
         term_xoovecs = np.vstack((self.termination_X_data,
                                   self.termination_Y_data))[:,

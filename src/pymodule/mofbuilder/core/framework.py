@@ -30,7 +30,7 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Sequence
 
 import numpy as np
 import networkx as nx
@@ -305,7 +305,9 @@ class Framework:
         new_framework.get_merged_data()
         return new_framework
 
-    def remove(self, remove_indices=[]):
+    def remove(self, remove_indices: Optional[Sequence[Any]] = None):
+        remove_indices = [] if remove_indices is None else remove_indices
+
         self.defectgenerator = TerminationDefectGenerator(comm=self.comm,
                                                           ostream=self.ostream)
         self.defectgenerator.use_termination = self.termination
@@ -483,11 +485,14 @@ class Framework:
             self.mofwriter.write_gro(skip_merge=True)
 
     def solvate(self,
-                solvents_files=[],
-                solvents_proportions=[],
-                solvents_quantities=[],
+                solvents_files: Optional[Sequence[str]] = None,
+                solvents_proportions: Optional[Sequence[float]] = None,
+                solvents_quantities: Optional[Sequence[int]] = None,
                 padding_angstrom=10):
-        
+        solvents_files = [] if solvents_files is None else solvents_files
+        solvents_proportions = [] if solvents_proportions is None else solvents_proportions
+        solvents_quantities = [] if solvents_quantities is None else solvents_quantities
+
         self.solvationbuilder.solvents_files = solvents_files if solvents_files else self.solvents
         #if not provided, use TIP3P as default solvent
         if not self.solvationbuilder.solvents_files:
