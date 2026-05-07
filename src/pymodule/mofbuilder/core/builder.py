@@ -634,6 +634,7 @@ class MetalOrganicFrameworkBuilder:
 
     def build(self) -> Framework:
         """Load net and topology, place nodes/linkers, optimize rotations and cell, build supercell (and defects). Returns self.framework."""
+        self.print_reference()
         self.load_framework()
         self.optimize_framework()
         self.make_supercell()
@@ -717,3 +718,21 @@ class MetalOrganicFrameworkBuilder:
         self.framework.mlp_type = self.mlp_type
         self.framework.mlp_model_path = self.mlp_model_path
         return self.framework
+
+    def print_reference(self) -> None:
+        """Print the MOFBuilder reference."""
+
+        self.ostream.print_reference('Reference: ' + self.get_reference())
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def get_reference(self) -> str:
+        """Return the MOFBuilder reference string."""
+
+        ref_str = 'C. Li, M. S. G. Ahlquist, '
+        ref_str += 'MOFBuilder: automated end-to-end modeling of MOF dynamics '
+        ref_str += 'for high-throughput screening, '
+        ref_str += 'npj Comput. Mater., 2026, 12, 156. '
+        ref_str += 'https://doi.org/10.1038/s41524-026-02086-x'
+
+        return ref_str
