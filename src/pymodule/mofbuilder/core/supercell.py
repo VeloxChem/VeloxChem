@@ -60,10 +60,10 @@ from .superimpose import superimpose_rotation_only
 
 
 class SupercellBuilder:
-    """Build supercell graph from primitive cell graph sG and optionally add virtual edges.
+    """Build a supercell graph from a primitive graph.
 
-    For ditopic linkers, expands sG by supercell and checks virtual edges. For multitopic,
-    bundles multiedges (CV nodes), then expands and updates bundle in supercell.
+    Ditopic linkers are expanded directly. Multitopic linkers are first bundled
+    through CV nodes, then expanded into the target supercell.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -73,17 +73,15 @@ class SupercellBuilder:
         self.ostream = ostream or OutputStream(sys.stdout if self.rank ==
                                                mpi_master() else None)
 
-        #need to be set before use
         self.sG = None
         self.linker_connectivity = None
         self.supercell = [1, 1, 1]
-        self.cell_info = None  #a list of 6 elements, a,b,c,alpha,beta,gamma
-        #virtual edge settings for bridge type nodes
+        self.cell_info = None
+
         self.add_virtual_edge = False
-        self.vir_edge_range = 0.5  #in fractional coordinate should be less than 0.5
+        self.vir_edge_range = 0.5
         self.vir_edge_max_neighbor = 2
 
-        #will be generated during the process
         self.multiedge_bundlings = None
         self.superG = None
 
@@ -94,7 +92,7 @@ class SupercellBuilder:
         return self.linker_connectivity == 2
 
     def build_supercellGraph(self):
-        """Build superG from sG: expand by supercell, (for multitopic) bundle multiedges, optionally add virtual edges. Returns superG."""
+        """Expand ``sG`` into ``superG`` and return the supercell graph."""
         self.ostream.print_info("building supercell graph...")
         self.ostream.flush()
         self.superG_cell_info = [
@@ -125,7 +123,6 @@ class SupercellBuilder:
         if self._is_ditopic_linker():
             self.superG = self._check_virtual_edge(superG.copy())
             return self.superG
-        # for multitopic linker MOF
         self.prim_multiedge_bundlings = self.multiedge_bundlings
         self.super_multiedge_bundlings = self._make_super_multiedge_bundlings(
             self.prim_multiedge_bundlings, self.supercell)
@@ -173,14 +170,10 @@ class SupercellBuilder:
                 multiedge_bundlings.append((n, list(sG.neighbors(n))))
         return multiedge_bundlings
 
-    # check if node is at the boundary of the supercell
-    # if at boundary, then add the diff_e to the node name and add the diff_e to the f_points
     def _update_supercell_node_fpoints_loose(self, sG, supercell):
-        # boundary_node_res = []
-        # incell_node_res = []
         superG = nx.Graph()
         for n in sG.nodes():
-            if sG.nodes[n]["type"] != "V":  # get rid of SV, sv will be pnode+i
+            if sG.nodes[n]["type"] != "V":
                 superG.add_node(
                     n,
                     f_points=sG.nodes[n]["f_points"],
@@ -191,7 +184,6 @@ class SupercellBuilder:
 
                 continue
 
-            # add the node to superG, if lname(n) is np.array([0,0,0])
             superG.add_node(
                 pname(n) + "_" + str(lname(n)),
                 f_points=sG.nodes[n]["f_points"],
@@ -204,12 +196,7 @@ class SupercellBuilder:
                      sG.nodes[n]["fcoords"] + np.asarray(supercell))
             diffs = diffs.astype(int)
             diff_ele = Carte_points_generator(diffs)
-            diff_ele = diff_ele[1:]  # remove the first element [0,0,0]
-
-            # if len(diff_ele) > supercell_Carte.shape[0]:
-            #    boundary_node_res.append(n)
-            # else:
-            #    incell_node_res.append(n)
+            diff_ele = diff_ele[1:]
 
             for diff_e in diff_ele:
                 diff_e = np.asarray(diff_e)
@@ -224,7 +211,7 @@ class SupercellBuilder:
                     f_points=np.hstack((
                         sG.nodes[n]["f_points"][:, 0:2],
                         sG.nodes[n]["f_points"][:, 2:5].astype(float) + diff_e,
-                    )),  # NOTE:modified because of extra column of atom type
+                    )),
                     fcoords=sG.nodes[n]["fcoords"] + diff_e,
                     type="SV",
                     note=sG.nodes[n]["note"],
@@ -232,16 +219,7 @@ class SupercellBuilder:
 
         return superG
 
-    """
-    sG_node_note_set:{'CV', 'V'}
-    sG_node_type_set:{'DV', 'V'}
-    sG_edge_type_set:{'DE', 'E'}
-    """
-
-    # check if edge is at the boundary of the supercell
     def _update_supercell_edge_fpoints(self, sG, superG, supercell):
-        # boundary edge is DE
-        # incell edge is E
         supercell_Carte = Carte_points_generator(supercell)
         for e in sG.edges():
             for i in supercell_Carte:
@@ -250,7 +228,6 @@ class SupercellBuilder:
                     pname(e[1]) + "_" + str(i + lname(e[1])),
                 )
 
-                # check if node e[0]+'_'+str(diff_e) and e[1]+'_'+str(diff_e) in superG
                 if (s_edge[0] in superG.nodes()) and (s_edge[1]
                                                       in superG.nodes()):
                     superG.add_edge(
@@ -303,7 +280,7 @@ class SupercellBuilder:
                                 sG.edges[e]["f_points"][:, 2:5].astype(float) +
                                 i,
                             )
-                        ),  # NOTE:modified because of extra column of atom type
+                        ),
                         fcoords=sG.edges[e]["fcoords"] + i,
                         type="DSE",
                     )
@@ -315,9 +292,6 @@ class SupercellBuilder:
                         self.ostream.flush()
         return superG
 
-    ########## the below is to process the multiedge bundling in superG###########
-    # need to combine with the multiedge_bundling.py
-    # replace bundle dvnode with vnode+diff_e
     def _replace_bundle_dvnode_with_vnode(self, dv_v_pairs,
                                           multiedge_bundlings):
         for dv, v in dv_v_pairs:
@@ -328,8 +302,6 @@ class SupercellBuilder:
                 if dv in bund[0]:
                     if pname(bund[0][bund[0].index(dv)]) == pname(dv):
                         bund[0][bund[0].index(dv)] = v
-        # update v if no list then add [0,0,0]
-        # convert tuple to list
         updated_bundlings = []
         for bund in multiedge_bundlings:
             ec_node = pname(bund[0]) + "_" + str(lname(bund[0]))
@@ -337,7 +309,6 @@ class SupercellBuilder:
             updated_bundlings.append((ec_node, con_nodes))
         return updated_bundlings
 
-    # loop bundle and check if any element in the bundle is in the superG, if not, add the element to the superG
     def _make_super_multiedge_bundlings(self, prim_multiedge_bundlings,
                                         supercell):
         super_multiedge_bundlings = {}
@@ -358,7 +329,6 @@ class SupercellBuilder:
             self.ostream.flush()
         for ec_node in super_multiedge_bundlings.keys():
             con_nodes = super_multiedge_bundlings[ec_node]
-            # order the con_nodes by th x-x pair of the ecnode X atoms
             prim_ecname = pname(ec_node) + "_" + str(np.array([0.0, 0.0, 0.0]))
             if ec_node not in superG.nodes():
                 trans = lname(ec_node)
@@ -375,7 +345,7 @@ class SupercellBuilder:
             for j in range(len(con_nodes)):
                 cn = con_nodes[j]
                 prim_cnname = super_multiedge_bundlings[prim_ecname][
-                    j]  # find prim_ecname in super_multiedge_bundlings and then get the corresponding prim_cnname
+                    j]
                 trans = lname(cn) - lname(prim_cnname)
                 if cn not in superG.nodes():
                     superG.add_node(
@@ -407,11 +377,9 @@ class SupercellBuilder:
                                             superG):
         super_multiedge_bundlings_edges = []
         for ec_node in super_multiedge_bundlings:
-            # check is all CV node in superG are in the super_multiedge_bundlings_edges first element
             cvnodes = [
                 n for n in superG.nodes() if superG.nodes[n]["note"] == "CV"
             ]
-            # use set to check if all cvnodes are in the super_multiedge_bundlings_edges
             if set(cvnodes) == set(
                 [i[0] for i in super_multiedge_bundlings_edges]):
                 return superG
@@ -425,10 +393,8 @@ class SupercellBuilder:
                     self.ostream.print_info(
                         f"removing diff_element: {diff_element}")
                     self.ostream.flush()
-                # remove the diff_element from the superG
                 for n in diff_element:
                     superG.remove_node(n)
-                    # remove all edges linked to the node
                     edges = [e for e in superG.edges(n)]
                     for e in edges:
                         superG.remove_edge(e[0], e[1])
@@ -440,7 +406,6 @@ class SupercellBuilder:
                           superG,
                           bridge_node_distance,
                           max_neighbor=2):
-        # add pillar nodes virtual edges
         nodes_list = [
             n for n in superG.nodes() if superG.nodes[n]["note"] == "V"
         ]
@@ -456,7 +421,6 @@ class SupercellBuilder:
                     ))
             n_n_distance_matrix[i, i] = 1000
 
-        # find the shortest path between all nodes
         for i in range(len(nodes_list)):
             neighbor_count = 0
             while neighbor_count < max_neighbor:
@@ -489,9 +453,7 @@ class SupercellBuilder:
         return superG
 
     def _add_virtual_edge_for_bridge_node(self, superG):
-        """
-        after setting the virtual edge search, add the virtual edge to the target supercell superG MOF
-        """
+        """Add configured virtual bridge-node edges to ``superG``."""
         if self.add_virtual_edge:
             add_superG = self._add_virtual_edge(
                 self.sc_unit_cell,
@@ -508,10 +470,11 @@ class SupercellBuilder:
 
 
 class EdgeGraphBuilder:
-    """Build edge graph (eG) from supercell graph superG: V/EDGE nodes, XOO attachment, and optional cleaving.
+    """Build and cleave an edge graph from a supercell graph.
 
-    Converts superG to eG (ditopic or multitopic), adds XOO from nodes to edges,
-    cleaves to custom_fbox/supercell range, and sets matched_vnode_xind and unsaturated lists.
+    The builder converts ditopic or multitopic supercell graphs into edge
+    graphs, transfers XOO atoms from nodes to edges, applies the selected
+    supercell range, and records unsaturated nodes and linkers.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -521,16 +484,13 @@ class EdgeGraphBuilder:
         self.ostream = ostream or OutputStream(sys.stdout if self.rank ==
                                                mpi_master() else None)
 
-        #need to be set before use
         self.superG = None
         self.linker_connectivity = None
-        self.sc_unit_cell = None  #3x3 matrix of the supercell unit cell
-        self.supercell = None  #same as the supercell in supercellbuilder
+        self.sc_unit_cell = None
+        self.supercell = None
         self.node_connectivity = None
-        #specific buffer range for cleaving the supercell
-        self.custom_fbox = None  #in fractional coordinate
+        self.custom_fbox = None
 
-        #will be generated during the process
         self.eG = None
         self.cleaved_eG = None
         self.cleaved_edges = None
@@ -543,18 +503,17 @@ class EdgeGraphBuilder:
         self._debug = False
 
     def build_edgeG_from_superG(self):
-        """Build eG from superG, add XOO to edges, cleave to range, set unsaturated nodes/linkers."""
+        """Build, cleave, and annotate the edge graph."""
         if self.linker_connectivity == 2:
             eG, eG_index_name_dict = self._superG_to_eG_ditopic(self.superG)
         else:
             eG, eG_index_name_dict = self._superG_to_eG_multitopic(
                 self.superG, self.sc_unit_cell)
 
-        # only keep the main fragment of the target MOF cell, remove the other fragments, to avoid the disconnected fragments
         self.ostream.print_info("main fragment of the eG kept")
         self.ostream.flush()
         self.eG = [eG.subgraph(c).copy() for c in nx.connected_components(eG)
-                   ][0]  #keep the main fragment of the eG
+                   ][0]
         if self.linker_connectivity == 2:
             self.eG, unsaturated_linker, self.matched_vnode_xind, self.xoo_dict = self._addxoo2edge_ditopic(
                 self.eG, self.sc_unit_cell)
@@ -824,20 +783,12 @@ class EdgeGraphBuilder:
             nearest_neighbor[ind].append(n_j)
         return nearest_neighbor
 
-    # Function to find 'XOO' pairs for a specific node
     def _xoo_pair_ind_node(self, single_node_fc, sc_unit_cell):
-        # if the node x is not surrounded by two o atoms,
-        # then modify the fetch_X_atoms_ind_array(single_node, 0, 'O') find_surrounding_points(k, xs_os_dist_matrix, 2)
-        # this function is to find the XOO pairs in a specific node(by node_id),
-        # this xoo pair is the indice of x and nearest two o atoms in the same node
-        # return the indice of x and nearest two o atoms in the same node, which can be convert to a dict with x_index as key and o_indices as value
-        # the distance is in cartesian coordinates
-        # single_node_fc: coordinates of any node in the main fragment
-        # sc_unit_cell: supercell unit cell matrix
+        """Return each X atom index with the nearest two O atom indices."""
         single_node = np.hstack((
             single_node_fc[:, 0:1],
             np.dot(sc_unit_cell, single_node_fc[:, 2:5].astype(float).T).T,
-        ))  # NOTE: modified to skip atom type
+        ))
         xind, xs_coords = fetch_X_atoms_ind_array(single_node, 0, "X")
         oind, os_coords = fetch_X_atoms_ind_array(single_node, 0, "O")
         xs_os_dist_matrix = np.zeros((len(xs_coords), len(os_coords)))
@@ -857,16 +808,15 @@ class EdgeGraphBuilder:
         return xoo_ind_list
 
     def _get_xoo_dict_of_node(self, eG, sc_unit_cell):
-        # quick check the order of xoo in every node are same, select n0 and n1, if xoo_ind_node0 == xoo_ind_node1, then xoo_dict is the same
-        # return xoo dict of every node, key is x index, value is o index
+        """Return the node XOO map after checking that node ordering is consistent."""
         n0 = [i for i in eG.nodes() if pname(i) != "EDGE"][0]
         n1 = [i for i in eG.nodes() if pname(i) != "EDGE"][1]
         xoo_ind_node0 = self._xoo_pair_ind_node(
             eG.nodes[n0]["f_points"],
-            sc_unit_cell)  # pick node one and get xoo_ind pair
+            sc_unit_cell)
         xoo_ind_node1 = self._xoo_pair_ind_node(
             eG.nodes[n1]["f_points"],
-            sc_unit_cell)  # pick node two and get xoo_ind pair
+            sc_unit_cell)
         if xoo_ind_node0 == xoo_ind_node1:
             xoo_dict = {}
             for xoo in xoo_ind_node0:
@@ -885,10 +835,6 @@ class EdgeGraphBuilder:
         xoo_dict = self._get_xoo_dict_of_node(eG, sc_unit_cell)
         matched_vnode_X = []
         unsaturated_linker = []
-        # for every X atom in the EDGE node, search for the paired(nearest) X atom in the connected V node
-        # and then use the xoo_dict of the connected V node to extract the xoos of the connected V node
-        # and then add the xoos to the EDGE node
-        # all xoo_node for the V node is the same
         EDGE_nodes = [n for n in eG.nodes() if pname(n) == "EDGE"]
         for n in EDGE_nodes:
             eG.nodes[n]["xoo_f_points"] = np.zeros((0, 5))
@@ -1112,10 +1058,6 @@ class EdgeGraphBuilder:
         removed_nodes = []
 
         if custom_fbox is None:
-            #self.cleaved_eG = new_eG.copy()
-            #self.cleaved_edges = removed_edges
-            #self.cleaved_nodes = removed_nodes
-            #return
             custom_fbox = [[
                 0,
                 supercell[0],
@@ -1209,8 +1151,6 @@ class EdgeGraphBuilder:
                     )
                 to_remove_row.append(i)
 
-        # Build a new list excluding the marked indices. This preserves original ordering
-        # for entries that remain valid.
         update_matched_vnode_xind = [
             entry for j, entry in enumerate(matched_vnode_xind)
             if j not in to_remove_row

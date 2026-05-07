@@ -121,7 +121,6 @@ class MofTopLibrary:
             mof_top_dict_path = str(Path(data_path, "MOF_topology_dict"))
             with open(mof_top_dict_path, "r") as f:
                 lines = f.readlines()
-            # titles = lines[0].split()
             mofs = lines[1:]
         if self._debug:
             self.ostream.print_info(
@@ -224,7 +223,6 @@ class MofTopLibrary:
                 "please select another MOF family, or upload the template cif file"
             )
 
-            #TODO: set it as repository for template cif files
             self.ostream.print_info(
                 "or download the template cif files from the internet and  set it as the template directory"
             )

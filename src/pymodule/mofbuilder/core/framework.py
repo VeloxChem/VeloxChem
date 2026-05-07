@@ -203,9 +203,9 @@ class Framework:
         self.virtual_edge_max_neighbor = None
         self.sc_unit_cell = None
         self.sc_unit_cell_inv = None
-        self.periodicity = False  #whether the framework are periodic
+        self.periodicity = False
 
-        self.linker_fake_edge = False  #TODO: check
+        self.linker_fake_edge = False
 
         self.clean_unsaturated_linkers = False
         self.update_node_termination = True
@@ -214,12 +214,11 @@ class Framework:
         self.matched_vnode_xind = None
         self.xoo_dict = None
 
-        self.residues_info = None  #dictionary of residue name and quantity
-        self.solvents_dict = None  #dictionary of solvents info after solvation
+        self.residues_info = None
+        self.solvents_dict = None
 
-        #MLP energy minimization
-        self.mlp_type = 'mace'  #default MLP type
-        self.mlp_model_path = None  #path to the MLP model file
+        self.mlp_type = 'mace'
+        self.mlp_model_path = None
 
     def replace(
         self,
@@ -243,34 +242,28 @@ class Framework:
         self.defectgenerator.update_node_termination = self.update_node_termination
         self.defectgenerator.unsaturated_linkers = self.unsaturated_linkers
         self.defectgenerator.unsaturated_nodes = self.unsaturated_nodes
-        #replace
         if new_node_pdbfile is not None:
             self.new_node_pdbfile = new_node_pdbfile
-            #use pdbreader to read the replace node pdb files
             pdbreader = PdbReader(comm=self.comm, ostream=self.ostream)
             self.defectgenerator.new_node_data = pdbreader.read_pdb(
                 filepath=self.new_node_pdbfile)
             self.defectgenerator.new_node_X_data = pdbreader.X_data
         if new_linker_pdbfile is not None:
             self.new_linker_pdbfile = new_linker_pdbfile
-            #use pdbreader to read the replace linker pdb files
             pdbreader = PdbReader(comm=self.comm, ostream=self.ostream)
             self.defectgenerator.new_linker_data = pdbreader.read_pdb(
                 filepath=self.new_linker_pdbfile)
             self.defectgenerator.new_linker_X_data = pdbreader.X_data
         if new_linker_molecule is not None:
             self.new_linker_molecule = new_linker_molecule
-            #use the molecule directly
             fr_new_linker = FrameLinker(comm=self.comm, ostream=self.ostream)
             fr_new_linker.linker_connectivity = self.linker_connectivity
-            if self.save_files:  #TODO: check if the target directory is set
+            if self.save_files:
                 fr_new_linker.target_directory = self.target_directory
             fr_new_linker.create(molecule=self.new_linker_molecule)
-            #pass linker data
             new_linker_center_data = fr_new_linker.linker_center_data
             new_linker_center_X_data = fr_new_linker.linker_center_X_data
             if fr_new_linker.linker_connectivity > 2:
-                #recenter com of out data
                 new_linker_com = np.mean(
                     fr_new_linker.linker_outer_X_data[:, 5:8].astype(float),
                     axis=0)
@@ -494,7 +487,6 @@ class Framework:
         solvents_quantities = [] if solvents_quantities is None else solvents_quantities
 
         self.solvationbuilder.solvents_files = solvents_files if solvents_files else self.solvents
-        #if not provided, use TIP3P as default solvent
         if not self.solvationbuilder.solvents_files:
             self.ostream.print_info("No solvents provided, using TIP3P as default solvent.")
             self.solvents_file = str(Path(self.data_path, 'solvents_database','TIP3P.xyz'))
@@ -558,7 +550,6 @@ class Framework:
         self.linker_ff_gen.linker_optimization = self.linker_reconnect_opt
         self.linker_ff_gen.linker_residue_name = "EDG"
         self.linker_ff_gen.optimize_drv = self.linker_reconnect_drv  # xtb or qm
-        #self.linker_ff_gen.linker_ff_name = self.linker_ff_name if self.linker_ff_name is not None else f"{self.mof_family}_linker"
         self.linker_ff_gen.linker_charge = self.linker_charge if self.linker_charge is not None else -1 * int(
             self.linker_connectivity)
         self.linker_ff_gen.linker_multiplicity = self.linker_multiplicity if self.linker_multiplicity is not None else 1

@@ -289,7 +289,6 @@ class FrameNode:
                     dists, key=lambda x: x[1])[:2 * self.metal_valence]:
                 if oxy_node not in sG.adj[metal_n]:
                     sG.add_edge(metal_n, oxy_node)
-        #for dummy atoms
         if self.dummy_node:
             count = ind_max + 1
             for mn in metal_nodes:
@@ -550,7 +549,6 @@ class FrameNode:
             self.ostream.flush()
             self._write_dummy_node_pdb()
             self._write_dummy_node_split_dict()
-            #self._copy_node_pdb2target()
 
         self.node_data, self.node_X_data = self.pdbreader.expand_arr2data(
             self.lines)

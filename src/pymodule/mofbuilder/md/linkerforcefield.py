@@ -422,7 +422,6 @@ class LinkerForceFieldGenerator:
         def correct_connectivity(mol: Molecule, conn: np.ndarray) -> np.ndarray:
             conn = correct_connectivity_for_hydrogens(mol, conn)
             conn = correct_connectivity_for_oxygens(mol, conn)
-            #conn = correct_connectivity_for_carbons(mol, conn)
             return conn
         
         src_mol_connectivity = correct_connectivity(src_mol, src_mol.get_connectivity_matrix())

@@ -99,7 +99,6 @@ class NetOptimizer:
         self.sc_unit_cell = None
         self.sc_unit_cell_inv = None
         self.fake_edge = False
-        #self.constant_length = 1.54  #default C-C single bond length
         self.linker_frag_length = None
 
         self.load_optimized_rotations = None
@@ -109,11 +108,6 @@ class NetOptimizer:
         # Optimization parameters
         self.opt_drv = OptimizationDriver(comm=self.comm, ostream=self.ostream)
         self.opt_drv.pname_set_dict = None  #to be set later
-        #self.opt_drv.opt_method = 'L-BFGS-B'
-        #self.opt_drv.maxfun = 15000
-        #self.opt_drv.maxiter = 15000
-        #self.opt_drv.display = True
-        #self.opt_drv.eps = 1e-8
 
         #other parameters
         self._debug = False
@@ -192,7 +186,6 @@ class NetOptimizer:
         1. optimize the node rotation (vertex or edge center)
         2. optimize the cell parameters to fit the target MOF cell
         """
-        #if self._debug:
         self.ostream.print_info(f"constant_length: {self.constant_length}")
         self.ostream.flush()
 
@@ -252,7 +245,6 @@ class NetOptimizer:
 
         if self.load_optimized_rotations is not None and Path(
                 self.load_optimized_rotations).is_file():
-            #load the saved optimized rotations
             with h5py.File(self.load_optimized_rotations, 'r') as hf:
                 saved_optimized_rotations = hf['optimized_rotations'][:]
                 if self._debug:
@@ -272,7 +264,6 @@ class NetOptimizer:
             self.skip_rotation_optimization = False
 
         if not self.skip_rotation_optimization:
-            ####TODO: modified for mil53
             opt_rot_pre, _ = self.opt_drv._optimize_rotations_pre(
                 num_nodes, G, node_X_pos_dict, ini_rot)
             opt_rot_aft, _ = self.opt_drv._optimize_rotations_after(
@@ -281,7 +272,6 @@ class NetOptimizer:
             opt_rot_aft = saved_optimized_rotations.reshape(-1, 3, 3)
 
         if self.rotation_filename is not None:
-            #save it as h5 file
             with h5py.File(self.rotation_filename, 'w') as hf:
                 hf.create_dataset('optimized_rotations', data=opt_rot_aft)
 
@@ -398,7 +388,6 @@ class NetOptimizer:
         return:
             sG (networkx graph):graph of the target MOF cell, with scaled and rotated node and edge positions
         """
-        # linker_middle_point = np.mean(linker_x_vecs,axis=0)
         e_xx_vec = self.e_x_ccoords
         self.e_atom = self.E_data[:, 0:2]
         linker_frag_length = self.linker_frag_length
@@ -438,7 +427,6 @@ class NetOptimizer:
             flip_matrix = -np.eye(3) + 2 * np.outer(axis, axis)
             return np.dot(rot, flip_matrix)
 
-        # edges = {}
         for (i, j), pair in optimized_pair.items():
             x_idx_i, x_idx_j = pair
             reindex_i = sorted_nodes.index(i)
@@ -465,33 +453,25 @@ class NetOptimizer:
                 self.ostream.print_info(
                     f"  Normalized XX vector: {norm_xx_vector}")
                 self.ostream.flush()
-            # use superimpose to get the rotation matrix
-            # use record to record the rotation matrix for get rid of the repeat calculation
             if self.linker_frag_length >= 0.0:
-                # for normal linker, the direction is important
                 indices = [
                     index for index, value in enumerate(norm_xx_vector_record)
                     if is_list_A_in_B(norm_xx_vector, value)
                 ]
                 if len(indices) == 1:
                     rot = rot_record[indices[0]]
-                    # rot = reorthogonalize_matrix(rot)
                 else:
                     _, rot, trans = superimpose_rotation_only(
                         extended_e_xx_vec, xx_vector)
-                    # rot = reorthogonalize_matrix(rot)
                     norm_xx_vector_record.append(norm_xx_vector)
-                    # the rot may be opposite, so we need to check the angle between the two vectors
-                    # if the angle is larger than 90 degree, we need to reverse the rot
+                    # Reverse rotations that point the linker fragment away from the target edge.
                     if self.EC_X_data is None:
                         roted_xx = np.dot(extended_e_xx_vec, rot)
 
                         if np.dot(roted_xx[1] - roted_xx[0],
                                   xx_vector[1] - xx_vector[0]) < 0:
-                            ##rotate 180 around the axis of the cross product of the two vectors
                             axis = np.cross(roted_xx[1] - roted_xx[0],
                                             xx_vector[1] - xx_vector[0])
-                            # if 001 not linear to the two vectors
                             if np.linalg.norm(axis) == 0:
                                 check_z_axis = np.cross(
                                     roted_xx[1] - roted_xx[0], [0, 0, 1])
@@ -567,7 +547,6 @@ class NetOptimizer:
         if len(set(lengths)) != 1:
             self.ostream.print_warning(
                 "Warning: more than one type of edge length")
-            # if the length are close, which can be shown by std
             if np.std(lengths) < 1:  #1 Angstrom
                 self.ostream.print_info("the edge lengths are close")
             else:
@@ -591,9 +570,6 @@ class NetOptimizer:
         sorted_edges_of_sortednodeidx = self.sorted_edges_of_sortednodeidx
 
         for i, node in enumerate(sorted_nodes):
-            # if node type is V
-            # if 'DV' in G.nodes[node]['type']:
-            # continue
             R = optimized_rotations[i]
 
             original_positions = rotated_positions[i][:, 1:]
@@ -786,7 +762,6 @@ class OptimizationDriver:
         Returns:
             float: Total distance metric to minimize.
         """
-        # num_nodes = len(G.nodes())
 
         sorted_nodes = self.sorted_nodes
         sorted_edges = self.sorted_edges
@@ -806,9 +781,6 @@ class OptimizationDriver:
             rotated_i_positions = (
                 np.dot(static_atom_positions[i][:, 1:] - com_i, R_i.T) + com_i)
 
-            #dist_matrix = np.empty((len(rotated_i_positions), 1))
-            #for idx_i in range(len(rotated_i_positions)):
-            #    dist = np.linalg.norm(rotated_i_positions[idx_i] - com_j)
             #    dist_matrix[idx_i, 0] = dist
             dist_matrix = np.linalg.norm(rotated_i_positions - com_j,
                                          axis=1,
@@ -836,33 +808,12 @@ class OptimizationDriver:
         Returns:
             float: Total distance metric to minimize.
         """
-        # num_nodes = len(G.nodes())
         set_rotation_matrices = params.reshape(len(self.pname_set_dict), 3, 3)
         rotation_matrices = expand_set_rots(self.pname_set_dict,
                                             set_rotation_matrices,
                                             self.sorted_nodes)
         total_distance = 0.0
 
-        #for i, j in self.sorted_edges:
-        #    R_i = reorthogonalize_matrix(rotation_matrices[i])
-        #    R_j = reorthogonalize_matrix(rotation_matrices[j])
-        #
-        #    com_i = G.nodes[self.sorted_nodes[i]]["ccoords"]
-        #    com_j = G.nodes[self.sorted_nodes[j]]["ccoords"]
-
-        # Rotate positions around their mass center
-        #rotated_i_positions = (
-        #    np.dot(static_atom_positions[i][:, 1:] - com_i, R_i.T) + com_i)
-        #rotated_j_positions = (
-        #    np.dot(static_atom_positions[j][:, 1:] - com_j, R_j.T) + com_j)
-        #
-        #dist_matrix = np.empty(
-        #    (len(rotated_i_positions), len(rotated_j_positions)))
-        #for idx_i in range(len(rotated_i_positions)):
-        #    for idx_j in range(len(rotated_j_positions)):
-        #        dist = np.linalg.norm(rotated_i_positions[idx_i] -
-        #                              rotated_j_positions[idx_j])
-        #        dist_matrix[idx_i, idx_j] = dist
         for i, j in self.sorted_edges:
             R_i = reorthogonalize_matrix(rotation_matrices[i])
             R_j = reorthogonalize_matrix(rotation_matrices[j])
@@ -920,12 +871,9 @@ class OptimizationDriver:
         self.ostream.print_info(f"Rotation Optimization (stage 1)")
         self.ostream.flush()
 
-        # initial_rotations = np.tile(np.eye(3), (num_nodes, 1)).flatten()
         # get a better initial guess, use random rotation matrix combination
-        # initial_rotations  = np.array([reorthogonalize_matrix(np.random.rand(3,3)) for i in range(num_nodes)]).flatten()
         static_atom_positions = atom_positions.copy()
         # Precompute edge-specific pairings
-        # edge_pairings = find_edge_pairings(sorted_edges, atom_positions).
 
         result = minimize(
             self._objective_function_pre,
@@ -966,10 +914,8 @@ class OptimizationDriver:
         self.ostream.flush()
 
         # get a better initial guess, use random rotation matrix combination
-        # initial_rotations  = np.array([reorthogonalize_matrix(np.random.rand(3,3)) for i in range(num_nodes)]).flatten()
         static_atom_positions = atom_positions.copy()
         # Precompute edge-specific pairings
-        # edge_pairings = find_edge_pairings(sorted_edges, atom_positions)
 
         result = minimize(
             self._objective_function_after,
@@ -1011,7 +957,6 @@ class OptimizationDriver:
             old_cartesian_coords, T_old_inv)
 
         # backup
-        # old_fractional_coords = cartesian_to_fractional(old_cartesian_coords,T_old_inv)
 
         # Compute transformation matrix for the new unit cell
         T_new = unit_cell_to_cartesian_matrix(a_new, b_new, c_new, alpha_old,

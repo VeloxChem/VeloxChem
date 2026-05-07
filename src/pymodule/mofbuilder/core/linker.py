@@ -213,7 +213,6 @@ class FrameLinker:
         # loop each pair to find center pair
         for p in pairs:
             a = p[0]
-            # b = p[1]
             ds = []
             for n in centers:
                 if n not in p:
@@ -355,8 +354,6 @@ class FrameLinker:
         boundary_atoms = []
         for n in G.nodes:
             if G.nodes[n]["label"] in boundary_labels:
-                #check if it belongs to a -COO group or -COOH group
-                #if only 1 edge on node n
                 neighbors = list(G.neighbors(n))
                 if len(neighbors) == 1:
                     boundary_atoms.append((n, neighbors[0]))
@@ -603,7 +600,6 @@ class FrameLinker:
                 self.target_directory is not None,
                 "Linker: target_dir is not set. Please set the target directory."
             )
-        #assert_msg_critical(self.linker_connectivity in [2, 3, 4] or int(self.linker_connectivity) > 4, "Linker: linker_connectivity should be 2, 3, 4 or >4.")
 
         if molecule is None:
             assert_msg_critical(

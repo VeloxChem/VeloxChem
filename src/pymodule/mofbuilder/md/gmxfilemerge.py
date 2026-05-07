@@ -47,33 +47,32 @@ from mpi4py import MPI
 
 
 class GromacsForcefieldMerger:
-    """
-    Main class responsible for assembling and merging GROMACS forcefield files for MOF simulations.
+    """Assemble GROMACS input files for MOF molecular dynamics.
 
     Attributes:
         comm (mpi4py.MPI.Comm): MPI communicator for parallel execution.
         rank (int): Rank of the current MPI process.
         nodes (int): Total number of MPI processes.
         ostream (OutputStream): Output stream for logging.
-        database_dir (Optional[str]): Directory containing reference forcefield database.
-        target_dir (Optional[str]): Output directory for all generated files.
+        database_dir (Optional[str]): Directory containing force-field templates.
+        target_dir (Optional[str]): Output directory for generated files.
         node_metal_type (Optional[str]): Type of metal node in the MOF.
-        dummy_atom_node (bool): Whether to use dummy atoms for the node (default: False).
+        dummy_atom_node (bool): Whether node ITP files use dummy atom names.
         termination_name (Optional[str]): Name of termination group for the structure.
-        linker_itp_dir (str): Directory holding linker .itp files.
+        linker_itp_dir (str): Directory containing linker ITP files.
         linker_name (Optional[str]): Name of the linker molecule.
+        linker_names (Optional[Sequence[str]]): Names of linker molecules to include.
         residues_info (Optional[Dict[str, int]]): Dictionary mapping residue names to copy number.
-        mof_name (Optional[str]): Name for the MOF/model (used for the top file).
-        other_residues (List[str]): List of additional residues that can be included.
-        solvents_name (Optional[Sequence[str]]): List or tuple of solvent names.
-        solvents_dict (Optional[Dict[str, Dict[str, Any]]]): Maps solvent names to their info, including Molecule object.
-        _debug (bool): If True, print extensive debug information.
-        top_path (Optional[Path]): The path to the generated .top file (written upon generation).
+        mof_name (Optional[str]): Name used for the generated topology file.
+        other_residues (List[str]): Additional node residue ITP files to include.
+        solvents_name (Optional[Sequence[str]]): Solvent residue names to include.
+        solvents_dict (Optional[Dict[str, Dict[str, Any]]]): Solvent metadata and molecules.
+        _debug (bool): If True, print additional diagnostics.
+        top_path (Optional[Path]): Path to the generated topology file.
     """
 
     def __init__(self, comm: Optional[Any] = None, ostream: Optional[OutputStream] = None) -> None:
-        """
-        Initializes a GromacsForcefieldMerger instance.
+        """Initialize the merger.
 
         Args:
             comm (Optional[Any]): Optional MPI communicator.
@@ -84,7 +83,6 @@ class GromacsForcefieldMerger:
         self.nodes = self.comm.Get_size()
         self.ostream = ostream or OutputStream(sys.stdout if self.rank == mpi_master() else None)
 
-        # Attributes related to input and output directories, model setup, and optional features.
         self.database_dir: Optional[str] = None
         self.target_dir: Optional[str] = None
         self.node_metal_type: Optional[str] = None
@@ -97,7 +95,6 @@ class GromacsForcefieldMerger:
         self.mof_name: Optional[str] = None
         self.other_residues: List[str] = ['O', 'HO', 'HHO']
 
-        # Solvent related attributes
         self.solvents_name: Optional[Sequence[str]] = None
         self.solvents_dict: Optional[Dict[str, Dict[str, Any]]] = None
 
@@ -105,8 +102,7 @@ class GromacsForcefieldMerger:
         self.top_path: Optional[Path] = None
 
     def _copy_file(self, old_path: str, new_path: str) -> None:
-        """
-        Copy a file from `old_path` to `new_path` if it doesn't already exist at `new_path`.
+        """Copy a file if the destination does not exist.
 
         Args:
             old_path (str): Source file path.
@@ -123,14 +119,13 @@ class GromacsForcefieldMerger:
             self.ostream.flush()
 
     def _backup_and_rename(self, target_path: str) -> None:
-        """
-        If the directory at target_path exists and is not empty, rename it by prefixing with '#i_' where i is the next available integer.
+        """Move a non-empty output directory aside and recreate it.
 
         Args:
             target_path (str): Folder to potentially back up/rename.
         """
         p = Path(target_path)
-        if p.exists() and any(p.iterdir()):  # non-empty
+        if p.exists() and any(p.iterdir()):
             i = 1
             new_path = Path(p.parent, f"#{i}_{p.name}")
             while new_path.exists():
@@ -139,13 +134,13 @@ class GromacsForcefieldMerger:
             self.ostream.print_info(f"{p} existed and not empty, renaming {p} --> {new_path}")
             self.ostream.flush()
             p.rename(new_path)
-            # Recreate the original folder
             Path(target_path).mkdir(parents=True, exist_ok=True)
 
     def _get_itps_from_database(self, data_path: Optional[str] = None) -> None:
-        """
-        Collect .itp files for nodes, linkers, terminations, and solvents/ions/gas. 
-        If some are missing (such as new solvents), they will be generated and added to the database.
+        """Collect node, linker, termination, solvent, ion, and gas ITP files.
+
+        Missing solvent ITP files are generated in the solvent database before
+        being copied into the run directory.
 
         Args:
             data_path (Optional[str]): Path to forcefield database. Defaults to self.database_dir.
@@ -155,9 +150,7 @@ class GromacsForcefieldMerger:
         target_itp_path = Path(self.target_dir, 'MD_run/itps')
         self._backup_and_rename(str(target_itp_path))
         target_itp_path.mkdir(parents=True, exist_ok=True)
-        #copy amber itp files for ions and gases
         amber_itp_path = Path(data_path, "amber14sb_OL21.ff")
-        #this is a folder
         dest_amber_itp_path = Path(target_itp_path, "amber14sb_OL21.ff")
         def copy_folder(src: Path, dest: Path) -> None:
             if not dest.is_dir():
@@ -170,7 +163,6 @@ class GromacsForcefieldMerger:
         copy_folder(amber_itp_path, dest_amber_itp_path)
         
         
-        # Copy node ITPs
         node_itp_name = f"{self.node_metal_type}_dummy" if self.dummy_atom_node else f"{self.node_metal_type}"
         if self._debug:
             self.ostream.print_info(f"looking for {node_itp_name}.itp for node")
@@ -180,7 +172,6 @@ class GromacsForcefieldMerger:
                 dest_p = Path(target_itp_path, i.name)
                 self._copy_file(str(i), str(dest_p))
 
-        # Copy linker itp(s)
         if self.linker_itp_dir not in [None, '']:
             linker_names = {
                 Path(str(name)).stem
@@ -194,7 +185,6 @@ class GromacsForcefieldMerger:
                 if itp_name in linker_names:
                     self._copy_file(str(j), str(dest_p))
 
-        # Copy termination itp
         for k in Path(data_path, 'terminations_itps').rglob('*.itp'):
             dest_p = Path(target_itp_path, k.name)
             if k.stem == Path(str(self.termination_name)).stem:
@@ -202,12 +192,10 @@ class GromacsForcefieldMerger:
                 self.ostream.print_info(f"term.  {k} to {dest_p}")
                 self.ostream.flush()
 
-        # Copy/generate solvent itp files
         if self.solvents_name:
             for sol in self.solvents_name:
                 src_p = Path(data_path, 'solvents_database', f'{sol}.itp')
                 if not src_p.is_file():
-                    # generate solvent itp if not found
                     self.ostream.print_info(
                         f"solvent itp file {src_p} not found in database... will generate {sol} forcefield and add it to database!"
                     )
@@ -222,7 +210,6 @@ class GromacsForcefieldMerger:
                 self.ostream.flush()
                 self._copy_file(str(src_p), str(dest_p))
 
-        # Print files in itp directory if debug
         final_itp_files = [
             str(i) for i in Path(target_itp_path).rglob("*.itp")
         ]
@@ -235,8 +222,7 @@ class GromacsForcefieldMerger:
             self.ostream.flush()
 
     def _generate_solvent_itp(self, solvent_name: str, molecule: Molecule, target_path: str) -> str:
-        """
-        Generates a GROMACS .itp file for a given solvent molecule. Also performs structure optimization.
+        """Optimize a solvent molecule and generate its GROMACS ITP file.
 
         Args:
             solvent_name (str): Name of the solvent.
@@ -259,7 +245,6 @@ class GromacsForcefieldMerger:
         mol_opt_drv.conv_dmax = 2e-02
         mol_opt_drv.conv_grms = 4e-03
         mol_opt_drv.conv_gmax = 8e-03
-        # mol_opt_drv.constraints = ... # Constraints could be added here if needed.
         mol_opt_drv.tmax = 0.02
         mol_opt_drv.filename = mol_scf_drv.file_name
         mol_opt_drv.ostream.mute()
@@ -269,7 +254,6 @@ class GromacsForcefieldMerger:
         ffgen.create_topology(opt_mol)
         ff_name = str(Path(target_path, f"{solvent_name}"))
         ffgen.write_gromacs_files(filename=f"{ff_name}", mol_name=solvent_name)
-        # Remove .gro and .top files generated
         gro_file = ff_name + ".gro"
         top_file = ff_name + ".top"
         Path(gro_file).unlink(missing_ok=True)
@@ -277,15 +261,13 @@ class GromacsForcefieldMerger:
         return ff_name + ".itp"
 
     def _itp_extract(self, itp_file: str) -> List[str]:
-        """
-        Extracts the atomtypes section (typically lines between [ atomtypes ] and [ moleculetype ]) from an .itp file.
-        Also removes this section from the .itp file in place.
+        """Extract and remove the atomtypes section from an ITP file.
 
         Args:
             itp_file (str): Path to the .itp file.
 
         Returns:
-            List[str]: The lines of the atomtypes section (with whitespace trimmed), or empty if not found.
+            List[str]: Non-empty atomtype lines, or an empty list if not found.
         """
         with open(itp_file, "r") as f:
             lines = f.readlines()
@@ -293,7 +275,7 @@ class GromacsForcefieldMerger:
         keyword2 = "moleculetype"
         start = None
         end = None
-        for eachline in lines:  # search for keywords and get linenumber
+        for eachline in lines:
             if re.search(keyword1, eachline):
                 start = lines.index(eachline) + 2
             elif re.search(keyword2, eachline):
@@ -307,9 +289,7 @@ class GromacsForcefieldMerger:
         return target_lines
 
     def _extract_atomstypes(self, itp_path: str) -> List[str]:
-        """
-        Walks through all .itp files in a given directory and collects all atomtype lines,
-        except those from "posre.itp".
+        """Collect atomtype lines from ITP files under a directory.
 
         Args:
             itp_path (str): Folder to search for .itp files.
@@ -349,8 +329,7 @@ class GromacsForcefieldMerger:
         return unique_atomtypes
 
     def _parsetop(self, inputfile: str) -> Tuple[List[List[str]], List[str]]:
-        """
-        Parses a GROMACS .top template file by splitting it into sections by the occurrence of ']'.
+        """Parse a GROMACS topology template into bracketed sections.
 
         Args:
             inputfile (str): Path to the template .top file.
@@ -366,10 +345,10 @@ class GromacsForcefieldMerger:
         number = []
         lineNumber = 1
         keyword1 = "]"
-        for eachline in lines:  # search for keywords and get linenumber
+        for eachline in lines:
             m = re.search(keyword1, eachline)
             if m is not None:
-                number.append(lineNumber - 1)  # split by linenumber
+                number.append(lineNumber - 1)
             lineNumber += 1
         number.append(len(lines))
         number = list(set(number))
@@ -391,8 +370,7 @@ class GromacsForcefieldMerger:
         res_info: Optional[Dict[str, int]] = None,
         model_name: Optional[str] = None,
     ) -> Path:
-        """
-        Assembles the final GROMACS .top file for the system from supplied .itp files and molecule counts.
+        """Assemble the final GROMACS topology file.
 
         Args:
             itp_path (str): Directory of .itp files to include.
@@ -421,18 +399,12 @@ class GromacsForcefieldMerger:
 
         top_itp_lines = []
         top_itp_lines.append("; Include forcefield parameters\n")
-        #include amber ff firstly
-        #top_itp_lines.append('#include "itps/amber14sb_OL21.ff/forcefield.itp"\n')
-        #restrain depth of the rglobal search to avoid including itp files in subfolders such as posre
         itps = [i for i in Path(itp_path).rglob("*.itp") if i.is_file() and i.suffix == ".itp" and str(Path(i).name) not in ["posre.itp"]]
-        for i in itps[::-1]:  # reverse the order to include amber ff first, so that the atomtypes in the itp files of nodes and linkers can overwrite those in amber ff if there are overlaps
+        for i in itps[::-1]:
             if i.name not in ["posre.itp", "ffnonbonded.itp","ffbonded.itp","gbsa.itp"]:  
                 if self._debug:
                     self.ostream.print_info(f"found file: {i} in path {itp_path}")
                     self.ostream.flush()
-                    # use relative path to the top file, which is in the same folder as the itp folder
-                    #line = '#include "itps/' + i.name + '"\n'
-                    #the name cannot show the subfolder, which is important for distinguishing different itp files with the same name in different subfolders (e.g. posre)
                 line = '#include "itps/' + str(i.relative_to(itp_path)) + '"\n'
                 top_itp_lines.append(line)
                 if self._debug:
@@ -462,8 +434,7 @@ class GromacsForcefieldMerger:
         return top_path
 
     def _copy_mdps(self, data_path: Optional[str] = None) -> Path:
-        """
-        Copies all .mdp files (GROMACS MD parameter files) from the database to the target run directory.
+        """Copy GROMACS MDP files from the database to the run directory.
 
         Args:
             data_path (Optional[str]): Path to forcefield database. Uses self.database_dir if not provided.
@@ -481,10 +452,7 @@ class GromacsForcefieldMerger:
         return dest_mdp_path
 
     def generate_MOF_gromacsfile(self) -> None:
-        """
-        Public entry point: Generates all GROMACS forcefield files for the MOF system.
-        This includes .itp, .top, and .mdp files, copying or generating as needed.
-        """
+        """Generate ITP, topology, and MDP files for a MOF system."""
         database_path = self.database_dir
         itps_path = Path(self.target_dir, 'MD_run/itps')
         res_info = self.residues_info

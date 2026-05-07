@@ -109,32 +109,29 @@ class TerminationDefectGenerator:
         self.ostream = ostream or OutputStream(sys.stdout if self.rank ==
                                                mpi_master() else None)
 
-        #need to be set before use
         self.cleaved_eG = None
         self.node_connectivity = None
         self.linker_connectivity = None
         self.eG_index_name_dict = None
         self.sc_unit_cell = None
         self.sc_unit_cell_inv = None
-        #for remove
         self.res_idx2rm = []
         self.xoo_dict = None
 
         self.matched_vnode_xind = None
-        self.updated_matched_vnode_xind = None  #will be set after remove
-        self.unsaturated_nodes = []  # list of unsaturated node name
-        self.updated_unsaturated_nodes = []  #will be set after remove
-        self.unsaturated_linkers = []  # list of unsaturated linker name
-        self.termination_data = []  # list of termination XOO vectors
-        self.termination_X_data = []  # list of termination X atoms
-        self.termination_Y_data = []  # list of termination Y atoms
+        self.updated_matched_vnode_xind = None
+        self.unsaturated_nodes = []
+        self.updated_unsaturated_nodes = []
+        self.unsaturated_linkers = []
+        self.termination_data = []
+        self.termination_X_data = []
+        self.termination_Y_data = []
 
         self.use_termination = True
 
         self.clean_unsaturated_linkers = False
         self.update_node_termination = True
 
-        #for replace
         self.nodes_idx2rp = []
         self.linkers_idx2rp = []
         self.new_node_data = None
@@ -143,7 +140,6 @@ class TerminationDefectGenerator:
         self.new_linker_X_data = None
 
         #will be set after use
-        #self.saved_eG_matched_vnode_xind = None  #saved matched_vnode_xind before remove items
         self.defectG = None  #eG after removing nodes or linkers
         self.termG = None  #eG after adding terminations
         self.finalG = None  #eG after removing xoo from node
@@ -242,8 +238,6 @@ class TerminationDefectGenerator:
                 f"new unsaturated linkers: {new_unsaturated_linkers}")
             self.ostream.flush()
 
-        #old_unsaturated_nodes = self.unsaturated_nodes
-        #old_unsaturated_linkers = self.unsaturated_linkers
 
         if not self.use_termination:
             if self._debug:
@@ -258,7 +252,6 @@ class TerminationDefectGenerator:
 
             updated_matched_vnode_xind = self._update_matched_nodes_xind(
                 nodes_names2rm, self.matched_vnode_xind)
-            #self.saved_eG_matched_vnode_xind = self.matched_vnode_xind
             #add termination to the new unsaturated node
             termG, _ = self._add_terminations_to_unsaturated_nodes(
                 defectG, new_unsaturated_nodes, updated_matched_vnode_xind)
@@ -267,7 +260,6 @@ class TerminationDefectGenerator:
             return termG
 
         else:
-            #self.matched_vnode_xind = self.saved_eG_matched_vnode_xind
             #add termination to the old unsaturated node
             termG, _ = self._add_terminations_to_unsaturated_nodes(
                 defectG, self.unsaturated_nodes, self.matched_vnode_xind)
@@ -545,7 +537,6 @@ class TerminationDefectGenerator:
                         oo_fpoints_in_vnode = np.vstack(
                             [fpoints[i] for i in oo_ind_in_vnode])
                     except Exception:
-                        # if any index invalid, skip this xind
                         continue
                     oo_cpoints = np.hstack((
                         oo_fpoints_in_vnode[:, 0:2],
@@ -617,7 +608,6 @@ class TerminationDefectGenerator:
                 i for i in range(len(n_f_points))
                 if nn(n_f_points[i][0]) == "X"
             ]
-            #if x atoms in new linker is not equal to the x atoms in the processed edge print warning and skip
             if len(x_indices) != len(new_n_x_ccoords):
                 self.ostream.print_warning(
                     f"the number of X atoms in the new fragment does not match the origin connectivity of {n}, skipping"

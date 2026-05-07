@@ -597,7 +597,6 @@ class MetalOrganicFrameworkBuilder:
         self.supercellbuilder.add_virtual_edge = self.add_virtual_edge
         self.supercellbuilder.vir_edge_range = self.vir_edge_range
         self.supercellbuilder.vir_edge_max_neighbor = self.vir_edge_max_neighbor
-        #self.supercellbuilder._debug = self._debug
 
         self.supercellbuilder.build_supercellGraph()
         self.superG = self.supercellbuilder.superG
@@ -618,7 +617,6 @@ class MetalOrganicFrameworkBuilder:
         self.edgegraphbuilder.custom_fbox = self.supercell_custom_fbox
         self.edgegraphbuilder.sc_unit_cell = self.net_optimizer.sc_unit_cell
         self.edgegraphbuilder.supercell = self.supercell
-        #self.edgegraphbuilder._debug = self._debug
         self.edgegraphbuilder.build_edgeG_from_superG()
         self.eG = self.edgegraphbuilder.eG.copy()
         self.eG_index_name_dict = self.edgegraphbuilder.eG_index_name_dict

@@ -138,7 +138,6 @@ class XyzWriter:
 
         for i, values in enumerate(lines):
             atom_label = values[1]
-            # atom_number = i + 1  # Not used in XYZ format
             x = float(values[5])
             y = float(values[6])
             z = float(values[7])
@@ -178,7 +177,6 @@ class XyzWriter:
         newxyz.append(header.strip('\n') + '\n')
         for i, values in enumerate(lines):
             atom_label = values[1]
-            # atom_number = i + 1  # Not used in XYZ format
             x = float(values[5])
             y = float(values[6])
             z = float(values[7])
