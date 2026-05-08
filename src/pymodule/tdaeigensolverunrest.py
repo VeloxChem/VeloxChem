@@ -48,7 +48,7 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
 from .errorhandler import assert_msg_critical
 from .checkpoint import read_rsp_hdf5, write_rsp_hdf5
 from .resultsio import (write_lr_rsp_results_to_hdf5,
-                        write_detach_attach_to_hdf5)
+                        write_detach_attach_to_hdf5, write_rsp_solution)
 
 
 class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
@@ -393,22 +393,10 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
         # print converged excited states
 
         if self.rank == mpi_master() and self._is_converged:
-            if self.core_excitation:
-                mo_occ_a = scf_results['C_alpha'][:, :self.
-                                                  num_core_orbitals].copy()
-                mo_occ_b = scf_results['C_beta'][:, :self.
-                                                 num_core_orbitals].copy()
-            else:
-                mo_occ_a = scf_results['C_alpha'][:, :nocc_a].copy()
-                mo_occ_b = scf_results['C_beta'][:, :nocc_b].copy()
+            (mo_occ_a, mo_occ_b), (mo_vir_a, mo_vir_b) = self._get_mo_occ_and_mo_vir_unrestricted(
+                scf_results, nocc_a, nocc_b)
 
-            mo_vir_a = scf_results['C_alpha'][:, nocc_a:].copy()
-            mo_vir_b = scf_results['C_beta'][:, nocc_b:].copy()
-
-            if self.core_excitation:
-                n_ov_a = self.num_core_orbitals * mo_vir_a.shape[1]
-            else:
-                n_ov_a = mo_occ_a.shape[1] * mo_vir_a.shape[1]
+            n_ov_a = mo_occ_a.shape[1] * mo_vir_a.shape[1]
 
             eigvals, rnorms = self.solver.get_eigenvalues()
             eigvecs = self.solver.ritz_vectors.copy()
@@ -452,6 +440,13 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
                                                       mo_vir_a.shape[1])
                 t_mat_b = eigvecs[n_ov_a:, s].reshape(mo_occ_b.shape[1],
                                                       mo_vir_b.shape[1])
+
+                # write eigenvectors to h5 file
+                if (self.save_solutions and final_h5_fname is not None):
+                    write_rsp_solution(final_h5_fname,
+                                       'S{:d}(a)'.format(s + 1), eigvecs[:n_ov_a, s])
+                    write_rsp_solution(final_h5_fname,
+                                       'S{:d}(b)'.format(s + 1), eigvecs[n_ov_a:, s])
 
                 # save excitation details
                 excitation_details.append(
@@ -588,12 +583,13 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
             if self.detach_attach_cubes:
                 ret_dict['density_cubes'] = dens_cube_files
 
-            self._write_final_hdf5(final_h5_fname, molecule, basis,
-                                   dft_dict['dft_func_label'],
-                                   pe_dict['potfile_text'], eigvecs)
-
             if (self.save_solutions and final_h5_fname is not None):
-                # Write response results to final checkpoint file.
+                self.ostream.print_info(
+                    'Response solution vectors written to file: ' +
+                    final_h5_fname)
+                self.ostream.print_blank()
+                self.ostream.flush()
+
                 # Keep the legacy rsp HDF5 layout for compatibility.
                 # Eigenvectors are written separately as S1/S2/... datasets, so
                 # they do not belong in this HDF5-facing payload.
@@ -610,8 +606,6 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
 
         elif self.rank != mpi_master() and self._is_converged:
             # non-master rank
-            # TODO: return eigenvalues on non-master ranks
-            # TODO: return distributed eigenvectors
             return {
                 'eigenvalues': None,
                 'eigenvectors': None,
@@ -620,6 +614,37 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
         else:
             # not converged
             return {}
+
+    def _get_mo_occ_and_mo_vir_unrestricted(self, scf_results, nocc_a, nocc_b):
+        """
+        Gets occupied MO coefficents and virtual MO coefficients that are
+        involved in response calculation.
+
+        :param scf_results:
+            The dictionary containing SCF results.
+        :param nocc_a:
+            The number of spin-alpha occupied orbitals.
+        :param nocc_b:
+            The number of spin-beta occupied orbitals.
+        :return:
+            The involved occupied MO coefficents and virtual MO coefficients.
+        """
+
+        if self.core_excitation:
+            mo_occ_a = scf_results['C_alpha'][:, :self.num_core_orbitals].copy()
+            mo_vir_a = scf_results['C_alpha'][:, nocc_a:].copy()
+
+            mo_occ_b = scf_results['C_beta'][:, :self.num_core_orbitals].copy()
+            mo_vir_b = scf_results['C_beta'][:, nocc_b:].copy()
+
+        else:
+            mo_occ_a = scf_results['C_alpha'][:, :nocc_a].copy()
+            mo_vir_a = scf_results['C_alpha'][:, nocc_a:].copy()
+
+            mo_occ_b = scf_results['C_beta'][:, :nocc_b].copy()
+            mo_vir_b = scf_results['C_beta'][:, nocc_b:].copy()
+
+        return (mo_occ_a, mo_occ_b), (mo_vir_a, mo_vir_b)
 
     def _gen_trial_vectors(self, molecule, orb_ene, nocc, n_excl_states=0):
         """
@@ -706,7 +731,7 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
 
     def _get_trans_densities(self,
                              trial_mat,
-                             tensors,
+                             scf_results,
                              molecule,
                              basis,
                              spin='alpha'):
@@ -715,8 +740,8 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
 
         :param trial_mat:
             The matrix containing the Z vectors as columns.
-        :param tensors:
-            The dictionary of tensors from converged SCF wavefunction.
+        :param scf_results:
+            The dictionary of results from converged SCF wavefunction.
         :param molecule:
             The molecule.
         :param basis:
@@ -731,58 +756,35 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
         # form transition densities
 
         if self.rank == mpi_master():
-            if spin == 'alpha':
-                nocc = molecule.number_of_alpha_occupied_orbitals(basis)
-                mo_key = 'C_alpha'
-            elif spin == 'beta':
-                nocc = molecule.number_of_beta_occupied_orbitals(basis)
-                mo_key = 'C_beta'
-
-            norb = tensors[mo_key].shape[1]
-            nvir = norb - nocc
-
-            if self.core_excitation:
-                mo_occ = tensors[mo_key][:, :self.num_core_orbitals].copy()
-            else:
-                mo_occ = tensors[mo_key][:, :nocc].copy()
-            mo_vir = tensors[mo_key][:, nocc:].copy()
-
             nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
-            if self.core_excitation:
-                n_ov_a = self.num_core_orbitals * (norb - nocc_a)
-            else:
-                n_ov_a = nocc_a * (norb - nocc_a)
-            nocc_a = None
+            nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
+            (mo_occ_a, mo_occ_b), (mo_vir_a, mo_vir_b) = self._get_mo_occ_and_mo_vir_unrestricted(
+                scf_results, nocc_a, nocc_b)
+
+            n_ov_a = mo_occ_a.shape[1] * mo_vir_a.shape[1]
 
             tdens = []
             for k in range(trial_mat.shape[1]):
-                if self.core_excitation:
-                    if spin == 'alpha':
-                        mat = trial_mat[:n_ov_a,
-                                        k].reshape(self.num_core_orbitals, nvir)
-                    elif spin == 'beta':
-                        mat = trial_mat[n_ov_a:,
-                                        k].reshape(self.num_core_orbitals, nvir)
-                else:
-                    if spin == 'alpha':
-                        mat = trial_mat[:n_ov_a, k].reshape(nocc, nvir)
-                    elif spin == 'beta':
-                        mat = trial_mat[n_ov_a:, k].reshape(nocc, nvir)
-                mat = np.matmul(mo_occ, np.matmul(mat, mo_vir.T))
+                if spin == 'alpha':
+                    mat = trial_mat[:n_ov_a, k].reshape(mo_occ_a.shape[1], mo_vir_a.shape[1])
+                    mat = np.matmul(mo_occ_a, np.matmul(mat, mo_vir_a.T))
+                elif spin == 'beta':
+                    mat = trial_mat[n_ov_a:, k].reshape(mo_occ_b.shape[1], mo_vir_b.shape[1])
+                    mat = np.matmul(mo_occ_b, np.matmul(mat, mo_vir_b.T))
                 tdens.append(mat)
         else:
             tdens = None
 
         return tdens
 
-    def _get_sigmas(self, fock, tensors, molecule, basis, trial_mat):
+    def _get_sigmas(self, fock, scf_results, molecule, basis, trial_mat):
         """
         Computes the sigma vectors.
 
         :param fock:
             The Fock matrix.
-        :param tensors:
-            The dictionary of tensors from converged SCF wavefunction.
+        :param scf_results:
+            The dictionary of results from converged SCF wavefunction.
         :param molecule:
             The molecule.
         :param basis:
@@ -797,23 +799,16 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
         nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
         nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
-        norb = tensors['C_alpha'].shape[1]
+        norb = scf_results['C_alpha'].shape[1]
 
         nvir_a = norb - nocc_a
         nvir_b = norb - nocc_b
 
-        if self.core_excitation:
-            mo_occ_a = tensors['C_alpha'][:, :self.num_core_orbitals].copy()
-            mo_occ_b = tensors['C_beta'][:, :self.num_core_orbitals].copy()
-        else:
-            mo_occ_a = tensors['C_alpha'][:, :nocc_a].copy()
-            mo_occ_b = tensors['C_beta'][:, :nocc_b].copy()
+        (mo_occ_a, mo_occ_b), (mo_vir_a, mo_vir_b) = self._get_mo_occ_and_mo_vir_unrestricted(
+            scf_results, nocc_a, nocc_b)
 
-        mo_vir_a = tensors['C_alpha'][:, nocc_a:].copy()
-        mo_vir_b = tensors['C_beta'][:, nocc_b:].copy()
-
-        orb_ene_a = tensors['E_alpha']
-        orb_ene_b = tensors['E_beta']
+        orb_ene_a = scf_results['E_alpha']
+        orb_ene_b = scf_results['E_beta']
 
         sigma_vecs = []
         for idx in range(len(fock) // 2):
@@ -942,36 +937,27 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
         else:
             if self.rank == mpi_master():
                 # for rsp_results read from h5 file
+                label_a = state_label + '(a)'
+                label_b = state_label + '(b)'
                 assert_msg_critical(
-                    state_label in rsp_results,
-                    f'{type(self).__name__}: No eigenvector found for {state_label}')
-                eigvec = rsp_results[state_label].copy()
+                    label_a in rsp_results and label_b in rsp_results,
+                    f'{type(self).__name__}: No eigenvector found for {state_label}'
+                )
+                eigvec = np.hstack((rsp_results[label_a], rsp_results[label_b]))
             else:
                 eigvec = None
 
         if self.rank == mpi_master():
             # Get MO coefficients and orbital information
-            mo_a = scf_results['C_alpha']
             nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
-            norb = mo_a.shape[1]
-            nvir_a = norb - nocc_a
-            mo_occ_a = mo_a[:, :nocc_a].copy()
-            mo_vir_a = mo_a[:, nocc_a:].copy()
-
-            mo_b = scf_results['C_beta']
             nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
-            nvir_b = norb - nocc_b
-            mo_occ_b = mo_b[:, :nocc_b].copy()
-            mo_vir_b = mo_b[:, nocc_b:].copy()
-
-            # Split eigenvector into alpha and beta components
-            n_ov_a = nocc_a * nvir_a
-            eigvec_a = eigvec[:n_ov_a]
-            eigvec_b = eigvec[n_ov_a:]
+            (mo_occ_a, mo_occ_b), (mo_vir_a, mo_vir_b) = self._get_mo_occ_and_mo_vir_unrestricted(
+                scf_results, nocc_a, nocc_b)
 
             # Build transition density matrices in MO basis (TDA)
-            t_mat_a = eigvec_a.reshape(nocc_a, nvir_a)
-            t_mat_b = eigvec_b.reshape(nocc_b, nvir_b)
+            n_ov_a = mo_occ_a.shape[1] * mo_vir_a.shape[1]
+            t_mat_a = eigvec[:n_ov_a].reshape(mo_occ_a.shape[1], mo_vir_a.shape[1])
+            t_mat_b = eigvec[n_ov_a:].reshape(mo_occ_b.shape[1], mo_vir_b.shape[1])
 
             nto_mo = self._compute_nto_unrestricted(
                 (t_mat_a, t_mat_b),

@@ -34,7 +34,6 @@ from mpi4py import MPI
 from copy import deepcopy
 import sys
 
-from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import mpi_master, hartree_in_wavenumber, hartree_in_ev
 from .outputstream import OutputStream
 from .linearsolver import LinearSolver
@@ -42,7 +41,6 @@ from .oneeints import (compute_electric_dipole_integrals,
                        compute_linear_momentum_integrals,
                        compute_angular_momentum_integrals)
 from .errorhandler import assert_msg_critical
-from .resultsio import write_rsp_solution
 from .spectrumplot import (plot_uv_vis_spectrum, plot_xas_spectrum,
                            plot_ecd_spectrum, plot_xcd_spectrum)
 
@@ -266,37 +264,6 @@ class TdaEigenSolverBase(LinearSolver):
             exec_str += 'a.u. Residual Norm: {:3.8f}'.format(rnorms[i])
             self.ostream.print_header(exec_str.ljust(84))
 
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-    def _write_final_hdf5(self, final_h5_fname, molecule, basis, dft_func_label,
-                          potfile_text, eigvecs):
-        """
-        Writes final HDF5 that contains TDA solution vectors.
-
-        :param final_h5_fname:
-            The name of the final hdf5 file.
-        :param molecule:
-            The molecule.
-        :param ao_basis:
-            The AO basis set.
-        :param dft_func_label:
-            The name of DFT functional.
-        :param potfile_text:
-            The content of potential file for polarizable embedding.
-        :param eigvecs:
-            The TDA eigenvectors (in columns).
-        """
-
-        if (not self.save_solutions) or (final_h5_fname is None):
-            return
-
-        for s in range(eigvecs.shape[1]):
-            write_rsp_solution(final_h5_fname, 'S{:d}'.format(s + 1),
-                               eigvecs[:, s])
-
-        self.ostream.print_info('Response solution vectors written to file: ' +
-                                final_h5_fname)
         self.ostream.print_blank()
         self.ostream.flush()
 

@@ -35,7 +35,6 @@ from copy import deepcopy
 import numpy as np
 import sys
 
-from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import (mpi_master, rotatory_strength_in_cgs, hartree_in_ev,
                            hartree_in_inverse_nm, hartree_in_wavenumber,
                            fine_structure_constant,

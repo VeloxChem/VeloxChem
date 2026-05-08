@@ -579,6 +579,10 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
 
             excitation_details = []
 
+            if self.rank == mpi_master():
+                (mo_occ_a, mo_occ_b), (mo_vir_a, mo_vir_b) = self._get_mo_occ_and_mo_vir_unrestricted(
+                    scf_results, nocc_a, nocc_b)
+
             for s in range(self.nstates):
                 eigvec_full = self.get_full_solution_vector(exc_solutions[s])
 
@@ -599,36 +603,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                         eigvec_full[n_ov_a + n_ov_b + n_ov_a:],
                     ))
 
-                    if self.core_excitation:
-                        mo_occ_a = scf_results[
-                            'C_alpha'][:, :self.num_core_orbitals].copy()
-                        mo_vir_a = scf_results['C_alpha'][:, nocc_a:].copy()
-                        z_mat_a = eigvec_a[:eigvec_a.size // 2].reshape(
-                            self.num_core_orbitals, -1)
-                        y_mat_a = eigvec_a[eigvec_a.size // 2:].reshape(
-                            self.num_core_orbitals, -1)
-
-                        mo_occ_b = scf_results[
-                            'C_beta'][:, :self.num_core_orbitals].copy()
-                        mo_vir_b = scf_results['C_beta'][:, nocc_b:].copy()
-                        z_mat_b = eigvec_b[:eigvec_b.size // 2].reshape(
-                            self.num_core_orbitals, -1)
-                        y_mat_b = eigvec_b[eigvec_b.size // 2:].reshape(
-                            self.num_core_orbitals, -1)
-                    else:
-                        mo_occ_a = scf_results['C_alpha'][:, :nocc_a].copy()
-                        mo_vir_a = scf_results['C_alpha'][:, nocc_a:].copy()
-                        z_mat_a = eigvec_a[:eigvec_a.size // 2].reshape(
-                            nocc_a, -1)
-                        y_mat_a = eigvec_a[eigvec_a.size // 2:].reshape(
-                            nocc_a, -1)
-
-                        mo_occ_b = scf_results['C_beta'][:, :nocc_b].copy()
-                        mo_vir_b = scf_results['C_beta'][:, nocc_b:].copy()
-                        z_mat_b = eigvec_b[:eigvec_b.size // 2].reshape(
-                            nocc_b, -1)
-                        y_mat_b = eigvec_b[eigvec_b.size // 2:].reshape(
-                            nocc_b, -1)
+                    (z_mat_a, z_mat_b), (y_mat_a, y_mat_b) = self._get_z_mat_and_y_mat_unrestricted(
+                        eigvec_a, eigvec_b, nocc_a, nocc_b)
 
                 if self.nto or self.detach_attach:
                     vis_drv = VisualizationDriver(self.comm)
@@ -815,7 +791,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                         magn_trans_dipoles[s, ind] += np.vdot(
                             mdip_grad_b[ind], eigvec_b)
 
-                    # write to h5 file for response solutions
+                    # write response solutions to h5 file
                     if (self.save_solutions and final_h5_fname is not None):
                         write_rsp_solution(final_h5_fname,
                                            'S{:d}(a)'.format(s + 1), eigvec_a)
@@ -903,6 +879,74 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
         else:
             # not converged
             return {}
+
+    def _get_mo_occ_and_mo_vir_unrestricted(self, scf_results, nocc_a, nocc_b):
+        """
+        Gets occupied MO coefficents and virtual MO coefficients that are
+        involved in response calculation.
+
+        :param scf_results:
+            The dictionary containing SCF results.
+        :param nocc_a:
+            The number of spin-alpha occupied orbitals.
+        :param nocc_b:
+            The number of spin-beta occupied orbitals.
+        :return:
+            The involved occupied MO coefficents and virtual MO coefficients.
+        """
+
+        if self.core_excitation:
+            mo_occ_a = scf_results['C_alpha'][:, :self.num_core_orbitals].copy()
+            mo_vir_a = scf_results['C_alpha'][:, nocc_a:].copy()
+
+            mo_occ_b = scf_results['C_beta'][:, :self.num_core_orbitals].copy()
+            mo_vir_b = scf_results['C_beta'][:, nocc_b:].copy()
+
+        else:
+            mo_occ_a = scf_results['C_alpha'][:, :nocc_a].copy()
+            mo_vir_a = scf_results['C_alpha'][:, nocc_a:].copy()
+
+            mo_occ_b = scf_results['C_beta'][:, :nocc_b].copy()
+            mo_vir_b = scf_results['C_beta'][:, nocc_b:].copy()
+
+        return (mo_occ_a, mo_occ_b), (mo_vir_a, mo_vir_b)
+
+    def _get_z_mat_and_y_mat_unrestricted(self, eigvec_a, eigvec_b, nocc_a,
+                                          nocc_b):
+        """
+        Gets excitation and de-excitation vectors in matrix form.
+
+        :param eigvec_a:
+            The spin-alpha part of the eigen vector.
+        :param eigvec_b:
+            The spin-beta part of the eigen vector.
+        :param nocc_a:
+            The number of spin-alpha occupied orbitals.
+        :param nocc_b:
+            The number of spin-beta occupied orbitals.
+        :return:
+            The excitation and de-excitation vectors in matrix form.
+        """
+
+        if self.core_excitation:
+            z_mat_a = eigvec_a[:eigvec_a.size // 2].reshape(
+                self.num_core_orbitals, -1)
+            y_mat_a = eigvec_a[eigvec_a.size // 2:].reshape(
+                self.num_core_orbitals, -1)
+
+            z_mat_b = eigvec_b[:eigvec_b.size // 2].reshape(
+                self.num_core_orbitals, -1)
+            y_mat_b = eigvec_b[eigvec_b.size // 2:].reshape(
+                self.num_core_orbitals, -1)
+
+        else:
+            z_mat_a = eigvec_a[:eigvec_a.size // 2].reshape(nocc_a, -1)
+            y_mat_a = eigvec_a[eigvec_a.size // 2:].reshape(nocc_a, -1)
+
+            z_mat_b = eigvec_b[:eigvec_b.size // 2].reshape(nocc_b, -1)
+            y_mat_b = eigvec_b[eigvec_b.size // 2:].reshape(nocc_b, -1)
+
+        return (z_mat_a, z_mat_b), (y_mat_a, y_mat_b)
 
     def _solve_reduced_space(self, nroots):
         """
@@ -1228,7 +1272,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                 label_b = state_label + '(b)'
                 assert_msg_critical(
                     label_a in rsp_results and label_b in rsp_results,
-                    f'{type(self).__name__}: No eigenvector found for {state_label}')
+                    f'{type(self).__name__}: No eigenvector found for {state_label}'
+                )
                 eigvec_a = rsp_results[label_a].copy()
                 eigvec_b = rsp_results[label_b].copy()
             else:
@@ -1237,34 +1282,17 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
 
         if self.rank == mpi_master():
             # Get MO coefficients and orbital information
-            mo_a = scf_results['C_alpha']
             nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
-            norb = mo_a.shape[1]
-            nvir_a = norb - nocc_a
-            mo_occ_a = mo_a[:, :nocc_a].copy()
-            mo_vir_a = mo_a[:, nocc_a:].copy()
-
-            mo_b = scf_results['C_beta']
             nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
-            nvir_b = norb - nocc_b
-            mo_occ_b = mo_b[:, :nocc_b].copy()
-            mo_vir_b = mo_b[:, nocc_b:].copy()
-
-            n_ov_a = nocc_a * nvir_a
-            n_ov_b = nocc_b * nvir_b
+            (mo_occ_a, mo_occ_b), (mo_vir_a, mo_vir_b) = self._get_mo_occ_and_mo_vir_unrestricted(
+                scf_results, nocc_a, nocc_b)
 
             # Build transition density matrices in MO basis (RPA)
-            z_mat_a = eigvec_a[:n_ov_a].reshape(nocc_a, nvir_a)
-            y_mat_a = eigvec_a[n_ov_a:].reshape(nocc_a, nvir_a)
-            t_mat_a = z_mat_a - y_mat_a
-
-            z_mat_b = eigvec_b[:n_ov_b].reshape(nocc_b, nvir_b)
-            y_mat_b = eigvec_b[n_ov_b:].reshape(nocc_b, nvir_b)
-            t_mat_b = z_mat_b - y_mat_b
+            (z_mat_a, z_mat_b), (y_mat_a, y_mat_b) = self._get_z_mat_and_y_mat_unrestricted(
+                eigvec_a, eigvec_b, nocc_a, nocc_b)
 
             nto_mo = self._compute_nto_unrestricted(
-                (t_mat_a, t_mat_b),
-                (mo_occ_a, mo_occ_b),
+                (z_mat_a - y_mat_a, z_mat_b - y_mat_b), (mo_occ_a, mo_occ_b),
                 (mo_vir_a, mo_vir_b))
         else:
             nto_mo = MolecularOrbitals()
