@@ -851,7 +851,7 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
     def _get_mo_occ_and_mo_vir(self, scf_results, nocc):
         """
-        Gets occupied MO coefficents and virtual MO coefficients that are
+        Gets occupied MO coefficients and virtual MO coefficients that are
         involved in response calculation.
 
         :param scf_results:
@@ -859,7 +859,7 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
         :param nocc:
             The number of occupied orbitals.
         :return:
-            The involved occupied MO coefficents and virtual MO coefficients.
+            The involved occupied MO coefficients and virtual MO coefficients.
         """
 
         if self.core_excitation:

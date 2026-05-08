@@ -470,7 +470,7 @@ class TpaDriverBase(NonlinearSolver):
         :param Nx:
             A dictonary with all the first-order response vectors in distributed form
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param nocc:
             Number of occupied orbitals
         :param norb:
@@ -495,7 +495,7 @@ class TpaDriverBase(NonlinearSolver):
         :param F0:
             The Fock matrix in MO basis
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param molecule:
             The molecule
         :param ao_basis:
@@ -583,7 +583,7 @@ class TpaDriverBase(NonlinearSolver):
         :param Nxy:
             A dict of the two index response vectors in distributed form
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param nocc:
             Number of occupied orbitals
         :param nocc:
@@ -606,7 +606,7 @@ class TpaDriverBase(NonlinearSolver):
         :param density_list:
             A list of tranformed compounded densities
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param molecule:
             The molecule
         :param ao_basis:

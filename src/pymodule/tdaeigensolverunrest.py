@@ -617,7 +617,7 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
 
     def _get_mo_occ_and_mo_vir_unrestricted(self, scf_results, nocc_a, nocc_b):
         """
-        Gets occupied MO coefficents and virtual MO coefficients that are
+        Gets occupied MO coefficients and virtual MO coefficients that are
         involved in response calculation.
 
         :param scf_results:
@@ -627,7 +627,7 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
         :param nocc_b:
             The number of spin-beta occupied orbitals.
         :return:
-            The involved occupied MO coefficents and virtual MO coefficients.
+            The involved occupied MO coefficients and virtual MO coefficients.
         """
 
         if self.core_excitation:

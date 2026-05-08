@@ -103,7 +103,7 @@ class TpaFullDriver(TpaDriverBase):
             A dictonary with all the first-order response vectors in
             distributed form
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param nocc:
             Number of occupied orbitals
         :param norb:
@@ -336,7 +336,7 @@ class TpaFullDriver(TpaDriverBase):
         :param F0_a:
             The Fock matrix in MO basis
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param molecule:
             The molecule
         :param ao_basis:
@@ -895,7 +895,7 @@ class TpaFullDriver(TpaDriverBase):
         :param Nxy:
             A dict of the two index response vectors in distributed form
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param nocc:
             Number of occupied orbitals
         :param norb:
@@ -1157,7 +1157,7 @@ class TpaFullDriver(TpaDriverBase):
         :param density_list:
             A list of tranformed compounded densities
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param molecule:
             The molecule
         :param ao_basis:

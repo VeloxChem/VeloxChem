@@ -1238,7 +1238,7 @@ class NonlinearSolver:
         Transform a matrix to molecular basis
 
         :param mo:
-            molecular orbital coefficent matrix
+            molecular orbital coefficients matrix
         :param A:
             The matrix in AO basis that is the converted to MO basis
 
