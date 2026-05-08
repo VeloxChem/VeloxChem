@@ -56,8 +56,6 @@ try:
 except ImportError:
     pass
 
-from concurrent.futures import ProcessPoolExecutor
-
 # ---- global worker state (created once per process) ----
 _W = {}
 
