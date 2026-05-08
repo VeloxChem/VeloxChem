@@ -546,7 +546,7 @@ class ThreePATransitionDriver(NonlinearSolver):
             #            print(f"{key}: {value}")
 
             ret_dict = {
-                'photon_energies': [-w for w in freqs],
+                'photon_energies': [float(-w) for w in freqs],
                 'transition_moments': T_tensors,
                 #'cross_sections': tpa_cross_sections,
                 '3pa_strengths': tpa_strengths,

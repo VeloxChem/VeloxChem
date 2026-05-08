@@ -634,7 +634,7 @@ class TpaTransitionDriver(NonlinearSolver):
             profiler.check_memory_usage('End of QRF')
 
             ret_dict = {
-                'photon_energies': [-w for w in freqs],
+                'photon_energies': [float(-w) for w in freqs],
                 'transition_moments': M_tensors,
                 'tpa_strengths': tpa_strengths,
                 'excited_state_dipole_moments': excited_state_dipole_moments,
