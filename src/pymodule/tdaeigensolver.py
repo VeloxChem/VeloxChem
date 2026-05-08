@@ -430,7 +430,7 @@ class TdaEigenSolver(TdaEigenSolverBase):
                 self.ostream.flush()
 
                 if self.rank == mpi_master():
-                    nto_mo = self.get_nto(t_mat, mo_occ, mo_vir)
+                    nto_mo = self._compute_nto(t_mat, mo_occ, mo_vir)
 
                     nto_lam = nto_mo.occa_to_numpy()
                     lam_start = mo_occ.shape[1]
@@ -820,3 +820,62 @@ class TdaEigenSolver(TdaEigenSolverBase):
             ])
 
         return transition_dipoles
+
+    def get_nto(self, molecule, basis, scf_results, rsp_results, state_label):
+        """
+        Computes natural transition orbitals for a given excited state.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_results:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param rsp_results:
+            The dictionary of results from a linear response calculation.
+        :param state_label:
+            A string label identifying the state, e.g. 'S1', 'S2'.
+
+        :return:
+            The NTOs as a MolecularOrbitals object.
+        """
+
+        # Extract 1-based state index from label (e.g. 'S1' -> 1)
+        state_index = int(state_label[1:])
+
+        # Extract eigenvector from rsp_results
+        if 'eigenvectors' in rsp_results:
+            if self.rank == mpi_master():
+                eigvec = rsp_results['eigenvectors'][:, state_index - 1].copy()
+            else:
+                eigvec = None
+        else:
+            if self.rank == mpi_master():
+                # for rsp_results read from h5 file
+                assert_msg_critical(
+                    state_label in rsp_results,
+                    f'{type(self).__name__}: No eigenvector found for {state_label}')
+                eigvec = rsp_results[state_label].copy()
+            else:
+                eigvec = None
+
+        if self.rank == mpi_master():
+            # Get MO coefficients and orbital information
+            mo = scf_results['C_alpha']
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+            norb = mo.shape[1]
+            nvir = norb - nocc
+            mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
+
+            # Build transition density matrix in MO basis (TDA)
+            nexc = nocc * nvir
+            z_mat = eigvec[:nexc]
+            t_mat = np.reshape(z_mat, (nocc, nvir))
+
+            nto_mo = self._compute_nto(t_mat, mo_occ, mo_vir)
+        else:
+            nto_mo = MolecularOrbitals()
+        nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())
+
+        return nto_mo

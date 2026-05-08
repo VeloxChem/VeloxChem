@@ -646,7 +646,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                     self.ostream.flush()
 
                     if self.rank == mpi_master():
-                        nto_mo = self.get_nto_unrestricted(
+                        nto_mo = self._compute_nto_unrestricted(
                             (z_mat_a - y_mat_a, z_mat_b - y_mat_b),
                             (mo_occ_a, mo_occ_b), (mo_vir_a, mo_vir_b))
 
@@ -820,7 +820,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                         write_rsp_solution(final_h5_fname,
                                            'S{:d}(a)'.format(s + 1), eigvec_a)
                         write_rsp_solution(final_h5_fname,
-                                           'S{:d}(a)'.format(s + 1), eigvec_b)
+                                           'S{:d}(b)'.format(s + 1), eigvec_b)
 
                     # save excitation details
                     excitation_details.append(
@@ -1181,3 +1181,93 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
         p_mat = np.vstack((p_mat_alpha, p_mat_beta))
 
         return DistributedArray(p_mat, self.comm)
+
+    def get_nto(self, molecule, basis, scf_results, rsp_results, state_label):
+        """
+        Computes natural transition orbitals for a given excited state.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_results:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param rsp_results:
+            The dictionary of results from a linear response calculation.
+        :param state_label:
+            A string label identifying the state, e.g. 'S1', 'S2'.
+
+        :return:
+            The NTOs as a MolecularOrbitals object.
+        """
+
+        # Extract 1-based state index from label (e.g. 'S1' -> 1)
+        state_index = int(state_label[1:])
+
+        # Extract eigenvector from rsp_results
+        if 'eigenvectors_distributed' in rsp_results:
+            eigvec_full = self.get_full_solution_vector(
+                rsp_results['eigenvectors_distributed'][state_index - 1])
+            if self.rank == mpi_master():
+                # Split eigenvector into alpha and beta components
+                eigvec_a = np.hstack((
+                    eigvec_full[:n_ov_a],
+                    eigvec_full[n_ov_a + n_ov_b:n_ov_a + n_ov_b + n_ov_a],
+                ))
+                eigvec_b = np.hstack((
+                    eigvec_full[n_ov_a:n_ov_a + n_ov_b],
+                    eigvec_full[n_ov_a + n_ov_b + n_ov_a:],
+                ))
+            else:
+                eigvec_a = None
+                eigvec_b = None
+        else:
+            if self.rank == mpi_master():
+                # for rsp_results read from h5 file
+                label_a = state_label + '(a)'
+                label_b = state_label + '(b)'
+                assert_msg_critical(
+                    label_a in rsp_results and label_b in rsp_results,
+                    f'{type(self).__name__}: No eigenvector found for {state_label}')
+                eigvec_a = rsp_results[label_a].copy()
+                eigvec_b = rsp_results[label_b].copy()
+            else:
+                eigvec_a = None
+                eigvec_b = None
+
+        if self.rank == mpi_master():
+            # Get MO coefficients and orbital information
+            mo_a = scf_results['C_alpha']
+            nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+            norb = mo_a.shape[1]
+            nvir_a = norb - nocc_a
+            mo_occ_a = mo_a[:, :nocc_a].copy()
+            mo_vir_a = mo_a[:, nocc_a:].copy()
+
+            mo_b = scf_results['C_beta']
+            nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
+            nvir_b = norb - nocc_b
+            mo_occ_b = mo_b[:, :nocc_b].copy()
+            mo_vir_b = mo_b[:, nocc_b:].copy()
+
+            n_ov_a = nocc_a * nvir_a
+            n_ov_b = nocc_b * nvir_b
+
+            # Build transition density matrices in MO basis (RPA)
+            z_mat_a = eigvec_a[:n_ov_a].reshape(nocc_a, nvir_a)
+            y_mat_a = eigvec_a[n_ov_a:].reshape(nocc_a, nvir_a)
+            t_mat_a = z_mat_a - y_mat_a
+
+            z_mat_b = eigvec_b[:n_ov_b].reshape(nocc_b, nvir_b)
+            y_mat_b = eigvec_b[n_ov_b:].reshape(nocc_b, nvir_b)
+            t_mat_b = z_mat_b - y_mat_b
+
+            nto_mo = self._compute_nto_unrestricted(
+                (t_mat_a, t_mat_b),
+                (mo_occ_a, mo_occ_b),
+                (mo_vir_a, mo_vir_b))
+        else:
+            nto_mo = MolecularOrbitals()
+        nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())
+
+        return nto_mo
