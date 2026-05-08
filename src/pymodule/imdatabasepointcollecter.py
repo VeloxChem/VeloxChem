@@ -93,15 +93,6 @@ from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
 from .imtrustradiusoptimizer import IMTrustRadiusOptimizer
 
-from .imrotorbuilder import (
-    RotorDefinition,
-    RotorClusterDefinition,
-    RotorClusterInformation,
-    RotorClusterStateDefinition,
-    RotorClusterAngleLibrary,
-    build_rotor_clusters,
-    rotor_coupling_score,
-)
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -114,37 +105,6 @@ try:
 except ImportError:
     pass
 
-# def _rank_root_print(*args, **kwargs):
-#     """
-#     Print only on MPI root rank to avoid delayed/duplicated worker stdout noise.
-#     Falls back to normal print when MPI rank detection is unavailable.
-#     """
-#     try:
-#         if MPI.COMM_WORLD.Get_rank() == mpi_master():
-#             builtins.print(*args, **kwargs)
-#     except Exception:
-#         builtins.print(*args, **kwargs)
-
-
-# print = _rank_root_print
-
-# def _collective_call_inline_style(comm, rank, root, phase_name, fn, *args, **kwargs):
-#     comm.barrier()
-#     local_err = None
-#     result = None
-#     try:
-#         result = fn(*args, **kwargs)
-#     except Exception as exc:
-#         local_err = f"rank {rank}: {exc}"
-
-#     errs = [e for e in comm.allgather(local_err) if e is not None]
-#     if errs:
-#         if rank == root:
-#             raise RuntimeError(f"{phase_name} failed\n" + "\n".join(errs))
-#         raise RuntimeError(f"{phase_name} failed on another rank")
-
-#     comm.barrier()
-#     return result
 
 @contextmanager
 def scoped_omp_num_threads(nthreads):
@@ -159,13 +119,6 @@ def scoped_omp_num_threads(nthreads):
     old_env = environ.get("OMP_NUM_THREADS")
     old_runtime = None
     set_runtime_threads = None
-
-    # try:
-    #     from .veloxchemlib import get_number_of_threads, set_number_of_threads
-    #     old_runtime = int(get_number_of_threads())
-    #     set_runtime_threads = set_number_of_threads
-    # except Exception:
-    #     pass
 
     environ["OMP_NUM_THREADS"] = str(nthreads)
     if set_runtime_threads is not None:
@@ -325,10 +278,8 @@ class IMDatabasePointCollecter:
         self.linking_atoms = None
         self.qm_force_index = None
         self.driver_flag = None
-        self.swapped = False
-        self.state_swtiched = False
-        self.velo_switch = False
-        self.excitation_pulse = None
+
+
         self.prev_dens_of_points = None
 
         self.roots_to_follow = []
@@ -337,7 +288,7 @@ class IMDatabasePointCollecter:
         self.load_system = None
         self.pressure = None
         self.output_file = None
-        self.adiabatic_basis = False
+
         self.density_around_data_point = None
         self.impes_drivers = None
         self.im_labels = None
@@ -382,7 +333,7 @@ class IMDatabasePointCollecter:
         self.expansion_molecules = []
         self.dynamics_settings_interpolation_run = None
         self.sampled_molecules = None
-        self.bayes_models = None
+
 
         self.opt_mols_org_mol_swap = {}
 
@@ -397,15 +348,6 @@ class IMDatabasePointCollecter:
 
         # symmetry considerations
         # per-root-state active rotor cluster information used for setup diagnostics
-        self.rotor_cluster_information = {"gs": None, "es": None}
-        # root -> family_label -> cluster bank payload loaded from registry
-        self.qm_rotor_cluster_banks = None
-        self.qm_sampling_rotor_cluster_banks = None
-        # rotor_id -> RotorDefinition mapping for currently analyzed symmetry rotors
-        self.symmetry_rotors = None
-        self.rotor_corr_threshold = None
-        self.cluster_run = None
-        
 
         # output_file variables that will be written into self.general_variable_output
         self.gradients = None
@@ -419,12 +361,11 @@ class IMDatabasePointCollecter:
         # toggle + optional fixed list for important internal-coordinate constraints
         self.identfy_relevant_int_coordinates = (True, [])
         # master switch for generating/using symmetry-equivalent datapoints
-        self.use_symmetry = True
+
         self.use_opt_confidence_radius = True
         self.confidence_radius_optimized = True
         # root-indexed dictionary of symmetry-expanded QM datapoint banks
         self.qm_symmetry_dict = None
-        self.add_gpr_model = True
         
         self.summary_output = 'summary_output.h5'
         self.coordinates_xyz = None
@@ -440,32 +381,11 @@ class IMDatabasePointCollecter:
         self.profile_runtime_timing = False
         self.profile_runtime_print_interval = 0
         self.profile_interpolation_timing = False
-        self.profile_interpolation_print_summary = True
+        self.profile_interpolation_print_summary = False
         self._qmmm_runtime_profiler = None
         self._qmmm_runtime_totals = {}
         self._qmmm_runtime_step = {}
         self._qmmm_runtime_steps = 0
-
-        # self.mpi_control_plane_enabled = (self.nodes > 1)
-        # self.mpi_root_worker_mode = (self.nodes > 1)
-        # self.mpi_reload_from_hdf5 = True
-        # self.mpi_debug_sync = False
-
-        # # command IDs
-        # self._MPI_CMD_STEP = 1
-        # self._MPI_CMD_STOP = 2
-        # self._MPI_CMD_AUX = 3
-
-        # # AUX task IDs
-        # self._MPI_AUX_EG = 11        # energy + gradient
-        # self._MPI_AUX_EGH = 12       # energy + gradient + hessian
-        # self._MPI_AUX_OPT = 13       # constrained optimization
-
-        # True only while worker service loop is active
-        # self._mpi_worker_service_running = False
-
-        # roots requiring dataset reload on worker ranks
-        # self._mpi_pending_sync_roots = set()
 
         # Cache of the most recent QM molecule passed through interpolation.
         self._latest_qm_molecule = None
@@ -730,476 +650,7 @@ class IMDatabasePointCollecter:
         """
         driver = self.impes_drivers[root]
         driver.mark_runtime_data_cache_dirty()
-        driver.prepare_runtime_data_cache(force=True)
-        # if getattr(driver, 'local_engine', None) is not None:
-        #     driver.local_engine.mark_dirty()
-        #     if self.nodes <= 1:
-        #         driver.local_engine.preload_static_data(force=True)
 
-        # if self.nodes <= 1 and bool(getattr(driver, 'use_outer_parallel', False)):
-        #     n_labels = len(getattr(driver, 'qm_data_points', []) or [])
-        #     if driver._can_use_outer_parallel(n_labels):
-        #         try:
-        #             n_workers = driver._resolve_outer_parallel_workers(n_labels)
-        #             driver._ensure_outer_parallel_pool(n_workers)  # sets _outer_parallel_pool_dirty = False
-        #         except Exception as exc:
-        #             driver._close_outer_parallel_pool()
-
-        # if getattr(driver, 'mpi_engine', None) is not None:
-        #     driver.mpi_engine.mark_dirty()
-        #     # In root-worker mode, defer preload rebuild until synchronized compute
-        #     # to avoid standalone collectives desynchronizing the worker control loop.
-        #     if not (self._mpi_is_active() and self.mpi_root_worker_mode):
-        #         driver.mpi_engine.preload_static_data(force=True)
-
-        # if self.sampling_enabled and self.sampling_impes_drivers is not None:
-        #     samp_driver = self.sampling_impes_drivers[root]
-        #     if samp_driver is not None:
-        #         samp_driver.mark_runtime_data_cache_dirty()
-        #         samp_driver.prepare_runtime_data_cache(force=True)
-
-        #         if getattr(samp_driver, 'mpi_engine', None) is not None:
-        #             samp_driver.mpi_engine.mark_dirty()
-        #             # In root-worker mode, defer preload rebuild until synchronized compute
-        #             # to avoid standalone collectives desynchronizing the worker control loop.
-        #             if not (self._mpi_is_active() and self.mpi_root_worker_mode):
-        #                 samp_driver.mpi_engine.preload_static_data(force=True)
-
-        #         if getattr(samp_driver, 'local_engine', None) is not None:
-        #             samp_driver.local_engine.mark_dirty()
-        #             if self.nodes <= 1:
-        #                 samp_driver.local_engine.preload_static_data(force=True)
-
-        # self._mpi_mark_root_dirty(root)
-    
-    
-    # def _mpi_is_active(self):
-    #     return bool(self.nodes > 1 and self.mpi_control_plane_enabled)
-
-    # def _mpi_is_root(self):
-    #     return self.rank == mpi_master()
-
-    # def _mpi_mark_root_dirty(self, root):
-    #     if self._mpi_is_active() and self.mpi_root_worker_mode:
-    #         self._mpi_pending_sync_roots.add(int(root))
-
-    # def _mpi_bcast_control(self, message):
-    #     if not self._mpi_is_active():
-    #         return message
-    #     return self._mpi_ctrl_comm.bcast(message if self._mpi_is_root() else None, root=mpi_master())
-
-    # def _mpi_decode_cmd(self, cmd_obj):
-    #     if isinstance(cmd_obj, np.ndarray):
-    #         arr = np.asarray(cmd_obj)
-    #         if arr.size == 1:
-    #             return int(arr.reshape(-1)[0])
-    #         raise RuntimeError(
-    #             f"MPI control-channel desync on rank {self.rank}: expected scalar command, "
-    #             f"got ndarray shape={arr.shape} dtype={arr.dtype}")
-
-    #     if isinstance(cmd_obj, (int, np.integer)):
-    #         return int(cmd_obj)
-
-    #     raise RuntimeError(
-    #         f"MPI control-channel desync on rank {self.rank}: expected int command, "
-    #         f"got {type(cmd_obj).__name__}")
-
-    # @staticmethod
-    # def _serialize_molecule_for_mpi(mol):
-    #     return (mol.get_xyz_string(), int(mol.get_charge()), int(mol.get_multiplicity()))
-
-    # @staticmethod
-    # def _deserialize_molecule_from_mpi(payload):
-    #     mol = Molecule.from_xyz_string(payload[0])
-    #     mol.set_charge(int(payload[1]))
-    #     mol.set_multiplicity(int(payload[2]))
-    #     return mol
-
-    # def _mpi_can_dispatch_aux(self):
-    #     return bool(
-    #         self._mpi_is_active()
-    #         and self.mpi_root_worker_mode
-    #         and self._mpi_is_root()
-    #         and self._mpi_worker_service_running
-    #     )
-
-    # def _mpi_run_aux(self, aux_cmd, payload):
-    #     # Root-worker mode: root dispatches AUX command to parked workers.
-    #     if self._mpi_can_dispatch_aux():
-    #         self._mpi_bcast_control({
-    #             'cmd': self._MPI_CMD_AUX,
-    #             'aux_cmd': int(aux_cmd),
-    #             'payload': payload,
-    #         })
-    #         return self._mpi_execute_aux_collective(aux_cmd, payload)
-
-    #     # Full-SPMD mode (mpi_root_worker_mode=False): all ranks enter here directly.
-    #     if self._mpi_is_active() and (not self.mpi_root_worker_mode):
-    #         return self._mpi_execute_aux_collective(aux_cmd, payload)
-
-    #     # Root-local fallback.
-    #     return self._mpi_execute_aux_local(aux_cmd, payload)
-
-    # def _mpi_execute_aux_collective(self, aux_cmd, payload):
-    #     if int(aux_cmd) == self._MPI_AUX_EG:
-    #         return self._mpi_aux_eval_qm_block(payload, include_hessian=False, collective_mode=True)
-    #     if int(aux_cmd) == self._MPI_AUX_EGH:
-    #         return self._mpi_aux_eval_qm_block(payload, include_hessian=True, collective_mode=True)
-    #     if int(aux_cmd) == self._MPI_AUX_OPT:
-    #         return self._mpi_aux_optimize_block(payload, collective_mode=True)
-    #     raise RuntimeError(f"Unknown MPI AUX command {aux_cmd}")
-
-    # def _mpi_execute_aux_local(self, aux_cmd, payload):
-    #     if int(aux_cmd) == self._MPI_AUX_EG:
-    #         return self._mpi_aux_eval_qm_block(payload, include_hessian=False, collective_mode=False)
-    #     if int(aux_cmd) == self._MPI_AUX_EGH:
-    #         return self._mpi_aux_eval_qm_block(payload, include_hessian=True, collective_mode=False)
-    #     if int(aux_cmd) == self._MPI_AUX_OPT:
-    #         return self._mpi_aux_optimize_block(payload, collective_mode=False)
-    #     raise RuntimeError(f"Unknown MPI AUX command {aux_cmd}")
-    
-    # def _mpi_aux_eval_qm_block(self, payload, include_hessian=False, collective_mode=False):
-    #     driver_key = str(payload['driver_key'])   # 'gs' or 'es'
-    #     state_mask = [int(x) for x in payload.get('state_mask', [])]
-    #     molecule = self._deserialize_molecule_from_mpi(payload['molecule'])
-    #     basis_label = str(payload['basis_label'])
-    #     basis = MolecularBasis.read(molecule, basis_label)
-
-    #     drivers = self.drivers[driver_key]
-    #     restore_state_deriv = None
-
-    #     if isinstance(drivers[0], (LinearResponseEigenSolver, TdaEigenSolver)):
-    #         restore_state_deriv = list(drivers[1].state_deriv_index)
-    #         drivers[1].state_deriv_index = list(state_mask)
-
-    #     try:
-    #         energies, scf_results, rsp_results = self._compute_energy_mpi_safe(
-    #             drivers[0], molecule, basis,
-    #             collective=collective_mode,
-    #             phase_name='AUX energy',
-    #         )
-
-    #         if isinstance(drivers[0], (LinearResponseEigenSolver, TdaEigenSolver)):
-    #             energies = np.asarray(energies)[state_mask]
-
-    #         gradients = self._compute_gradient_mpi_safe(
-    #             drivers[1], molecule, basis, scf_results, rsp_results,
-    #             collective=collective_mode,
-    #             phase_name='AUX gradient',
-    #         )
-
-    #         out = {
-    #             'energies': energies,
-    #             'gradients': gradients,
-    #         }
-
-    #         if include_hessian:
-    #             hessians = self._compute_hessian_mpi_safe(
-    #                 drivers[2], molecule, basis,
-    #                 collective=collective_mode,
-    #                 phase_name='AUX hessian',
-    #             )
-    #             out['hessians'] = hessians
-
-    #         return out
-    #     finally:
-    #         if restore_state_deriv is not None:
-    #             drivers[1].state_deriv_index = restore_state_deriv
-
-    # def _mpi_aux_optimize_block(self, payload, collective_mode=False):
-    #     state_to_optim = int(payload['state_to_optim'])
-    #     molecule = self._deserialize_molecule_from_mpi(payload['molecule'])
-    #     constraints = payload.get('constraints', [])
-    #     basis_label = str(payload['basis_label'])
-    #     basis = MolecularBasis.read(molecule, basis_label)
-
-    #     if state_to_optim == 0:
-    #         if isinstance(self.drivers['gs'][0], (ScfRestrictedDriver, ScfUnrestrictedDriver)):
-    #             _, scf_results, _ = self._compute_energy_mpi_safe(
-    #                 self.drivers['gs'][0], molecule, basis,
-    #                 collective=collective_mode, phase_name='AUX opt pre-energy')
-    #             optimized_molecule, opt_results = self._run_optimization_mpi_safe(
-    #                 self.drivers['gs'][0],
-    #                 molecule,
-    #                 constraints=constraints,
-    #                 index_offset=1,
-    #                 compute_args=(basis, scf_results),
-    #                 source_molecule=molecule,
-    #                 collective=collective_mode,
-    #                 phase_name='AUX optimization',
-    #             )
-    #         elif isinstance(self.drivers['gs'][0], XtbDriver):
-    #             optimized_molecule, opt_results = self._run_optimization_mpi_safe(
-    #                 self.drivers['gs'][0],
-    #                 molecule,
-    #                 constraints=constraints,
-    #                 index_offset=1,
-    #                 source_molecule=molecule,
-    #                 collective=collective_mode,
-    #                 phase_name='AUX optimization',
-    #             )
-    #         else:
-    #             raise RuntimeError("Unsupported GS optimization driver in AUX optimization.")
-    #     else:
-    #         if not isinstance(self.drivers['es'][0], (LinearResponseEigenSolver, TdaEigenSolver)):
-    #             raise RuntimeError("Unsupported ES optimization driver in AUX optimization.")
-
-    #         old_state_deriv = list(self.drivers['es'][1].state_deriv_index)
-    #         self.drivers['es'][1].state_deriv_index = [state_to_optim]
-    #         try:
-    #             _, _, rsp_results = self._compute_energy_mpi_safe(
-    #                 self.drivers['es'][0], molecule, basis,
-    #                 collective=collective_mode, phase_name='AUX ES pre-energy')
-
-    #             optimized_molecule, opt_results = self._run_optimization_mpi_safe(
-    #                 self.drivers['es'][1],
-    #                 molecule,
-    #                 constraints=constraints,
-    #                 index_offset=1,
-    #                 compute_args=(basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results),
-    #                 source_molecule=molecule,
-    #                 collective=collective_mode,
-    #                 phase_name='AUX ES optimization',
-    #             )
-    #         finally:
-    #             self.drivers['es'][1].state_deriv_index = old_state_deriv
-
-    #     return {
-    #         'optimized_molecule': self._serialize_molecule_for_mpi(optimized_molecule),
-    #         'opt_results': opt_results,
-    #     }
-    
-    # def _aux_eval_eg(self, molecule, basis_label, driver_key, state_mask):
-    #     payload = {
-    #         'molecule': self._serialize_molecule_for_mpi(molecule),
-    #         'basis_label': str(basis_label),
-    #         'driver_key': str(driver_key),
-    #         'state_mask': [int(x) for x in state_mask],
-    #     }
-    #     out = self._mpi_run_aux(self._MPI_AUX_EG, payload)
-    #     return out['energies'], out['gradients']
-
-    # def _aux_eval_egh(self, molecule, basis_label, driver_key, state_mask):
-    #     payload = {
-    #         'molecule': self._serialize_molecule_for_mpi(molecule),
-    #         'basis_label': str(basis_label),
-    #         'driver_key': str(driver_key),
-    #         'state_mask': [int(x) for x in state_mask],
-    #     }
-    #     out = self._mpi_run_aux(self._MPI_AUX_EGH, payload)
-    #     return out['energies'], out['gradients'], out['hessians']
-
-    # def _aux_optimize(self, state_to_optim, molecule, basis_label, constraints):
-    #     payload = {
-    #         'state_to_optim': int(state_to_optim),
-    #         'molecule': self._serialize_molecule_for_mpi(molecule),
-    #         'basis_label': str(basis_label),
-    #         'constraints': constraints,
-    #     }
-    #     out = self._mpi_run_aux(self._MPI_AUX_OPT, payload)
-    #     optimized_molecule = self._deserialize_molecule_from_mpi(out['optimized_molecule'])
-    #     return optimized_molecule, out['opt_results']
-
-
-    # def _run_qmmm_worker_service(self):
-    #     """
-    #     Worker-side MPI service loop.
-    #     Receives STEP messages from rank 0 and executes interpolation compute only.
-    #     """
-    #     expected_step_idx = 0
-    #     while True:
-    #         msg = self._mpi_bcast_control(None)
-    #         if not isinstance(msg, dict):
-    #             raise RuntimeError(
-    #                 f"MPI control-channel desync on worker rank {self.rank}: "
-    #                 f"unexpected message type={type(msg).__name__}")
-    #         if 'cmd' not in msg:
-    #             raise RuntimeError(
-    #                 f"MPI control-channel desync on worker rank {self.rank}: "
-    #                 f"control dict missing 'cmd'; keys={list(msg.keys())}")
-
-    #         cmd = self._mpi_decode_cmd(msg['cmd'])
-
-    #         if cmd == self._MPI_CMD_STOP:
-    #             break
-
-    #         if cmd == self._MPI_CMD_STEP:
-    #             step_idx_obj = msg.get('step_idx', None)
-    #             if step_idx_obj is not None:
-    #                 step_idx = self._mpi_decode_cmd(step_idx_obj)
-    #                 if step_idx != expected_step_idx:
-    #                     raise RuntimeError(
-    #                         f"MPI STEP index mismatch on worker rank {self.rank}: "
-    #                         f"expected {expected_step_idx}, got {step_idx}")
-    #                 expected_step_idx += 1
-
-    #             if 'qm_positions_nm' not in msg:
-    #                 raise RuntimeError(
-    #                     f"MPI STEP message missing 'qm_positions_nm' on worker rank {self.rank}")
-
-    #             sync_roots = msg.get('sync_roots', [])
-    #             qm_positions_nm = msg['qm_positions_nm']
-    #             self._mpi_worker_compute_step(qm_positions_nm, sync_roots)
-    #             continue
-
-    #         if cmd == self._MPI_CMD_AUX:
-    #             aux_cmd_obj = msg.get('aux_cmd', None)
-    #             if aux_cmd_obj is None:
-    #                 raise RuntimeError(
-    #                     f"MPI AUX message missing 'aux_cmd' on worker rank {self.rank}")
-    #             aux_cmd = self._mpi_decode_cmd(aux_cmd_obj)
-    #             payload = msg.get('payload', {})
-    #             self._mpi_execute_aux_collective(aux_cmd, payload)
-    #             continue
-
-    #         raise RuntimeError(f"Unknown MPI command {cmd} on worker rank {self.rank}")
-
-    # def _mpi_collect_driver_objects_for_root_local_work(self):
-    #     objs = []
-    #     drv_dict = getattr(self, 'drivers', None)
-    #     if isinstance(drv_dict, dict):
-    #         for key in ('gs', 'es'):
-    #             drv_val = drv_dict.get(key)
-    #             if isinstance(drv_val, (list, tuple)):
-    #                 for obj in drv_val:
-    #                     if obj is not None:
-    #                         objs.append(obj)
-    #             elif drv_val is not None:
-    #                 objs.append(drv_val)
-    #     return objs
-
-    # def _mpi_apply_comm_override(self, obj, comm, saved, seen):
-    #     if obj is None:
-    #         return
-
-    #     obj_id = id(obj)
-    #     if obj_id in seen:
-    #         return
-    #     seen.add(obj_id)
-
-    #     def _record_and_set(target, attr_name, new_value):
-    #         try:
-    #             old_value = getattr(target, attr_name)
-    #         except Exception:
-    #             return
-    #         try:
-    #             setattr(target, attr_name, new_value)
-    #         except Exception:
-    #             return
-    #         saved.append((target, attr_name, old_value))
-
-    #     # Update both public and private communicator/rank/size fields.
-    #     for comm_attr in ('comm', '_comm'):
-    #         if hasattr(obj, comm_attr):
-    #             _record_and_set(obj, comm_attr, comm)
-
-    #     for rank_attr in ('rank', '_rank'):
-    #         if hasattr(obj, rank_attr):
-    #             _record_and_set(obj, rank_attr, comm.Get_rank())
-
-    #     for size_attr in ('nodes', '_nodes', 'size', '_size', 'nnodes', '_nnodes'):
-    #         if hasattr(obj, size_attr):
-    #             _record_and_set(obj, size_attr, comm.Get_size())
-
-    #     # Recurse through nested veloxchem objects and container members.
-    #     if isinstance(obj, dict):
-    #         iterable = obj.values()
-    #     elif isinstance(obj, (list, tuple, set)):
-    #         iterable = obj
-    #     else:
-    #         iterable = getattr(obj, '__dict__', {}).values()
-
-    #     for child in iterable:
-    #         if child is None:
-    #             continue
-    #         if isinstance(child, (str, bytes, int, float, complex, bool, np.ndarray)):
-    #             continue
-    #         child_mod = getattr(getattr(child, '__class__', None), '__module__', '')
-    #         if child_mod.startswith('veloxchem') or isinstance(child, (dict, list, tuple, set)):
-    #             self._mpi_apply_comm_override(child, comm, saved, seen)
-
-    # @staticmethod
-    # def _mpi_restore_comm_override(saved):
-    #     for target, attr_name, old_value in reversed(saved):
-    #         try:
-    #             setattr(target, attr_name, old_value)
-    #         except Exception:
-    #             pass
-
-    # @contextmanager
-    # def _mpi_root_local_qm_context(self, extra_objects=None):
-    #     """
-    #     Temporarily forces auxiliary QM drivers to run on COMM_SELF.
-
-    #     This avoids deadlocks when rank 0 performs point-check/add-point
-    #     QM/optimization work while worker ranks are blocked in the
-    #     root-worker control service loop.
-    #     """
-
-    #     if not (self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root()):
-    #         yield
-    #         return
-
-    #     saved = []
-    #     seen = set()
-    #     local_comm = MPI.COMM_SELF
-
-    #     for obj in self._mpi_collect_driver_objects_for_root_local_work():
-    #         self._mpi_apply_comm_override(obj, local_comm, saved, seen)
-
-    #     if extra_objects is not None:
-    #         for obj in extra_objects:
-    #             self._mpi_apply_comm_override(obj, local_comm, saved, seen)
-
-    #     try:
-    #         yield
-    #     finally:
-    #         self._mpi_restore_comm_override(saved)
-
-    # def _opt_compute_mpi_safe(self, opt_drv, molecule, *compute_args):
-    #     with self._mpi_root_local_qm_context(extra_objects=[opt_drv]):
-    #         if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root() and hasattr(opt_drv, "comm"):
-    #             if opt_drv.comm.Get_size() != 1:
-    #                 raise RuntimeError("Root-local MPI override failed for OptimizationDriver (comm size != 1).")
-    #         return opt_drv.compute(molecule, *compute_args)
-
-
-    # def _ensure_interp_engine_comm(self, driver):
-    #     engine = getattr(driver, 'mpi_engine', None)
-    #     if engine is None:
-    #         return
-
-    #     if getattr(engine, 'comm', None) is self._mpi_interp_comm:
-    #         return
-
-    #     engine.comm = self._mpi_interp_comm
-    #     engine.rank = self._mpi_interp_comm.Get_rank()
-    #     engine.size = self._mpi_interp_comm.Get_size()
-    
-    def _interp_compute_root_local_serial(self, driver, molecule):
-        """
-        Runs InterpolationDriver.compute in a root-local serial-safe mode.
-
-        In root-worker MPI mode, this is used for auxiliary/root-only logic
-        (point checks, constrained point generation) where workers are parked
-        in the control loop. MPI preload collectives must be disabled here.
-        """
-        # if not (self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root()):
-        #     self._ensure_interp_engine_comm(driver)
-        #     driver.compute(molecule)
-        #     return
-
-        # self._ensure_interp_engine_comm(driver)
-        # old_collective = bool(getattr(driver, 'mpi_collective_compute_active', False))
-        # old_preload_enabled = bool(getattr(driver, 'mpi_preload_enabled', False))
-
-        # try:
-            # driver.mpi_collective_compute_active = False
-            # driver.mpi_preload_enabled = False
-        driver.compute(molecule)
-        # finally:
-        #     driver.mpi_collective_compute_active = old_collective
-        #     driver.mpi_preload_enabled = old_preload_enabled
 
     def add_bias_force(self, atoms, force_constant, target=0.109, anchor=False):
         """
@@ -1560,14 +1011,6 @@ class IMDatabasePointCollecter:
         if 'profile_interpolation_print_summary' in dynamics_settings:
             self.profile_interpolation_print_summary = bool(
                 dynamics_settings['profile_interpolation_print_summary'])
-        # if 'mpi_control_plane_enabled' in dynamics_settings:
-        #     self.mpi_control_plane_enabled = bool(dynamics_settings['mpi_control_plane_enabled'])
-        # if 'mpi_root_worker_mode' in dynamics_settings:
-        #     self.mpi_root_worker_mode = bool(dynamics_settings['mpi_root_worker_mode'])
-        # if 'mpi_reload_from_hdf5' in dynamics_settings:
-        #     self.mpi_reload_from_hdf5 = bool(dynamics_settings['mpi_reload_from_hdf5'])
-        # if 'mpi_debug_sync' in dynamics_settings:
-        #     self.mpi_debug_sync = bool(dynamics_settings['mpi_debug_sync'])
 
     def _build_run_qmmm_runtime_cache(self):
         """
@@ -1888,7 +1331,6 @@ class IMDatabasePointCollecter:
             drv = InterpolationDriver(self.root_z_matrix[root])
             drv.update_settings(self.sampling_interpolation_settings[root])
             drv.symmetry_information = self.impes_drivers[root].symmetry_information
-            drv.use_symmetry = self.use_symmetry
             drv.impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
 
             labels, _ = drv.read_labels()
@@ -1899,30 +1341,14 @@ class IMDatabasePointCollecter:
                 dp.read_hdf5(self.sampling_interpolation_settings[root]['imforcefield_file'], label)
 
                 dp.inv_sqrt_masses = inv_sqrt_masses
-                if dp.bank_role == "core" or "cluster" not in dp.point_label and "symmetry" not in dp.point_label:
-                    self.sampling_qm_data_point_dict[root].append(dp)
-                    old_label = dp.point_label
-                    self.sampling_qm_symmetry_datapoint_dict[root][old_label] = [dp]
-                elif dp.bank_role == "symmetry":
-                    self.sampling_qm_symmetry_datapoint_dict[root][old_label].append(dp)
-            
+
+                self.sampling_qm_data_point_dict[root].append(dp)
+                old_label = dp.point_label
 
             drv.qm_data_points = self.sampling_qm_data_point_dict[root]
-            drv.qm_symmetry_data_points = self.sampling_qm_symmetry_datapoint_dict[root]
+
             drv.mark_runtime_data_cache_dirty()
-            
-            drv.prepare_runtime_data_cache(force=True)
-            
-            if len(self.sampling_qm_data_point_dict[root]) > 0:
-                drv.impes_coordinate.eq_bond_lengths = self.sampling_qm_data_point_dict[root][0].eq_bond_lengths
-            drv.qm_rotor_cluster_banks = self.qm_sampling_rotor_cluster_banks[root]
-            
-            if drv.qm_rotor_cluster_banks:
-                first_family = next(iter(drv.qm_rotor_cluster_banks.values()))
-                drv.rotor_cluster_information = first_family.get("cluster_info")
-            else:
-                drv.rotor_cluster_information = None
-            
+          
             self.sampling_impes_drivers[root] = drv
     
     def _reload_interpolation_root_from_hdf5(self, root, inv_sqrt_masses):
@@ -1943,77 +1369,15 @@ class IMDatabasePointCollecter:
             qm_data_point.read_hdf5(self.interpolation_settings[root]['imforcefield_file'], label)
             qm_data_point.inv_sqrt_masses = inv_sqrt_masses
             
-            if qm_data_point.bank_role == "core" or "cluster" not in qm_data_point.point_label and "symmetry" not in qm_data_point.point_label:
+            self.qm_data_point_dict[root].append(qm_data_point)
+            self.qm_energies_dict[root].append(qm_data_point.energy)
+            self.sorted_state_spec_im_labels[root].append(label)
 
-                self.qm_data_point_dict[root].append(qm_data_point)
-                self.qm_energies_dict[root].append(qm_data_point.energy)
-                self.sorted_state_spec_im_labels[root].append(label)
-                
-                opt_mol = Molecule(self.molecule.get_labels(), qm_data_point.cartesian_coordinates, 'bohr')
-                print(opt_mol.get_xyz_string())
-
-                old_label = qm_data_point.point_label
-                self.qm_symmetry_datapoint_dict[root][old_label] = [qm_data_point]
-            
-            elif qm_data_point.bank_role == "symmetry":
-
-                self.qm_symmetry_datapoint_dict[root][old_label].append(qm_data_point)
-
-        driver_object.qm_symmetry_data_points = self.qm_symmetry_datapoint_dict[root]
         driver_object.qm_data_points = self.qm_data_point_dict[root]
         driver_object.labels = self.sorted_state_spec_im_labels[root]
         
-        print(len(self.qm_data_point_dict[root]), driver_object.impes_coordinate.eq_bond_lengths, self.qm_data_point_dict[root][0].eq_bond_lengths)
-        if len(self.qm_data_point_dict[root]) > 0:
-            driver_object.impes_coordinate.eq_bond_lengths = self.qm_data_point_dict[root][0].eq_bond_lengths
 
         driver_object.mark_runtime_data_cache_dirty()
-        driver_object.prepare_runtime_data_cache(force=True)
-
-        # use_local_preload = bool(self.interpolation_settings[root].get('use_local_preload', False))
-        # local_workers = int(self.interpolation_settings[root].get('local_preload_workers', 0))
-        # local_min_tasks = int(self.interpolation_settings[root].get('local_preload_min_tasks', 8))
-        # local_omp_threads = int(self.interpolation_settings[root].get('local_preload_omp_threads', 1))
-
-        # driver_object.set_local_preload_engine(
-        #     enabled=(use_local_preload and self.nodes <= 1),
-        #     n_workers=local_workers,
-        #     min_tasks=local_min_tasks,
-        #     omp_threads=local_omp_threads,
-        #     force_rebuild=use_local_preload,
-        # )
-        # driver_object._local_preload_enabled_config = bool(getattr(driver_object, 'local_preload_enabled', False))
-
-        # use_outer_parallel = bool(self.interpolation_settings[root].get('use_outer_parallel', False))
-        # outer_workers = int(self.interpolation_settings[root].get('outer_parallel_workers', 0))
-        # outer_min_labels = int(self.interpolation_settings[root].get('outer_parallel_min_labels', 8))
-        # outer_chunk_size = int(self.interpolation_settings[root].get('outer_parallel_chunk_size', 0))
-
-        # driver_object.set_outer_parallel_engine(
-        #     enabled=(use_outer_parallel and self.nodes <= 1),
-        #     n_workers=outer_workers,
-        #     min_labels=outer_min_labels,
-        #     chunk_size=outer_chunk_size,
-        #     force_rebuild=True,
-        # )
-        # driver_object._outer_parallel_enabled_config = bool(getattr(driver_object, 'use_outer_parallel', False))
-
-        # use_mpi_preload = bool(self.interpolation_settings[root].get('use_mpi_preload', False))
-        # # In root-worker mode, avoid immediate preload collectives here; rebuild lazily
-        # # in synchronized compute path on the next step.
-        # force_rebuild_preload = not (self._mpi_is_active() and self.mpi_root_worker_mode)
-        # driver_object.set_mpi_preload_engine(
-        #     comm=self._mpi_interp_comm,
-        #     enabled=(use_mpi_preload and self.nodes > 1),
-        #     force_rebuild=force_rebuild_preload,
-        # )
-
-        # driver_object._mpi_preload_enabled_config = bool(getattr(driver_object, 'mpi_preload_enabled', False))
-        # self._ensure_interp_engine_comm(driver_object)
-        # # In root-worker mode, keep preload disabled outside synchronized compute
-        # # phases to prevent root-only branches from emitting collective packets.
-        # if self._mpi_is_active() and self.mpi_root_worker_mode:
-        #     driver_object.mpi_preload_enabled = False
 
 
     def run_qmmm(self,
@@ -2074,78 +1438,59 @@ class IMDatabasePointCollecter:
 
         save_freq = max(1, self.nsteps // self.snapshots) if self.snapshots else max(1, self.nsteps)
 
-        # is_worker_service_rank = (
-        #     self._mpi_is_active() and self.mpi_root_worker_mode and (not self._mpi_is_root())
-        # )
-
         self.topology = self.pdb.topology
 
         self.positions = self.pdb.positions
         self._topology_atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
 
-        # if not is_worker_service_rank:
-        if 1 == 1:
-            # Create or update the integrator
-            if self.integrator is None:
-                new_integrator = self._create_integrator()
-            else:
-                new_integrator = self.integrator
-
-            # initializing the metadynamics variables
-
-            self.metad_bias_energies = []
-            self.metad_cv_history = []
-            self._metadynamics = None
-
-            self.metadynamics_bias_energies = []
-            self.metadynamics_cv_history = []
-
-            if self.metadynamics_enabled:
-                # Optional guard to avoid double-biasing in early rollout
-                if self.bias_force_reaction_prop is not None:
-                    raise RuntimeError(
-                        "Both legacy bias_force_reaction_prop and metadynamics are enabled. "
-                        "Disable one to avoid conflicting bias potentials."
-                    )
-                self._initialize_metadynamics()
-
-            self.simulation = app.Simulation(self.topology, self.system, new_integrator, platform=self._create_platform())
-
-            # Load the state if a restart file is provided
-            if self.load_system is not None:
-                self.simulation.loadState(self.load_system)
-            else:
-                self.simulation.context.setPositions(self.positions)
-
-                # Set initial velocities if the ensemble is NVT or NPT
-                if self.ensemble in ['NVT', 'NPT']:
-                    self.simulation.context.setVelocitiesToTemperature(self.temperature * 0.5)
-                # else:
-                #     self.simulation.context.setVelocitiesToTemperature(150 * unit.kelvin)
-            self.start_velocities = self.simulation.context.getState(getVelocities=True).getVelocities()
-
-            # Set up reporting
-            self.simulation.reporters.clear()
-            self.simulation.reporters.append(app.PDBReporter(self.out_file, save_freq))
-
-            # Print header
-            print('QM/MM Simulation Parameters')
-            print('=' * 60)
-            print('QM Driver:', self.driver_flag)
-            print('Ensemble:', self.ensemble)
-            print('Integration method:', new_integrator.__class__.__name__)
-            if self.ensemble in ['NVT', 'NPT']:
-                print('Temperature:', self.temperature, 'K')
-                if self.ensemble == 'NPT':
-                    print('Pressure:', self.pressure, 'atm')
-            print('Friction:', self.friction, '1/ps')
-            print('Timestep:', self.timestep, 'fs')
-            print('Total simulation time in ns:', self.nsteps * timestep / 1e6)
-            print('=' * 60)
+        # Create or update the integrator
+        if self.integrator is None:
+            new_integrator = self._create_integrator()
         else:
-            new_integrator = None
-            self.simulation = None
-            self.start_velocities = None
+            new_integrator = self.integrator
+        # initializing the metadynamics variables
+        self.metad_bias_energies = []
+        self.metad_cv_history = []
+        self._metadynamics = None
+        self.metadynamics_bias_energies = []
+        self.metadynamics_cv_history = []
+        if self.metadynamics_enabled:
+            # Optional guard to avoid double-biasing in early rollout
+            if self.bias_force_reaction_prop is not None:
+                raise RuntimeError(
+                    "Both legacy bias_force_reaction_prop and metadynamics are enabled. "
+                    "Disable one to avoid conflicting bias potentials."
+                )
+            self._initialize_metadynamics()
+        self.simulation = app.Simulation(self.topology, self.system, new_integrator, platform=self._create_platform())
+        # Load the state if a restart file is provided
+        if self.load_system is not None:
+            self.simulation.loadState(self.load_system)
+        else:
+            self.simulation.context.setPositions(self.positions)
+            # Set initial velocities if the ensemble is NVT or NPT
+            if self.ensemble in ['NVT', 'NPT']:
+                self.simulation.context.setVelocitiesToTemperature(self.temperature * 0.5)
+            # else:
+            #     self.simulation.context.setVelocitiesToTemperature(150 * unit.kelvin)
+        self.start_velocities = self.simulation.context.getState(getVelocities=True).getVelocities()
+        # Set up reporting
+        self.simulation.reporters.clear()
+        self.simulation.reporters.append(app.PDBReporter(self.out_file, save_freq))
+        # Print header
+        print('QM/MM Simulation Parameters')
+        print('=' * 60)
+        print('QM Driver:', self.driver_flag)
+        print('Ensemble:', self.ensemble)
+        print('Integration method:', new_integrator.__class__.__name__)
+        if self.ensemble in ['NVT', 'NPT']:
+            print('Temperature:', self.temperature, 'K')
+            if self.ensemble == 'NPT':
+                print('Pressure:', self.pressure, 'atm')
+        print('Friction:', self.friction, '1/ps')
+        print('Timestep:', self.timestep, 'fs')
+        print('Total simulation time in ns:', self.nsteps * timestep / 1e6)
+        print('=' * 60)
 
         self.last_point_added = 0
         self.cycle_iteration = self.unadded_cycles
@@ -2156,8 +1501,6 @@ class IMDatabasePointCollecter:
         print('current datapoints around the given starting structure', self.desired_datpoint_density, self.density_around_data_point, '\n allowed derivation from the given structure', self.allowed_molecule_deviation, '\n ---------------------------------------')
         openmm_coordinate = self.simulation.context.getState(getPositions=True).getPositions()
         self.coordinates = [openmm_coordinate]
-        # else:
-        #     self.coordinates = []
 
         self.coordinates_xyz = []
         self.gradients = []
@@ -2216,36 +1559,18 @@ class IMDatabasePointCollecter:
             driver_object.impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
             if root == 0:
                 driver_object.symmetry_information = self.non_core_symmetry_groups['gs']
-            elif root == 1 and self.drivers['es'] is not None and self.drivers['es'][0].spin_flip:
-                driver_object.symmetry_information = self.non_core_symmetry_groups['gs']
-            else:
-                driver_object.symmetry_information = self.non_core_symmetry_groups['es']
-            
 
-            driver_object.use_symmetry = self.use_symmetry
+            
             self.impes_drivers[root] = driver_object
             self._reload_interpolation_root_from_hdf5(root, inv_sqrt_masses)
             self.prev_dens_of_points[root] = len(self.qm_data_point_dict[root])
-            self.qm_rotor_cluster_banks[root] = self._load_rotor_cluster_bank_for_root(root)
-            driver_object.qm_rotor_cluster_banks = self.qm_rotor_cluster_banks[root]
 
-            if driver_object.qm_rotor_cluster_banks:
-                first_family = next(iter(driver_object.qm_rotor_cluster_banks.values()))
-                driver_object.rotor_cluster_information = first_family.get("cluster_info")
-            else:
-                driver_object.rotor_cluster_information = None
-            print('In set up', driver_object.rotor_cluster_information)
             # Set the object as an attribute of the instance
             setattr(self, attribute_name, driver_object)
             # Append the object to the list
             self.impes_drivers[root] = driver_object
 
         if self.sampling_enabled:
-            for root in self.roots_to_follow:
-                self.qm_sampling_rotor_cluster_banks[root] = self._load_rotor_cluster_bank_for_root(
-                    root,
-                    sampling_mode=True,
-                )
             self._initialize_sampling_impes_drivers(inv_sqrt_masses)
 
         self.current_state = self.roots_to_follow[0]
@@ -2255,19 +1580,6 @@ class IMDatabasePointCollecter:
         self.step = 0 
         self.prev_dE_gpr = 0.0
         self.last_gpr_addition = 0
-
-        # if self._mpi_is_active() and self.mpi_root_worker_mode:
-        #     self._mpi_pending_sync_roots.clear()
-            # Ensure all initialization-time MPI collectives have completed
-            # before starting the control-channel STEP/STOP loop.
-            # self._mpi_ctrl_comm.Barrier()
-            # if self._mpi_interp_comm is not self._mpi_ctrl_comm:
-            #     self._mpi_interp_comm.Barrier()
-            # self._mpi_worker_service_running = True
-            # if not self._mpi_is_root():
-            #     self._run_qmmm_worker_service()
-            #     self._mpi_worker_service_running = False
-            #     return None
 
         start_time = time()
         runtime_cache = self._build_run_qmmm_runtime_cache()
@@ -2280,26 +1592,6 @@ class IMDatabasePointCollecter:
             step_t0 = time()
 
             force_t0 = time()
-
-            # if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root():
-            # qm_positions_nm = np.array([
-            #     p.value_in_unit(unit.nanometer)
-            #     for p in self.simulation.context.getState(getPositions=True).getPositions()
-            # ])[self.qm_atoms]
-
-                # sync_roots = sorted(self._mpi_pending_sync_roots)
-                # self._mpi_pending_sync_roots.clear()
-
-                # if self.mpi_reload_from_hdf5 and len(sync_roots) > 0:
-                #     for root_sync in sync_roots:
-                #         self._reload_interpolation_root_from_hdf5(root_sync, self.inv_sqrt_masses)
-
-                # self._mpi_bcast_control({
-                #     'cmd': self._MPI_CMD_STEP,
-                #     'step_idx': int(step),
-                #     'qm_positions_nm': np.asarray(qm_positions_nm, dtype=np.float64),
-                #     'sync_roots': sync_roots,
-                # })
 
 
             self.update_forces(self.simulation.context)
@@ -2344,7 +1636,6 @@ class IMDatabasePointCollecter:
             }
             self._emit_test_hook("step", step_payload)
 
-            # self._update_induction_embedding(phase == 'periodic')
             integ_t0 = time()
 
             if self._metadynamics is not None:
@@ -2377,12 +1668,6 @@ class IMDatabasePointCollecter:
 
             if self.unadded_cycles == 0:
                 break
-
-        # if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root():
-        #     self._mpi_bcast_control({'cmd': self._MPI_CMD_STOP})
-        
-        # if self._mpi_is_active() and self.mpi_root_worker_mode:
-        #     self._mpi_worker_service_running = False
 
         end_time = time()
         elapsed_time = end_time - start_time
@@ -3282,49 +2567,17 @@ class IMDatabasePointCollecter:
         
     
     def _compute_all_roots_for_molecule(self, molecule, collective_mode=None):
-        # if collective_mode is None:
-        #     collective_mode = bool(self._mpi_is_active() and self.mpi_root_worker_mode)
-        # collective_mode = bool(collective_mode)
+
 
         for root in self.roots_to_follow:
             driver = self.impes_drivers[root]
-            # self._ensure_interp_engine_comm(driver)
+
             if driver.qm_data_points is not self.qm_data_point_dict[root]:
                 driver.qm_data_points = self.qm_data_point_dict[root]
-            driver.prepare_runtime_data_cache()
-            
-            # local_config = bool(getattr(driver, '_local_preload_enabled_config', getattr(driver, 'local_preload_enabled', False)))
-            # preload_config = bool(getattr(driver, '_mpi_preload_enabled_config', getattr(driver, 'mpi_preload_enabled', False)))
-            
-            # if self.nodes <= 1:
-            #     driver.local_preload_enabled = local_config
-            # else:
-            #     driver.local_preload_enabled = False
-            
-            # outer_config = bool(getattr(driver, '_outer_parallel_enabled_config', getattr(driver, 'use_outer_parallel', False)))
-            # if self.nodes <= 1:
-            #     driver.use_outer_parallel = outer_config
-            # else:
-            #     driver.use_outer_parallel = False
-            
-            # Enable preload only while root+workers are in the synchronized
-            # compute phase. Outside this phase, keep it disabled.
-            # if self._mpi_is_active() and self.mpi_root_worker_mode:
-            #     driver.mpi_preload_enabled = bool(preload_config and collective_mode)
-            # else:
-            #     driver.mpi_preload_enabled = preload_config
 
-            # driver.mpi_collective_compute_active = collective_mode
             compute_t0 = time()
-            # try:
+
             driver.compute(molecule)
-               
-            # finally:
-            #     driver.mpi_collective_compute_active = False
-            #     if self._mpi_is_active() and self.mpi_root_worker_mode:
-            #         driver.mpi_preload_enabled = False
-            #     else:
-            #         driver.mpi_preload_enabled = preload_config
       
             compute_dt = time() - compute_t0
             self._add_runtime_timing(
@@ -3338,14 +2591,6 @@ class IMDatabasePointCollecter:
     
         self.current_state = self.roots_to_follow[0]
 
-    # def _mpi_worker_compute_step(self, qm_positions_nm, sync_roots):
-    #     if self.mpi_reload_from_hdf5:
-    #         for root in sync_roots:
-    #             self._reload_interpolation_root_from_hdf5(root, self.inv_sqrt_masses)
-
-    #     # qm_positions_nm is shape (n_qm_atoms, 3)
-    #     new_molecule = self._build_qm_molecule_from_positions(np.asarray(qm_positions_nm, dtype=np.float64))
-    #     self._compute_all_roots_for_molecule(new_molecule)
 
 
     def update_gradient(self, new_positions, collective_mode=None):
@@ -3421,7 +2666,6 @@ class IMDatabasePointCollecter:
                 threshold = 5e-2 #self.distance_thrsh - 0.05
                 new_coords = new_molecule.get_coordinates_in_bohr()
                 n_atoms = len(new_molecule.get_labels())
-                sym_group = self.non_core_symmetry_groups['gs' if self.current_state == 0 or self.drivers['es'] is not None and self.drivers['es'][0].spin_flip and self.current_state == 1 else 'es'][4]
                 molecule_list = self.allowed_molecules[self.current_state]['molecules']
             
                 if not hasattr(self, "previous_candidate_indices"):
@@ -3435,7 +2679,7 @@ class IMDatabasePointCollecter:
                         continue
                     checked_molecule = molecule_list[idx]
                     checked_coords = checked_molecule.get_coordinates_in_bohr()
-                    checked_distance = self.cartesian_just_distance(checked_coords, new_coords, sym_group)
+                    checked_distance = self.cartesian_just_distance(checked_coords, new_coords, [])
                     normed_dist = (np.linalg.norm(checked_distance) / np.sqrt(n_atoms)) * bohr_in_angstrom()
                     if idx not in index_added:
                         closest_indices.append((idx, normed_dist))
@@ -3447,7 +2691,7 @@ class IMDatabasePointCollecter:
                 if not scanned:
                     for idx, checked_molecule in enumerate(molecule_list):
                         checked_coords = checked_molecule.get_coordinates_in_bohr()
-                        checked_distance = self.cartesian_just_distance(checked_coords, new_coords, sym_group)
+                        checked_distance = self.cartesian_just_distance(checked_coords, new_coords, [])
                         normed_dist = (np.linalg.norm(checked_distance) / np.sqrt(n_atoms)) * bohr_in_angstrom()
                         closest_indices.append((idx, normed_dist))
                         if normed_dist <= threshold:
@@ -3546,7 +2790,7 @@ class IMDatabasePointCollecter:
         details = {}
 
         for root in self.roots_to_follow:
-            self._interp_compute_root_local_serial(self.sampling_impes_drivers[root], molecule)
+            self.sampling_impes_drivers[root].compute(molecule)
             e_im = self.sampling_impes_drivers[root].impes_coordinate.energy
             g_im = self.sampling_impes_drivers[root].impes_coordinate.gradient
 
@@ -3622,27 +2866,18 @@ class IMDatabasePointCollecter:
         addition_of_state_specific_points = []
 
         for state, key in enumerate(self.drivers.keys()):
+            if key == 'es':
+                continue
 
             drivers = None
             identification_state = state
             
             if state == 0 and self.drivers[key] is not None and 0 in self.roots_to_follow:
                 drivers = self.drivers[key]
-
-            mask = None
-            if state == 0 and self.drivers['gs'] is not None and any(x == 0 for x in self.roots_to_follow):
-                mask = [0] 
-            elif state == 1 and self.drivers['es'] is not None and any(x > 0 for x in self.roots_to_follow):
-                drivers = self.drivers[key]
-                mask = [x for x in self.roots_to_follow if x != 0]
-                if 0 not in self.roots_to_follow:
-                    identification_state = 0
-            else:
-                continue
                 
 
             natms = len(molecule.get_labels())
-            print('############# Energy is QM claculated ############')
+            print('############# QM calculated ############')
             print('identifaction state', identification_state, 'current state', self.current_state)
             current_basis = None
             if identification_state == 0:
@@ -3652,13 +2887,6 @@ class IMDatabasePointCollecter:
             
             qm_energy, scf_results, rsp_results = self._compute_energy(drivers[0], molecule, current_basis)
             gradients = self._compute_gradient(drivers[1], molecule, current_basis, scf_results, rsp_results)
-
-            # qm_energy, gradients = self._aux_eval_eg(
-            #     molecule=molecule,
-            #     basis_label=current_basis.get_main_basis_label(),
-            #     driver_key=key,
-            #     state_mask=mask,
-            # )
 
             for e_idx in range(len(qm_energy)):
 
@@ -3679,7 +2907,7 @@ class IMDatabasePointCollecter:
                     significant_mask = (np.abs(gq) > 1e-4) | (np.abs(gi) > 1e-4)
                     if np.sum(significant_mask) == 0:
                         cos_theta = 1.0
-                    # print('significant components', np.sum(significant_mask))
+
                     gq_clean = gq[significant_mask]
                     gi_clean = gi[significant_mask]
 
@@ -3777,7 +3005,6 @@ class IMDatabasePointCollecter:
                                                                 chosen_im_energies, 
                                                                 self.qm_data_point_dict[self.current_state], 
                                                                 self.interpolation_settings[self.current_state],
-                                                                self.qm_symmetry_datapoint_dict[self.current_state],
                                                                 sym_dict,
                                                                 self.root_z_matrix[self.current_state],
                                                                 exponent_p_q = (self.impes_drivers[self.current_state].exponent_p, self.impes_drivers[self.current_state].exponent_q))
@@ -3855,7 +3082,7 @@ class IMDatabasePointCollecter:
                         current_basis = MolecularBasis.read(molecule, self.basis_set_label['es'])
                                 
                     optimized_molecule = molecule
-                    self._interp_compute_root_local_serial(self.impes_drivers[state_to_optim], molecule)
+                    self.impes_drivers[state_to_optim].compute(molecule)
                     current_weights = self.impes_drivers[state_to_optim].weights
                     weights = [value for _, value in current_weights.items()]
                     used_labels = [label_idx for label_idx, _ in current_weights.items()]
@@ -3889,7 +3116,6 @@ class IMDatabasePointCollecter:
 
                             if (
                                 set([dihedral[1], dihedral[2]]) == set(rot_bond)
-                                and bond_key[:] not in self.impes_drivers[state_to_optim].symmetry_information[7][3]
                             ):
                                 if dihedral not in main_constraint_list:
                                     added_bond_key.append(bond_key)
@@ -3905,12 +3131,6 @@ class IMDatabasePointCollecter:
                     elif isinstance(drivers[0], XtbDriver):
                          opt_results = self._run_optimization(drivers[0], molecule, constraints=main_constraint_list, index_offset=1)
                     
-                    # optimized_molecule, opt_results = self._aux_optimize(
-                    #     state_to_optim=state_to_optim,
-                    #     molecule=molecule,
-                    #     basis_label=current_basis.get_main_basis_label(),
-                    #     constraints=main_constraint_list,
-                    # )
                     optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
                     optimized_molecule.set_charge(molecule.get_charge())
                     optimized_molecule.set_multiplicity(molecule.get_multiplicity())
@@ -3967,7 +3187,7 @@ class IMDatabasePointCollecter:
 
         return opt_constraint_list
 
-    def _run_optimization(self, optimization_driver, molecule, constraints=None, transition=False, index_offset=1, compute_args=None, source_molecule=None):
+    def _run_optimization(self, optimization_driver, molecule, constraints=None, transition=False, index_offset=1, compute_args=None):
 
         opt_drv = OptimizationDriver(optimization_driver)
         opt_drv.ostream.mute()
@@ -3981,1094 +3201,13 @@ class IMDatabasePointCollecter:
         else:
             opt_results = opt_drv.compute(molecule, *compute_args)
 
-        # if source_molecule is None:
-        #     source_molecule = molecule
-
-        # optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-        # optimized_molecule.set_charge(source_molecule.get_charge())
-        # optimized_molecule.set_multiplicity(source_molecule.get_multiplicity())
-
         return opt_results
     
     def _write_string_dataset(self, h5f, name, value):
         if value is None:
             return
         dt = h5py.string_dtype(encoding="utf-8")
-        h5f.create_dataset(name, data=np.array(value, dtype=object), dtype=dt)
-
-    def _write_cluster_registry_for_family(
-        self,
-        imff_file,
-        root,
-        family_label,
-        cluster_info,
-        cluster_angle_library,
-        point_index,
-    ):
-        payload_info = {
-            "dihedral_start": cluster_info.dihedral_start,
-            "dihedral_end": cluster_info.dihedral_end,
-            "rotors": {
-                int(rotor_id): {
-                    "center": list(rotor.center),
-                    "torsion_rows": list(rotor.torsion_rows),
-                    "torsion_coords": [list(t) for t in rotor.torsion_coords],
-                    "symmetry_order": rotor.symmetry_order,
-                    "atom_group": list(rotor.atom_group),
-                }
-                for rotor_id, rotor in cluster_info.rotors.items()
-            },
-            "clusters": {
-                int(cluster_id): {
-                    "rotor_ids": list(cluster.rotor_ids),
-                    "cluster_type": cluster.cluster_type,
-                    "torsion_rows": list(cluster.torsion_rows),
-                }
-                for cluster_id, cluster in cluster_info.clusters.items()
-            },
-            "rotor_to_cluster": {
-                int(rotor_id): int(cluster_id)
-                for rotor_id, cluster_id in cluster_info.rotor_to_cluster.items()
-            },
-        }
-
-        payload_library = {
-            int(cluster_id): [
-                {
-                    "state_id": state.state_id,
-                    "cluster_type": state.cluster_type,
-                    "rotor_ids": list(state.rotor_ids),
-                    "angle_assignment": {
-                        ",".join(str(x) for x in dihedral): float(angle)
-                        for dihedral, angle in state.angle_assignment.items()
-                    },
-                    "dihedrals_to_rotate": [list(x) for x in (state.dihedrals_to_rotate or ())],
-                    "phase_signature": (
-                        None if state.phase_signature is None
-                        else state.phase_signature
-                    ),
-                    "is_anchor": state.is_anchor,
-                    "label_suffix": state.label_suffix,
-                }
-                for state in state_bank
-            ]
-            for cluster_id, state_bank in cluster_angle_library.state_banks.items()
-        }
-
-        payload_index = {
-            "family_label": family_label,
-            "core_label": point_index["core_label"],
-            "cluster_state_labels": {
-                int(cluster_id): {
-                    int(state_id): label
-                    for state_id, label in state_map.items()
-                }
-                for cluster_id, state_map in point_index["cluster_state_labels"].items()
-            },
-        }
-
-        with h5py.File(imff_file, "a") as h5f:
-            prefix = f"rotor_cluster_registry/root_{root}/family_{family_label}"
-            self._write_string_dataset(
-                h5f,
-                prefix + "/cluster_info_json",
-                json.dumps(payload_info, sort_keys=True),
-            )
-            self._write_string_dataset(
-                h5f,
-                prefix + "/cluster_angle_library_json",
-                json.dumps(payload_library, sort_keys=True),
-            )
-            self._write_string_dataset(
-                h5f,
-                prefix + "/point_index_json",
-                json.dumps(payload_index, sort_keys=True),
-            )
-    
-    
-    def _register_core_datapoint_runtime(self, root, impes_coordinate, new_label, energy_value, refresh_driver_caches=True):
-        self.qm_data_point_dict[root].append(impes_coordinate)
-        self.sorted_state_spec_im_labels[root].append(new_label)
-        self.qm_energies_dict[root].append(energy_value)
-
-        core_key = impes_coordinate.point_label
-        self.qm_symmetry_datapoint_dict[root][core_key] = [impes_coordinate]
-
-        drv = self.impes_drivers[root]
-        drv.qm_data_points = self.qm_data_point_dict[root]
-        drv.qm_symmetry_data_points = self.qm_symmetry_datapoint_dict[root]
-        drv.labels = self.sorted_state_spec_im_labels[root]
-
-        if refresh_driver_caches:
-            self._refresh_interpolation_driver_caches(root)
-
-
-
-    def _refresh_rotor_cluster_runtime_for_root(self, root):
-        self.qm_rotor_cluster_banks[root] = self._load_rotor_cluster_bank_for_root(root)
-        drv = self.impes_drivers[root]
-        drv.qm_rotor_cluster_banks = self.qm_rotor_cluster_banks[root]
-
-        if drv.qm_rotor_cluster_banks:
-            first_family = next(iter(drv.qm_rotor_cluster_banks.values()))
-            drv.rotor_cluster_information = first_family.get("cluster_info")
-        else:
-            drv.rotor_cluster_information = None
-
-        # Critical for cluster correctness after registry/bank updates
-        drv.rotor_cluster_runtime = None
-
-        if self.sampling_enabled:
-            samp_drv = self.sampling_impes_drivers[root]
-            samp_drv.qm_rotor_cluster_banks = self._load_rotor_cluster_bank_for_root(root, sampling_mode=True)
-            if samp_drv.qm_rotor_cluster_banks:
-                first_family = next(iter(samp_drv.qm_rotor_cluster_banks.values()))
-                samp_drv.rotor_cluster_information = first_family.get("cluster_info")
-            else:
-                samp_drv.rotor_cluster_information = None
-
-            # Same invalidation on sampling driver
-            samp_drv.rotor_cluster_runtime = None
-
-        self._refresh_interpolation_driver_caches(root)
-
-    def _build_rotor_mapping_masks(self, reference_molecule, z_matrix, rotor_ids):
-        ident = list(range(len(z_matrix)))
-        if not (self.use_symmetry and self.symmetry_rotors and rotor_ids):
-            return [ident]
-
-        rotor_ids = tuple(int(rid) for rid in rotor_ids)
-        labels = reference_molecule.get_labels()
-        ref_xyz = np.asarray(reference_molecule.get_coordinates_in_bohr(), dtype=np.float64)
-        atom_map = list(range(len(labels)))
-        z_lookup = {}
-        for i, row in enumerate(z_matrix):
-            row_key = tuple(int(x) for x in row)
-            z_lookup[row_key] = i
-            z_lookup[tuple(reversed(row_key))] = i
-
-        groups = [tuple(self.symmetry_rotors[rid].atom_group) for rid in rotor_ids]
-        dihedrals = [self.symmetry_rotors[rid].torsion_coords[0] for rid in rotor_ids]
-
-        masks = [ident]
-        seen = {tuple(ident)}
-        rotations = (0.0, 2.0 * np.pi / 3.0, 4.0 * np.pi / 3.0)
-
-        for combo in itertools.product(rotations, repeat=len(dihedrals)):
-
-            if all(abs(x) < 1.0e-14 for x in combo):
-                continue
-
-            rot_mol = Molecule(labels, ref_xyz.copy(), "bohr")
-            rot_mol.set_charge(reference_molecule.get_charge())
-            rot_mol.set_multiplicity(reference_molecule.get_multiplicity())
-
-            for angle, dihedral in zip(combo, dihedrals):
-                dih = tuple(dihedral[::-1]) if dihedral[0] > dihedral[3] else tuple(dihedral)
-                dih1 = tuple(x + 1 for x in dih)
-                rot_mol.set_dihedral(dih1, rot_mol.get_dihedral(dih1, "radian") + angle, "radian")
-
-            # ref = self._calculate_translation_coordinates(ref_xyz)
-            # target = self._calculate_translation_coordinates(rot_mol.get_coordinates_in_bohr())
-
-            # if fit_atoms:
-            #     R = geometric.rotate.get_rot(target[fit_atoms], ref[fit_atoms])
-            #     target = np.dot(R, target.T).T
-
-            mapping = {}
-            for group in groups:
-                g = list(group)
-                mapping.update(self._perform_symmetry_assignment(atom_map, g, reference_molecule.get_coordinates_in_bohr()[g], rot_mol.get_coordinates_in_bohr()[g]))
-
-            if not mapping:
-                continue
-    
-            mask = []
-            for row in z_matrix:
-                mapped = tuple(mapping.get(int(atom), int(atom)) for atom in row)
-                idx = z_lookup.get(mapped)
-                if idx is None:
-                    raise RuntimeError(
-                        f"IMForceFieldGenerator: rotor mask maps row {tuple(row)} "
-                        f"to missing oriented row {mapped}."
-                    )
-                mask.append(idx)
-
-            key = tuple(mask)
-
-            if key not in seen:
-                seen.add(key)
-                masks.append(mask)
-
-        return masks
-    
-    def _finalize_mapping_masks_and_eq_mode(self, impes_coordinate, masks):
-        impes_coordinate.mapping_masks = masks
-
-        if not impes_coordinate.use_eq_bond_length:
-            return
-
-        mode = str(getattr(impes_coordinate, 'eq_bond_symmetry_mode', 'masked_exact')).strip().lower()
-        if mode == 'symmetrized':
-            impes_coordinate.symmetrize_eq_bond_lengths_from_masks(masks)
-            impes_coordinate.transform_gradient_and_hessian()
-
-    def _build_rotor_owned_rows(self, z_matrix, rotors):
-        if isinstance(z_matrix, dict):
-            flat_z = (
-                list(z_matrix.get("bonds", []))
-                + list(z_matrix.get("angles", []))
-                + list(z_matrix.get("dihedrals", []))
-                + list(z_matrix.get("impropers", []))
-            )
-        else:
-            flat_z = list(z_matrix)
-
-        atom_sets = {
-            rid: set(int(a) for a in rotor.atom_group)
-            for rid, rotor in rotors.items()
-        }
-        
-        owned = {rid: set(rotor.torsion_rows) for rid, rotor in rotors.items()}
-        forced_couplings = set()
-
-        for row_idx, row in enumerate(flat_z):
-
-            row_atoms = set(int(a) for a in row)
-            owners = [
-                rid for rid, atoms in atom_sets.items()
-                if row_atoms & atoms
-            ]
-
-            if len(owners) == 1:
-                owned[owners[0]].add(row_idx)
-            elif len(owners) > 1:
-                for rid in owners:
-                    owned[rid].add(row_idx)
-                for i, a in enumerate(owners):
-                    for b in owners[i + 1:]:
-                        forced_couplings.add(tuple(sorted((a, b))))
-
-        return {
-            rid: tuple(sorted(rows))
-            for rid, rows in owned.items()
-        }, forced_couplings
-    
-    def _clone_core_datapoint_as_cluster_anchor(self, core_dp, target_root, label, job):
-        anchor_dp = deepcopy(core_dp)
-        anchor_dp.update_settings(self.interpolation_settings[target_root])
-
-        anchor_dp.family_label = core_dp.family_label
-        anchor_dp.point_label = label
-        anchor_dp.bank_role = "cluster"
-        anchor_dp.cluster_id = job["cluster_id"]
-        anchor_dp.cluster_type = job["cluster_type"]
-        anchor_dp.dihedrals_to_rotate = job["dihedrals_to_rotate"]
-        anchor_dp.cluster_rotor_ids = job["cluster_rotor_ids"]
-        anchor_dp.cluster_state_id = job["state_id"]
-        anchor_dp.phase_signature = job["phase_signature"]
-        anchor_dp.mapping_masks = None
-
-        return anchor_dp
-    
-    def add_point_rotor(self, molecule_specific_information, symmetry_information={}):
-        """ Adds a new point to the database.
-
-            :param molecule:
-                the molecule.
-            :param imforcefielddatafile:
-                Datafile containing the information of the IM forcefield.
-
-        """
-
-        if len(self.drivers) == 0:
-            raise ValueError("No energy driver defined.")
-        
-        self._emit_test_hook("add_point_start", {
-            "n_molecules": int(len(molecule_specific_information)),
-            "cluster_run": bool(self.cluster_run),
-        })
-
-        def build_rotor_cluster_information(
-            rotors,
-            cluster_components,
-            coupling,
-            dihedral_start,
-            dihedral_end,
-            rotor_owned_rows=None,
-        ):
-            clusters = {}
-            rotor_to_clusters = {}
-
-            for cluster_id, rotor_ids in enumerate(cluster_components):
-                rows = set()
-                for rotor_id in rotor_ids:
-                    rotor_to_clusters[rotor_id] = cluster_id
-                    if rotor_owned_rows is None:
-                        rows.update(rotors[rotor_id].torsion_rows)
-                    else:
-                        rows.update(rotor_owned_rows[rotor_id])
-
-                cluster_type = "independent" if len(rotor_ids) == 1 else "coupled"
-                clusters[cluster_id] = RotorClusterDefinition(
-                    cluster_id=cluster_id,
-                    rotor_ids=tuple(rotor_ids),
-                    cluster_type=cluster_type,
-                    torsion_rows=tuple(sorted(rows)),  # now owned/projector rows
-                )
-
-            return RotorClusterInformation(
-                dihedral_start=dihedral_start,
-                dihedral_end=dihedral_end,
-                rotors=rotors,
-                clusters=clusters,
-                rotor_to_cluster=rotor_to_clusters,
-                coupling_matrix=coupling,
-            )
-
-        def _get_rotor_phase_library(cluster_info):
-            out = {}
-            for rotor_id, rotor in cluster_info.rotors.items():
-                symmetry_order = max(int(rotor.symmetry_order), 1)
-                rotor_period = (2.0 * np.pi) / symmetry_order
-                # state_id = 0 is the anchor state, so only store the nonzero offsets
-                # that will become additional cluster-bank points.
-                if symmetry_order == 3:
-                    out[rotor_id] = tuple([0.0, np.pi/6.0, np.pi/3.0, np.pi/2.0])
-
-            return out
-        
-        def _build_cluster_angle_library(
-            cluster_info,
-            reference_internal_values,
-            phase_library,
-            ):
-            out = RotorClusterAngleLibrary()
-
-            for cluster_id, cluster in cluster_info.clusters.items():
-                state_bank = []
-                rotor_ids = cluster.rotor_ids
-
-                # Build the anchor state first. It always gets state_id = 0.
-                anchor_assignment = {}
-                
-                for rotor_id in rotor_ids:
-                    rotor = cluster_info.rotors[rotor_id]
-                    for row, torsion in zip(rotor.torsion_rows, rotor.torsion_coords):
-                        angle = float(reference_internal_values[row])
-                        anchor_assignment[torsion] = angle
-
-                state_bank.append(
-                    RotorClusterStateDefinition(
-                        cluster_id=cluster_id,
-                        state_id=0,
-                        cluster_type=cluster.cluster_type,
-                        rotor_ids=rotor_ids,
-                        angle_assignment=anchor_assignment,
-                        dihedrals_to_rotate=None,
-                        phase_signature=None,
-                        is_anchor=True,
-                        label_suffix="anchor",
-                    )
-                )
-
-                if cluster.cluster_type == "independent":
-                    rotor_id = rotor_ids[0]
-                    rotor = cluster_info.rotors[rotor_id]
-                    sampled_phases = phase_library[rotor_id]
-                    dihedrals_to_rotate = [rotor.torsion_coords[0]]
-
-                    state_skipped = 0
-                    for phase_index, phase in enumerate(sampled_phases, start=1):
-                        if phase == 0.0:
-                            state_skipped += 1
-                            continue
-                        angle_assignment = {}
-
-                        for torsion in rotor.torsion_coords:
-                            angle_assignment[torsion] = anchor_assignment[torsion] + float(phase)
-
-
-                        state_bank.append(
-                            RotorClusterStateDefinition(
-                                cluster_id=cluster_id,
-                                state_id=phase_index - state_skipped,
-                                cluster_type=cluster.cluster_type,
-                                rotor_ids=rotor_ids,
-                                angle_assignment=angle_assignment,
-                                dihedrals_to_rotate=dihedrals_to_rotate,
-                                phase_signature=[phase],
-                            )
-                        )
-
-                else:
-                    joint_phases = []
-                    for rotor_id in rotor_ids:
-                        joint_phases.append(phase_library[rotor_id])
-
-                    state_id = 1
-
-                    for phase_tuple in itertools.product(*joint_phases):
-                        if all(abs(float(phase)) < 1.0e-12 for phase in phase_tuple):
-                            continue
-                        angle_assignment = {}
-                        dihedrals_to_rotate = []
-                        current_phase_signiture = []
-                        for rotor_id, phase in zip(rotor_ids, phase_tuple):
-                            current_phase_signiture.append(phase)
-                            rotor = cluster_info.rotors[rotor_id]
-                            dihedrals_to_rotate.append(rotor.torsion_coords[0])
-                            for torsion in rotor.torsion_coords:
-                                angle_assignment[torsion] = anchor_assignment[torsion] + float(phase)
-
-                        state_bank.append(
-                            RotorClusterStateDefinition(
-                                cluster_id=cluster_id,
-                                state_id=state_id,
-                                cluster_type=cluster.cluster_type,
-                                rotor_ids=rotor_ids,
-                                angle_assignment=angle_assignment,
-                                dihedrals_to_rotate=dihedrals_to_rotate,
-                                phase_signature=current_phase_signiture,
-                                # label_suffix=f"state_{state_id}",
-                            )
-                        )
-                        state_id += 1
-
-                out.state_banks[cluster_id] = tuple(state_bank)
-
-            return out
-        
-        def _enumerate_cluster_bank_jobs(cluster_info, cluster_angle_libary):
-            
-            jobs = []
-
-            for cluster_id, cluster in cluster_info.clusters.items():
-                for state_def in cluster_angle_libary[cluster_id]:
-
-                    jobs.append({
-                        "bank_role": "cluster",
-                        "cluster_id": cluster_id,
-                        "cluster_type": cluster.cluster_type,
-                        "state_id": state_def.state_id,
-                        "cluster_rotor_ids": state_def.rotor_ids,
-                        "angle_assignment": state_def.angle_assignment,
-                        "dihedrals_to_rotate":state_def.dihedrals_to_rotate,
-                        "phase_signature": state_def.phase_signature,
-                        "is_anchor": state_def.is_anchor,
-                        "label_suffix": state_def.label_suffix,
-                    })
-
-            return jobs
-                
-
-        # define impesdriver to determine if stucture should be added:
-        
-        ## For symmetry groups of periodicty of 3 it is crucial for the interpolation to set the dihedral to the position between 2 extreme points in order to account
-        ## for the symmetry correclty using only one reference point!
-        
-        # create all molecule combinations
-
-        adjusted_molecule = {'gs': [], 'es': []}
-        symmetry_mapping_groups = []
-        symmetry_exclusion_groups = []
-
-        # comm = self._mpi_collective_comm()
-        # rank = comm.Get_rank()
-        # root = mpi_master()
-
-        # root_worker_service_mode = bool(
-        #     self._mpi_is_active()
-        #     and self.mpi_root_worker_mode
-        #     and self._mpi_worker_service_running
-        # )
-
-        # if root_worker_service_mode and rank != root:
-        #     return
-
-        # use the first incomming structure to determine the cluster grouping
-
-        for entries in molecule_specific_information:
-            molecule = entries[0]
-            bexitasis = entries[1]
-            states = entries[2]
-            symmetry_point = False
-
-            if 0 in entries[2]:
-                adjusted_molecule['gs'].append((entries[0], entries[1], 1, None, [0], symmetry_point, entries[3])) 
-            if any(x > 0 for x in entries[2]): 
-                states = [state for state in entries[2] if state > 0]
-                adjusted_molecule['es'].append((entries[0], entries[1], 1, None, states, symmetry_point, entries[3])) 
-
-        rotor_to_cluster_inf = {'gs': None, 'es': None}
-
-        for state_key, entries in adjusted_molecule.items():
-            if len(entries) == 0:
-                continue
-
-            drivers = self.drivers[state_key]
-    
-            org_roots = None
-            if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):           
-                    org_roots = drivers[1].state_deriv_index
-            label_counter = 0
-            for mol_basis in entries:
-                if not mol_basis[5]:
-                    label_counter = 0
-                if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
-                    root_to_follow_calc = mol_basis[4]           
-                    drivers[1].state_deriv_index = root_to_follow_calc 
-                    # drivers[2].roots_to_follow = root_to_follow_calc
-                
-                symmetry_mapping_groups = [item for item in range(len(mol_basis[0].get_labels()))]
-                symmetry_exclusion_groups = [item for element in symmetry_information[state_key][1] for item in element]
-                
-                energies, scf_results, rsp_results = self._compute_energy(drivers[0], mol_basis[0], mol_basis[1])
-                
-                if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
-                    energies = energies[mol_basis[4]]
-                
-                gradients = self._compute_gradient(drivers[1], mol_basis[0], mol_basis[1], scf_results, rsp_results)             
-                hessians = self._compute_hessian(drivers[2], mol_basis[0], mol_basis[1])
-                # energies, gradients, hessians = self._aux_eval_egh(
-                #     molecule=mol_basis[0],
-                #     basis_label=mol_basis[1].get_main_basis_label(),
-                #     driver_key=state_key,
-                #     state_mask=mol_basis[4],
-                # )
-
-                masses = mol_basis[0].get_masses().copy()
-                masses_cart = np.repeat(masses, 3)
-                inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
-
-                state_spec_dp = {}
-                # if rank == root:
-
-                for number in range(len(energies)):
-                    target_root = mol_basis[4][number]
-                    target_file = self.interpolation_settings[target_root]['imforcefield_file']
-                    
-                    z_matrix = self.root_z_matrix[target_root]
-                    interpolation_driver = InterpolationDriver(z_matrix)
-                    interpolation_driver.update_settings(self.interpolation_settings[target_root])
-                    interpolation_driver.imforcefield_file = target_file
-                    
-                    sorted_labels = []
-                    if target_file in os.listdir(os.getcwd()):
-                        org_labels, z_matrix = interpolation_driver.read_labels()
-                        labels = [label for label in org_labels if '_cluster' not in label]
-                        sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
-                    label = None
-                    grad = gradients[number].copy()
-                    hess = hessians[number].copy()
-                    grad_vec = grad.reshape(-1)         # (3N,)
-                    hess_mat = hess.reshape(grad_vec.size, grad_vec.size)
-                    mw_grad_vec = inv_sqrt_masses * grad_vec
-                    mw_hess_mat = (inv_sqrt_masses[:, None] * hess_mat) * inv_sqrt_masses[None, :]
-                    if mol_basis[5] == False:
-                        family_label = f'point_{len(sorted_labels) + 1}'
-                        label = f'point_{len(sorted_labels) + 1}_core'
-                    
-                    impes_coordinate = InterpolationDatapoint(z_matrix)
-                    impes_coordinate.eq_bond_lengths = self.qm_data_point_dict[mol_basis[4][number]][0].eq_bond_lengths
-                    impes_coordinate.update_settings(self.interpolation_settings[target_root])
-                    impes_coordinate.cartesian_coordinates = mol_basis[0].get_coordinates_in_bohr()
-                    impes_coordinate.imp_int_coordinates = mol_basis[6]
-                    impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
-                    impes_coordinate.energy = energies[number]
-                    impes_coordinate.gradient =  mw_grad_vec.reshape(grad.shape)
-                    impes_coordinate.hessian = mw_hess_mat.reshape(hess.shape)
-                    impes_coordinate.transform_gradient_and_hessian()
-                    # impes_coordinate.point_label = label
-                    impes_coordinate.family_label = family_label
-                    impes_coordinate.point_label = label
-                    impes_coordinate.bank_role = "core"
-                    trust_radius = self.use_opt_confidence_radius[2]
-                    impes_coordinate.confidence_radius = trust_radius
-                    
-                    # if self.use_symmetry and len(self.symmetry_rotors) > 0:
-                    #     rotation_combinations = None
-                    #     dihedral_list = [rotor.torsion_coords[0] for _, rotor in self.symmetry_rotors.items()]
-                        
-                    #     from itertools import product
-                    #     rotations = [0.0, 2.0*np.pi/3.0, 4.0*np.pi/3.0]
-                    #     dihedrals = dihedral_list  # your list of rotatable dihedrals
-                    #     rotation_combinations = list(product(rotations, repeat=len(dihedrals)))
-                        
-                        
-                    #     org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
-                    #     masks = [org_mask]
-                    #     for combo in rotation_combinations:
-                    #         if all(r == 0 for r in combo):
-                    #             continue  # skip the base geometry if desired
-                            
-                                
-                    #         rot_mol = Molecule(self.molecule.get_labels(), mol_basis[0].get_coordinates_in_bohr(), 'bohr')
-                    #         for angle, dihedral in zip(combo, dihedrals):
-                    #             dihedral_p_1 = (dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1)
-                    #             rot_mol.set_dihedral(dihedral_p_1, mol_basis[0].get_dihedral(dihedral_p_1, 'radian') - angle, 'radian')
-                    #         target_coordinates = self.calculate_translation_coordinates(rot_mol.get_coordinates_in_bohr())
-                    #         reference_coordinates = self.calculate_translation_coordinates(mol_basis[0].get_coordinates_in_bohr())
-                            
-                    #         target_coordinates_core = target_coordinates.copy()
-                    #         reference_coordinates_core = reference_coordinates.copy()
-                                
-                    #         target_coordinates_core = np.delete(target_coordinates, symmetry_exclusion_groups, axis=0)
-                    #         reference_coordinates_core = np.delete(reference_coordinates, symmetry_exclusion_groups, axis=0)
-                    #         rotation_matrix = geometric.rotate.get_rot(target_coordinates_core,
-                    #                                                 reference_coordinates_core)
-                    #         # Rotate the data point
-                    #         rotated_coordinates = np.dot(rotation_matrix, target_coordinates.T).T
-                    #         rotated_coordinates = np.ascontiguousarray(rotated_coordinates)
-                            
-                    #         mapping_dict_12 = self.perform_symmetry_assignment(symmetry_mapping_groups, symmetry_exclusion_groups, 
-                    #                                                             mol_basis[0].get_coordinates_in_bohr()[symmetry_exclusion_groups], rotated_coordinates[symmetry_exclusion_groups])
-                            
-                            
-                    #         z_matrix_dict = {tuple(sorted(element)): i 
-                    #             for i, element in enumerate(impes_coordinate.z_matrix)}
-                            
-                    #         mapping_dict = [mapping_dict_12]
-                    #         reorded_int_coords = [impes_coordinate.internal_coordinates_values.copy()]
-
-                    #         for ord in range(len(mapping_dict)):
-                    #             mask = []
-                    #             # inverse_mapping = {v: k for k, v in mapping_dict[ord].items()}
-                    #             reorded_int_coord = np.zeros_like(impes_coordinate.internal_coordinates_values)
-                    #             for i, element in enumerate(impes_coordinate.z_matrix):
-                    #                 # Otherwise, reorder the element
-                    #                 reordered_element = [mapping_dict[ord].get(x, x) for x in element]
-                    #                 key = tuple(sorted(reordered_element))
-                    #                 z_mat_index = z_matrix_dict.get(key)
-                    #                 mask.append(z_mat_index)
-                    #                 reorded_int_coord[i] = (float(reorded_int_coords[0][z_mat_index]))
-                    #             reorded_int_coords.append(reorded_int_coord)
-        
-                    #             masks.append(mask)
-                    #     self._finalize_mapping_masks_and_eq_mode(impes_coordinate, masks)
-                    # else:        
-                    #     org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
-                    #     masks = [org_mask]
-                    #     self._finalize_mapping_masks_and_eq_mode(impes_coordinate, masks)
-                    core_rotor_ids = (
-                        tuple(sorted(self.symmetry_rotors))
-                        if self.symmetry_rotors else ()
-                    )
-                    masks = self._build_rotor_mapping_masks(
-                        mol_basis[0],
-                        impes_coordinate.z_matrix,
-                        core_rotor_ids,
-                    )
-                    self._finalize_mapping_masks_and_eq_mode(impes_coordinate, masks)
-
-                    impes_coordinate.write_hdf5(self.interpolation_settings[mol_basis[4][number]]['imforcefield_file'], label)
-                    state_spec_dp[target_root] = impes_coordinate
-                    if self.sampling_enabled:
-                        self._write_sampling_point_from_geometry(
-                            root=mol_basis[4][number],
-                            molecule=mol_basis[0],
-                            label=label,
-                            template_point=impes_coordinate
-                        )
-                    
-                    self._emit_test_hook("datapoint_written", {
-                        "root": int(target_root),
-                        "label": str(label),
-                        "energy_hartree": float(impes_coordinate.energy),
-                        "confidence_radius": float(impes_coordinate.confidence_radius),
-                        "bank_role": str(getattr(impes_coordinate, "bank_role", "core")),
-                    })
-                    
-                    self.simulation.saveCheckpoint('checkpoint')    
-                    self._register_core_datapoint_runtime(
-                        target_root,
-                        impes_coordinate,
-                        label,
-                        energies[number],
-                        refresh_driver_caches=False,
-                    )
-                    self.density_around_data_point[target_root] += 1
-                    # impes_coordinate.write_hdf5(self.interpolation_settings[target_root]['imforcefield_file'], label)
-                    print('Family label part', impes_coordinate.family_label)
-                    print('Point label in core part', impes_coordinate.point_label)
-                    state_spec_dp[target_root] = impes_coordinate
-                        
-                state_spec_payload = None
-                # if rank == root:
-                state_spec_payload = {
-                    int(state): {
-                        "z_matrix": dp.z_matrix,
-                        "point_label": dp.point_label,
-                        "family_label": dp.family_label,
-                        "eq_bond_lengths": np.array(dp.eq_bond_lengths, copy=True),
-                        "internal_coordinates_values": np.array(dp.internal_coordinates_values, copy=True),
-                        "internal_hessian": np.array(dp.internal_hessian, copy=True),
-                        "cartesian_coordinates": np.array(dp.cartesian_coordinates, copy=True),
-                        "imp_int_coordinates": copy.deepcopy(
-                            getattr(
-                                dp,
-                                "imp_int_coordinates",
-                                {"bonds": [], "angles": [], "dihedrals": [], "impropers": []},
-                            )
-                        ),
-                    }
-                    for state, dp in state_spec_dp.items()
-                }
-
-                # if root_worker_service_mode:
-                #     # Workers are in _run_qmmm_worker_service, so do not use raw bcast here.
-                #     state_spec_payload = state_spec_payload if rank == root else {}
-                # else:
-                #     state_spec_payload = comm.bcast(
-                #         state_spec_payload if rank == root else None,
-                #         root,
-                #     )
-
-                for state, cur_dp_payload in state_spec_payload.items():
-                    cur_dp = type("CorePointMeta", (), {})()
-                    cur_dp.z_matrix = cur_dp_payload["z_matrix"]
-                    cur_dp.point_label = cur_dp_payload["point_label"]
-                    cur_dp.family_label = cur_dp_payload["family_label"]
-                    cur_dp.eq_bond_lengths = cur_dp_payload["eq_bond_lengths"]
-                    cur_dp.internal_coordinates_values = cur_dp_payload["internal_coordinates_values"]
-                    cur_dp.internal_hessian = cur_dp_payload["internal_hessian"]
-                    cur_dp.imp_int_coordinates = copy.deepcopy(
-                        cur_dp_payload.get(
-                            "imp_int_coordinates",
-                            {"bonds": [], "angles": [], "dihedrals": [], "impropers": []},
-                        )
-                    )
-                    current_cartesian_coordinates = cur_dp_payload["cartesian_coordinates"]
-                    current_constraints = cur_dp.imp_int_coordinates
-
-
-                    point_index = {"core_label": cur_dp.point_label, "cluster_state_labels": {}}
-                    
-                    nrot = len(self.symmetry_rotors)
-                    coupling_map = np.zeros((nrot, nrot), dtype=np.float64)
-                    np.fill_diagonal(coupling_map, 1.0)
-                    
-                    for rotor_i in range(nrot - 1):
-                        for rotor_j in range(rotor_i + 1, nrot):
-                            a = self.symmetry_rotors[rotor_i]
-                            b = self.symmetry_rotors[rotor_j]
-                            rotor_coupling = rotor_coupling_score(cur_dp.internal_hessian, a.torsion_rows, b.torsion_rows)
-                            coupling_map[a.rotor_id, b.rotor_id] = rotor_coupling
-                            coupling_map[b.rotor_id, a.rotor_id] = rotor_coupling
-                    
-                    rotor_owned_rows, forced_edges = self._build_rotor_owned_rows(
-                                                        self.root_z_matrix[state],
-                                                        self.symmetry_rotors,
-                                                    )
-
-                    for rid_i, rid_j in forced_edges:
-                        coupling_map[rid_i, rid_j] = max(
-                            coupling_map[rid_i, rid_j],
-                            self.rotor_corr_threshold,
-                        )
-                        coupling_map[rid_j, rid_i] = coupling_map[rid_i, rid_j]
-
-                    clusters = build_rotor_clusters(self.symmetry_rotors, coupling_map, self.rotor_corr_threshold)
-
-                    rotor_to_cluster_inf[state_key] = build_rotor_cluster_information(
-                                                        self.symmetry_rotors,
-                                                        clusters,
-                                                        coupling_map,
-                                                        symmetry_information[state_key][-1][0],
-                                                        symmetry_information[state_key][-1][1],
-                                                        rotor_owned_rows=rotor_owned_rows,
-                                                    )
-
-                    angle_phases = _get_rotor_phase_library(rotor_to_cluster_inf[state_key])
-                    final_clusters_angle_lib = _build_cluster_angle_library(  rotor_to_cluster_inf[state_key], 
-                                                                    cur_dp.internal_coordinates_values,
-                                                                    angle_phases)
-                    cluster_jobs = _enumerate_cluster_bank_jobs(rotor_to_cluster_inf[state_key], final_clusters_angle_lib)
-                    
-
-                    for job in cluster_jobs:
-                        if job["is_anchor"]:
-                            target_root = int(state)
-   
-                            core_dp_full = state_spec_dp[target_root]
-
-                            label = (
-                                f"{cur_dp.point_label}_cluster_"
-                                f"{job['cluster_id']}_state_{job['state_id']}"
-                            )
-                            if job["label_suffix"]:
-                                label += f"_{job['label_suffix']}"
-
-                            core_molecule = Molecule(
-                                self.molecule.get_labels(),
-                                core_dp_full.cartesian_coordinates,
-                                "bohr",
-                            )
-                            core_molecule.set_charge(self.molecule.get_charge())
-                            core_molecule.set_multiplicity(self.molecule.get_multiplicity())
-
-                            anchor_dp = self._clone_core_datapoint_as_cluster_anchor(
-                                core_dp_full,
-                                target_root,
-                                label,
-                                job,
-                            )
-
-                            masks = self._build_rotor_mapping_masks(
-                                core_molecule,
-                                anchor_dp.z_matrix,
-                                tuple(job["cluster_rotor_ids"]),
-                            )
-                            self._finalize_mapping_masks_and_eq_mode(anchor_dp, masks)
-
-                            anchor_dp.write_hdf5(
-                                self.interpolation_settings[target_root]["imforcefield_file"],
-                                label,
-                            )
-                            if self.sampling_enabled:
-                                self._write_sampling_point_from_geometry(
-                                    root=target_root,
-                                    molecule=core_molecule,
-                                    label=label,
-                                    template_point=anchor_dp,
-                                )
-
-                            point_index["cluster_state_labels"].setdefault(int(job["cluster_id"]), {})
-                            point_index["cluster_state_labels"][int(job["cluster_id"])][
-                                int(job["state_id"])
-                            ] = label
-
-                            self._emit_test_hook("datapoint_written", {
-                                "root": int(target_root),
-                                "label": str(label),
-                                "energy_hartree": float(anchor_dp.energy),
-                                "confidence_radius": float(anchor_dp.confidence_radius),
-                                "bank_role": str(getattr(anchor_dp, "bank_role", "cluster")),
-                            })
-
-                            continue
-                        
-                        cur_molecule = Molecule(self.molecule.get_labels(), current_cartesian_coordinates, 'bohr')
-                        cur_molecule.set_charge(self.molecule.get_charge())
-                        cur_molecule.set_multiplicity(self.molecule.get_multiplicity())
-                        current_angles_setting = []
-                        constraints = []
-                        for key ,entries in current_constraints.items():
-                            for entry in entries:
-                                constraints.append(entry)
-                        # constraints = outside_constraints.copy()
-                        for dihedral in job["dihedrals_to_rotate"]:
-                            angle = job["angle_assignment"].get(dihedral)
-                            if dihedral[0] > dihedral[3]:
-                                dihedral = dihedral[::-1]
-                            cur_molecule.set_dihedral(
-                                [
-                                    dihedral[0] + 1,
-                                    dihedral[1] + 1,
-                                    dihedral[2] + 1,
-                                    dihedral[3] + 1,
-                                ],
-                                angle,
-                                "radian",
-                            )
-                            current_angles_setting.append(angle)
-                            constraints.append(dihedral)
-                        
-                        current_basis = MolecularBasis.read(cur_molecule, mol_basis[1].get_main_basis_label())
-                        opt_results = None
-                        if isinstance(drivers[0], ScfRestrictedDriver):
-
-                            energies, scf_results, rsp_results = self._compute_energy(drivers[0], cur_molecule, current_basis)
-                    
-                            opt_results = self._run_optimization(drivers[0], cur_molecule, constraints=constraints, index_offset=1, compute_args=(current_basis, scf_results))
-                        elif isinstance(drivers[0], XtbDriver):
-                            opt_results = self._run_optimization(drivers[0], cur_molecule, constraints=constraints, index_offset=1)
-                        
-                        cur_molecule = opt_results['final_molecule']
-                        # optimized_molecule, opt_results = self._aux_optimize(
-                        #     state_to_optim=state,
-                        #     molecule=cur_molecule,
-                        #     basis_label=current_basis.get_main_basis_label(),
-                        #     constraints=constraints,
-                        # )
-                        # cur_molecule = optimized_molecule
-                        
-                        
-                        current_basis = MolecularBasis.read(cur_molecule, mol_basis[1].get_main_basis_label())
-                        energies, scf_results, rsp_results = self._compute_energy(drivers[0], cur_molecule, current_basis)
-                
-                        if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
-                            energies = energies[mol_basis[4]]
-                        
-                        gradients = self._compute_gradient(drivers[1], cur_molecule, current_basis, scf_results, rsp_results)             
-                        hessians = self._compute_hessian(drivers[2], cur_molecule, current_basis)
-
-                # energies, gradients, hessians = self._aux_eval_egh(
-                        # energies, gradients, hessians = self._aux_eval_egh(
-                        #     molecule=cur_molecule,
-                        #     basis_label=current_basis.get_main_basis_label(),
-                        #     driver_key=state_key,
-                        #     state_mask=[state],
-                        # )
-
-                        # state_spec_dp = {}
-                        # if rank == root:
-                        # masks = []
-                        # if self.use_symmetry and len(self.symmetry_rotors) > 0:
-                        #     rotation_combinations = None
-                        #     dihedral_list = [rotor.torsion_coords[0] for _, rotor in self.symmetry_rotors.items()]
-                            
-                        #     from itertools import product
-                        #     rotations = [0.0, 2.0*np.pi/3.0, 4.0*np.pi/3.0]
-                        #     dihedrals = dihedral_list  # your list of rotatable dihedrals
-                        #     rotation_combinations = list(product(rotations, repeat=len(dihedrals)))
-                            
-                        #     org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
-                        #     masks = [org_mask]
-                        #     for combo in rotation_combinations:
-                        #         if all(r == 0 for r in combo):
-                        #             continue  # skip the base geometry if desired
-                                
-                                    
-                        #         rot_mol = Molecule(self.molecule.get_labels(), cur_molecule.get_coordinates_in_bohr(), 'bohr')
-                        #         for angle, dihedral in zip(combo, dihedrals):
-            
-                        #             dihedral_p_1 = (dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1)
-                        #             rot_mol.set_dihedral(dihedral_p_1, cur_molecule.get_dihedral(dihedral_p_1, 'radian') - angle, 'radian')
-                        #         target_coordinates = self.calculate_translation_coordinates(rot_mol.get_coordinates_in_bohr())
-                        #         reference_coordinates = self.calculate_translation_coordinates(cur_molecule.get_coordinates_in_bohr())
-                                
-                        #         target_coordinates_core = target_coordinates.copy()
-                        #         reference_coordinates_core = reference_coordinates.copy()
-                                    
-                        #         target_coordinates_core = np.delete(target_coordinates, symmetry_exclusion_groups, axis=0)
-                        #         reference_coordinates_core = np.delete(reference_coordinates, symmetry_exclusion_groups, axis=0)
-                        #         rotation_matrix = geometric.rotate.get_rot(target_coordinates_core,
-                        #                                                 reference_coordinates_core)
-                        #         # Rotate the data point
-                        #         rotated_coordinates = np.dot(rotation_matrix, target_coordinates.T).T
-                        #         rotated_coordinates = np.ascontiguousarray(rotated_coordinates)
-                                
-                        #         mapping_dict_12 = self.perform_symmetry_assignment(symmetry_mapping_groups, symmetry_exclusion_groups, 
-                        #                                                             cur_molecule.get_coordinates_in_bohr()[symmetry_exclusion_groups], rotated_coordinates[symmetry_exclusion_groups])
-                                
-                                
-                        #         z_matrix_dict = {tuple(sorted(element)): i 
-                        #             for i, element in enumerate(impes_coordinate.z_matrix)}
-                                
-                        #         mapping_dict = [mapping_dict_12]
-                        #         reorded_int_coords = [impes_coordinate.internal_coordinates_values.copy()]
-
-                        #         for ord in range(len(mapping_dict)):
-                        #             mask = []
-                        #             # inverse_mapping = {v: k for k, v in mapping_dict[ord].items()}
-                        #             reorded_int_coord = np.zeros_like(impes_coordinate.internal_coordinates_values)
-                        #             for i, element in enumerate(impes_coordinate.z_matrix):
-                        #                 # Otherwise, reorder the element
-                        #                 reordered_element = [mapping_dict[ord].get(x, x) for x in element]
-                        #                 key = tuple(sorted(reordered_element))
-                        #                 z_mat_index = z_matrix_dict.get(key)
-                        #                 mask.append(z_mat_index)
-                        #                 reorded_int_coord[i] = (float(reorded_int_coords[0][z_mat_index]))
-                        #             reorded_int_coords.append(reorded_int_coord)
-        
-                        #             masks.append(mask)
-                            
-                        # else:        
-                        #     org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
-                        #     masks = [org_mask]
-        
-                        for number in range(len(energies)):
-                            target_root = mol_basis[4][number]
-                            grad = gradients[number].copy()
-                            hess = hessians[number].copy()
-                            grad_vec = grad.reshape(-1)         # (3N,)
-                            hess_mat = hess.reshape(grad_vec.size, grad_vec.size)
-                            mw_grad_vec = inv_sqrt_masses * grad_vec
-                            mw_hess_mat = (inv_sqrt_masses[:, None] * hess_mat) * inv_sqrt_masses[None, :]
-                            impes_coordinate = InterpolationDatapoint(z_matrix)
-                            impes_coordinate.eq_bond_lengths = cur_dp.eq_bond_lengths
-                            impes_coordinate.update_settings(self.interpolation_settings[target_root])
-                            impes_coordinate.cartesian_coordinates = cur_molecule.get_coordinates_in_bohr()
-                            impes_coordinate.imp_int_coordinates = cur_dp.imp_int_coordinates
-                            impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
-                            impes_coordinate.energy = energies[number]
-                            impes_coordinate.gradient =  mw_grad_vec.reshape(grad.shape)
-                            impes_coordinate.hessian = mw_hess_mat.reshape(hess.shape)
-                            impes_coordinate.transform_gradient_and_hessian()
-                            
-                            label = (
-                                f"{cur_dp.point_label}_cluster_"
-                                f"{job['cluster_id']}_state_{job['state_id']}"
-                            )
-                            if job["label_suffix"]:
-                                label += f"_{job['label_suffix']}"
-                            print('here is the label', label)
-                            impes_coordinate.family_label = cur_dp.family_label
-                            impes_coordinate.point_label = label
-                            impes_coordinate.bank_role = job["bank_role"]
-                            impes_coordinate.cluster_id = job["cluster_id"]
-                            impes_coordinate.cluster_type = job["cluster_type"]
-                            impes_coordinate.dihedrals_to_rotate = job["dihedrals_to_rotate"]
-                            impes_coordinate.cluster_rotor_ids = job["cluster_rotor_ids"]
-                            impes_coordinate.cluster_state_id = job["state_id"]
-                            trust_radius = self.use_opt_confidence_radius[2]
-                            impes_coordinate.confidence_radius = trust_radius
-                            
-                            impes_coordinate.phase_signature = job["phase_signature"]
-
-                            for phase in job["phase_signature"]:
-                                print('statements', abs(abs(phase) - np.pi/6) <= 1e-3, abs(abs(phase) - np.pi/2) <= 1e-3)
-                                if abs(abs(phase) - np.pi/6) <= 1e-3 or abs(abs(phase) - np.pi/2) <= 1e-3:
-                                    trust_radius = 0.45
-                                    break
-
-                            masks = self._build_rotor_mapping_masks(
-                                cur_molecule,
-                                impes_coordinate.z_matrix,
-                                tuple(job["cluster_rotor_ids"]),
-                            )
-
-                            
-                            self._finalize_mapping_masks_and_eq_mode(impes_coordinate, masks)
-
-                            impes_coordinate.write_hdf5(self.interpolation_settings[target_root]['imforcefield_file'], label)
-                            if self.sampling_enabled:
-                                    self._write_sampling_point_from_geometry(
-                                        root=target_root,
-                                        molecule=cur_molecule,
-                                        label=label,
-                                        template_point=impes_coordinate,
-                                    )
-                            self._emit_test_hook("datapoint_written", {
-                                "root": int(target_root),
-                                "label": str(label),
-                                "energy_hartree": float(impes_coordinate.energy),
-                                "confidence_radius": float(impes_coordinate.confidence_radius),
-                                "bank_role": str(getattr(impes_coordinate, "bank_role", "core")),
-                            })
-                            
-                            print('Symmetry rotor label', label)
-                            point_index["cluster_state_labels"].setdefault(int(job["cluster_id"]), {})
-                            point_index["cluster_state_labels"][int(job["cluster_id"])][int(job["state_id"])] = label
-
-                    # if rank == root:
-                    self._write_cluster_registry_for_family(self.interpolation_settings[target_root]['imforcefield_file'], target_root, cur_dp.family_label, rotor_to_cluster_inf[state_key], final_clusters_angle_lib, point_index)
-                    self._refresh_rotor_cluster_runtime_for_root(target_root)
-
-                    # if not root_worker_service_mode:
-                    #     comm.barrier()
-                    label_counter += 1
-                    if any(root > 0 for root in self.roots_to_follow): 
-                        if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):           
-                            drivers[1].state_deriv_index = org_roots
-
-        self._emit_test_hook("add_point_end", {
-            "n_datapoints_per_root": {
-                int(root): int(len(self.qm_data_point_dict[root]))
-                for root in self.roots_to_follow
-            }
-        })                
+        h5f.create_dataset(name, data=np.array(value, dtype=object), dtype=dt)         
 
     def add_point(self, state_specific_molecules, symmetry_information):
         """ Adds a new point to the database.
@@ -5088,153 +3227,34 @@ class IMDatabasePointCollecter:
         if self.cluster_run:
             return self.add_point_rotor(state_specific_molecules, symmetry_information)
 
-        self._emit_test_hook("add_point_start", {
-            "n_molecules": int(len(state_specific_molecules)),
-            "cluster_run": bool(self.cluster_run),
-        })
             
         adjusted_molecule = {'gs': [], 'es': []}
         symmetry_mapping_groups = []
         symmetry_exclusion_groups = []
         category_label = None
 
-        # comm = self._mpi_collective_comm()
-        # rank = comm.Get_rank()
-        # root = mpi_master()
-
-        # root_worker_service_mode = bool(
-        #     self._mpi_is_active()
-        #     and self.mpi_root_worker_mode
-        #     and self._mpi_worker_service_running
-        # )
-
-        # if root_worker_service_mode and rank != root:
-        #     return
-
         for entries in state_specific_molecules:
             symmetry_point = False
-            if 0 in entries[2] and len(symmetry_information['gs']) != 0 and len(symmetry_information['gs'][2]) != 0:
-                symmetry_mapping_groups = [item for item in range(len(entries[0].get_labels()))]
-                symmetry_exclusion_groups = [item for element in symmetry_information['gs'][1] for item in element]
-
-                sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(symmetry_information['gs'][1], symmetry_information['gs'][5], self.root_z_matrix[0])
-                
-                # Generate all combinations
-                keys = list(sym_dihedrals.keys())
-                values = list(sym_dihedrals.values())
-                combinations = list(itertools.product(*values))
-                # Convert to list of dictionaries
-                molecule_configs = [dict(zip(keys, combo)) for combo in combinations] # if all(element == combo[0] for element in combo)
-
-                for i, molecule_config in enumerate(molecule_configs):
-                    cur_molecule = Molecule.from_xyz_string(entries[0].get_xyz_string())
-                    cur_molecule.set_charge(entries[0].get_charge())
-                    cur_molecule.set_multiplicity(entries[0].get_multiplicity())
-                    dihedral_to_change = []
-                    optim_dih_0based = []
-                    for dihedral, angle in molecule_config.items():
-             
-                        opt_dihedral_val = cur_molecule.get_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], 'radian')
-                        cur_molecule.set_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], opt_dihedral_val + angle, 'radian')
-                        dihedral_to_change.append([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1])
-                        optim_dih_0based.append(dihedral)
-                    current_basis = MolecularBasis.read(cur_molecule, entries[1].get_main_basis_label())
-                    
-                    if i > 0:
-                        symmetry_point = True
-                    
-                    current_basis = MolecularBasis.read(cur_molecule, entries[1].get_main_basis_label())
-                    for key ,add_const in entries[3].items():
-                            for ac in add_const:
-                                optim_dih_0based.append(ac)
-                    
-                    opt_results = None
-                    if isinstance(drivers[0], ScfRestrictedDriver):
-                        energies, scf_results, rsp_results = self._compute_energy(self.drivers['gs'][0], cur_molecule, current_basis)
-                
-                        opt_results = self._run_optimization(drivers[0], cur_molecule, constraints=optim_dih_0based, index_offset=1, compute_args=(current_basis, scf_results))
-                    elif isinstance(drivers[0], XtbDriver):
-                        opt_results = self._run_optimization(drivers[0], cur_molecule, constraints=optim_dih_0based, index_offset=1)
-                        
-                    optimized_molecule = opt_results['final_molecule']
-                    # optimized_molecule, opt_results = self._aux_optimize(
-                    #         state_to_optim=0,
-                    #         molecule=cur_molecule,
-                    #         basis_label=current_basis.get_main_basis_label(),
-                    #         constraints=optim_dih_0based,
-                    #     )
-                    
-                    print(i, opt_results['opt_energies'][-1], optimized_molecule.get_xyz_string())
-                    adjusted_molecule['gs'].append((optimized_molecule, current_basis, periodicites[dihedral], dihedral_to_change, entries[2], symmetry_point, entries[3]))
-            
-            elif any(x > 0 for x in entries[2]) and len(symmetry_information['es']) != 0 and len(symmetry_information['es'][2]) != 0:
-                symmetry_mapping_groups = [item for item in range(len(entries[0].get_labels()))]
-                symmetry_exclusion_groups = [item for element in symmetry_information['es'][1] for item in element]
-                state_idx_b_0 = 0
-                for ent in entries[2]:
-                    if ent > 0:
-                        state_idx_b_0 = ent
-                        break
-                sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(symmetry_information['es'][1], symmetry_information['es'][5], self.root_z_matrix[state_idx_b_0])
-                
-                # Generate all combinations
-                keys = list(sym_dihedrals.keys())
-                values = list(sym_dihedrals.values())
-                combinations = list(itertools.product(*values))
-                # Convert to list of dictionaries
-                molecule_configs = [dict(zip(keys, combo)) for combo in combinations] # if all(element == combo[0] for element in combo)
-                for i, molecule_config in enumerate(molecule_configs):
-                    cur_molecule = Molecule.from_xyz_string(entries[0].get_xyz_string())
-                    cur_molecule.set_charge(entries[0].get_charge())
-                    cur_molecule.set_multiplicity(entries[0].get_multiplicity())
-                    dihedral_to_change = []
-                    for dihedral, angle in molecule_config.items():
-                        cur_molecule.set_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], angle, 'radian')
-                        dihedral_to_change.append([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1])
-                    if i > 0:
-                        symmetry_point = True   
-                    current_basis = MolecularBasis.read(cur_molecule, entries[1].get_main_basis_label())
-                    adjusted_molecule['es'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change, entries[2], symmetry_point, entries[3]))
-            else:
-                if 0 in entries[2]:
-                    adjusted_molecule['gs'].append((entries[0], entries[1], 1, None, [0], symmetry_point, entries[3])) 
-                if any(x > 0 for x in entries[2]): 
-                    states = [state for state in entries[2] if state > 0]
-                    adjusted_molecule['es'].append((entries[0], entries[1], 1, None, states, symmetry_point, entries[3])) 
+            adjusted_molecule['gs'].append((entries[0], entries[1], 1, None, [0], symmetry_point, entries[3])) 
 
         
         for state_key, entries in adjusted_molecule.items():
             if len(entries) == 0:
                 continue
-            print(state_key, entries)
+
             drivers = self.drivers[state_key]
             
             org_roots = self.roots_to_follow[0]
-            if any(root > 0 for root in self.roots_to_follow): 
-                if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):           
-                    org_roots = drivers[1].state_deriv_index  
 
             label_counter = 0
             for mol_basis in entries:
-                if any(root > 0 for root in self.roots_to_follow):
-                    if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers, TdaEigenSolver):
-                        root_to_follow_calc = mol_basis[4]           
-                        drivers[1].state_deriv_index = root_to_follow_calc 
 
                 energies, scf_results, rsp_results = self._compute_energy(drivers[0], mol_basis[0], mol_basis[1])
-                
-                if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
-                    energies = energies[mol_basis[4]]
                 
                 gradients = self._compute_gradient(drivers[1], mol_basis[0], mol_basis[1], scf_results, rsp_results)             
                 hessians = self._compute_hessian(drivers[2], mol_basis[0], mol_basis[1])
                 
-                # energies, gradients, hessians = self._aux_eval_egh(
-                #     molecule=mol_basis[0],
-                #     basis_label=mol_basis[1].get_main_basis_label(),
-                #     driver_key=state_key,
-                #     state_mask=mol_basis[4],
-                # )
+
 
                 masses = mol_basis[0].get_masses().copy()
                 masses_cart = np.repeat(masses, 3)
@@ -5254,7 +3274,6 @@ class IMDatabasePointCollecter:
 
                     impes_coordinate = InterpolationDatapoint(self.root_z_matrix[mol_basis[4][number]])
                     impes_coordinate.update_settings(self.interpolation_settings[mol_basis[4][number]])
-                    impes_coordinate.eq_bond_lengths = self.qm_data_point_dict[mol_basis[4][number]][0].eq_bond_lengths
                     impes_coordinate.cartesian_coordinates = mol_basis[0].get_coordinates_in_bohr()
                     impes_coordinate.imp_int_coordinates = mol_basis[6]
                     impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
@@ -5268,77 +3287,6 @@ class IMDatabasePointCollecter:
                     if mol_basis[5]:
                             new_label = f'{label}_symmetry_{label_counter}'
 
-                    if mol_basis[2] > 1:
-                                
-                        rotation_combinations = None
-                        
-                        if mol_basis[2] == 3:
-                            from itertools import product
-                            rotations = [0.0, 2*np.pi/3, 4*np.pi/3]
-                            dihedrals = mol_basis[3]  # your list of rotatable dihedrals
-                            rotation_combinations = list(product(rotations, repeat=len(dihedrals)))
-                        
-                        if mol_basis[2] == 2:
-                            from itertools import product
-                            rotations = [0.0, np.pi]
-                            dihedrals = mol_basis[3]  # your list of rotatable dihedrals
-                            rotation_combinations = list(product(rotations, repeat=len(dihedrals)))
-                        print('rot comb', rotation_combinations)
-                        
-                        org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
-                        masks = [org_mask]
-                        for combo in rotation_combinations:
-                            if all(r == 0 for r in combo):
-                                continue  # skip the base geometry if desired
-                            
-                    
-                            rot_mol = Molecule(self.molecule.get_labels(), mol_basis[0].get_coordinates_in_bohr(), 'bohr')
-                            for angle, dihedral in zip(combo, dihedrals):
-                                
-                                rot_mol.set_dihedral(dihedral, mol_basis[0].get_dihedral(dihedral, 'radian') - angle, 'radian')
-                            target_coordinates = self.calculate_translation_coordinates(rot_mol.get_coordinates_in_bohr())
-                            reference_coordinates = self.calculate_translation_coordinates(mol_basis[0].get_coordinates_in_bohr())
-                            
-                            target_coordinates_core = target_coordinates.copy()
-                            reference_coordinates_core = reference_coordinates.copy()
-                                
-                            target_coordinates_core = np.delete(target_coordinates, symmetry_exclusion_groups, axis=0)
-                            reference_coordinates_core = np.delete(reference_coordinates, symmetry_exclusion_groups, axis=0)
-                            rotation_matrix = geometric.rotate.get_rot(target_coordinates_core,
-                                                                    reference_coordinates_core)
-                            # Rotate the data point
-                            rotated_coordinates = np.dot(rotation_matrix, target_coordinates.T).T
-                            rotated_coordinates = np.ascontiguousarray(rotated_coordinates)
-    
-                            mapping_dict_12 = self.perform_symmetry_assignment(symmetry_mapping_groups, symmetry_exclusion_groups, 
-                                                                                mol_basis[0].get_coordinates_in_bohr()[symmetry_exclusion_groups], rotated_coordinates[symmetry_exclusion_groups])
-                            z_matrix_dict = {tuple(sorted(element)): i 
-                                for i, element in enumerate(impes_coordinate.z_matrix)}
-                            
-                            mapping_dict = [mapping_dict_12]
-                            
-                            
-                            reorded_int_coords = [impes_coordinate.internal_coordinates_values.copy()]
-        
-                            for ord in range(len(mapping_dict)):
-                                mask = []
-                                reorded_int_coord = np.zeros_like(impes_coordinate.internal_coordinates_values)
-                                for i, element in enumerate(impes_coordinate.z_matrix):
-                                    # Otherwise, reorder the element
-                                    reordered_element = [mapping_dict[ord].get(x, x) for x in element]
-                                    key = tuple(sorted(reordered_element))
-                                    z_mat_index = z_matrix_dict.get(key)
-                                    mask.append(z_mat_index)
-                                    reorded_int_coord[i] = (float(reorded_int_coords[0][z_mat_index]))
-                                reorded_int_coords.append(reorded_int_coord)
-                                masks.append(mask)
-                        self._finalize_mapping_masks_and_eq_mode(impes_coordinate, masks)
-                    else:
-                        org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
-                        masks = [org_mask]
-                        self._finalize_mapping_masks_and_eq_mode(impes_coordinate, masks)
-
-                    print('Label counter', label_counter, len(self.qm_data_point_dict[mol_basis[4][number]]), new_label)
                     if not mol_basis[5]:
                         category_label = label
                         if impes_coordinate.use_inverse_bond_length:
@@ -5350,14 +3298,13 @@ class IMDatabasePointCollecter:
                         else:
                             category_label += "_dihedral"
                         
-                        print('dict and key', self.impes_drivers[mol_basis[4][number]].qm_symmetry_data_points, category_label)
+
                         self.qm_data_point_dict[mol_basis[4][number]].append(impes_coordinate)
                         self.sorted_state_spec_im_labels[mol_basis[4][number]].append(new_label)
                         self.qm_symmetry_datapoint_dict[mol_basis[4][number]][category_label] = [impes_coordinate]
-                        self.impes_drivers[mol_basis[4][number]].qm_symmetry_data_points[category_label] = [impes_coordinate]
+
                         impes_coordinate.point_label = category_label
-                        impes_coordinate.family_label = category_label
-                        impes_coordinate.bank_role = "core"
+
                         
                         self.qm_energies_dict[mol_basis[4][number]].append(energies[number])
                         
@@ -5367,19 +3314,10 @@ class IMDatabasePointCollecter:
                         print('I am writing the file', category_label, self.interpolation_settings[mol_basis[4][number]]['imforcefield_file'])
                     
                         self.density_around_data_point[mol_basis[4][number]] += 1
-
-                    else:
-                        
-                        impes_coordinate.bank_role = "symmetry"
-                        self.qm_symmetry_datapoint_dict[mol_basis[4][number]][category_label].append(impes_coordinate)
-                        self.impes_drivers[mol_basis[4][number]].qm_symmetry_data_points[category_label].append(impes_coordinate)
-                        self._refresh_interpolation_driver_caches(mol_basis[4][number])
-
                     
                     impes_coordinate.confidence_radius = self.use_opt_confidence_radius[2]
 
                     print('data list', len(self.allowed_molecules[mol_basis[4][number]]['molecules']))
-
 
                     impes_coordinate.write_hdf5(
                         self.interpolation_settings[mol_basis[4][number]]['imforcefield_file'],
@@ -5403,20 +3341,6 @@ class IMDatabasePointCollecter:
                             template_point=impes_coordinate
                         )
 
-                    # Only synchronize in full-SPMD mode; NEVER do this in root-worker service mode.
-                    # if self._mpi_is_active() and (not root_worker_service_mode):
-                    #     comm.barrier()
-                    
-                    # if self._mpi_is_root() or (not self._mpi_is_active()):
-                    #     impes_coordinate.write_hdf5(self.interpolation_settings[mol_basis[4][number]]['imforcefield_file'], new_label)
-                    #     if self.sampling_enabled:
-                    #         self._write_sampling_point_from_geometry(
-                    #             root=mol_basis[4][number],
-                    #             molecule=mol_basis[0],
-                    #             label=new_label,
-                    #             template_point=impes_coordinate
-                    #         )
-                    # if self._mpi_is_root() or (not self._mpi_is_active()):
                     for root_idx in mol_basis[4]:
                         self.write_qm_energy_determined_points_h5(self.allowed_molecules[root_idx]['molecules'][self.last_added: ],
                                                             self.allowed_molecules[root_idx]['qm_energies'][self.last_added:],
@@ -5426,18 +3350,12 @@ class IMDatabasePointCollecter:
                 
                 self.last_added = len(self.allowed_molecules[mol_basis[4][number]]['molecules'])
                 label_counter += 1
-            if any(root > 0 for root in self.roots_to_follow):
-                                   
-                if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):           
-                    
-                    drivers[1].state_deriv_index = org_roots
+    
 
             if self.current_state in self.opt_mols_org_mol_swap:
-                self._interp_compute_root_local_serial(self.impes_drivers[self.current_state], self.opt_mols_org_mol_swap[self.current_state])
-                print(self.impes_drivers[self.current_state].weights, self.impes_drivers[self.current_state].get_energy(), self.opt_mols_org_mol_swap[self.current_state].get_xyz_string())
+                self.impes_drivers[self.current_state].compute(self.opt_mols_org_mol_swap[self.current_state])
+                
 
-        
-        # if self._mpi_is_root() or (not self._mpi_is_active()):
         self.simulation.saveCheckpoint('checkpoint')
         self._emit_test_hook("add_point_end", {
             "n_datapoints_per_root": {
@@ -5445,158 +3363,6 @@ class IMDatabasePointCollecter:
                 for root in self.roots_to_follow
             }
         })
-
-        # if self._mpi_is_active() and (not root_worker_service_mode):
-        #     comm.barrier()
-    
-    def _list_rotor_cluster_families_from_registry(self, root, imff_file):
-        
-        prefix = f"rotor_cluster_registry/root_{root}"
-        with h5py.File(imff_file, "r") as h5f:
-            if prefix not in h5f:
-                return []
-            return sorted(name.replace("family_", "", 1) for name in h5f[prefix].keys())
-
-
-    def _read_cluster_registry_for_family(self, imff_file, root, family_label):
-        def _read_scalar_string(ds):
-            val = ds[()]
-            return val.decode("utf-8") if isinstance(val, bytes) else str(val)
-
-        with h5py.File(imff_file, "r") as h5f:
-            prefix = f"rotor_cluster_registry/root_{root}/family_{family_label}"
-            info_json = _read_scalar_string(h5f[prefix + "/cluster_info_json"])
-            library_json = _read_scalar_string(h5f[prefix + "/cluster_angle_library_json"])
-            index_json = _read_scalar_string(h5f[prefix + "/point_index_json"])
-
-        info_payload = json.loads(info_json)
-        library_payload = json.loads(library_json)
-        index_payload = json.loads(index_json)
-        
-        rotor_to_cluster_map = {
-            int(rid): int(cid) for rid, cid in info_payload["rotor_to_cluster"].items()
-        }
-        cluster_info = RotorClusterInformation(
-            dihedral_start=int(info_payload["dihedral_start"]),
-            dihedral_end=int(info_payload["dihedral_end"]),
-            rotor_to_cluster=rotor_to_cluster_map,
-        )
-        for rotor_id, rotor_data in info_payload["rotors"].items():
-            cluster_info.rotors[int(rotor_id)] = RotorDefinition(
-                rotor_id=int(rotor_id),
-                center=tuple(rotor_data["center"]),
-                torsion_rows=tuple(rotor_data["torsion_rows"]),
-                torsion_coords=tuple(tuple(x) for x in rotor_data["torsion_coords"]),
-                symmetry_order=int(rotor_data["symmetry_order"]),
-                atom_group=tuple(rotor_data["atom_group"]),
-            )
-        for cid, cdata in info_payload["clusters"].items():
-            cluster_info.clusters[int(cid)] = RotorClusterDefinition(
-                cluster_id=int(cid),
-                rotor_ids=tuple(cdata["rotor_ids"]),
-                cluster_type=cdata["cluster_type"],
-                torsion_rows=tuple(cdata["torsion_rows"]),
-            )
-
-        angle_library = RotorClusterAngleLibrary()
-        for cid, state_list in library_payload.items():
-            bank = []
-            for state in state_list:
-                aa = {}
-                for key, val in state["angle_assignment"].items():
-                    aa[tuple(int(x) for x in key.split(","))] = float(val)
-                bank.append(
-                    RotorClusterStateDefinition(
-                        cluster_id=int(cid),
-                        state_id=int(state["state_id"]),
-                        cluster_type=state["cluster_type"],
-                        rotor_ids=tuple(state["rotor_ids"]),
-                        angle_assignment=aa,
-                        dihedrals_to_rotate=(
-                            None
-                            if state["dihedrals_to_rotate"] is None
-                            else tuple(tuple(int(x) for x in row) for row in state["dihedrals_to_rotate"])
-                        ),
-                        phase_signature=(
-                            None if state["phase_signature"] is None
-                            else np.asarray(state["phase_signature"], dtype=np.float64)
-                        ),
-                        is_anchor=bool(state.get("is_anchor", False)),
-                        label_suffix=str(state.get("label_suffix", "")),
-                    )
-                )
-            angle_library.state_banks[int(cid)] = tuple(bank)
-
-        point_index = {
-            "family_label": index_payload["family_label"],
-            "core_label": index_payload["core_label"],
-            "cluster_state_labels": {
-                int(cid): {int(sid): lbl for sid, lbl in smap.items()}
-                for cid, smap in index_payload["cluster_state_labels"].items()
-            },
-        }
-        return cluster_info, angle_library, point_index
-
-
-    def _load_rotor_cluster_bank_for_root(self, root, sampling_mode=False):
-        out = {}
-        imff_file = self.interpolation_settings[root]["imforcefield_file"]
-        families = self._list_rotor_cluster_families_from_registry(root, imff_file)
-        
-        for family in families:
-            imff_file = self.interpolation_settings[root]["imforcefield_file"]
-            cluster_info, angle_library, point_index = self._read_cluster_registry_for_family(
-                imff_file, root, family
-            )
-            fam = {
-                "cluster_info": cluster_info,
-                "cluster_angle_library": angle_library,
-                "point_index": point_index,
-                "core": None,
-                "clusters": {
-                    cid: {
-                        "cluster_type": cluster.cluster_type,
-                        "rotor_ids": tuple(cluster.rotor_ids),
-                        "expected_states": {state.state_id: None for state in angle_library.state_banks[cid]},
-                    }
-                    for cid, cluster in cluster_info.clusters.items()
-                },
-            }
-            
-            core_dp = InterpolationDatapoint(self.root_z_matrix[root])
-            
-            current_interpolation_settings = self.interpolation_settings[root]
-            if sampling_mode:
-                imff_file = self.sampling_interpolation_settings[root]['imforcefield_file']
-                current_interpolation_settings = self.sampling_interpolation_settings[root]
-                core_dp.update_settings(self.sampling_interpolation_settings[root])
-                core_dp.read_hdf5(imff_file, point_index["core_label"])
-            else:
-                core_dp.update_settings(current_interpolation_settings)
-                core_dp.read_hdf5(imff_file, point_index["core_label"])
-            
-            fam["core"] = core_dp
-
-            for cid, state_map in point_index["cluster_state_labels"].items():
-                for sid, label in state_map.items():
-                    dp = InterpolationDatapoint(self.root_z_matrix[root])
-                    dp.update_settings(current_interpolation_settings)
-                    dp.read_hdf5(imff_file, label)
-                    fam["clusters"][cid]["expected_states"][sid] = dp
-
-            for cid, cbank in fam["clusters"].items():
-                expected = cbank["expected_states"]
-                if 0 in expected and expected[0] is None:
-                    raise RuntimeError(
-                        "IMForceFieldGenerator: rotor-cluster anchor state 0 "
-                        f"is missing for root {root}, family {family}, cluster {cid}. "
-                        "Regenerate the rotor-cluster database with explicit "
-                        "cluster anchor datapoints."
-                    )
-
-            out[family] = fam
-
-        return out
      
     def _write_sampling_point_from_geometry(self, root, molecule, label, template_point):
         sampling_qm, sampling_grad, sampling_hess = self.sampling_driver['gs']
@@ -5618,8 +3384,6 @@ class IMDatabasePointCollecter:
 
         # Geometry + transformed tensors
         dp.cartesian_coordinates = np.array(template_point.cartesian_coordinates, copy=True)
-        dp.eq_bond_lengths = None if template_point.eq_bond_lengths is None else np.array(template_point.eq_bond_lengths, copy=True)
-        dp.mapping_masks = None if getattr(template_point, "mapping_masks", None) is None else np.array(template_point.mapping_masks, copy=True)
         dp.imp_int_coordinates = copy.deepcopy(
             getattr(
                 template_point,
@@ -5635,30 +3399,6 @@ class IMDatabasePointCollecter:
 
         # Carry rotor-cluster metadata into sampling datapoints.
         dp.point_label = label
-        dp.family_label = getattr(template_point, "family_label", None)
-        dp.bank_role = str(getattr(template_point, "bank_role", "core") or "core")
-
-        cluster_id = getattr(template_point, "cluster_id", None)
-        dp.cluster_id = None if cluster_id is None else int(cluster_id)
-
-        dp.cluster_type = getattr(template_point, "cluster_type", None)
-
-        rotor_ids = getattr(template_point, "cluster_rotor_ids", None)
-        dp.cluster_rotor_ids = None if rotor_ids is None else tuple(int(x) for x in rotor_ids)
-
-        cluster_state_id = getattr(template_point, "cluster_state_id", 0)
-        dp.cluster_state_id = 0 if cluster_state_id is None else int(cluster_state_id)
-
-        dihedrals_to_rotate = getattr(template_point, "dihedrals_to_rotate", None)
-        if dihedrals_to_rotate is None:
-            dp.dihedrals_to_rotate = None
-        else:
-            dp.dihedrals_to_rotate = tuple(
-                tuple(int(x) for x in row) for row in dihedrals_to_rotate
-            )
-
-        phase_signature = getattr(template_point, "phase_signature", None)
-        dp.phase_signature = None if phase_signature is None else np.asarray(phase_signature, dtype=np.float64)
 
         dp.transform_gradient_and_hessian()
 
@@ -5668,9 +3408,6 @@ class IMDatabasePointCollecter:
         # Refresh in-memory sampling interpolator
         self._reload_sampling_root_from_hdf5(root, inv_sqrt)
 
-
-
-
     def _reload_sampling_root_from_hdf5(self, root, inv_sqrt_masses):
         driver_object = self.sampling_impes_drivers[root]
 
@@ -5679,46 +3416,22 @@ class IMDatabasePointCollecter:
         self.sampling_qm_data_point_dict[root] = []
         self.sampling_qm_symmetry_datapoint_dict[root] = {}
 
-        old_label = None
+
         for label in im_labels:
             dp = InterpolationDatapoint(self.root_z_matrix[root])
             dp.update_settings(self.sampling_interpolation_settings[root])
             dp.read_hdf5(self.sampling_interpolation_settings[root]['imforcefield_file'], label)
             dp.inv_sqrt_masses = inv_sqrt_masses
-            if dp.bank_role == "core" or "cluster" not in dp.point_label and "symmetry" not in dp.point_label:
-                self.sampling_qm_data_point_dict[root].append(dp)
-                old_label = dp.point_label
-                self.sampling_qm_symmetry_datapoint_dict[root][old_label] = [dp]
-            elif dp.bank_role == "symmetry":
-                self.sampling_qm_symmetry_datapoint_dict[root][old_label].append(dp)
-            
 
-        driver_object.qm_symmetry_data_points = self.sampling_qm_symmetry_datapoint_dict[root]
+            self.sampling_qm_data_point_dict[root].append(dp)
+
+            
         driver_object.qm_data_points = self.sampling_qm_data_point_dict[root]
         driver_object.labels = self.sorted_state_spec_im_labels[root]
 
-        if len(self.sampling_qm_data_point_dict[root]) > 0:
-            driver_object.impes_coordinate.eq_bond_lengths = self.sampling_qm_data_point_dict[root][0].eq_bond_lengths
-
         driver_object.mark_runtime_data_cache_dirty()
-        driver_object.prepare_runtime_data_cache(force=True)
 
-        # use_mpi_preload = bool(self.sampling_interpolation_settings[root].get('use_mpi_preload', False))
-        # # In root-worker mode, avoid immediate preload collectives here; rebuild lazily
-        # # in synchronized compute path on the next step.
-        # force_rebuild_preload = not (self._mpi_is_active() and self.mpi_root_worker_mode)
-        # driver_object.set_mpi_preload_engine(
-        #     comm=self._mpi_interp_comm,
-        #     enabled=(use_mpi_preload and self.nodes > 1),
-        #     force_rebuild=force_rebuild_preload,
-        # )
 
-        # driver_object._mpi_preload_enabled_config = bool(getattr(driver_object, 'mpi_preload_enabled', False))
-        # self._ensure_interp_engine_comm(driver_object)
-        # # In root-worker mode, keep preload disabled outside synchronized compute
-        # # phases to prevent root-only branches from emitting collective packets.
-        # if self._mpi_is_active() and self.mpi_root_worker_mode:
-        #     driver_object.mpi_preload_enabled = False
 
     def _build_opt_constraint_list(self, constraints, index_offset=1):
 
@@ -5832,7 +3545,6 @@ class IMDatabasePointCollecter:
         z_matrix,
         interpolation_setting,
         sym_dict,
-        sym_datapoints,
         exponent_p_q,
         datapoints_eval,
         cluster_banks=None,
@@ -5840,19 +3552,10 @@ class IMDatabasePointCollecter:
         drv = InterpolationDriver(z_matrix)
         drv.update_settings(interpolation_setting)
         drv.symmetry_information = sym_dict
-        drv.qm_symmetry_data_points = sym_datapoints
-        drv.qm_rotor_cluster_banks = cluster_banks or {}
-        if drv.qm_rotor_cluster_banks:
-            first_family = next(iter(drv.qm_rotor_cluster_banks.values()))
-            drv.rotor_cluster_information = first_family.get("cluster_info")
-        else:
-            drv.rotor_cluster_information = None
         drv.print = False
         drv.calc_optim_trust_radius = False
         drv.exponent_p = exponent_p_q[0]
         drv.exponent_q = exponent_p_q[1]
-
-        drv.impes_coordinate.eq_bond_lengths = datapoints_eval[0].eq_bond_lengths
 
         if len(datapoints_eval) > 0 and hasattr(datapoints_eval[0], "inv_sqrt_masses"):
             drv.impes_coordinate.inv_sqrt_masses = datapoints_eval[0].inv_sqrt_masses
@@ -5860,7 +3563,7 @@ class IMDatabasePointCollecter:
             drv.impes_coordinate.inv_sqrt_masses = self.inv_sqrt_masses
 
         drv.qm_data_points = datapoints_eval
-        drv.prepare_runtime_data_cache(force=True)
+
         return drv
     
     def _evaluate_interpolation_errors_on_reference_set(
@@ -5874,7 +3577,6 @@ class IMDatabasePointCollecter:
         z_matrix,
         interpolation_setting,
         sym_dict,
-        sym_datapoints,
         exponent_p_q,
         cluster_banks=None,
     ):
@@ -5883,7 +3585,6 @@ class IMDatabasePointCollecter:
             z_matrix=z_matrix,
             interpolation_setting=interpolation_setting,
             sym_dict=sym_dict,
-            sym_datapoints=sym_datapoints,
             exponent_p_q=exponent_p_q,
             datapoints_eval=datapoints_eval,
             cluster_banks=cluster_banks,
@@ -5900,7 +3601,7 @@ class IMDatabasePointCollecter:
         w_dpref = np.zeros((n_dp, n_ref), dtype=np.float64)
 
         for i, mol in enumerate(molecules):
-            self._interp_compute_root_local_serial(drv, mol)
+            drv.compute(mol)
             
             for dp_idx, weight in drv.weights.items():
                 w_dpref[int(dp_idx), i] = float(weight)
@@ -6011,9 +3712,9 @@ class IMDatabasePointCollecter:
                 subset[family_label] = cluster_banks[family_label]
         return subset
 
-    def determine_trust_radius_gradient(self, molecules, qm_energies, qm_gradients, im_energies, datapoints, interpolation_setting, sym_datapoints, sym_dict, z_matrix, exponent_p_q):
+    def determine_trust_radius_gradient(self, molecules, qm_energies, qm_gradients, im_energies, datapoints, interpolation_setting, sym_dict, z_matrix, exponent_p_q):
         
-        def optimize_trust_radius(alpha_full_start, trainable_idx, geom_list, E_ref_list, G_ref_list, E_im_list, dps, impes_dict, sym_datapoints, sym_dict, exponent_p_q, cluster_banks, basin_id=None):
+        def optimize_trust_radius(alpha_full_start, trainable_idx, geom_list, E_ref_list, G_ref_list, E_im_list, dps, impes_dict, sym_dict, exponent_p_q, cluster_banks, basin_id=None):
             """
             Perform the gradient-based optimization to find R*
             that minimizes the sum of squared errors to reference QM energies.
@@ -6060,10 +3761,10 @@ class IMDatabasePointCollecter:
             else:
                 energy_weight = 0.5
 
-            opt = IMTrustRadiusOptimizer(z_matrix, impes_dict, sym_dict, sym_datapoints, dps,
+            opt = IMTrustRadiusOptimizer(z_matrix, impes_dict, sym_dict, dps,
                  geom_list, E_ref_list, G_ref_list, exponent_p_q,
                  e_x=energy_weight,
-                 beta=0.8, n_workers=os.cpu_count(), cluster_banks=cluster_banks)
+                 beta=0.8, cluster_banks=cluster_banks)
 
             history = []
             iter_counter = {"value": 0}
@@ -6237,7 +3938,6 @@ class IMDatabasePointCollecter:
                 z_matrix=z_matrix,
                 interpolation_setting=interpolation_setting,
                 sym_dict=sym_dict,
-                sym_datapoints=sym_datapoints,
                 exponent_p_q=exponent_p_q,
                 cluster_banks=_cluster_banks_for(dp_eval_a),
             )
@@ -6254,7 +3954,6 @@ class IMDatabasePointCollecter:
                 z_matrix=z_matrix,
                 interpolation_setting=interpolation_setting,
                 sym_dict=sym_dict,
-                sym_datapoints=sym_datapoints,
                 exponent_p_q=exponent_p_q,
                 cluster_banks=_cluster_banks_for(dp_eval_b),
             )
@@ -6276,7 +3975,6 @@ class IMDatabasePointCollecter:
 
         for j in range(n_ref):
             weight_col_agg = w_dpref[:, j]
-            print(weight_col_agg)
 
             finite_mask = np.isfinite(weight_col_agg) & (weight_col_agg > 0.0)
             idx = np.where(finite_mask)[0]
@@ -6285,10 +3983,8 @@ class IMDatabasePointCollecter:
             cummulative = np.cumsum(sorted_weight_col_agg)
             
             target = float(np.clip(coverage_mass, 0.0, 1.0) * cummulative[-1])
-            print(target)
             cutoff_pos = int(np.searchsorted(cummulative, target, side="left"))
             selected_dp = order[:cutoff_pos + 1]
-            print(selected_dp)
 
             if selected_dp.size == 0:
                 continue
@@ -6297,7 +3993,6 @@ class IMDatabasePointCollecter:
         support_int = support_mask.astype(np.int32)
         shared_reference_counts = (support_int @ support_int.T)
         support_counts = np.sum(support_int, axis=1).astype(np.int32)
-        print(support_int, shared_reference_counts)
 
         overlap_denominator = np.minimum.outer(support_counts, support_counts).astype(np.float64)
         normalized_overlap = np.divide(
@@ -6318,7 +4013,7 @@ class IMDatabasePointCollecter:
 
         graph = csr_matrix(adjacency_dp.astype(np.int8))
         _, dp_labels = connected_components(csgraph=graph, directed=False, return_labels=True)
-        print(dp_labels)
+
         basin_groups = []
         active_indices = np.where(active_dp_mask)[0]
 
@@ -6391,7 +4086,6 @@ class IMDatabasePointCollecter:
                 E_im_list=im_energies_sub,
                 dps=datapoints,  # full set for interpolation physics
                 impes_dict=interpolation_setting,
-                sym_datapoints=sym_datapoints,
                 sym_dict=sym_dict,
                 exponent_p_q=exponent_p_q,
                 cluster_banks=cluster_banks_full,
@@ -6416,7 +4110,6 @@ class IMDatabasePointCollecter:
                 z_matrix=z_matrix,
                 interpolation_setting=interpolation_setting,
                 sym_dict=sym_dict,
-                sym_datapoints=sym_datapoints,
                 exponent_p_q=exponent_p_q,
                 cluster_banks=_cluster_banks_for(dp_eval_c),
             )
@@ -6539,93 +4232,6 @@ class IMDatabasePointCollecter:
             source_molecule=source_molecule,
             collective=False,
         )
-
-    # def _run_optimization(
-    #     self,
-    #     optimization_driver,
-    #     molecule,
-    #     constraints=None,
-    #     transition=False,
-    #     index_offset=1,
-    #     compute_args=None,
-    #     source_molecule=None,
-    #     collective=False,
-    # ):
-    #     opt_drv = OptimizationDriver(optimization_driver)
-    #     opt_drv.ostream.mute()
-    #     opt_drv.transition = transition
-
-    #     if constraints is not None:
-    #         opt_drv.constraints = self._build_opt_constraint_list(constraints, index_offset=index_offset)
-
-    #     if compute_args is None:
-    #         if collective:
-    #             opt_results = opt_drv.compute(molecule)
-    #         else:
-    #             opt_results = self._opt_compute_mpi_safe(opt_drv, molecule)
-    #     else:
-    #         if collective:
-    #             opt_results = opt_drv.compute(molecule, *compute_args)
-    #         else:
-    #             opt_results = self._opt_compute_mpi_safe(opt_drv, molecule, *compute_args)
-
-    #     if source_molecule is None:
-    #         source_molecule = molecule
-
-    #     optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-    #     optimized_molecule.set_charge(source_molecule.get_charge())
-    #     optimized_molecule.set_multiplicity(source_molecule.get_multiplicity())
-
-    #     return optimized_molecule, opt_results
-
-    # def _compute_energy_mpi_safe(self, qm_driver, molecule, basis=None, collective=False, phase_name='Energy calcualtion'):
-    #     if collective:
-    #         comm = self._mpi_collective_comm()
-    #         rank = comm.Get_rank()
-    #         root = mpi_master()
-    #         return _collective_call_inline_style(
-    #             comm, rank, root, phase_name, self.compute_energy, qm_driver, molecule, basis
-    #         )
-
-    #     with self._mpi_root_local_qm_context(extra_objects=[qm_driver]):
-    #         if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root() and hasattr(qm_driver, "comm"):
-    #             if qm_driver.comm.Get_size() != 1:
-    #                 raise RuntimeError("Root-local MPI override failed for QM energy driver (comm size != 1).")
-    #         return self.compute_energy(qm_driver, molecule, basis)
-
-    # def _compute_gradient_mpi_safe(
-    #     self, grad_driver, molecule, basis=None, scf_results=None, rsp_results=None,
-    #     collective=False, phase_name='Gradient Calculation'
-    # ):
-    #     if collective:
-    #         comm = self._mpi_collective_comm()
-    #         rank = comm.Get_rank()
-    #         root = mpi_master()
-    #         return _collective_call_inline_style(
-    #             comm, rank, root, phase_name,
-    #             self.compute_gradient, grad_driver, molecule, basis, scf_results, rsp_results
-    #         )
-
-    #     with self._mpi_root_local_qm_context(extra_objects=[grad_driver]):
-    #         if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root() and hasattr(grad_driver, "comm"):
-    #             if grad_driver.comm.Get_size() != 1:
-    #                 raise RuntimeError("Root-local MPI override failed for QM gradient driver (comm size != 1).")
-    #         return self.compute_gradient(grad_driver, molecule, basis, scf_results, rsp_results)
-
-    # def _compute_hessian_mpi_safe(self, hess_driver, molecule, basis=None, collective=False, phase_name='hessian calculation'):
-    #     if collective:
-    #         comm = self._mpi_collective_comm()
-    #         rank = comm.Get_rank()
-    #         root = mpi_master()
-    #         return _collective_call_inline_style(
-    #             comm, rank, root, phase_name, self.compute_hessian, hess_driver, molecule, basis
-    #         )
-
-    #     with self._mpi_root_local_qm_context(extra_objects=[hess_driver]):
-    #         if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root() and hasattr(hess_driver, "comm"):
-    #             if hess_driver.comm.Get_size() != 1:
-    #                 raise RuntimeError("Root-local MPI override failed for QM hessian driver (comm size != 1).")
-    #         return self.compute_hessian(hess_driver, molecule, basis)
     
     def _compute_energy(self, qm_driver, molecule, basis=None):
         """ Computes the QM energy using self.qm_driver.
@@ -6671,17 +4277,6 @@ class IMDatabasePointCollecter:
 
             print('qm_energy in SCF driver', qm_energy)
         
-        elif isinstance(qm_driver, LinearResponseEigenSolver) or isinstance(qm_driver, TdaEigenSolver):
-            self.drivers['es'][0].ostream.mute()
-
-            scf_results = self.drivers['es'][3].compute(molecule, basis)
-            self.drivers['es'][3].filename = None
-            self.drivers['es'][3].checkpoint_file = None
-            scf_energy = self.drivers['es'][3].scf_energy
-            qm_driver.ostream.mute()
-            rsp_results = qm_driver.compute(molecule, basis, scf_results)
-            
-            qm_energy = np.insert(rsp_results['eigenvalues'] + scf_energy, 0, scf_energy)
 
         if qm_energy is None:
             error_txt = "Could not compute the QM energy. "
@@ -6723,11 +4318,6 @@ class IMDatabasePointCollecter:
                 finally:
                     grad_driver.ostream.unmute()
 
-        elif isinstance(grad_driver, TddftGradientDriver):
-            grad_driver.ostream.mute()
-            grad_driver._rsp_results = None
-            grad_driver.compute(molecule, basis, self.drivers['es'][3], self.drivers['es'][0], rsp_results)
-            qm_gradient = grad_driver.gradient
 
         if qm_gradient is None:
             error_txt = "Could not compute the QM gradient. "
@@ -6773,17 +4363,6 @@ class IMDatabasePointCollecter:
                     qm_hessians = np.array([qm_hessian])
                 finally:
                     hess_driver.ostream.unmute()
-        
-        elif isinstance(hess_driver, TddftHessianDriver):
-            roots = self.drivers['es'][1].state_deriv_index
-
-            qm_hessians = []
-            for root in roots:
-                print('In hessian clac', root, hess_driver)
-                self.drivers['es'][1].state_deriv_index = root
-                hess_driver.compute(molecule, basis)
-                qm_hessian = hess_driver.hessian
-                qm_hessians.append(qm_hessian)
 
         if qm_hessians is None:
             error_txt = "Could not compute the QM Hessian. "

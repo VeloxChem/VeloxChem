@@ -34,13 +34,11 @@ from mpi4py import MPI
 import numpy as np
 from time import time
 from typing import List, Tuple, Dict, Any, Optional
-from scipy.optimize import linear_sum_assignment
 import sys
-import os
+
 from .profiler import Profiler
 import h5py
-import math
-import copy
+
 from contextlib import redirect_stderr
 from io import StringIO
 from .interpolationdatapoint import InterpolationDatapoint
@@ -51,7 +49,6 @@ from .veloxchemlib import mpi_master
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input)
 
-from .imrotorbuilder import build_runtime_cluster_set
 
 
 with redirect_stderr(StringIO()) as fg_err:
@@ -105,9 +102,7 @@ class InterpolationDriver():
 
         # Create InterpolationDatapoint, z-matrix required!
         self.impes_coordinate = InterpolationDatapoint(z_matrix)#, self.comm,self.ostream)
-        self.gpr_intdriver = None
-        
-        self.dihedral_function = None
+
         # simple or Shepard interpolation
         self.interpolation_type = 'shepard'
         self.weightfunction_type = 'cartesian'
@@ -123,11 +118,10 @@ class InterpolationDriver():
         self.sum_of_weights_grad = None
         self.print = False
         self.store_weights = False
-        self.perform_mapping = True
         # symmetry metadata tuple produced during database-point generation
         self.symmetry_information = None
         # global switch controlling symmetry-expanded candidate evaluation
-        self.use_symmetry = True
+
         self.weights = {}
         self.int_coord_weights = {}
         self.potentials = []
@@ -136,21 +130,7 @@ class InterpolationDriver():
         # kpoint file with QM data
         self.imforcefield_file = None
         self.qm_data_points = None
-        # per-label torsion descriptors used by symmetry-aware distance metrics
-        self.symmetry_dihedral_lists = {}
-        # grouped datapoints: core label -> [core point, symmetry-expanded points...]
-        self.qm_symmetry_data_points = {}
-        # legacy containers kept for backward-compatible symmetry workflows
-        self.qm_symmetry_data_points_1 = None
-        self.qm_symmetry_data_points_2 = None
-
-        # active rotor-cluster metadata for the current datapoint family
-        self.rotor_cluster_information = None
-        # cached runtime masks/projectors derived from rotor_cluster_information
-        self.rotor_cluster_runtime = None
-        # family_label -> {core point, cluster registry, expected states}
-        self.qm_rotor_cluster_banks = {}
-
+    
         # Confidence radii optimization information
         self.dw_dalpha_list = []
         self.dw_dX_dalpha_list = []
@@ -163,10 +143,8 @@ class InterpolationDriver():
         # Name lables for the QM data points
         self.labels = None
         self.use_inverse_bond_length = True
-        self.use_eq_bond_length = False
-        self.eq_bond_symmetry_mode = "masked_exact"  # "masked_exact" | "symmetrized"
         self.use_cosine_dihedral = False
-        self.use_tc_weights = True
+        self.use_tc_weights = False
 
         # Optional runtime profiling for interpolation bottleneck analysis.
         self.runtime_profile_enabled = False
@@ -198,28 +176,12 @@ class InterpolationDriver():
                 'imforcefield_file':
                     ('str', 'the name of the chk file with QM data'),
                     'use_inverse_bond_length': ('bool', 'whether to use inverse bond lengths in the Z-matrix'),
-                    'use_eq_bond_length': ('bool', 'whether to use eq bond lengths in the Z-matrix'),
-                    'eq_bond_symmetry_mode': ('str', 'eq-bond symmetry mode: masked_exact or symmetrized'),
                     'use_cosine_dihedral':('bool', 'wether to use cosine and sin for the diehdral in the Z-matrix'),
                     'use_tc_weights':('bool', 'weither to use target coustomized weights'),
-                    # 'use_mpi_preload': ('bool', 'enable MPI preload backend for compute_potential'),
-                    'use_symmetry': ('bool', 'enable symmetry-expanded candidate evaluation'),
                 'labels': ('seq_fixed_str', 'the list of QM data point labels'),
             }
         }
 
-
-    def _get_eq_symmetry_mode(self):
-        mode = getattr(self.impes_coordinate, 'eq_bond_symmetry_mode', self.eq_bond_symmetry_mode)
-        if mode is None:
-            mode = self.eq_bond_symmetry_mode
-        mode = str(mode).strip().lower()
-        if mode not in ('masked_exact', 'symmetrized'):
-            raise ValueError(
-                f"InterpolationDriver: invalid eq_bond_symmetry_mode='{mode}'. "
-                "Use 'masked_exact' or 'symmetrized'."
-            )
-        return mode
 
     def update_settings(self, impes_dict=None):
         """
@@ -300,12 +262,6 @@ class InterpolationDriver():
             'last': dict(self.runtime_profile_last),
         }
 
-    def _cluster_weight_metric_worker(self, payload):
-        cluster_id, datapoint, org_int_coords, base_cache = payload
-        d2_i, grad_d2_i = self._cluster_state_signature_metric(
-            cluster_id, datapoint, org_int_coords, base_cache=base_cache
-        )
-        return float(d2_i), np.asarray(grad_d2_i, dtype=np.float64)
 
     def mark_runtime_data_cache_dirty(self):
         """
@@ -313,53 +269,6 @@ class InterpolationDriver():
         """
 
         self._runtime_data_cache_dirty = True
-
-
-    def prepare_runtime_data_cache(self, force=False):
-        """
-        Pre-builds flattened symmetry task entries from symmetry datapoints.
-
-        Each entry is a tuple ``(symmetry_data_point, mask0, mask)`` used by
-        potential evaluation. The expensive object/mask traversal is done once
-        and reused across timesteps.
-        """
-       
-        if not self.runtime_data_cache_enabled:
-            self._symmetry_task_cache = {}
-            self._runtime_data_cache_dirty = False
-            return
-
-        if (not force) and (not self._runtime_data_cache_dirty):
-            return
-
-        cache = {}
-
-        for dp_label, symmetry_data_points in (self.qm_symmetry_data_points or {}).items():
-            entries = []
-            for symmetry_data_point in symmetry_data_points:
-                masks = getattr(symmetry_data_point, 'mapping_masks', None)
-                if masks is None:
-                    continue
-
-                masks_arr = np.asarray(masks, dtype=np.int64)
-                if masks_arr.ndim == 1:
-                    masks_arr = masks_arr.reshape(1, -1)
-                if masks_arr.shape[0] == 0:
-                    continue
-
-                mask0 = np.ascontiguousarray(masks_arr[0], dtype=np.int64)
-                for mask in masks_arr:
-                    entries.append(
-                        (symmetry_data_point, mask0,
-                         np.ascontiguousarray(mask, dtype=np.int64)))
-            cache[dp_label] = entries
-
-        self._symmetry_task_cache = cache
-        self._runtime_data_cache_dirty = False
-  
-    def _use_symmetry_for_label(self, dp_label):
-        sym_list = (self.qm_symmetry_data_points or {}).get(dp_label, [])
-        return bool(len(sym_list) > 1)
     
     def _get_datapoint_by_label(self, dp_label):
         for dp in (self.qm_data_points or []):
@@ -413,45 +322,10 @@ class InterpolationDriver():
         }
     
     def _build_candidates_for_label(self, dp_label):
-        if self._use_symmetry_for_label(dp_label):
-            return self._get_symmetry_task_entries(dp_label)
         dp = self._get_datapoint_by_label(dp_label)   # from qm_data_points
         n_ic = len(dp.internal_coordinates_values)
         ident = np.arange(n_ic, dtype=np.int64)
         return [(dp, ident, ident)]
-
-    def _get_symmetry_task_entries(self, dp_label):
-        """
-        Returns flattened symmetry task entries for one datapoint label.
-        """
-
-        if self.runtime_data_cache_enabled:
-            self.prepare_runtime_data_cache()
-            cached_entries = self._symmetry_task_cache.get(dp_label)
-            if cached_entries is not None:
-                return cached_entries
-
-        entries = []
-        symmetry_data_points = (self.qm_symmetry_data_points or {}).get(dp_label, [])
-
-        for symmetry_data_point in symmetry_data_points:
-            masks = getattr(symmetry_data_point, 'mapping_masks', None)
-            if masks is None:
-                continue
-
-            masks_arr = np.asarray(masks, dtype=np.int64)
-            if masks_arr.ndim == 1:
-                masks_arr = masks_arr.reshape(1, -1)
-            if masks_arr.shape[0] == 0:
-                continue
-
-            mask0 = np.ascontiguousarray(masks_arr[0], dtype=np.int64)
-            for mask in masks_arr:
-                entries.append(
-                    (symmetry_data_point, mask0,
-                     np.ascontiguousarray(mask, dtype=np.int64)))
-  
-        return entries
 
     def read_labels(self):
         """
@@ -474,10 +348,6 @@ class InterpolationDriver():
         if self.impes_coordinate.use_inverse_bond_length:
             remove_from_label += "_rinv"
             z_matrix_label += '_rinv'
-        
-        elif self.impes_coordinate.use_eq_bond_length:
-            remove_from_label += "_eq"
-            z_matrix_label += '_eq'
         
         else:
             remove_from_label += "_r"
@@ -551,831 +421,7 @@ class InterpolationDriver():
         else:
             self.impes_coordinate.reset_coordinates_impes_driver(coordinates)
 
-    def _ensure_rotor_cluster_runtime(self):
-        if self.rotor_cluster_information is None:
-            self.rotor_cluster_runtime = None
-            return
-        n_ic = len(self.impes_coordinate.internal_coordinates_values)
-
        
-        if self.rotor_cluster_runtime is None or self.rotor_cluster_runtime.n_ic != n_ic:
-            self.rotor_cluster_runtime = build_runtime_cluster_set(
-                self.rotor_cluster_information, n_ic=n_ic
-            )
-
-
-    def _get_core_projector(self):
-        self._ensure_rotor_cluster_runtime()
-
-        return self.rotor_cluster_runtime.core_mask
-
-
-    def _get_cluster_projector(self, cluster_id):
-        self._ensure_rotor_cluster_runtime()
-        return self.rotor_cluster_runtime.clusters[cluster_id].projector_mask
-
-
-    def _get_cluster_signature_rows(self, cluster_id):
-        self._ensure_rotor_cluster_runtime()
-        return self.rotor_cluster_runtime.clusters[cluster_id].grouped_signature_rows
-    
-    def _build_cluster_signature(self, cluster_id, int_coords):
-        rows_by_rotor = self._get_cluster_signature_rows(cluster_id)
-        grouped = []
-        for rows in rows_by_rotor:
-            grouped.append(np.asarray(int_coords[list(rows)], dtype=np.float64).copy())
-        return grouped
-
-    def _cluster_state_signature_metric(self, cluster_id, datapoint, org_int_coords, base_cache=None):
-        masks = getattr(datapoint, "mapping_masks", None)
-
-        if masks is None or len(masks) == 0:
-            cur = self._build_cluster_signature(cluster_id, np.asarray(org_int_coords, dtype=np.float64))
-            ref = self._build_cluster_signature(cluster_id, np.asarray(datapoint.internal_coordinates_values, dtype=np.float64))
-            return self._cluster_signature_distance_and_gradient(cluster_id, cur, ref)
-
-        best_d2 = None
-        best_grad = None
-        for mask in np.asarray(masks, dtype=np.int64):
-            d2, gd2 = self._cluster_mask_signature_distance_and_gradient(
-                cluster_id=cluster_id,
-                datapoint=datapoint,
-                mask=mask,
-                org_int_coords=org_int_coords,
-                base_cache=base_cache,
-            )
-            if best_d2 is None or d2 < best_d2:
-                best_d2, best_grad = d2, gd2
-        return best_d2, best_grad
-
-    def _cluster_signature_distance_and_gradient(self, cluster_id, current_signature, reference_signature, b_matrix=None):
-        rows_by_rotor = self._get_cluster_signature_rows(cluster_id)
-        if b_matrix is None:
-            b_matrix = self.impes_coordinate.b_matrix
-        b_matrix = np.asarray(b_matrix, dtype=np.float64)
-
-        ncart = b_matrix.shape[1]
-        d2_total = 0.0
-        grad_total = np.zeros(ncart, dtype=np.float64)
-        n_groups = len(rows_by_rotor)
-
-        for ridx, rows in enumerate(rows_by_rotor):
-            rows_arr = np.asarray(rows, dtype=np.int64)
-            brows = b_matrix[rows_arr, :]
-            sig_c = np.asarray(current_signature[ridx], dtype=np.float64)
-            sig_r = np.asarray(reference_signature[ridx], dtype=np.float64)
-            delta = sig_c - sig_r
-            terms = 2.0 * (1.0 - np.cos(delta))
-            d2_r = float(np.mean(terms))
-            grad_r = np.mean(2.0 * np.sin(delta)[:, None] * brows, axis=0)
-            d2_total += d2_r
-            grad_total += grad_r
-
-        if n_groups > 0:
-            d2_total /= n_groups
-            grad_total /= n_groups
-
-        return d2_total, grad_total
-    
-    def _evaluate_masked_core_state(self, core_dp, core_projector, org_int_coords, base_cache=None):
-        masked_E = []
-        masked_G = []
-        raw = []
-        raw_grad = []
-
-        natm = self.impes_coordinate.cartesian_coordinates.shape[0]
-
-        for mask in self._coerce_mapping_masks(core_dp):
-            mask_arr = np.asarray(mask, dtype=np.int64)
-
-            org_eval_m, b_eval_m = self._candidate_current_chart(
-                symmetry_data_point=core_dp,
-                mask=mask_arr,
-                org_int_coords=org_int_coords,
-                b_matrix=self.impes_coordinate.b_matrix,
-                base_cache=base_cache,
-            )
-
-            E_m, G_m = self._restricted_taylor_eval_for_mask(
-                datapoint=core_dp,
-                mask=mask_arr,
-                projector=core_projector,
-                org_int_coords=org_int_coords,
-                base_cache=base_cache,
-                precomputed_current=(org_eval_m, b_eval_m),
-            )
-
-            d2_m, grad_d2_m = self._all_rotor_mask_signature_distance_and_gradient(
-                datapoint=core_dp,
-                mask=mask_arr,
-                org_int_coords=org_int_coords,
-                b_matrix=b_eval_m,
-                base_cache=base_cache,
-                precomputed_current=(org_eval_m, b_eval_m),
-            )
-
-            if d2_m <= 1.0e-10:
-                w_m = 1.0e30
-                grad_w_m = np.zeros((natm, 3), dtype=np.float64)
-            else:
-                w_m, grad_w_m = self._normalize_symmetry_candidate_weight(d2_m, grad_d2_m)
-
-            masked_E.append(E_m)
-            masked_G.append(G_m)
-            raw.append(w_m)
-            raw_grad.append(grad_w_m)
-
-        weights, grad_weights = self._normalize_mask_weight_pool(raw, raw_grad)
-
-        masked_E = np.asarray(masked_E, dtype=np.float64)
-        masked_G = np.asarray(masked_G, dtype=np.float64)
-
-        E = float(np.dot(weights, masked_E))
-        G = (
-            np.tensordot(weights, masked_G, axes=1)
-            + np.tensordot(masked_E - E, grad_weights, axes=1)
-        )
-
-        return E, G
-
-    def _all_rotor_mask_signature_distance_and_gradient(
-        self,
-        *,
-        datapoint,
-        mask,
-        org_int_coords,
-        b_matrix=None,
-        base_cache=None,
-        precomputed_current=None,
-    ):
-        mask = np.asarray(mask, dtype=np.int64)
-
-        if precomputed_current is None:
-            org_eval, b_eval = self._candidate_current_chart(
-                symmetry_data_point=datapoint,
-                mask=mask,
-                org_int_coords=org_int_coords,
-                b_matrix=self.impes_coordinate.b_matrix if b_matrix is None else b_matrix,
-                base_cache=base_cache,
-            )
-        else:
-            org_eval, b_eval = precomputed_current
-
-        ref_masked = np.asarray(datapoint.internal_coordinates_values, dtype=np.float64)[mask]
-        b_eval = np.asarray(b_eval, dtype=np.float64)
-
-        d2_total = 0.0
-        grad_total = np.zeros(b_eval.shape[1], dtype=np.float64)
-        n_groups = 0
-
-        for rotor in self.rotor_cluster_information.rotors.values():
-            rows = np.asarray(rotor.torsion_rows, dtype=np.int64)
-            delta = np.asarray(org_eval, dtype=np.float64)[rows] - ref_masked[rows]
-
-            d2_total += float(np.mean(2.0 * (1.0 - np.cos(delta))))
-            grad_total += np.mean(
-                2.0 * np.sin(delta)[:, None] * b_eval[rows, :],
-                axis=0,
-            )
-            n_groups += 1
-
-        if n_groups > 0:
-            d2_total /= n_groups
-            grad_total /= n_groups
-
-        return d2_total, grad_total
-
-    
-    def _coerce_mapping_masks(self, datapoint, masks=None):
-        if masks is None:
-            masks = getattr(datapoint, "mapping_masks", None)
-
-        n_ic = len(datapoint.internal_coordinates_values)
-        if masks is None or len(masks) == 0:
-            return np.arange(n_ic, dtype=np.int64).reshape(1, -1)
-
-        masks_arr = np.asarray(masks, dtype=np.int64)
-        if masks_arr.ndim == 1:
-            masks_arr = masks_arr.reshape(1, -1)
-        return masks_arr
-    
-    def _evaluate_projected_datapoint_on_mask(
-        self,
-        *,
-        datapoint,
-        projector,
-        org_int_coords,
-        mask,
-        base_cache=None,
-    ):
-        """
-        Evaluate one datapoint Taylor model in one fixed symmetry chart.
-
-        The mask may be a full-product rotor mask from the core datapoint.
-        This is intentional: independent cluster states must be evaluated in
-        the same global chart as every other cluster and the core.
-        """
-        mask_arr = np.asarray(mask, dtype=np.int64)
-
-        org_eval_m, b_eval_m = self._candidate_current_chart(
-            symmetry_data_point=datapoint,
-            mask=mask_arr,
-            org_int_coords=org_int_coords,
-            b_matrix=self.impes_coordinate.b_matrix,
-            base_cache=base_cache,
-        )
-
-        return self._restricted_taylor_eval_for_mask(
-            datapoint=datapoint,
-            mask=mask_arr,
-            projector=projector,
-            org_int_coords=org_int_coords,
-            base_cache=base_cache,
-            precomputed_current=(org_eval_m, b_eval_m),
-        )
-
-
-    def _global_symmetry_mask_weights(
-        self,
-        *,
-        core_dp,
-        org_int_coords,
-        base_cache=None,
-        exact_tol=1.0e-10,
-    ):
-        """
-        Build normalized weights over the full-product rotor symmetry masks.
-
-        These weights define the global symmetry gauge. They must be shared by
-        the core and every independent/coupled cluster model during assembly.
-        """
-        masks = self._coerce_mapping_masks(core_dp)
-        natm = self.impes_coordinate.cartesian_coordinates.shape[0]
-
-        raw = []
-        raw_grad = []
-        exact = []
-
-        for mask in masks:
-            mask_arr = np.asarray(mask, dtype=np.int64)
-
-            org_eval_m, b_eval_m = self._candidate_current_chart(
-                symmetry_data_point=core_dp,
-                mask=mask_arr,
-                org_int_coords=org_int_coords,
-                b_matrix=self.impes_coordinate.b_matrix,
-                base_cache=base_cache,
-            )
-
-            d2_m, grad_d2_m = self._all_rotor_mask_signature_distance_and_gradient(
-                datapoint=core_dp,
-                mask=mask_arr,
-                org_int_coords=org_int_coords,
-                b_matrix=b_eval_m,
-                base_cache=base_cache,
-                precomputed_current=(org_eval_m, b_eval_m),
-            )
-
-            if d2_m <= exact_tol:
-                exact.append(True)
-                raw.append(0.0)
-                raw_grad.append(np.zeros((natm, 3), dtype=np.float64))
-            else:
-                exact.append(False)
-                w_m, grad_w_m = self._normalize_symmetry_candidate_weight(
-                    d2_m,
-                    grad_d2_m,
-                )
-                raw.append(w_m)
-                raw_grad.append(grad_w_m)
-
-        exact_idx = np.where(np.asarray(exact, dtype=bool))[0]
-        if exact_idx.size > 0:
-            weights = np.zeros(len(masks), dtype=np.float64)
-            weights[exact_idx] = 1.0 / exact_idx.size
-            grad_weights = np.zeros((len(masks), natm, 3), dtype=np.float64)
-            return masks, weights, grad_weights
-
-        weights, grad_weights = self._normalize_mask_weight_pool(raw, raw_grad)
-        return masks, weights, grad_weights
-
-
-    def _evaluate_masked_cluster_correction(
-        self,
-        *,
-        cluster_id,
-        state_dp,
-        core_dp,
-        cluster_projector,
-        core_projector,
-        org_int_coords,
-        base_cache=None,
-    ):
-        masked_dE = []
-        masked_dG = []
-        raw = []
-        raw_grad = []
-
-        for mask in self._coerce_mapping_masks(state_dp):
-            mask_arr = np.asarray(mask, dtype=np.int64)
-
-            org_eval_m, b_eval_m = self._candidate_current_chart(
-                symmetry_data_point=state_dp,
-                mask=mask_arr,
-                org_int_coords=org_int_coords,
-                b_matrix=self.impes_coordinate.b_matrix,
-                base_cache=base_cache,
-            )
-
-            state_E_m, state_G_m = self._restricted_taylor_eval_for_mask(
-                datapoint=state_dp,
-                mask=mask_arr,
-                projector=cluster_projector,
-                org_int_coords=org_int_coords,
-                base_cache=base_cache,
-                precomputed_current=(org_eval_m, b_eval_m),
-            )
-
-            core_E_m, core_G_m = self._restricted_taylor_eval_for_mask(
-                datapoint=core_dp,
-                mask=mask_arr,
-                projector=core_projector,
-                org_int_coords=org_int_coords,
-                base_cache=base_cache,
-                precomputed_current=(org_eval_m, b_eval_m),
-            )
-
-            d2_m, grad_d2_m = self._cluster_mask_signature_distance_and_gradient(
-                cluster_id=cluster_id,
-                datapoint=state_dp,
-                mask=mask_arr,
-                org_int_coords=org_int_coords,
-                b_matrix=b_eval_m,
-                base_cache=base_cache,
-                precomputed_current=(org_eval_m, b_eval_m),
-            )
-
-            w_m, grad_w_m = self._normalize_symmetry_candidate_weight(d2_m, grad_d2_m)
-
-            masked_dE.append(state_E_m - core_E_m)
-            masked_dG.append(state_G_m - core_G_m)
-            raw.append(w_m)
-            raw_grad.append(grad_w_m)
-
-        weights, grad_weights = self._normalize_mask_weight_pool(raw, raw_grad)
-        print('masked_weights', weights)
-        masked_dE = np.asarray(masked_dE, dtype=np.float64)
-        masked_dG = np.asarray(masked_dG, dtype=np.float64)
-
-        dE = float(np.dot(weights, masked_dE))
-        dG = (
-            np.tensordot(weights, masked_dG, axes=1)
-            + np.tensordot(masked_dE, grad_weights, axes=1)
-        )
-        return dE, dG
-
-    def _evaluate_masked_cluster_state(
-        self,
-        cluster_id,
-        datapoint,
-        projector,
-        org_int_coords,
-        base_cache=None,
-        exact_tol=1.0e-10,
-    ):
-        masked_E = []
-        masked_G = []
-        raw = []
-        raw_grad = []
-        exact_flags = []
-
-        natm = self.impes_coordinate.cartesian_coordinates.shape[0]
-
-        for mask in self._coerce_mapping_masks(datapoint):
-            mask_arr = np.asarray(mask, dtype=np.int64)
-
-            org_eval_m, b_eval_m = self._candidate_current_chart(
-                symmetry_data_point=datapoint,
-                mask=mask_arr,
-                org_int_coords=org_int_coords,
-                b_matrix=self.impes_coordinate.b_matrix,
-                base_cache=base_cache,
-            )
-
-            E_m, G_m = self._restricted_taylor_eval_for_mask(
-                datapoint=datapoint,
-                mask=mask_arr,
-                projector=projector,
-                org_int_coords=org_int_coords,
-                base_cache=base_cache,
-                precomputed_current=(org_eval_m, b_eval_m),
-            )
-
-            d2_m, grad_d2_m = self._cluster_mask_signature_distance_and_gradient(
-                cluster_id=cluster_id,
-                datapoint=datapoint,
-                mask=mask_arr,
-                org_int_coords=org_int_coords,
-                b_matrix=b_eval_m,
-                base_cache=base_cache,
-                precomputed_current=(org_eval_m, b_eval_m),
-            )
-
-            masked_E.append(E_m)
-            masked_G.append(G_m)
-
-            if d2_m <= exact_tol:
-                exact_flags.append(True)
-                raw.append(0.0)
-                raw_grad.append(np.zeros((natm, 3), dtype=np.float64))
-            else:
-                exact_flags.append(False)
-                w_m, grad_w_m = self._normalize_symmetry_candidate_weight(d2_m, grad_d2_m)
-                raw.append(w_m)
-                raw_grad.append(grad_w_m)
-
-        masked_E = np.asarray(masked_E, dtype=np.float64)
-        masked_G = np.asarray(masked_G, dtype=np.float64)
-
-        exact_idx = np.where(np.asarray(exact_flags, dtype=bool))[0]
-        if exact_idx.size > 0:
-            weights = np.zeros(masked_E.size, dtype=np.float64)
-            weights[exact_idx] = 1.0 / exact_idx.size
-            grad_weights = np.zeros((masked_E.size, natm, 3), dtype=np.float64)
-        else:
-            weights, grad_weights = self._normalize_mask_weight_pool(raw, raw_grad)
-
-        state_E = float(np.dot(weights, masked_E))
-        state_G = (
-            np.tensordot(weights, masked_G, axes=1)
-            + np.tensordot(masked_E - state_E, grad_weights, axes=1)
-        )
-
-        return state_E, state_G
-
-    
-    def _cluster_mask_signature_distance_and_gradient(
-        self,
-        *,
-        cluster_id,
-        datapoint,
-        mask,
-        org_int_coords,
-        b_matrix=None,
-        base_cache=None,
-        precomputed_current=None,
-    ):
-        mask = np.asarray(mask, dtype=np.int64)
-
-        if precomputed_current is None:
-            org_eval, b_eval = self._candidate_current_chart(
-                symmetry_data_point=datapoint,
-                mask=mask,
-                org_int_coords=org_int_coords,
-                b_matrix=self.impes_coordinate.b_matrix if b_matrix is None else b_matrix,
-                base_cache=base_cache,
-            )
-        else:
-            org_eval, b_eval = precomputed_current
-
-        cur_sig = self._build_cluster_signature(cluster_id, np.asarray(org_eval, dtype=np.float64))
-        ref_masked = np.asarray(datapoint.internal_coordinates_values, dtype=np.float64)[mask]
-        ref_sig = self._build_cluster_signature(cluster_id, ref_masked)
-
-        return self._cluster_signature_distance_and_gradient(
-            cluster_id, cur_sig, ref_sig, b_matrix=b_eval
-        )
-
-    def _normalize_symmetry_candidate_weight(
-        self,
-        d2,
-        grad_d2,
-        *,
-        confidence_radius=1.0,
-        power=2,
-        eps=1.0e-12,
-    ):
-        """
-        Raw inverse-distance-like weight for one symmetry-mask candidate.
-        Returns scalar weight and Cartesian gradient (natm,3).
-        """
-        rho2 = max(float(confidence_radius) ** 2, eps)
-        x = float(d2) / rho2 + eps
-        w = 1.0 / (2.0 * (x ** power))
-        dw_dd2 = -(power / (2.0 * rho2)) * (x ** (-(power + 1)))
-        grad_w = dw_dd2 * np.asarray(grad_d2, dtype=np.float64)
-
-        natm = self.impes_coordinate.cartesian_coordinates.shape[0]
-        return float(w), grad_w.reshape(natm, 3)
-
-
-    def _normalize_mask_weight_pool(self, raw, raw_grad, *, eps=1.0e-14):
-        """
-        Normalize a pool of raw mask-local weights and their gradients.
-        """
-        raw = np.asarray(raw, dtype=np.float64)
-        raw_grad = np.asarray(raw_grad, dtype=np.float64)
-
-        natm = self.impes_coordinate.cartesian_coordinates.shape[0]
-        if raw.size == 0:
-            return (
-                np.zeros((0,), dtype=np.float64),
-                np.zeros((0, natm, 3), dtype=np.float64),
-            )
-
-        S = raw.sum()
-        if S < eps:
-            idx = int(np.argmax(raw))
-            weights = np.zeros_like(raw)
-            weights[idx] = 1.0
-            grad_weights = np.zeros_like(raw_grad)
-            return weights, grad_weights
-
-        sum_grad = raw_grad.sum(axis=0)
-        weights = raw / S
-        grad_weights = (raw_grad * S - raw[:, None, None] * sum_grad) / (S ** 2)
-        return weights, grad_weights
-
-    def _restricted_taylor_eval_for_mask(
-        self,
-        *,
-        datapoint,
-        mask,
-        projector,
-        org_int_coords,
-        base_cache=None,
-        precomputed_current=None,
-    ):
-        mask = np.asarray(mask, dtype=np.int64)
-        n_ic = len(datapoint.internal_coordinates_values)
-        mask0 = np.arange(n_ic, dtype=np.int64)
-
-        grad_eff = np.asarray(datapoint.internal_gradient, dtype=np.float64).copy()
-        hess_eff = np.asarray(datapoint.internal_hessian, dtype=np.float64).copy()
-        ref_masked = np.asarray(datapoint.internal_coordinates_values, dtype=np.float64)[mask]
-
-        grad_eff[mask0] = grad_eff[mask]
-        hess_eff[np.ix_(mask0, mask0)] = hess_eff[np.ix_(mask, mask)]
-
-        bounds = self._get_internal_coordinate_partitions()
-        dstart = int(bounds["dihedral_start"])
-        dend = int(bounds["dihedral_end"])
-        bend = int(bounds['bond_end'])
-        aend = int(bounds['angle_end'])
-
-        if precomputed_current is None:
-            org_eval, b_eval = self._candidate_current_chart(
-                symmetry_data_point=datapoint,
-                mask=mask,
-                org_int_coords=np.asarray(org_int_coords, dtype=np.float64),
-                b_matrix=np.asarray(self.impes_coordinate.b_matrix, dtype=np.float64),
-                base_cache=base_cache,
-            )
-        else:
-            org_eval, b_eval = precomputed_current
-
-        return self._restricted_taylor_eval(
-            energy=float(datapoint.energy),
-            grad=grad_eff,
-            hess=hess_eff,
-            ref_coords=ref_masked,
-            org_int_coords=org_eval,
-            b_matrix=b_eval,
-            projector=np.asarray(projector, dtype=np.float64),
-            dihedral_start=dstart,
-            dihedral_end=dend,
-            angle_end=aend,
-            bond_end=bend,
-        )
-
-    def _restricted_taylor_eval(
-        self,
-        *,
-        energy,
-        grad,
-        hess,
-        ref_coords,
-        org_int_coords,
-        b_matrix,
-        projector,
-        dihedral_start,
-        dihedral_end,
-        angle_end,
-        bond_end
-    ):
-        if self.bond_rmsd is None:
-            self.bond_rmsd = []
-        if self.angle_rmsd is None:
-            self.angle_rmsd = []
-        if self.dihedral_rmsd is None:
-            self.dihedral_rmsd = []
-        delta_raw = np.asarray(org_int_coords, dtype=np.float64) - np.asarray(ref_coords, dtype=np.float64)
-        delta_eff = delta_raw.copy()
-        chain = np.ones_like(delta_raw)
-        delta_eff[dihedral_start:dihedral_end] = np.sin(delta_raw[dihedral_start:dihedral_end])
-        chain[dihedral_start:dihedral_end] = np.cos(delta_raw[dihedral_start:dihedral_end])
-        
-        self.bond_rmsd.append(
-            np.sqrt(np.mean(np.sum((delta_eff[:bond_end])**2)))
-        )
-        self.angle_rmsd.append(
-            np.sqrt(np.mean(np.sum(delta_eff[bond_end:angle_end]**2)))
-        )
-        self.dihedral_rmsd.append(
-            np.sqrt(np.mean(np.sum(delta_eff[dihedral_start:dihedral_end]**2)))
-        )
-
-        delta_cluster = projector * delta_eff
-        
-        U = float(energy + grad @ delta_cluster + 0.5 * delta_cluster @ hess @ delta_cluster)
-        grad_eff_cluster = projector * (grad + hess @ delta_cluster)
-        grad_internal = chain * grad_eff_cluster
-        natm = b_matrix.shape[1] // 3
-        grad_cart = (b_matrix.T @ grad_internal).reshape(natm, 3)
-        return U, grad_cart
-    
-    def _assemble_clustered_family_model(self, family_label, org_int_coords):
-        family_bank = self.qm_rotor_cluster_banks[family_label]
-        family_cluster_info = family_bank.get("cluster_info")
-
-        if family_cluster_info is not None:
-            if self.rotor_cluster_information is not family_cluster_info:
-                self.rotor_cluster_information = family_cluster_info
-                self.rotor_cluster_runtime = None
-
-        core_dp = family_bank["core"]
-        org_coords = np.asarray(org_int_coords, dtype=np.float64)
-
-        candidate_base_cache = None
-        if self.impes_coordinate.use_eq_bond_length:
-            if self._get_eq_symmetry_mode() == "masked_exact":
-                candidate_base_cache = self.impes_coordinate.prepare_eq_candidate_base_cache()
-
-        core_projector = self._get_core_projector()
-        core_E, core_G = self._evaluate_masked_core_state(
-            core_dp,
-            core_projector,
-            org_coords,
-            base_cache=candidate_base_cache,
-        )
-
-        cluster_E_terms = []
-        cluster_G_terms = []
-
-        for cid, cluster_bank in family_bank["clusters"].items():
-            projector = self._get_cluster_projector(cid)
-
-            weights, grad_weights, states = self._compute_cluster_weights(
-                cid,
-                cluster_bank,
-                org_coords,
-                base_cache=candidate_base_cache,
-            )
-            if len(states) == 0:
-                continue
-
-            state_E = []
-            state_G = []
-
-            for _, dp in states:
-                E_s, G_s = self._evaluate_masked_cluster_state(
-                    cid,
-                    dp,
-                    projector,
-                    org_coords,
-                    base_cache=candidate_base_cache,
-                )
-                state_E.append(E_s)
-                state_G.append(G_s)
-
-            state_E = np.asarray(state_E, dtype=np.float64)
-            state_G = np.asarray(state_G, dtype=np.float64)
-
-            cluster_E = float(np.dot(weights, state_E))
-            cluster_G = (
-                np.tensordot(weights, state_G, axes=1)
-                + np.tensordot(state_E - cluster_E, grad_weights, axes=1)
-            )
-
-            cluster_E_terms.append(cluster_E)
-            cluster_G_terms.append(cluster_G)
-
-        if len(cluster_E_terms) == 0:
-            return core_E, core_G
-
-        n_clusters = len(cluster_E_terms)
-        total_E = float(np.sum(cluster_E_terms) - (n_clusters - 1) * core_E)
-        total_G = (
-            np.sum(np.asarray(cluster_G_terms, dtype=np.float64), axis=0)
-            - (n_clusters - 1) * core_G
-        )
-
-        return total_E, total_G
-
-    def _compute_cluster_weights(
-        self,
-        cluster_id,
-        cluster_bank,
-        org_int_coords,
-        base_cache=None,
-        eq_mode=None,
-    ):
-        populated = [
-            (sid, dp) for sid, dp in sorted(cluster_bank["expected_states"].items())
-            if dp is not None
-        ]
-
-        natm = self.impes_coordinate.cartesian_coordinates.shape[0]
-        if len(populated) == 0:
-            return (
-                np.zeros((0,), dtype=np.float64),
-                np.zeros((0, natm, 3), dtype=np.float64),
-                [],
-            )
-
-        t0 = time()
-        metric_results = [
-            self._cluster_weight_metric_worker(
-                (cluster_id, dp, org_int_coords, base_cache)
-            )
-            for _, dp in populated
-        ]
-        self._add_runtime_timing('compute.cluster.weight_eval_serial', time() - t0)
-
-        d2_values = np.asarray([item[0] for item in metric_results], dtype=np.float64)
-        exact_idx = np.where(d2_values <= 1.0e-10)[0]
-
-        if exact_idx.size > 0:
-            weights = np.zeros(len(populated), dtype=np.float64)
-            weights[exact_idx] = 1.0 / exact_idx.size
-            grad_weights = np.zeros((len(populated), natm, 3), dtype=np.float64)
-            return weights, grad_weights, populated
-
-        raw = []
-        raw_grad = []
-
-        for (_, dp), (d2_i, grad_d2_i) in zip(populated, metric_results):
-            R = getattr(dp, "confidence_radius", 1.0)
-            if R is None:
-                R = 1.0
-
-            R = float(np.asarray(R, dtype=np.float64).reshape(-1)[0])
-            R = max(R, 1.0e-8)
-
-            rho2 = R * R
-            u = max(float(d2_i) / rho2, 1.0e-12)
-
-            p = float(self.exponent_p if self.exponent_p is not None else 2.0)
-            q = float(self.exponent_q if self.exponent_q is not None else p / 2.0)
-
-            denom = u**p + u**q
-            w_i = 1.0 / denom
-
-            ddenom_du = p * u**(p - 1.0) + q * u**(q - 1.0)
-            du_dd2 = 1.0 / rho2
-            dw_dd2 = -(ddenom_du * du_dd2) / (denom * denom)
-
-            grad_w_i = dw_dd2 * np.asarray(grad_d2_i, dtype=np.float64)
-
-            raw.append(w_i)
-            raw_grad.append(grad_w_i.reshape(natm, 3))
-
-        raw = np.asarray(raw, dtype=np.float64)
-        raw_grad = np.asarray(raw_grad, dtype=np.float64)
-
-        S = raw.sum()
-        if S < 1.0e-14:
-            idx = int(np.argmax(raw))
-            weights = np.zeros_like(raw)
-            weights[idx] = 1.0
-            grad_weights = np.zeros_like(raw_grad)
-            return weights, grad_weights, populated
-
-        sum_grad = raw_grad.sum(axis=0)
-        weights = raw / S
-        grad_weights = (raw_grad * S - raw[:, None, None] * sum_grad) / (S**2)
-
-        return weights, grad_weights, populated
-
-    
-    def _compute_potential_clustered(self, data_point, org_int_coords):
-        family_label = data_point.family_label or data_point.point_label
-        family_bank = self.qm_rotor_cluster_banks.get(family_label)
-
-        if not isinstance(family_bank, dict):
-            return None
-        if family_bank.get("cluster_info") is None:
-            return None
-        if family_bank.get("core") is None:
-            return None
-        if not isinstance(family_bank.get("clusters"), dict):
-            return None
-        pes, gradient = self._assemble_clustered_family_model(family_label, org_int_coords)
-
-        return pes, gradient, 0.0
-    
-    ###### End of the new rotor set up #####################
-    
     def compute(self, molecule):
         """Computes the energy and gradient by interpolation
            between pre-defined points.
@@ -1401,8 +447,6 @@ class InterpolationDriver():
         
         self.molecule = molecule 
 
-        # self.distance_molecule = Molecule.from_xyz_string(xyz_string)
-
         self._add_runtime_timing('compute.prepare_state', time() - prep_t0)
 
         define_t0 = time()
@@ -1416,7 +460,6 @@ class InterpolationDriver():
 
         if self.runtime_data_cache_enabled and self._runtime_data_cache_dirty:
             cache_t0 = time()
-            self.prepare_runtime_data_cache()
             self._add_runtime_timing('compute.prepare_runtime_cache', time() - cache_t0)
 
         if self.interpolation_type == 'shepard':
@@ -1479,9 +522,9 @@ class InterpolationDriver():
         distance_scan_t0 = time()
 
         if self.weightfunction_type == 'cartesian':
-            for i, data_point in enumerate(self.qm_data_points[:]):
+            for data_point in self.qm_data_points[:]:
 
-                distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, _, dw_da_dx = self.cartesian_distance(data_point)
+                distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, _, _ = self.cartesian_distance(data_point)
                 
                 
                 if abs(distance) < min_distance:
@@ -1490,7 +533,7 @@ class InterpolationDriver():
 
         elif self.weightfunction_type == 'internal':
             for i, data_point in enumerate(self.qm_data_points[:]):
-                distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, _, dw_da_dx = self.internal_distance(data_point)
+                distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, _, _ = self.internal_distance(data_point)
 
                 if abs(distance) < min_distance:
                     min_distance = abs(distance)
@@ -1612,425 +655,7 @@ class InterpolationDriver():
         self.qm_data_points = qm_data_points
 
         return qm_data_points
-
-    def _get_symmetry_torsion_meta(self):
-        """
-        Prepares row-index metadata for vectorized torsion handling.
-
-        :returns:
-            Dict containing dihedral start index, symmetry-center mapping and
-            row indices for periodicity-3 and periodicity-2 contributions.
-        """
-
-        bounds = self._get_internal_coordinate_partitions()
-        dihedral_start = bounds['dihedral_start']
-
-        if self.symmetry_information is None or len(self.symmetry_information) <= 7:
-            return {
-                'sym3_keys': (),
-                'sym3_rows': np.array([], dtype=np.int64),
-                'sym3_center_ids': np.array([], dtype=np.int64),
-                'sym2_rows': np.array([], dtype=np.int64),
-                'dihedral_start': int(bounds['dihedral_start']),
-                'dihedral_end': int(bounds['dihedral_end']),
-            }
-
-        sym3_keys = tuple(self.symmetry_information[7][3].keys())
-        sym3_key_to_idx = {key: idx for idx, key in enumerate(sym3_keys)}
-        sym2_set = {tuple(sorted(entry)) for entry in self.symmetry_information[7][2]}
-
-        sym3_rows = []
-        sym3_center_ids = []
-        sym2_rows = []
-
-        for row_idx, element in enumerate(self.impes_coordinate.z_matrix_dict['dihedrals']):
-            center = tuple(element[1:3])
-            if center in sym3_key_to_idx:
-                sym3_rows.append(dihedral_start + row_idx)
-                sym3_center_ids.append(sym3_key_to_idx[center])
-            elif tuple(sorted(element)) in sym2_set:
-                sym2_rows.append(row_idx)
-
-        return {
-            'sym3_keys': sym3_keys,
-            'sym3_rows': np.asarray(sym3_rows, dtype=np.int64),
-            'sym3_center_ids': np.asarray(sym3_center_ids, dtype=np.int64),
-            'sym2_rows': np.asarray(sym2_rows, dtype=np.int64),
-            'dihedral_start': int(bounds['dihedral_start']),
-            'dihedral_end': int(bounds['dihedral_end']),
-        }
     
-    def _build_symmetry_phase_candidates(self, dp_label, torsion_meta):
-        """
-        Build cheap phase-labeled symmetry candidates.
-
-        Returns
-        -------
-        candidates : list of dict
-            Each dict contains:
-            - symmetry_data_point
-            - mask0
-            - mask
-            - candidate_full_phases
-        """
-        symmetry_task_entries = self._get_symmetry_task_entries(dp_label)
-        candidates = []
-
-        for symmetry_data_point, mask0, mask in symmetry_task_entries:
-            candidate_full_phases = self._compute_collective_methyl_phases_full(
-                symmetry_data_point.internal_coordinates_values[mask],
-                torsion_meta
-            )
-
-            candidates.append({
-                "symmetry_data_point": symmetry_data_point,
-                "mask0": mask0,
-                "mask": mask,
-                "candidate_full_phases": candidate_full_phases,
-            })
-
-        return candidates
-
-    def _vectorized_symmetry_dihedral_terms(self, dist_org, dist_correlation, b_matrix, torsion_meta):
-        """
-        Computes symmetry dihedral weights and derivatives in vectorized form.
-
-        :param dist_org:
-            Internal-coordinate displacement before dihedral sin transform.
-        :param dist_correlation:
-            Correlation displacement array updated in-place for selected rows.
-        :param b_matrix:
-            Current B matrix.
-        :param torsion_meta:
-            Metadata prepared by ``_get_symmetry_torsion_meta``.
-
-        :returns:
-            Tuple of scalar/array accumulators required in compute_potential.
-        """
-
-        # phase construction section
-        ncart = b_matrix.shape[1]
-        n_sym3 = len(torsion_meta['sym3_keys'])
-        sym3_rows = torsion_meta['sym3_rows']
-        center_ids = torsion_meta['sym3_center_ids']
-        
-        phases = np.zeros(n_sym3, dtype=np.float64)
-        if sym3_rows.size == 0:
-         return phases
-
-        theta = dist_org[sym3_rows]  # radians
-
-        # Fold threefold symmetry into the phase average
-        exp_3theta = np.exp(1j * 3.0 * theta)
-
-        z_real = np.bincount(center_ids, weights=exp_3theta.real, minlength=n_sym3)
-        z_imag = np.bincount(center_ids, weights=exp_3theta.imag, minlength=n_sym3)
-        counts = np.bincount(center_ids, minlength=n_sym3)
-
-        z_real /= np.maximum(counts, 1)
-        z_imag /= np.maximum(counts, 1)
-
-        phases_3 = np.arctan2(z_imag, z_real)
-        phases = phases_3 / 3.0
-
-        ncart = b_matrix.shape[1]
-
-        n_sym3 = len(torsion_meta['sym3_keys'])
-        sum_sym_3_dihedral_cos = np.zeros(n_sym3, dtype=np.float64)
-        sum_sym_3_dihedral_prime_cos = np.zeros((n_sym3, ncart), dtype=np.float64)
-
-        sym3_rows = torsion_meta['sym3_rows']
-        if sym3_rows.size > 0:
-            theta3 = dist_org[sym3_rows]
-
-            dist_correlation[sym3_rows] = 0.0
-
-            cos_terms = 2.0 * (1.0 - np.cos(theta3))
-            sin_terms = 2.0 * np.sin(theta3)
-            center_ids = torsion_meta['sym3_center_ids']
-
-            sum_sym_3_dihedral_cos += np.bincount(
-                center_ids, weights=cos_terms, minlength=n_sym3)
-                
-
-            sin_b = sin_terms[:, None] * b_matrix[sym3_rows, :]
-            np.add.at(sum_sym_3_dihedral_prime_cos, center_ids, sin_b)
-
-        return (
-                sum_sym_3_dihedral_cos,
-                sum_sym_3_dihedral_prime_cos)
-
-    def _compute_collective_methyl_phases_sym3(self, int_coords, torsion_meta, s=0):
-        """
-        Compute one threefold-symmetry-adapted phase per methyl center.
-        int_coords must contain absolute torsion values in radians.
-        """
-        sym3_rows = torsion_meta['sym3_rows']
-        center_ids = torsion_meta['sym3_center_ids']
-        n_sym3 = len(torsion_meta['sym3_keys'])
-
-        phases = np.zeros(n_sym3, dtype=np.float64)
-
-        if sym3_rows.size == 0:
-            return phases
-
-        theta = int_coords[sym3_rows]
-
-        exp_3theta = np.exp(1j * theta)
-
-        z_real = np.bincount(center_ids, weights=exp_3theta.real, minlength=n_sym3)
-        z_imag = np.bincount(center_ids, weights=exp_3theta.imag, minlength=n_sym3)
-        counts = np.bincount(center_ids, minlength=n_sym3)
-
-        z_real /= np.maximum(counts, 1)
-        z_imag /= np.maximum(counts, 1)
-
-        phases_3 = np.arctan2(z_imag, z_real)
-        phases = phases_3 + (2.0 * np.pi / 3.0) * s
-        return phases
-
-    def _build_grouped_symmetry_signatures(self, int_coords, torsion_meta):
-        """
-        Build one torsion signature block per methyl rotor.
-
-        Parameters
-        ----------
-        int_coords : np.ndarray
-            Absolute internal coordinates in radians.
-        torsion_meta : dict
-            Must contain:
-            - 'sym3_rows'
-            - 'sym3_center_ids'
-            - 'sym3_keys'
-
-        Returns
-        -------
-        grouped : list[np.ndarray]
-            grouped[r] is the torsion signature block for methyl rotor r.
-        """
-        sym3_rows = torsion_meta['sym3_rows']
-        center_ids = torsion_meta['sym3_center_ids']
-        n_sym3 = len(torsion_meta['sym3_keys'])
-
-        grouped = []
-        for rid in range(n_sym3):
-            rows_r = sym3_rows[center_ids == rid]
-            grouped.append(np.asarray(int_coords[rows_r], dtype=np.float64).copy())
-
-        return grouped
-    
-    def _build_grouped_symmetry_brows(self, torsion_meta):
-        sym3_rows = torsion_meta['sym3_rows']
-        center_ids = torsion_meta['sym3_center_ids']
-        n_sym3 = len(torsion_meta['sym3_keys'])
-
-        grouped = []
-        for rid in range(n_sym3):
-            rows_r = sym3_rows[center_ids == rid]
-            grouped.append(self.impes_coordinate.b_matrix[rows_r, :].copy())
-
-        return grouped
-    
-    def _grouped_signature_distance_and_gradient(
-        self,
-        grouped_current,
-        grouped_candidate,
-        grouped_brows,
-        rotor_weights=None
-    ):
-        """
-        Returns
-        -------
-        d2_total : float
-            Weighted grouped signature distance.
-        grad_d2 : np.ndarray, shape (ncart,)
-            Cartesian gradient of d2_total.
-        """
-        n_rotors = len(grouped_current)
-        ncart = grouped_brows[0].shape[1] if n_rotors > 0 else self.impes_coordinate.b_matrix.shape[1]
-
-        if rotor_weights is None:
-            rotor_weights = np.ones(n_rotors, dtype=np.float64)
-
-        d2_total = 0.0
-        grad_total = np.zeros(ncart, dtype=np.float64)
-        w_total = 0.0
-
-        for rid in range(n_rotors):
-            sig_c = grouped_current[rid]
-            sig_r = grouped_candidate[rid]
-            brows = grouped_brows[rid]   # shape (m_r, ncart)
-
-            delta = sig_c - sig_r
-            terms = 2.0 * (1.0 - np.cos(delta))
-            d2_r = np.mean(terms)
-
-            grad_terms = 2.0 * np.sin(delta)[:, None] * brows
-            grad_r = np.mean(grad_terms, axis=0)
-
-            wr = rotor_weights[rid]
-            d2_total += wr * d2_r
-            grad_total += wr * grad_r
-            w_total += wr
-        
-        d2_total /= max(w_total, 1e-12)
-        grad_total /= max(w_total, 1e-12)
-
-        return d2_total, grad_total
-    
-    def _signature_inverse_weight_and_gradient(
-        self,
-        d2,
-        grad_d2,
-        confidence_radius=1.5,
-        power=2,
-        eps=1e-12
-    ):
-        """
-        Raw inverse-distance-like weight and its gradient.
-        """
-        rho2 = max(confidence_radius**2, eps)
-        x = d2 / rho2 + eps
-
-        w = 1.0 / (2.0 * (x ** power))
-        dw_dd2 = -(power / (2.0 * rho2)) * (x ** (-(power + 1)))
-
-        grad_w = dw_dd2 * grad_d2
-        return w, grad_w
-    
-    def _normalized_signature_weights(self, d2_array, confidence_radius=1.0, power=1,
-                                  eps=1e-12, exact_tol=1e-10):
-        """
-        Shepard-like normalized inverse-distance weights.
-        """
-        d2_array = np.asarray(d2_array, dtype=np.float64)
-        idx_best = int(np.argmin(d2_array))
-        d2_min = d2_array[idx_best]
-
-        if d2_min < exact_tol:
-            w = np.zeros_like(d2_array)
-            w[idx_best] = 1.0
-            return w
-
-        x = d2_array / max(confidence_radius**2, eps)
-        raw = 1.0 / ((x + eps) ** power + (x + eps) ** power)
-
-        S = raw.sum()
-        if S < eps:
-            w = np.zeros_like(raw)
-            w[idx_best] = 1.0
-            return w
-
-        return raw / S
-    
-    def _compute_two_rotor_phase_distance(self, current_phases, reference_phases, rotor_weights=None):
-        """
-        current_phases:   shape (2,)
-        reference_phases: shape (2,)
-        rotor_weights:    optional shape (2,)
-        """
-        delta = current_phases - reference_phases   # shape (2,)
-        mism = 2.0 * (1.0 - np.cos(delta))                   # shape (2,)
-
-        
-        
-        if rotor_weights is not None:
-            return np.sum(rotor_weights * mism)
-        
-        if np.sum(mism) == 0.0:
-            return 1e-8
-        return np.sum(mism)
-    
-    def _candidate_current_chart(self, symmetry_data_point, mask, org_int_coords, b_matrix, base_cache=None):
-        """
-        Return candidate-local current chart (org_int_coords, B).
-        masked_exact  -> candidate-local eq masking (exact).
-        symmetrized   -> global chart reuse (fast).
-        """
-        org = np.asarray(org_int_coords, dtype=np.float64)
-        bmat = np.asarray(b_matrix, dtype=np.float64)
-
-        if not self.impes_coordinate.use_eq_bond_length:
-            return org, bmat
-
-        mode = self._get_eq_symmetry_mode()
-        if mode == 'symmetrized':
-            return org, bmat
-
-        eq_ref = getattr(symmetry_data_point, 'eq_bond_lengths', None)
-        assert_msg_critical(
-            eq_ref is not None,
-            f"InterpolationDriver: missing eq_bond_lengths for symmetry_data_point "
-            f"{getattr(symmetry_data_point, 'point_label', None)}."
-        )
-
-        if base_cache is not None:
-            return self.impes_coordinate.build_masked_current_chart_from_reference_eq_fast(
-                reference_eq_bond_lengths=eq_ref,
-                mask=mask,
-                base_cache=base_cache,
-            )
-
-        # Safe fallback if cache was not prepared.
-        return self.impes_coordinate.build_masked_current_chart_from_reference_eq(
-            reference_eq_bond_lengths=eq_ref,
-            mask=mask,
-        )
-    
-    def _evaluate_candidate_taylor(
-            self,
-            *,
-            energy: float,
-            grad: np.ndarray,
-            hess: np.ndarray,
-            ref_coords: np.ndarray,
-            mask0: np.ndarray,
-            mask: np.ndarray,
-            org_int_coords: np.ndarray,
-            b_matrix: np.ndarray,
-            use_cosine_dihedral: bool,
-            dihedral_start: int,
-            dihedral_end: int) -> Tuple[float, np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Evaluates one masked Taylor candidate in a parity-safe way shared by
-        serial and MPI preload paths.
-        """
-        grad_eff = np.asarray(grad, dtype=np.float64).copy()
-        hess_eff = np.asarray(hess, dtype=np.float64).copy()
-        ref = np.asarray(ref_coords, dtype=np.float64)
-        mask0_arr = np.asarray(mask0, dtype=np.int64)
-        mask_arr = np.asarray(mask, dtype=np.int64)
-        org = np.asarray(org_int_coords, dtype=np.float64)
-        bmat = np.asarray(b_matrix, dtype=np.float64)
-
-        grad_eff[mask0_arr] = grad_eff[mask_arr]
-        hess_eff[np.ix_(mask0_arr, mask0_arr)] = hess_eff[np.ix_(mask_arr, mask_arr)]
-
-        dist_org = org - ref[mask_arr]
-        dist_check = dist_org.copy()
-        if not use_cosine_dihedral:
-            dist_check[dihedral_start:dihedral_end] = np.sin(
-                dist_org[dihedral_start:dihedral_end])
-
-        dist_correlation = dist_check.copy()
-
-        U_i = float(
-            energy
-            + dist_check @ grad_eff
-            + 0.5 * np.linalg.multi_dot([dist_check, hess_eff, dist_check])
-        )
-
-        dist_hess = dist_check @ hess_eff
-        if not use_cosine_dihedral:
-            c = np.cos(dist_org[dihedral_start:dihedral_end])
-            grad_eff[dihedral_start:dihedral_end] *= c
-            dist_hess[dihedral_start:dihedral_end] *= c
-
-        natm = bmat.shape[1] // 3
-        dU_i = (bmat.T @ (grad_eff + dist_hess)).reshape(natm, 3)
-
-        return U_i, dU_i, dist_org, dist_correlation
-
     def compute_potential(self, data_point, org_int_coords):
         """Calculates the potential energy surface at self.impes_coordinate
            based on the energy, gradient and Hessian of data_point.
@@ -2038,197 +663,41 @@ class InterpolationDriver():
            :param data_point:
                 InterpolationDatapoint object.
         """
-        
-        clustered_out = self._compute_potential_clustered(data_point, org_int_coords)
-        if clustered_out is not None:
-            return clustered_out
-        
 
         pes = 0.0
-        gradient = None
         natm = data_point.cartesian_coordinates.shape[0]
         # print(len(self.qm_symmetry_data_points))
-        dp_label = data_point.point_label 
         
-        symmetry_data_points = (self.qm_symmetry_data_points or {}).get(dp_label, [])
-        use_symmetry_branch = (len(symmetry_data_points) > 1)
         bounds = self._get_internal_coordinate_partitions()
         bond_end = int(bounds['bond_end'])
         angle_end = int(bounds['angle_end'])
         dihedral_start = int(bounds['dihedral_start'])
         dihedral_end = int(bounds['dihedral_end'])
 
-        symmetry_task_entries = ()
-        if use_symmetry_branch:
-            symmetry_task_entries = self._get_symmetry_task_entries(dp_label)
-            use_symmetry_branch = len(symmetry_task_entries) > 0
+        energy = data_point.energy
+        grad = data_point.internal_gradient.copy()
+        hessian = data_point.internal_hessian.copy()
+        dist_org = (org_int_coords.copy() - data_point.internal_coordinates_values)
+        dist_check = (org_int_coords.copy() - data_point.internal_coordinates_values)
+        if not self.use_cosine_dihedral:
+            dist_check[dihedral_start:dihedral_end] = np.sin(dist_org[dihedral_start:dihedral_end])
+        self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:bond_end])**2))))
+        self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[bond_end:angle_end]**2))))
+        self.dihedral_rmsd.append(np.sqrt(np.mean(np.sum(dist_check[dihedral_start:dihedral_end]**2))))
+        pes = (
+            energy
+            + np.matmul(dist_check.T, grad)
+            + 0.5 * np.linalg.multi_dot([dist_check.T, hessian, dist_check])
+        )
 
-        if use_symmetry_branch:
-
-            potentials = []
-            pot_gradients = []
-            hessian_error = []
-
-            torsion_meta = self._get_symmetry_torsion_meta()
-            b_matrix = self.impes_coordinate.b_matrix
-
-            eq_mode = None
-            candidate_base_cache = None
-            if self.impes_coordinate.use_eq_bond_length:
-                eq_mode = self._get_eq_symmetry_mode()
-                if eq_mode == 'masked_exact':
-                    candidate_base_cache = self.impes_coordinate.prepare_eq_candidate_base_cache()
-
-            current_grouped = self._build_grouped_symmetry_signatures(org_int_coords.copy(), torsion_meta)
-            grouped_brows = self._build_grouped_symmetry_brows(torsion_meta)
+        dist_hessian_eff = np.matmul(dist_check.T, hessian)
+        if not self.use_cosine_dihedral:
+            cos_dist = np.cos(dist_org[dihedral_start:dihedral_end])
+            grad[dihedral_start:dihedral_end] *= cos_dist
+            dist_hessian_eff[dihedral_start:dihedral_end] *= cos_dist
+        pes_prime = np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian_eff)).reshape(natm, 3)
+        return pes, pes_prime, (grad + dist_hessian_eff)
             
-            cand_grouped_signitures = []
-            candidate_labels = []
-  
-
-            # reset diagnostics if needed
-            self.bond_rmsd = []
-            self.angle_rmsd = []
-            self.dihedral_rmsd = []
-
-            for symmetry_data_point, mask0, mask in symmetry_task_entries:
-                energy = symmetry_data_point.energy
-
-                candidate_full_grouped = self._build_grouped_symmetry_signatures(
-                    symmetry_data_point.internal_coordinates_values[mask],
-                    torsion_meta
-                )
-
-                cand_grouped_signitures.append(candidate_full_grouped)
-                candidate_labels.append((symmetry_data_point.point_label, tuple(mask)))
-
-                org_eval_i, b_eval_i = self._candidate_current_chart(
-                    symmetry_data_point=symmetry_data_point,
-                    mask=mask,
-                    org_int_coords=org_int_coords,
-                    b_matrix=b_matrix,
-                    base_cache=candidate_base_cache,
-                )
-                
-                pes_i, pes_prime_i, dist_org, dist_correlation = self._evaluate_candidate_taylor(
-                    energy=energy,
-                    grad=symmetry_data_point.internal_gradient,
-                    hess=symmetry_data_point.internal_hessian,
-                    ref_coords=symmetry_data_point.internal_coordinates_values,
-                    mask0=mask0,
-                    mask=mask,
-                    org_int_coords=org_eval_i,
-                    b_matrix=b_eval_i,
-                    use_cosine_dihedral=bool(self.use_cosine_dihedral),
-                    dihedral_start=dihedral_start,
-                    dihedral_end=dihedral_end,
-                )
-
-                self.bond_rmsd.append(
-                    np.sqrt(np.mean(np.sum((dist_org[:bond_end])**2)))
-                )
-                self.angle_rmsd.append(
-                    np.sqrt(np.mean(np.sum(dist_org[bond_end:angle_end]**2)))
-                )
-                self.dihedral_rmsd.append(
-                    np.sqrt(np.mean(np.sum(dist_correlation[dihedral_start:dihedral_end]**2)))
-                )
-
-                potentials.append(pes_i)
-                pot_gradients.append(pes_prime_i)
-
-            raw_w = []
-            raw_grad_w = []
-
-            for cand_grouped in cand_grouped_signitures:
-                d2_i, grad_d2_i = self._grouped_signature_distance_and_gradient(
-                    current_grouped,
-                    cand_grouped,
-                    grouped_brows
-                )
-        
-                w_i, grad_w_i = self._signature_inverse_weight_and_gradient(
-                    d2_i,
-                    grad_d2_i,
-                    confidence_radius=1.0,
-                    power=2,
-                    eps=1e-12
-                )
-
-                raw_w.append(w_i)
-                raw_grad_w.append(grad_w_i.reshape(natm, 3))
-
-            w_i_sig = np.asarray(raw_w, dtype=np.float64)
-            grad_w_i_sig = np.asarray(raw_grad_w, dtype=np.float64)
-
-            S_sig = w_i_sig.sum()
-            sum_grad_w_sig = grad_w_i_sig.sum(axis=0)
-
-            W_i_sig = w_i_sig / S_sig
-            grad_W_i_sig = (grad_w_i_sig * S_sig - w_i_sig[:, None, None] * sum_grad_w_sig) / (S_sig**2)
-
-            U_i = np.asarray(potentials, dtype=np.float64)
-            grad_U_i = np.asarray(pot_gradients, dtype=np.float64)
-
-            pes = np.dot(W_i_sig, U_i)
-
-            grad_pes = (
-                np.tensordot(W_i_sig, grad_U_i, axes=1)
-                + np.tensordot(U_i, grad_W_i_sig, axes=1)
-            )
-
-            gradient = grad_pes
-
-            return pes, gradient, hessian_error
-
-        else:
-            hessian_error = 0.0
-            energy = data_point.energy
-            grad = data_point.internal_gradient.copy()
-            hessian = data_point.internal_hessian.copy()
-            dist_org = (org_int_coords.copy() - data_point.internal_coordinates_values)
-            dist_check = (org_int_coords.copy() - data_point.internal_coordinates_values)
-
-            if not self.use_cosine_dihedral:
-                dist_check[dihedral_start:dihedral_end] = np.sin(dist_org[dihedral_start:dihedral_end])
-
-            self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:bond_end])**2))))
-            self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[bond_end:angle_end]**2))))
-            self.dihedral_rmsd.append(np.sqrt(np.mean(np.sum(dist_check[dihedral_start:dihedral_end]**2))))
-
-            pes = (
-                energy
-                + np.matmul(dist_check.T, grad)
-                + 0.5 * np.linalg.multi_dot([dist_check.T, hessian, dist_check])
-            )
-  
-            dist_hessian_eff = np.matmul(dist_check.T, hessian)
-
-            if not self.use_cosine_dihedral:
-                cos_dist = np.cos(dist_org[dihedral_start:dihedral_end])
-                grad[dihedral_start:dihedral_end] *= cos_dist
-                dist_hessian_eff[dihedral_start:dihedral_end] *= cos_dist
-
-            pes_prime = np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian_eff)).reshape(natm, 3)
-
-            return pes, pes_prime, (grad + dist_hessian_eff)
-            
-
-    def simple_weight_gradient(self, distance_vector, distance):
-        """ Returns the derivative of an unormalized simple interpolation
-            weight with respect to the Cartesian coordinates in
-            self.impes_coordinate
-
-            :param distance_vector:
-                The Cartesian distance vector between
-                the current data_point and self.impes_coordinate.
-            :param distance:
-                The norm of the distance vector * sqrt(N), N number of atoms.
-        """
-        weight_gradient = (-2 * self.exponent_p * distance_vector /
-                           (distance**(2 * self.exponent_p + 2)))
-
-        return weight_gradient
 
     def trust_radius_weight_gradient(self, confidence_radius, distance):
         
@@ -2992,69 +1461,6 @@ z
             )
         )
 
-        # for anchor_idx in candidate_anchor_indices:
-        #     anchor_coord = tuple(int(x) for x in coords_flat[anchor_idx])
-
-        #     if anchor_coord in constraints_to_exclude:
-        #         continue
-
-        #     if (
-        #         kinds_flat[anchor_idx] == "dihedral"
-        #         and tuple(anchor_coord[1:3]) in self._get_symmetric_dihedral_centers(self.symmetry_information)
-        #     ):
-        #         continue
-
-        #     block_indices = self._build_candidate_block(
-        #         anchor_idx=anchor_idx,
-        #         global_coord_score=global_coord_score,
-        #         global_pair=global_pair,
-        #         z_matrix=coords_flat,
-        #         coord_kinds=kinds_flat,
-        #         constraints_to_exclude=constraints_to_exclude,
-        #         max_partners=max_block_partners,
-        #         min_partner_pair_frac=min_partner_pair_frac,
-        #         min_partner_coord_frac=min_partner_coord_frac,
-        #     )
-
-        #     key = tuple(sorted(block_indices))
-        #     if key in seen_blocks:
-        #         continue
-        #     seen_blocks.add(key)
-
-        #     coord_mass = float(np.sum(global_coord_score[block_indices]))
-        #     support_mass = float(np.mean(global_support[block_indices])) if block_indices else 0.0
-
-        #     pair_mass = 0.0
-        #     for a in range(len(block_indices)):
-        #         for b in range(a + 1, len(block_indices)):
-        #             i = block_indices[a]
-        #             j = block_indices[b]
-        #             pair_mass += global_pair[i, j]
-
-        #     acq_score = coord_mass + pair_weight * pair_mass + support_weight * support_mass
-
-        #     block_coords = [tuple(int(x) for x in coords_flat[i]) for i in block_indices]
-        #     block_types = [kinds_flat[i] for i in block_indices]
-
-        #     ranked_blocks.append({
-        #         "anchor_idx": int(anchor_idx),
-        #         "anchor_coord": anchor_coord,
-        #         "anchor_type": kinds_flat[anchor_idx],
-        #         "block_indices": [int(i) for i in block_indices],
-        #         "block_coords": block_coords,
-        #         "block_types": block_types,
-        #         "coord_mass": float(coord_mass),
-        #         "pair_mass": float(pair_mass),
-        #         "support_mass": float(support_mass),
-        #         "acq_score": float(acq_score),
-        #     })
-
-        # ranked_blocks = sorted(ranked_blocks, key=lambda x: x["acq_score"], reverse=True)
-
-        # if not ranked_blocks:
-        #     return [], [], []
-
-        # best_block = ranked_blocks[0]
         ranked_blocks = []
         seen_blocks = set()
 
@@ -3084,7 +1490,6 @@ z
                 int(i) for i in component
                 if not (
                     kinds_flat[i] == "dihedral"
-                    and tuple(coords_flat[i][1:3]) in self._get_symmetric_dihedral_centers(self.symmetry_information)
                 )
             ]
 
@@ -3192,7 +1597,6 @@ z
             global_response_score=global_response,
             global_pair=global_pair,
             z_matrix=coords_flat,
-            coord_kinds=kinds_flat,
             max_constraints=max_constraints_to_return,
             singleton_dominance=singleton_dominance,
             singleton_source_frac=singleton_source_frac,
@@ -3248,10 +1652,8 @@ z
 
         return primary_constraint, candidate_constraints, best_block["block_coords"]
 
-
-    # ======================================================================
     # Helper methods
-    # ======================================================================
+
     def _robust_positive_threshold(
         self,
         values: np.ndarray,
@@ -3293,7 +1695,6 @@ z
 
         if (
             kinds_flat[idx] == "dihedral"
-            and tuple(coord[1:3]) in self._get_symmetric_dihedral_centers(self.symmetry_information)
         ):
             return True
 
@@ -3484,16 +1885,6 @@ z
         return coords, kinds
 
 
-    def _get_symmetric_dihedral_centers(self, symmetry_information) -> set:
-        """
-        Return central atom pairs of torsions that should be symmetry-excluded.
-        """
-        try:
-            return set(tuple(int(y) for y in x) for x in symmetry_information[7][3])
-        except Exception:
-            return set()
-
-
     def _normalize_nonnegative(self, x: np.ndarray, eps: float = 1e-12) -> np.ndarray:
         x = np.asarray(x, dtype=float)
         x = np.maximum(x, 0.0)
@@ -3567,15 +1958,8 @@ z
         dq_eff = np.zeros(N, dtype=float)
         chain = np.ones(N, dtype=float)
 
-        sym_torsion_centers = self._get_symmetric_dihedral_centers(symmetry_information)
-
         for idx, (coord, kind) in enumerate(zip(coords_flat, kinds_flat)):
             if kind == "dihedral":
-                if tuple(coord[1:3]) in sym_torsion_centers:
-                    dq_raw[idx] = 0.0
-                    dq_eff[idx] = 0.0
-                    chain[idx] = 0.0
-                    continue
 
                 d = self._principal_torsion_delta(q_current[idx] - q_ref[idx])
                 dq_raw[idx] = d
@@ -3859,19 +2243,15 @@ z
         if H.shape != (N, N):
             raise ValueError("H has wrong shape")
 
-        sym_torsion_centers = self._get_symmetric_dihedral_centers(self.symmetry_information)
 
         dq_eff = np.zeros(N, dtype=float)
         chain = np.ones(N, dtype=float)
 
         for idx, (coord, kind) in enumerate(zip(coords_flat, kinds_flat)):
             if kind == "dihedral":
-                if tuple(coord[1:3]) in sym_torsion_centers:
-                    dq_eff[idx] = 0.0
-                    chain[idx] = 0.0
-                else:
-                    dq_eff[idx] = np.sin(dq_raw[idx])
-                    chain[idx] = np.cos(dq_raw[idx])
+
+                dq_eff[idx] = np.sin(dq_raw[idx])
+                chain[idx] = np.cos(dq_raw[idx])
 
             elif kind == "improper":
                 dq_eff[idx] = dq_raw[idx]
@@ -4029,7 +2409,6 @@ z
             return block
 
         anchor_atoms = set(z_matrix[anchor_idx])
-        sym_torsion_centers = self._get_symmetric_dihedral_centers(self.symmetry_information)
 
         candidates = []
         for j in range(N):
@@ -4039,9 +2418,6 @@ z
             coord_j = tuple(int(x) for x in z_matrix[j])
 
             if coord_j in constraints_to_exclude:
-                continue
-
-            if coord_kinds[j] == "dihedral" and tuple(coord_j[1:3]) in sym_torsion_centers:
                 continue
 
             pair_ok = pair_row[j] >= min_partner_pair_frac * best_pair
@@ -4076,7 +2452,6 @@ z
         global_response_score: np.ndarray,
         global_pair: np.ndarray,
         z_matrix: List[Tuple[int, ...]],
-        coord_kinds: List[str],
         max_constraints: int = 3,
         singleton_dominance: float = 1.35,
         singleton_source_frac: float = 0.85,
@@ -4269,28 +2644,28 @@ z
         return self.impes_coordinate.gradient
     
 
-    def perform_symmetry_assignment(self, atom_map, sym_group, reference_group, datapoint_group):
-        """ Performs the atom mapping. """
+    # def perform_symmetry_assignment(self, atom_map, sym_group, reference_group, datapoint_group):
+    #     """ Performs the atom mapping. """
 
-        new_map = atom_map.copy()
-        mapping_dict = {}
-        # cost = self.get_dihedral_cost(atom_map, sym_group, non_group_atoms)
-        cost = np.linalg.norm(datapoint_group[:, np.newaxis, :] - reference_group[np.newaxis, :, :], axis=2)
-        row, col = linear_sum_assignment(cost)
-        assigned = False
-        print('row col', row, col)
-        if not np.equal(row, col).all():
-            assigned = True
+    #     new_map = atom_map.copy()
+    #     mapping_dict = {}
+    #     # cost = self.get_dihedral_cost(atom_map, sym_group, non_group_atoms)
+    #     cost = np.linalg.norm(datapoint_group[:, np.newaxis, :] - reference_group[np.newaxis, :, :], axis=2)
+    #     row, col = linear_sum_assignment(cost)
+    #     assigned = False
+    #     print('row col', row, col)
+    #     if not np.equal(row, col).all():
+    #         assigned = True
             
-            # atom_maps = self.linear_assignment_solver(cost)
-            reordred_arr = np.array(sym_group)[col]
-            new_map[sym_group] = new_map[reordred_arr]
+    #         # atom_maps = self.linear_assignment_solver(cost)
+    #         reordred_arr = np.array(sym_group)[col]
+    #         new_map[sym_group] = new_map[reordred_arr]
 
-            for org, new in zip(np.array(sym_group), reordred_arr):
-                print('org, neww', org, new)
-            mapping_dict = {org: new for org, new in zip(np.array(sym_group), reordred_arr)}
+    #         for org, new in zip(np.array(sym_group), reordred_arr):
+    #             print('org, neww', org, new)
+    #         mapping_dict = {org: new for org, new in zip(np.array(sym_group), reordred_arr)}
         
-        return [new_map], mapping_dict, assigned
+    #     return [new_map], mapping_dict, assigned
 
     def compute_internal_coordinates_values(self, coordinates):
         """
@@ -4330,58 +2705,4 @@ z
         X = np.array(int_coords)
 
         return X
-    
-    def compute_ic_and_groups(self, coordinates):
-        """
-        Returns:
-        X : np.ndarray shape (D,) feature vector
-        groups : dict[str, np.ndarray] index arrays for feature groups
-                keys: 'bond', 'angle', 'torsion' (torsion contains both sin/cos indices)
-        types : list[str] parallel to features, e.g. 'bond','angle','torsion_sin','torsion_cos'
-        """
-        cart = np.asarray(coordinates, dtype=np.float64)
-        n_atoms = cart.shape[0]
-        coords = cart.reshape(n_atoms * 3)
-
-        # Build geometric objects only once
-        internal_coordinates = []
-        for z in self.z_matrix:
-            if len(z) == 2:
-                internal_coordinates.append(('bond',     geometric.internal.Distance(*z)))
-            elif len(z) == 3:
-                internal_coordinates.append(('angle',    geometric.internal.Angle(*z)))
-            elif len(z) == 4:
-                internal_coordinates.append(('torsion',  geometric.internal.Dihedral(*z)))
-            else:
-                assert_msg_critical(False, 'Invalid entry size in Z-matrix.')
-
-        X = []
-        types = []
-        bond_idx, angle_idx, torsion_idx = [], [], []
-        k = 0
-
-        for kind, q in internal_coordinates:
-            val = q.value(coords)  # distances in Å, angles/torsions in rad (assuming)
-
-            if kind == 'bond':
-                # choose ONE: r or 1/r or log r ; avoid 1/r if you expect very short bonds
-                feat = 1.0 / val                                # or: feat = val; or feat = np.log(val)
-                X.append(feat); types.append('bond'); bond_idx.append(k); k += 1
-
-            elif kind == 'angle':
-                X.append(val); types.append('angle'); angle_idx.append(k); k += 1
-
-            elif kind == 'torsion':
-                # continuous encoding: add *two* features that should share a lengthscale
-                X.append(np.sin(val)); types.append('torsion_sin'); torsion_idx.append(k); k += 1
-                X.append(np.cos(val)); types.append('torsion_cos'); torsion_idx.append(k); k += 1
-
-        X = np.asarray(X, dtype=np.float64)
-
-        groups = {
-            'bond':    np.asarray(bond_idx, dtype=int),
-            'angle':   np.asarray(angle_idx, dtype=int),
-            'torsion': np.asarray(torsion_idx, dtype=int),  # includes both sin & cos indices
-        }
-        return X, groups, types
     

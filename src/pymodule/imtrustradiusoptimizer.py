@@ -61,25 +61,17 @@ from concurrent.futures import ProcessPoolExecutor
 # ---- global worker state (created once per process) ----
 _W = {}
 
-def _init_worker(z_matrix, impes_dict, sym_dict, sym_datapoints, cluster_banks, dps, idx, exponent_p_q, beta, e_x, structures, qm_e, qm_g_flat):
+def _init_worker(z_matrix, impes_dict, sym_dict, cluster_banks, dps, idx, exponent_p_q, beta, e_x, structures, qm_e, qm_g_flat):
     """Runs once per process. Build a private driver & static constants."""
     # Avoid oversubscription when each process calls BLAS:
     os.environ["OMP_NUM_THREADS"] = "1"
     os.environ["MKL_NUM_THREADS"] = "1"
-    os.environ["OPENBLAS_NUM_THREADS"] = "1"
     
     driver = InterpolationDriver(z_matrix)
     driver.update_settings(impes_dict)
     driver.symmetry_information = sym_dict
-    driver.qm_symmetry_data_points = sym_datapoints
-    driver.qm_rotor_cluster_banks = cluster_banks or {}
-    if driver.qm_rotor_cluster_banks:
-        first_family = next(iter(driver.qm_rotor_cluster_banks.values()))
-        driver.rotor_cluster_information = first_family.get("cluster_info")
-    else:
-        driver.rotor_cluster_information = None
+
     driver.impes_coordinate.inv_sqrt_masses = dps[0].inv_sqrt_masses
-    driver.impes_coordinate.eq_bond_lengths = dps[0].eq_bond_lengths
 
     driver.exponent_p = exponent_p_q[0]
     driver.exponent_q = exponent_p_q[1]
@@ -180,11 +172,10 @@ def _eval_structure(payload):
 
 
 class IMTrustRadiusOptimizer:
-    def __init__(self, z_matrix, impes_dict, sym_dict, sym_datapoints, dps, structure_list, qm_e, qm_g, exponent_p_q, e_x, beta=0.8, n_workers=None, verbose=False, cluster_banks=None):
+    def __init__(self, z_matrix, impes_dict, sym_dict, dps, structure_list, qm_e, qm_g, exponent_p_q, e_x, beta=0.8, verbose=False, cluster_banks=None):
         self.z_matrix       = z_matrix
         self.impes_dict     = impes_dict
         self.sym_dict       = sym_dict
-        self.sym_datapoints = sym_datapoints
         self.dps            = dps
         self.structures     = structure_list
         self.qm_e           = np.asarray(qm_e, dtype=np.float64)
@@ -202,17 +193,19 @@ class IMTrustRadiusOptimizer:
         
         os.environ["OMP_NUM_THREADS"] = "1"
         os.environ["MKL_NUM_THREADS"] = "1"
-        os.environ["OPENBLAS_NUM_THREADS"] = "1"
-        os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
-        self._pool = ProcessPoolExecutor(
-            max_workers=(n_workers or os.cpu_count() or 2),
-            initializer=_init_worker,
-            initargs=(
-                z_matrix, impes_dict, sym_dict, sym_datapoints, self.cluster_banks,
-                dps, self.idx, exponent_p_q, self.beta, self.e_x,
-                self.structures, self.qm_e, self.qm_g_flat,
-            )
+        # self._pool = ProcessPoolExecutor(
+        #     max_workers=(n_workers or os.cpu_count() or 2),
+        #     initializer=_init_worker,
+        #     initargs=(
+        #         z_matrix, impes_dict, sym_dict, self.cluster_banks,
+        #         dps, self.idx, exponent_p_q, self.beta, self.e_x,
+        #         self.structures, self.qm_e, self.qm_g_flat,
+        #     )
+        _init_worker(
+            z_matrix, impes_dict, sym_dict, self.cluster_banks,
+            dps, self.idx, exponent_p_q, self.beta, self.e_x,
+            self.structures, self.qm_e, self.qm_g_flat,
         )
 
         self._cache_key = None
@@ -235,10 +228,12 @@ class IMTrustRadiusOptimizer:
         if not np.all(np.isfinite(alphas_arr)):
             raise ValueError("AlphaOptimizer.fun received non-finite alpha values")
 
-        payloads = [(i, alphas_arr) for i in range(self.S)]
+        # payloads = [(i, alphas_arr) for i in range(self.S)]
 
-        chunksize = max(1, math.ceil(self.S / (4 * self._pool._max_workers)))
-        futs = self._pool.map(_eval_structure, payloads, chunksize=chunksize)
+        # chunksize = max(1, math.ceil(self.S / (4 * self._pool._max_workers)))
+        # futs = self._pool.map(_eval_structure, payloads, chunksize=chunksize)
+        futs = (_eval_structure((i, alphas_arr)) for i in range(self.S))
+ 
 
         sum_loss = 0.0
         sum_grad = np.zeros(self.M, dtype=np.float64)
@@ -400,7 +395,8 @@ class IMTrustRadiusOptimizer:
 
     def close(self):
         if not self._closed:
-            self._pool.shutdown(wait=True)
+            # self._pool.shutdown(wait=True)
+            _W.clear()
             self._closed = True
 
     def __del__(self):
