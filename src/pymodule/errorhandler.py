@@ -31,7 +31,13 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
-from sys import stderr
+import sys
+
+
+class VeloxChemError(RuntimeError):
+    """
+    Exception raised for critical errors in VeloxChem.
+    """
 
 
 def assert_msg_critical(condition, msg=''):
@@ -44,11 +50,14 @@ def assert_msg_critical(condition, msg=''):
     :param msg:
         The error message.
     """
-    if __debug__ and MPI.COMM_WORLD.Get_size() == 1:
-        assert condition, msg
+    if MPI.COMM_WORLD.Get_size() == 1:
+        if not condition:
+            sys.stdout.flush()
+            sys.stderr.flush()
+            raise VeloxChemError(msg)
     else:
         if not condition:
-            stderr.write(' **** Critical Error (process {}) **** {}\n'.format(
+            sys.stderr.write(' **** Critical Error (process {}) **** {}\n'.format(
                 MPI.COMM_WORLD.Get_rank(), msg))
-            stderr.flush()
+            sys.stderr.flush()
             MPI.COMM_WORLD.Abort()

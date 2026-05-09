@@ -32,6 +32,7 @@
 
 from mpi4py import MPI
 from datetime import datetime, timedelta
+import sys
 
 from .veloxchemlib import mpi_master
 from .mpitask import MpiTask
@@ -75,7 +76,7 @@ from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .cli import cli
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, VeloxChemError
 
 
 def select_scf_driver(task, scf_type):
@@ -259,6 +260,19 @@ def updated_dict_with_eri_settings(settings_dict, scf_drv):
 def main():
     """
     Runs VeloxChem with command line arguments.
+    """
+    try:
+        return _main_body()
+    except VeloxChemError as e:
+        sys.stdout.flush()
+        sys.stderr.flush()
+        print(f'\n* VeloxChemError * {e}\n', file=sys.stderr)
+        return 1
+
+
+def _main_body():
+    """
+    Implementation of main.
     """
 
     program_start_time = datetime.now()
