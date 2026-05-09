@@ -552,11 +552,11 @@ class TransitionStateGuesser():
         else:
             pdb_name = f'topology_{getrandbits(32):08x}.pdb'
 
-        # pdb = mmapp.PDBFile.writeFile(
-        #     topology,
-        #     init_pos * mmunit.angstrom,
-        #     pdb_name,
-        # )
+        pdb_not_used = mmapp.PDBFile.writeFile(
+            topology,
+            init_pos * mmunit.angstrom,
+            pdb_name,
+        )
         opm_dyn.pdb = mmapp.PDBFile(pdb_name)
         opm_dyn.system = system
 
