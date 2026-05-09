@@ -587,12 +587,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                 eigvec_full = self.get_full_solution_vector(exc_solutions[s])
 
                 if self.rank == mpi_master():
-                    if self.core_excitation:
-                        n_ov_a = self.num_core_orbitals * (norb - nocc_a)
-                        n_ov_b = self.num_core_orbitals * (norb - nocc_b)
-                    else:
-                        n_ov_a = nocc_a * (norb - nocc_a)
-                        n_ov_b = nocc_b * (norb - nocc_b)
+                    n_ov_a = mo_occ_a.shape[1] * mo_vir_a.shape[1]
+                    n_ov_b = mo_occ_b.shape[1] * mo_vir_b.shape[1]
 
                     eigvec_a = np.hstack((
                         eigvec_full[:n_ov_a],
@@ -1248,12 +1244,21 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
         # Extract 1-based state index from label (e.g. 'S1' -> 1)
         state_index = int(state_label[1:])
 
+        if self.rank == mpi_master():
+            # Get MO coefficients and orbital information
+            nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+            nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
+            (mo_occ_a, mo_occ_b), (mo_vir_a, mo_vir_b) = self._get_mo_occ_and_mo_vir_unrestricted(
+                scf_results, nocc_a, nocc_b)
+
         # Extract eigenvector from rsp_results
         if 'eigenvectors_distributed' in rsp_results:
             eigvec_full = self.get_full_solution_vector(
                 rsp_results['eigenvectors_distributed'][state_index - 1])
             if self.rank == mpi_master():
                 # Split eigenvector into alpha and beta components
+                n_ov_a = mo_occ_a.shape[1] * mo_vir_a.shape[1]
+                n_ov_b = mo_occ_b.shape[1] * mo_vir_b.shape[1]
                 eigvec_a = np.hstack((
                     eigvec_full[:n_ov_a],
                     eigvec_full[n_ov_a + n_ov_b:n_ov_a + n_ov_b + n_ov_a],
@@ -1281,12 +1286,6 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                 eigvec_b = None
 
         if self.rank == mpi_master():
-            # Get MO coefficients and orbital information
-            nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
-            nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
-            (mo_occ_a, mo_occ_b), (mo_vir_a, mo_vir_b) = self._get_mo_occ_and_mo_vir_unrestricted(
-                scf_results, nocc_a, nocc_b)
-
             # Build transition density matrices in MO basis (RPA)
             (z_mat_a, z_mat_b), (y_mat_a, y_mat_b) = self._get_z_mat_and_y_mat_unrestricted(
                 eigvec_a, eigvec_b, nocc_a, nocc_b)
