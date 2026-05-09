@@ -32,7 +32,9 @@
 
 from mpi4py import MPI
 from datetime import datetime, timedelta
+import traceback
 import sys
+import os
 
 from .veloxchemlib import mpi_master
 from .mpitask import MpiTask
@@ -266,7 +268,11 @@ def main():
     except VeloxChemError as e:
         sys.stdout.flush()
         sys.stderr.flush()
-        print(f'\n* VeloxChemError * {e}\n', file=sys.stderr)
+        if os.environ.get("VLX_DEBUG"):
+            traceback.print_exc()
+        else:
+            print(f'\n* VeloxChemError * {e}', file=sys.stderr)
+            print("(set VLX_DEBUG=1 for full traceback)", file=sys.stderr)
         return 1
 
 
