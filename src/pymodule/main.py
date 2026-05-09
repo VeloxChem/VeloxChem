@@ -377,6 +377,11 @@ def _main_body():
         'pe force field', 'vibrational', 'polarizability_gradient'
     ]
 
+    run_scf_only = task_type in [
+        'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
+        'wave function'
+    ]
+
     scf_type = 'restricted'
     if task_type in ['uhf', 'uscf', 'ump2', 'uscf_gradient']:
         scf_type = 'unrestricted'
@@ -434,12 +439,15 @@ def _main_body():
                 density = scf_drv.density
 
                 if not scf_drv.is_converged:
-                    return
+                    return 1
 
                 if (scf_drv.electric_field is not None and
                         task.molecule.get_charge() != 0):
-                    task.finish()
-                    return
+                    if not run_scf_only:
+                        task.ostream.print_warning(
+                            'Charged molecule in electric field: stopping after SCF.')
+                        task.finish()
+                        return 0
 
     # Gradient
 
@@ -717,7 +725,7 @@ def _main_body():
         rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
         if not rsp_prop.is_converged:
-            return
+            return 1
 
         # Calculate the excited-state gradient if requested
 
@@ -881,3 +889,4 @@ def _main_body():
     # All done
 
     task.finish()
+    return 0
