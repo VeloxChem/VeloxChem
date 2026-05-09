@@ -59,7 +59,8 @@ class TestNTO2:
             rsp_drv.restricted_subspace = True
             rsp_drv.num_core_orbitals = 1
             rsp_drv.num_valence_orbitals = 1
-            rsp_drv.num_virtual_orbitals = 2
+            rsp_drv.num_virtual_orbitals = 5
+            rsp_drv.nstates = 8
 
         rsp_drv.filename = fname
         rsp_drv.ostream.mute()
