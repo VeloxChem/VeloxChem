@@ -146,7 +146,16 @@ class TestNTO2:
         if core_excitation and restricted_subspace:
             pytest.skip('Core excitation and restricted subspace are mutually exclusive')
 
-        mol = Molecule.read_smiles('C=C')
+        mol = Molecule.read_xyz_string("""
+        6
+        xyz
+        C      0.00000    0.00000   -0.65808
+        C     -0.00000    0.00000    0.65808
+        H      0.00000    0.91399   -1.22928
+        H      0.00000   -0.91399   -1.22928
+        H     -0.00000    0.91399    1.22928
+        H     -0.00000   -0.91399    1.22928
+        """)
         mol.set_multiplicity(multiplicity)
 
         basis = MolecularBasis.read(mol, 'def2-svp')
