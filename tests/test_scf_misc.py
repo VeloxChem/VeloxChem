@@ -16,6 +16,7 @@ from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.resultsio import read_molecule_and_basis
 from veloxchem.inputparser import unparse_input, read_unparsed_input_from_hdf5
+from veloxchem.errorhandler import VeloxChemError
 
 
 @pytest.mark.solvers
@@ -344,7 +345,7 @@ class TestScfDriverMiscellaneous:
             driver.ri_coulomb = True
             driver.ri_jk = True
 
-        with pytest.raises(AssertionError, match="either ri_coulomb or ri_jk"):
+        with pytest.raises(VeloxChemError, match="either ri_coulomb or ri_jk"):
             self.run_hf_scf(molecule, basis, configure)
 
     def test_grid_level_consistency(self):

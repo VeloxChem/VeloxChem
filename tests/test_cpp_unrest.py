@@ -8,6 +8,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.cppsolverunrest import ComplexResponseUnrestrictedSolver
 from veloxchem.resultsio import read_results
+from veloxchem.errorhandler import VeloxChemError
 
 
 @pytest.mark.solvers
@@ -248,7 +249,7 @@ class TestCppUnrestricted:
         lr_drv.ostream.mute()
         lr_drv.frequencies = [0.10]
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='not implemented for nonlinear'):
             lr_drv.compute(mol, bas, scf_results, v_grad={('x', 0.10): None})
 

@@ -8,6 +8,7 @@ from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.mp2driver import Mp2Driver
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecularorbitals import MolecularOrbitals, molorb
+from veloxchem.errorhandler import VeloxChemError
 
 
 class TestMp2Driver:
@@ -124,6 +125,6 @@ class TestMp2Driver:
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
 
         with pytest.raises(
-                AssertionError,
+                VeloxChemError,
                 match='Alpha occupation numbers must follow Aufbau occupations'):
             mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)

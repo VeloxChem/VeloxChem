@@ -6,6 +6,7 @@ from mpi4py import MPI
 from veloxchem.molecule import Molecule
 from veloxchem.symmetryanalyzer import SymmetryAnalyzer
 from veloxchem.symmetryoperations import ImproperRotation, Rotation
+from veloxchem.errorhandler import VeloxChemError
 
 
 class TestPointGroup:
@@ -479,12 +480,12 @@ class TestPointGroup:
 
         sym_analyzer = SymmetryAnalyzer()
 
-        with pytest.raises(AssertionError, match='Invalid tolerance keyword'):
+        with pytest.raises(VeloxChemError, match='Invalid tolerance keyword'):
             sym_analyzer.identify_pointgroup(self.gen_mol_C2v(),
                                              tolerance='invalid')
 
         sym_analyzer.identify_pointgroup(self.gen_mol_C2v())
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Identity matrix should not be checked'):
             sym_analyzer._check_symmetry_operation(Rotation([1.0, 0.0, 0.0]),
                                                    'C1')

@@ -6,6 +6,7 @@ import pytest
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.mmforcefieldgenerator import MMForceFieldGenerator
+from veloxchem.errorhandler import VeloxChemError
 
 skip_multi_rank_raises = pytest.mark.skipif(
     MPI.COMM_WORLD.Get_size() > 1,
@@ -42,7 +43,7 @@ class TestMMForceFieldGenerator:
         ff_gen = MMForceFieldGenerator()
         ff_gen.ostream.mute()
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='explicit water_model is required'):
             ff_gen.create_topology(water)
 
@@ -368,45 +369,45 @@ class TestMMForceFieldGenerator:
     @skip_multi_rank_raises
     def test_ffgen_canonicalize_helpers_reject_invalid_indices(self):
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='zero-based atom indices must be non-negative'):
             MMForceFieldGenerator._canonicalize_zero_based_bond_key((-1, 2))
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='zero-based atom indices must be non-negative'):
             MMForceFieldGenerator._canonicalize_zero_based_angle_key(
                 [0, -1, 2])
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='zero-based atom indices must be non-negative'):
             MMForceFieldGenerator._canonicalize_zero_based_dihedral_key(
                 (0, 1, 2, -3))
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='atom indices in a bond must be unique'):
             MMForceFieldGenerator._canonicalize_zero_based_bond_key((2, 2))
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='atom indices in an angle must be unique'):
             MMForceFieldGenerator._canonicalize_zero_based_angle_key(
                 (0, 1, 0))
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='atom indices in a dihedral must be unique'):
             MMForceFieldGenerator._canonicalize_zero_based_dihedral_key(
                 (0, 1, 0, 2))
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='one-based atom indices must be greater than 0'):
             MMForceFieldGenerator._to_zero_based_indices((1, 0))
 
         ff_gen = MMForceFieldGenerator()
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='one-based atom indices must be greater than 0'):
             ff_gen.get_bond_params((0, 1))
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='one-based atom indices must be greater than 0'):
             ff_gen.set_angle_params((1, -2, 3), {})
 
@@ -443,7 +444,7 @@ class TestMMForceFieldGenerator:
         force_field_file.parent.mkdir(parents=True)
         force_field_file.write_text('; unsupported FF data\n')
 
-        with pytest.raises(AssertionError, match='Only GAFF is supported'):
+        with pytest.raises(VeloxChemError, match='Only GAFF is supported'):
             ff_gen.update_settings({'force_field_data': 'amber99sb.dat'})
 
     @skip_multi_rank_raises
@@ -475,7 +476,7 @@ class TestMMForceFieldGenerator:
         H 0.0 0.0 0.7
         """)
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='scan file does not contain any Scan records'):
             ff_gen.reparameterize_dihedrals((1, 2),
                                             scan_file=str(missing_scan_file))
@@ -485,7 +486,7 @@ class TestMMForceFieldGenerator:
             'Scan Cycle 1/1 ; Dihedral 6-1-2-7 = 0.00 ; Iteration 1 Energy -1.0\n'
         )
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='scan file name does not match dihedral indices'):
             ff_gen.reparameterize_dihedrals((1, 2),
                                             scan_file=str(wrong_name_file))
@@ -504,7 +505,7 @@ class TestMMForceFieldGenerator:
         H 0.0 0.0 0.7
         """)
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='does not contain any Scan records'):
             ff_gen.read_qm_scan_xyz_files([xyz_file.name], inp_dir=tmp_path)
 
@@ -524,7 +525,7 @@ class TestMMForceFieldGenerator:
                             "Scan Cycle 2/2 ; Dihedral 1-2-3-4 = 180.00 ; "
                             "Iteration 1 Energy -0.5\n")
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='inconsistent number of geometries, energies, and dihedral angles'):
             ff_gen.read_qm_scan_xyz_files([xyz_file.name], inp_dir=tmp_path)
 
@@ -554,7 +555,7 @@ class TestMMForceFieldGenerator:
             'target_dihedrals': [[0, 4, 5, 6]],
         }
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='rotatable bond does not match the scan data'):
             ff_gen.reparameterize_dihedrals((2, 3),
                                             scan_results=scan_results,
@@ -752,5 +753,5 @@ class TestMMForceFieldGenerator:
         missing_include_top = tmp_path / 'missing.top'
         missing_include_top.write_text('[ system ]\nTest\n')
 
-        with pytest.raises(AssertionError, match='could not find included file'):
+        with pytest.raises(VeloxChemError, match='could not find included file'):
             ff_gen.get_included_file(str(missing_include_top))

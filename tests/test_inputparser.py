@@ -11,6 +11,7 @@ from veloxchem.inputparser import (InputParser, parse_seq_range,
                                    parse_input, unparse_input,
                                    write_unparsed_input_to_hdf5,
                                    read_unparsed_input_from_hdf5)
+from veloxchem.errorhandler import VeloxChemError
 
 
 @patch.object(InputParser, 'parse')
@@ -59,7 +60,7 @@ def test_error_in_input(tmpdir):
         here = Path(__file__).parent
         inpfile = here / 'data' / 'water_error.inp'
 
-        with pytest.raises(AssertionError) as info:
+        with pytest.raises(VeloxChemError) as info:
             InputParser(str(inpfile))
             assert 'bad syntax' in str(info.value)
 

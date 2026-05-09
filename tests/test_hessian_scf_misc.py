@@ -12,6 +12,7 @@ from veloxchem.scfgradientdriver import ScfGradientDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfhessiandriver import ScfHessianDriver
 from veloxchem.dftutils import get_default_grid_level
+from veloxchem.errorhandler import VeloxChemError
 
 
 @pytest.mark.solvers
@@ -268,7 +269,7 @@ class TestScfHessianDriverMiscellaneous:
         else:
             molecule, basis = getattr(self, molecule_basis_getter)()
 
-        with pytest.raises(AssertionError, match=expected_message):
+        with pytest.raises(VeloxChemError, match=expected_message):
             hess_drv._determine_xc_hessian_grid_level(molecule, basis,
                                                       grid_level)
 
