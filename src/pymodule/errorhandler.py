@@ -31,7 +31,9 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
+import os
 import sys
+import traceback
 
 
 class VeloxChemError(RuntimeError):
@@ -57,7 +59,9 @@ def assert_msg_critical(condition, msg=''):
             raise VeloxChemError(msg)
     else:
         if not condition:
-            sys.stderr.write(' **** Critical Error (process {}) **** {}\n'.format(
-                MPI.COMM_WORLD.Get_rank(), msg))
+            if os.environ.get('VLX_DEBUG'):
+                traceback.print_stack()
+            print(f'**** Critical Error (process {MPI.COMM_WORLD.Get_rank()}) **** {msg}',
+                  file=sys.stderr)
             sys.stderr.flush()
             MPI.COMM_WORLD.Abort()

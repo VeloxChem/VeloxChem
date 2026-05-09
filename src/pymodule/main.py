@@ -271,7 +271,7 @@ def main():
         if os.environ.get("VLX_DEBUG"):
             traceback.print_exc()
         else:
-            print(f'\n* VeloxChemError * {e}', file=sys.stderr)
+            print(f'* VeloxChemError * {e}', file=sys.stderr)
             print("(set VLX_DEBUG=1 for full traceback)", file=sys.stderr)
         return 1
 
