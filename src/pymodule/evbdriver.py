@@ -47,10 +47,8 @@ from .evbsystembuilder import EvbSystemBuilder
 from .evbfepdriver import EvbFepDriver
 from .reaffbuilder import ReactionForceFieldBuilder
 from .evbdataprocessing import EvbDataProcessing
-from .evbsystembuilder import EvbForceGroup
 from .solvationbuilder import SolvationBuilder
 from .errorhandler import assert_msg_critical
-from .sanitychecks import molecule_sanity_check
 
 try:
     import openmm as mm
@@ -168,8 +166,8 @@ class EvbDriver():
         """Build OpenMM systems for the given configurations with interpolated forcefields for each lambda value. Saves the systems as xml files, the topology as a pdb file and the options as a json file to the disk.
 
         Args:
-            configurations (list[str] | list[dict]): The given configurations for which to perform an FEP. The first configuration will be regarded as the reference configuration. 
-            Lambda (list[float] | np.ndarray): The Lambda vector to be used for the FEP. Should start with 0, end with 1 and be monotonically increasing. 
+            configurations (list[str] | list[dict]): The given configurations for which to perform an FEP. The first configuration will be regarded as the reference configuration.
+            Lambda (list[float] | np.ndarray): The Lambda vector to be used for the FEP. Should start with 0, end with 1 and be monotonically increasing.
                 Defaults to None, in which case default values will be assigned depending on if debugging is enabled or not.
                 If a string is given, the return value of default_system_configurations() will be used. See this function for default configurations.
             constraints (dict | list[dict] | None, optional): Dictionary of harmonic bond, angle or (improper) torsion forces to apply over in every FEP frame. Defaults to None.
@@ -211,9 +209,9 @@ class EvbDriver():
         Lambda = [round(lam, 3) for lam in Lambda]
         self.Lambda = Lambda
 
-        #Per configuration
+        # Per configuration
         for conf in self.configurations:
-            #create folders,
+            # create folders,
             data_folder = f"EVB_{self.name}_{conf['name']}_data_{self.t_label}"
             while Path(data_folder).exists():
                 self.t_label += 1
@@ -301,7 +299,7 @@ class EvbDriver():
                             name: str,
                             load_systems=False,
                             load_pdb=False):
-        """Load a configuration from a data folder for which the systems have already been generated, such that an FEP can be performed. 
+        """Load a configuration from a data folder for which the systems have already been generated, such that an FEP can be performed.
         The topology, initial positions, temperature and Lambda vector will be loaded from the data folder.
 
         Args:
@@ -426,10 +424,14 @@ class EvbDriver():
                                                  time_sub_sample)
         self.ostream.flush()
 
-        if alpha is not None: dp.alpha = alpha
-        if H12 is not None: dp.H12 = H12
-        if alpha_guess is not None: dp.alpha_guess = alpha_guess
-        if H12_guess is not None: dp.H12_guess = H12_guess
+        if alpha is not None:
+            dp.alpha = alpha
+        if H12 is not None:
+            dp.H12 = H12
+        if alpha_guess is not None:
+            dp.alpha_guess = alpha_guess
+        if H12_guess is not None:
+            dp.H12_guess = H12_guess
         if dE_range is not None:
             dp.coordinate_bins = np.linspace(dE_range[0], dE_range[1], 200)
 
@@ -900,7 +902,7 @@ class EvbDriver():
             }
         else:
             try:
-                solvent = SolvationBuilder()._solvent_properties(name)
+                solvent_prop_not_used = SolvationBuilder()._solvent_properties(name)
                 conf = {
                     "name": name,
                     "solvent": name,

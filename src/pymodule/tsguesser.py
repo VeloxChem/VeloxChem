@@ -388,8 +388,7 @@ class TransitionStateGuesser():
                         V, E1, E2, conf_indices = self._get_best_mm_E_from_scan_dict(
                             scan_dict)
                         discont_indices = self._check_discontinuities(E1, E2)
-
-        except Exception as e:
+        except Exception:
             err_str = f"The MM scan crashed. Saving results in self.results and raising exception"
             self.ostream.print_warning(err_str)
             self.ostream.flush()
@@ -680,14 +679,16 @@ class TransitionStateGuesser():
             self.molecule = Molecule.read_xyz_string(max_qm_xyz)
             self.molecule.set_multiplicity(self.mol_multiplicity)
             self.molecule.set_charge(self.mol_charge)
-        except Exception as e:
+        except Exception:
             err_str = f"The QM scan crashed. Saving results in self.results and raising exception"
             self.ostream.print_warning(err_str)
             self.ostream.flush()
             self.results.update(results)
             raise
+
         if self.save_results_file:
             self.save_results(self.results_file, self.results)
+
         return self.results
 
     def _get_qm_energy(self, xyz):

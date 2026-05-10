@@ -266,7 +266,7 @@ class EvbDataProcessing:
                 if len(hist[n][s]) > 0:
                     dGcor[n, s] = -self.kb * Temp_set * np.log(
                         np.mean(
-                            hist[n][s]))  #What to do with the temperature here
+                            hist[n][s]))  # What to do with the temperature here
                     pnscount[n, s] = len(hist[n][s])
                 else:
                     dGcor[n, s] = 0
@@ -600,7 +600,7 @@ class EvbDataProcessing:
             ax[j, 0].grid(True, linestyle='-', which='major')
             ax[j, 0].grid(True, linestyle=':', which='minor')
 
-            middle = len(dens_max) // 2
+            # middle = len(dens_max) // 2
             # start = np.where(dens_max[:middle] == 0)[0][-1]
             # end = np.where(dens_max[middle:] == 0)[0][0] + middle
             start = 0
@@ -663,7 +663,7 @@ class EvbDataProcessing:
                 to_plot.append(conf)
         for i, (name, result) in enumerate(zip(names, to_plot)):
 
-            #Shift both averages by the same amount so that their relative differences stay the same
+            # Shift both averages by the same amount so that their relative differences stay the same
             ax[0].plot(Lambda, result["dGfep"], label=name)
             ax[0].set_xlim(0, 1)
             if plot_discrete:
@@ -684,14 +684,14 @@ class EvbDataProcessing:
                         label=f"{name} analytical",
                         color=colors[colorkeys[i]],
                     )
-                    #add zero-line
+                    # add zero-line
                     zero_ind = result['analytical']['min_arg'][0]
                     barrier = result['analytical']['barrier']
                     barrier_ind = result['analytical']['max_arg'][0]
                     free_energy = result['analytical']['free_energy']
                     free_ind = result['analytical']['min_arg'][1]
 
-                    #mark the zero-point
+                    # mark the zero-point
                     ax[1].plot(
                         [
                             bin_indicators[max(0, zero_ind - 25)],
@@ -814,7 +814,7 @@ class EvbDataProcessing:
         for i, (name,
                 result) in enumerate(results["configuration_results"].items()):
             dGfep = result["dGfep"]
-            #discrete curves
+            # discrete curves
             pns = result['discrete']['pns']
             dGcor = result['discrete']['dGcor']
 
@@ -832,7 +832,7 @@ class EvbDataProcessing:
                        linestyle=":")
             ax[i].plot(coordinate_bins, dGevb_disc[:-1], colors['tab:blue'])
 
-            #analytical curves
+            # analytical curves
             shift = result['analytical']['shift']
             fepxi = result['analytical']['fep']
             dGevb_ana = shift + fepxi
@@ -868,7 +868,7 @@ class EvbDataProcessing:
         lam = results['Lambda']
         bins = results['coordinate_bins']
         config_results = results['configuration_results']
-        relevant_column = []
+        # relevant_column = []
         relevant_fgs = []
         relevant_decomps = []
 
@@ -908,7 +908,7 @@ class EvbDataProcessing:
         plot_output = widgets.Output()
 
         def update_plot(change=None):
-            x = np.linspace(0, 10, 500)
+            # x = np.linspace(0, 10, 500)
             with plot_output:
                 fig1, ax1 = plt.subplots(1, 3, figsize=(18, 4))
                 fig2, ax2 = plt.subplots(1, 1, figsize=(18, 4))
@@ -936,7 +936,7 @@ class EvbDataProcessing:
                         E2_decomp = np.sum(
                             result['decompositions']['E2'][decomp_to_sum],
                             axis=0)
-                        #todo does the minus sign here work?
+                        # todo does the minus sign here work?
                         E1 = E1_fg - E1_decomp
                         E2 = E2_fg - E2_decomp
                     else:
