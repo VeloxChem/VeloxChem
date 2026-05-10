@@ -296,9 +296,15 @@ class SolvationBuilder:
             run_steps = (self.steps if equilibration_steps is None else
                          equilibration_steps)
             # TODO: run perform_equilibration using openmm files
+            start = time.time()
             try:
-                start = time.time()
                 self.perform_equilibration(steps=equilibration_steps)
+            except ValueError:
+                # ValueError: Could not locate #include file: amber03.ff/forcefield.itp
+                self.ostream.print_info(
+                    "Equilibration skipped due to missing files")
+                self.ostream.print_blank()
+            else:
                 end = time.time()
                 self.ostream.print_info("Equilibrating the system")
                 self.ostream.print_blank()
@@ -310,11 +316,6 @@ class SolvationBuilder:
                     f"Elapsed time to equilibrate the system: {end - start:.2f} s"
                 )
                 self.equilibration_flag = True
-            except ValueError:
-                # ValueError: Could not locate #include file: amber03.ff/forcefield.itp
-                self.ostream.print_info(
-                    "Equilibration skipped due to missing files")
-                self.ostream.print_blank()
             self.ostream.flush()
 
     def custom_solvate(self, solute, solvents, proportion, box_size):

@@ -750,8 +750,8 @@ class TransitionStateGuesser():
                         filename,
                         ostream,
                     )
-                except Exception as e:
-                    raise e
+                except Exception:
+                    raise
             else:
                 raise ValueError(
                     "No results provided. Provide either ts_results or filename."

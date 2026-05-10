@@ -727,7 +727,7 @@ class EvbFepDriver():
                     f"Error during simulation step {i}: {e}")
                 self.ostream.flush()
                 self._save_states(states, simulation, i)
-                raise e
+                raise
 
             state = simulation.context.getState(
                 getPositions=True,

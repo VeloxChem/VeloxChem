@@ -275,7 +275,7 @@ def polorbrsp_sanity_check_1(obj):
     # check that there is no zero frequency for the complex case
     # this can cause divergence with the subspace solver
     if obj.is_complex:
-        try:
+        if 0.0 in obj.frequencies:
             idx0 = obj.frequencies.index(0.0)
             warn_msg = 'Zero (0.0) frequency in input frequencies for complex'
             warn_msg += ' polarizability gradient/orbital response!\n\n'
@@ -293,8 +293,6 @@ def polorbrsp_sanity_check_1(obj):
                 warn_msg += 'Computations will be carried out for frequencies: '
                 warn_msg += str(obj.frequencies)
             obj.ostream.print_warning(warn_msg)
-        except ValueError:
-            pass
 
 
 def polorbrsp_sanity_check_2(obj, method_flag, lr_results):
@@ -428,7 +426,7 @@ def raman_sanity_check(obj):
     # This check is due to convergence/singularity issues in the cphf
     # subspace solver for some molecules.
     if obj.do_resonance_raman:
-        try:
+        if 0.0 in obj.frequencies:
             idx0 = obj.frequencies.index(0.0)
             warn_msg = 'Zero frequency in input frequencies for resonance Raman!\n'
             if len(obj.frequencies) == 1:
@@ -446,8 +444,6 @@ def raman_sanity_check(obj):
                 warn_msg += 'Resonance Raman will be calculated for frequencies: '
                 warn_msg += str(obj.frequencies)
             obj.ostream.print_warning(warn_msg)
-        except ValueError:
-            pass
 
 
 def pe_sanity_check(obj, method_dict=None, molecule=None):

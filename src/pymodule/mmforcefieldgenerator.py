@@ -2246,7 +2246,12 @@ class MMForceFieldGenerator:
                     try:
                         periodicity = int(dihedral_ff[3])
                     except ValueError:
-                        periodicity = int(float(dihedral_ff[3]))
+                        try:
+                            periodicity = int(float(dihedral_ff[3]))
+                        except ValueError:
+                            raise ValueError(
+                                'Invalid periodicity value: '
+                                f'{dihedral_ff[3]}') from None
 
                     dihedral_barriers.append(barrier)
                     dihedral_phases.append(phase)
