@@ -235,9 +235,9 @@ class EvbDriver():
                 str(data_folder_path / "product_struct.xyz"))
 
             MMForceFieldGenerator.save_forcefield(
-                self.reactant, str(data_folder_path / f"reactant_ff_data.json"))
+                self.reactant, str(data_folder_path / "reactant_ff_data.json"))
             MMForceFieldGenerator.save_forcefield(
-                self.product, str(data_folder_path / f"product_ff_data.json"))
+                self.product, str(data_folder_path / "product_ff_data.json"))
 
             if conf.get('solvent', None) is None and conf.get('pressure',
                                                               -1) > 0:
@@ -750,7 +750,7 @@ class EvbDriver():
             if conf.get("solvent", None) is not None:
 
                 sol_script = (
-                    f'sol = resname("SOL");\n'
+                    'sol = resname("SOL");\n'
                     'close_sol = (within(5, rea) and resname("SOL"));\n')
             pdb_script = ""
             if conf.get('pdb', None) is not None:

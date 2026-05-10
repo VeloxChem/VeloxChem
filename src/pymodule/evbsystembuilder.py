@@ -1253,7 +1253,7 @@ class EvbSystemBuilder():
                 systems.update(self._add_nb_decompositions(pro_system, 'pro'))
             else:
                 self.ostream.print_info(
-                    f"Skipping nonbonded force decompositions")
+                    "Skipping nonbonded force decompositions")
             self.ostream.flush()
 
         if self.decompose_bonded:

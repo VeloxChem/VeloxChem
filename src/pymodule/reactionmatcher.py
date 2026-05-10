@@ -572,7 +572,7 @@ class ReactionMatcher:
         if forming_edges is None:
             if not self._check_monomorphic:
                 self.ostream.print_info(
-                    f"Could not find forming edges from subgraph isomorphism, attempting subgraph monomorphism"
+                    "Could not find forming edges from subgraph isomorphism, attempting subgraph monomorphism"
                 )
                 self.ostream.flush()
                 self._check_monomorphic = True
@@ -590,7 +590,7 @@ class ReactionMatcher:
         GM = self.get_graph_matcher(A, B)
         map = next(GM.isomorphisms_iter())
 
-        self._check_time(f"finding mapping.")
+        self._check_time("finding mapping.")
         if swapped:
             # if we swapped A and B, we need to swap the mapping back
             self.ostream.print_info(
@@ -886,7 +886,7 @@ class ReactionMatcher:
                 if edge is not None:
                     break
             if edge is None:
-                self.ostream.print_info(f"Bond not found, aborting")
+                self.ostream.print_info("Bond not found, aborting")
                 self.ostream.flush()
                 return None
         return forming_edges

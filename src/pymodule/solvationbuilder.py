@@ -264,7 +264,7 @@ class SolvationBuilder:
 
         if self._molecule_linearity(solvent_molecule):
             self.ostream.print_info(
-                f"The solvent molecule is linear, random rotation is disabled")
+                "The solvent molecule is linear, random rotation is disabled")
             self.ostream.flush()
             self.random_rotation = False
 
@@ -1576,7 +1576,7 @@ class SolvationBuilder:
                     solvent_ff.ostream.mute()
 
                     self.ostream.print_info(
-                        f'Generating the ForceField for the solvent')
+                        'Generating the ForceField for the solvent')
                     self.ostream.flush()
 
                     if use_water_model:

@@ -374,7 +374,7 @@ class ReactionForceFieldBuilder():
                     scf_drv.max_iter = 200
                     scf_results = scf_drv.compute(molecule, basis)
                 # self.ostream.unmute()
-                assert scf_drv.is_converged, f"SCF calculation for RESP charges did not converge, aborting"
+                assert scf_drv.is_converged, "SCF calculation for RESP charges did not converge, aborting"
                 resp_drv = RespChargesDriver()
                 self.ostream.flush()
                 if self.mute_scf:
@@ -449,7 +449,7 @@ class ReactionForceFieldBuilder():
                     scf_drv.conv_thresh = 1.0e-4
                     scf_drv.max_iter = 200
                     scf_drv.compute(molecule, basis)
-                assert scf_drv.is_converged, f"SCF calculation for Hessian did not converge, aborting"
+                assert scf_drv.is_converged, "SCF calculation for Hessian did not converge, aborting"
 
                 hess_drv = ScfHessianDriver(scf_drv)
                 if self.mute_scf:
@@ -664,7 +664,7 @@ class ReactionForceFieldBuilder():
 
         if len(broken_bonds) > 0:
             self.ostream.print_header(
-                f"ReaType  ProType  ID - ReaType  ProType  ID")
+                "ReaType  ProType  ID - ReaType  ProType  ID")
         for bond_key in broken_bonds:
             reactant_type0 = reactant.atoms[bond_key[0]]["type"]
             product_type0 = product.atoms[bond_key[0]]["type"]

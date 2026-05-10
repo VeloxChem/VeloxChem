@@ -383,7 +383,7 @@ class EvbFepDriver():
         self._minimize(simulation)
         if self.save_equil_traj:
             equil_traj_reporter = mmapp.XTCReporter(
-                str(self.run_folder / f"equil_traj_initial.xtc"),
+                str(self.run_folder / "equil_traj_initial.xtc"),
                 self.write_step,
                 enforcePeriodicBox=True,
             )
@@ -435,7 +435,7 @@ class EvbFepDriver():
         )
         self._save_state(
             simulation,
-            f"equil_state_initial",
+            "equil_state_initial",
             xml=False,
             chk=True,
         )
@@ -833,7 +833,7 @@ class EvbFepDriver():
         header = "step, kinetic, potential, volume,"
         header += EvbForceGroup.get_header()
         np.savetxt(
-            self.data_folder / f"crash_energies.csv",
+            self.data_folder / "crash_energies.csv",
             energies,
             delimiter=",",
             header=header,

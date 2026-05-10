@@ -1071,7 +1071,7 @@ class OpenMMDynamics:
 
         equiv_conformer_pairs= []
         if unique_conformers:
-            msg = f'Filtering for unique conformers'
+            msg = 'Filtering for unique conformers'
             self.ostream.print_info(msg)
             self.ostream.flush()
             

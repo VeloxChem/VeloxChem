@@ -529,7 +529,7 @@ class PolarizabilityGradient:
                                                    rel_dm_ao, x_plus_y_ao, x_minus_y_ao,
                                                    local_atoms)
             profiler.stop_timer("ERI")
-            profiler.check_memory_usage(f"ERI grad")
+            profiler.check_memory_usage("ERI grad")
 
             pol_gradient += eri_contrib
 

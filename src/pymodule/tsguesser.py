@@ -389,7 +389,7 @@ class TransitionStateGuesser():
                             scan_dict)
                         discont_indices = self._check_discontinuities(E1, E2)
         except Exception:
-            err_str = f"The MM scan crashed. Saving results in self.results and raising exception"
+            err_str = "The MM scan crashed. Saving results in self.results and raising exception"
             self.ostream.print_warning(err_str)
             self.ostream.flush()
             self.results.update({'scan': scan_dict})
@@ -680,7 +680,7 @@ class TransitionStateGuesser():
             self.molecule.set_multiplicity(self.mol_multiplicity)
             self.molecule.set_charge(self.mol_charge)
         except Exception:
-            err_str = f"The QM scan crashed. Saving results in self.results and raising exception"
+            err_str = "The QM scan crashed. Saving results in self.results and raising exception"
             self.ostream.print_warning(err_str)
             self.ostream.flush()
             self.results.update(results)
@@ -1326,7 +1326,7 @@ class TransitionStateGuesser():
         if self.mute_scf:
             self.ostream.print_info("Disable mute_scf to see detailed output.")
         self.ostream.print_blank()
-        self.ostream.print_header(f"Starting QM scan")
+        self.ostream.print_header("Starting QM scan")
         self.ostream.print_blank()
         self.ostream.print_header("QM parameters:")
         self.ostream.print_header(f"Basis:       {self.qm_basis:>10}")
