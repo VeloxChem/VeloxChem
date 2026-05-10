@@ -744,14 +744,11 @@ class TransitionStateGuesser():
 
         if ts_results is None:
             if filename is not None:
-                try:
-                    ostream.print_info(f"Loading results from {filename}")
-                    ts_results = TransitionStateGuesser.load_results(
-                        filename,
-                        ostream,
-                    )
-                except Exception:
-                    raise
+                ostream.print_info(f"Loading results from {filename}")
+                ts_results = TransitionStateGuesser.load_results(
+                    filename,
+                    ostream,
+                )
             else:
                 raise ValueError(
                     "No results provided. Provide either ts_results or filename."
@@ -885,7 +882,7 @@ class TransitionStateGuesser():
         try:
             from IPython import get_ipython as _get_ipython
             _ip = _get_ipython()
-        except Exception:
+        except ImportError:
             _ip = None
 
         if _ip is not None:

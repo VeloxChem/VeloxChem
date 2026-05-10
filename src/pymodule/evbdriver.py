@@ -909,7 +909,8 @@ class EvbDriver():
                     "padding": 1.5,
                     "ion_count": 0,
                 }
-            except:
+            except ValueError:
+                # _solvent_properties raises ValueError for unrecognized names
                 raise ValueError(f"Unknown system configuration {name}")
 
         return conf
