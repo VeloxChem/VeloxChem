@@ -40,7 +40,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import boltzmann_in_hartreeperkelvin, hartree_in_kjpermol
 from .evbsystembuilder import EvbForceGroup
 from .outputstream import OutputStream
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, print_exception_if_debug
 
 with redirect_stderr(StringIO()) as fg_err:
     try:
@@ -199,6 +199,7 @@ class EvbDataProcessing:
                                                  False)["Delta_f"]
                 dg_bar = -1 / self._beta(Temp_set) * dF
             except Exception as e:
+                print_exception_if_debug()
                 self.ostream.print_warning(
                     f"Error {e} encountered during BAR calculation, setting dG_bar to 0 for lambda {l}"
                 )

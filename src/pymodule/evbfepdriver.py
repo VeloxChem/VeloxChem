@@ -41,7 +41,7 @@ import glob
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .evbreporter import EvbReporter
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, print_exception_if_debug
 from .evbsystembuilder import EvbForceGroup
 
 try:
@@ -804,6 +804,7 @@ class EvbFepDriver():
                     energy = energy.value_in_unit(mmunit.kilojoule_per_mole)
                     energies[j, k + 4] = energy
             except Exception:
+                print_exception_if_debug()
                 self.ostream.print_warning(
                     "Encountered error while saving forcegroups, continuing without forcegroups"
                 )

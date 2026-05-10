@@ -42,6 +42,18 @@ class VeloxChemError(RuntimeError):
     """
 
 
+def print_exception_if_debug():
+    """
+    Prints traceback of the current exception to stderr if VLX_DEBUG
+    environment variable is set.
+
+    Intended for use in broad except blocks to aid diagnostic without
+    affecting normal output.
+    """
+    if os.environ.get('VLX_DEBUG'):
+        traceback.print_exc()
+
+
 def assert_msg_critical(condition, msg=''):
     """
     Asserts that the condition is true. Otherwise terminates the program with

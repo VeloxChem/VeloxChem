@@ -37,7 +37,7 @@ import numpy as np
 import copy
 from pathlib import Path
 
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, print_exception_if_debug
 from .evbsystembuilder import EvbForceGroup, EvbSystemBuilder
 
 try:
@@ -491,6 +491,7 @@ class EvbReporter():
             try:
                 simulation.context.setState(state)
             except Exception:
+                print_exception_if_debug()
                 # Decomposition systems which have the barostat removed will throw an error on the above case
                 simulation.context.setPositions(state.getPositions())
 

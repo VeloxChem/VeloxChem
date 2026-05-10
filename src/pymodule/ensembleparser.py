@@ -36,7 +36,7 @@ import sys
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, print_exception_if_debug
 
 try:
     import MDAnalysis as mda
@@ -194,6 +194,7 @@ class EnsembleParser:
                 if frags:
                     chains = frags
         except Exception:
+            print_exception_if_debug()
             chains = []
 
         # Fallback: group by chainIDs (PDB) or segids
@@ -493,6 +494,7 @@ class EnsembleParser:
                 if dims.size > 3 and np.all(dims[:3] > 0):
                     has_box = True
         except Exception:
+            print_exception_if_debug()
             has_box = False
 
         if has_box:

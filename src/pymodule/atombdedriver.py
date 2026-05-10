@@ -39,7 +39,7 @@ from .veloxchemlib import mpi_master, hartree_in_kcalpermol, hartree_in_kjpermol
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .atomtypeidentifier import AtomTypeIdentifier
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, print_exception_if_debug
 from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
@@ -774,6 +774,7 @@ class AtomBdeDriver:
             scf_err_msg = "SCF did not converge! "
 
         except Exception as e:
+            print_exception_if_debug()
             scf_skip_flag_local = True
             scf_err_msg = f"Exception occurred during radical SCF for molecule {run_idx+1}: {e}"
 
@@ -796,6 +797,7 @@ class AtomBdeDriver:
             opt_skip_flag_local = opt_results_rad is None
             opt_err_msg = ""
         except Exception as e:
+            print_exception_if_debug()
             opt_skip_flag_local = True
             opt_err_msg = f"Exception occurred during radical optimization for molecule {run_idx+1}: {e}"
 

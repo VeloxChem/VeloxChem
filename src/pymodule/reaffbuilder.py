@@ -48,7 +48,7 @@ from .mmforcefieldgenerator import MMForceFieldGenerator
 from .reactionmatcher import ReactionMatcher
 from .outputstream import OutputStream
 from .veloxchemlib import Point
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, print_exception_if_debug
 from .openmmdynamics import OpenMMDynamics
 
 try:
@@ -769,6 +769,7 @@ class ReactionForceFieldBuilder():
                 exiting = True
 
             except Exception as e:
+                print_exception_if_debug()
                 if self.optimize_dist_restraint_offset < 2.5:
                     self.optimize_dist_restraint_offset += 0.5
                     self.ostream.print_warning(
