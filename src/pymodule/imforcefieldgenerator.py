@@ -56,8 +56,6 @@ from .scfgradientdriver import ScfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
 from .tdaeigensolver import TdaEigenSolver
 from .lreigensolver import LinearResponseEigenSolver
-from .tddftgradientdriver import TddftGradientDriver
-from .tddfthessiandriver import TddftHessianDriver
 
 from .molecularbasis import MolecularBasis
 from .interpolationdriver import InterpolationDriver
@@ -67,7 +65,6 @@ from .mmforcefieldgenerator import MMForceFieldGenerator
 from .conformergenerator import ConformerGenerator
 from .optimizationdriver import OptimizationDriver
 # from .atommapper import AtomMapper
-from .tsguesser import TransitionStateGuesser
 
 from .molecule import Molecule
 from .errorhandler import assert_msg_critical
@@ -385,71 +382,6 @@ class IMForceFieldGenerator:
                                 "gradient": None,
                                 "hessian": None,
                             }
-
-        self._test_hooks = {}
-        self._test_hook_strict = False
-        self._test_event_counter = 0
-        self._test_run_id = None
-
-    def _to_test_payload(self, obj):
-        """
-        Convert payload content to JSON-friendly Python-native types.
-
-        Why:
-        - tests should not handle numpy scalar/array types directly,
-        - payloads must be serializable for debugging and artifact dumps.
-        """
-        if isinstance(obj, dict):
-            return {str(k): self._to_test_payload(v) for k, v in obj.items()}
-        if isinstance(obj, (list, tuple)):
-            return [self._to_test_payload(v) for v in obj]
-        if isinstance(obj, (np.floating, np.integer)):
-            return obj.item()
-        if hasattr(obj, "tolist"):
-            return self._to_test_payload(obj.tolist())
-        return obj
-
-    def _event_envelope(self, event_name, payload):
-        """
-        Build a stable event envelope consumed by integration tests.
-        """
-        self._test_event_counter += 1
-        return {
-            "event": str(event_name),
-            "seq": int(self._test_event_counter),
-            "run_id": self._test_run_id,
-            "roots_to_follow": list(self.roots_to_follow),
-            "payload": self._to_test_payload(payload),
-        }
-
-    def _emit_test_hook(self, event_name, payload):
-        """
-        Emit one event to test callbacks.
-
-        Behavior:
-        - emits only on MPI root rank (avoids duplicate test events),
-        - supports exact-name callback and wildcard callback (`*`),
-        - optional strict-mode failure.
-        """
-
-        hook_map = getattr(self, "_test_hooks", {})
-        fn = hook_map.get(event_name)
-        wildcard = hook_map.get("*")
-        if fn is None and wildcard is None:
-            return
-
-        envelope = self._event_envelope(event_name, payload)
-
-        for cb in (fn, wildcard):
-            if cb is None:
-                continue
-            try:
-                cb(envelope)
-            except Exception as exc:
-                if self._test_hook_strict:
-                    raise RuntimeError(
-                        f"IMForceFieldGenerator test hook failed for event '{event_name}': {exc}"
-                    ) from exc
     
     def _mode_signature(self):
         """
@@ -966,7 +898,7 @@ class IMForceFieldGenerator:
             samp_dp.write_hdf5(sampling_file, label)
 
             
-    def compute(self, molecule, states_basis=None, test_hooks=None):
+    def compute(self, molecule, states_basis=None):
 
         """
         Construct the interpolation dynamics database by generating molecular structures, 
@@ -980,24 +912,6 @@ class IMForceFieldGenerator:
         to expand/generate the interpolation forcefield with new data points.
 
         """
-
-        def _bridge(event_name):
-            def _cb(payload):
-                self._emit_test_hook(
-                    f"qmmm.{event_name}",
-                    {
-                        "state": int(0),
-                        "dihedral_key": key,
-                        "structure_index": int(i),
-                        "collector": payload,
-                    },
-                )
-            return _cb
-        
-        self._test_hooks = test_hooks or {}
-        self._test_hook_strict = bool(self._test_hooks.get("__strict__", False))
-        self._test_event_counter = 0
-        self._test_run_id = self._test_hooks.get("__run_id__", None)
 
         if self.reference_struc_energy_file is not None and not os.path.exists(self.reference_struc_energy_file):
             self.reference_struc_energy_file = None
@@ -1032,25 +946,8 @@ class IMForceFieldGenerator:
                 self.imforcefieldfiles[self.roots_to_follow[root_idx]] = standard_file
                 self.sampling_imforcefieldfiles[self.roots_to_follow[root_idx]] = standard_smapling_files[root_idx]
 
-        self._emit_test_hook("ffg.compute_start", {
-            "imforcefieldfiles": dict(self.imforcefieldfiles or {}),
-            "mode_signature": self._mode_signature(),
-            "dynamics": {
-                "ensemble": str(self.ensemble),
-                "nsteps": int(self.nsteps),
-                "timestep_fs": float(self.timestep),
-                "temperature_K": float(self.temperature),
-            },
-        })
-
         print(f'IMPORTANT: IM ForceFieldFile is initalized from the current directory as {self.imforcefieldfiles}')
         self.set_up_the_system(molecule, extract_z_matrix=root_extract_z_matrix)
-
-        self._emit_test_hook("ffg.setup_complete", {
-            "z_matrix_summary": self.roots_z_matrix,
-            "symmetry_information": self.symmetry_information,
-            "all_rotatable_bonds": self.all_rotatable_bonds,
-        })
 
         
         print('Set up the system is here')
@@ -1345,27 +1242,7 @@ class IMForceFieldGenerator:
 
                 im_database_driver.update_settings(self.dynamics_settings, self.states_interpolation_settings, self.sampling_states_interpolation_settings)
                 
-                self._emit_test_hook("ffg.run_qmmm_start", {
-                    "state": int(self.roots_to_follow[0]),
-                    "structure_index": int(0),
-                    "current_structure_density": current_structure_density,
-                })
-                im_database_driver.run_qmmm(
-                    test_hooks={
-                        "run_start": _bridge("run_start"),
-                        "step": _bridge("step"),
-                        "point_correlation_decision": _bridge("point_correlation_decision"),
-                        "datapoint_written": _bridge("datapoint_written"),
-                        "alpha_optimization_end": _bridge("alpha_optimization_end"),
-                        "run_end": _bridge("run_end"),
-                    },
-                    collect_step_trace=False,
-                    strict_test_hooks=self._test_hook_strict,
-                )
-                self._emit_test_hook("ffg.run_qmmm_end", {
-                    "state": int(self.roots_to_follow[0]),
-                    "structure_index": int(0),
-                })
+                im_database_driver.run_qmmm()
  
                 # individual impes run objects
                 self.qm_energies.append(im_database_driver.qm_potentials)
@@ -1382,12 +1259,6 @@ class IMForceFieldGenerator:
             
             print('The construction of the database was sucessfull', self.states_data_point_density)
             self.im_results['n_datapoints'] = self.states_data_point_density
-
-            self._emit_test_hook("ffg.compute_end", {
-                "states_data_point_density": self.states_data_point_density,
-                "im_results": self.im_results,
-                "final_label_count_per_root": self._label_count_per_root(),
-            })
             
         return self.im_results 
 
@@ -2294,10 +2165,6 @@ class IMForceFieldGenerator:
         
         # create all molecule combinations
 
-        self._emit_test_hook("ffg.initial_add_point_start", {
-            "n_molecules": int(len(molecule_specific_information)),
-            "roots": list(self.roots_to_follow),
-        })
         adjusted_molecule = {'gs': [], 'es': []}
 
         for entries in molecule_specific_information:
@@ -2376,12 +2243,7 @@ class IMForceFieldGenerator:
                     impes_coordinate.confidence_radius = trust_radius
                     
                     impes_coordinate.write_hdf5(target_file, label)
-                    self._emit_test_hook("datapoint_written", {
-                        "root": int(target_root),
-                        "label": str(label),
-                        "energy_hartree": float(impes_coordinate.energy),
-                        "confidence_radius": float(impes_coordinate.confidence_radius),
-                    })
+
                     impes_coordinate.write_hdf5(f'im_database_{target_root}_org.h5', label)
                     interpolation_driver.imforcefield_file = target_file
     
@@ -2390,10 +2252,6 @@ class IMForceFieldGenerator:
                     print(f"Database expansion with {', '.join(labels)}")
 
                 label_counter += 1
-                    
-        self._emit_test_hook("ffg.initial_add_point_done", {
-                            "label_count_per_root": self._label_count_per_root(),
-                        })
         
     def _calculate_translation_coordinates(self, cart_coord):
         """Center the molecule by translating its geometric center to (0, 0, 0)."""

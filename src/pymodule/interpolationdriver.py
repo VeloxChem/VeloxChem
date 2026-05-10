@@ -44,7 +44,7 @@ from io import StringIO
 from .interpolationdatapoint import InterpolationDatapoint
 
 from .outputstream import OutputStream
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master, bohr_in_angstrom
 
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input)
@@ -153,6 +153,18 @@ class InterpolationDriver():
         self.runtime_profile_totals = {}
         self.runtime_profile_last = {}
         self.runtime_profile_calls = 0
+
+        self.tc_imp_gate_lambda = 0.7
+
+        # Coordinate tolerances defining the sphere of influence.
+        self.tc_imp_bond_sigma_angstrom = 0.04
+        self.tc_imp_angle_sigma_degrees = 5.0
+        self.tc_imp_dihedral_sigma_degrees = 12.0
+        self.tc_imp_improper_sigma_degrees = 5.0
+
+        # Numerical guards.
+        self.tc_imp_gate_exp_clip = 50.0
+        self.tc_imp_min_sigma = 1.0e-12
 
         # Optional runtime cache for symmetry-expanded task evaluation.
         # enables reuse of flattened symmetry tasks across compute() calls
@@ -663,6 +675,9 @@ class InterpolationDriver():
            :param data_point:
                 InterpolationDatapoint object.
         """
+        def principal_angle(delta):
+            return (delta + np.pi) % (2.0 * np.pi) - np.pi
+
 
         pes = 0.0
         natm = data_point.cartesian_coordinates.shape[0]
@@ -679,11 +694,22 @@ class InterpolationDriver():
         hessian = data_point.internal_hessian.copy()
         dist_org = (org_int_coords.copy() - data_point.internal_coordinates_values)
         dist_check = (org_int_coords.copy() - data_point.internal_coordinates_values)
+        chain = np.ones_like(dist_org)
         if not self.use_cosine_dihedral:
-            dist_check[dihedral_start:dihedral_end] = np.sin(dist_org[dihedral_start:dihedral_end])
+            d_prop = self._principal_torsion_delta(dist_org[dihedral_start:dihedral_end])
+            dist_check[dihedral_start:dihedral_end] = np.sin(d_prop)
+            d_imp = self._principal_torsion_delta(
+                dist_org[dihedral_end:]
+            )
+            chain[dihedral_start:dihedral_end] = np.cos(d_prop)
+            imp_slice = slice(dihedral_end, len(dist_org))
+            dist_check[imp_slice] = 2.0 * np.tan(0.5 * d_imp)
+            chain[imp_slice] = 1.0 / np.maximum(np.cos(0.5 * d_imp)**2, 1.0e-12)
+
         self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:bond_end])**2))))
         self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[bond_end:angle_end]**2))))
         self.dihedral_rmsd.append(np.sqrt(np.mean(np.sum(dist_check[dihedral_start:dihedral_end]**2))))
+        
         pes = (
             energy
             + np.matmul(dist_check.T, grad)
@@ -692,12 +718,236 @@ class InterpolationDriver():
 
         dist_hessian_eff = np.matmul(dist_check.T, hessian)
         if not self.use_cosine_dihedral:
-            cos_dist = np.cos(dist_org[dihedral_start:dihedral_end])
-            grad[dihedral_start:dihedral_end] *= cos_dist
-            dist_hessian_eff[dihedral_start:dihedral_end] *= cos_dist
+
+            grad *= chain
+            dist_hessian_eff *= chain
+
+
         pes_prime = np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian_eff)).reshape(natm, 3)
         return pes, pes_prime, (grad + dist_hessian_eff)
+
+    def _iter_imp_internal_coordinate_rows(self, data_point):
+        """
+        Yields important internal-coordinate entries for a datapoint.
+
+        Returns
+        -------
+        section : str
+            One of 'bonds', 'angles', 'dihedrals', 'impropers'.
+        coord : tuple[int, ...]
+            Atom tuple defining the coordinate.
+        idx : int
+            Row index in self.impes_coordinate.z_matrix.
+
+        Notes
+        -----
+        This implementation assumes use_cosine_dihedral=False for proper
+        dihedral gates. That matches the current default and avoids ambiguity
+        caused by duplicated cosine/sine rows.
+        """
+
+        imp = getattr(data_point, "imp_int_coordinates", None)
+        if not isinstance(imp, dict):
+            return
+
+        zmat = [tuple(int(x) for x in z) for z in self.impes_coordinate.z_matrix]
+
+        for section in ("bonds", "angles", "dihedrals", "impropers"):
+            for coord_raw in imp.get(section, []):
+                coord = tuple(int(x) for x in coord_raw)
+
+                try:
+                    idx = zmat.index(coord)
+                except ValueError:
+                    # Important coordinate is absent from the active z-matrix.
+                    # This should not happen for a consistent database, but skip
+                    # defensively rather than killing interpolation.
+                    continue
+
+                yield section, coord, idx
+
             
+    def _imp_coordinate_sigma(self, section, idx, q_ref):
+        """
+        Returns the sigma value in the same coordinate representation as the
+        internal coordinate row idx.
+
+        For inverse bonds, q = 1/r, so a physical bond tolerance sigma_r is
+        converted into q-space via sigma_q = sigma_r / r_ref^2.
+        """
+
+        sigma_bond_bohr = (
+            float(self.tc_imp_bond_sigma_angstrom) / bohr_in_angstrom()
+        )
+
+        if section == "bonds":
+            if self.use_inverse_bond_length:
+                # q_ref is 1/r in bohr^-1.
+                r_ref = 1.0 / max(abs(float(q_ref[idx])), self.tc_imp_min_sigma)
+                sigma = sigma_bond_bohr / max(r_ref * r_ref, self.tc_imp_min_sigma)
+            else:
+                sigma = sigma_bond_bohr
+
+        elif section == "angles":
+            sigma = np.deg2rad(float(self.tc_imp_angle_sigma_degrees))
+
+        elif section == "dihedrals":
+            sigma = np.sin(np.deg2rad(float(self.tc_imp_dihedral_sigma_degrees)))
+
+        elif section == "impropers":
+            sigma = np.deg2rad(float(self.tc_imp_improper_sigma_degrees))
+
+        else:
+            raise ValueError(f"Unknown important-coordinate section: {section}")
+
+        return max(float(abs(sigma)), self.tc_imp_min_sigma)
+
+    def _important_coordinate_gate_metric(self, data_point, active_dofs):
+        """
+        Computes the dimensionless important-coordinate distance A_imp and
+        its Cartesian derivative.
+
+        A_imp = sum_k beta_k z_k^2 / sum_k beta_k
+
+        The derivative is with respect to the active Cartesian coordinates
+        used by the Cartesian weight gradient.
+
+        Returns
+        -------
+        A_imp : float
+            Dimensionless mean squared important-coordinate displacement.
+
+        grad_A_imp : ndarray, shape (n_active_dofs,)
+            dA_imp/dX for active Cartesian degrees of freedom.
+        """
+
+        q_cur = np.asarray(
+            self.impes_coordinate.internal_coordinates_values,
+            dtype=np.float64,
+        )
+        q_ref = np.asarray(
+            data_point.internal_coordinates_values,
+            dtype=np.float64,
+        )
+
+        B = np.asarray(self.impes_coordinate.b_matrix, dtype=np.float64)
+
+        inv_sqrt_masses = getattr(self.impes_coordinate, "inv_sqrt_masses", None)
+        if inv_sqrt_masses is not None:
+            inv_sqrt_active = np.asarray(inv_sqrt_masses, dtype=np.float64)[active_dofs]
+        else:
+            inv_sqrt_active = None
+
+        A_num = 0.0
+        beta_sum = 0.0
+        grad_A_num = np.zeros(active_dofs.size, dtype=np.float64)
+
+        for section, coord, idx in self._iter_imp_internal_coordinate_rows(data_point):
+            beta = 1.0
+
+            dq_raw = float(q_cur[idx] - q_ref[idx])
+            sigma = self._imp_coordinate_sigma(section, idx, q_ref)
+
+            # B row is mass-weighted if inv_sqrt_masses was set on the datapoint.
+            # Convert it back to derivative with respect to physical Cartesian
+            # coordinates, matching the existing target-customized code path.
+            b_row = B[idx, active_dofs].copy()
+            if inv_sqrt_active is not None:
+                b_row = b_row / inv_sqrt_active
+
+            if section == "dihedrals":
+                # Periodic, smooth metric.
+                d = self._principal_torsion_delta(dq_raw)
+                z = np.sin(d) / sigma
+                dz_dx = np.cos(d) * b_row / sigma
+
+            elif section == "impropers":
+                d = self._principal_torsion_delta(dq_raw)
+                z = d / sigma
+                dz_dx = b_row / sigma
+
+            elif section == "angles":
+                z = dq_raw / sigma
+                dz_dx = b_row / sigma
+
+            elif section == "bonds":
+                z = dq_raw / sigma
+                dz_dx = b_row / sigma
+
+            else:
+                continue
+
+            A_num += beta * z * z
+            grad_A_num += beta * 2.0 * z * dz_dx
+            beta_sum += beta
+
+        if beta_sum <= 0.0:
+            return 0.0, np.zeros(active_dofs.size, dtype=np.float64)
+
+        A_imp = A_num / beta_sum
+        grad_A_imp = grad_A_num / beta_sum
+
+        return float(A_imp), grad_A_imp
+    
+    def _apply_imp_coordinate_penalty_gate(
+            self,
+            denominator_base,
+            raw_weight_gradient_base,
+            A_imp,
+            grad_A_imp,
+        ):
+            """
+            Applies the important-coordinate penalty gate to a raw Shepard weight.
+
+            Base:
+                w = 1 / denominator_base
+
+            Gate:
+                G = exp(-lambda * A_imp)
+
+            Modified raw weight:
+                w_mod = w * G
+
+            Gradient:
+                grad(w_mod) = G grad(w) + w grad(G)
+                            = G grad(w) - lambda w G grad(A_imp)
+
+            Returns
+            -------
+            denominator_mod : float
+                1 / w_mod, so the surrounding code can still use
+                raw_weight = 1 / denominator.
+
+            raw_weight_gradient_mod : ndarray
+                Gradient of w_mod with respect to active Cartesian coordinates.
+            """
+
+            if not np.isfinite(denominator_base) or denominator_base <= 0.0:
+                return np.inf, np.zeros_like(raw_weight_gradient_base)
+
+            lam = float(self.tc_imp_gate_lambda)
+            exponent = min(lam * float(A_imp), float(self.tc_imp_gate_exp_clip))
+
+            gate = np.exp(-exponent)
+            w_base = 1.0 / denominator_base
+
+            grad_base_flat = np.asarray(raw_weight_gradient_base, dtype=np.float64).reshape(-1)
+            grad_A_flat = np.asarray(grad_A_imp, dtype=np.float64).reshape(-1)
+
+            grad_gate = -lam * gate * grad_A_flat
+
+            w_mod = w_base * gate
+            grad_w_mod = gate * grad_base_flat + w_base * grad_gate
+
+            if w_mod <= 1.0e-300:
+                return np.inf, np.zeros_like(raw_weight_gradient_base)
+
+            denominator_mod = 1.0 / w_mod
+
+            return denominator_mod, grad_w_mod.reshape(raw_weight_gradient_base.shape)
+
+
+
 
     def trust_radius_weight_gradient(self, confidence_radius, distance):
         
@@ -894,7 +1144,7 @@ class InterpolationDriver():
         return final_denominator, final_weight_gradient
     
     
-    def calculate_translation_coordinates(self, given_coordinates, weights=None):
+    def calculate_translation_coordinates(self, given_coordinates):
         """Center the molecule by translating its geometric center to (0, 0, 0)."""
 
         center = np.mean(given_coordinates, axis=0)
@@ -1106,58 +1356,74 @@ class InterpolationDriver():
         if distance < 1e-8:
             distance = 1e-8
             distance_vector_sub[:] = 0
-
-            
-        # sum of the derivative necessary 
-        imp_int_coord_derivative_contribution = np.zeros_like(distance_vector_sub).reshape(-1)
-        imp_int_coord_distance = 0
-        dq_dx = np.zeros_like(distance_vector_sub).reshape(-1)
-        Dimp_sq = 0.0
-        if self.use_tc_weights:
-            for key, entries in data_point.imp_int_coordinates.items():
-                for element in entries:
-                    idx = self.impes_coordinate.z_matrix.index(element)
-                    org_imp_int_coord_distance = (self.impes_coordinate.internal_coordinates_values[idx] - data_point.internal_coordinates_values[idx])
-                    unmw_b_matrix = self.impes_coordinate.b_matrix[idx, active_dofs] / self.impes_coordinate.inv_sqrt_masses[active_dofs]
-                    # print(key, org_imp_int_coord_distance)
-                    if len(element) == 4:
-                        sin_delta = np.sin(org_imp_int_coord_distance)
-                        cos_delta = np.cos(org_imp_int_coord_distance)
-                        imp_int_coord_derivative_contribution += 2.0 * unmw_b_matrix * cos_delta * sin_delta
-                        imp_int_coord_distance += sin_delta**2
-
-                        dq_dx +=  2.0 * unmw_b_matrix * np.cos( org_imp_int_coord_distance) * np.sin( org_imp_int_coord_distance) 
-                        Dimp_sq += np.sin(org_imp_int_coord_distance)**2
-                    else:
-                        imp_int_coord_distance += org_imp_int_coord_distance**2
-                        imp_int_coord_derivative_contribution += 2.0 * unmw_b_matrix * org_imp_int_coord_distance
-
-                        dq_dx += 2.0 * unmw_b_matrix * org_imp_int_coord_distance
-                        Dimp_sq += (org_imp_int_coord_distance)**2
-                
-            if imp_int_coord_distance < 1e-8:
-                imp_int_coord_distance = 1e-8
-                imp_int_coord_derivative_contribution[:] = 0
-        
-        
+      
         dw_dalhpa_i = 0
         dw_dX_dalpha_i = 0
 
         if self.interpolation_type == 'shepard':
             
-            denominator_imp_coord, weight_gradient_sub_imp_coord = self.VL_target_customized_shepard_weight_gradient(
-                distance_vector_sub, distance, data_point.confidence_radius, Dimp_sq, dq_dx)
-            
-            if self.calc_optim_trust_radius:
+            denominator_base, weight_gradient_sub_base = self.shepard_weight_gradient(
+                distance_vector_sub,
+                distance,
+                data_point.confidence_radius,
+            )
+            if self.use_tc_weights:
+                A_imp, grad_A_imp = self._important_coordinate_gate_metric(
+                    data_point,
+                    active_dofs,
+                )
 
-                dw_dalhpa_i = self.trust_radius_tc_weight_gradient(
-                    data_point.confidence_radius, distance, Dimp_sq)
-                dw_dX_dalpha_i = self.trust_radius_tc_weight_gradient_gradient(
-                    data_point.confidence_radius,
-                    distance,
-                    distance_vector_sub,
-                    Dimp_sq,
-                    dq_dx)
+                denominator_imp_coord, weight_gradient_sub_imp_coord = (
+                    self._apply_imp_coordinate_penalty_gate(
+                        denominator_base,
+                        weight_gradient_sub_base,
+                        A_imp,
+                        grad_A_imp,
+                    )
+                )
+            else:
+                denominator_imp_coord = denominator_base
+                weight_gradient_sub_imp_coord = weight_gradient_sub_base
+
+            if self.calc_optim_trust_radius:
+                if self.use_tc_weights:
+                    A_imp, grad_A_imp = self._important_coordinate_gate_metric(
+                        data_point,
+                        active_dofs,
+                    )
+
+                    lam = float(self.tc_imp_gate_lambda)
+                    gate = np.exp(-min(lam * A_imp, self.tc_imp_gate_exp_clip))
+                    grad_gate = -lam * gate * grad_A_imp
+
+                    dw_base_dR = self.trust_radius_weight_gradient(
+                        data_point.confidence_radius,
+                        distance,
+                    )
+
+                    dgradw_base_dR = self.trust_radius_weight_gradient_gradient(
+                        data_point.confidence_radius,
+                        distance,
+                        distance_vector_sub,
+                    )
+
+                    dw_dalhpa_i = gate * dw_base_dR
+
+                    dw_dX_dalpha_i = (
+                        gate * dgradw_base_dR.reshape(-1)
+                        + grad_gate * dw_base_dR
+                    ).reshape(distance_vector_sub.shape)
+                else:
+                    dw_dalhpa_i = self.trust_radius_weight_gradient(
+                        data_point.confidence_radius,
+                        distance,
+                    )
+
+                    dw_dX_dalpha_i = self.trust_radius_weight_gradient_gradient(
+                        data_point.confidence_radius,
+                        distance,
+                        distance_vector_sub,
+                    )
 
                 if store_alpha_gradients:
                     self.dw_dalpha_list.append(dw_dalhpa_i)
@@ -1184,6 +1450,7 @@ class InterpolationDriver():
             return 0.0
         p = scores / s
         return 1.0 / (np.sum(p * p) + eps)
+    
 
     def determine_important_internal_coordinates(
         self,
@@ -1235,9 +1502,6 @@ z
 
         # block construction / ranking
         max_anchor_candidates = 8
-        max_block_partners = 4
-        min_partner_pair_frac = 0.15
-        min_partner_coord_frac = 0.20
         pair_weight = 0.35
         support_weight = 0.25
 
@@ -1488,9 +1752,6 @@ z
 
             component = [
                 int(i) for i in component
-                if not (
-                    kinds_flat[i] == "dihedral"
-                )
             ]
 
             if not component:
@@ -2178,7 +2439,7 @@ z
             "delta_g_err": delta_g_err,
             "rho": rho,
             "pE_total": np.zeros(N, dtype=np.float64),
-            "source_contrib": blame_matrix,  # semantic reuse for compatibility
+            "source_contrib": blame_matrix,
             "blame_matrix": blame_matrix,
             "harmful_matrix": harmful_matrix,
             "helpful_matrix": helpful_matrix,

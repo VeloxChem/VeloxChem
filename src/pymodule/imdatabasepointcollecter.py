@@ -391,14 +391,7 @@ class IMDatabasePointCollecter:
         self._latest_qm_molecule = None
         self._latest_qm_positions_nm = None
 
-        self._test_hooks: Dict[str, Callable[[Dict[str, Any]], None]] = {}
-        self._collect_step_trace: bool = False
-        self._step_trace: List[Dict[str, Any]] = []
-        self._strict_test_hooks: bool = False
-
-        self.qm_omp_threads = {
-            "energy": None
-        }
+        self.qm_omp_threads = None
         
 
     def _create_platform(self):
@@ -435,39 +428,6 @@ class IMDatabasePointCollecter:
             platform.setPropertyDefaultValue("Precision", precision_map[precision_key])
 
         return platform
-        
-    def _set_test_hooks(
-            self, 
-            hooks: Optional[Dict[str, Callable[[Dict[str, Any]], None]]] = None,
-            collect_step_trace: bool = False,
-            strict: bool = False, 
-        ):
-
-        self._test_hooks = hooks or {}
-        self._collect_step_trace = bool(collect_step_trace)
-        self._strict_test_hooks = bool(strict)
-        self._step_trace = []
-    
-    def _emit_test_hook(self, event_name: str, payload: Dict[str, Any]):
-        fn = self._test_hooks.get(event_name)
-        if fn is None:
-            if self._collect_step_trace and event_name == "step":
-                self._step_trace.append(deepcopy(payload))
-            return
-
-        try:
-            fn(payload)
-        except Exception as exc:
-            if self._strict_test_hooks:
-                raise RuntimeError(
-                    f"Test hook '{event_name}' failed: {exc}"
-                ) from exc
-
-        if self._collect_step_trace and event_name == "step":
-            self._step_trace.append(deepcopy(payload))
-
-    def get_step_trace(self):
-        return list(self._step_trace)
 
     # Method to generate OpenMM system from VeloxChem objects
     def system_from_molecule(self,
@@ -1380,11 +1340,7 @@ class IMDatabasePointCollecter:
         driver_object.mark_runtime_data_cache_dirty()
 
 
-    def run_qmmm(self,
-                test_hooks=None,
-                collect_step_trace=False,
-                strict_test_hooks=False,
-                ):
+    def run_qmmm(self):
         """
         Runs a QM/MM simulation using OpenMM, storing the trajectory and simulation data.
 
@@ -1405,17 +1361,6 @@ class IMDatabasePointCollecter:
         
         if self.system is None:
             raise RuntimeError('System has not been created!')
-        
-        # test_hook section for consistent set up tests
-        self._set_test_hooks(hooks=test_hooks, 
-                             collect_step_trace=collect_step_trace,
-                             strict=strict_test_hooks)
-        
-        self._emit_test_hook("run_start", {
-            "nsteps": int(self.nsteps),
-            "ensemble": str(self.ensemble),
-            "roots_to_follow": list(self.roots_to_follow),
-        })
 
         # temperature = self.temperature
         self.temperature_number = self.temperature
@@ -1634,7 +1579,6 @@ class IMDatabasePointCollecter:
                     for root in self.roots_to_follow
                 },
             }
-            self._emit_test_hook("step", step_payload)
 
             integ_t0 = time()
 
@@ -1673,14 +1617,6 @@ class IMDatabasePointCollecter:
         elapsed_time = end_time - start_time
         elapsed_time_days = elapsed_time / (24 * 3600)
         performance = (self.nsteps * timestep / 1e6) / elapsed_time_days
-        self._emit_test_hook("run_end", {
-            "steps_collected": int(len(self.total_energies)),
-            "final_state": int(self.current_state),
-            "n_datapoints_per_root": {
-                int(root): int(len(self.qm_data_point_dict[root]))
-                for root in self.roots_to_follow
-            },
-        })
     
         self._print_qmmm_runtime_profile_summary()
         self._print_interpolation_runtime_profile_summary()
@@ -3022,17 +2958,6 @@ class IMDatabasePointCollecter:
 
                 self.confidence_radius_optimized = True
                 self.add_a_point = False
-        
-        self._emit_test_hook("point_correlation_decision", {
-            "current_state": int(self.current_state),
-            "energy_threshold_kcal_per_atom": float(self.energy_threshold),
-            "gradient_threshold": float(self.gradient_rmsd_thrsh),
-            "force_orient_threshold": float(self.force_orient_thrsh),
-            "add_a_point": bool(self.add_a_point),
-            "state_diff_kcal_per_atom": float(current_state_difference[self.current_state][0]),
-            "state_grad_rmsd": float(current_state_difference[self.current_state][1]),
-            "state_force_orient_cos": float(current_state_difference[self.current_state][2]),
-        })
 
         # calcualte energy gradient
         if self.add_a_point is False:
@@ -3105,21 +3030,34 @@ class IMDatabasePointCollecter:
                     main_constraint_list = selected
 
                     imp_coord_constraint = main_constraint_list.copy()
-                    
+                    print('Main CONSTRAINTS pre selection', main_constraint_list)
                     opt_results = None
-                    added_bond_key = []
-                    for dihedral in self.root_z_matrix[state_to_optim]['dihedrals']:
-                        for rot_bond in self.impes_drivers[state_to_optim].symmetry_information[5]:
-                            bond_key = tuple(sorted([dihedral[1], dihedral[2]]))
-                            if bond_key in added_bond_key:
-                                continue
+                    constraints = list(selected)
+                    selected_atoms = {a for coord in selected for a in coord}
 
-                            if (
-                                set([dihedral[1], dihedral[2]]) == set(rot_bond)
-                            ):
-                                if dihedral not in main_constraint_list:
-                                    added_bond_key.append(bond_key)
-                                    main_constraint_list.append(dihedral)
+                    for dih in self.root_z_matrix[state_to_optim]['dihedrals']:
+                        mid_bond = tuple(sorted((dih[1], dih[2])))
+
+                        if mid_bond not in self.impes_drivers[state_to_optim].symmetry_information[5]:
+                            continue
+
+                        touches_fault = bool(selected_atoms.intersection(dih))
+                        if touches_fault and dih not in constraints:
+                            constraints.append(dih)
+                    main_constraint_list.extend(constraints)
+                    # added_bond_key = []
+                    # for dihedral in self.root_z_matrix[state_to_optim]['dihedrals']:
+                    #     for rot_bond in self.impes_drivers[state_to_optim].symmetry_information[5]:
+                    #         bond_key = tuple(sorted([dihedral[1], dihedral[2]]))
+                    #         if bond_key in added_bond_key:
+                    #             continue
+
+                    #         if (
+                    #             set([dihedral[1], dihedral[2]]) == set(rot_bond)
+                    #         ):
+                    #             if dihedral not in main_constraint_list:
+                    #                 added_bond_key.append(bond_key)
+                    #                 main_constraint_list.append(dihedral)
                                    
                     print('Main CONSTRAINTS', main_constraint_list)
                     opt_results = None
@@ -3323,13 +3261,6 @@ class IMDatabasePointCollecter:
                         self.interpolation_settings[mol_basis[4][number]]['imforcefield_file'],
                         new_label
                     )
-                    self._emit_test_hook("datapoint_written", {
-                        "root": int(mol_basis[4][number]),
-                        "label": str(new_label),
-                        "energy_hartree": float(impes_coordinate.energy),
-                        "confidence_radius": float(impes_coordinate.confidence_radius),
-                        "bank_role": str(getattr(impes_coordinate, "bank_role", "core")),
-                    })
 
 
                     # Call on all active ranks in full-SPMD mode so in-memory sampling caches stay consistent.
@@ -3357,12 +3288,6 @@ class IMDatabasePointCollecter:
                 
 
         self.simulation.saveCheckpoint('checkpoint')
-        self._emit_test_hook("add_point_end", {
-            "n_datapoints_per_root": {
-                int(root): int(len(self.qm_data_point_dict[root]))
-                for root in self.roots_to_follow
-            }
-        })
      
     def _write_sampling_point_from_geometry(self, root, molecule, label, template_point):
         sampling_qm, sampling_grad, sampling_hess = self.sampling_driver['gs']
@@ -3848,7 +3773,7 @@ class IMDatabasePointCollecter:
                 "jac": jac_var,
                 "bounds": bounds,
                 "callback": _local_minimizer_callback,
-                "options": {"gtol": gtol, "ftol": ftol, "maxls": 10, "maxiter": maxiter, "disp": False},
+                "options": {"gtol": gtol, "ftol": ftol, "maxls": 10, "maxiter": maxiter},
             }
 
             print(
@@ -3903,12 +3828,6 @@ class IMDatabasePointCollecter:
         def _cluster_banks_for(dp_subset):
             return self._subset_rotor_cluster_bank_for_datapoints(cluster_banks_all, dp_subset)
 
-        self._emit_test_hook("alpha_optimization_start", {
-            "n_structures": int(len(molecules)),
-            "n_datapoints": int(len(datapoints)),
-            "mode": str(self.use_opt_confidence_radius[1]),
-        })
-        
         initial_alphas = np.array(
             [float(np.asarray(dp.confidence_radius).reshape(-1)[0]) for dp in datapoints],
             dtype=float
@@ -4095,10 +4014,6 @@ class IMDatabasePointCollecter:
             final_alphas = np.asarray(res['x'], dtype=np.float64).copy()
             print('FINAL Trust radius', final_alphas[trainable_idx])
 
-            self._emit_test_hook("alpha_optimization_end", {
-                "optimized_alphas": [float(x) for x in final_alphas],
-            })
-        
         dp_eval_c = self._clone_datapoints_with_alphas(datapoints, final_alphas)
         stage_results.append(
             self._evaluate_interpolation_errors_on_reference_set(
@@ -4186,52 +4101,6 @@ class IMDatabasePointCollecter:
                 dihedral_groups[2].extend([tuple(sorted(element)) for element in symmetry_group_dihedral_list])
 
         return angles_to_set, periodicities, symmetry_group_dihedral_dict, dihedral_groups       
-
-    def _mpi_collective_comm(self):
-        return self._mpi_ctrl_comm if self._mpi_is_active() else self.comm
-
-    def _run_optimization_mpi_safe(
-        self,
-        optimization_driver,
-        molecule,
-        constraints=None,
-        transition=False,
-        index_offset=1,
-        compute_args=None,
-        source_molecule=None,
-        collective=False,
-        phase_name='optimization tag',
-    ):
-        if collective:
-            comm = self._mpi_collective_comm()
-            rank = comm.Get_rank()
-            root = mpi_master()
-            return _collective_call_inline_style(
-                comm,
-                rank,
-                root,
-                phase_name,
-                self._run_optimization,
-                optimization_driver,
-                molecule,
-                constraints,
-                transition,
-                index_offset,
-                compute_args,
-                source_molecule,
-                True,
-            )
-
-        return self._run_optimization(
-            optimization_driver,
-            molecule,
-            constraints=constraints,
-            transition=transition,
-            index_offset=index_offset,
-            compute_args=compute_args,
-            source_molecule=source_molecule,
-            collective=False,
-        )
     
     def _compute_energy(self, qm_driver, molecule, basis=None):
         """ Computes the QM energy using self.qm_driver.

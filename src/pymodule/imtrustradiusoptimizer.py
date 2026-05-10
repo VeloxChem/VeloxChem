@@ -56,117 +56,6 @@ try:
 except ImportError:
     pass
 
-# ---- global worker state (created once per process) ----
-_W = {}
-
-def _init_worker(z_matrix, impes_dict, sym_dict, cluster_banks, dps, idx, exponent_p_q, beta, e_x, structures, qm_e, qm_g_flat):
-    """Runs once per process. Build a private driver & static constants."""
-    # Avoid oversubscription when each process calls BLAS:
-    os.environ["OMP_NUM_THREADS"] = "1"
-    os.environ["MKL_NUM_THREADS"] = "1"
-    
-    driver = InterpolationDriver(z_matrix)
-    driver.update_settings(impes_dict)
-    driver.symmetry_information = sym_dict
-
-    driver.impes_coordinate.inv_sqrt_masses = dps[0].inv_sqrt_masses
-
-    driver.exponent_p = exponent_p_q[0]
-    driver.exponent_q = exponent_p_q[1]
-    driver.print = False
-    driver.calc_optim_trust_radius = True
-    # Deep copy datapoints so each process can mutate dp.confidence_radius safely:
-    driver.qm_data_points = [copy.deepcopy(dp) for dp in dps]
-
-    _W["driver"] = driver
-    _W["idx"]    = np.asarray(idx, dtype=int)
-    _W["nsub"]   = len(idx)
-    _W["beta"]   = float(beta)
-    _W["e_x"]    = float(e_x)
-    _W["conv"]   = float(hartree_in_kcalpermol())
-    _W["structures"] = tuple(structures)
-    _W["qm_e"] = np.asarray(qm_e, dtype=np.float64)
-    _W["qm_g_flat"] = np.asarray(qm_g_flat, dtype=np.float64)
-
-
-def _eval_structure(payload):
-    """Compute loss and grad contrib for one structure index."""
-    s_idx, alphas = payload
-    drv    = _W["driver"]
-    idx    = _W["idx"]; nsub = _W["nsub"]
-    beta   = _W["beta"]; e_x = _W["e_x"]; conv = _W["conv"]
-    mol = _W["structures"][s_idx]
-    E_qm = _W["qm_e"][s_idx]
-    G_qm_flat = _W["qm_g_flat"][s_idx]
-
-    # Update alphas in this worker's private datapoints
-    for j, dp in enumerate(drv.qm_data_points):
-        dp.confidence_radius = alphas[j]
-
-    # Run interpolation for this structure
-    drv.compute(mol)
-    E_interp = drv.get_energy()                  # Hartree
-    G_interp = drv.get_gradient().reshape(-1)    # Hartree/Bohr
-
-    # Vectorized getters (M, MxD, etc.)
-    P       = np.asarray(drv.potentials, dtype=np.float64)                # (M,)
-    G       = np.asarray(drv.gradients, dtype=np.float64).reshape(len(P), -1)  # (M,D)
-    w_dα    = np.asarray(drv.dw_dalpha_list, dtype=np.float64)                  # (M,)
-    w_x_alpha     = np.asarray(drv.dw_dX_dalpha_list, dtype=np.float64).reshape(len(P), -1) # (M,D)
-    S       = float(drv.sum_of_weights)                                         # ()
-    S_x     = np.asarray(drv.sum_of_weights_grad, dtype=np.float64).reshape(-1) # (D,)
-    
-    # Residuals in kcal/mol
-    dE_res  = (E_interp - E_qm) * conv                                          # ()
-
-    # ----- loss (your anisotropic force term) -----
-    g_sub   = (G_interp[idx] - G_qm_flat[idx]) * conv / bohr_in_angstrom()   # (nsub,) in kcal/mol/Angstrom
-
-    h_sub   = (G_qm_flat[idx]) * conv / bohr_in_angstrom()   # (nsub,) in kcal/mol/Angstrom
-    nh      = np.linalg.norm(h_sub)
-    L_iso   = (g_sub @ g_sub) / nsub
-
-    if nh > 1e-8:
-        u    = h_sub / nh
-        tau  = 1e-8
-        gate = (nh*nh) / (nh*nh + tau*tau)
-        gpar = (u @ g_sub) * u
-        gper = g_sub - gpar
-        L_e   = dE_res**2
-        L_per = (gper @ gper) / nsub
-        L_par = (u @ g_sub)**2
-        L_F   = gate * (beta * L_per + (1.0 - beta) * L_par) + (1.0 - gate) * L_iso
-    else:
-        L_e = dE_res**2
-        L_F = L_iso
-
-    loss_s = 1.0 * e_x * L_e + 0.5 * (1.0 - e_x) * L_F
-    
-    # ----- gradient wrt alphas (vector length M) -----
-    # dE/dα
-    dE_dα = (w_dα * (P - E_interp)) * (conv / S)                                 # (M,)
-
-    # dG/dα only on relevant coordinates (matrix M x nsub), all in kcal/mol
-    G_sub = G[:, idx]
-    G_interp_sub = G_interp[idx]
-    w_x_alpha_sub = w_x_alpha[:, idx]
-    S_x_sub = S_x[idx]
-    term1 = (w_x_alpha_sub * (P - E_interp)[:, None]) * (conv/bohr_in_angstrom() / S)                  # (M,nsub)
-    term2 = (w_dα[:, None] * (G_sub - G_interp_sub[None, :])) * (conv/bohr_in_angstrom() / S)          # (M,nsub)
-    term3 = ((w_dα * (P - E_interp)) / (S**2))[:, None] * (conv/bohr_in_angstrom() * S_x_sub[None, :]) # (M,nsub)
-    dG_dα_sub = term1 + term2 - term3                                                # (M,nsub)
-
-    # dL/dg in subspace
-    if nh > 1e-8:
-        dL_dg_sub = (2.0 * gate) * ((beta/nsub)*(gper) + (1.0 - beta)*(gpar)) + (2.0 * (1.0 - gate) / nsub) * g_sub
-    else:
-        dL_dg_sub = 2.0 * g_sub / nsub
-
-    grad_force_part  = dG_dα_sub @ dL_dg_sub                     # (M,)
-    grad_energy_part = 2.0 * e_x * dE_res * dE_dα                # (M,)
-    grad_s = grad_energy_part + 0.5 * (1.0 - e_x) * grad_force_part   # (M,)
-    return float(loss_s), grad_s, float(L_e), float(L_F)
-
 
 
 class IMTrustRadiusOptimizer:
@@ -188,9 +77,6 @@ class IMTrustRadiusOptimizer:
             self.cluster_banks = copy.deepcopy(cluster_banks)
         else:
             self.cluster_banks = {}
-        
-        os.environ["OMP_NUM_THREADS"] = "1"
-        os.environ["MKL_NUM_THREADS"] = "1"
 
         # self._pool = ProcessPoolExecutor(
         #     max_workers=(n_workers or os.cpu_count() or 2),
@@ -200,16 +86,146 @@ class IMTrustRadiusOptimizer:
         #         dps, self.idx, exponent_p_q, self.beta, self.e_x,
         #         self.structures, self.qm_e, self.qm_g_flat,
         #     )
-        _init_worker(
-            z_matrix, impes_dict, sym_dict, self.cluster_banks,
-            dps, self.idx, exponent_p_q, self.beta, self.e_x,
-            self.structures, self.qm_e, self.qm_g_flat,
-        )
+        # _init_worker(
+        #     z_matrix, impes_dict, sym_dict, self.cluster_banks,
+        #     dps, self.idx, exponent_p_q, self.beta, self.e_x,
+        #     self.structures, self.qm_e, self.qm_g_flat,
+        # )
+
+        self._init_worker_state(exponent_p_q)
 
         self._cache_key = None
         self._cache_grad = None
         self._cache_metrics = None
         self._closed = False
+
+    def _init_worker_state(self, exponent_p_q):
+        """
+        Build driver and static constants for this optimizer instance.
+
+        This replaces the global _W dictionary in serial mode.
+        """
+
+        os.environ["OMP_NUM_THREADS"] = "1"
+        os.environ["MKL_NUM_THREADS"] = "1"
+
+        driver = InterpolationDriver(self.z_matrix)
+        driver.update_settings(self.impes_dict)
+        driver.symmetry_information = self.sym_dict
+
+        driver.impes_coordinate.inv_sqrt_masses = self.dps[0].inv_sqrt_masses
+
+        driver.exponent_p = exponent_p_q[0]
+        driver.exponent_q = exponent_p_q[1]
+        driver.print = False
+        driver.calc_optim_trust_radius = True
+
+        # Keep this if datapoints are mutated during evaluation
+        driver.qm_data_points = [copy.deepcopy(dp) for dp in self.dps]
+
+        self._worker_state = {
+            "driver": driver,
+            "idx": np.asarray(self.idx, dtype=int),
+            "nsub": len(self.idx),
+            "beta": float(self.beta),
+            "e_x": float(self.e_x),
+            "conv": float(hartree_in_kcalpermol()),
+            "structures": tuple(self.structures),
+            "qm_e": np.asarray(self.qm_e, dtype=np.float64),
+            "qm_g_flat": np.asarray(self.qm_g_flat, dtype=np.float64),
+        }
+
+        # _W["driver"] = driver
+        # _W["idx"]    = np.asarray(idx, dtype=int)
+        # _W["nsub"]   = len(idx)
+        # _W["beta"]   = float(beta)
+        # _W["e_x"]    = float(e_x)
+        # _W["conv"]   = float(hartree_in_kcalpermol())
+        # _W["structures"] = tuple(structures)
+        # _W["qm_e"] = np.asarray(qm_e, dtype=np.float64)
+        # _W["qm_g_flat"] = np.asarray(qm_g_flat, dtype=np.float64)
+
+
+    def _eval_structure(self, payload):
+        """Compute loss and grad contrib for one structure index."""
+        s_idx, alphas = payload
+
+        W = self._worker_state
+
+        drv    = W["driver"]
+        idx    = W["idx"]; nsub = W["nsub"]
+        beta   = W["beta"]; e_x = W["e_x"]; conv = W["conv"]
+        mol = W["structures"][s_idx]
+        E_qm = W["qm_e"][s_idx]
+        G_qm_flat = W["qm_g_flat"][s_idx]
+
+        # Update alphas in this worker's private datapoints
+        for j, dp in enumerate(drv.qm_data_points):
+            dp.confidence_radius = alphas[j]
+
+        # Run interpolation for this structure
+        drv.compute(mol)
+        E_interp = drv.get_energy()                  # Hartree
+        G_interp = drv.get_gradient().reshape(-1)    # Hartree/Bohr
+
+        # Vectorized getters (M, MxD, etc.)
+        P       = np.asarray(drv.potentials, dtype=np.float64)                # (M,)
+        G       = np.asarray(drv.gradients, dtype=np.float64).reshape(len(P), -1)  # (M,D)
+        w_dα    = np.asarray(drv.dw_dalpha_list, dtype=np.float64)                  # (M,)
+        w_x_alpha     = np.asarray(drv.dw_dX_dalpha_list, dtype=np.float64).reshape(len(P), -1) # (M,D)
+        S       = float(drv.sum_of_weights)                                         # ()
+        S_x     = np.asarray(drv.sum_of_weights_grad, dtype=np.float64).reshape(-1) # (D,)
+        
+        # Residuals in kcal/mol
+        dE_res  = (E_interp - E_qm) * conv                                          # ()
+
+        # ----- loss (your anisotropic force term) -----
+        g_sub   = (G_interp[idx] - G_qm_flat[idx]) * conv / bohr_in_angstrom()   # (nsub,) in kcal/mol/Angstrom
+
+        h_sub   = (G_qm_flat[idx]) * conv / bohr_in_angstrom()   # (nsub,) in kcal/mol/Angstrom
+        nh      = np.linalg.norm(h_sub)
+        L_iso   = (g_sub @ g_sub) / nsub
+
+        if nh > 1e-8:
+            u    = h_sub / nh
+            tau  = 1e-8
+            gate = (nh*nh) / (nh*nh + tau*tau)
+            gpar = (u @ g_sub) * u
+            gper = g_sub - gpar
+            L_e   = dE_res**2
+            L_per = (gper @ gper) / nsub
+            L_par = (u @ g_sub)**2
+            L_F   = gate * (beta * L_per + (1.0 - beta) * L_par) + (1.0 - gate) * L_iso
+        else:
+            L_e = dE_res**2
+            L_F = L_iso
+
+        loss_s = 1.0 * e_x * L_e + 0.5 * (1.0 - e_x) * L_F
+        
+        # ----- gradient wrt alphas (vector length M) -----
+        # dE/dα
+        dE_dα = (w_dα * (P - E_interp)) * (conv / S)                                 # (M,)
+
+        # dG/dα only on relevant coordinates (matrix M x nsub), all in kcal/mol
+        G_sub = G[:, idx]
+        G_interp_sub = G_interp[idx]
+        w_x_alpha_sub = w_x_alpha[:, idx]
+        S_x_sub = S_x[idx]
+        term1 = (w_x_alpha_sub * (P - E_interp)[:, None]) * (conv/bohr_in_angstrom() / S)                  # (M,nsub)
+        term2 = (w_dα[:, None] * (G_sub - G_interp_sub[None, :])) * (conv/bohr_in_angstrom() / S)          # (M,nsub)
+        term3 = ((w_dα * (P - E_interp)) / (S**2))[:, None] * (conv/bohr_in_angstrom() * S_x_sub[None, :]) # (M,nsub)
+        dG_dα_sub = term1 + term2 - term3                                                # (M,nsub)
+
+        # dL/dg in subspace
+        if nh > 1e-8:
+            dL_dg_sub = (2.0 * gate) * ((beta/nsub)*(gper) + (1.0 - beta)*(gpar)) + (2.0 * (1.0 - gate) / nsub) * g_sub
+        else:
+            dL_dg_sub = 2.0 * g_sub / nsub
+
+        grad_force_part  = dG_dα_sub @ dL_dg_sub                     # (M,)
+        grad_energy_part = 2.0 * e_x * dE_res * dE_dα                # (M,)
+        grad_s = grad_energy_part + 0.5 * (1.0 - e_x) * grad_force_part   # (M,)
+        return float(loss_s), grad_s, float(L_e), float(L_F)
 
     @staticmethod
     def _key(x):
@@ -230,7 +246,7 @@ class IMTrustRadiusOptimizer:
 
         # chunksize = max(1, math.ceil(self.S / (4 * self._pool._max_workers)))
         # futs = self._pool.map(_eval_structure, payloads, chunksize=chunksize)
-        futs = (_eval_structure((i, alphas_arr)) for i in range(self.S))
+        futs = (self._eval_structure((i, alphas_arr)) for i in range(self.S))
  
 
         sum_loss = 0.0
@@ -394,7 +410,7 @@ class IMTrustRadiusOptimizer:
     def close(self):
         if not self._closed:
             # self._pool.shutdown(wait=True)
-            _W.clear()
+            self._worker_state = None
             self._closed = True
 
     def __del__(self):
