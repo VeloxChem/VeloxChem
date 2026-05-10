@@ -527,9 +527,9 @@ def plot_xps_spectrum(xps_results,
 
     # Plot the spectrum for this single element
     _plot_single_element_xps(ax, element, energies, intensities,
-                            broadening_type, broadening_value,
-                            elem_color, atom_indices, show_atom_labels,
-                            color_by_atom)
+                             broadening_type, broadening_value,
+                             elem_color, atom_indices, show_atom_labels,
+                             color_by_atom)
 
     return ax
 
@@ -577,14 +577,14 @@ def _plot_single_element_xps(ax, element, energies, intensities,
         # Use a colormap for distinguishing atoms
         cmap = plt.cm.get_cmap('tab10')
         atom_colors = {atom_idx: cmap(i % 10) for i, atom_idx in enumerate(unique_atoms)}
-    
+
     # Plot stick spectrum
     for i in range(len(energies)):
         if color_by_atom and atom_indices is not None:
             peak_color = atom_colors[atom_indices[i]]
         else:
             peak_color = color
-            
+
         ax2.plot(
             [energies[i], energies[i]],
             [0.0, intensities[i]],
@@ -592,13 +592,13 @@ def _plot_single_element_xps(ax, element, energies, intensities,
             linewidth=2,
             color=peak_color,
         )
-        
+
         # Add atom labels above peaks (1-based indexing)
         if show_atom_labels and atom_indices is not None:
-            ax2.text(energies[i], intensities[i] * 1.05, 
-                    f'{element}{atom_indices[i] + 1}',
-                    ha='center', va='bottom', fontsize=9,
-                    fontweight='bold')
+            ax2.text(energies[i], intensities[i] * 1.05,
+                     f'{element}{atom_indices[i] + 1}',
+                     ha='center', va='bottom', fontsize=9,
+                     fontweight='bold')
 
     # Set up energy range for broadened spectrum
     xmin = max(0.0, min(energies) - 5.0)
@@ -623,26 +623,26 @@ def _plot_single_element_xps(ax, element, energies, intensities,
 
     # Add legend
     legend_handles = []
-    
+
     if color_by_atom and atom_indices is not None:
         # Add legend entry for each atom (1-based indexing)
         for atom_idx in np.unique(atom_indices):
             legend_handles.append(
                 mlines.Line2D([], [],
-                            color=atom_colors[atom_idx],
-                            alpha=0.7,
-                            linewidth=2,
-                            label=f'{element}{atom_idx + 1}')
+                              color=atom_colors[atom_idx],
+                              alpha=0.7,
+                              linewidth=2,
+                              label=f'{element}{atom_idx + 1}')
             )
     else:
         legend_handles.append(
             mlines.Line2D([], [],
-                        color=color,
-                        alpha=0.7,
-                        linewidth=2,
-                        label=f'{element} core orbitals')
+                          color=color,
+                          alpha=0.7,
+                          linewidth=2,
+                          label=f'{element} core orbitals')
         )
-    
+
     label_spectrum = f'{broadening_type.capitalize()} '
     label_spectrum += f'broadening ({broadening_value:.2f} eV FWHM)'
     legend_spectrum = mlines.Line2D([], [],
@@ -651,7 +651,7 @@ def _plot_single_element_xps(ax, element, energies, intensities,
                                     linewidth=2.5,
                                     label=label_spectrum)
     legend_handles.append(legend_spectrum)
-    
+
     ax2.legend(handles=legend_handles,
                frameon=False,
                borderaxespad=0.,

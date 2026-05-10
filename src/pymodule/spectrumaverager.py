@@ -72,7 +72,7 @@ class SpectrumAverager:
                 ostream = OutputStream(sys.stdout)
             else:
                 ostream = OutputStream(None)
-   
+
         self.broadening_type = "lorentzian"
         self.broadening_value_ev = 0.124
         self.xstep_ev = 0.01
@@ -276,7 +276,7 @@ class SpectrumAverager:
         Plot an averaged UV/Vis spectrum from multiple response results.
 
         :param rsp_all:
-            A list of response results dictionaries: (frame, rsp_results) tuples 
+            A list of response results dictionaries: (frame, rsp_results) tuples
             (as returned by the compute method).
         :param energy_min_ev:
             Minimum photon energy in eV for the common grid. If None, it is set to
@@ -316,10 +316,10 @@ class SpectrumAverager:
         auxnm = 1.0e7 / hartree_in_wavenumber()
 
         spectrum = self.compute(
-                rsp_all,
-                energy_min_ev=energy_min_ev,
-                energy_max_ev=energy_max_ev,
-            )
+            rsp_all,
+            energy_min_ev=energy_min_ev,
+            energy_max_ev=energy_max_ev,
+        )
 
         if ax is None:
             _, ax = plt.subplots()
@@ -367,7 +367,7 @@ class SpectrumAverager:
 
             ax2.set_ylim(0.0, max(0.2, ax2.get_ylim()[1]))
             ax2.set_xlim(ax.get_xlim())
-        
+
         if save_averaged_spectra:
             data = np.column_stack((wl, ymean))
             np.savetxt(
