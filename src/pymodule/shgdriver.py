@@ -47,7 +47,6 @@ from .distributedarray import DistributedArray
 from .firstorderprop import FirstOrderProperties
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check)
-from .errorhandler import assert_msg_critical
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
 
@@ -454,12 +453,9 @@ class ShgDriver(NonlinearSolver):
         for (wb, wc) in freqpairs:
 
             Na = {
-                'x': ComplexResponseSolver.get_full_solution_vector(Nx[('x',
-                                                                  (wb + wc))]),
-                'y': ComplexResponseSolver.get_full_solution_vector(Nx[('y',
-                                                                  (wb + wc))]),
-                'z': ComplexResponseSolver.get_full_solution_vector(Nx[('z',
-                                                                  (wb + wc))]),
+                'x': ComplexResponseSolver.get_full_solution_vector(Nx[('x', (wb + wc))]),
+                'y': ComplexResponseSolver.get_full_solution_vector(Nx[('y', (wb + wc))]),
+                'z': ComplexResponseSolver.get_full_solution_vector(Nx[('z', (wb + wc))]),
             }
 
             Nb = {

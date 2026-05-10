@@ -36,7 +36,6 @@ import numpy as np
 import math
 import sys
 
-from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import mpi_master, boltzmann_in_hartreeperkelvin
 from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
