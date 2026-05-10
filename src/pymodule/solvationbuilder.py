@@ -174,7 +174,7 @@ class SolvationBuilder:
         :param solvent:
             The name of the solvent molecule. The default is 'water'.
             Available options: 'cspce', 'ctip3p', 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone',
-            'chloroform', 'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf', 
+            'chloroform', 'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf',
             'acetonitrile', 'dmf', 'other' or 'itself'.
                 * 'other': The solvent molecule must be provided.
                 * 'itself': The solute molecule is used as the solvent as well.
@@ -919,9 +919,7 @@ class SolvationBuilder:
                 self.ostream.flush()
 
             for i, solvent_ff in enumerate(self.solvent_ffs):
-                solvent_ff.generate_residue_xml(
-                                                str(self._path(
-                                                    f'solvent_{i+1}.xml')),
+                solvent_ff.generate_residue_xml(str(self._path(f'solvent_{i+1}.xml')),
                                                 f'S{i+1:02d}')
                 self.ostream.print_info(f"solvent_{i+1}.xml file written")
                 self.ostream.flush()
@@ -1097,12 +1095,12 @@ class SolvationBuilder:
     def _determine_cubic_box_size(self, coordinates, padding):
         """
         Determines the size of a cubic box based on the molecular geometry and a padding parameter.
-        
-        :param coordinates: 
+
+        :param coordinates:
             The array of shape (n, 3) where n is the number of atoms, and each row contains the (x, y, z) coordinates of an atom.
-        :param padding: 
+        :param padding:
             The padding to be added to the bounding box of the molecule in nm.
-        :return: 
+        :return:
             The size of the cubic box in the same units as the input coordinates.
         """
         # Calculate the minimum and maximum coordinates along each axis
@@ -1311,7 +1309,7 @@ class SolvationBuilder:
     def _extract_atomtypes(self, itp_filename):
         """
         Extracts atom types from an ITP file, removes duplicates, and returns a list of unique atom types.
-        
+
         :param itp_filename: The name of the ITP file from which to extract atom types.
         :return: A list of unique atom types.
         """
@@ -1340,7 +1338,7 @@ class SolvationBuilder:
     def _remove_atomtypes_section(self, itp_filename):
         """
         Removes the [ atomtypes ] section from an ITP file.
-        
+
         :param itp_filename:
             The name of the ITP file from which to remove the atom types
             section.
@@ -1884,7 +1882,7 @@ class SolvationBuilder:
     def _get_volume(self, molecule):
         """
         Determine the volume of the molecule based on the vdW radii, with careful intersection correction.
-        
+
         :return:
             The volume of the molecule in cubic Angstrom.
         """
@@ -1982,7 +1980,7 @@ class SolvationBuilder:
                             total_quantity):
         """
         Compute the batch size dynamically based on the number of molecules added.
-        
+
         :param added_count: Number of molecules already added to the system.
         :param max_batch_size: Maximum batch size to start with.
         :param min_batch_size: Minimum batch size to avoid being too small.
