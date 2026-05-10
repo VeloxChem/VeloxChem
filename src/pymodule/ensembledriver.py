@@ -94,7 +94,7 @@ class EnsembleDriver:
         PE (SEP/CP3) and NPE (TIP3P/ff19sb) parameter tables are read from the
         ``database/environment_parameters`` directory.
 
-        See this reference, Figure 4, for a summary of 
+        See this reference, Figure 4, for a summary of
         an overview of SEP/CP3 parametrizations:
         https://doi.org/10.1021/acs.jctc.5c01719
         """
@@ -274,7 +274,6 @@ class EnsembleDriver:
                                 res_atoms.append(atom_info)
                         data['residues'][resname] = res_atoms
 
-
         db = {}
 
         for resname in data['residues']:
@@ -315,7 +314,7 @@ class EnsembleDriver:
             'HW': {'element': 'H', 'charge': 0.417},
             'HW1': {'element': 'H', 'charge': 0.417},
             'HW2': {'element': 'H', 'charge': 0.417},
-       }
+        }
 
         db['WAT'] = tip3p_params
         db['HOH'] = tip3p_params
@@ -417,7 +416,7 @@ class EnsembleDriver:
                     else:
                         merged_res_db[atom] = dict(params)
         return merged_db
-        
+
     def set_env_models(self,
                        pe_model: str | list[str] | tuple[str, ...] | None = None,
                        npe_model: str | list[str] | tuple[str, ...] | None = None):
@@ -432,7 +431,7 @@ class EnsembleDriver:
         - PE only:  e.g., set_env_models(pe_model="CP3")
         - NPE only: e.g., set_env_models(npe_model="ff19sb")
         - Both:     e.g., set_env_models(pe_model="CP3", npe_model="ff19sb")
-        - Multiple: e.g., set_env_models(pe_model=["SEP", "CP3"], 
+        - Multiple: e.g., set_env_models(pe_model=["SEP", "CP3"],
                                          npe_model=["tip3p", "ff19sb"]),
                                          e.g. a system that contains a protein,
                                          water, and described with both pe and npe.
@@ -453,7 +452,7 @@ class EnsembleDriver:
         """
         if pe_model is None and npe_model is None:
             raise ValueError("At least one of pe_model or npe_model must be provided.")
-        
+
         pe_model_names = self._normalize_model_names(pe_model)
         npe_model_names = self._normalize_model_names(npe_model)
 
@@ -472,7 +471,7 @@ class EnsembleDriver:
             }
         else:
             self.npe_model = None
-    
+
     @staticmethod
     def _first_residue_atom_pattern(atom_names, residue_ids, resnames, target_resname: str) -> list[str]:
         """
@@ -609,7 +608,6 @@ class EnsembleDriver:
                 return cand
 
         return None
-
 
     @staticmethod
     def _resolve_atom_name_for_pe_db(atom_name: str, available_atoms) -> str | None:
@@ -814,7 +812,6 @@ class EnsembleDriver:
                         "residue name must contain the same ordered atom list."
                     )
 
-
     def _build_point_charges(self, coords_ang, atom_names, resnames) -> np.ndarray | None:
         """
         Build point charges array expected by SCF driver: shape (6, N), coords in bohr.
@@ -880,13 +877,13 @@ class EnsembleDriver:
 
         if isinstance(snapshots, dict):
             snapshots = [snapshots]
-        
+
         # Write PE files only on master rank for now.
         # Other ranks wait at the barrier.
         if self.rank != mpi_master():
             self.comm.barrier()
             return
-        
+
         outdir = Path(outdir)
         outdir.mkdir(parents=True, exist_ok=True)
 
@@ -914,8 +911,8 @@ class EnsembleDriver:
             )
             npe_resnames = np.asarray(snap.get("npe_resnames", []), dtype=object)
             npe_atom_names = np.asarray(snap.get("npe_atom_names", []), dtype=object)
- 
-            if pe_coords.size == 0 and npe_coords.size == 0:                
+
+            if pe_coords.size == 0 and npe_coords.size == 0:
                 continue
 
             if pe_coords.size > 0 and pe_atom_names.size != pe_coords.shape[0]:
@@ -929,16 +926,16 @@ class EnsembleDriver:
 
             if pe_coords.size > 0 and pe_resids.size != pe_coords.shape[0]:
                 raise ValueError("pe_resids is missing or wrong length in snapshots.")
-            
+
             if pe_coords.size > 0 and pe_resnames.size != pe_coords.shape[0]:
-                raise ValueError("pe_resnames is missing or wrong length in snapshots.")            
+                raise ValueError("pe_resnames is missing or wrong length in snapshots.")
 
             if pe_coords.size > 0 and pe_resindices.size != pe_coords.shape[0]:
                 raise ValueError(
                     "pe_resindices is missing or wrong length in snapshots. "
                     "Required for robust residue-based PE validation and writing."
                 )
-            
+
             if npe_coords.size > 0 and npe_atom_names.size != npe_coords.shape[0]:
                 raise ValueError(
                     "npe_atom_names is missing or wrong length in snapshots. "
@@ -959,7 +956,7 @@ class EnsembleDriver:
                     "npe_resindices is missing or wrong length in snapshots. "
                     "Required for robust residue-based NPE validation and writing."
                 )
-            
+
             self._ensure_no_split_residues_between_pe_and_npe(snap)
             if pe_coords.size > 0:
                 self._validate_pe_residue_atom_patterns(
@@ -985,7 +982,6 @@ class EnsembleDriver:
                     npe_resname_set.append(r)
 
             pot_path = outdir / f"pe_frame_{frame:06d}.pot"
-            
 
             with pot_path.open("w") as fh:
                 fh.write("@environment\n")
@@ -1049,7 +1045,7 @@ class EnsembleDriver:
                 fh.write("@end\n")
 
         # Ensure all ranks proceed only after master finished writing
-        self.comm.barrier()    
+        self.comm.barrier()
 
     @staticmethod
     def _apply_options_to_driver(driver, options: dict, skip_keys: set[str] | None = None):
@@ -1095,33 +1091,33 @@ class EnsembleDriver:
         """
         if not property_options:
             return None
- 
+
         if "property" not in property_options:
             raise ValueError("property_options must contain key 'property'.")
- 
+
         prop = str(property_options["property"]).lower().strip()
         has_nstates = "nstates" in property_options
         has_freqs = "frequencies" in property_options
- 
+
         if prop not in {"absorption", "ecd"}:
             raise ValueError(
                 "Invalid property in property_options. "
                 "Expected 'absorption' or 'ecd'."
             )
- 
+
         if has_nstates and has_freqs:
             raise ValueError(
                 "property_options cannot contain both 'nstates' and 'frequencies'."
             )
- 
+
         if has_freqs:
             drv = ComplexResponseSolver(self.comm, self.ostream)
             drv.set_cpp_property("absorption" if prop == "absorption" else "ecd")
             return drv
- 
+
         if has_nstates:
             return LinearResponseEigenSolver(self.comm, self.ostream)
- 
+
         raise ValueError(
             "property_options must define either 'nstates' (TD-DFT) "
             "or 'frequencies' (CPP)."
@@ -1166,7 +1162,7 @@ class EnsembleDriver:
         :param qm_multiplicity:
             Optional override for the QM-region multiplicity. If None, the value stored
             in each snapshot is used, defaulting to 1 when absent.
-        
+
         :return:
             Dictionary with keys:
             - scf_all: list of (frame, scf_results)
@@ -1177,7 +1173,7 @@ class EnsembleDriver:
         :raises ValueError:
             If snapshot fields required to build NPE point charges are missing.
         """
-   
+
         if isinstance(snapshots, dict):
             snapshots = [snapshots]
 
@@ -1246,12 +1242,12 @@ class EnsembleDriver:
 
             snap_qm_charge = (
                 qm_charge
-                if qm_charge is not None 
+                if qm_charge is not None
                 else int(snap.get("qm_charge", 0))
             )
             snap_qm_multiplicity = (
                 qm_multiplicity
-                if qm_multiplicity is not None 
+                if qm_multiplicity is not None
                 else int(snap.get("qm_multiplicity", 1))
             )
 
@@ -1275,7 +1271,7 @@ class EnsembleDriver:
             # Reset embedding inputs every frame
             scf_driver.potfile = None
             scf_driver.point_charges = None
-            
+
             if has_pe:
                 scf_driver.potfile = str(potdir / f"pe_frame_{frame:06d}.pot")
 
@@ -1283,8 +1279,7 @@ class EnsembleDriver:
                 npe_atom_names = snap.get("npe_atom_names", [])
                 npe_resnames = snap.get("npe_resnames", [])
                 if len(npe_atom_names) == 0:
-                    raise ValueError("npe_atom_names missing in snapshots (required to read NPE charges from CSV)."
-                    )
+                    raise ValueError("npe_atom_names missing in snapshots (required to read NPE charges from CSV).")
                 scf_driver.point_charges = self._build_point_charges(
                     npe_coords, npe_atom_names, npe_resnames
                 )

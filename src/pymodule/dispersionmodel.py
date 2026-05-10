@@ -127,7 +127,7 @@ class DispersionModel:
         try:
             disp_res = disp_model.get_dispersion(D4Param(method=disp_xc_label),
                                                  grad=True)
-        except Exception as e:
+        except Exception:
             print_exception_if_debug()
             errmsg = 'DispersionModel: Could not get dispersion correction for'
             errmsg += f' {xc_label}. Please use a more recent version of'

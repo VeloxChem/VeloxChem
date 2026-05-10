@@ -519,18 +519,14 @@ class CubicResponseDriver(NonlinearSolver):
 
         for (wb, wc, wd) in freqtriples:
 
-            Na = ComplexResponseSolver.get_full_solution_vector(Nx[('A',
-                                                              (wb + wc + wd))])
+            Na = ComplexResponseSolver.get_full_solution_vector(Nx[('A', (wb + wc + wd))])
             Nb = ComplexResponseSolver.get_full_solution_vector(Nx[('B', wb)])
             Nc = ComplexResponseSolver.get_full_solution_vector(Nx[('C', wc)])
             Nd = ComplexResponseSolver.get_full_solution_vector(Nx[('D', wd)])
 
-            Nbc = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BC', wb, wc),
-                                                                wb + wc)])
-            Nbd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BD', wb, wd),
-                                                                wb + wd)])
-            Ncd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('CD', wc, wd),
-                                                                wc + wd)])
+            Nbc = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BC', wb, wc), wb + wc)])
+            Nbd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BD', wb, wd), wb + wd)])
+            Ncd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('CD', wc, wd), wc + wd)])
 
             if self.rank == mpi_master():
 
@@ -805,12 +801,9 @@ class CubicResponseDriver(NonlinearSolver):
             Nc = ComplexResponseSolver.get_full_solution_vector(Nx[('C', wc)])
             Nd = ComplexResponseSolver.get_full_solution_vector(Nx[('D', wd)])
 
-            Nbc = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BC', wb, wc),
-                                                                wb + wc)])
-            Nbd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BD', wb, wd),
-                                                                wb + wd)])
-            Ncd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('CD', wc, wd),
-                                                                wc + wd)])
+            Nbc = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BC', wb, wc), wb + wc)])
+            Nbd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BD', wb, wd), wb + wd)])
+            Ncd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('CD', wc, wd), wc + wd)])
 
             if self.rank != mpi_master():
                 continue
@@ -1020,12 +1013,9 @@ class CubicResponseDriver(NonlinearSolver):
             Nc = ComplexResponseSolver.get_full_solution_vector(Nx[('C', wc)])
             Nd = ComplexResponseSolver.get_full_solution_vector(Nx[('D', wd)])
 
-            Nbc = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BC', wb, wc),
-                                                                wb + wc)])
-            Nbd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BD', wb, wd),
-                                                                wb + wd)])
-            Ncd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('CD', wc, wd),
-                                                                wc + wd)])
+            Nbc = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BC', wb, wc), wb + wc)])
+            Nbd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BD', wb, wd), wb + wd)])
+            Ncd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('CD', wc, wd), wc + wd)])
 
             if self.rank == mpi_master():
 
@@ -1345,8 +1335,7 @@ class CubicResponseDriver(NonlinearSolver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
-            Na = ComplexResponseSolver.get_full_solution_vector(Nx[('A',
-                                                              (wb + wc + wd))])
+            Na = ComplexResponseSolver.get_full_solution_vector(Nx[('A', (wb + wc + wd))])
             Nb = ComplexResponseSolver.get_full_solution_vector(Nx[('B', wb)])
             Nc = ComplexResponseSolver.get_full_solution_vector(Nx[('C', wc)])
             Nd = ComplexResponseSolver.get_full_solution_vector(Nx[('D', wd)])

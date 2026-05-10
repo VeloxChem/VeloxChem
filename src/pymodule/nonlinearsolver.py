@@ -578,7 +578,6 @@ class NonlinearSolver:
                     # 6 second-order densities per frequency
                     size_1, size_2 = 36, 6
 
-
                 elif mode.lower() == 'thg_ii':
                     # 36 first-order densities per frequency
                     # 6 second-order densities per frequency
