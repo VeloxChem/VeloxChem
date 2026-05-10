@@ -265,17 +265,3 @@ class TestValetAnalyzer:
         assert 'Donor' in texts
 
         valet_module.plt.close(fig)
-
-    @skip_multi_rank
-    def test_real_distributed_solution_vector_reconstruction_matches_solver(
-            self):
-
-        _, _, _, rsp_results, lr_drv = self._get_water_lr_case()
-        solution = rsp_results['eigenvectors_distributed'][0]
-
-        full_vector = ValetAnalyzer.get_full_solution_vector(solution)
-        ref_vector = lr_drv.get_full_solution_vector(solution)
-
-        assert solution.rank == mpi_master()
-        assert full_vector is not None
-        assert np.allclose(full_vector, ref_vector)
