@@ -327,7 +327,7 @@ class TestSolvationBuilder:
         target_density = _target_density_for_count(solute, solvent, 1, box)
         builder = SolvationBuilder(ostream=RecordingOutput())
 
-        def fake_perform_equilibration(water_model=None, steps=None):
+        def fake_perform_equilibration(water_model=None, steps=None, write_log=False):
             raise ValueError('missing forcefield include')
 
         monkeypatch.setattr(builder, 'perform_equilibration',
