@@ -795,7 +795,8 @@ class InterpolationDriver():
             sigma = np.sin(np.deg2rad(float(self.tc_imp_dihedral_sigma_degrees)))
 
         elif section == "impropers":
-            sigma = np.deg2rad(float(self.tc_imp_improper_sigma_degrees))
+            sigma = np.sin(np.deg2rad(float(self.tc_imp_improper_sigma_degrees)))
+
 
         else:
             raise ValueError(f"Unknown important-coordinate section: {section}")
@@ -863,8 +864,9 @@ class InterpolationDriver():
 
             elif section == "impropers":
                 d = self._principal_torsion_delta(dq_raw)
-                z = d / sigma
-                dz_dx = b_row / sigma
+                z = np.sin(d) / sigma
+                dz_dx = np.cos(d) * b_row / sigma
+
 
             elif section == "angles":
                 z = dq_raw / sigma
@@ -1587,6 +1589,13 @@ z
                 0.65 * source_blame_score + 0.35 * response_score
             )
 
+            norm_displacement = self._normalized_internal_displacement(
+                dq_eff=dq_eff,
+                q_ref=q_dp,
+                coords_flat=coords_flat,
+                kinds_flat=kinds_flat,
+            )
+            
             support_mask = np.zeros(N, dtype=float)
             if local_coord_score.sum() > eps:
                 order_dp = np.argsort(-local_coord_score)
@@ -1607,6 +1616,7 @@ z
                 "local_coord_score": local_coord_score.copy(),
                 "support_mask": support_mask.copy(),
                 "rows": diag_result["rows"],
+                "norm_displacement": norm_displacement.copy(),
             })
 
         if not per_dp_results:
@@ -1642,6 +1652,7 @@ z
         global_support = np.zeros(N, dtype=float)
         global_rho = np.zeros(N, dtype=float)
         global_pair = np.zeros((N, N), dtype=float)
+        global_displacement = np.zeros(N, dtype=float)
 
         for idx in keep_indices:
             wk = dp_weights[idx]
@@ -1653,6 +1664,7 @@ z
             global_support += wk * r["support_mask"]
             global_rho += wk * r["rho"]
             global_pair += wk * r["pair_score"]
+            global_displacement += wk * r["norm_displacement"]
 
         global_response = self._normalize_nonnegative(global_response)
         global_source_blame = self._normalize_nonnegative(global_source_blame)
@@ -1778,15 +1790,19 @@ z
                 ),
                 reverse=True,
             )
-
+            component_sorted = [anchor_idx] + [
+                int(i) for i in component_sorted if int(i) != int(anchor_idx)
+            ]
             # Trim oversized components by score coverage.
             total_component_score = float(np.sum(global_coord_score[component_sorted]))
-            block_indices = []
-            cumulative_score = 0.0
+            total_component_score = float(np.sum(global_coord_score[component_sorted]))
+            block_indices = [int(anchor_idx)]
+            cumulative_score = float(global_coord_score[anchor_idx])
 
             for i in component_sorted:
-                block_indices.append(int(i))
-                cumulative_score += float(global_coord_score[i])
+                i = int(i)
+                if i == anchor_idx:
+                    continue
 
                 if len(block_indices) >= max_component_size:
                     break
@@ -1797,6 +1813,9 @@ z
                     and len(block_indices) >= 1
                 ):
                     break
+
+                block_indices.append(i)
+                cumulative_score += float(global_coord_score[i])
 
             key = tuple(sorted(block_indices))
             if key in seen_blocks:
@@ -1866,6 +1885,19 @@ z
             min_secondary_pair_frac=min_secondary_pair_frac,
         )
 
+        fallback_constraints = self._select_fallback_locality_constraints(
+            block_indices=best_block["block_indices"],
+            candidate_constraints=candidate_constraints,
+            primary_constraint=primary_constraint,
+            coords_flat=coords_flat,
+            kinds_flat=kinds_flat,
+            constraints_to_exclude=constraints_to_exclude,
+            global_coord_score=global_coord_score,
+            global_pair=global_pair,
+            global_displacement=global_displacement,
+            max_constraints=max(2, min(8, max_constraints_to_return)),
+        )
+
         # ------------------------------------------------------------------
         # Debug printout
         # ------------------------------------------------------------------
@@ -1911,7 +1943,7 @@ z
         print("\nPrimary constraint:", primary_constraint)
         print("Candidate constraints:", candidate_constraints)
 
-        return primary_constraint, candidate_constraints, best_block["block_coords"]
+        return primary_constraint, candidate_constraints, best_block["block_coords"], fallback_constraints
 
     # Helper methods
 
@@ -1954,11 +1986,6 @@ z
         if coord in constraints_to_exclude:
             return True
 
-        if (
-            kinds_flat[idx] == "dihedral"
-        ):
-            return True
-
         return False
 
 
@@ -1973,22 +2000,23 @@ z
         score_z: float = 2.0,
         pair_z: float = 1.5,
         min_atom_overlap: float = 0.25,
+        bridge_score_frac: float = 0.20,
+        bridge_score_z: float = 0.5,
         eps: float = 1e-12,
     ) -> List[List[int]]:
         """
-        Build connected faulty coordinate components.
+        Build connected faulty coordinate components using core and bridge nodes.
 
-        Nodes:
-            coordinates with unusually high global_coord_score.
+        Core nodes:
+            coordinates with clearly high error-source score.
 
-        Edges:
-            coordinates connected by high pair blame,
-            or by chemically local atom overlap if both are relevant.
+        Bridge nodes:
+            coordinates with moderate score that are chemically or blame-coupled
+            to a core node.
 
-        Returns
-        -------
-        components:
-            list of index lists. Each component is a candidate repair subspace.
+        This avoids missing coordinates that are necessary to lock the failed
+        geometry during constrained optimization but do not have top direct
+        gradient-error scores.
         """
         global_coord_score = np.asarray(global_coord_score, dtype=float)
         global_pair = np.asarray(global_pair, dtype=float)
@@ -1998,42 +2026,9 @@ z
         if N == 0:
             return []
 
-        # ------------------------------------------------------------
-        # Node threshold
-        # ------------------------------------------------------------
-        score_threshold = self._robust_positive_threshold(
-            global_coord_score,
-            z=score_z,
-            eps=eps,
-        )
+        score_max = float(np.max(global_coord_score))
 
-        nodes = []
-        for i in range(N):
-            if self._is_coord_excluded_for_constraint(
-                i,
-                coords_flat,
-                kinds_flat,
-                constraints_to_exclude,
-            ):
-                continue
-
-            if global_coord_score[i] >= score_threshold:
-                nodes.append(int(i))
-
-        # Always keep at least the best coordinate.
-        if not nodes:
-            best_idx = int(np.argmax(global_coord_score))
-            if not self._is_coord_excluded_for_constraint(
-                best_idx,
-                coords_flat,
-                kinds_flat,
-                constraints_to_exclude,
-            ):
-                nodes = [best_idx]
-
-        nodes = set(nodes)
-
-        if not nodes:
+        if score_max <= eps:
             return []
 
         # ------------------------------------------------------------
@@ -2046,11 +2041,117 @@ z
             eps=eps,
         )
 
-        adjacency = {i: set() for i in nodes}
+        # If the pair matrix is almost empty, avoid pair_threshold = inf
+        # blocking all chemically local bridge connections.
+        if not np.isfinite(pair_threshold):
+            pair_threshold = np.inf
 
         # ------------------------------------------------------------
-        # Build graph
+        # Core and bridge score thresholds
         # ------------------------------------------------------------
+        core_threshold = self._robust_positive_threshold(
+            global_coord_score,
+            z=score_z,
+            eps=eps,
+        )
+
+        if not np.isfinite(core_threshold):
+            core_threshold = score_max
+
+        bridge_threshold = max(
+            bridge_score_frac * score_max,
+            self._robust_positive_threshold(
+                global_coord_score,
+                z=bridge_score_z,
+                eps=eps,
+            ),
+        )
+
+        if not np.isfinite(bridge_threshold):
+            bridge_threshold = bridge_score_frac * score_max
+
+        # Make sure bridge threshold is lower than core threshold.
+        bridge_threshold = min(bridge_threshold, 0.75 * core_threshold)
+
+        # ------------------------------------------------------------
+        # Collect core and bridge-candidate nodes
+        # ------------------------------------------------------------
+        core_nodes = []
+        bridge_candidates = []
+
+        for i in range(N):
+            if self._is_coord_excluded_for_constraint(
+                i,
+                coords_flat,
+                kinds_flat,
+                constraints_to_exclude,
+            ):
+                continue
+
+            score_i = float(global_coord_score[i])
+
+            if score_i >= core_threshold:
+                core_nodes.append(int(i))
+
+            elif score_i >= bridge_threshold:
+                bridge_candidates.append(int(i))
+
+        # Always retain at least the best non-excluded coordinate as a core.
+        if not core_nodes:
+            order = np.argsort(-global_coord_score)
+
+            for i in order:
+                i = int(i)
+
+                if self._is_coord_excluded_for_constraint(
+                    i,
+                    coords_flat,
+                    kinds_flat,
+                    constraints_to_exclude,
+                ):
+                    continue
+
+                core_nodes = [i]
+                break
+
+        if not core_nodes:
+            return []
+
+        # ------------------------------------------------------------
+        # Accept only bridge nodes connected to a core node
+        # ------------------------------------------------------------
+        accepted_bridges = []
+
+        for b in bridge_candidates:
+            atoms_b = set(coords_flat[b])
+
+            for c in core_nodes:
+                atoms_c = set(coords_flat[c])
+
+                atom_overlap = len(atoms_b.intersection(atoms_c)) / max(
+                    1,
+                    len(atoms_b.union(atoms_c)),
+                )
+
+                pair_ok = float(global_pair[b, c]) >= pair_threshold
+
+                # If the pair graph is sparse, atom overlap is still allowed
+                # to keep chemically local bridge nodes.
+                overlap_ok = atom_overlap >= min_atom_overlap
+
+                if pair_ok or overlap_ok:
+                    accepted_bridges.append(int(b))
+                    break
+
+        nodes = set(core_nodes + accepted_bridges)
+
+        if not nodes:
+            return []
+
+        # ------------------------------------------------------------
+        # Build graph between all accepted nodes
+        # ------------------------------------------------------------
+        adjacency = {i: set() for i in nodes}
         node_list = sorted(nodes)
 
         for a, i in enumerate(node_list):
@@ -2068,16 +2169,16 @@ z
 
                 pair_ok = pair_ij >= pair_threshold
 
-                # Chemical locality fallback:
-                # If both coordinates are relevant and share atoms, connect them
-                # even if the blame-pair score is not extremely high.
-                local_overlap_ok = (
-                    atom_overlap >= min_atom_overlap
-                    and min(global_coord_score[i], global_coord_score[j])
-                    >= 0.25 * max(global_coord_score[i], global_coord_score[j], eps)
+                overlap_ok = atom_overlap >= min_atom_overlap
+
+                # Additional score compatibility condition:
+                # avoid connecting very weak bridge nodes to everything.
+                score_compat_ok = (
+                    min(global_coord_score[i], global_coord_score[j])
+                    >= bridge_threshold
                 )
 
-                if pair_ok or local_overlap_ok:
+                if pair_ok or (overlap_ok and score_compat_ok):
                     adjacency[i].add(j)
                     adjacency[j].add(i)
 
@@ -2106,7 +2207,9 @@ z
 
             components.append(sorted(component))
 
-        # Rank roughly by coordinate mass before returning.
+        # ------------------------------------------------------------
+        # Rank components by score mass
+        # ------------------------------------------------------------
         components = sorted(
             components,
             key=lambda comp: float(np.sum(global_coord_score[comp])),
@@ -2159,6 +2262,25 @@ z
         """Wrap angular difference to (-pi, pi]."""
         return (delta + np.pi) % (2.0 * np.pi) - np.pi
 
+    def _improper_dihedral_displacement(self, delta):
+        """
+        Improper dihedral displacement used in the local Taylor model:
+            2 * tan(delta / 2)
+        """
+        d = self._principal_torsion_delta(delta)
+        return 2.0 * np.tan(0.5 * d)
+
+
+    def _improper_dihedral_chain(self, delta):
+        """
+        Chain factor for d[2*tan(delta/2)]/d(delta):
+            sec^2(delta / 2)
+        """
+        d = self._principal_torsion_delta(delta)
+        cos_half = np.cos(0.5 * d)
+        return 1.0 / np.maximum(cos_half * cos_half, 1.0e-12)
+
+
 
     def coord_type(self, coord: Tuple[int, ...], kind: Optional[str] = None) -> str:
         """
@@ -2189,25 +2311,14 @@ z
         symmetry_information,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
-        Returns
-        -------
-        dq_raw : raw internal differences
-        dq_eff : effective differences used in the interpolation model
-        chain  : derivative chain factors
-
         Proper dihedrals:
-            dq_raw wrapped to (-pi, pi]
-            dq_eff = sin(dq_raw)
-            chain  = cos(dq_raw)
+            dq_eff = sin(delta), chain = cos(delta)
 
         Impropers:
-            dq_raw wrapped to (-pi, pi]
-            dq_eff = dq_raw
-            chain  = 1
+            dq_eff = 2*tan(delta/2), chain = sec^2(delta/2)
 
         Bonds/angles:
-            dq_eff = dq_raw
-            chain  = 1
+            dq_eff = raw delta, chain = 1
         """
         q_current = np.asarray(q_current, dtype=float)
         q_ref = np.asarray(q_ref, dtype=float)
@@ -2219,9 +2330,8 @@ z
         dq_eff = np.zeros(N, dtype=float)
         chain = np.ones(N, dtype=float)
 
-        for idx, (coord, kind) in enumerate(zip(coords_flat, kinds_flat)):
+        for idx, (_, kind) in enumerate(zip(coords_flat, kinds_flat)):
             if kind == "dihedral":
-
                 d = self._principal_torsion_delta(q_current[idx] - q_ref[idx])
                 dq_raw[idx] = d
                 dq_eff[idx] = np.sin(d)
@@ -2230,8 +2340,8 @@ z
             elif kind == "improper":
                 d = self._principal_torsion_delta(q_current[idx] - q_ref[idx])
                 dq_raw[idx] = d
-                dq_eff[idx] = d
-                chain[idx] = 1.0
+                dq_eff[idx] = self._improper_dihedral_displacement(d)
+                chain[idx] = self._improper_dihedral_chain(d)
 
             else:
                 d = q_current[idx] - q_ref[idx]
@@ -2240,6 +2350,7 @@ z
                 chain[idx] = 1.0
 
         return dq_raw, dq_eff, chain
+
 
 
     def _compute_partial_taylor_contributions(
@@ -2362,8 +2473,7 @@ z
             q_wo_j = q_current.copy()
 
             # Remove displacement of source j in the same coordinate chart.
-            if kinds_flat[j] == "dihedral":
-                # Keep periodic consistency.
+            if kinds_flat[j] in ("dihedral", "improper"):
                 d = self._principal_torsion_delta(q_current[j] - q_ref[j])
                 q_wo_j[j] = q_current[j] - d
             else:
@@ -2504,23 +2614,27 @@ z
         if H.shape != (N, N):
             raise ValueError("H has wrong shape")
 
-
+        dq_raw = np.array(dq_raw, dtype=float).reshape(-1)
         dq_eff = np.zeros(N, dtype=float)
         chain = np.ones(N, dtype=float)
 
-        for idx, (coord, kind) in enumerate(zip(coords_flat, kinds_flat)):
+        for idx, (_, kind) in enumerate(zip(coords_flat, kinds_flat)):
             if kind == "dihedral":
-
-                dq_eff[idx] = np.sin(dq_raw[idx])
-                chain[idx] = np.cos(dq_raw[idx])
+                d = self._principal_torsion_delta(dq_raw[idx])
+                dq_raw[idx] = d
+                dq_eff[idx] = np.sin(d)
+                chain[idx] = np.cos(d)
 
             elif kind == "improper":
-                dq_eff[idx] = dq_raw[idx]
-                chain[idx] = 1.0
+                d = self._principal_torsion_delta(dq_raw[idx])
+                dq_raw[idx] = d
+                dq_eff[idx] = self._improper_dihedral_displacement(d)
+                chain[idx] = self._improper_dihedral_chain(d)
 
             else:
                 dq_eff[idx] = dq_raw[idx]
                 chain[idx] = 1.0
+
 
         Hdq_raw = H @ dq_eff
         Hdq = chain * Hdq_raw
@@ -2791,6 +2905,100 @@ z
                 selected.append(coord_i)
 
         return selected, primary_constraint
+    
+    def _section_from_kind(self, kind):
+        return {
+            "bond": "bonds",
+            "angle": "angles",
+            "dihedral": "dihedrals",
+            "improper": "impropers",
+        }.get(kind)
+
+
+    def _normalized_internal_displacement(self, dq_eff, q_ref, coords_flat, kinds_flat):
+        disp = np.zeros(len(coords_flat), dtype=float)
+
+        for idx, kind in enumerate(kinds_flat):
+            section = self._section_from_kind(kind)
+            if section is None:
+                continue
+
+            sigma = self._imp_coordinate_sigma(section, idx, q_ref)
+            disp[idx] = abs(float(dq_eff[idx])) / max(float(sigma), 1.0e-12)
+
+        return disp
+
+
+    def _select_fallback_locality_constraints(
+        self,
+        *,
+        block_indices,
+        candidate_constraints,
+        primary_constraint,
+        coords_flat,
+        kinds_flat,
+        constraints_to_exclude,
+        global_coord_score,
+        global_pair,
+        global_displacement,
+        max_constraints=6,
+        min_displacement_sigma=1.0,
+        min_score_frac=0.10,
+        min_pair_frac=0.10,
+    ):
+        eps = 1.0e-12
+        selected = {tuple(int(x) for x in c)
+                    for c in list(candidate_constraints) + list(primary_constraint)}
+
+        selected_atoms = {a for coord in selected for a in coord}
+        block_set = set(int(i) for i in block_indices)
+
+        primary_idx = None
+        if primary_constraint:
+            primary_coord = tuple(int(x) for x in primary_constraint[0])
+            for idx, coord in enumerate(coords_flat):
+                if tuple(int(x) for x in coord) == primary_coord:
+                    primary_idx = idx
+                    break
+
+        pair_row = np.zeros(len(coords_flat), dtype=float)
+        best_pair = 0.0
+        if primary_idx is not None:
+            pair_row = np.asarray(global_pair[primary_idx], dtype=float)
+            best_pair = max([float(pair_row[i]) for i in block_set if i != primary_idx], default=0.0)
+
+        disp_score = self._normalize_nonnegative(global_displacement)
+        block_score_ref = max([float(global_coord_score[i]) for i in block_set], default=float(np.max(global_coord_score)))
+
+        ranked = []
+        for idx, coord_raw in enumerate(coords_flat):
+            coord = tuple(int(x) for x in coord_raw)
+            if coord in selected:
+                continue
+            if self._is_coord_excluded_for_constraint(idx, coords_flat, kinds_flat, constraints_to_exclude):
+                continue
+
+            atoms = set(coord)
+            atom_overlap = bool(selected_atoms.intersection(atoms)) if selected_atoms else False
+            pair_ok = best_pair > eps and float(pair_row[idx]) >= min_pair_frac * best_pair
+            local_ok = idx in block_set or atom_overlap or pair_ok
+
+            disp_ok = float(global_displacement[idx]) >= min_displacement_sigma
+            score_ok = float(global_coord_score[idx]) >= min_score_frac * max(block_score_ref, eps)
+
+            if not local_ok or not (disp_ok or score_ok):
+                continue
+
+            rank_value = (
+                0.50 * float(disp_score[idx])
+                + 0.30 * float(global_coord_score[idx])
+                + 0.20 * float(pair_row[idx])
+            )
+            ranked.append((idx, rank_value))
+
+        ranked = sorted(ranked, key=lambda x: x[1], reverse=True)
+        return [tuple(int(x) for x in coords_flat[i]) for i, _ in ranked[:max_constraints]]
+
 
 
     def print_ranked_table(

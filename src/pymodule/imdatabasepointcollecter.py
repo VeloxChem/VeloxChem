@@ -3006,7 +3006,7 @@ class IMDatabasePointCollecter:
                         drivers = self.drivers['es']
                         current_basis = MolecularBasis.read(molecule, self.basis_set_label['es'])
                                 
-                    optimized_molecule = molecule
+                    optimized_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
                     self.impes_drivers[state_to_optim].compute(molecule)
                     current_weights = self.impes_drivers[state_to_optim].weights
                     weights = [value for _, value in current_weights.items()]
@@ -3023,7 +3023,7 @@ class IMDatabasePointCollecter:
                             break
                     # qm_datapoints_weighted = [qm_datapoint for qm_datapoint in enumerate if ]
                     print('Items', sorted_items, len(internal_coordinate_datapoints), state_specific_energies[state_to_optim][0])
-                    _, candidate_constraints, _ = self.impes_drivers[state_to_optim].determine_important_internal_coordinates(state_specific_gradients[state_to_optim][0], molecule, self.root_z_matrix[state_to_optim], internal_coordinate_datapoints)
+                    _, candidate_constraints, _, fallback_constraints = self.impes_drivers[state_to_optim].determine_important_internal_coordinates(state_specific_gradients[state_to_optim][0], molecule, self.root_z_matrix[state_to_optim], internal_coordinate_datapoints)
                     selected = list(candidate_constraints)
                     selected = [tuple(int(x) for x in c) for c in selected]
                     selected = list(dict.fromkeys(selected))  # preserve order, remove duplicates
@@ -3032,7 +3032,7 @@ class IMDatabasePointCollecter:
                     imp_coord_constraint = main_constraint_list.copy()
                     print('Main CONSTRAINTS pre selection', main_constraint_list)
                     opt_results = None
-                    constraints = list(selected)
+                    constraints = []
                     selected_atoms = {a for coord in selected for a in coord}
 
                     for dih in self.root_z_matrix[state_to_optim]['dihedrals']:
@@ -3042,7 +3042,7 @@ class IMDatabasePointCollecter:
                             continue
 
                         touches_fault = bool(selected_atoms.intersection(dih))
-                        if touches_fault and dih not in constraints:
+                        if touches_fault and dih not in main_constraint_list:
                             constraints.append(dih)
                     main_constraint_list.extend(constraints)
                     # added_bond_key = []
@@ -3073,8 +3073,108 @@ class IMDatabasePointCollecter:
                     optimized_molecule.set_charge(molecule.get_charge())
                     optimized_molecule.set_multiplicity(molecule.get_multiplicity())
                     current_basis = MolecularBasis.read(optimized_molecule, current_basis.get_main_basis_label())
-                    print('Optimized Molecule', optimized_molecule.get_xyz_string())
-   
+                    print('1st Optimized Molecule', optimized_molecule.get_xyz_string())
+
+                    # determine distance of the new structure:
+
+                    self.impes_drivers[state_to_optim].compute(optimized_molecule)
+
+                    current_weights = self.impes_drivers[state_to_optim].weights
+                    weights = [value for _, value in current_weights.items()]
+                    used_labels = [label_idx for label_idx, _ in current_weights.items()]
+                    # Sort labels and weights by descending weight
+                    sorted_items = sorted(zip(used_labels, weights), key=lambda x: x[1], reverse=True)
+                    delta_e = abs(opt_results['opt_energies'][-1] - self.impes_drivers[state_to_optim].get_energy()
+                    ) * hartree_in_kcalpermol()
+
+                    print("\n" + "=" * 80)
+                    print(f"IM-PES diagnostics for state {state_to_optim}")
+                    print("=" * 80)
+
+                    print("\nWeights:")
+                    for label, weight in sorted_items:
+                        print(f"  datapoint {label}: {weight: .10e}")
+
+                    print("\nEnergy difference:")
+                    print(f"  ΔE = {delta_e: .10f} kcal/mol")
+
+                    print("=" * 80 + "\n")
+                    needs_locality_fallback = bool(fallback_constraints) and abs(delta_e) < abs(state_specific_energies[state_to_optim][0] - state_specific_energies[state_to_optim][1]) * hartree_in_kcalpermol() * 0.5
+
+                    if needs_locality_fallback:
+                        converged = False
+                        while not converged:
+                            guarded_constraints = list(dict.fromkeys(main_constraint_list + fallback_constraints))
+                            print("Retrying constrained optimization with locality guards", guarded_constraints)
+
+                            if isinstance(drivers[0], ScfRestrictedDriver) or isinstance(drivers[0], ScfUnrestrictedDriver):
+                                current_basis = MolecularBasis.read(molecule, current_basis.get_main_basis_label())
+                                energies, scf_results, rsp_results = self._compute_energy(drivers[0], molecule, current_basis)
+                                print('org mol in optimized loop', molecule.get_xyz_string())
+                                opt_results = self._run_optimization(
+                                    drivers[0],
+                                    molecule,
+                                    constraints=guarded_constraints,
+                                    index_offset=1,
+                                    compute_args=(current_basis, scf_results),
+                                )
+                            elif isinstance(drivers[0], XtbDriver):
+                                opt_results = self._run_optimization(
+                                    drivers[0],
+                                    molecule,
+                                    constraints=guarded_constraints,
+                                    index_offset=1,
+                                )
+
+                            optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
+                            optimized_molecule.set_charge(molecule.get_charge())
+                            optimized_molecule.set_multiplicity(molecule.get_multiplicity())
+
+                            print('Final guarded structure \n\n', optimized_molecule.get_xyz_string())
+
+                            self.impes_drivers[state_to_optim].compute(optimized_molecule)
+
+                            current_weights = self.impes_drivers[state_to_optim].weights
+                            weights = [value for _, value in current_weights.items()]
+                            used_labels = [label_idx for label_idx, _ in current_weights.items()]
+                            # Sort labels and weights by descending weight
+                            sorted_items = sorted(zip(used_labels, weights), key=lambda x: x[1], reverse=True)
+                            delta_e = abs(opt_results['opt_energies'][-1] - self.impes_drivers[state_to_optim].get_energy()) * hartree_in_kcalpermol()
+
+                            print("\n" + "=" * 80)
+                            print(f"IM-PES diagnostics for state {state_to_optim}")
+                            print("=" * 80)
+
+                            print("\nWeights:")
+                            for label, weight in sorted_items:
+                                print(f"  datapoint {label}: {weight: .10e}")
+
+                            print("\nEnergy difference:")
+                            print(f"  ΔE = {delta_e: .10f} kcal/mol")
+
+                            print("=" * 80 + "\n")
+                            prev_fall_const_size = len(fallback_constraints)
+                            for key, coord_type_entries in self.root_z_matrix[state_to_optim].items():
+                                for coord in coord_type_entries:
+                                    if coord not in fallback_constraints:
+                                        fallback_constraints.append(coord)
+                                        break
+                                    
+                                if len(fallback_constraints) != prev_fall_const_size:
+                                    break
+
+                            needs_locality_fallback = bool(fallback_constraints) and abs(delta_e) < abs(state_specific_energies[state_to_optim][0] - state_specific_energies[state_to_optim][1]) * hartree_in_kcalpermol() * 0.5
+
+                            if needs_locality_fallback:
+                                optimized_molecule = molecule
+                                imp_coord_constraint = []
+                            else:
+                                main_constraint_list = guarded_constraints
+                                imp_coord_constraint = list(dict.fromkeys(imp_coord_constraint + fallback_constraints)) 
+                                converged = True
+
+
+
                     imp_int_coord = {'bonds': [], 'angles': [], 'dihedrals': [], 'impropers': []}
                     for element in imp_coord_constraint:
                     
@@ -3668,14 +3768,14 @@ class IMDatabasePointCollecter:
             elif sample_size <= 800:
                 size_label = 'medium'
                 n_bh_iter = 4
-                gtol = 2e-3
-                ftol = 5e-4
+                gtol = 1e-3
+                ftol = 1e-4
                 maxiter = 220
             else:
                 size_label = 'large'
                 n_bh_iter = 0
-                gtol = 5e-3
-                ftol = 5e-4
+                gtol = 1e-3
+                ftol = 1e-4
                 maxiter = 140
 
             # Backward compatible interpretation:
@@ -3845,7 +3945,7 @@ class IMDatabasePointCollecter:
         
         stage_results = []
         cluster_banks_all = self._resolve_trust_radius_cluster_bank(self.current_state)     
-
+        
         dp_eval_a = self._clone_datapoints_with_alphas(dp_wo_last, alphas_wo_last)
         stage_results.append(
             self._evaluate_interpolation_errors_on_reference_set(
@@ -3862,7 +3962,9 @@ class IMDatabasePointCollecter:
             )
         )
 
-        dp_eval_b = self._clone_datapoints_with_alphas(datapoints, initial_alphas)
+        averaged_alphas = [0.5 for i in range(len(initial_alphas))]
+
+        dp_eval_b = self._clone_datapoints_with_alphas(datapoints, averaged_alphas)
         stage_results.append(
             self._evaluate_interpolation_errors_on_reference_set(
                 scenario_name="with_new_datapoint_pre_opt",
