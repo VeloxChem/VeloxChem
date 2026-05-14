@@ -37,6 +37,7 @@ import scipy
 import h5py
 import re
 import os, copy, math
+import warnings
 
 from contextlib import redirect_stderr
 from io import StringIO
@@ -60,6 +61,21 @@ except ImportError:
 
 class IMTrustRadiusOptimizer:
     def __init__(self, z_matrix, impes_dict, sym_dict, dps, structure_list, qm_e, qm_g, exponent_p_q, e_x, beta=0.8, verbose=False, cluster_banks=None):
+
+        p, q = exponent_p_q
+
+        if p > 10:
+            warnings.warn(
+                (
+                    f"Large Shepard exponent detected: p = {p}, q = {q}. "
+                    "Trust-radius optimization may become numerically unstable because "
+                    "the two-part weights can become extremely localized, causing "
+                    "underflow of raw weights and division by a near-zero sum of weights. "
+                    "Consider using smaller exponents such as p=2,q=1 or p=4,q=2, p=6,q=2"
+                ),
+                RuntimeWarning,
+                stacklevel=2,
+            )
         self.z_matrix       = z_matrix
         self.impes_dict     = impes_dict
         self.sym_dict       = sym_dict
