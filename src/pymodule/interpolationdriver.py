@@ -1895,7 +1895,6 @@ z
             global_coord_score=global_coord_score,
             global_pair=global_pair,
             global_displacement=global_displacement,
-            max_constraints=max(2, min(8, max_constraints_to_return)),
         )
 
         # ------------------------------------------------------------------
@@ -2925,7 +2924,7 @@ z
 
             sigma = self._imp_coordinate_sigma(section, idx, q_ref)
             disp[idx] = abs(float(dq_eff[idx])) / max(float(sigma), 1.0e-12)
-
+        print('current disp', disp)
         return disp
 
 
@@ -2941,7 +2940,6 @@ z
         global_coord_score,
         global_pair,
         global_displacement,
-        max_constraints=6,
         min_displacement_sigma=1.0,
         min_score_frac=0.10,
         min_pair_frac=0.10,
@@ -2997,7 +2995,7 @@ z
             ranked.append((idx, rank_value))
 
         ranked = sorted(ranked, key=lambda x: x[1], reverse=True)
-        return [tuple(int(x) for x in coords_flat[i]) for i, _ in ranked[:max_constraints]]
+        return [tuple(int(x) for x in coords_flat[i]) for i, _ in ranked[:]]
 
 
 

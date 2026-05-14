@@ -3078,15 +3078,22 @@ class IMDatabasePointCollecter:
                     # determine distance of the new structure:
 
                     self.impes_drivers[state_to_optim].compute(optimized_molecule)
-
-                    current_weights = self.impes_drivers[state_to_optim].weights
-                    weights = [value for _, value in current_weights.items()]
-                    used_labels = [label_idx for label_idx, _ in current_weights.items()]
+                    trial_weights = self.impes_drivers[state_to_optim].weights
+                    weights = [value for _, value in trial_weights.items()]
+                    used_labels = [label_idx for label_idx, _ in trial_weights.items()]
                     # Sort labels and weights by descending weight
                     sorted_items = sorted(zip(used_labels, weights), key=lambda x: x[1], reverse=True)
                     delta_e = abs(opt_results['opt_energies'][-1] - self.impes_drivers[state_to_optim].get_energy()
                     ) * hartree_in_kcalpermol()
 
+                    # norm_ref_weights = self._normalize_weight_dict(current_weights)
+                    # norm_trial_weights = self._normalize_weight_dict(trial_weights)
+
+                    # weight_report = self._weight_distribution_report(norm_ref_weights, norm_trial_weights)
+                    
+                    # print(weight_report)
+                    # exit()
+                    
                     print("\n" + "=" * 80)
                     print(f"IM-PES diagnostics for state {state_to_optim}")
                     print("=" * 80)
@@ -3103,8 +3110,13 @@ class IMDatabasePointCollecter:
 
                     if needs_locality_fallback:
                         converged = False
+                        increasing_DOFs = 0
                         while not converged:
-                            guarded_constraints = list(dict.fromkeys(main_constraint_list + fallback_constraints))
+                            increasing_DOFs +=6
+                            if increasing_DOFs >= len(fallback_constraints):
+                                break
+                                
+                            guarded_constraints = list(dict.fromkeys(main_constraint_list + fallback_constraints[:increasing_DOFs]))
                             print("Retrying constrained optimization with locality guards", guarded_constraints)
 
                             if isinstance(drivers[0], ScfRestrictedDriver) or isinstance(drivers[0], ScfUnrestrictedDriver):
@@ -3205,6 +3217,73 @@ class IMDatabasePointCollecter:
                 self.add_point(state_specific_molecules, self.non_core_symmetry_groups)
                 self.last_point_added = self.point_checker - 1
                 self.point_checker = 0
+    
+    def _normalize_weight_dict(self, weights):
+        """
+        This function is used to normalize the incoming weight dictionary
+        used for the identificaiton of the necessary constraint optimizaiton
+        """
+        vals = {int(k): max(float(v), 0.0) for k, v in weights.items()}
+        total = sum(vals.values())
+
+        if total <= 1.0e-15:
+            n = max(len(vals), 1)
+            return {k: 1.0/n for k in vals}
+        return {k: v / total for k, v in vals.items()}
+
+    def _weight_distribution_report(self, ref_weights, cur_weights):
+        # define the current weight contribuionts
+        labels = sorted(set(ref_weights) | set(cur_weights))
+        p = np.array([ref_weights[k] for k in labels])
+        q = np.array([cur_weights[k] for k in labels])
+        
+        # normalization
+        p /= max(p.sum(), 1.0e-12)
+        q /= max(q.sum(), 1.0e-12)
+        
+        hell_coeff = float(np.sqrt(0.5 * np.sum((np.sqrt(p) - np.sqrt(q))**2)))
+        
+        m = 0.5 * (p + q)
+        mask_p = p > 0.0
+        mask_q = q > 0.0
+
+        js = 0.5 * np.sum(p[mask_p] * np.log(p[mask_p] / m[mask_p]))
+        js += 0.5 * np.sum(q[mask_q] * np.log(q[mask_q] / m[mask_q]))
+
+        order = np.argsort(-p)
+        keep = []
+        mass = 0.0
+        for idx in order:
+            keep.append(idx)
+            mass += p[idx]
+            if mass >= 0.8:
+                break
+        
+        retained = float(np.sum(q[keep]))
+        neff_ref = float(1.0 / max(np.sum(p * p), 1.0e-12))
+        neff_trial = float(1.0 / max(np.sum(q * q), 1.0e-12))
+
+        return {
+            "hell_coef": hell_coeff,
+            "js": float(js),
+            "retained_ref_top_mass": retained,
+            "max_abs_delta": float(np.max(np.abs(p - q))) if p.size else 0.0,
+            "neff_ratio": neff_trial / max(neff_ref, 1.0e-12)
+        }
+
+    def _weight_distribution_is_local(self, report):
+
+        return (
+            report["hellinger"] <= 0.20 and
+            report["js"] <= 0.05 and
+            report["retained_ref_top_mass"] >= 0.70 and
+            report["max_abs_delta"] <= 0.35 and
+            0.35 <= report["neff_ratio"] <= 3.0
+        )
+    
+    # def _normalized_coord_delta(self, driver, z_matrix, q_a, q_b, q_sigma_ref):
+
+    #     coords, kinds = 
 
     def _build_opt_constraint_list(self, constraints, index_offset=1):
 
