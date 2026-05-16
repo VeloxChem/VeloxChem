@@ -1,7 +1,0 @@
-[ moleculetype ]
-; Name            nrexcl
-MET          3
-
-[ atoms ]
-;   nr       type  resnr residue  atom   cgnr    charge       mass  typeB    chargeB      massB
-    1         ZA      1    MET     Zr1     1  4.0000000  91.224000   ; qtot 
