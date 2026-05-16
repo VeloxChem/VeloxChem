@@ -54,6 +54,27 @@ from ..md.openmmsetup import OpenmmSetup
 from .defects import TerminationDefectGenerator
 
 
+_ZR_HF_DUMMY_ATOM_REFERENCE = (
+    "Su, H.; Ahlquist, M. S. G. Nonbonded Zr4+ and Hf4+ models for "
+    "simulations of condensed phase metal-organic frameworks. "
+    "J. Phys. Chem. C 2021, 125 (11), 6471-6478."
+)
+
+_AL_FE_CR_DUMMY_ATOM_REFERENCE = (
+    "Golo, D.; Ahlquist, M. S. G.; Su, H. Development and Application of "
+    "Fe3+, Al3+, Cr3+ Dummy Atom Models for Metal-Organic Frameworks. "
+    "ACS Omega 2025, 10 (4), 3801-3807."
+)
+
+_DUMMY_ATOM_REFERENCES = {
+    "ZR": _ZR_HF_DUMMY_ATOM_REFERENCE,
+    "HF": _ZR_HF_DUMMY_ATOM_REFERENCE,
+    "AL": _AL_FE_CR_DUMMY_ATOM_REFERENCE,
+    "FE": _AL_FE_CR_DUMMY_ATOM_REFERENCE,
+    "CR": _AL_FE_CR_DUMMY_ATOM_REFERENCE,
+}
+
+
 class Framework:
     """Holds the built MOF: graph, cell, merged data, and options for writing, solvation, and MD.
 
@@ -219,6 +240,25 @@ class Framework:
 
         self.mlp_type = 'mace'
         self.mlp_model_path = None
+
+    def _dummy_atom_reference(self) -> Optional[str]:
+        """Return the citation for the selected dummy atom metal model."""
+        if not self.dummy_atom_node or self.node_metal is None:
+            return None
+
+        metal = str(self.node_metal).strip().upper()
+        return _DUMMY_ATOM_REFERENCES.get(metal)
+
+    def _print_dummy_atom_reference(self) -> None:
+        reference = self._dummy_atom_reference()
+        if reference is None:
+            return
+
+        if hasattr(self.ostream, "print_reference"):
+            self.ostream.print_reference("Reference: " + reference)
+        else:
+            self.ostream.print_info("Reference: " + reference)
+        self.ostream.flush()
 
     def replace(
         self,
@@ -567,6 +607,7 @@ class Framework:
     def md_prepare(self):
         #write gro file for the framework
         self.generate_linker_forcefield()
+        self._print_dummy_atom_reference()
         self.gmx_ff = GromacsForcefieldMerger()
         self.gmx_ff._debug = self._debug
         self.gmx_ff.solvents_dict = self.solvents_dict

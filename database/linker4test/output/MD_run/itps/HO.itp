@@ -1,0 +1,12 @@
+[ moleculetype ]
+;name            nrexcl
+HO                   3
+
+[ atoms ]
+;   nr  type  resi  res  atom  cgnr     charge       mass
+     1   O      1    HO    O1    1    -1.14491900    15.99492 ; qtot -1.000  equiv. o_00
+     2   HO     1    HO    H2    2     0.14491900     1.00782 ; qtot -0.064  equiv. hox1_00
+
+[ bonds ]
+;   ai     aj    funct       r           k_r
+      1      2     1      0.0981000  452123.040000; Guessed
