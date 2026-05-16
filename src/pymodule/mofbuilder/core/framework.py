@@ -470,6 +470,11 @@ class Framework:
         """Write framework to file(s). format: list of 'pdb'|'gro'|'xyz'|'cif'; optional MLP energy minimization."""
         format = format or []
 
+        if self.graph is not None and (
+                self.framework_data is None or
+                getattr(self.mofwriter, "merged_data", None) is None):
+            self.get_merged_data()
+
         if periodicity or self.periodicity:
             self.ostream.print_info("Writing periodic system")
             self.ostream.flush()
