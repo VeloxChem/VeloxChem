@@ -160,7 +160,15 @@ class GromacsForcefieldMerger:
                     self._copy_file(str(item), str(dest / item.name))
                 elif item.is_dir():
                     copy_folder(item, dest / item.name)
-        copy_folder(amber_itp_path, dest_amber_itp_path)
+        if amber_itp_path.is_dir():
+            copy_folder(amber_itp_path, dest_amber_itp_path)
+        else:
+            self.ostream.print_warning(
+                f"Amber force-field directory {amber_itp_path} was not found. "
+                "Skipping this copy step may cause issues with solvent "
+                "parameters or atom types in the generated GROMACS files."
+            )
+            self.ostream.flush()
         
         
         node_itp_name = f"{self.node_metal_type}_dummy" if self.dummy_atom_node else f"{self.node_metal_type}"
