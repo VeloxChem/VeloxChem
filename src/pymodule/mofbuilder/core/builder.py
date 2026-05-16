@@ -316,6 +316,14 @@ class MetalOrganicFrameworkBuilder:
         self.mof_top_library.data_path = self.data_path
         self.mof_top_library.list_mof_families()
 
+    def show_available_mof_families(self):
+        self.ostream.print_warning(
+            "MofBuilder.show_available_mof_families() is kept for "
+            "compatibility with old versions. The recommended method is "
+            "MofBuilder.list_available_mof_families().")
+        self.ostream.flush()
+        return self.list_available_mof_families()
+
     def list_available_metals(self, mof_family: Optional[str] = None) -> None:
         """Print available metals for the given (or current) MOF family from the topology library."""
         if self.data_path is None:
