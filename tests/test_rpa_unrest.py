@@ -9,6 +9,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
+from veloxchem.errorhandler import VeloxChemError
 
 
 @pytest.mark.solvers
@@ -435,7 +436,7 @@ class TestUnrestrictedRPA:
         nonlinear_drv.nstates = 1
         nonlinear_drv.nonlinear = True
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='not implemented for nonlinear'):
             nonlinear_drv.compute(mol, bas, scf_results)
 
@@ -444,6 +445,6 @@ class TestUnrestrictedRPA:
         restricted_drv.nstates = 1
         restricted_drv.restricted_subspace = True
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='restricted_subspace not implemented'):
             restricted_drv.compute(mol, bas, scf_results)

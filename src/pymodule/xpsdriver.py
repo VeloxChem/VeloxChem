@@ -42,6 +42,7 @@ from .errorhandler import assert_msg_critical
 from .spectrumplot import plot_xps_spectrum
 from .sanitychecks import scf_results_sanity_check
 
+
 class XPSDriver:
     """
     Implements XPS (X-ray Photoelectron Spectroscopy) calculations
@@ -294,7 +295,7 @@ class XPSDriver:
         else:
             assert_msg_critical(
                 False,
-                f'XPSDriver._find_core_orbital_indices: Cannot find orbital energies in scf_results')
+                'XPSDriver._find_core_orbital_indices: Cannot find orbital energies in scf_results')
 
         # Get appropriate energy ranges based on method type
         energy_ranges = self._get_energy_ranges(method_type)
@@ -316,7 +317,7 @@ class XPSDriver:
         emin, emax = energy_ranges[element_symbol]
         expansion_factor = 0.0
         max_expansions = 5
-        
+
         for expansion in range(max_expansions):
             # Expand range if needed
             if expansion > 0:
@@ -359,7 +360,7 @@ class XPSDriver:
         # Get MO coefficients for atom assignment
         assert_msg_critical(
             'C_alpha' in scf_results,
-            f'XPSDriver._find_core_orbital_indices: Cannot find MO coefficients in scf_results')
+            'XPSDriver._find_core_orbital_indices: Cannot find MO coefficients in scf_results')
 
         mo_coefficients = scf_results['C_alpha']
 
@@ -374,7 +375,7 @@ class XPSDriver:
 
     def compute(self, molecule, basis, scf_driver, element=None, elements=None):
         """
-        Computes core ionization energies for specified element(s) using 
+        Computes core ionization energies for specified element(s) using
         the full core-hole (FCH) approximation.
 
         :param molecule:
@@ -403,7 +404,7 @@ class XPSDriver:
             assert_msg_critical(
                 False,
                 'XPSDriver.compute: Must specify either element or elements parameter.')
-        
+
         if element is not None:
             assert_msg_critical(
                 isinstance(element, str),
@@ -495,7 +496,7 @@ class XPSDriver:
                         warning = f' The molecule contains {n_deloc} delocalized core orbitals.'
                         self.ostream.print_blank()
                         self.ostream.print_warning(warning)
-                        warning = f' For correct XPS spectra, localize these orbitals first: '
+                        warning = ' For correct XPS spectra, localize these orbitals first: '
                         for mo_idx in delocalized:
                             warning += f' MO {mo_idx} '
                         self.ostream.print_warning(warning)
@@ -539,7 +540,7 @@ class XPSDriver:
                 scf_ion.maximum_overlap(molecular_ion, basis, orbs, occa, occb)
 
                 # Compute FCH state
-                fch_results = scf_ion.compute(molecular_ion, basis)
+                fch_results_not_used = scf_ion.compute(molecular_ion, basis)
                 fch_energy = scf_ion.get_scf_energy()
 
                 # Calculate core ionization energy (in eV)
@@ -627,7 +628,7 @@ class XPSDriver:
         :param show_atom_labels:
             If True, display atom indices as labels above peaks. Default is True.
         :param color_by_atom:
-            If True, color each peak according to its atom index instead of using 
+            If True, color each peak according to its atom index instead of using
             element color. Default is False.
         :param ax:
             The matplotlib axis to plot on. If None, a new figure is created.

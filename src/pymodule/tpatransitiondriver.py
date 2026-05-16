@@ -634,7 +634,7 @@ class TpaTransitionDriver(NonlinearSolver):
             profiler.check_memory_usage('End of QRF')
 
             ret_dict = {
-                'photon_energies': [-w for w in freqs],
+                'photon_energies': [float(-w) for w in freqs],
                 'transition_moments': M_tensors,
                 'tpa_strengths': tpa_strengths,
                 'excited_state_dipole_moments': excited_state_dipole_moments,
@@ -657,7 +657,7 @@ class TpaTransitionDriver(NonlinearSolver):
         :param kX:
             A dictonary with all the first-order response matrices
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param nocc:
             Number of occupied orbitals
 
@@ -781,7 +781,7 @@ class TpaTransitionDriver(NonlinearSolver):
         :param F0:
             The Fock matrix in MO basis
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param molecule:
             The molecule
         :param ao_basis:

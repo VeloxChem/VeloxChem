@@ -122,6 +122,10 @@ class ScfGradientDriver(GradientDriver):
             not self.scf_driver.ri_jk,
             f'{type(self).__name__}.compute: RI-JK is not yet supported')
 
+        assert_msg_critical(
+            self.scf_driver.electric_field is None,
+            f'{type(self).__name__}.compute: electric_field is not supported')
+
         scf_results = self.scf_driver.scf_results
         if scf_results is None:
             # run SCF if needed
@@ -865,6 +869,7 @@ class ScfGradientDriver(GradientDriver):
             grad_timing['XC_grad'] += time.time() - t0
 
         # Embedding contribution to the gradient
+
         self._add_embedding_gradient(molecule, basis, Da + Db, grad_timing)
 
         # CPCM contribution to gradient

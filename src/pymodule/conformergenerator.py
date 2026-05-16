@@ -109,7 +109,7 @@ class ConformerGenerator:
         idtf = AtomTypeIdentifier()
         idtf.ostream.mute()
 
-        atom_type = idtf.generate_gaff_atomtypes(molecule)
+        atom_type_not_used = idtf.generate_gaff_atomtypes(molecule)
 
         idtf.identify_equivalences()
         equivalent_charges = idtf.equivalent_charges
@@ -419,7 +419,7 @@ class ConformerGenerator:
 
         coords_nm = molecule.get_coordinates_in_angstrom() * 0.1
         simulation.context.setPositions(coords_nm * nanometer)
-        #freeze atoms if specified
+        # freeze atoms if specified
         if self.freeze_atoms is not None:
             for atom_idx in self.freeze_atoms:
                 simulation.system.setParticleMass(atom_idx, 0.0 * dalton)
@@ -495,8 +495,8 @@ class ConformerGenerator:
         comm = self._comm
         rank = self._comm.Get_rank()
         size = self._comm.Get_size()
-        #default partial charges are RESP charges: self.resp_charges is True and partial_charges is None as default 
-        #if the user provides partial charges, then skip RESP charges calculation
+        # default partial charges are RESP charges: self.resp_charges is True and partial_charges is None as default
+        # if the user provides partial charges, then skip RESP charges calculation
         if self.resp_charges and (self.partial_charges is None):
             basis = MolecularBasis.read(molecule, "6-31g*")
             self.partial_charges = self.resp_charges_driver.compute(

@@ -36,7 +36,7 @@ import sys
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, print_exception_if_debug
 
 try:
     import MDAnalysis as mda
@@ -48,7 +48,7 @@ except ImportError:
 
 class EnsembleParser:
     """
-    
+
     This class automates the parsing of molecular dynamics trajectories and
     extracts information from the qm and environment regions for each snapshot.
 
@@ -83,9 +83,9 @@ class EnsembleParser:
     def _prefixed_resname(resname: str, prefix: str) -> str:
         """
         Resname in PDBs often go by 3 letters, and terminal residues (e.g., NASN or CASN for
-        n-terminal or c-terminal ASN) contain atom parameters slightly different from 
+        n-terminal or c-terminal ASN) contain atom parameters slightly different from
         the non-terminal residues.
-        This routine adds a terminal prefix to a residue name, 
+        This routine adds a terminal prefix to a residue name,
         so that the correct parameters can be later assigned.
 
         :param resname (str)
@@ -96,13 +96,12 @@ class EnsembleParser:
             Prefixed residue name (e.g. 'NASN', 'CASN'), or the original name
             if it already looks prefixed.
         """
-        # If the residue name already appears to be terminal-prefixed 
+        # If the residue name already appears to be terminal-prefixed
         # (four characters starting with 'N' or 'C'),
         # it is returned unchanged.
         if isinstance(resname, str) and len(resname) == 4 and resname[0] in ("N", "C"):
             return resname
         return f"{prefix}{resname}"
-
 
     @staticmethod
     def _looks_like_n_terminal(residue) -> bool:
@@ -155,14 +154,14 @@ class EnsembleParser:
             return True
 
         return False
-    
+
     def _terminal_resname_map(self, mda_universe):
         """
         Identifies N- and C-terminal protein residues and returns a renaming map.
 
-        For each protein chain found in the selection, the first residue is 
-        considered the N-terminus and the last residue the C-terminus. 
-        These residues are assigned terminal-prefixed 
+        For each protein chain found in the selection, the first residue is
+        considered the N-terminus and the last residue the C-terminus.
+        These residues are assigned terminal-prefixed
         residue names (e.g. 'ASN' -> 'NASN' or 'CASN').
 
         The returned mapping is keyed by MDAnalysis `resindex` (unique per
@@ -194,6 +193,7 @@ class EnsembleParser:
                 if frags:
                     chains = frags
         except Exception:
+            print_exception_if_debug()
             chains = []
 
         # Fallback: group by chainIDs (PDB) or segids
@@ -286,15 +286,14 @@ class EnsembleParser:
                    npe_cutoff: float | None = None,
                    start: float | None = None,
                    end: float | None = None,
-                   last_snapshot_only: bool = False,
-    ):
+                   last_snapshot_only: bool = False):
         """
         Parse a set of structures and extract QM and MM region data.
 
         :param trajectory_file:
             Path to the trajectory file:
                 - .xtc with a corresponding topology (.tpr) via topology_file
-                - .pdb (several configurations, or a single configuration; bonds are guessed        
+                - .pdb (several configurations, or a single configuration; bonds are guessed
         :param topology_file:
             Path to the topology file (e.g., .tpr).
         :param num_snapshots:
@@ -493,6 +492,7 @@ class EnsembleParser:
                 if dims.size > 3 and np.all(dims[:3] > 0):
                     has_box = True
         except Exception:
+            print_exception_if_debug()
             has_box = False
 
         if has_box:
@@ -634,28 +634,28 @@ class EnsembleParser:
             # If neither cutoff is set, interpret as all-qm
 
             snapshot = {
-                    "frame": int(mda_universe.trajectory.frame),
+                "frame": int(mda_universe.trajectory.frame),
 
-                    "qm_coords": qm_coords,
-                    "qm_elements": qm_elements,
-                    "qm_charge": qm_charge,
-                    "qm_multiplicity": qm_multiplicity,
+                "qm_coords": qm_coords,
+                "qm_elements": qm_elements,
+                "qm_charge": qm_charge,
+                "qm_multiplicity": qm_multiplicity,
 
-                    "pe_coords": pe_coords,
-                    "pe_atom_names": pe_atom_names,
-                    "pe_elements": pe_elements,
-                    "pe_resids": pe_resids,
-                    "pe_resindices": pe_resindices,
-                    "pe_resnames": pe_resnames,
-                    "number_residues_pe": number_residues_pe,
+                "pe_coords": pe_coords,
+                "pe_atom_names": pe_atom_names,
+                "pe_elements": pe_elements,
+                "pe_resids": pe_resids,
+                "pe_resindices": pe_resindices,
+                "pe_resnames": pe_resnames,
+                "number_residues_pe": number_residues_pe,
 
-                    "npe_coords": npe_coords,
-                    "npe_atom_names": npe_atom_names,
-                    "npe_elements": npe_elements,
-                    "npe_resids": npe_resids,
-                    "npe_resindices": npe_resindices,
-                    "npe_resnames": npe_resnames,
-                    "number_residues_npe": number_residues_npe,
+                "npe_coords": npe_coords,
+                "npe_atom_names": npe_atom_names,
+                "npe_elements": npe_elements,
+                "npe_resids": npe_resids,
+                "npe_resindices": npe_resindices,
+                "npe_resnames": npe_resnames,
+                "number_residues_npe": number_residues_npe,
             }
             snapshots.append(snapshot)
         return snapshots

@@ -32,12 +32,8 @@
 
 from mpi4py import MPI
 import numpy as np
-import networkx as nx
-import json
 import sys
 import os
-import copy
-import math
 from .veloxchemlib import mpi_master
 from .sanitychecks import molecule_sanity_check
 from .molecule import Molecule
@@ -47,14 +43,12 @@ from .scfrestdriver import ScfRestrictedDriver
 from .scfhessiandriver import ScfHessianDriver
 from .respchargesdriver import RespChargesDriver
 from .xtbdriver import XtbDriver
-from .xtbhessiandriver import XtbHessianDriver
 from .optimizationdriver import OptimizationDriver
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .reactionmatcher import ReactionMatcher
 from .outputstream import OutputStream
 from .veloxchemlib import Point
-from .waterparameters import get_water_parameters
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, print_exception_if_debug
 from .openmmdynamics import OpenMMDynamics
 
 try:
@@ -103,6 +97,8 @@ class ReactionForceFieldBuilder():
 
         self.hessian_xc_fun: str = 'B3LYP'
         self.hessian_basis = 'def2-SV_P_'
+
+        self._reaction_matcher_assist_min_depth = None
 
     def build_forcefields(
         self,
@@ -300,15 +296,16 @@ class ReactionForceFieldBuilder():
 
         return combined_ff, single_ffs, total_charge
 
-    # Transforms input difctionary with keys 'molecule', 'charges', 'forcefield', 'optimize' into a forcefield generator
-    # If the forcefield is not provided, it will be created from the molecule and charges
-    # Calculates resp charges with some fallbacks, does optimization if specified, reparameterizes the forcefield if necessary
     def _create_single_forcefield(
         self,
         molecule,
         partial_charges: list[float] | None,
         hessian: np.ndarray | None = None,
     ) -> MMForceFieldGenerator:
+
+        # Transforms input difctionary with keys 'molecule', 'charges', 'forcefield', 'optimize' into a forcefield generator
+        # If the forcefield is not provided, it will be created from the molecule and charges
+        # Calculates resp charges with some fallbacks, does optimization if specified, reparameterizes the forcefield if necessary
 
         # # If charges exist, load them into the forcefield object before creating the topology
 
@@ -331,8 +328,8 @@ class ReactionForceFieldBuilder():
         forcefield = MMForceFieldGenerator(ostream=self.ostream)
 
         forcefield.eq_param = False
-        #Load or calculate the charges
 
+        # Load or calculate the charges
         if partial_charges is not None:
             assert len(partial_charges) == molecule.number_of_atoms(
             ), "The number of provided charges does not match the number of atoms in the molecule"
@@ -377,7 +374,7 @@ class ReactionForceFieldBuilder():
                     scf_drv.max_iter = 200
                     scf_results = scf_drv.compute(molecule, basis)
                 # self.ostream.unmute()
-                assert scf_drv.is_converged, f"SCF calculation for RESP charges did not converge, aborting"
+                assert scf_drv.is_converged, "SCF calculation for RESP charges did not converge, aborting"
                 resp_drv = RespChargesDriver()
                 self.ostream.flush()
                 if self.mute_scf:
@@ -452,7 +449,7 @@ class ReactionForceFieldBuilder():
                     scf_drv.conv_thresh = 1.0e-4
                     scf_drv.max_iter = 200
                     scf_drv.compute(molecule, basis)
-                assert scf_drv.is_converged, f"SCF calculation for Hessian did not converge, aborting"
+                assert scf_drv.is_converged, "SCF calculation for Hessian did not converge, aborting"
 
                 hess_drv = ScfHessianDriver(scf_drv)
                 if self.mute_scf:
@@ -471,8 +468,9 @@ class ReactionForceFieldBuilder():
                                       reparameterize_keys=unknown_params)
         return forcefield
 
-    # Guesses how to combine molecular structures without overlapping them
     def _combine_molecule(self, molecules, total_multiplicity, name='MOL'):
+
+        # Guesses how to combine molecular structures without overlapping them
 
         combined_molecule = Molecule()
         # pos = []
@@ -512,7 +510,6 @@ class ReactionForceFieldBuilder():
         molecule_sanity_check(combined_molecule)
         return combined_molecule
 
-    #Match the indices of the reactant and product forcefield generators
     def _match_reactant_and_product(
         self,
         reactant: Molecule,
@@ -520,11 +517,16 @@ class ReactionForceFieldBuilder():
         breaking_bonds: set[tuple[int, int]],
         forming_bonds: set[tuple[int, int]],
     ):
+
+        # Match the indices of the reactant and product forcefield generators
+
         assert reactant.number_of_atoms() == product.number_of_atoms(
         ), "The number of atoms in the reactant and product do not match"
         # Turn the reactand and product into graphs
 
         rm = ReactionMatcher(ostream=self.ostream)
+        if self._reaction_matcher_assist_min_depth is not None:
+            rm._assist_min_depth = int(self._reaction_matcher_assist_min_depth)
         total_mapping, breaking_bonds, forming_bonds = rm.get_mapping(
             reactant,
             product,
@@ -541,11 +543,12 @@ class ReactionForceFieldBuilder():
         self.ostream.flush()
         return total_mapping
 
-        # Merge a list of forcefield generators into a single forcefield generator while taking care of the atom indices
-
     @staticmethod
     def _combine_forcefield(
             forcefields: list[MMForceFieldGenerator]) -> MMForceFieldGenerator:
+
+        # Merge a list of forcefield generators into a single forcefield generator while taking care of the atom indices
+
         forcefield = MMForceFieldGenerator()
         forcefield.atoms = {}
         forcefield.bonds = {}
@@ -577,11 +580,13 @@ class ReactionForceFieldBuilder():
 
         return forcefield
 
-    # Remap indices in the forcefield to the new indices
     @staticmethod
     def _apply_mapping_to_forcefield(
             forcefield: MMForceFieldGenerator,
             mapping: dict[int, int]) -> MMForceFieldGenerator:
+
+        # Remap indices in the forcefield to the new indices
+
         new_ff_atoms = {}
         for atom_key in forcefield.atoms:
             key = mapping[atom_key]
@@ -623,13 +628,14 @@ class ReactionForceFieldBuilder():
             new_molecule.add_atom(int(element_ids[id]), Point(positions[id]),
                                   'angstrom')
         return new_molecule
-        # int(elem), Point(coord), 'angstrom'
 
-    #Remap the indices in a specific set of parameters
     @staticmethod
     def _apply_mapping_to_parameters(
             old_parameters: dict[tuple, dict],
             mapping: dict[int, int]) -> dict[tuple, dict]:
+
+        # Remap the indices in a specific set of parameters
+
         new_parameters = {}
         for old_key in old_parameters:
             new_key = tuple([mapping[atom_key] for atom_key in old_key])
@@ -658,7 +664,7 @@ class ReactionForceFieldBuilder():
 
         if len(broken_bonds) > 0:
             self.ostream.print_header(
-                f"ReaType  ProType  ID - ReaType  ProType  ID")
+                "ReaType  ProType  ID - ReaType  ProType  ID")
         for bond_key in broken_bonds:
             reactant_type0 = reactant.atoms[bond_key[0]]["type"]
             product_type0 = product.atoms[bond_key[0]]["type"]
@@ -688,7 +694,6 @@ class ReactionForceFieldBuilder():
         self.ostream.flush()
         return formed_bonds, broken_bonds
 
-    # Does an FF optimization of the molecule.
     def _optimize_molecule(
         self,
         elemental_ids,
@@ -698,9 +703,14 @@ class ReactionForceFieldBuilder():
         note=None,
     ):
 
-        #merging of systems through openmm files is shaky, as it depends on the atom naming working. See atom renaming in combine_forcefield
-        #todo find a better way to do this
+        # Does an FF optimization of the molecule.
+
+        # merging of systems through openmm files is shaky, as it depends on the atom naming working. See atom renaming in combine_forcefield
+        # todo find a better way to do this
         forcefield.write_openmm_files(name, name)
+
+        # in case one wants to inspect reactant.itp and product.itp
+        # forcefield.write_gromacs_files(note, name)
 
         # for bond in changing_bonds:
         #     forcefield.bonds.pop(bond)
@@ -711,7 +721,7 @@ class ReactionForceFieldBuilder():
         modeller = mmapp.Modeller(pdb.topology, pdb.positions)
 
         top = modeller.getTopology()
-        pos = modeller.getPositions()
+        # pos = modeller.getPositions()
 
         exiting = False
         while not exiting:
@@ -721,7 +731,7 @@ class ReactionForceFieldBuilder():
                     nonbondedMethod=mmapp.CutoffNonPeriodic,
                     nonbondedCutoff=1.0 * mmunit.nanometers,
                 )
-                mmsys_bak = copy.deepcopy(mmsys)
+
                 if self.mm_opt_constrain_bonds:
                     mmsys = self._add_reaction_bonds(forcefield, mmsys,
                                                      changing_bonds, note)
@@ -759,6 +769,7 @@ class ReactionForceFieldBuilder():
                 exiting = True
 
             except Exception as e:
+                print_exception_if_debug()
                 if self.optimize_dist_restraint_offset < 2.5:
                     self.optimize_dist_restraint_offset += 0.5
                     self.ostream.print_warning(

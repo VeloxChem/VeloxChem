@@ -893,7 +893,7 @@ class OptimizationDriver:
             else:
                 delta_e = 0.0
                 rmsd, maxd = 0.0, 0.0
-            
+
             rel_e_ts = (energies[i] - e_ts) * hartree_in_kjpermol()
             status = '<- TS' if i == ts_index else ''
 
@@ -1366,7 +1366,7 @@ class OptimizationDriver:
             plt.plot(x, y, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
         else:
             plt.plot(irc_points, rel_energies_kJ, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
-        
+
         # Plot all IRC points
         plt.scatter(irc_points,
                     rel_energies_kJ,
@@ -1376,18 +1376,18 @@ class OptimizationDriver:
                     facecolors='darkcyan',
                     edgecolor='darkcyan',
                     zorder=1)
-        
+
         # Highlight transition state
         plt.scatter(ts_index,
-                rel_energies_kJ[ts_index],
-                color='#993399',
-                alpha=0.7,
-                s=80,
-                edgecolor='#993399',
-                linewidth=1.5,
-                zorder=2,
-                label='TS')
-        
+                    rel_energies_kJ[ts_index],
+                    color='#993399',
+                    alpha=0.7,
+                    s=80,
+                    edgecolor='#993399',
+                    linewidth=1.5,
+                    zorder=2,
+                    label='TS')
+
         plt.xlabel('IRC point')
         plt.ylabel('Energy - E(TS) [kJ/mol]')
         plt.title("Intrinsic Reaction Coordinate")
@@ -1465,7 +1465,7 @@ class OptimizationDriver:
             plt.plot(x, y, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
         else:
             plt.plot(irc_points, rel_energies_kJ, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
-        
+
         # Plot all IRC points
         plt.scatter(irc_points,
                     rel_energies_kJ,
@@ -1475,18 +1475,18 @@ class OptimizationDriver:
                     facecolors="none",
                     edgecolor="darkcyan",
                     zorder=1)
-        
+
         # Highlight transition state
         plt.scatter(ts_index,
-                rel_energies_kJ[ts_index],
-                color='#993399',
-                alpha=0.7,
-                s=80,
-                edgecolor='#993399',
-                linewidth=1.5,
-                zorder=2,
-                label='TS')
-        
+                    rel_energies_kJ[ts_index],
+                    color='#993399',
+                    alpha=0.7,
+                    s=80,
+                    edgecolor='#993399',
+                    linewidth=1.5,
+                    zorder=2,
+                    label='TS')
+
         # Highlight current point
         plt.scatter(point,
                     rel_energies_kJ[point],
@@ -1495,7 +1495,7 @@ class OptimizationDriver:
                     alpha=1.0,
                     s=120,
                     zorder=3)
-        
+
         plt.xlabel('IRC point')
         plt.ylabel('Energy - E(TS) [kJ/mol]')
         plt.title("Intrinsic Reaction Coordinate")

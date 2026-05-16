@@ -6,6 +6,7 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.distributedarray import DistributedArray
 from veloxchem.lrsolver import LinearResponseSolver
 from veloxchem.outputstream import OutputStream
+from veloxchem.errorhandler import VeloxChemError
 
 
 class RecordingOutput:
@@ -50,7 +51,7 @@ class TestLRBaseUtilities:
         assert lr_drv.a_components == 'xyz'
         assert lr_drv.b_components == 'xyz'
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='LinearResponseSolver: invalid LR property'):
             lr_drv.set_lr_property('hyperpolarizability')
 

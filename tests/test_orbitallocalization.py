@@ -8,6 +8,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.orbitallocalization import OrbitalLocalizationDriver
 from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.errorhandler import VeloxChemError
 
 
 class TestOrbitalLocalization:
@@ -103,7 +104,7 @@ class TestOrbitalLocalization:
         loc = OrbitalLocalizationDriver()
         loc.ostream.mute()
 
-        with pytest.raises(AssertionError, match="same occupation number"):
+        with pytest.raises(VeloxChemError, match="same occupation number"):
             loc.compute(molecule, basis, scf_res,
                         mo_range=(n_occ, n_occ + 1))
 

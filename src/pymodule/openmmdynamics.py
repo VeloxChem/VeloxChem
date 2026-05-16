@@ -810,6 +810,8 @@ class OpenMMDynamics:
                 if not duplicate:
                     if partial_charges:
                         ff_gen.partial_charges = partial_charges[i]
+                    self.ostream.print_info(f'Generating force field for molecule {i+1}...')
+                    self.ostream.flush()
                     ff_gen.create_topology(mol, water_model=water_model)
                     ff_gen.generate_residue_xml(f'molecule_{i+1}.xml', f'M{i+1:02d}')
                     xml_files.append(f'molecule_{i+1}.xml')
@@ -914,7 +916,7 @@ class OpenMMDynamics:
         self.ostream.print_info("Recalculating energies for the conformations...")
         self.ostream.flush()
         simulation = app.Simulation(self.topology, real_system, self._create_integrator(), platform=self._create_platform())
-
+        
         for idx, conformation in enumerate(conformations):    
             simulation.context.setPositions(conformation)
             simulation.minimizeEnergy()
@@ -1069,7 +1071,7 @@ class OpenMMDynamics:
 
         equiv_conformer_pairs= []
         if unique_conformers:
-            msg = f'Filtering for unique conformers'
+            msg = 'Filtering for unique conformers'
             self.ostream.print_info(msg)
             self.ostream.flush()
             
@@ -2760,10 +2762,8 @@ class OpenMMDynamics:
             pos_restraint.addPerParticleParameter('x0')
             pos_restraint.addPerParticleParameter('y0')
             pos_restraint.addPerParticleParameter('z0')
-            
+
             for mol_idx in position_restraint:
                 for atom_idx in groups[mol_idx - 1]:
                     pos_restraint.addParticle(atom_idx, self.positions[atom_idx])
-                    
-        
 

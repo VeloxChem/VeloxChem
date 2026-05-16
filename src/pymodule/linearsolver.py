@@ -3763,7 +3763,7 @@ class LinearSolver:
 
         return ediag, sdiag
 
-    def get_nto(self, t_mat, mo_occ, mo_vir):
+    def _compute_nto(self, t_mat, mo_occ, mo_vir):
         """
         Gets the natural transition orbitals.
 
@@ -3801,7 +3801,7 @@ class LinearSolver:
 
         return nto_mo
 
-    def get_nto_unrestricted(self, t_mat, mo_occ, mo_vir):
+    def _compute_nto_unrestricted(self, t_mat, mo_occ, mo_vir):
         """
         Gets the natural transition orbitals.
 

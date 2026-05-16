@@ -163,7 +163,7 @@ class GradientDriver:
         checkpoint_grad_input = self.comm.bcast(checkpoint_grad_input,
                                                 root=mpi_master())
         checkpoint_method_input = self.comm.bcast(checkpoint_method_input,
-                                                root=mpi_master())
+                                                  root=mpi_master())
 
         self.update_settings(checkpoint_grad_input, checkpoint_method_input)
 

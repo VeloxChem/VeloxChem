@@ -157,6 +157,10 @@ class ScfHessianDriver(HessianDriver):
             not self.scf_driver.ri_jk,
             f'{type(self).__name__}.compute: RI-JK is not yet supported')
 
+        assert_msg_critical(
+            self.scf_driver.electric_field is None,
+            f'{type(self).__name__}.compute: electric_field is not supported')
+
         if self.rank == mpi_master():
             self.print_header()
 

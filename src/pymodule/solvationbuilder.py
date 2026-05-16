@@ -165,6 +165,7 @@ class SolvationBuilder:
                 neutralize=True,
                 equilibrate=False,
                 equilibration_steps=None,
+                write_log=False,
                 box=None):
         """
         Create a solvated system with the most typical solvent molecules.
@@ -174,7 +175,7 @@ class SolvationBuilder:
         :param solvent:
             The name of the solvent molecule. The default is 'water'.
             Available options: 'cspce', 'ctip3p', 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone',
-            'chloroform', 'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf', 
+            'chloroform', 'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf',
             'acetonitrile', 'dmf', 'other' or 'itself'.
                 * 'other': The solvent molecule must be provided.
                 * 'itself': The solute molecule is used as the solvent as well.
@@ -192,6 +193,8 @@ class SolvationBuilder:
         :param equilibration_steps:
             Optional number of MD steps to use for the equilibration run.
             If None, the builder default stored in `self.steps` is used.
+        :param write_log:
+            Optional flag for writing to log.
         """
 
         from scipy.spatial import cKDTree
@@ -261,7 +264,7 @@ class SolvationBuilder:
 
         if self._molecule_linearity(solvent_molecule):
             self.ostream.print_info(
-                f"The solvent molecule is linear, random rotation is disabled")
+                "The solvent molecule is linear, random rotation is disabled")
             self.ostream.flush()
             self.random_rotation = False
 
@@ -295,10 +298,15 @@ class SolvationBuilder:
         if equilibrate:
             run_steps = (self.steps if equilibration_steps is None else
                          equilibration_steps)
-            # TODO: run perform_equilibration using openmm files
+            start = time.time()
             try:
-                start = time.time()
-                self.perform_equilibration(steps=equilibration_steps)
+                self.perform_equilibration(steps=equilibration_steps, write_log=write_log)
+            except ValueError:
+                # ValueError: Could not locate #include file: amber03.ff/forcefield.itp
+                self.ostream.print_info(
+                    "Equilibration skipped due to missing files")
+                self.ostream.print_blank()
+            else:
                 end = time.time()
                 self.ostream.print_info("Equilibrating the system")
                 self.ostream.print_blank()
@@ -310,11 +318,6 @@ class SolvationBuilder:
                     f"Elapsed time to equilibrate the system: {end - start:.2f} s"
                 )
                 self.equilibration_flag = True
-            except ValueError:
-                # ValueError: Could not locate #include file: amber03.ff/forcefield.itp
-                self.ostream.print_info(
-                    "Equilibration skipped due to missing files")
-                self.ostream.print_blank()
             self.ostream.flush()
 
     def custom_solvate(self, solute, solvents, proportion, box_size):
@@ -716,8 +719,7 @@ class SolvationBuilder:
 
     def write_gromacs_files(self,
                             solute_ff=None,
-                            solvent_ffs=None,
-                            equilibration=False):
+                            solvent_ffs=None):
         """
         Write the GROMACS topology and coordinate files for the system.
 
@@ -725,36 +727,32 @@ class SolvationBuilder:
             The force-field object of the solute.
         :param solvent_ffs:
             The force-field objects of the solvent molecules.
-        :param equilibration:
-            If True, suppress informational output for internal equilibration use.
         """
 
-        self._generate_forcefields(solute_ff, solvent_ffs, equilibration)
+        self._generate_forcefields(solute_ff, solvent_ffs)
 
         # Special case for 'itself' solvent
         if self.solvent_name == 'itself':
-            self._write_self_solvent_gromacs_files(equilibration)
+            self._write_self_solvent_gromacs_files()
             self._write_system_gro(filename='liquid.gro')
 
         else:
-            self._write_component_gromacs_files(equilibration)
+            self._write_component_gromacs_files()
             atomtypes = self._collect_component_atomtypes()
             solute_atomtypes_lines = self._strip_component_atomtypes()
             self._inject_solute_atomtypes_into_top(solute_atomtypes_lines)
             self._write_system_top_file(atomtypes)
 
-            if not equilibration:
-                self.ostream.print_info("system.top file written")
-                self.ostream.flush()
+            self.ostream.print_info("system.top file written")
+            self.ostream.flush()
 
             # Write the system GRO file
             self._write_system_gro()
 
-            if not equilibration:
-                self.ostream.print_info("system.gro file written")
-                self.ostream.flush()
+            self.ostream.print_info("system.gro file written")
+            self.ostream.flush()
 
-    def _write_self_solvent_gromacs_files(self, equilibration):
+    def _write_self_solvent_gromacs_files(self):
         """
         Write GROMACS files for the pure-liquid special case.
         """
@@ -774,12 +772,11 @@ class SolvationBuilder:
                     break
                 f.write(line)
 
-        if not equilibration:
-            self.ostream.print_info(
-                "liquid.itp, liquid.top, and solute.top files written")
-            self.ostream.flush()
+        self.ostream.print_info(
+            "liquid.itp, liquid.top, and solute.top files written")
+        self.ostream.flush()
 
-    def _write_component_gromacs_files(self, equilibration):
+    def _write_component_gromacs_files(self):
         """
         Write the component GROMACS files used to assemble the system topology.
         """
@@ -791,17 +788,15 @@ class SolvationBuilder:
         self.solute_ff.write_top(str(solute_top), str(solute_itp), 'MOL')
         self.solute_ff.write_gro(str(solute_gro), 'MOL')
 
-        if not equilibration:
-            self.ostream.print_info("solute.itp file written")
-            self.ostream.flush()
+        self.ostream.print_info("solute.itp file written")
+        self.ostream.flush()
 
         if self.solvent_ffs:
             for i, solvent_ff in enumerate(self.solvent_ffs):
                 solvent_ff.write_itp(str(self._path(f'solvent_{i+1}.itp')),
                                      f'SOL{i+1}')
-                if not equilibration:
-                    self.ostream.print_info(f"solvent_{i+1}.itp file written")
-                    self.ostream.flush()
+                self.ostream.print_info(f"solvent_{i+1}.itp file written")
+                self.ostream.flush()
 
     def _collect_component_atomtypes(self):
         """
@@ -918,26 +913,25 @@ class SolvationBuilder:
                 self.ostream.flush()
 
             for i, solvent_ff in enumerate(self.solvent_ffs):
-                solvent_ff.generate_residue_xml(
-                                                str(self._path(
-                                                    f'solvent_{i+1}.xml')),
+                solvent_ff.generate_residue_xml(str(self._path(f'solvent_{i+1}.xml')),
                                                 f'S{i+1:02d}')
                 self.ostream.print_info(f"solvent_{i+1}.xml file written")
                 self.ostream.flush()
 
             filename = 'system.pdb'
 
-        # Write the system PDB file
         if self.equilibration_flag:
             # If the system was equilibrated, remove pdb to align with new resnames etc.
             self._unlink_if_exists(self._path('equilibrated_system.pdb'))
 
+        # Write the system PDB file
         self._write_system_pdb(filename=filename)
+
         # Print information
         self.ostream.print_info(f"{filename} file written")
         self.ostream.flush()
 
-    def perform_equilibration(self, water_model=None, steps=None):
+    def perform_equilibration(self, water_model=None, steps=None, write_log=False):
         """
         Performs an equilibration using OpenMM.
 
@@ -946,6 +940,8 @@ class SolvationBuilder:
             `solvent='itself'` system.
         :param steps:
             Optional number of MD steps to run. If None, `self.steps` is used.
+        :param write_log:
+            Optional flag for writing to log.
         """
 
         try:
@@ -998,29 +994,24 @@ class SolvationBuilder:
                         solvent_ff.create_topology(self.solvents[i])
                 solvent_ffs.append(solvent_ff)
 
-        self.write_gromacs_files(solute_ff, solvent_ffs, equilibration=True)
+        self.write_openmm_files(solute_ff, solvent_ffs)
 
         # Load the system
         if self.solvent_name == 'itself':
-            gro = app.GromacsGroFile(str(self._path('liquid.gro')))
+            pdb = app.PDBFile(str(self._path('liquid.pdb')))
+            forcefield = app.ForceField(str(self._path('liquid.xml')))
         else:
-            gro = app.GromacsGroFile(str(self._path('system.gro')))
+            pdb = app.PDBFile(str(self._path('system.pdb')))
+            forcefield = app.ForceField(
+                str(self._path('solute.xml')),
+                *[str(self._path(f'solvent_{i+1}.xml')) for i in range(len(self.solvent_ffs))])
 
-        # # Create the force field
-        if self.solvent_name == 'itself':
-            forcefield = app.GromacsTopFile(
-                str(self._path('liquid.top')),
-                periodicBoxVectors=gro.getPeriodicBoxVectors())
-        else:
-            forcefield = app.GromacsTopFile(
-                str(self._path('system.top')),
-                periodicBoxVectors=gro.getPeriodicBoxVectors())
-
-        topology = forcefield.topology
-        positions = gro.positions
+        topology = pdb.topology
+        positions = pdb.positions
 
         # Create the OpenMM system
-        system = forcefield.createSystem(nonbondedMethod=app.PME,
+        system = forcefield.createSystem(topology,
+                                         nonbondedMethod=app.PME,
                                          nonbondedCutoff=1.0 * unit.nanometers,
                                          constraints=app.HBonds)
 
@@ -1040,13 +1031,14 @@ class SolvationBuilder:
         simulation.minimizeEnergy()
 
         # Equilibrate
-        simulation.reporters.append(
-            app.StateDataReporter(str(self._path('equilibration.log')),
-                                  1000,
-                                  step=True,
-                                  potentialEnergy=True,
-                                  temperature=True,
-                                  volume=True))
+        if write_log:
+            simulation.reporters.append(
+                app.StateDataReporter(str(self._path('equilibration.log')),
+                                      1000,
+                                      step=True,
+                                      potentialEnergy=True,
+                                      temperature=True,
+                                      volume=True))
         simulation.step(run_steps)
 
         # Get the final positions
@@ -1071,37 +1063,39 @@ class SolvationBuilder:
             f'The density of the system after equilibration is: {self._compute_density(box_volume_nm3)} kg/m^3'
         )
         self.ostream.flush()
+
         # Write the PDB file
         with open(self._path('equilibrated_system.pdb'), 'w') as f:
             app.PDBFile.writeFile(simulation.topology, positions, f)
 
+        # Update the system molecule
+        labels = [atom.element.symbol for atom in topology.atoms()]
+        xyz = f"{len(labels)}\n\n"
+        for label, coord in zip(labels, positions):
+            xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"
+        self.system_molecule = Molecule.read_xyz_string(xyz)
+
         # Delete the produced gro and top files with Path
         if self.solvent_name == 'itself':
-            self._unlink_if_exists(self._path('liquid.gro'))
-            self._unlink_if_exists(self._path('liquid.top'))
-            self._unlink_if_exists(self._path('liquid.itp'))
+            self._unlink_if_exists(self._path('liquid.pdb'))
+            self._unlink_if_exists(self._path('liquid.xml'))
         else:
-            self._unlink_if_exists(self._path('system.gro'))
-            self._unlink_if_exists(self._path('system.top'))
-            self._unlink_if_exists(self._path('solute.itp'))
+            self._unlink_if_exists(self._path('system.pdb'))
+            self._unlink_if_exists(self._path('system.xml'))
             for i in range(len(self.solvent_ffs)):
-                self._unlink_if_exists(self._path(f'solvent_{i+1}.itp'))
-
-        # Update the system molecule
-        self.system_molecule = Molecule.read_pdb_file(
-            str(self._path('equilibrated_system.pdb')))
+                self._unlink_if_exists(self._path(f'solvent_{i+1}.xml'))
 
     # Auxiliary functions
 
     def _determine_cubic_box_size(self, coordinates, padding):
         """
         Determines the size of a cubic box based on the molecular geometry and a padding parameter.
-        
-        :param coordinates: 
+
+        :param coordinates:
             The array of shape (n, 3) where n is the number of atoms, and each row contains the (x, y, z) coordinates of an atom.
-        :param padding: 
+        :param padding:
             The padding to be added to the bounding box of the molecule in nm.
-        :return: 
+        :return:
             The size of the cubic box in the same units as the input coordinates.
         """
         # Calculate the minimum and maximum coordinates along each axis
@@ -1310,7 +1304,7 @@ class SolvationBuilder:
     def _extract_atomtypes(self, itp_filename):
         """
         Extracts atom types from an ITP file, removes duplicates, and returns a list of unique atom types.
-        
+
         :param itp_filename: The name of the ITP file from which to extract atom types.
         :return: A list of unique atom types.
         """
@@ -1339,7 +1333,7 @@ class SolvationBuilder:
     def _remove_atomtypes_section(self, itp_filename):
         """
         Removes the [ atomtypes ] section from an ITP file.
-        
+
         :param itp_filename:
             The name of the ITP file from which to remove the atom types
             section.
@@ -1543,7 +1537,7 @@ class SolvationBuilder:
     def _generate_forcefields(self,
                               solute_ff,
                               solvent_ffs,
-                              equilibration=False):
+                              resp=True):
         """
         Generate the force fields for the solute and solvent molecules.
         The forcefields get stored in the solute_ff and solvent_ffs attributes (lists).
@@ -1552,20 +1546,16 @@ class SolvationBuilder:
             The ForceField object of the solute.
         :param solvent_ffs:
             The list of ForceField objects of the solvent molecules.
-        :param equilibration:
-            Boolean flag to indicate if the gromacs files will be used for equilibration.
-            If True, printouts will not be displayed.
         """
 
         # Solute
         if not solute_ff:
             self.solute_ff = MMForceFieldGenerator()
             self.solute_ff.ostream.mute()
-            if not equilibration:
-                self.ostream.print_info(
-                    'Generating the ForceField for the solute')
-                self.ostream.flush()
-            self.solute_ff.create_topology(self.solute)
+            self.ostream.print_info(
+                'Generating the ForceField for the solute')
+            self.ostream.flush()
+            self.solute_ff.create_topology(self.solute, resp=resp)
 
         else:
             self.solute_ff = solute_ff
@@ -1585,10 +1575,9 @@ class SolvationBuilder:
                     solvent_ff = MMForceFieldGenerator()
                     solvent_ff.ostream.mute()
 
-                    if not equilibration:
-                        self.ostream.print_info(
-                            f'Generating the ForceField for the solvent')
-                        self.ostream.flush()
+                    self.ostream.print_info(
+                        'Generating the ForceField for the solvent')
+                    self.ostream.flush()
 
                     if use_water_model:
                         solvent_ff.create_topology(
@@ -1883,7 +1872,7 @@ class SolvationBuilder:
     def _get_volume(self, molecule):
         """
         Determine the volume of the molecule based on the vdW radii, with careful intersection correction.
-        
+
         :return:
             The volume of the molecule in cubic Angstrom.
         """
@@ -1981,7 +1970,7 @@ class SolvationBuilder:
                             total_quantity):
         """
         Compute the batch size dynamically based on the number of molecules added.
-        
+
         :param added_count: Number of molecules already added to the system.
         :param max_batch_size: Maximum batch size to start with.
         :param min_batch_size: Minimum batch size to avoid being too small.

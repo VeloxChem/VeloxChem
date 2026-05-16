@@ -33,9 +33,7 @@
 import numpy as np
 import sys
 
-from .veloxchemlib import mpi_master
-from .molecule import Molecule
-from .molecularbasis import MolecularBasis
+from .lreigensolver import LinearResponseEigenSolver
 from .visualizationdriver import VisualizationDriver
 from .densityviewer import DensityViewer
 from .errorhandler import assert_msg_critical
@@ -57,11 +55,11 @@ except ImportError:
 class ValetAnalyzer:
     """
     Visual Analysis of Electronic Transitions (VALET).
-    
+
     Implements NTO (Natural Transition Orbital) analysis, transition matrix
     calculation, and interactive visualization of excited state properties.
     Based on the VALET method by Talha Bin Masood et al. [https://doi.org/10.1111/cgf.14307]
-    
+
     Instance variables:
         - density_isovalue: Isovalue for density isosurfaces (default: 0.002)
         - density_opacity: Opacity of density isosurfaces (default: 0.7)
@@ -75,23 +73,23 @@ class ValetAnalyzer:
         self.density_opacity = 0.7
         self.detachment_color = "#009966"  # Green
         self.attachment_color = "#993399"  # Red
-        
+
         # Results and molecular data
         self._molecule = None
         self._basis = None
         self._subgroups = None
-        
+
         # Density viewer for computing densities on grid
         self._density_viewer = None
-        
+
         # Interactive viewer state
         self._mol_grid_viewer = None
-    
+
     def initialize(self, molecule, basis, subgroups=None):
         """
         Initialize VALET analyzer with SCF and response results.
         Extracts and stores molecule, basis, and number of states.
-        
+
         :param molecule:
             The Molecule.
         :param basis:
@@ -105,18 +103,18 @@ class ValetAnalyzer:
         self._basis = basis
 
         self._subgroups = subgroups
-        
+
         # Initialize density viewer for computing densities
         self._density_viewer = DensityViewer()
         self._density_viewer.initialize(self._molecule, self._basis)
-        
+
         print(f"Molecule: {self._molecule.number_of_atoms()} atoms")
         print(f"Basis: {self._basis.get_label()}")
-    
+
     def set_subgroups(self, subgroups):
         """
         Set or update subgroups for transition diagrams.
-        
+
         :param subgroups:
             List of subgroup tuples for transition diagrams.
             Each tuple contains (name, atom_index or list_of_atom_indices).
@@ -127,18 +125,18 @@ class ValetAnalyzer:
     def compute_detach_attach_densities(self, scf_results, rsp_results, state_index=1):
         """
         Computes NTO attachment and detachment densities for a given excited state.
-        
+
         :param scf_results:
             The dictionary of results from converged SCF wavefunction.
         :param rsp_results:
             The dictionary containing the rsp results.
         :param state_index:
             The excited state for which the NTO densities are computed (1-based).
-            
+
         :return:
             A dictionary containing detachment and attachment density matrices.
         """
-        
+
         assert_msg_critical(self._molecule is not None,
                             'ValetAnalyzer is not yet initialized.')
 
@@ -161,7 +159,7 @@ class ValetAnalyzer:
 
         # RPA vs TDA vs rsp_results from h5
         if 'eigenvectors_distributed' in rsp_results:
-            eigvec = self.get_full_solution_vector(
+            eigvec = LinearResponseEigenSolver.get_full_solution_vector(
                 rsp_results['eigenvectors_distributed'][state_index - 1])
         elif 'eigenvectors' in rsp_results:
             eigvec = rsp_results['eigenvectors'][:, state_index - 1].copy()
@@ -193,28 +191,28 @@ class ValetAnalyzer:
     def compute_atom_charges(self, scf_results, rsp_results, state_index=1):
         """
         Computes Mulliken-like atomic charges for detachment and attachment densities.
-        
+
         Uses Mulliken population analysis: q_A = sum_{mu in A} (P*S)_{mu,mu}
         where P is the density matrix and S is the overlap matrix.
-        
+
         :param scf_results:
             The dictionary of results from converged SCF wavefunction.
         :param rsp_results:
             The dictionary containing the rsp results.
         :param state_index:
             The excited state for which the charges are computed (1-based).
-            
+
         :return:
             A dictionary containing detachment and attachment charges per atom.
         """
-        
+
         # Get density matrices
         densities = self.compute_detach_attach_densities(scf_results, rsp_results, state_index)
-        
+
         # Map atoms to AOs
         vis_drv = VisualizationDriver()
         atom_to_aos = vis_drv.map_atom_to_atomic_orbitals(self._molecule, self._basis)
-        
+
         detach_dens_ao = densities['detachment_density_matrix_AO']
         attach_dens_ao = densities['attachment_density_matrix_AO']
 
@@ -234,16 +232,16 @@ class ValetAnalyzer:
         for atomidx, aoinds in enumerate(atom_to_aos):
             detachment_charges[atomidx] += np.sum(diag_DS[aoinds])
             attachment_charges[atomidx] += np.sum(diag_AS[aoinds])
-        
+
         # Normalize charges to sum to 1.0
         detach_sum = sum(detachment_charges)
         attach_sum = sum(attachment_charges)
-        
+
         if detach_sum > 0:
             detachment_charges = [c / detach_sum for c in detachment_charges]
         if attach_sum > 0:
             attachment_charges = [c / attach_sum for c in attachment_charges]
-        
+
         return {
             'detachment_charges': detachment_charges,
             'attachment_charges': attachment_charges,
@@ -253,15 +251,15 @@ class ValetAnalyzer:
     def compute_transition_matrix(detachment_charges, attachment_charges):
         """
         Computes the transition matrix from detachment and attachment charges.
-        
+
         Ported from VALET (https://github.com/tbmasood/VALET) with permission
         from the author, Talha Bin Masood.
-        
+
         :param detachment_charges:
             List of detachment charges per atom/fragment.
         :param attachment_charges:
             List of attachment charges per atom/fragment.
-            
+
         :return:
             The transition matrix as a 2D list.
         """
@@ -303,7 +301,7 @@ class ValetAnalyzer:
                                 state_index=1):
         """
         Computes all data needed for transition diagram visualization.
-        
+
         :param scf_results:
             The dictionary of results from converged SCF wavefunction.
         :param rsp_results:
@@ -313,11 +311,11 @@ class ValetAnalyzer:
             name and an atom index (or list of atom indices).
         :param state_index:
             The index of the excited state (1-based).
-            
+
         :return:
             A dictionary containing all data needed for plotting the transition diagram.
         """
-        
+
         # Compute NPA charges
         charges = self.compute_atom_charges(scf_results, rsp_results, state_index)
         src_detachment_charges = charges['detachment_charges']
@@ -363,14 +361,14 @@ class ValetAnalyzer:
 
         # Compute transition matrix
         sg_matrix = self.compute_transition_matrix(sg_detachment_charges, sg_attachment_charges)
-        
+
         # Define colors
         colors = ["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3",
                   "#a6d854", "#ffd92f", "#e5c494", "#b3b3b3"]
-        
+
         # Assign subgroup colors (first is gray for unassigned)
         sg_colors = ["#727272"] + [colors[i % len(colors)] for i in range(1, num_subgroups)]
-        
+
         return {
             'subgroup_names': sg_names,
             'subgroup_colors': sg_colors,
@@ -388,10 +386,10 @@ class ValetAnalyzer:
                                 dpi=150):
         """
         Renders a transition diagram from pre-computed transition data.
-        
+
         Ported from VALET (https://github.com/tbmasood/VALET) with permission
         from the author, Talha Bin Masood.
-        
+
         :param transition_data:
             A dictionary containing:
                 - 'subgroup_names': List of subgroup names
@@ -406,27 +404,27 @@ class ValetAnalyzer:
             Width of the plot.
         :param height:
             Height of the plot.
-            
+
         :return:
             A tuple containing (fig, ax) for the matplotlib figure.
         """
 
         assert_msg_critical('matplotlib' in sys.modules,
                             'matplotlib is required for transition diagrams.')
-        
+
         # Extract data from dictionary
         sg_names = transition_data['subgroup_names']
         sg_colors = transition_data['subgroup_colors']
         sg_detachment_charges = transition_data['detachment_charges']
         sg_attachment_charges = transition_data['attachment_charges']
         sg_matrix = transition_data['transition_matrix']
-        
+
         # Skip first 'unassigned' group if it has no charge
-        skip_first = (len(sg_names) > 0 and 
-                     sg_names[0].lower() == 'unassigned' and
-                     sg_detachment_charges[0] == 0.0 and 
-                     sg_attachment_charges[0] == 0.0)
-        
+        skip_first = (len(sg_names) > 0 and
+                      sg_names[0].lower() == 'unassigned' and
+                      sg_detachment_charges[0] == 0.0 and
+                      sg_attachment_charges[0] == 0.0)
+
         if skip_first:
             sg_names = sg_names[1:]
             sg_colors = sg_colors[1:]
@@ -434,29 +432,29 @@ class ValetAnalyzer:
             sg_attachment_charges = sg_attachment_charges[1:]
             # Remove first row and column from matrix
             sg_matrix = [row[1:] for row in sg_matrix[1:]]
-        
+
         num_subgroups = len(sg_names)
 
         WIDTH = width
         HEIGHT = height
-        
+
         # Create figure and get renderer for text measurements
         fig, ax = plt.subplots(figsize=(WIDTH/100, HEIGHT/100), dpi=dpi, constrained_layout=False)
-        
+
         # Calculate actual text heights in data coordinates
         temp_text_10pt = ax.text(0, 0, "Test", family="sans-serif", size=10)
         temp_text_16pt = ax.text(0, 0, "Test", family="serif", size=16)
-        
+
         bbox_10pt = temp_text_10pt.get_window_extent(renderer=fig.canvas.get_renderer())
         bbox_16pt = temp_text_16pt.get_window_extent(renderer=fig.canvas.get_renderer())
-        
+
         temp_text_10pt.remove()
         temp_text_16pt.remove()
-        
+
         # Convert heights from display to data coordinates (pixels)
         text_height_10pt = bbox_10pt.height
         text_height_16pt = bbox_16pt.height
-        
+
         # Layout parameters
         PADDING_LEFT = 0.08
         BAR_THICKNESS = 0.04
@@ -464,14 +462,14 @@ class ValetAnalyzer:
         FLOW_GAP = 0.0
         SPACING = 3  # pixels between text rows
         EDGE_PADDING = 10  # pixels at very top and bottom
-        
+
         # Calculate heights in pixels
         leftPadding = WIDTH * PADDING_LEFT
         barHeight = HEIGHT * BAR_THICKNESS
-        
+
         # Title height (16pt text + spacing)
         titleHeight = (text_height_16pt + SPACING) if title is not None else 0
-        
+
         # 2 rows of 10pt text (percentage + name) + spacing
         textHeight = 2 * text_height_10pt + 2 * SPACING
 
@@ -480,7 +478,7 @@ class ValetAnalyzer:
         # Calculate vertical positions
         # Top bar: HEIGHT - edge - title - top text - bar
         topY = HEIGHT - EDGE_PADDING - titleHeight - textHeight - barHeight
-        
+
         # Bottom bar: edge + bottom text (below bar) + bar
         bottomY = EDGE_PADDING + textHeight * 2 + barHeight
 
@@ -498,9 +496,9 @@ class ValetAnalyzer:
 
             percent = "%.2f%%" % (sg_attachment_charges[i] * 100)
             plt.text(x + barWidth / 2, topY + barHeight + SPACING + text_height_10pt/2,
-                    sg_names[i], ha="center", va="center", family="sans-serif", size=10)
+                     sg_names[i], ha="center", va="center", family="sans-serif", size=10)
             plt.text(x + barWidth / 2, topY + barHeight + SPACING + text_height_10pt + SPACING + text_height_10pt/2,
-                    percent, ha="center", va="center", family="monospace", size=10)
+                     percent, ha="center", va="center", family="monospace", size=10)
             rect = mpatches.Rectangle(
                 [x, topY], barWidth, barHeight, facecolor=sg_colors[i], ec="black", lw=0.5)
             ax.add_patch(rect)
@@ -518,9 +516,9 @@ class ValetAnalyzer:
 
             percent = "%.2f%%" % (sg_detachment_charges[i] * 100)
             plt.text(x + barWidth / 2, bottomY - barHeight - SPACING - text_height_10pt/2,
-                    sg_names[i], ha="center", va="center", family="sans-serif", size=10)
+                     sg_names[i], ha="center", va="center", family="sans-serif", size=10)
             plt.text(x + barWidth / 2, bottomY - barHeight - SPACING - text_height_10pt - SPACING - text_height_10pt/2,
-                    percent, ha="center", va="center", family="monospace", size=10)
+                     percent, ha="center", va="center", family="monospace", size=10)
             rect = mpatches.Rectangle(
                 [x, bottomY - barHeight], barWidth, barHeight, facecolor=sg_colors[i], ec="black", lw=0.5)
             ax.add_patch(rect)
@@ -572,8 +570,8 @@ class ValetAnalyzer:
 
                 if flow > 0.05:
                     percent = "%.2f%%" % (flow * 100)
-                    plt.text((topXleft + topXright + bottomXleft + bottomXright)/ 4,
-                        yMiddle, percent, ha="center", family="monospace", size=8)
+                    plt.text((topXleft + topXright + bottomXleft + bottomXright) / 4,
+                             yMiddle, percent, ha="center", family="monospace", size=8)
 
                 propoFilledGS[i] = propoFilledGS[i] + flow
                 propoFilledES[j] = propoFilledES[j] + flow
@@ -583,7 +581,7 @@ class ValetAnalyzer:
         plt.axis('off')
 
         return fig, ax
-    
+
     def save_transition_diagram(self,
                                 scf_results,
                                 rsp_results,
@@ -722,9 +720,9 @@ class ValetAnalyzer:
         """
         Display interactive viewer with transition diagram and density views.
         Diagrams are generated on-demand when changing states.
-        
+
         Must call initialize() first with scf_results, rsp_results, and subgroups.
-        
+
         :param scf_results:
             The dictionary of results from converged SCF wavefunction.
         :param rsp_results:
@@ -735,58 +733,58 @@ class ValetAnalyzer:
             Height to width ratio for the viewer (default: 0.6).
             Height will be calculated as width * aspect_ratio.
         """
-        
+
         # Check if subgoups defined
         assert_msg_critical(
             self._subgroups is not None,
             'ValetAnalyzer.show: Must provide subgroups via initialize() or set_subgroups().'
         )
-        
+
         assert_msg_critical('py3Dmol' in sys.modules,
-                    'py3Dmol is required for interactive viewer.')
-        
+                            'py3Dmol is required for interactive viewer.')
+
         try:
             from IPython.display import display, HTML
             import ipywidgets as widgets
         except ImportError:
             raise ImportError('IPython.display and ipywidgets are required for interactive viewer.')
-        
+
         # Calculate component sizes based on layout
         # Width: Use 100% of available space
         # Height: Calculated from aspect ratio
         # Layout: [Left: Diagram | Right: [Top: Attachment | Bottom: Detachment]]
         # Note: We'll use percentage-based widths, but need pixel heights for matplotlib/py3Dmol
-        
+
         # Assume a reference width for calculations (will use % in layout)
         reference_width = 1000  # Reference for ratio calculations
         height = int(reference_width * aspect_ratio)
-        
+
         left_width_pct = 50  # 50% for diagram
         right_width_pct = 50  # 50% for viewers
-        
+
         # Calculate pixel sizes for matplotlib figure and py3Dmol viewers
         diagram_width = int(reference_width * left_width_pct * 0.01)
         diagram_height = height
         viewer_width = int(reference_width * right_width_pct * 0.01)
         viewer_height = height
-        
+
         num_states = len(rsp_results['eigenvalues'])
         print(f"Visualizing {num_states} excited states")
-        
+
         # Validate initial state
         if initial_state < 1 or initial_state > num_states:
             print(f"Warning: initial_state {initial_state} out of range. Using state 1.")
             initial_state = 1
-        
+
         # Compute initial transition data
         transition_data = self.compute_transition_data(
             scf_results, rsp_results,
             self._subgroups, state_index=initial_state
         )
-        
+
         # Create grid viewer for molecule structure with subgroup coloring
         self._mol_grid_viewer = py3Dmol.view(viewergrid=(2,1), width=viewer_width, height=viewer_height, linked=True)
-        
+
         # Add molecule structure
         self._mol_grid_viewer.addModel(self._molecule.get_xyz_string(), "xyz")
 
@@ -794,7 +792,7 @@ class ValetAnalyzer:
         sg_colors = transition_data['subgroup_colors']
         sg_atom_map = transition_data['atom_to_subgroup_map']
         num_atoms = self._molecule.number_of_atoms()
-        
+
         for atom_idx in range(num_atoms):
             sg_idx = sg_atom_map.get(atom_idx, 0)
             color = sg_colors[sg_idx]
@@ -805,17 +803,17 @@ class ValetAnalyzer:
             })
 
         self._mol_grid_viewer.zoomTo()
-        
+
         # Store calculated sizes for use in on_state_change
         self._viewer_width = viewer_width
         self._viewer_height = viewer_height
         self._diagram_width = diagram_width
         self._diagram_height = diagram_height
-        
+
         # Use persistent output widgets for dynamic updates
         diagram_output = widgets.Output()
-        viewer_output  = widgets.Output()
-        
+        viewer_output = widgets.Output()
+
         # Helper function to display transition diagram
         def display_diagram(state_idx):
             transition_data = self.compute_transition_data(
@@ -829,27 +827,27 @@ class ValetAnalyzer:
             # Display the figure directly in the output widget
             plt.show()
             return transition_data
-        
+
         # Display initial state
         with diagram_output:
             transition_data = display_diagram(initial_state)
-        
+
         with viewer_output:
             # Display initial viewer with molecule only
             display(HTML(self._mol_grid_viewer._make_html()))
-        
+
         # Store outputs for updates
         self._diagram_output = diagram_output
-        self._viewer_output  = viewer_output
-        
+        self._viewer_output = viewer_output
+
         def on_state_change(change):
             state_idx = change['new']
-            
+
             # Update diagram
             self._diagram_output.clear_output(wait=True)
             with self._diagram_output:
                 trans_data = display_diagram(state_idx)
-            
+
             # Recreate viewer with new state
             self._viewer_output.clear_output(wait=True)
             with self._viewer_output:
@@ -857,7 +855,7 @@ class ValetAnalyzer:
                 new_viewer = self._create_viewer_with_densities(scf_results, rsp_results, state_idx, trans_data)
                 self._mol_grid_viewer = new_viewer
                 display(HTML(new_viewer._make_html()))
-        
+
         # Create dropdown
         dropdown = widgets.Dropdown(
             options=list(range(1, num_states + 1)),
@@ -865,30 +863,30 @@ class ValetAnalyzer:
             description='State:'
         )
         dropdown.observe(on_state_change, names='value')
-        
+
         # Layout with percentage-based widths and calculated heights
         diagram_box = widgets.VBox([
             diagram_output
         ], layout=widgets.Layout(width=f'{left_width_pct}%', height=f'{height}px', overflow='hidden'))
-        
+
         viewer_box = widgets.VBox([
             viewer_output
         ], layout=widgets.Layout(width=f'{right_width_pct}%', height=f'{height}px', overflow='hidden'))
-        
+
         main_layout = widgets.HBox([diagram_box, viewer_box],
                                    layout=widgets.Layout(width='100%', height=f'{height}px', overflow='hidden'))
-        
+
         display(dropdown, main_layout)
-        
+
         # Invoke initial density addition
         on_state_change({'new': initial_state})
-        
+
         return None
-    
+
     def _create_viewer_with_densities(self, scf_results, rsp_results, state_idx, transition_data):
         """
         Create a new grid viewer with molecule, subgroup coloring, and density isosurfaces.
-        
+
         :param scf_results:
             The dictionary of results from converged SCF wavefunction.
         :param rsp_results:
@@ -897,27 +895,27 @@ class ValetAnalyzer:
             The excited state index (1-based).
         :param transition_data:
             Dictionary containing subgroup colors and atom mapping.
-            
+
         :return:
             py3Dmol viewer object with all visual elements.
         """
         # Create grid viewer
         viewer = py3Dmol.view(
-            viewergrid=(2,1), 
-            width=self._viewer_width, 
-            height=self._viewer_height, 
+            viewergrid=(2,1),
+            width=self._viewer_width,
+            height=self._viewer_height,
             linked=True
         )
-        
+
         # Add molecule - addModel without viewer param adds to all grid positions
         xyz_str = self._molecule.get_xyz_string()
         viewer.addModel(xyz_str, "xyz")
-        
+
         # Apply subgroup coloring to all viewers
         sg_colors = transition_data['subgroup_colors']
         sg_atom_map = transition_data['atom_to_subgroup_map']
         num_atoms = self._molecule.number_of_atoms()
-        
+
         for atom_idx in range(num_atoms):
             sg_idx = sg_atom_map.get(atom_idx, 0)
             color = sg_colors[sg_idx]
@@ -926,15 +924,15 @@ class ValetAnalyzer:
                 'sphere': {'scale': 0.25, 'color': color}
             }
             viewer.setStyle({'serial': atom_idx}, style)
-        
+
         # Zoom before adding densities
         viewer.zoomTo()
-        
+
         # Compute densities
         densities = self.compute_detach_attach_densities(
             scf_results, rsp_results, state_idx
         )
-        
+
         # Compute attachment density
         attachment_data = self._density_viewer.compute_density(
             densities['attachment_density_matrix_AO']
@@ -942,7 +940,7 @@ class ValetAnalyzer:
         attachment_cube_str = self._density_viewer._get_density_cube_str(
             attachment_data, f"S{state_idx}_attachment"
         )
-        
+
         # Compute detachment density
         detachment_data = self._density_viewer.compute_density(
             densities['detachment_density_matrix_AO']
@@ -950,7 +948,7 @@ class ValetAnalyzer:
         detachment_cube_str = self._density_viewer._get_density_cube_str(
             detachment_data, f"S{state_idx}_detachment"
         )
-        
+
         # Add volumetric data directly using viewer parameter
         # Attachment density (green) to top viewer (0,0)
         viewer.addVolumetricData(
@@ -958,34 +956,12 @@ class ValetAnalyzer:
             {'isoval': self.density_isovalue, 'color': self.attachment_color, 'opacity': self.density_opacity},
             viewer=(0,0)
         )
-        
-        # Detachment density (red) to bottom viewer (1,0)  
+
+        # Detachment density (red) to bottom viewer (1,0)
         viewer.addVolumetricData(
             detachment_cube_str, "cube",
             {'isoval': self.density_isovalue, 'color': self.detachment_color, 'opacity': self.density_opacity},
             viewer=(1,0)
         )
-        
+
         return viewer
-
-    @staticmethod
-    def get_full_solution_vector(solution):
-        """
-        Gets a full solution vector from the distributed solution.
-
-        :param solution:
-            The distributed solution as a tuple.
-
-        :return:
-            The full solution vector.
-        """
-
-        x_ger = solution.get_full_vector(0)
-        x_ung = solution.get_full_vector(1)
-
-        if solution.rank == mpi_master():
-            x_ger_full = np.hstack((x_ger, x_ger))
-            x_ung_full = np.hstack((x_ung, -x_ung))
-            return x_ger_full + x_ung_full
-        else:
-            return None

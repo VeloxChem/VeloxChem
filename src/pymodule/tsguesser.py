@@ -45,9 +45,7 @@ from .veloxchemlib import mpi_master, hartree_in_kjpermol, bohr_in_angstrom
 from .outputstream import OutputStream
 from .openmmdynamics import OpenMMDynamics
 from .errorhandler import assert_msg_critical
-from .sanitychecks import molecule_sanity_check
 from .mmforcefieldgenerator import MMForceFieldGenerator
-from .evbdriver import EvbDriver
 from .molecule import Molecule
 from .scfrestdriver import ScfRestrictedDriver
 from .molecularbasis import MolecularBasis
@@ -133,6 +131,8 @@ class TransitionStateGuesser():
             "soft_core_lj_int": False,
         }
 
+        self._reaction_matcher_assist_min_depth = None
+
         self.ffbuilder = ReactionForceFieldBuilder(ostream=self.ostream)
         self.ffbuilder.calculate_resp = False
 
@@ -176,6 +176,9 @@ class TransitionStateGuesser():
             )
             self.ostream.flush()
             self.ostream.mute()
+
+        if self._reaction_matcher_assist_min_depth is not None:
+            self.ffbuilder._reaction_matcher_assist_min_depth = int(self._reaction_matcher_assist_min_depth)
 
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_forcefields(
             reactant=reactant,
@@ -256,7 +259,6 @@ class TransitionStateGuesser():
         self.folder = Path().cwd() / self.folder_name
 
         # pdbs are saved in angstrom
-        exception = None
 
         rea_int = mm.VerletIntegrator(1)
         rea_sim = mmapp.Simulation(
@@ -386,9 +388,8 @@ class TransitionStateGuesser():
                         V, E1, E2, conf_indices = self._get_best_mm_E_from_scan_dict(
                             scan_dict)
                         discont_indices = self._check_discontinuities(E1, E2)
-
-        except Exception as e:
-            err_str = f"The MM scan crashed. Saving results in self.results and raising exception"
+        except Exception:
+            err_str = "The MM scan crashed. Saving results in self.results and raising exception"
             self.ostream.print_warning(err_str)
             self.ostream.flush()
             self.results.update({'scan': scan_dict})
@@ -467,7 +468,7 @@ class TransitionStateGuesser():
             e1 = result[arg]['e1']
             e2 = result[arg]['e2']
             v = result[arg]['v']
-            e_int = result[arg]['e_int']
+            # e_int = result[arg]['e_int']
             pos = result[arg]['pos']
             n_conf = len(result)
 
@@ -496,7 +497,7 @@ class TransitionStateGuesser():
                 e1 = result[arg]['e1']
                 e2 = result[arg]['e2']
                 v = result[arg]['v']
-                e_int = result[arg]['e_int']
+                # e_int = result[arg]['e_int']
                 pos = result[arg]['pos']
                 n_conf = len(result)
                 self._print_mm_iter(l, e1, e2, v, n_conf)
@@ -550,7 +551,7 @@ class TransitionStateGuesser():
         else:
             pdb_name = f'topology_{getrandbits(32):08x}.pdb'
 
-        pdb = mmapp.PDBFile.writeFile(
+        pdb_not_used = mmapp.PDBFile.writeFile(
             topology,
             init_pos * mmunit.angstrom,
             pdb_name,
@@ -625,7 +626,7 @@ class TransitionStateGuesser():
             for l in results['scan'].keys():
 
                 min_qm_conf_E = None
-                min_conf_index = 0
+                # min_conf_index = 0
                 scan = sorted(results['scan'][l], key=lambda x: x['v'])
                 results['scan'][l] = scan
                 # Pick out lowest 5 conformers from scan
@@ -639,7 +640,7 @@ class TransitionStateGuesser():
                         continue
                     if min_qm_conf_E is None or qm_E < min_qm_conf_E:
                         min_qm_conf_E = qm_E
-                        min_conf_index = i
+                        # min_conf_index = i
 
                     if ref is None:
                         ref = qm_E
@@ -678,14 +679,16 @@ class TransitionStateGuesser():
             self.molecule = Molecule.read_xyz_string(max_qm_xyz)
             self.molecule.set_multiplicity(self.mol_multiplicity)
             self.molecule.set_charge(self.mol_charge)
-        except Exception as e:
-            err_str = f"The QM scan crashed. Saving results in self.results and raising exception"
+        except Exception:
+            err_str = "The QM scan crashed. Saving results in self.results and raising exception"
             self.ostream.print_warning(err_str)
             self.ostream.flush()
             self.results.update(results)
             raise
+
         if self.save_results_file:
             self.save_results(self.results_file, self.results)
+
         return self.results
 
     def _get_qm_energy(self, xyz):
@@ -742,14 +745,11 @@ class TransitionStateGuesser():
 
         if ts_results is None:
             if filename is not None:
-                try:
-                    ostream.print_info(f"Loading results from {filename}")
-                    ts_results = TransitionStateGuesser.load_results(
-                        filename,
-                        ostream,
-                    )
-                except Exception as e:
-                    raise e
+                ostream.print_info(f"Loading results from {filename}")
+                ts_results = TransitionStateGuesser.load_results(
+                    filename,
+                    ostream,
+                )
             else:
                 raise ValueError(
                     "No results provided. Provide either ts_results or filename."
@@ -883,7 +883,7 @@ class TransitionStateGuesser():
         try:
             from IPython import get_ipython as _get_ipython
             _ip = _get_ipython()
-        except Exception:
+        except ImportError:
             _ip = None
 
         if _ip is not None:
@@ -1326,7 +1326,7 @@ class TransitionStateGuesser():
         if self.mute_scf:
             self.ostream.print_info("Disable mute_scf to see detailed output.")
         self.ostream.print_blank()
-        self.ostream.print_header(f"Starting QM scan")
+        self.ostream.print_header("Starting QM scan")
         self.ostream.print_blank()
         self.ostream.print_header("QM parameters:")
         self.ostream.print_header(f"Basis:       {self.qm_basis:>10}")
@@ -1351,8 +1351,8 @@ class TransitionStateGuesser():
         self.ostream.print_header(valstr)
         self.ostream.flush()
 
-    #todo add option for reading geometry (bond distances, angles, etc.) from transition state instead of averaging them
-    #todo add option for recalculating charges from ts_mol
+    # todo add option for reading geometry (bond distances, angles, etc.) from transition state instead of averaging them
+    # todo add option for recalculating charges from ts_mol
     def get_ts_ffgen(self,
                      reaffgen=None,
                      proffgen=None,
@@ -1410,7 +1410,7 @@ class TransitionStateGuesser():
             if id in reaparams.keys() and id in proparams.keys():
                 reaparam = reaparams[id]
                 proparam = proparams[id]
-                #todo change this to measurement from molecule
+                # todo change this to measurement from molecule
                 eq = (1 -
                       l) * reaparam['equilibrium'] + l * proparam['equilibrium']
                 fc = (1 - l) * reaparam['force_constant'] + l * proparam[
@@ -1439,7 +1439,7 @@ class TransitionStateGuesser():
         ts_params = {}
         for dict, scaling in zip([rea_dihedrals, pro_dihedrals], [1 - l, l]):
             for id, param in dict.items():
-                #todo reassign value of phase?
+                # todo reassign value of phase?
                 new_param = copy.copy(param)
                 if new_param.get('multiple'):
                     new_param['barrier'] = [

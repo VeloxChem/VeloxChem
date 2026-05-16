@@ -11,6 +11,7 @@ from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.outputstream import OutputStream
 from veloxchem.firstorderprop import FirstOrderProperties
 from veloxchem.firstorderpropdriver import FirstOrderPropertyDriver
+from veloxchem.errorhandler import VeloxChemError
 
 
 @pytest.mark.solvers
@@ -164,7 +165,7 @@ class TestFirstOrderPropertyDriver:
         prop_drv.property = 'quadrupole moment'
 
         with pytest.raises(
-                AssertionError,
+                VeloxChemError,
                 match='Property quadrupole moment not yet supported'):
             prop_drv.compute(None, None, None)
 

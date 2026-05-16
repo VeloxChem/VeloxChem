@@ -115,7 +115,6 @@ class TestTransitionStateGuesser:
 
     @pytest.mark.skipif(('openmm' not in sys.modules),
                         reason='openmm not available')
-    @pytest.mark.timeconsuming
     def test_ts_guesser(self):
 
         rea = Molecule.read_str("""
