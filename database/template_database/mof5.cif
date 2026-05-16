@@ -1,5 +1,5 @@
-data_fcu_Fm-3m  hall_number: 523, V_con: 12
-_audit_creation_date              2025-03-05
+data_MOF5_Fmmm  hall_number: 334, V_con: 6
+_audit_creation_date              2025-11-11
 _audit_creation_method            'MOFBuilder'
 _symmetry_space_group_name_H-M    'P1'
 _symmetry_Int_Tables_number       1
@@ -7,9 +7,9 @@ _symmetry_cell_setting            triclinic
 loop_
 _symmetry_equiv_pos_as_xyz
   x,y,z
-_cell_length_a                    14.1421
-_cell_length_b                    14.1421
-_cell_length_c                    14.1421
+_cell_length_a                    25.6676
+_cell_length_b                    25.668
+_cell_length_c                    25.668
 _cell_angle_alpha                 90.0
 _cell_angle_beta                  90.0
 _cell_angle_gamma                 90.0
@@ -19,10 +19,14 @@ _atom_site_type_symbol
 _atom_site_fract_x
 _atom_site_fract_y
 _atom_site_fract_z
-V1    V   0.00000  0.00000  0.00000
-V2    V   0.00000  0.50000  0.50000
-V3    V   0.50000  0.00000  0.50000
-V4    V   0.50000  0.50000  0.00000
+V1    V   0.25000  0.25000  0.25000
+V2    V   0.25000  0.25000  0.75000
+V3    V   0.25000  0.75000  0.25000
+V4    V   0.25000  0.75000  0.75000
+V5    V   0.75000  0.25000  0.25000
+V6    V   0.75000  0.25000  0.75000
+V7    V   0.75000  0.75000  0.25000
+V8    V   0.75000  0.75000  0.75000
 E1    E   0.00000  0.25000  0.25000
 E2    E   0.00000  0.25000  0.75000
 E3    E   0.00000  0.75000  0.25000

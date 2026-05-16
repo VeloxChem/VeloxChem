@@ -1,0 +1,10 @@
+COMPND   acetate
+COMPND   Created by MOFBuilder
+HETATM    1  X1  MOL     0       0.052  -0.366   0.004  1.00  0.00           C  
+HETATM    2  C2  MOL     0       1.487   0.129   0.017  1.00  0.00           C  
+HETATM    3  Y1  MOL     0      -0.469  -0.544  -1.117  1.00  0.00           O  
+HETATM    4  Y2  MOL     0      -0.494  -0.557   1.111  1.00  0.00           O
+HETATM    5  H1  MOL     0       1.841   0.250   1.040  1.00  0.00           H  
+HETATM    6  H2  MOL     0       2.127  -0.586  -0.497  1.00  0.00           H  
+HETATM    7  H3  MOL     0       1.548   1.089  -0.493  1.00  0.00           H  
+
