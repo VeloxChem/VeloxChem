@@ -286,9 +286,9 @@ class MetalOrganicFrameworkBuilder:
             "to access this functionality.")
         self.ostream.flush()
 
-    def show(self, w=800, h=600, residue_indices=False, residue_name=False):
+    def show(self, w=800, h=600, residue_indices=False, residue_names=False):
         self._print_framework_warning("show")
-        return self.framework.show(w, h, residue_indices, residue_name)
+        return self.framework.show(w, h, residue_indices, residue_names)
 
     def write_gromacs_files(self,
                             filename=None,
