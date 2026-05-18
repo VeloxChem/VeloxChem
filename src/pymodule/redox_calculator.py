@@ -1312,49 +1312,55 @@ class RedoxCalculator:
     # Named solvation interface
     # ------------------------------------------------------------------
 
-    def _conformer_search(self, input_data, max_conformers: int = 5,
-                        basis_label: str = "def2-svp",
-                        use_solvent: bool = True,
-                        solvent_epsilon: float = 78.39):
+    def _conformer_search(
+        self,
+        input_data,
+        max_conformers: int = 5,
+        basis_label: str = "def2-svp",
+        use_solvent: bool = True,
+        solvent_epsilon: float = 78.39,
+    ):
+        """
+        Generate/collect conformers and return the lowest-energy optimized conformer.
 
+        The conformer pre-optimization is intentionally cheap (BLYP/def2-SVP)
+        and is applied independently to each charge state passed in.
+        """        
         conf = vlx.ConformerGenerator()
-        conf.implicit_solvent_model='gbn'
+        conf.implicit_solvent_model = "gbn"
+        conf.partial_charges = input_data.get_partial_charges(input_data.get_charge())
+        conformers_dict = conf.generate(input_data)
+        molecules = conformers_dict.get("molecules", [])
+        n_to_opt = min(max_conformers, len(molecules))
+        #Untill counter is added to ConformerGenerator, no selection on amount of condformers is done
+        all_opt_results = []
+        for i, molecule in enumerate(molecules[:n_to_opt], start=1):
+            print(f"Optimizing conformer {i}...")
 
-        n = conf.count_conformer_combinations(input_data)
-        if n < 10000:
-            conformers_dict = conf.generate(input_data)
-            opt_results = {}
-            all_opt_results = []
-        else:
-            print('Too many conformer combinations, using OpenMM for conformational sampling...')
-            ff_gen = vlx.MMForceFieldGenerator()
-            ff_gen.partial_charges = input_data.get_partial_charges(input_data.get_charge())
-            ff_gen.create_topology(input_data)
-            omm = vlx.OpenMMDynamics()
-            omm.create_system_from_molecule(input_data,ff_gen, solvent='implicit')
-            conformers_dict = omm.conformational_sampling(nsteps=10000,snapshots=100)
-            
-            
-        for i, xyz in enumerate(conformers_dict["geometries"][:max_conformers], start=1):
-                print(f"Optimizing conformer {i}...")
+            molecule.set_charge(input_data.get_charge())
+            molecule.set_multiplicity(input_data.get_multiplicity())
 
-                molecule=vlx.Molecule.read_xyz_string(xyz)
-                molecule.set_charge(input_data.get_charge())
-                molecule.set_multiplicity(input_data.get_multiplicity())
-                
-                basis = vlx.MolecularBasis.read(molecule, basis_label)
-                scf_drv = (vlx.ScfUnrestrictedDriver() if input_data.get_multiplicity() > 1 else vlx.ScfRestrictedDriver())
-                scf_drv.xcfun = "blyp"
+            basis = vlx.MolecularBasis.read(molecule, basis_label)
+            scf_drv = (
+                vlx.ScfUnrestrictedDriver()
+                if molecule.get_multiplicity() > 1
+                else vlx.ScfRestrictedDriver()
+            )
+            scf_drv.xcfun = "blyp"
+            scf_drv.ri_jk = False
+            if hasattr(scf_drv, "ri_coulomb"):
                 scf_drv.ri_coulomb = True
-                scf_drv.max_iter = 100
-                scf_drv.conv_thresh = 1.0e-4
-                scf_drv.ostream.mute()
-                if use_solvent:
-                    scf_drv.solvation_model = "cpcm"
+            scf_drv.max_iter = 100
+            scf_drv.conv_thresh = 1.0e-4
+            scf_drv.ostream.mute()
+
+            if use_solvent:
+                scf_drv.solvation_model = "cpcm"
+                if hasattr(scf_drv, "cpcm_epsilon"):
                     scf_drv.cpcm_epsilon = solvent_epsilon
 
-                scf_results = scf_drv.compute(input_data, basis)
-
+            try:
+                scf_results = scf_drv.compute(molecule, basis)
                 opt_drv = vlx.OptimizationDriver(scf_drv)
                 opt_drv.conv_energy = 1.0e-3
                 opt_drv.conv_grms = 3.0e-4
@@ -1364,28 +1370,118 @@ class RedoxCalculator:
                 opt_drv.restart = False
                 opt_drv.ostream.mute()
 
-                result = opt_drv.compute(input_data, basis, scf_results)
-
+                result = opt_drv.compute(molecule, basis, scf_results)
                 final_energy = result["opt_energies"][-1]
                 final_geometry = result["final_geometry"]
-                final_molecule = result["final_molecule"]
 
-                opt_results[i] = result
+                all_opt_results.append(
+                    {
+                        "conformer_index": i,
+                        "energy_au": final_energy,
+                        "final_geometry": final_geometry,
+                        "final_molecule": result.get("final_molecule"),
+                        "opt_results": result,
+                    }
+                )
+            except Exception as exc:
+                log.warning("Conformer %d pre-optimization failed: %s", i, exc)
 
-                all_opt_results.append({
-                    "conformer_index": i,
-                    "energy_au": final_energy,
-                    "final_geometry": final_geometry,
-                    "final_molecule": final_molecule,
-                    "opt_results": result,
-                })
+        if not all_opt_results:
+            log.warning("All conformer pre-optimizations failed; using input geometry.")
+            return input_data
 
         all_opt_results.sort(key=lambda x: x["energy_au"])
-
-        mol = vlx.Molecule.read_xyz_string(result['geometries'][0])
+        mol = vlx.Molecule.read_xyz_string(all_opt_results[0]["final_geometry"])
         mol.set_charge(input_data.get_charge())
         mol.set_multiplicity(input_data.get_multiplicity())
         return mol
+    
+        #TODO counter is not implemented in conformerGenerator thus this is commented out for now
+        
+        '''
+        if n < 10000:
+            conf.partial_charges = molecule.get_partial_charges(molecule.get_charge())
+            conformers_dict = conf.generate(input_data)
+            geometries = conformers_dict.get("geometries", [])
+        else:
+            print("Too many conformer combinations; using OpenMM conformational sampling.")
+            ff_gen = vlx.MMForceFieldGenerator()
+            ff_gen.create_topology(input_data, resp=False)
+            omm = vlx.OpenMMDynamics()
+            omm.create_system_from_molecule(input_data, ff_gen, solvent="implicit")
+            sampled = omm.conformational_sampling(nsteps=10000, snapshots=100)
+            geometries = sampled.get("geometries", [])
+
+        if not geometries:
+            print("Conformer search produced no geometries; using input geometry.")
+            return input_data
+
+        all_opt_results = []
+        n_to_opt = min(max_conformers, len(geometries))
+
+        for i, xyz in enumerate(geometries[:n_to_opt], start=1):
+            print(f"Optimizing conformer {i}...")
+
+            molecule = vlx.Molecule.read_xyz_string(xyz)
+            molecule.set_charge(input_data.get_charge())
+            molecule.set_multiplicity(input_data.get_multiplicity())
+
+            basis = vlx.MolecularBasis.read(molecule, basis_label)
+            scf_drv = (
+                vlx.ScfUnrestrictedDriver()
+                if molecule.get_multiplicity() > 1
+                else vlx.ScfRestrictedDriver()
+            )
+            scf_drv.xcfun = "blyp"
+            scf_drv.ri_jk = False
+            if hasattr(scf_drv, "ri_coulomb"):
+                scf_drv.ri_coulomb = True
+            scf_drv.max_iter = 100
+            scf_drv.conv_thresh = 1.0e-4
+            scf_drv.ostream.mute()
+
+            if use_solvent:
+                scf_drv.solvation_model = "cpcm"
+                if hasattr(scf_drv, "cpcm_epsilon"):
+                    scf_drv.cpcm_epsilon = solvent_epsilon
+
+            try:
+                scf_results = scf_drv.compute(molecule, basis)
+                opt_drv = vlx.OptimizationDriver(scf_drv)
+                opt_drv.conv_energy = 1.0e-3
+                opt_drv.conv_grms = 3.0e-4
+                opt_drv.conv_gmax = 1.2e-3
+                opt_drv.max_iter = 50
+                opt_drv.conv_maxiter = True
+                opt_drv.restart = False
+                opt_drv.ostream.mute()
+
+                result = opt_drv.compute(molecule, basis, scf_results)
+                final_energy = result["opt_energies"][-1]
+                final_geometry = result["final_geometry"]
+
+                all_opt_results.append(
+                    {
+                        "conformer_index": i,
+                        "energy_au": final_energy,
+                        "final_geometry": final_geometry,
+                        "final_molecule": result.get("final_molecule"),
+                        "opt_results": result,
+                    }
+                )
+            except Exception as exc:
+                log.warning("Conformer %d pre-optimization failed: %s", i, exc)
+
+        if not all_opt_results:
+            log.warning("All conformer pre-optimizations failed; using input geometry.")
+            return input_data
+
+        all_opt_results.sort(key=lambda x: x["energy_au"])
+        mol = vlx.Molecule.read_xyz_string(all_opt_results[0]["final_geometry"])
+        mol.set_charge(input_data.get_charge())
+        mol.set_multiplicity(input_data.get_multiplicity())
+        return mol
+        '''
         
     def register_solvation(
         self,
