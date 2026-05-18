@@ -284,9 +284,9 @@ class CpcmDriver:
             The density matrix.
 
         :return:
-            The CPCM gradient contribution.
+            The CPCM excited state gradient contribution.
         """
-
+        
         grad_V_pol = self.grad_V_pol(molecule, basis, self._cpcm_grid,
                                      self._cpcm_sw_func, self._cpcm_precond,
                                      self._cpcm_q, self.epsilon, self.x,
@@ -1097,7 +1097,7 @@ class CpcmDriver:
         :param cpcm_cg_thresh:
             threshold for solving charges.
 
-        :return: 
+        :return:
             The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
 
