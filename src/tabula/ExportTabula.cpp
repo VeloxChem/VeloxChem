@@ -164,6 +164,24 @@ export_tabula(py::module& m) -> void
         "Computes the overlap matrix and returns the per-phase wall-time breakdown.",
         "molecule"_a, "basis"_a, "threshold"_a = 0.0);
 
+    m.def(
+        "tabula_overlap_profile_sparse",
+        [](const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) -> py::dict {
+            OverlapProfile profile;
+            OverlapDriver().computeSparse(molecule, basis, threshold, &profile);
+
+            py::dict result;
+            result["make_blocks"] = profile.make_blocks;
+            result["pair_setup"]  = profile.pair_setup;
+            result["screen"]      = profile.screen;
+            result["kernel"]      = profile.kernel;
+            result["scatter"]     = profile.scatter;
+            result["symmetrize"]  = profile.symmetrize;
+            return result;
+        },
+        "Computes the block-sparse overlap matrix and returns the per-phase wall-time breakdown.",
+        "molecule"_a, "basis"_a, "threshold"_a = 0.0);
+
     // block-pair parallel loop — per-thread load balance of the last run
 
     m.def(

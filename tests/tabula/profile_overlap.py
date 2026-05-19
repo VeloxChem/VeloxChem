@@ -1,15 +1,26 @@
-"""Per-phase wall-time breakdown of tabula::OverlapDriver::compute, across
-c240 and a span of def2 bases.
+"""Per-phase wall-time breakdown of tabula::OverlapDriver — both the dense
+`compute` and the block-sparse `computeSparse` path.
 
-Thread-summed seconds.
+Dense is profiled unscreened (threshold 0); sparse at the lossless 1e-12
+threshold the benchmark uses. Times are thread-summed seconds.
 """
 
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
-from veloxchem.tabulalib import tabula_overlap_profile
+from veloxchem.tabulalib import tabula_overlap_profile, tabula_overlap_profile_sparse
 
 GEOMETRY_DIR = "/Users/rinkevic/Development/VeloxChem"
 PHASES = ["make_blocks", "pair_setup", "screen", "kernel", "scatter", "symmetrize"]
+SPARSE_THRESHOLD = 1.0e-12
+
+# (molecule, basis) cells — a compact span plus the large cells.
+CELLS = [
+    ("c240", "def2-SVP"),
+    ("c240", "def2-TZVP"),
+    ("c240", "def2-QZVP"),
+    ("olestra", "def2-QZVPD"),
+    ("olestra", "aug-cc-pVQZ"),
+]
 
 
 def read_molecule(name):
@@ -18,16 +29,25 @@ def read_molecule(name):
     return Molecule.read_str("\n".join(lines[2:]), "angstrom")
 
 
-for molecule_name in ["c240"]:
+def report(label, profile):
+    total = sum(profile[p] for p in PHASES)
+    print(f"  {label:8s}  total {total * 1e3:9.1f} ms")
+    for phase in PHASES:
+        ms = profile[phase] * 1e3
+        share = ms / (total * 1e3) * 100 if total > 0 else 0.0
+        print(f"    {phase:12s} {ms:9.2f} ms  ({share:5.1f} %)")
+
+
+for molecule_name, basis_label in CELLS:
     molecule = read_molecule(molecule_name)
-    for basis_label in ["def2-SVP", "def2-TZVP", "def2-QZVP"]:
-        basis = MolecularBasis.read(molecule, basis_label, ostream=None)
+    basis = MolecularBasis.read(molecule, basis_label, ostream=None)
 
-        tabula_overlap_profile(molecule, basis, 0.0)            # warm-up
-        profile = tabula_overlap_profile(molecule, basis, 0.0)
+    tabula_overlap_profile(molecule, basis, 0.0)                          # warm-up
+    dense = tabula_overlap_profile(molecule, basis, 0.0)
 
-        total = sum(profile[p] for p in PHASES)
-        print(f"\n{molecule_name} / {basis_label}   (thread-summed; total {total * 1e3:.1f} ms)")
-        for phase in PHASES:
-            ms = profile[phase] * 1e3
-            print(f"  {phase:12s} {ms:9.2f} ms  ({ms / (total * 1e3) * 100:5.1f} %)")
+    tabula_overlap_profile_sparse(molecule, basis, SPARSE_THRESHOLD)      # warm-up
+    sparse = tabula_overlap_profile_sparse(molecule, basis, SPARSE_THRESHOLD)
+
+    print(f"\n{molecule_name} / {basis_label}")
+    report("dense", dense)
+    report("sparse", sparse)
