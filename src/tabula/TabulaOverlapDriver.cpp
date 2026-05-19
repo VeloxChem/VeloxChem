@@ -5,9 +5,12 @@
 
 #include "TabulaOverlapDriver.hpp"
 
+#include <chrono>
 #include <cstddef>
 #include <utility>
 #include <vector>
+
+#include "omp.h"
 
 #include "GtoBlock.hpp"
 #include "GtoFunc.hpp"
@@ -23,14 +26,22 @@ namespace tabula {  // tabula namespace
 
 namespace {  // unnamed namespace
 
+/// @brief Wall seconds spanned by a steady-clock interval.
+inline auto
+seconds(const std::chrono::steady_clock::duration &interval) -> double
+{
+    return std::chrono::duration<double>(interval).count();
+}
+
 /// @brief Evaluates a screened `CGtoPairBlock` into the overlap matrix — the
 /// late-contraction recursion end to end: the seed ladder (a), the
 /// primitive-pair contraction (b), the single-centre MD recursion (c), the
 /// Cartesian-to-spherical assembly (d), and the scatter into the matrix (e).
 ///
-/// An off-diagonal block pair also fills its transpose.
+/// An off-diagonal block pair also fills its transpose. When `profile` is
+/// non-null, the per-phase wall times are accumulated into it.
 auto
-evaluate_pair_block(DenseMatrix &matrix, const CGtoPairBlock &pair_block, const bool diagonal_pair) -> void
+evaluate_pair_block(DenseMatrix &matrix, const CGtoPairBlock &pair_block, const bool diagonal_pair, OverlapProfile *profile) -> void
 {
     const auto angular_momentums = pair_block.angular_momentums();
     const auto l_a               = angular_momentums.first;
@@ -42,9 +53,16 @@ evaluate_pair_block(DenseMatrix &matrix, const CGtoPairBlock &pair_block, const 
 
     const auto nppairs = static_cast<std::size_t>(pair_block.number_of_primitive_pairs());
 
+    const auto t_start = std::chrono::steady_clock::now();
+
     // (a) + (b) — the contracted seed ladder [0]^m
-    const auto seed       = compute_overlap_seed(pair_block);
+    const auto seed = compute_overlap_seed(pair_block);
+
+    const auto t_seed = std::chrono::steady_clock::now();
+
     const auto contracted = contract_primitive_pairs(seed, order + 1, cdim, nppairs);
+
+    const auto t_contract = std::chrono::steady_clock::now();
 
     // AC = A − C, per contracted pair
     const auto bra_coords = pair_block.bra_coordinates();
@@ -63,13 +81,17 @@ evaluate_pair_block(DenseMatrix &matrix, const CGtoPairBlock &pair_block, const 
     // (c) — the single-centre MD recursion [r]^0
     const auto rterms = compute_one_center_md(contracted, order, cdim, ac_x, ac_y, ac_z);
 
+    const auto t_md = std::chrono::steady_clock::now();
+
     // (d) — the Cartesian-to-spherical assembly
-    const auto stride          = ((cdim + 7) / 8) * 8;
-    const auto bra_components  = 2 * l_a + 1;
-    const auto ket_components  = 2 * l_c + 1;
+    const auto stride         = ((cdim + 7) / 8) * 8;
+    const auto bra_components = 2 * l_a + 1;
+    const auto ket_components = 2 * l_c + 1;
 
     std::vector<double> spherical(static_cast<std::size_t>(bra_components * ket_components) * stride, 0.0);
     overlap_transform(l_a, l_c, rterms.data(), cdim, spherical.data());
+
+    const auto t_transform = std::chrono::steady_clock::now();
 
     // (e) — scatter the spherical block into the matrix; the orbital indices
     // carry the AO component stride ([0]) and the per-pair offset ([ij+1])
@@ -96,14 +118,34 @@ evaluate_pair_block(DenseMatrix &matrix, const CGtoPairBlock &pair_block, const 
             }
         }
     }
+
+    if (profile != nullptr)
+    {
+        const auto t_scatter = std::chrono::steady_clock::now();
+        profile->seed      += seconds(t_seed - t_start);
+        profile->contract  += seconds(t_contract - t_seed);
+        profile->md        += seconds(t_md - t_contract);
+        profile->transform += seconds(t_transform - t_md);
+        profile->scatter   += seconds(t_scatter - t_transform);
+    }
 }
 
 }  // namespace
 
 auto
-OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, const double threshold) const -> DenseMatrix
+OverlapDriver::compute(const CMolecule       &molecule,
+                       const CMolecularBasis &basis,
+                       const double           threshold,
+                       OverlapProfile        *profile) const -> DenseMatrix
 {
+    const auto t_blocks = std::chrono::steady_clock::now();
+
     const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
+
+    if (profile != nullptr)
+    {
+        profile->make_blocks += seconds(std::chrono::steady_clock::now() - t_blocks);
+    }
 
     const auto dimension = static_cast<std::size_t>(gtofunc::getNumberOfAtomicOrbitals(gto_blocks));
 
@@ -121,11 +163,23 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
         }
     }
 
+    // per-thread profile accumulators, summed after the parallel region
+    std::vector<OverlapProfile> thread_profiles;
+    if (profile != nullptr)
+    {
+        thread_profiles.resize(static_cast<std::size_t>(omp_get_max_threads()));
+    }
+
 #pragma omp parallel for schedule(dynamic)
     for (int p = 0; p < static_cast<int>(block_pairs.size()); p++)
     {
+        OverlapProfile *slot =
+            (profile != nullptr) ? &thread_profiles[static_cast<std::size_t>(omp_get_thread_num())] : nullptr;
+
         const auto i = block_pairs[static_cast<std::size_t>(p)].first;
         const auto j = block_pairs[static_cast<std::size_t>(p)].second;
+
+        const auto t_setup = std::chrono::steady_clock::now();
 
         const auto estimator = make_overlap_screening_estimator(gto_blocks[i].angular_momentum(),
                                                                 gto_blocks[j].angular_momentum());
@@ -134,7 +188,25 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
         // dropped at construction
         const CGtoPairBlock pair_block(gto_blocks[i], gto_blocks[j], estimator, threshold);
 
-        evaluate_pair_block(matrix, pair_block, i == j);
+        if (slot != nullptr)
+        {
+            slot->pair_setup += seconds(std::chrono::steady_clock::now() - t_setup);
+        }
+
+        evaluate_pair_block(matrix, pair_block, i == j, slot);
+    }
+
+    if (profile != nullptr)
+    {
+        for (const auto &thread_profile : thread_profiles)
+        {
+            profile->pair_setup += thread_profile.pair_setup;
+            profile->seed       += thread_profile.seed;
+            profile->contract   += thread_profile.contract;
+            profile->md         += thread_profile.md;
+            profile->transform  += thread_profile.transform;
+            profile->scatter    += thread_profile.scatter;
+        }
     }
 
     return matrix;

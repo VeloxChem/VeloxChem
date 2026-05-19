@@ -136,7 +136,12 @@ export_tabula(py::module& m) -> void
     py::class_<OverlapDriver, std::shared_ptr<OverlapDriver>>(
         m, "TabulaOverlapDriver", "Driver for the Tabula two-center overlap integral.")
         .def(py::init<>())
-        .def("compute", &OverlapDriver::compute, "Computes the overlap matrix.", "molecule"_a, "basis"_a, "threshold"_a = 0.0);
+        .def(
+            "compute",
+            [](const OverlapDriver& self, const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) {
+                return self.compute(molecule, basis, threshold);
+            },
+            "Computes the overlap matrix.", "molecule"_a, "basis"_a, "threshold"_a = 0.0);
 
     // overlap recursion — step (a): the seed ladder [0]^m
 
@@ -311,6 +316,27 @@ export_tabula(py::module& m) -> void
         },
         "Computes the assembled spherical overlap block of a basis-function-pair block.",
         "pair_block"_a);
+
+    // overlap driver — per-phase wall-time profile of a compute run
+
+    m.def(
+        "tabula_overlap_profile",
+        [](const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) -> py::dict {
+            OverlapProfile profile;
+            OverlapDriver().compute(molecule, basis, threshold, &profile);
+
+            py::dict result;
+            result["make_blocks"] = profile.make_blocks;
+            result["pair_setup"]  = profile.pair_setup;
+            result["seed"]        = profile.seed;
+            result["contract"]    = profile.contract;
+            result["md"]          = profile.md;
+            result["transform"]   = profile.transform;
+            result["scatter"]     = profile.scatter;
+            return result;
+        },
+        "Computes the overlap matrix and returns the per-phase wall-time breakdown.",
+        "molecule"_a, "basis"_a, "threshold"_a = 0.0);
 }
 
 }  // namespace tabula
