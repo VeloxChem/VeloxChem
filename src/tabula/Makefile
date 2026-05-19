@@ -33,14 +33,14 @@ CXXFLAGS += $(MATH_INC)
 # symbols are resolved at load time from the already-imported veloxchemlib
 debug: $(LOCAL_OBJ)
 	@echo ====== Linking $(LOCAL_LIB)...
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -shared -undefined dynamic_lookup -o $(LOCAL_LIB) $^
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -shared -undefined dynamic_lookup $(OPENMP_LD) -o $(LOCAL_LIB) $^
 	mkdir -p $(CURDIR)/../../build/python/veloxchem
 	$(CP) $(LOCAL_LIB) $(CURDIR)/../../build/python/veloxchem
 
 # Default rule for linking the Tabula shared library
 release: $(LOCAL_OBJ)
 	@echo ====== Linking $(LOCAL_LIB)...
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -shared -undefined dynamic_lookup -o $(LOCAL_LIB) $^
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -shared -undefined dynamic_lookup $(OPENMP_LD) -o $(LOCAL_LIB) $^
 	mkdir -p $(CURDIR)/../../build/python/veloxchem
 	$(CP) $(LOCAL_LIB) $(CURDIR)/../../build/python/veloxchem
 

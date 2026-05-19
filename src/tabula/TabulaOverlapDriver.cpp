@@ -6,6 +6,7 @@
 #include "TabulaOverlapDriver.hpp"
 
 #include <cstddef>
+#include <utility>
 #include <vector>
 
 #include "GtoBlock.hpp"
@@ -108,20 +109,32 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
 
     DenseMatrix matrix(dimension, dimension, Symmetry::symmetric);
 
-    // triangular loop over the basis-function-block pairs
+    // the triangular basis-function-block pairs are the unit of parallel work
+    // — each pair writes a disjoint AO region of the matrix, so the concurrent
+    // writes do not race
+    std::vector<std::pair<std::size_t, std::size_t>> block_pairs;
     for (std::size_t i = 0; i < gto_blocks.size(); i++)
     {
         for (std::size_t j = 0; j <= i; j++)
         {
-            const auto estimator = make_overlap_screening_estimator(gto_blocks[i].angular_momentum(),
-                                                                    gto_blocks[j].angular_momentum());
-
-            // a screened pair block — the negligible contracted-GTO pairs are
-            // dropped at construction
-            const CGtoPairBlock pair_block(gto_blocks[i], gto_blocks[j], estimator, threshold);
-
-            evaluate_pair_block(matrix, pair_block, i == j);
+            block_pairs.push_back({i, j});
         }
+    }
+
+#pragma omp parallel for schedule(dynamic)
+    for (int p = 0; p < static_cast<int>(block_pairs.size()); p++)
+    {
+        const auto i = block_pairs[static_cast<std::size_t>(p)].first;
+        const auto j = block_pairs[static_cast<std::size_t>(p)].second;
+
+        const auto estimator = make_overlap_screening_estimator(gto_blocks[i].angular_momentum(),
+                                                                gto_blocks[j].angular_momentum());
+
+        // a screened pair block — the negligible contracted-GTO pairs are
+        // dropped at construction
+        const CGtoPairBlock pair_block(gto_blocks[i], gto_blocks[j], estimator, threshold);
+
+        evaluate_pair_block(matrix, pair_block, i == j);
     }
 
     return matrix;
