@@ -13,6 +13,7 @@
 
 #include "TabulaBlockSparseMatrix.hpp"
 #include "TabulaBoys.hpp"
+#include "TabulaCoulombDriver.hpp"
 #include "TabulaDenseMatrix.hpp"
 #include "TabulaKineticDriver.hpp"
 #include "TabulaMixedPrecisionBlockSparseMatrix.hpp"
@@ -267,6 +268,75 @@ export_tabula(py::module& m) -> void
             return result;
         },
         "Gets the per-thread load balance of the most recent kinetic compute.");
+
+    // tabula::CoulombDriver class
+
+    py::class_<CoulombDriver, std::shared_ptr<CoulombDriver>>(
+        m, "TabulaCoulombDriver", "Driver for the Tabula two-center Coulomb integral.")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CoulombDriver& self, const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) {
+                return self.compute(molecule, basis, threshold);
+            },
+            "Computes the Coulomb matrix.", "molecule"_a, "basis"_a, "threshold"_a = 0.0)
+        .def(
+            "compute_sparse",
+            [](const CoulombDriver& self, const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) {
+                return self.computeSparse(molecule, basis, threshold);
+            },
+            "Computes the Coulomb matrix in block-sparse storage.", "molecule"_a, "basis"_a, "threshold"_a = 0.0);
+
+    // Coulomb driver — per-phase wall-time profile of a compute run
+
+    m.def(
+        "tabula_coulomb_profile",
+        [](const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) -> py::dict {
+            KernelProfile profile;
+            CoulombDriver().compute(molecule, basis, threshold, &profile);
+
+            py::dict result;
+            result["make_blocks"] = profile.make_blocks;
+            result["pair_setup"]  = profile.pair_setup;
+            result["screen"]      = profile.screen;
+            result["kernel"]      = profile.kernel;
+            result["scatter"]     = profile.scatter;
+            result["symmetrize"]  = profile.symmetrize;
+            return result;
+        },
+        "Computes the Coulomb matrix and returns the per-phase wall-time breakdown.",
+        "molecule"_a, "basis"_a, "threshold"_a = 0.0);
+
+    m.def(
+        "tabula_coulomb_profile_sparse",
+        [](const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) -> py::dict {
+            KernelProfile profile;
+            CoulombDriver().computeSparse(molecule, basis, threshold, &profile);
+
+            py::dict result;
+            result["make_blocks"] = profile.make_blocks;
+            result["pair_setup"]  = profile.pair_setup;
+            result["screen"]      = profile.screen;
+            result["kernel"]      = profile.kernel;
+            result["scatter"]     = profile.scatter;
+            result["symmetrize"]  = profile.symmetrize;
+            return result;
+        },
+        "Computes the block-sparse Coulomb matrix and returns the per-phase wall-time breakdown.",
+        "molecule"_a, "basis"_a, "threshold"_a = 0.0);
+
+    m.def(
+        "coulomb_thread_balance",
+        []() -> py::dict {
+            const auto balance = coulomb_thread_balance();
+
+            py::dict result;
+            result["wall"]  = balance.wall;
+            result["busy"]  = balance.busy;
+            result["pairs"] = balance.pairs;
+            return result;
+        },
+        "Gets the per-thread load balance of the most recent Coulomb compute.");
 
     // tabula::boys — the Coulomb / nuclear-attraction integral seed
 
