@@ -13,6 +13,7 @@
 
 #include "GtoPairBlock.hpp"
 #include "TabulaBlockSparseMatrix.hpp"
+#include "TabulaContraction.hpp"
 #include "TabulaDenseMatrix.hpp"
 #include "TabulaMixedPrecisionBlockSparseMatrix.hpp"
 #include "TabulaOverlapDriver.hpp"
@@ -164,6 +165,40 @@ export_tabula(py::module& m) -> void
             return result;
         },
         "Computes the overlap seed ladder [0]^m of a basis-function-pair block.",
+        "pair_block"_a);
+
+    // overlap recursion — step (b): the seed ladder contracted over primitives
+
+    m.def(
+        "tabula_overlap_contracted",
+        [](const CGtoPairBlock& pair_block) -> py::array_t<double> {
+            const auto seed = compute_overlap_seed(pair_block);
+
+            const auto angular_momentums = pair_block.angular_momentums();
+            const auto rows              = static_cast<std::size_t>(
+                angular_momentums.first + angular_momentums.second + 1);
+
+            const auto cdim    = pair_block.number_of_contracted_pairs();
+            const auto nppairs = static_cast<std::size_t>(pair_block.number_of_primitive_pairs());
+
+            const auto contracted = contract_primitive_pairs(seed, rows, cdim, nppairs);
+
+            const auto stride = ((cdim + 7) / 8) * 8;
+
+            py::array_t<double> result({rows, cdim});
+            auto                view = result.mutable_unchecked<2>();
+
+            for (std::size_t m = 0; m < rows; m++)
+            {
+                for (std::size_t ij = 0; ij < cdim; ij++)
+                {
+                    view(m, ij) = contracted[m * stride + ij];
+                }
+            }
+
+            return result;
+        },
+        "Computes the contracted overlap seed ladder [0]^m of a basis-function-pair block.",
         "pair_block"_a);
 }
 
