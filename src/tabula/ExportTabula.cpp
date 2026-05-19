@@ -14,14 +14,10 @@
 
 #include "GtoBlock.hpp"
 #include "TabulaBlockSparseMatrix.hpp"
-#include "TabulaContraction.hpp"
 #include "TabulaDenseMatrix.hpp"
 #include "TabulaGtoPairBlock.hpp"
-#include "TabulaMDRecursion.hpp"
 #include "TabulaMixedPrecisionBlockSparseMatrix.hpp"
 #include "TabulaOverlapDriver.hpp"
-#include "TabulaOverlapRecursion.hpp"
-#include "TabulaOverlapTransform.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -183,180 +179,6 @@ export_tabula(py::module& m) -> void
             },
             "Gets the primitive-pair weights (normalization × overlap factor).");
 
-    // overlap recursion — step (a): the seed ladder [0]^m
-
-    m.def(
-        "tabula_overlap_seed",
-        [](const GtoPairBlock& pair_block) -> py::array_t<double> {
-            const auto seed = compute_overlap_seed(pair_block);
-
-            const auto [l_a, l_c] = pair_block.angular_momentums();
-            const auto order      = l_a + l_c;
-
-            const auto cdim    = pair_block.number_of_contracted_pairs();
-            const auto nppairs = static_cast<std::size_t>(pair_block.number_of_primitive_pairs());
-            const auto pdim    = cdim * nppairs;
-            const auto stride  = ((pdim + 7) / 8) * 8;
-
-            py::array_t<double> result({static_cast<std::size_t>(order + 1), pdim});
-            auto                view = result.mutable_unchecked<2>();
-
-            for (int m = 0; m <= order; m++)
-            {
-                for (std::size_t k = 0; k < pdim; k++)
-                {
-                    view(m, k) = seed[static_cast<std::size_t>(m) * stride + k];
-                }
-            }
-
-            return result;
-        },
-        "Computes the overlap seed ladder [0]^m of a basis-function-pair block.",
-        "pair_block"_a);
-
-    // overlap recursion — step (b): the seed ladder contracted over primitives
-
-    m.def(
-        "tabula_overlap_contracted",
-        [](const GtoPairBlock& pair_block) -> py::array_t<double> {
-            const auto seed = compute_overlap_seed(pair_block);
-
-            const auto angular_momentums = pair_block.angular_momentums();
-            const auto rows              = static_cast<std::size_t>(
-                angular_momentums.first + angular_momentums.second + 1);
-
-            const auto cdim    = pair_block.number_of_contracted_pairs();
-            const auto nppairs = static_cast<std::size_t>(pair_block.number_of_primitive_pairs());
-
-            const auto contracted = contract_primitive_pairs(seed, rows, cdim, nppairs);
-
-            const auto stride = ((cdim + 7) / 8) * 8;
-
-            py::array_t<double> result({rows, cdim});
-            auto                view = result.mutable_unchecked<2>();
-
-            for (std::size_t m = 0; m < rows; m++)
-            {
-                for (std::size_t ij = 0; ij < cdim; ij++)
-                {
-                    view(m, ij) = contracted[m * stride + ij];
-                }
-            }
-
-            return result;
-        },
-        "Computes the contracted overlap seed ladder [0]^m of a basis-function-pair block.",
-        "pair_block"_a);
-
-    // overlap recursion — step (c): the single-centre MD recursion [r]^0
-
-    m.def(
-        "tabula_overlap_rterms",
-        [](const GtoPairBlock& pair_block) -> py::array_t<double> {
-            const auto angular_momentums = pair_block.angular_momentums();
-            const auto order             = static_cast<std::size_t>(
-                angular_momentums.first + angular_momentums.second);
-
-            const auto cdim    = pair_block.number_of_contracted_pairs();
-            const auto nppairs = static_cast<std::size_t>(pair_block.number_of_primitive_pairs());
-
-            // steps (a) + (b) — the contracted seed ladder
-            const auto seed       = compute_overlap_seed(pair_block);
-            const auto contracted = contract_primitive_pairs(seed, order + 1, cdim, nppairs);
-
-            // AC = A − C, per contracted pair
-            const auto bra_coords = pair_block.bra_coordinates();
-            const auto ket_coords = pair_block.ket_coordinates();
-
-            std::vector<double> ac_x(cdim), ac_y(cdim), ac_z(cdim);
-            for (std::size_t ij = 0; ij < cdim; ij++)
-            {
-                const auto a = bra_coords[ij].coordinates();
-                const auto c = ket_coords[ij].coordinates();
-                ac_x[ij]     = a[0] - c[0];
-                ac_y[ij]     = a[1] - c[1];
-                ac_z[ij]     = a[2] - c[2];
-            }
-
-            // step (c) — the single-centre MD recursion
-            const auto rterms = compute_one_center_md(contracted, order, cdim, ac_x, ac_y, ac_z);
-
-            const auto monomials = (order + 1) * (order + 2) / 2;
-            const auto stride    = ((cdim + 7) / 8) * 8;
-
-            py::array_t<double> result({monomials, cdim});
-            auto                view = result.mutable_unchecked<2>();
-
-            for (std::size_t r = 0; r < monomials; r++)
-            {
-                for (std::size_t ij = 0; ij < cdim; ij++)
-                {
-                    view(r, ij) = rterms[r * stride + ij];
-                }
-            }
-
-            return result;
-        },
-        "Computes the single-centre MD recursion terms [r]^0, |r| = l_a+l_c, of a pair block.",
-        "pair_block"_a);
-
-    // overlap recursion — step (d): the assembled spherical overlap block
-
-    m.def(
-        "tabula_overlap_spherical",
-        [](const GtoPairBlock& pair_block) -> py::array_t<double> {
-            const auto angular_momentums = pair_block.angular_momentums();
-            const auto l_a               = angular_momentums.first;
-            const auto l_c               = angular_momentums.second;
-            const auto order             = static_cast<std::size_t>(l_a + l_c);
-
-            const auto cdim    = pair_block.number_of_contracted_pairs();
-            const auto nppairs = static_cast<std::size_t>(pair_block.number_of_primitive_pairs());
-
-            // steps (a) + (b) — the contracted seed ladder
-            const auto seed       = compute_overlap_seed(pair_block);
-            const auto contracted = contract_primitive_pairs(seed, order + 1, cdim, nppairs);
-
-            // AC = A − C, per contracted pair
-            const auto bra_coords = pair_block.bra_coordinates();
-            const auto ket_coords = pair_block.ket_coordinates();
-
-            std::vector<double> ac_x(cdim), ac_y(cdim), ac_z(cdim);
-            for (std::size_t ij = 0; ij < cdim; ij++)
-            {
-                const auto a = bra_coords[ij].coordinates();
-                const auto c = ket_coords[ij].coordinates();
-                ac_x[ij]     = a[0] - c[0];
-                ac_y[ij]     = a[1] - c[1];
-                ac_z[ij]     = a[2] - c[2];
-            }
-
-            // step (c) — the single-centre MD recursion
-            const auto rterms = compute_one_center_md(contracted, order, cdim, ac_x, ac_y, ac_z);
-
-            // step (d) — the Cartesian-to-spherical assembly
-            const auto stride         = ((cdim + 7) / 8) * 8;
-            const auto component_rows = static_cast<std::size_t>((2 * l_a + 1) * (2 * l_c + 1));
-
-            std::vector<double> spherical(component_rows * stride, 0.0);
-            overlap_transform(l_a, l_c, rterms.data(), cdim, spherical.data());
-
-            py::array_t<double> result({component_rows, cdim});
-            auto                view = result.mutable_unchecked<2>();
-
-            for (std::size_t s = 0; s < component_rows; s++)
-            {
-                for (std::size_t ij = 0; ij < cdim; ij++)
-                {
-                    view(s, ij) = spherical[s * stride + ij];
-                }
-            }
-
-            return result;
-        },
-        "Computes the assembled spherical overlap block of a basis-function-pair block.",
-        "pair_block"_a);
-
     // overlap driver — per-phase wall-time profile of a compute run
 
     m.def(
@@ -368,33 +190,13 @@ export_tabula(py::module& m) -> void
             py::dict result;
             result["make_blocks"] = profile.make_blocks;
             result["pair_setup"]  = profile.pair_setup;
-            result["seed"]        = profile.seed;
-            result["contract"]    = profile.contract;
-            result["md"]          = profile.md;
-            result["transform"]   = profile.transform;
+            result["kernel"]      = profile.kernel;
             result["scatter"]     = profile.scatter;
             result["symmetrize"]  = profile.symmetrize;
             return result;
         },
         "Computes the overlap matrix and returns the per-phase wall-time breakdown.",
         "molecule"_a, "basis"_a, "threshold"_a = 0.0);
-
-    // overlap seed — accumulated allocate / row0 / ladder profile
-
-    m.def(
-        "seed_profile",
-        []() -> py::dict {
-            const auto profile = seed_profile();
-
-            py::dict result;
-            result["allocate"] = profile.allocate;
-            result["row0"]     = profile.row0;
-            result["ladder"]   = profile.ladder;
-            return result;
-        },
-        "Gets the accumulated compute_overlap_seed allocate / row0 / ladder profile.");
-
-    m.def("reset_seed_profile", &reset_seed_profile, "Resets the accumulated compute_overlap_seed profile.");
 
     // block-pair parallel loop — per-thread load balance of the last run
 
@@ -411,14 +213,6 @@ export_tabula(py::module& m) -> void
         },
         "Gets the per-thread load balance of the most recent overlap compute.");
 
-    // Cartesian-to-spherical transform — accumulated per-(l_a, l_c) profile
-
-    m.def(
-        "transform_profile",
-        []() { return transform_profile(); },
-        "Gets the accumulated transform wall time per (l_a, l_c), indexed l_a * 5 + l_c.");
-
-    m.def("reset_transform_profile", &reset_transform_profile, "Resets the accumulated transform profile.");
 }
 
 }  // namespace tabula

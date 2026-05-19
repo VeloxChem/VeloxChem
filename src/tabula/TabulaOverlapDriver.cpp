@@ -6,8 +6,6 @@
 #include "TabulaOverlapDriver.hpp"
 
 #include <algorithm>
-#include <array>
-#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <utility>
@@ -18,12 +16,9 @@
 #include "GtoBlock.hpp"
 #include "GtoFunc.hpp"
 #include "Point.hpp"
-#include "TabulaContraction.hpp"
 #include "TabulaGtoPairBlock.hpp"
-#include "TabulaMDRecursion.hpp"
-#include "TabulaOverlapRecursion.hpp"
+#include "TabulaOverlapKernel.hpp"
 #include "TabulaOverlapScreener.hpp"
-#include "TabulaOverlapTransform.hpp"
 
 namespace tabula {  // tabula namespace
 
@@ -39,14 +34,10 @@ seconds(const std::chrono::steady_clock::duration &interval) -> double
 // per-thread load balance of the most recent compute's block-pair loop
 ThreadBalance g_balance;
 
-// accumulated wall time of the Cartesian-to-spherical transform, keyed by
-// the angular-momentum pair as l_a * 5 + l_c — for profiling
-std::array<std::atomic<double>, 25> g_transform{};
-
-/// @brief Evaluates a screened `CGtoPairBlock` into the overlap matrix — the
-/// late-contraction recursion end to end: the seed ladder (a), the
-/// primitive-pair contraction (b), the single-centre MD recursion (c), the
-/// Cartesian-to-spherical assembly (d), and the scatter into the matrix (e).
+/// @brief Evaluates a `GtoPairBlock` into the overlap matrix — the fused
+/// overlap kernel (the seed ladder, the primitive-pair contraction, the
+/// single-centre MD recursion, and the Cartesian-to-spherical assembly, in
+/// one tiled pass) followed by the scatter into the matrix.
 ///
 /// Each element is scattered once into the matrix's upper triangle; the
 /// lower triangle is filled by a single `symmetrize` once every block pair
@@ -60,23 +51,11 @@ evaluate_pair_block(DenseMatrix &matrix, const GtoPairBlock &pair_block, const b
     const auto angular_momentums = pair_block.angular_momentums();
     const auto l_a               = angular_momentums.first;
     const auto l_c               = angular_momentums.second;
-    const auto order             = static_cast<std::size_t>(l_a + l_c);
 
     const auto cdim = pair_block.number_of_contracted_pairs();
     if (cdim == 0) return;
 
-    const auto nppairs = static_cast<std::size_t>(pair_block.number_of_primitive_pairs());
-
     const auto t_start = std::chrono::steady_clock::now();
-
-    // (a) + (b) — the contracted seed ladder [0]^m
-    const auto &seed = compute_overlap_seed(pair_block);
-
-    const auto t_seed = std::chrono::steady_clock::now();
-
-    const auto contracted = contract_primitive_pairs(seed, order + 1, cdim, nppairs);
-
-    const auto t_contract = std::chrono::steady_clock::now();
 
     // AC = A − C, per contracted pair
     const auto &bra_coords = pair_block.bra_coordinates();
@@ -92,22 +71,27 @@ evaluate_pair_block(DenseMatrix &matrix, const GtoPairBlock &pair_block, const b
         ac_z[ij]     = a[2] - c[2];
     }
 
-    // (c) — the single-centre MD recursion [r]^0
-    const auto rterms = compute_one_center_md(contracted, order, cdim, ac_x, ac_y, ac_z);
-
-    const auto t_md = std::chrono::steady_clock::now();
-
-    // (d) — the Cartesian-to-spherical assembly
+    // (a–d) — the fused overlap kernel: the seed ladder, the primitive-pair
+    // contraction, the single-centre MD recursion, and the
+    // Cartesian-to-spherical assembly, in one tiled pass
     const auto stride         = ((cdim + 7) / 8) * 8;
     const auto bra_components = 2 * l_a + 1;
     const auto ket_components = 2 * l_c + 1;
 
     std::vector<double> spherical(static_cast<std::size_t>(bra_components * ket_components) * stride, 0.0);
-    overlap_transform(l_a, l_c, rterms.data(), cdim, spherical.data());
+    overlap_kernel(l_a,
+                   l_c,
+                   pair_block.bra_exponents(),
+                   pair_block.ket_exponents(),
+                   pair_block.weights(),
+                   ac_x.data(),
+                   ac_y.data(),
+                   ac_z.data(),
+                   cdim,
+                   pair_block.number_of_primitive_pairs(),
+                   spherical.data());
 
-    const auto t_transform = std::chrono::steady_clock::now();
-
-    g_transform[static_cast<std::size_t>(l_a * 5 + l_c)].fetch_add(seconds(t_transform - t_md), std::memory_order_relaxed);
+    const auto t_kernel = std::chrono::steady_clock::now();
 
     // (e) — scatter the spherical block into the matrix; the orbital indices
     // carry the AO component stride ([0]) and the per-pair offset ([ij+1]).
@@ -139,11 +123,8 @@ evaluate_pair_block(DenseMatrix &matrix, const GtoPairBlock &pair_block, const b
     if (profile != nullptr)
     {
         const auto t_scatter = std::chrono::steady_clock::now();
-        profile->seed      += seconds(t_seed - t_start);
-        profile->contract  += seconds(t_contract - t_seed);
-        profile->md        += seconds(t_md - t_contract);
-        profile->transform += seconds(t_transform - t_md);
-        profile->scatter   += seconds(t_scatter - t_transform);
+        profile->kernel  += seconds(t_kernel - t_start);
+        profile->scatter += seconds(t_scatter - t_kernel);
     }
 }
 
@@ -153,26 +134,6 @@ auto
 overlap_thread_balance() -> ThreadBalance
 {
     return g_balance;
-}
-
-auto
-transform_profile() -> std::array<double, 25>
-{
-    std::array<double, 25> profile{};
-    for (std::size_t k = 0; k < 25; k++)
-    {
-        profile[k] = g_transform[k].load(std::memory_order_relaxed);
-    }
-    return profile;
-}
-
-auto
-reset_transform_profile() -> void
-{
-    for (auto &accumulator : g_transform)
-    {
-        accumulator.store(0.0, std::memory_order_relaxed);
-    }
 }
 
 auto
@@ -304,10 +265,7 @@ OverlapDriver::compute(const CMolecule       &molecule,
         for (const auto &thread_profile : thread_profiles)
         {
             profile->pair_setup += thread_profile.pair_setup;
-            profile->seed       += thread_profile.seed;
-            profile->contract   += thread_profile.contract;
-            profile->md         += thread_profile.md;
-            profile->transform  += thread_profile.transform;
+            profile->kernel     += thread_profile.kernel;
             profile->scatter    += thread_profile.scatter;
         }
     }

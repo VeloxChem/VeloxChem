@@ -6,7 +6,6 @@
 #ifndef TabulaOverlapDriver_hpp
 #define TabulaOverlapDriver_hpp
 
-#include <array>
 #include <vector>
 
 #include "MolecularBasis.hpp"
@@ -21,17 +20,13 @@ struct OverlapProfile
 {
     /// @brief `gtofunc::make_gto_blocks`.
     double make_blocks{0.0};
-    /// @brief Screened `CGtoPairBlock` construction.
+    /// @brief `GtoPairBlock` construction.
     double pair_setup{0.0};
-    /// @brief Step (a) — the seed ladder `[0]^m`.
-    double seed{0.0};
-    /// @brief Step (b) — the primitive-pair contraction.
-    double contract{0.0};
-    /// @brief Step (c) — the single-centre MD recursion.
-    double md{0.0};
-    /// @brief Step (d) — the Cartesian-to-spherical assembly.
-    double transform{0.0};
-    /// @brief Step (e) — the scatter into the matrix's upper triangle.
+    /// @brief The fused overlap kernel — the seed ladder, the primitive-pair
+    /// contraction, the single-centre MD recursion, and the
+    /// Cartesian-to-spherical assembly.
+    double kernel{0.0};
+    /// @brief The scatter into the matrix's upper triangle.
     double scatter{0.0};
     /// @brief Mirroring the upper triangle into the lower — one `symmetrize`
     /// after every block pair (wall time, not thread-summed).
@@ -84,15 +79,6 @@ struct ThreadBalance
 /// `OverlapDriver::compute` run.
 /// @return The thread-balance capture.
 auto overlap_thread_balance() -> ThreadBalance;
-
-/// @brief Gets the accumulated Cartesian-to-spherical transform wall time,
-/// in seconds, summed over the OpenMP threads — indexed by the
-/// angular-momentum pair as `l_a * 5 + l_c` (`l = 0 … 4`).
-/// @return The per-`(l_a, l_c)` transform profile.
-auto transform_profile() -> std::array<double, 25>;
-
-/// @brief Resets the accumulated transform profile.
-auto reset_transform_profile() -> void;
 
 }  // namespace tabula
 
