@@ -228,6 +228,7 @@ from .serenityscfdriver import SerenityScfDriver
 from .serenitygradientdriver import SerenityGradientDriver
 from .serenitylrrspeigensolver import SerenityLinearResponseSolver
 from .serenityexcitedstategradientdriver import SerenityExcitedStateGradientDriver
+from .transitiondensitytracker import TransitionDensityTracker
 
 # Python functions
 from .errorhandler import assert_msg_critical

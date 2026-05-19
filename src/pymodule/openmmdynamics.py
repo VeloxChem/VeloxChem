@@ -59,6 +59,7 @@ from .serenityscfdriver import SerenityScfDriver
 from .serenitygradientdriver import SerenityGradientDriver
 from .serenitylrrspeigensolver import SerenityLinearResponseSolver
 from .serenityexcitedstategradientdriver import SerenityExcitedStateGradientDriver
+from .transitiondensitytracker import TransitionDensityTracker
 
 from .errorhandler import assert_msg_critical
 from .mofutils import svd_superimpose
@@ -196,6 +197,12 @@ class OpenMMDynamics:
 
         # Default value for the C-H linker distance
         self.linking_atom_distance = 1.0705 
+
+        # tracking variales in order to track the same state for now
+        self.state_mode = "ground"
+        self.active_state_index = None
+        self.state_tracking_log = []
+        self.current_step = None
         
     # Loading methods
     # TODO: Integrate the guess with the read_pdb_file in Molecule.
@@ -1420,7 +1427,10 @@ class OpenMMDynamics:
                  snapshots=100, 
                  traj_file='trajectory.pdb',
                  state_file='output.xml',
-                 output_file='output'):
+                 output_file='output',
+                 track_state=False,
+                 state_tracker=None,
+                 state_tracking_settings=None):
         """
         Runs a QM/MM simulation using OpenMM, storing the trajectory and simulation data.
 
@@ -1523,6 +1533,21 @@ class OpenMMDynamics:
             self.active_state_index = state_index
             self.driver_flag = 'Serenity Excited-State Driver'
 
+            self.state_tracking_log = []
+
+            if track_state or state_tracker is not None:
+                if state_tracker is None:
+                    settings = state_tracking_settings or {}
+                    state_tracker = TransitionDensityTracker(
+                        self.qm_driver,
+                        target_state=state_index,
+                        min_overlap=settings.get("min_overlap", 0.5),
+                        overlap_ratio_bounds=settings.get("overlap_ratio_bounds", (0.0, 0.8)),
+                        degeneracy_threshold=settings.get("degeneracy_threshold", None),
+                    )
+
+                self.grad_driver.set_state_tracker(state_tracker)
+
         
         else:
             raise ValueError('Invalid QM driver. Please use a valid VeloxChem driver.')
@@ -1611,6 +1636,7 @@ class OpenMMDynamics:
         start_time = time()
 
         for step in range(nsteps):
+            self.current_step = step
 
             self.update_forces(self.simulation.context)
 
@@ -2544,14 +2570,27 @@ class OpenMMDynamics:
             self.dynamic_molecules.append(new_molecule)
 
         if isinstance(self.qm_driver, SerenityLinearResponseSolver):
-            # Excited-state single-state dynamics:
-            # use the dedicated excited-state gradient driver, which also
-            # provides total excited-state energy (E_gs + E_exc).
             self.grad_driver.compute(new_molecule)
+
+            if getattr(self.grad_driver, "state_tracker", None) is not None:
+                info = self.grad_driver.track_state(
+                    new_molecule,
+                    recompute_on_switch=True,
+                    update_reference=True,
+                )
+                self.active_state_index = int(self.grad_driver.state_deriv_index)
+
+                if info is not None:
+                    info = dict(info)
+                    info["step"] = getattr(self, "current_step", None)
+                    self.state_tracking_log.append(info)
+                print('Tracking info \n', info)
             gradient = self.grad_driver.get_gradient()
             total_energy_au = self.grad_driver.total_energy
+
             if total_energy_au is None:
                 total_energy_au = self.grad_driver.compute_energy(new_molecule)
+
             potential_kjmol = float(total_energy_au) * hartree_in_kjpermol()
 
         elif isinstance(self.qm_driver, SerenityScfDriver):

@@ -38,6 +38,7 @@ from .errorhandler import assert_msg_critical
 from .gradientdriver import GradientDriver
 from .serenityscfdriver import SerenityScfDriver
 from .serenitylrrspeigensolver import SerenityLinearResponseSolver
+from .transitiondensitytracker import TransitionDensityTracker
 
 try:
     from qcserenity import serenipy as spy
@@ -82,6 +83,15 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         self.total_energy = None
 
         self.flag = 'Serenity Excited-State Gradient Driver'
+
+        self._grad_task = None
+        self.state_tracker = None
+        self.tracking_info = None
+        self.last_lrscf_controller = None
+        self._last_tracking_system = None
+        self._last_tracking_mode = None
+        self._last_tracking_molecule = None
+
 
     def set_state_deriv_index(self, state_deriv_index):
         """
@@ -232,11 +242,19 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         with self.serenity_driver._serenity_output_context():
             grad_task.run()
         
-        self.excited_state_energy = grad_task.getLRSCFController().getExcitationEnergies(spy.ISOLATED) / hartree_in_ev()
+        self.excited_state_energy = grad_task.getLRSCFController().getExcitationEnergies("isolated") / hartree_in_ev()
         gradient = np.array(self.serenity_driver._system.getGeometry().getGradients(),
                             dtype=float)
         self.total_energy = float(self.serenity_driver.get_energy() +
                                   self.excited_state_energy[self.state_deriv_index - 1])
+
+        self._grad_task = grad_task
+        self.last_lrscf_controller = grad_task.getLRSCFController()
+        self._last_tracking_system = self.serenity_driver._system
+        self._last_tracking_mode = mode
+        self._last_tracking_molecule = molecule
+
+
 
         return gradient
 
@@ -295,3 +313,46 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         assert_msg_critical(state <= nst, errmsg)
 
         return float(eig[state - 1])
+    
+    def set_state_tracker(self, tracker):
+        assert_msg_critical(
+            tracker is None or isinstance(tracker, TransitionDensityTracker),
+            "SerenityExcitedStateGradientDriver: invalid transition-density tracker.")
+        self.state_tracker = tracker
+
+    def track_state(self, molecule, recompute_on_switch=True,
+                update_reference=True):
+        if self.state_tracker is None:
+            self.tracking_info = None
+            return None
+
+        assert_msg_critical(
+            self.last_lrscf_controller is not None,
+            "track_state: call compute() before track_state()."
+        )
+        old_state = int(self.state_deriv_index)
+        info = self.state_tracker.track(
+            self._last_tracking_system,
+            self.last_lrscf_controller,
+            self._last_tracking_mode,
+            active_reference_state=old_state,
+        )
+        new_state = int(info["new_state"])
+        info["gradient_recomputed"] = False
+        info["reference_updated"] = False
+        if info["assignment_confident"] and new_state != old_state:
+            self.set_state_deriv_index(new_state)
+            if recompute_on_switch:
+                self.gradient = self._compute_analytical_master(molecule)
+                info["gradient_recomputed"] = True
+        if update_reference and info["assignment_confident"]:
+            self.state_tracker.accept_reference(
+                self._last_tracking_system,
+                self.last_lrscf_controller,
+                self._last_tracking_mode,
+                int(self.state_deriv_index),
+            )
+            info["reference_updated"] = True
+        self.tracking_info = info
+
+        return self.tracking_info
