@@ -39,7 +39,7 @@ from .distributedarray import DistributedArray
 from .lrsolverbase import LinearResponseSolverBase
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
+                           solvation_model_sanity_check, gostshyp_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
 from .checkpoint import check_rsp_hdf5
@@ -123,6 +123,9 @@ class LinearResponseSolver(LinearResponseSolverBase):
 
         # check solvation setup
         solvation_model_sanity_check(self)
+
+        # check gostshyp setup
+        gostshyp_sanity_check(self)
 
         # check solvation model setup
         if self.rank == mpi_master():

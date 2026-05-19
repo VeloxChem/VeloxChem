@@ -635,6 +635,46 @@ def embedding_sanity_check(options):
             "At least one of 'json_file' or 'objects' must be provided in 'inputs'."
         )
 
+def gostshyp_sanity_check(obj):
+    """
+    Checks the GOSTSHYP settings and updates relevant attributes.
+
+    :param method_dict:
+        The dictionary of method settings.
+    """
+    #print(method_dict)
+
+    obj._gostshyp = (obj.pressure != 0.0)
+
+    if obj._gostshyp:
+        assert_msg_critical(obj.pressure > 0.0,
+            'GOSTSHYP: Unphysical negative pressures invalid')
+
+        from .gostshyp import parse_pressure_units
+        from .tessellation import TessellationDriver
+
+        # check wether the requested number of points is valid
+        # tessellation_drv = TessellationDriver(obj.comm, obj.ostream)
+
+        # # should this be here?
+        # if method_dict == None:
+        #     method_dict = {
+        #     'num_leb_points': 110,
+        #     'tssf': 1.2,
+        #     'discretization': 'fixed',
+        #     'filename': None,
+        #     'r_ext': 0.0
+        #     }
+
+        # tessellation_drv.update_settings(method_dict)
+        #obj.num_leb_points = tessellation_drv.update_num_points() #points are not updated correctly but likely a problem in the ScfDriver
+
+        # TODO
+        # keep self.pressure_units for user-tailored output
+        obj._pressure_in_input_units = obj.pressure
+        obj.pressure = parse_pressure_units(obj.pressure,
+                                                obj.pressure_units)
+
 
 def solvation_model_sanity_check(obj):
     """

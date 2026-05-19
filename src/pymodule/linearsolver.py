@@ -56,8 +56,9 @@ from .oneeints import (compute_electric_dipole_integrals,
                        compute_quadrupole_integrals,
                        compute_linear_momentum_integrals,
                        compute_angular_momentum_integrals)
-from .sanitychecks import (dft_sanity_check, ri_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
+from .sanitychecks import ((dft_sanity_check, ri_sanity_check, pe_sanity_check,
+                           solvation_model_sanity_check),
+                           gostshyp_sanity_check)
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel, unparse_input,
@@ -165,6 +166,16 @@ class LinearSolver:
         self.cpcm_cg_thresh = 1.0e-8
         self.cpcm_x = 0
         self.cpcm_custom_vdw_radii = None
+        # pressure with gostshyp
+        self._gostshyp = False
+        self.gostshyp_drv = None
+        self.pressure = 0.0
+        self.pressure_units = 'MPa'
+        self.num_leb_points = 110
+        self.tssf = 1.2
+        self.discretization = 'fixed'
+        self.switching_thresh = 1.0e-8
+        self.r_ext = 0.0
 
         # solver setup
         self.conv_thresh = 1.0e-4
@@ -371,6 +382,8 @@ class LinearSolver:
         dft_sanity_check(self, 'update_settings')
 
         pe_sanity_check(self, method_dict)
+
+        gostshyp_sanity_check(self)
 
         solvation_model_sanity_check(self)
 
@@ -694,6 +707,53 @@ class LinearSolver:
                     + f'generated in {tm.time() - cpcm_grid_t0:.2f} sec.')
                 self.ostream.print_blank()
                 self.ostream.flush()
+
+    def _init_gostshyp(self, molecule, basis, scf_tensors):
+        """
+        Initializes GOSTSHYP.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+
+        :return:
+            The ground state density
+        """
+
+        if self._gostshyp:
+
+            self.gostshyp_drv = GostshypDriver(molecule,
+                                               basis,
+                                               self.pressure,
+                                               self.pressure_units,
+                                               self.comm,
+                                               self.ostream)
+            
+            tessellation_settings = {'num_leb_points': self.num_leb_points,
+                                     'tssf': self.tssf,
+                                     'discretization': self.discretization,
+                                     'switching_thresh': self.switching_thresh,
+                                     'filename': self.filename,
+                                     'r_ext': self.r_ext}
+
+            if self.rank == mpi_master():
+                # Note: make gs_density a tuple
+                gs_density = (scf_tensors['D_alpha'].copy(),)
+            else:
+                gs_density = None
+            
+            gs_density = self.comm.bcast(gs_density, root=mpi_master())
+
+        else:
+            gs_density = None
+            tessellation_settings = {}
+            
+        return {'tess_info': tessellation_settings, 
+                'gs_density': gs_density}
+
 
     def _read_checkpoint(self, rsp_vector_labels):
         """
@@ -2088,6 +2148,26 @@ class LinearSolver:
             if profiler is not None:
                 profiler.add_timing_info('FockCPCM', tm.time() - t0)
 
+        if self._gostshyp:
+
+            t0 = tm.time()
+            gs_dm = gs_dm_gost[0]
+
+            for idx in range(num_densities):
+                
+                dm = dens[idx]
+                
+                # Note: only closed shell density for now
+                fock_gost = self.gostshyp_drv.gostshyp_resp_contrib(gs_dm * 2.0,
+                                                                    dm * 2.0,
+                                                                    tessellation_settings)
+
+                if comm_rank == mpi_master():
+                    fock_arrays[idx] += fock_gost
+
+            if profiler is not None:
+                profiler.add_timing_info('FockGOST', tm.time() - t0)
+
         for idx in range(len(fock_arrays)):
             fock_arrays[idx] = comm.reduce(fock_arrays[idx], root=mpi_master())
 
@@ -2955,6 +3035,27 @@ class LinearSolver:
                 cur_str = 'C-PCM Optical Dielectric Const. : '
                 cur_str += f'{self.cpcm_optical_epsilon}'
                 self.ostream.print_header(cur_str.ljust(str_width))
+
+        if self._gostshyp:
+            cur_str = 'Pressure Model                  : '
+            cur_str += 'GOSTSHYP'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Input Pressure                  : '
+            cur_str += f'{self._pressure_in_input_units} '
+            cur_str += self.pressure_units
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'vDW Cavity Switching Function   : '
+            cur_str += self.discretization.upper()
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'vdW Sphere Scaling Factor       : '
+            cur_str += f'{self.tssf}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Grid Points per vdW Sphere      : '
+            cur_str += f'{self.num_leb_points}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Extension radius for OCC        : '
+            cur_str += f'{self.r_ext}'
+            self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()
         self.ostream.flush()

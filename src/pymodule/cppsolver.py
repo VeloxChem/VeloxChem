@@ -40,7 +40,7 @@ from .distributedarray import DistributedArray
 from .cppsolverbase import ComplexResponseSolverBase
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
+                           solvation_model_sanity_check, gostshyp_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
 from .checkpoint import check_rsp_hdf5
@@ -153,6 +153,8 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
         # check solvation setup
         solvation_model_sanity_check(self)
 
+        gostshyp_sanity_check(self)
+
         # check print level (verbosity of output)
         self.print_level = max(1, min(self.print_level, 3))
 
@@ -189,6 +191,9 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
         pe_dict = self._init_pe(molecule, basis)
         # CPCM information
         self._init_cpcm(molecule, basis)
+
+        # GOSTSHYP information
+        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_tensors)
 
         # right-hand side (gradient)
         if self.rank == mpi_master():

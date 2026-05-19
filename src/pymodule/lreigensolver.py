@@ -45,7 +45,7 @@ from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
+                           solvation_model_sanity_check, gostshyp_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import screened_eigh, symmetric_matrix_function
 from .checkpoint import check_rsp_hdf5
@@ -149,6 +149,9 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
+
+        # check gostshyp setup
+        gostshyp_sanity_check(self)
 
         # check solvation
         solvation_model_sanity_check(self)
