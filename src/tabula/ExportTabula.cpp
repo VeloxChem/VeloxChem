@@ -149,6 +149,7 @@ export_tabula(py::module& m) -> void
             py::dict result;
             result["make_blocks"] = profile.make_blocks;
             result["pair_setup"]  = profile.pair_setup;
+            result["screen"]      = profile.screen;
             result["kernel"]      = profile.kernel;
             result["scatter"]     = profile.scatter;
             result["symmetrize"]  = profile.symmetrize;

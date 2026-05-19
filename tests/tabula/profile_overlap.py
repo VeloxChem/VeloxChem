@@ -9,7 +9,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.tabulalib import tabula_overlap_profile
 
 GEOMETRY_DIR = "/Users/rinkevic/Development/VeloxChem"
-PHASES = ["make_blocks", "pair_setup", "kernel", "scatter", "symmetrize"]
+PHASES = ["make_blocks", "pair_setup", "screen", "kernel", "scatter", "symmetrize"]
 
 
 def read_molecule(name):

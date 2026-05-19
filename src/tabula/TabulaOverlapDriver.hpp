@@ -22,6 +22,8 @@ struct OverlapProfile
     double make_blocks{0.0};
     /// @brief Per-block primitive-data fetch.
     double pair_setup{0.0};
+    /// @brief Atom-span screening and the gather of the surviving ket block.
+    double screen{0.0};
     /// @brief The fused overlap kernel — the primitive-pair weight, the seed
     /// ladder, the primitive contraction, the single-centre MD recursion, and
     /// the Cartesian-to-spherical assembly.
@@ -48,9 +50,9 @@ class OverlapDriver
     /// @brief Computes the overlap matrix.
     /// @param molecule The molecule.
     /// @param basis The molecular basis.
-    /// @param threshold The screening threshold. Screening is not yet ported
-    /// to the fused-kernel path, so this is currently ignored — every pair is
-    /// kept.
+    /// @param threshold The screening threshold — a ket atom span is kept
+    /// when its conservative overlap estimate against the bra span is at or
+    /// above this value. `0` (the default) keeps every span.
     /// @param profile Optional — when non-null, receives the per-phase
     /// wall-time breakdown of the run.
     /// @return The overlap matrix.
