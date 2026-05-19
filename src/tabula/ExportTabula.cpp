@@ -12,6 +12,7 @@
 #include <utility>
 
 #include "TabulaBlockSparseMatrix.hpp"
+#include "TabulaBoys.hpp"
 #include "TabulaDenseMatrix.hpp"
 #include "TabulaKineticDriver.hpp"
 #include "TabulaMixedPrecisionBlockSparseMatrix.hpp"
@@ -266,6 +267,18 @@ export_tabula(py::module& m) -> void
             return result;
         },
         "Gets the per-thread load balance of the most recent kinetic compute.");
+
+    // tabula::boys — the Coulomb / nuclear-attraction integral seed
+
+    m.def(
+        "tabula_boys",
+        [](const int order, const double x) -> std::vector<double> {
+            std::vector<double> results(static_cast<std::size_t>(order) + 1, 0.0);
+            boys(order, x, results.data());
+            return results;
+        },
+        "Evaluates the Boys function F_0 … F_order at x.",
+        "order"_a, "x"_a);
 
 }
 
