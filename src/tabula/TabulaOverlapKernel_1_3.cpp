@@ -17,8 +17,8 @@ namespace tabula {  // tabula namespace
 namespace detail {  // detail namespace
 
 auto
-overlap_kernel_1_3(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void
+overlap_kernel_1_3(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void
 {
     const double fpi = mathconst::pi_value();
     const std::size_t cdim =
@@ -26,8 +26,8 @@ overlap_kernel_1_3(const OverlapBlockData& bra, const int bra_begin, const int b
     const auto stride = ((cdim + 7) / 8) * 8;
     constexpr std::size_t tile = 512;
 
-    if (g_kernel_scratch.size() < 70 * tile) g_kernel_scratch.resize(70 * tile);
-    auto* s = g_kernel_scratch.data();
+    if (g_overlap_scratch.size() < 70 * tile) g_overlap_scratch.resize(70 * tile);
+    auto* s = g_overlap_scratch.data();
 
     double acx[tile];
     double acy[tile];

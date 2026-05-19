@@ -54,7 +54,7 @@ struct AtomSpan
 };
 
 /// @brief One basis-function block's primitive data, fetched once from a
-/// `CGtoBlock` — the fused kernel reads it through an `OverlapBlockData` view.
+/// `CGtoBlock` — the fused kernel reads it through an `KernelBlockData` view.
 struct BlockArrays
 {
     /// @brief The primitive exponents, primitive-major.
@@ -78,9 +78,9 @@ struct BlockArrays
     int angular_momentum{0};
 
     /// @brief A pointer view of this block, as the kernel consumes it.
-    auto view() const -> OverlapBlockData
+    auto view() const -> KernelBlockData
     {
-        return OverlapBlockData{exponents.data(), norms.data(), x.data(), y.data(), z.data(), ncgtos, nprims};
+        return KernelBlockData{exponents.data(), norms.data(), x.data(), y.data(), z.data(), ncgtos, nprims};
     }
 };
 
@@ -220,7 +220,7 @@ screen_and_kernel(const BlockArrays   &bra,
 
     // gather the surviving ket contracted GTOs into a contiguous block; when
     // every contracted GTO survives the kernel reads the block directly
-    OverlapBlockData ket_view = ket.view();
+    KernelBlockData ket_view = ket.view();
     if (kept != ket.ncgtos)
     {
         thread_local std::vector<double> cmp_exp, cmp_norm, cmp_x, cmp_y, cmp_z;
@@ -247,7 +247,7 @@ screen_and_kernel(const BlockArrays   &bra,
                 cmp_norm[dst] = ket.norms[static_cast<std::size_t>(lk) * ket.ncgtos + kc];
             }
         }
-        ket_view = OverlapBlockData{cmp_exp.data(), cmp_norm.data(), cmp_x.data(), cmp_y.data(), cmp_z.data(),
+        ket_view = KernelBlockData{cmp_exp.data(), cmp_norm.data(), cmp_x.data(), cmp_y.data(), cmp_z.data(),
                                     kept, ket.nprims};
     }
 

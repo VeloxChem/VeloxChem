@@ -16,58 +16,58 @@ namespace detail {  // detail namespace
 
 /// @brief The fused kernels' tile-local scratch — grow-only,
 /// thread-local, shared by every per-(l_a, l_c) kernel translation unit.
-extern thread_local std::vector<double> g_kernel_scratch;
+extern thread_local std::vector<double> g_overlap_scratch;
 
-auto overlap_kernel_0_0(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_0_1(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_0_2(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_0_3(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_0_4(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_1_0(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_1_1(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_1_2(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_1_3(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_1_4(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_2_0(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_2_1(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_2_2(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_2_3(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_2_4(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_3_0(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_3_1(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_3_2(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_3_3(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_3_4(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_4_0(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_4_1(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_4_2(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_4_3(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
-auto overlap_kernel_4_4(const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-                          const OverlapBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_0_0(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_0_1(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_0_2(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_0_3(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_0_4(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_1_0(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_1_1(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_1_2(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_1_3(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_1_4(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_2_0(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_2_1(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_2_2(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_2_3(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_2_4(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_3_0(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_3_1(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_3_2(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_3_3(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_3_4(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_4_0(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_4_1(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_4_2(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_4_3(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
+auto overlap_kernel_4_4(const KernelBlockData& bra, const int bra_begin, const int bra_end,
+                          const KernelBlockData& ket, double* spherical) -> void;
 
 }  // namespace detail
 

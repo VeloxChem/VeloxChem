@@ -13,6 +13,7 @@
 
 #include "TabulaBlockSparseMatrix.hpp"
 #include "TabulaDenseMatrix.hpp"
+#include "TabulaKineticDriver.hpp"
 #include "TabulaMixedPrecisionBlockSparseMatrix.hpp"
 #include "TabulaOverlapDriver.hpp"
 
@@ -196,6 +197,75 @@ export_tabula(py::module& m) -> void
             return result;
         },
         "Gets the per-thread load balance of the most recent overlap compute.");
+
+    // tabula::KineticDriver class
+
+    py::class_<KineticDriver, std::shared_ptr<KineticDriver>>(
+        m, "TabulaKineticDriver", "Driver for the Tabula two-center kinetic-energy integral.")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const KineticDriver& self, const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) {
+                return self.compute(molecule, basis, threshold);
+            },
+            "Computes the kinetic-energy matrix.", "molecule"_a, "basis"_a, "threshold"_a = 0.0)
+        .def(
+            "compute_sparse",
+            [](const KineticDriver& self, const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) {
+                return self.computeSparse(molecule, basis, threshold);
+            },
+            "Computes the kinetic-energy matrix in block-sparse storage.", "molecule"_a, "basis"_a, "threshold"_a = 0.0);
+
+    // kinetic driver — per-phase wall-time profile of a compute run
+
+    m.def(
+        "tabula_kinetic_profile",
+        [](const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) -> py::dict {
+            KineticProfile profile;
+            KineticDriver().compute(molecule, basis, threshold, &profile);
+
+            py::dict result;
+            result["make_blocks"] = profile.make_blocks;
+            result["pair_setup"]  = profile.pair_setup;
+            result["screen"]      = profile.screen;
+            result["kernel"]      = profile.kernel;
+            result["scatter"]     = profile.scatter;
+            result["symmetrize"]  = profile.symmetrize;
+            return result;
+        },
+        "Computes the kinetic-energy matrix and returns the per-phase wall-time breakdown.",
+        "molecule"_a, "basis"_a, "threshold"_a = 0.0);
+
+    m.def(
+        "tabula_kinetic_profile_sparse",
+        [](const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) -> py::dict {
+            KineticProfile profile;
+            KineticDriver().computeSparse(molecule, basis, threshold, &profile);
+
+            py::dict result;
+            result["make_blocks"] = profile.make_blocks;
+            result["pair_setup"]  = profile.pair_setup;
+            result["screen"]      = profile.screen;
+            result["kernel"]      = profile.kernel;
+            result["scatter"]     = profile.scatter;
+            result["symmetrize"]  = profile.symmetrize;
+            return result;
+        },
+        "Computes the block-sparse kinetic-energy matrix and returns the per-phase wall-time breakdown.",
+        "molecule"_a, "basis"_a, "threshold"_a = 0.0);
+
+    m.def(
+        "kinetic_thread_balance",
+        []() -> py::dict {
+            const auto balance = kinetic_thread_balance();
+
+            py::dict result;
+            result["wall"]  = balance.wall;
+            result["busy"]  = balance.busy;
+            result["pairs"] = balance.pairs;
+            return result;
+        },
+        "Gets the per-thread load balance of the most recent kinetic compute.");
 
 }
 

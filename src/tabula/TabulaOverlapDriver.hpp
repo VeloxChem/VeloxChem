@@ -12,6 +12,7 @@
 #include "Molecule.hpp"
 #include "TabulaBlockSparseMatrix.hpp"
 #include "TabulaDenseMatrix.hpp"
+#include "TabulaThreadBalance.hpp"
 
 namespace tabula {  // tabula namespace
 
@@ -77,18 +78,6 @@ class OverlapDriver
                        const CMolecularBasis& basis,
                        const double         threshold = 0.0,
                        OverlapProfile      *profile   = nullptr) const -> BlockSparseMatrix;
-};
-
-/// @brief Per-thread load balance of the task parallel loop in the most
-/// recent `OverlapDriver::compute` run.
-struct ThreadBalance
-{
-    /// @brief Wall time of the whole parallel region.
-    double wall{0.0};
-    /// @brief Busy wall seconds of each OpenMP thread.
-    std::vector<double> busy;
-    /// @brief Number of tasks handled by each OpenMP thread.
-    std::vector<long> pairs;
 };
 
 /// @brief Gets the per-thread balance captured by the most recent

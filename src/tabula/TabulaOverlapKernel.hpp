@@ -6,30 +6,9 @@
 #ifndef TabulaOverlapKernel_hpp
 #define TabulaOverlapKernel_hpp
 
-#include <cstddef>
+#include "TabulaKernelBlockData.hpp"
 
 namespace tabula {  // tabula namespace
-
-/// @brief A view of one basis-function block's primitive data, as the fused
-/// overlap kernel consumes it — raw pointers into arrays the driver fetched
-/// once per block.
-struct OverlapBlockData
-{
-    /// @brief The primitive exponents, primitive-major: `[prim·ncgtos + cgto]`.
-    const double *exponents;
-    /// @brief The primitive normalization factors, same layout.
-    const double *norms;
-    /// @brief The x coordinate of each contracted GTO.
-    const double *x;
-    /// @brief The y coordinate of each contracted GTO.
-    const double *y;
-    /// @brief The z coordinate of each contracted GTO.
-    const double *z;
-    /// @brief The number of contracted GTOs in the block.
-    int ncgtos;
-    /// @brief The number of primitives per contracted GTO.
-    int nprims;
-};
 
 /// @brief The fused two-center overlap kernel.
 ///
@@ -55,10 +34,10 @@ struct OverlapBlockData
 /// `(i−bra_begin)·ket.ncgtos + j`.
 auto overlap_kernel(const int               l_a,
                     const int               l_c,
-                    const OverlapBlockData &bra,
+                    const KernelBlockData  &bra,
                     const int               bra_begin,
                     const int               bra_end,
-                    const OverlapBlockData &ket,
+                    const KernelBlockData  &ket,
                     double                 *spherical) -> void;
 
 }  // namespace tabula

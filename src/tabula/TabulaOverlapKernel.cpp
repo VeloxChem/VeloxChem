@@ -14,13 +14,13 @@ namespace tabula {  // tabula namespace
 namespace detail {  // detail namespace
 
 // the fused kernels' tile-local scratch — grow-only, thread-local
-thread_local std::vector<double> g_kernel_scratch;
+thread_local std::vector<double> g_overlap_scratch;
 
 }  // namespace detail
 
 auto
-overlap_kernel(const int l_a, const int l_c, const OverlapBlockData& bra, const int bra_begin, const int bra_end,
-               const OverlapBlockData& ket, double* spherical) -> void
+overlap_kernel(const int l_a, const int l_c, const KernelBlockData& bra, const int bra_begin, const int bra_end,
+               const KernelBlockData& ket, double* spherical) -> void
 {
     switch (l_a * 5 + l_c)
     {
