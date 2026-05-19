@@ -150,7 +150,7 @@ export_tabula(py::module& m) -> void
     m.def(
         "tabula_overlap_profile",
         [](const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) -> py::dict {
-            OverlapProfile profile;
+            KernelProfile profile;
             OverlapDriver().compute(molecule, basis, threshold, &profile);
 
             py::dict result;
@@ -168,7 +168,7 @@ export_tabula(py::module& m) -> void
     m.def(
         "tabula_overlap_profile_sparse",
         [](const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) -> py::dict {
-            OverlapProfile profile;
+            KernelProfile profile;
             OverlapDriver().computeSparse(molecule, basis, threshold, &profile);
 
             py::dict result;
@@ -221,7 +221,7 @@ export_tabula(py::module& m) -> void
     m.def(
         "tabula_kinetic_profile",
         [](const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) -> py::dict {
-            KineticProfile profile;
+            KernelProfile profile;
             KineticDriver().compute(molecule, basis, threshold, &profile);
 
             py::dict result;
@@ -239,7 +239,7 @@ export_tabula(py::module& m) -> void
     m.def(
         "tabula_kinetic_profile_sparse",
         [](const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) -> py::dict {
-            KineticProfile profile;
+            KernelProfile profile;
             KineticDriver().computeSparse(molecule, basis, threshold, &profile);
 
             py::dict result;
