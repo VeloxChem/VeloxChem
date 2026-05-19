@@ -91,22 +91,41 @@ compute_one_center_md(const std::vector<double> &contracted_seed,
 
     const auto t_start = md_now();
 
-    // per-degree buffers — level[d] holds [r]^m for the degree-d monomials and
-    // m = 0 … L-d: monomial_count(d) × (L-d+1) rows of `stride`
-    std::vector<std::vector<double>> level(L + 1);
+    // level L — [r]^0 for the degree-L monomials — is the returned result
+    std::vector<double> result(monomial_count(L) * stride, 0.0);
 
-    for (std::size_t d = 0; d <= L; d++)
+    // the intermediate levels 0 … L-1 share a grow-only thread-local scratch.
+    // Every value the recursion reads is written before use — level 0 from the
+    // seed copy, levels 1 … L-1 from the build — so the scratch needs no
+    // zero-fill; only an actual resize() growth costs anything, and that
+    // settles once the largest block pair has been seen.
+    thread_local std::vector<double> md_scratch;
+
+    // level[d] holds [r]^m for the degree-d monomials and m = 0 … L-d:
+    // monomial_count(d) × (L-d+1) rows of `stride`
+    const std::size_t          level0_size = (L + 1) * stride;
+    std::array<std::size_t, 9> level_offset{};
+    std::size_t                scratch_size = 0;
+    for (std::size_t d = 0; d < L; d++)
     {
-        level[d].assign(monomial_count(d) * (L - d + 1) * stride, 0.0);
+        level_offset[d] = scratch_size;
+        scratch_size += monomial_count(d) * (L - d + 1) * stride;
     }
+    if (md_scratch.size() < scratch_size) md_scratch.resize(scratch_size);
+
+    // the base pointer of each degree level — levels 0 … L-1 in the scratch,
+    // level L in the result
+    std::array<double *, 9> level{};
+    for (std::size_t d = 0; d < L; d++) level[d] = md_scratch.data() + level_offset[d];
+    level[L] = result.data();
 
     const auto t_allocated = md_now();
     md_add(g_md_allocate, t_start, t_allocated);
 
     // level 0 — the contracted seed ladder [0]^m, m = 0 … L
-    if (contracted_seed.size() >= level[0].size())
+    if (contracted_seed.size() >= level0_size)
     {
-        std::copy(contracted_seed.begin(), contracted_seed.begin() + static_cast<long>(level[0].size()), level[0].begin());
+        std::copy(contracted_seed.begin(), contracted_seed.begin() + static_cast<long>(level0_size), level[0]);
     }
 
     md_add(g_md_seed_copy, t_allocated, md_now());
@@ -171,12 +190,12 @@ compute_one_center_md(const std::vector<double> &contracted_seed,
 
                 for (std::size_t m = 0; m < md_count; m++)
                 {
-                    auto       *out   = level[d].data() + (r_index * md_count + m) * stride;
-                    const auto *prev1 = level[d - 1].data() + (idx1 * md_count_1 + (m + 1)) * stride;
+                    auto       *out   = level[d] + (r_index * md_count + m) * stride;
+                    const auto *prev1 = level[d - 1] + (idx1 * md_count_1 + (m + 1)) * stride;
 
                     if (r_i >= 2)
                     {
-                        const auto *prev2 = level[d - 2].data() + (idx2 * md_count_2 + (m + 1)) * stride;
+                        const auto *prev2 = level[d - 2] + (idx2 * md_count_2 + (m + 1)) * stride;
                         const auto  scale = static_cast<double>(r_i - 1);
 
 #pragma omp simd
@@ -203,7 +222,7 @@ compute_one_center_md(const std::vector<double> &contracted_seed,
     }
 
     // level L is [r]^0 for |r| = L — monomial_count(L) rows of `stride`
-    return level[L];
+    return result;
 }
 
 }  // namespace tabula
