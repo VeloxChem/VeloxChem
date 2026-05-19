@@ -1,6 +1,6 @@
 import numpy as np
 
-from veloxchem.veloxchemlib import (
+from veloxchem.tabulalib import (
     TabulaBlockSparseMatrix,
     TabulaMixedPrecisionBlockSparseMatrix,
 )

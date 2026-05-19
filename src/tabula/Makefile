@@ -1,7 +1,7 @@
 
-# Makefile for internal Tabula library
+# Makefile for the Tabula shared library
 
-LOCAL_LIB := tabula.a
+LOCAL_LIB := tabulalib.so
 LOCAL_SCR := $(wildcard *.cpp)
 LOCAL_OBJ := $(subst .cpp,.o,$(LOCAL_SCR))
 LOCAL_DEP := $(subst .cpp,.d,$(LOCAL_SCR))
@@ -29,15 +29,20 @@ vpath %.hpp $(VLX_INCLUDES)
 # Add MKL includes
 CXXFLAGS += $(MATH_INC)
 
-# Default rule for linking library
+# Default rule for linking the Tabula shared library — VeloxChem and Python
+# symbols are resolved at load time from the already-imported veloxchemlib
 debug: $(LOCAL_OBJ)
 	@echo ====== Linking $(LOCAL_LIB)...
-	$(AR) $(ARFLAGS) $(LOCAL_LIB) $^
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -shared -undefined dynamic_lookup -o $(LOCAL_LIB) $^
+	mkdir -p $(CURDIR)/../../build/python/veloxchem
+	$(CP) $(LOCAL_LIB) $(CURDIR)/../../build/python/veloxchem
 
-# Default rule for linking library
+# Default rule for linking the Tabula shared library
 release: $(LOCAL_OBJ)
 	@echo ====== Linking $(LOCAL_LIB)...
-	$(AR) $(ARFLAGS) $(LOCAL_LIB) $^
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -shared -undefined dynamic_lookup -o $(LOCAL_LIB) $^
+	mkdir -p $(CURDIR)/../../build/python/veloxchem
+	$(CP) $(LOCAL_LIB) $(CURDIR)/../../build/python/veloxchem
 
 # Default rule for cleaning library directory
 clean:

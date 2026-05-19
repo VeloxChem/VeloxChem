@@ -58,7 +58,6 @@ VLX_LIBS_DIR += t3c_electron_repulsion_geom_0X0
 VLX_LIBS_DIR += visualization
 VLX_LIBS_DIR +=	onee_ints
 VLX_LIBS_DIR +=	pdft_func
-VLX_LIBS_DIR += tabula
 
 # Generate all internal libraries related files
 VLX_LIBS = $(foreach d,$(VLX_LIBS_DIR),$(addsuffix .a,$(addprefix $d/,$d)))
@@ -80,6 +79,8 @@ debug: $(VLX_LIBS)
 	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
 	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py
 	@echo "__commit__ = \"$(VLX_COMMIT)\"" >> $(CURDIR)/../build/python/veloxchem/__init__.py
+	@echo ====== Building tabulalib.so...
+	$(MAKE) --directory=tabula $(MAKECMDGOALS)
 
 # Release
 release: $(VLX_LIBS)
@@ -94,6 +95,8 @@ release: $(VLX_LIBS)
 	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
 	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py
 	@echo "__commit__ = \"$(VLX_COMMIT)\"" >> $(CURDIR)/../build/python/veloxchem/__init__.py
+	@echo ====== Building tabulalib.so...
+	$(MAKE) --directory=tabula $(MAKECMDGOALS)
 
 # Clean up
 clean:

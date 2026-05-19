@@ -131,7 +131,12 @@ export_tabula(py::module& m) -> void
     py::class_<OverlapDriver, std::shared_ptr<OverlapDriver>>(
         m, "TabulaOverlapDriver", "Driver for the Tabula two-center overlap integral.")
         .def(py::init<>())
-        .def("compute", &OverlapDriver::compute, "Computes the overlap matrix.", "molecule"_a, "basis"_a);
+        .def("compute", &OverlapDriver::compute, "Computes the overlap matrix.", "molecule"_a, "basis"_a, "threshold"_a = 0.0);
 }
 
 }  // namespace tabula
+
+PYBIND11_MODULE(tabulalib, m)
+{
+    tabula::export_tabula(m);
+}

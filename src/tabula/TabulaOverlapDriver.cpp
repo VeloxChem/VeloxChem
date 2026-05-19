@@ -11,7 +11,9 @@
 
 #include "GtoBlock.hpp"
 #include "GtoFunc.hpp"
+#include "GtoPairBlock.hpp"
 #include "Point.hpp"
+#include "TabulaOverlapScreener.hpp"
 
 namespace tabula {  // tabula namespace
 
@@ -21,16 +23,16 @@ namespace {  // unnamed namespace
 //  RECURSION SEAM
 //
 //  This is where Tabula's custom recursion plugs in. The scaffold below
-//  owns the block-pair loop, the late contraction, and the AO scatter; it
-//  calls this routine once per primitive pair and expects the *primitive*
-//  overlap integrals back (no contraction coefficients — the scaffold
-//  applies those).
+//  owns the contracted-pair loop, the late contraction, and the AO
+//  scatter; it calls this routine once per primitive pair and expects the
+//  *primitive* overlap integrals back (no contraction coefficients — the
+//  scaffold applies those).
 // ====================================================================
 
 /// @brief Fills `primitive` with the primitive overlap integrals of one
 /// primitive pair, for the `(la, lc)` shell pair.
 ///
-/// `primitive` has length `(2*la+1) * (2*lc+1)`, row-major over the bra/ket
+/// `primitive` has length `(2*la+1)*(2*lc+1)`, row-major over the bra/ket
 /// solid-harmonic components: element `(ma, mc)` is at `ma*(2*lc+1) + mc`.
 ///
 /// STUB — currently zero-filled. The custom recursion replaces this body.
@@ -52,93 +54,83 @@ compute_primitive_overlap(double*                              primitive,
     }
 }
 
-/// @brief Evaluates one bra/ket basis-function-block pair into the overlap
-/// matrix — the late-contraction scaffold.
+/// @brief Evaluates a screened `CGtoPairBlock` into the overlap matrix — the
+/// late-contraction scaffold.
 ///
-/// For each contracted-GTO pair the primitive integrals are summed over the
-/// primitive pairs, weighted by the contraction coefficients (the block's
-/// normalization factors), and the contracted block is scattered into the
-/// global matrix. An off-diagonal block pair also fills its transpose.
+/// For each surviving contracted-GTO pair the primitive integrals are summed
+/// over the primitive pairs, weighted by the pair's contraction coefficient
+/// (`normalization_factors`, the combined bra/ket primitive weight), and the
+/// contracted block is scattered into the global matrix. An off-diagonal
+/// block pair also fills its transpose.
 auto
-compute_block_pair(DenseMatrix&     matrix,
-                   const CGtoBlock& braBlock,
-                   const CGtoBlock& ketBlock,
-                   const bool       diagonalPair) -> void
+compute_pair_block(DenseMatrix& matrix, const CGtoPairBlock& pairBlock, const bool diagonalPair) -> void
 {
-    const auto la = braBlock.angular_momentum();
-    const auto lc = ketBlock.angular_momentum();
+    const auto [la, lc] = pairBlock.angular_momentums();
 
-    const auto nca = braBlock.number_of_basis_functions();
-    const auto ncc = ketBlock.number_of_basis_functions();
-    const auto npa = braBlock.number_of_primitives();
-    const auto npc = ketBlock.number_of_primitives();
+    const auto cdim    = pairBlock.number_of_contracted_pairs();
+    const auto nppairs = pairBlock.number_of_primitive_pairs();
 
     const auto ma = 2 * la + 1;
     const auto mc = 2 * lc + 1;
 
-    // basis-function-block SoA data
-    const auto braCoords = braBlock.coordinates();
-    const auto ketCoords = ketBlock.coordinates();
-    const auto braExps   = braBlock.exponents();
-    const auto ketExps   = ketBlock.exponents();
-    const auto braNorms  = braBlock.normalization_factors();
-    const auto ketNorms  = ketBlock.normalization_factors();
+    // basis-function-pair-block SoA data
+    const auto braCoords = pairBlock.bra_coordinates();
+    const auto ketCoords = pairBlock.ket_coordinates();
+    const auto braExps   = pairBlock.bra_exponents();
+    const auto ketExps   = pairBlock.ket_exponents();
+    const auto norms     = pairBlock.normalization_factors();
 
-    // global AO indices — component-major: (component, contracted GTO)
-    const auto braAO = braBlock.getAtomicOrbitalsIndexes();
-    const auto ketAO = ketBlock.getAtomicOrbitalsIndexes();
+    // orbital indices — [0] is the AO component stride, [ij+1] the per-pair
+    // global orbital offset
+    const auto braOrb = pairBlock.bra_orbital_indices();
+    const auto ketOrb = pairBlock.ket_orbital_indices();
 
     std::vector<double> primitive(static_cast<std::size_t>(ma * mc), 0.0);
     std::vector<double> contracted(static_cast<std::size_t>(ma * mc), 0.0);
 
-    for (int a = 0; a < nca; a++)
+    for (std::size_t ij = 0; ij < cdim; ij++)
     {
-        for (int c = 0; c < ncc; c++)
+        std::fill(contracted.begin(), contracted.end(), 0.0);
+
+        const auto rA = braCoords[ij];
+        const auto rC = ketCoords[ij];
+
+        // late contraction — sum the primitive integrals over the primitive
+        // pairs, weighted by the contraction coefficients
+        for (int pp = 0; pp < nppairs; pp++)
         {
-            std::fill(contracted.begin(), contracted.end(), 0.0);
+            const auto ijoff = static_cast<std::size_t>(pp) * cdim + ij;
 
-            // late contraction — sum the primitive integrals over the
-            // primitive pairs, weighted by the contraction coefficients
-            for (int p = 0; p < npa; p++)
+            const auto alpha  = braExps[ijoff];
+            const auto beta   = ketExps[ijoff];
+            const auto weight = norms[ijoff];
+
+            compute_primitive_overlap(primitive.data(), la, lc, alpha, beta, rA, rC);
+
+            for (int k = 0; k < ma * mc; k++)
             {
-                const auto alpha = braExps[p * nca + a];
-                const auto cA    = braNorms[p * nca + a];
-
-                for (int q = 0; q < npc; q++)
-                {
-                    const auto beta = ketExps[q * ncc + c];
-                    const auto cB   = ketNorms[q * ncc + c];
-
-                    compute_primitive_overlap(primitive.data(), la, lc, alpha, beta, braCoords[a], ketCoords[c]);
-
-                    const auto weight = cA * cB;
-
-                    for (int k = 0; k < ma * mc; k++)
-                    {
-                        contracted[k] += weight * primitive[k];
-                    }
-                }
+                contracted[k] += weight * primitive[k];
             }
+        }
 
-            // scatter the contracted block into the global matrix
-            for (int ia = 0; ia < ma; ia++)
+        // scatter the contracted block into the global matrix
+        for (int ia = 0; ia < ma; ia++)
+        {
+            const auto row = static_cast<std::size_t>(ia) * braOrb[0] + braOrb[ij + 1];
+
+            for (int ic = 0; ic < mc; ic++)
             {
-                const auto row = static_cast<std::size_t>(braAO[ia * nca + a]);
+                const auto col = static_cast<std::size_t>(ic) * ketOrb[0] + ketOrb[ij + 1];
 
-                for (int ic = 0; ic < mc; ic++)
+                const auto value = contracted[ia * mc + ic];
+
+                matrix(row, col) = value;
+
+                // an off-diagonal block pair also fills its transpose; a
+                // diagonal pair already visits both (a,c) and (c,a)
+                if (!diagonalPair)
                 {
-                    const auto col = static_cast<std::size_t>(ketAO[ic * ncc + c]);
-
-                    const auto value = contracted[ia * mc + ic];
-
-                    matrix(row, col) = value;
-
-                    // an off-diagonal block pair also fills its transpose;
-                    // a diagonal pair already visits both (a,c) and (c,a)
-                    if (!diagonalPair)
-                    {
-                        matrix(col, row) = value;
-                    }
+                    matrix(col, row) = value;
                 }
             }
         }
@@ -148,7 +140,7 @@ compute_block_pair(DenseMatrix&     matrix,
 }  // namespace
 
 auto
-OverlapDriver::compute(const CMolecule& molecule, const CMolecularBasis& basis) const -> DenseMatrix
+OverlapDriver::compute(const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) const -> DenseMatrix
 {
     const auto gtoBlocks = gtofunc::make_gto_blocks(basis, molecule);
 
@@ -161,7 +153,14 @@ OverlapDriver::compute(const CMolecule& molecule, const CMolecularBasis& basis) 
     {
         for (std::size_t j = 0; j <= i; j++)
         {
-            compute_block_pair(matrix, gtoBlocks[i], gtoBlocks[j], i == j);
+            const auto estimator = make_overlap_screening_estimator(gtoBlocks[i].angular_momentum(),
+                                                                    gtoBlocks[j].angular_momentum());
+
+            // a screened pair block — the negligible contracted-GTO pairs are
+            // dropped at construction
+            const CGtoPairBlock pairBlock(gtoBlocks[i], gtoBlocks[j], estimator, threshold);
+
+            compute_pair_block(matrix, pairBlock, i == j);
         }
     }
 

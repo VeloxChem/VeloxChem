@@ -1,6 +1,6 @@
 import numpy as np
 
-from veloxchem.veloxchemlib import TabulaDenseMatrix, TabulaSymmetry
+from veloxchem.tabulalib import TabulaDenseMatrix, TabulaSymmetry
 
 
 class TestTabulaDenseMatrix:

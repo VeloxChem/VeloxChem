@@ -2,7 +2,7 @@ import numpy as np
 
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
-from veloxchem.veloxchemlib import TabulaOverlapDriver, TabulaSymmetry
+from veloxchem.tabulalib import TabulaOverlapDriver, TabulaSymmetry
 
 
 class TestTabulaOverlap:
@@ -10,9 +10,10 @@ class TestTabulaOverlap:
 
     The per-shell-pair primitive recursion is still a stub, so the overlap
     comes out all zeros. These tests exercise the scaffold — basis-block
-    intake, the block-pair loop, the AO scatter, the matrix dimension and
-    symmetry — on both s-only and s+p molecules. Once the custom recursion is
-    in, the zero checks become comparisons against VeloxChem's overlap.
+    intake, the screened CGtoPairBlock construction, the contracted-pair loop,
+    the AO scatter, the matrix dimension and symmetry. Once the custom
+    recursion is in, the zero checks become comparisons against VeloxChem's
+    overlap.
     """
 
     def test_h2_sto3g(self):
@@ -44,3 +45,18 @@ class TestTabulaOverlap:
         assert S.rows() == 7 and S.columns() == 7
         assert S.symmetry() == TabulaSymmetry.symmetric
         assert np.allclose(S.to_numpy(), 0.0, 1.0e-13, 1.0e-13)
+
+    def test_runs_with_screening_threshold(self):
+
+        mol = Molecule.read_molecule_string(
+            "O 0.000  0.000  0.000\n"
+            "H 0.000  0.757  0.587\n"
+            "H 0.000 -0.757  0.587", units='angstrom')
+        bas = MolecularBasis.read(mol, 'STO-3G', ostream=None)
+
+        # a positive screening threshold drops negligible CGTO pairs at the
+        # screened-CGtoPairBlock construction; the matrix shape is unchanged
+        S = TabulaOverlapDriver().compute(mol, bas, threshold=1.0e-10)
+
+        assert S.rows() == 7 and S.columns() == 7
+        assert S.symmetry() == TabulaSymmetry.symmetric
