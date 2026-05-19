@@ -6,6 +6,8 @@
 #ifndef TabulaOverlapDriver_hpp
 #define TabulaOverlapDriver_hpp
 
+#include <vector>
+
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "TabulaDenseMatrix.hpp"
@@ -64,6 +66,23 @@ class OverlapDriver
                  const double         threshold = 0.0,
                  OverlapProfile      *profile   = nullptr) const -> DenseMatrix;
 };
+
+/// @brief Per-thread load balance of the block-pair parallel loop in the
+/// most recent `OverlapDriver::compute` run.
+struct ThreadBalance
+{
+    /// @brief Wall time of the whole parallel region.
+    double wall{0.0};
+    /// @brief Busy wall seconds of each OpenMP thread.
+    std::vector<double> busy;
+    /// @brief Number of block pairs handled by each OpenMP thread.
+    std::vector<long> pairs;
+};
+
+/// @brief Gets the per-thread balance captured by the most recent
+/// `OverlapDriver::compute` run.
+/// @return The thread-balance capture.
+auto overlap_thread_balance() -> ThreadBalance;
 
 }  // namespace tabula
 

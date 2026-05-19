@@ -395,6 +395,21 @@ export_tabula(py::module& m) -> void
         "Gets the accumulated compute_overlap_seed allocate / row0 / ladder profile.");
 
     m.def("reset_seed_profile", &reset_seed_profile, "Resets the accumulated compute_overlap_seed profile.");
+
+    // block-pair parallel loop — per-thread load balance of the last run
+
+    m.def(
+        "overlap_thread_balance",
+        []() -> py::dict {
+            const auto balance = overlap_thread_balance();
+
+            py::dict result;
+            result["wall"]  = balance.wall;
+            result["busy"]  = balance.busy;
+            result["pairs"] = balance.pairs;
+            return result;
+        },
+        "Gets the per-thread load balance of the most recent overlap compute.");
 }
 
 }  // namespace tabula

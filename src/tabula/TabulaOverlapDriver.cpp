@@ -34,6 +34,9 @@ seconds(const std::chrono::steady_clock::duration &interval) -> double
     return std::chrono::duration<double>(interval).count();
 }
 
+// per-thread load balance of the most recent compute's block-pair loop
+ThreadBalance g_balance;
+
 /// @brief Evaluates a screened `CGtoPairBlock` into the overlap matrix — the
 /// late-contraction recursion end to end: the seed ladder (a), the
 /// primitive-pair contraction (b), the single-centre MD recursion (c), the
@@ -133,6 +136,12 @@ evaluate_pair_block(DenseMatrix &matrix, const GtoPairBlock &pair_block, Overlap
 }  // namespace
 
 auto
+overlap_thread_balance() -> ThreadBalance
+{
+    return g_balance;
+}
+
+auto
 OverlapDriver::compute(const CMolecule       &molecule,
                        const CMolecularBasis &basis,
                        const double           threshold,
@@ -163,18 +172,28 @@ OverlapDriver::compute(const CMolecule       &molecule,
         }
     }
 
+    const auto nthreads = static_cast<std::size_t>(omp_get_max_threads());
+
     // per-thread profile accumulators, summed after the parallel region
     std::vector<OverlapProfile> thread_profiles;
     if (profile != nullptr)
     {
-        thread_profiles.resize(static_cast<std::size_t>(omp_get_max_threads()));
+        thread_profiles.resize(nthreads);
     }
+
+    // per-thread load-balance capture of the block-pair loop
+    std::vector<double> thread_busy(nthreads, 0.0);
+    std::vector<long>   thread_pairs(nthreads, 0);
+
+    const auto t_region = std::chrono::steady_clock::now();
 
 #pragma omp parallel for schedule(dynamic)
     for (int p = 0; p < static_cast<int>(block_pairs.size()); p++)
     {
-        OverlapProfile *slot =
-            (profile != nullptr) ? &thread_profiles[static_cast<std::size_t>(omp_get_thread_num())] : nullptr;
+        const auto tid    = static_cast<std::size_t>(omp_get_thread_num());
+        const auto t_body = std::chrono::steady_clock::now();
+
+        OverlapProfile *slot = (profile != nullptr) ? &thread_profiles[tid] : nullptr;
 
         const auto i = block_pairs[static_cast<std::size_t>(p)].first;
         const auto j = block_pairs[static_cast<std::size_t>(p)].second;
@@ -200,7 +219,14 @@ OverlapDriver::compute(const CMolecule       &molecule,
         }
 
         evaluate_pair_block(matrix, pair_block, slot);
+
+        thread_busy[tid] += seconds(std::chrono::steady_clock::now() - t_body);
+        thread_pairs[tid] += 1;
     }
+
+    g_balance.wall  = seconds(std::chrono::steady_clock::now() - t_region);
+    g_balance.busy  = thread_busy;
+    g_balance.pairs = thread_pairs;
 
     // the scatter filled the upper triangle only — mirror it into the lower
     const auto t_symmetrize = std::chrono::steady_clock::now();
