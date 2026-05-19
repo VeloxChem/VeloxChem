@@ -20,7 +20,9 @@ namespace tabula {  // tabula namespace
 /// sums, for each contracted pair `ij`, its `nppairs` primitive-pair entries.
 ///
 /// The combined primitive contraction weight is assumed already folded into
-/// the input (as in `compute_overlap_seed`), so this is a plain sum.
+/// the input (as in `compute_overlap_seed`), so this is a plain sum. With a
+/// single primitive pair per contracted pair the contraction is the identity
+/// and the input buffer is returned directly.
 ///
 /// @param primitive The primitive-pair buffer.
 /// @param rows The number of rows.

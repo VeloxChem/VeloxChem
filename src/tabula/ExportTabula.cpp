@@ -15,6 +15,7 @@
 #include "TabulaBlockSparseMatrix.hpp"
 #include "TabulaContraction.hpp"
 #include "TabulaDenseMatrix.hpp"
+#include "TabulaMDRecursion.hpp"
 #include "TabulaMixedPrecisionBlockSparseMatrix.hpp"
 #include "TabulaOverlapDriver.hpp"
 #include "TabulaOverlapRecursion.hpp"
@@ -199,6 +200,58 @@ export_tabula(py::module& m) -> void
             return result;
         },
         "Computes the contracted overlap seed ladder [0]^m of a basis-function-pair block.",
+        "pair_block"_a);
+
+    // overlap recursion — step (c): the single-centre MD recursion [r]^0
+
+    m.def(
+        "tabula_overlap_rterms",
+        [](const CGtoPairBlock& pair_block) -> py::array_t<double> {
+            const auto angular_momentums = pair_block.angular_momentums();
+            const auto order             = static_cast<std::size_t>(
+                angular_momentums.first + angular_momentums.second);
+
+            const auto cdim    = pair_block.number_of_contracted_pairs();
+            const auto nppairs = static_cast<std::size_t>(pair_block.number_of_primitive_pairs());
+
+            // steps (a) + (b) — the contracted seed ladder
+            const auto seed       = compute_overlap_seed(pair_block);
+            const auto contracted = contract_primitive_pairs(seed, order + 1, cdim, nppairs);
+
+            // AC = A − C, per contracted pair
+            const auto bra_coords = pair_block.bra_coordinates();
+            const auto ket_coords = pair_block.ket_coordinates();
+
+            std::vector<double> ac_x(cdim), ac_y(cdim), ac_z(cdim);
+            for (std::size_t ij = 0; ij < cdim; ij++)
+            {
+                const auto a = bra_coords[ij].coordinates();
+                const auto c = ket_coords[ij].coordinates();
+                ac_x[ij]     = a[0] - c[0];
+                ac_y[ij]     = a[1] - c[1];
+                ac_z[ij]     = a[2] - c[2];
+            }
+
+            // step (c) — the single-centre MD recursion
+            const auto rterms = compute_one_center_md(contracted, order, cdim, ac_x, ac_y, ac_z);
+
+            const auto monomials = (order + 1) * (order + 2) / 2;
+            const auto stride    = ((cdim + 7) / 8) * 8;
+
+            py::array_t<double> result({monomials, cdim});
+            auto                view = result.mutable_unchecked<2>();
+
+            for (std::size_t r = 0; r < monomials; r++)
+            {
+                for (std::size_t ij = 0; ij < cdim; ij++)
+                {
+                    view(r, ij) = rterms[r * stride + ij];
+                }
+            }
+
+            return result;
+        },
+        "Computes the single-centre MD recursion terms [r]^0, |r| = l_a+l_c, of a pair block.",
         "pair_block"_a);
 }
 

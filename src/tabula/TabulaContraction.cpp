@@ -13,6 +13,11 @@ contract_primitive_pairs(const std::vector<double> &primitive,
                          const std::size_t          cdim,
                          const std::size_t          nppairs) -> std::vector<double>
 {
+    // a single primitive pair per contracted pair — the contraction is the
+    // identity (in/out row strides coincide), so the primitive buffer is
+    // already the contracted buffer; skip the summation
+    if (nppairs == 1) return primitive;
+
     // input / output row strides — padded to a multiple of 8 for aligned
     // SIMD, matching the seed-buffer convention (see compute_overlap_seed)
     const auto pdim       = cdim * nppairs;
