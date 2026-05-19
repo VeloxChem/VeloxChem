@@ -121,8 +121,8 @@ class ScfDriver:
         - num_leb_points: The number of Lebedev points per van der Waals sphere.
         - tssf: The tessellation sphere scaling factor.
         - discretization: The surface discretization method.
-        - homemade: The flag for running with a homemade cavity for gostshyp pressure calculation
-        - tess_file: The data file containing tessellation data for homemade cavity
+        - switching_thresh: The (I)SWIG switching function threshold.
+        - r_ext: The extension radius for the outer cavity correction in angstrom.
         - dispersion: The flag for calculating D4 dispersion correction.
         - d4_energy: The D4 dispersion correction to energy.
         - electric_field: The static electric field.
@@ -245,8 +245,7 @@ class ScfDriver:
         self.num_leb_points = 110
         self.tssf = 1.2
         self.discretization = 'fixed'
-        self.homemade = False #TODO: remove (added for testing of gradient with fixed cavity)
-        self.tess_file = None #TODO: remove (added for testing of gradient with fixed cavity)
+        self.switching_thresh = 1.0e-8
         self.r_ext = 0.0
 
         # solvation model
@@ -339,9 +338,9 @@ class ScfDriver:
                 'num_leb_points': ('int', 'number of grid points per sphere'),
                 'tssf': ('float', 'tessellation sphere scaling factor'),
                 'discretization': ('str', 'surface discretization method'),
-                'homemade': ('bool', 'read tessellation data from file'), #TODO: remove (added for testing of gradient with fixed cavity)
-                'tess_file': ('str', 'tessellation data file name'),#TODO: remove (added for testing of gradient with fixed cavity)
-                'r_ext': ('float', 'extension to vdw radii for outer cavity correction in angstrom'),
+                'switching_thresh': ('float', 'switching function threshold'),
+                'r_ext': 
+                    ('float', 'extension radius for outer cavity correction in angstrom'),
                 'solvation_model': ('str', 'solvation model'),
                 'cpcm_grid_per_sphere':
                     ('int', 'number of grid points per sphere (C-PCM)'),
@@ -531,13 +530,7 @@ class ScfDriver:
 
         pe_sanity_check(self, method_dict)
 
-        #print(self.tssf)
-        #print(self.num_leb_points)
-
-        gostshyp_sanity_check(self, method_dict)
-
-        #print(self.tssf)
-        #print(self.num_leb_points)
+        #gostshyp_sanity_check(self)
 
         if self.electric_field is not None:
             assert_msg_critical(
@@ -599,7 +592,7 @@ class ScfDriver:
         pe_sanity_check(self)
 
         # check gostshyp setup
-        #gostshyp_sanity_check(self)
+        gostshyp_sanity_check(self)
 
         # check solvation model setup
         solvation_model_sanity_check(self)
@@ -895,9 +888,8 @@ class ScfDriver:
                 'num_leb_points': self.num_leb_points,
                 'tssf': self.tssf,
                 'discretization': self.discretization,
+                'switching_thresh' : self.switching_thresh,
                 'filename': self.filename,
-                'homemade': self.homemade, #TODO: remove (added for testing of gradient with fixed cavity)
-                'tess_file': self.tess_file, #TODO: remove (added for testing of gradient with fixed cavity)
                 'r_ext': self.r_ext
             }
 
@@ -905,10 +897,22 @@ class ScfDriver:
             tessellation = self._gostshyp_drv.generate_tessellation(
                                                         tessellation_settings)
 
-            tess_info = 'Surface tessellation with '
+            tess_info = 'Van der Waals cavity with '
             tess_info += '{0:d} grid points generated in {1:.2f} sec.'.format(
                 tessellation.shape[1], tm.time() - tess_t0)
             self.ostream.print_info(tess_info)
+            self.ostream.print_blank()
+
+            if self.r_ext > 0:
+                occ_info = 'Using the Outer Cavity Correction with exterior radius of '
+                occ_info += '{:.2f} angstrom.'.format(self.r_ext)
+                self.ostream.print_info(occ_info)
+                self.ostream.print_blank()
+
+            area_info = 'The total surface area of the van der Waals cavity is '
+            area_info += '{:.2f} angstrom^2.'.format(
+                np.sum(np.sum(tessellation[3, :]) * bohr_in_angstrom()**2))
+            self.ostream.print_info(area_info)
             self.ostream.print_blank()
 
         # C2-DIIS method
@@ -2353,23 +2357,17 @@ class ScfDriver:
         
         gostshyp_t0 = tm.time()
         if self._gostshyp and not self._first_step:
-            # which density matrix is needed?
             if self.scf_type == 'restricted':
                 density_matrix = 2.0 * den_mat[0]
             else:
                 density_matrix = den_mat[0] + den_mat[1]
-            e_pr, V_pr = self._gostshyp_drv.get_gostshyp_contribution_occ(density_matrix)
-            #e_pr, V_pr, g_time, f_time = self._gostshyp_drv.get_gostshyp_contribution(density_matrix)
-            #print('Energy contribution from  GOSTSHYP: ', e_pr) #should be printed in ostream?
-            #print(g_time, f_time)
+            e_pr, V_pr = self._gostshyp_drv.gostshyp_contrib(density_matrix)
+
         else:
             e_pr, V_pr = 0.0, None
 
         if self.timing and self._gostshyp and not self._first_step:
             profiler.add_timing_info('FockGOSTSHYP', tm.time() - gostshyp_t0)
-            # profiler.add_timing_info('g_mat', g_time)
-            # profiler.add_timing_info('f_mat', f_time)
-            # profiler.add_timing_info('g_mat+f_mat', g_time + f_time)
 
         return fock_mat, vxc_mat, vkx_mat, e_emb, V_emb, e_pr, V_pr
 
@@ -2872,13 +2870,13 @@ class ScfDriver:
             cur_str += f'{self._pressure_in_input_units} '
             cur_str += self.pressure_units
             self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = 'Discretization Choice for Cavity: '
-            cur_str += self.discretization
+            cur_str = 'vDW Cavity Switching Function   : '
+            cur_str += self.discretization.upper()
             self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = 'Tessellation Sphere Scaling     : '
+            cur_str = 'vdW Sphere Scaling Factor       : '
             cur_str += f'{self.tssf}'
             self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = 'Grid Points per Atomic Sphere   : '
+            cur_str = 'Grid Points per vdW Sphere      : '
             cur_str += f'{self.num_leb_points}'
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'Extension radius for OCC        : '
@@ -2904,16 +2902,32 @@ class ScfDriver:
         else:
             self.ostream.print_blank()
             if self._dft:
-                valstr = '{} | {} | {} | {} | {} | {}'.format(
-                    'Iter.', '   Kohn-Sham Energy', 'Energy Change',
-                    'Gradient Norm', 'Max. Gradient', 'Density Change')
+                if self._gostshyp:
+                    valstr = '{} | {} | {} | {} | {} | {} | {}'.format(
+                        'Iter.', '   Kohn-Sham Energy', 'Energy Change',
+                        'Gradient Norm', 'Max. Gradient', 'Density Change',
+                        'Neg. Amplitudes')
+                else:
+                    valstr = '{} | {} | {} | {} | {} | {}'.format(
+                        'Iter.', '   Kohn-Sham Energy', 'Energy Change',
+                        'Gradient Norm', 'Max. Gradient', 'Density Change')
                 self.ostream.print_header(valstr)
             else:
-                valstr = '{} | {} | {} | {} | {} | {}'.format(
-                    'Iter.', 'Hartree-Fock Energy', 'Energy Change',
-                    'Gradient Norm', 'Max. Gradient', 'Density Change')
+                if self._gostshyp:
+                    valstr = '{} | {} | {} | {} | {} | {} | {}'.format(
+                        'Iter.', 'Hartree-Fock Energy', 'Energy Change',
+                        'Gradient Norm', 'Max. Gradient', 'Density Change',
+                        'Neg. Amplitudes')
+                else:
+                    valstr = '{} | {} | {} | {} | {} | {}'.format(
+                        'Iter.', 'Hartree-Fock Energy', 'Energy Change',
+                        'Gradient Norm', 'Max. Gradient', 'Density Change')
                 self.ostream.print_header(valstr)
-            self.ostream.print_header(92 * '-')
+
+            if self._gostshyp:
+                self.ostream.print_header(110 * '-')
+            else:    
+                self.ostream.print_header(92 * '-')
 
     def _print_scf_finish(self, start_time):
         """
@@ -2979,12 +2993,11 @@ class ScfDriver:
                     self._num_iter, te, diff_te)
                 valstr += '{:15.8f} {:15.8f} {:15.8f} '.format(
                     e_grad, max_grad, diff_den)
+                
+                if self._gostshyp:
+                    valstr += ' ' * 13 + '{:3d} '.format(self._gostshyp_drv._neg_p_amp)
 
                 self.ostream.print_header(valstr)
-
-                if self._gostshyp:
-                    valstr = 'Total of {:d} Negative Gaussian Amplitudes'.format(self._gostshyp_drv._neg_p_amp)
-                    self.ostream.print_header(valstr.ljust(92))
 
                 self.ostream.flush()
 

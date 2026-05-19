@@ -381,7 +381,7 @@ def embedding_sanity_check(options):
             "At least one of 'json_file' or 'objects' must be provided in 'inputs'."
         )
 
-def gostshyp_sanity_check(obj, method_dict):
+def gostshyp_sanity_check(obj):
     """
     Checks the GOSTSHYP settings and updates relevant attributes.
 
@@ -400,20 +400,19 @@ def gostshyp_sanity_check(obj, method_dict):
         from .tessellation import TessellationDriver
 
         # check wether the requested number of points is valid
-        tessellation_drv = TessellationDriver(obj.comm, obj.ostream)
+        # tessellation_drv = TessellationDriver(obj.comm, obj.ostream)
 
-        # should this be here?
-        if method_dict == None:
-            method_dict = {
-            'num_leb_points': 110,
-            'tssf': 1.2,
-            'discretization': 'fixed',
-            'filename': None,
-            'homemade': False, #TODO: remove (added for testing of gradient with fixed cavity)
-            'tess_file': None #TODO: remove (added for testing of gradient with fixed cavity)
-            }
+        # # should this be here?
+        # if method_dict == None:
+        #     method_dict = {
+        #     'num_leb_points': 110,
+        #     'tssf': 1.2,
+        #     'discretization': 'fixed',
+        #     'filename': None,
+        #     'r_ext': 0.0
+        #     }
 
-        tessellation_drv.update_settings(method_dict)
+        # tessellation_drv.update_settings(method_dict)
         #obj.num_leb_points = tessellation_drv.update_num_points() #points are not updated correctly but likely a problem in the ScfDriver
 
         # TODO

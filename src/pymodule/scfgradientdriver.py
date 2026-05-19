@@ -190,6 +190,12 @@ class ScfGradientDriver(GradientDriver):
         self.print_geometry(molecule)
         self.print_gradient(molecule)
 
+        if self.scf_driver._gostshyp:
+            valstr = '*** GOSTSHYP information: A total number of '
+            valstr += '{} grid points with negative amplitudes were excluded ***'.format(self.scf_driver._gostshyp_drv._neg_p_amp)
+            self.ostream.print_header(valstr)
+            self.ostream.print_blank()
+
         valstr = '*** Time spent in gradient calculation: '
         valstr += '{:.2f} sec ***'.format(time.time() - start_time)
         self.ostream.print_header(valstr)
@@ -513,20 +519,23 @@ class ScfGradientDriver(GradientDriver):
         if self.scf_driver._gostshyp:
             from .gostshyp import GostshypDriver
 
-            self._gostshyp_drv = GostshypDriver(molecule = molecule, basis = basis,
-                    pressure = self.scf_driver.pressure, pressure_units = self.scf_driver.pressure_units, comm = self.comm, ostream = self.ostream)
+            self._gostshyp_drv = GostshypDriver(molecule = molecule, 
+                                                basis = basis,
+                                                pressure = self.scf_driver.pressure, 
+                                                pressure_units = self.scf_driver.pressure_units, 
+                                                comm = self.comm, 
+                                                ostream = self.ostream)
 
             tessellation_settings = {
                 'num_leb_points': self.scf_driver.num_leb_points,
                 'tssf': self.scf_driver.tssf,
                 'discretization': self.scf_driver.discretization,
+                'switching_thresh': self.scf_driver.switching_thresh,
                 'filename': self.scf_driver.filename,
-                'homemade': self.scf_driver.homemade, #TODO: remove (added for testing of gradient with fixed cavity)
-                'tess_file': self.scf_driver.tess_file, #TODO: remove (added for testing of gradient with fixed cavity)
                 'r_ext': self.scf_driver.r_ext
             }
 
-            gostshyp_grad = self._gostshyp_drv.get_gostshyp_grad_new_ints_occ(2 * D, tessellation_settings)
+            gostshyp_grad = self._gostshyp_drv.gostshyp_grad_contrib(2 * D, tessellation_settings)
 
             self.gradient += gostshyp_grad
 
@@ -893,27 +902,6 @@ class ScfGradientDriver(GradientDriver):
 
             if self.rank == mpi_master():
                 self.gradient += pe_grad
-
-
-        if self.scf_driver._gostshyp:
-            from .gostshyp import GostshypDriver
-
-            self._gostshyp_drv = GostshypDriver(molecule = molecule, basis = basis,
-                    pressure = self.scf_driver.pressure, pressure_units = self.scf_driver.pressure_units, comm = self.comm, ostream = self.ostream)
-
-            tessellation_settings = {
-                'num_leb_points': self.scf_driver.num_leb_points,
-                'tssf': self.scf_driver.tssf,
-                'discretization': self.scf_driver.discretization,
-                'filename': self.scf_driver.filename,
-                'homemade': self.scf_driver.homemade, #TODO: remove (added for testing purposes)
-                'tess_file': self.scf_driver.tess_file, #TODO: remove (added for testing purposes)
-                'r_ext': self.scf_driver.r_ext
-            }
-
-            gostshyp_grad = self._gostshyp_drv.get_gostshyp_grad_new_ints_occ(Da + Db, tessellation_settings)
-
-            self.gradient += gostshyp_grad
         
         # nuclear contribution to gradient
         # and D4 dispersion correction if requested
@@ -1018,6 +1006,14 @@ class ScfGradientDriver(GradientDriver):
         else:
             # always try restarting scf for analytical gradient
             self.scf_driver.restart = True
+        
+        # reset pressure to input units
+        # this is needed if the scf_driver is called multiple times
+        # since the pressure is recalculated from input units to atomic units 
+        # when the compute() method is called
+        if self.scf_driver._gostshyp:
+            self.scf_driver.pressure = self.scf_driver._pressure_in_input_units
+        
         new_scf_results = self.scf_driver.compute(molecule, ao_basis)
         assert_msg_critical(self.scf_driver.is_converged,
                             'ScfGradientDriver: SCF did not converge')

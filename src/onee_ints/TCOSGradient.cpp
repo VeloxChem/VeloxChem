@@ -45,13 +45,13 @@ namespace onee {  // onee namespace
 
 auto
 computeTCOSGradient(const             CMolecule& molecule, 
-                  const             CMolecularBasis& basis, 
-                  const double*     point_coords, 
-                  const int         npoints, 
-                  const double*     point_exp, 
-                  const double*     point_amp, 
-                  const double*     D, 
-                  const int         naos) -> std::vector<CDenseMatrix>
+                    const             CMolecularBasis& basis, 
+                    const double*     point_coords, 
+                    const int         npoints, 
+                    const double*     point_exp, 
+                    const double*     point_amp, 
+                    const double*     D, 
+                    const int         naos) -> std::vector<CDenseMatrix>
 {
     const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
 
