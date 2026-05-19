@@ -472,7 +472,12 @@ OverlapDriver::compute(const CMolecule       &molecule,
 
     const auto dimension = static_cast<std::size_t>(gtofunc::getNumberOfAtomicOrbitals(gto_blocks));
 
-    DenseMatrix matrix(dimension, dimension, Symmetry::symmetric);
+    // Unscreened (threshold <= 0) the scatter plus symmetrize write every
+    // element, so the zero-fill is redundant — skip it. Screened, the
+    // screened-out elements must stay zero, so initialize.
+    const bool initialize = threshold > 0.0;
+
+    DenseMatrix matrix(dimension, dimension, Symmetry::symmetric, initialize);
 
     const auto t_setup = std::chrono::steady_clock::now();
 

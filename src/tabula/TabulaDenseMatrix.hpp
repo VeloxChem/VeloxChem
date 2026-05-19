@@ -7,9 +7,45 @@
 #define TabulaDenseMatrix_hpp
 
 #include <cstddef>
+#include <memory>
+#include <new>
+#include <utility>
 #include <vector>
 
 namespace tabula {  // tabula namespace
+
+/// @brief An allocator that default-initializes — for a trivial type, leaves
+/// the storage uninitialized — on a no-argument construct, so a `resize` can
+/// grow the buffer without the zero-fill. Value-initializing constructs
+/// (`vector(n, value)`) are unaffected.
+template <typename T>
+struct DefaultInitAllocator : std::allocator<T>
+{
+    DefaultInitAllocator() = default;
+
+    template <typename U>
+    DefaultInitAllocator(const DefaultInitAllocator<U>&) noexcept
+    {
+    }
+
+    template <typename U>
+    struct rebind
+    {
+        using other = DefaultInitAllocator<U>;
+    };
+
+    template <typename U>
+    void construct(U* ptr)
+    {
+        ::new (static_cast<void*>(ptr)) U;
+    }
+
+    template <typename U, typename... Args>
+    void construct(U* ptr, Args&&... args)
+    {
+        ::new (static_cast<void*>(ptr)) U(std::forward<Args>(args)...);
+    }
+};
 
 /// @brief The symmetry of a dense matrix.
 enum class Symmetry
@@ -35,11 +71,17 @@ class DenseMatrix
     /// @brief Creates an empty (0 x 0) general matrix.
     DenseMatrix();
 
-    /// @brief Creates a zero-initialized matrix.
+    /// @brief Creates a matrix.
     /// @param rows The number of rows.
     /// @param columns The number of columns.
     /// @param symmetry The matrix symmetry.
-    DenseMatrix(const std::size_t rows, const std::size_t columns, const Symmetry symmetry = Symmetry::general);
+    /// @param initialize When true (the default) the buffer is zeroed; when
+    /// false it is left uninitialized — the caller must write every element
+    /// before reading, which a full unscreened evaluation does.
+    DenseMatrix(const std::size_t rows,
+                const std::size_t columns,
+                const Symmetry    symmetry   = Symmetry::general,
+                const bool        initialize = true);
 
     /// @brief Element access for assignment.
     /// @param row The row index.
@@ -97,7 +139,7 @@ class DenseMatrix
     Symmetry _symmetry;
 
     /// @brief The row-major value buffer, length `_rows * _columns`.
-    std::vector<double> _values;
+    std::vector<double, DefaultInitAllocator<double>> _values;
 };
 
 }  // namespace tabula

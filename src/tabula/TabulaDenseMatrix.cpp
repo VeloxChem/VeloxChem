@@ -24,7 +24,7 @@ DenseMatrix::DenseMatrix()
 {
 }
 
-DenseMatrix::DenseMatrix(const std::size_t rows, const std::size_t columns, const Symmetry symmetry)
+DenseMatrix::DenseMatrix(const std::size_t rows, const std::size_t columns, const Symmetry symmetry, const bool initialize)
 
     : _rows{rows}
 
@@ -32,11 +32,22 @@ DenseMatrix::DenseMatrix(const std::size_t rows, const std::size_t columns, cons
 
     , _symmetry{symmetry}
 
-    , _values(rows * columns, 0.0)
+    , _values{}
 {
     if (symmetry != Symmetry::general)
     {
         errors::assertMsgCritical(rows == columns, std::string("DenseMatrix: a symmetric or antisymmetric matrix must be square"));
+    }
+
+    if (initialize)
+    {
+        // zero-fill — the default.
+        _values.assign(rows * columns, 0.0);
+    }
+    else
+    {
+        // leave the buffer uninitialized; the caller writes every element.
+        _values.resize(rows * columns);
     }
 }
 
