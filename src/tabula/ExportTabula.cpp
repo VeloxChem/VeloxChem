@@ -14,6 +14,7 @@
 #include "TabulaBlockSparseMatrix.hpp"
 #include "TabulaDenseMatrix.hpp"
 #include "TabulaMixedPrecisionBlockSparseMatrix.hpp"
+#include "TabulaOverlapDriver.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -124,6 +125,13 @@ export_tabula(py::module& m) -> void
         .def("stored_element_count", &MixedPrecisionBlockSparseMatrix::stored_element_count, "Gets the stored scalar count.")
         .def("stored_byte_count", &MixedPrecisionBlockSparseMatrix::stored_byte_count, "Gets the stored footprint in bytes.")
         .def("to_dense", &MixedPrecisionBlockSparseMatrix::to_dense, "Reconstructs the dense symmetric matrix.");
+
+    // tabula::OverlapDriver class
+
+    py::class_<OverlapDriver, std::shared_ptr<OverlapDriver>>(
+        m, "TabulaOverlapDriver", "Driver for the Tabula two-center overlap integral.")
+        .def(py::init<>())
+        .def("compute", &OverlapDriver::compute, "Computes the overlap matrix.", "molecule"_a, "basis"_a);
 }
 
 }  // namespace tabula
