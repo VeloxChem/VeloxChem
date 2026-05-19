@@ -412,6 +412,23 @@ export_tabula(py::module& m) -> void
         "Gets the accumulated overlap-scatter direct / transposed write profile.");
 
     m.def("reset_scatter_profile", &reset_scatter_profile, "Resets the accumulated overlap-scatter profile.");
+
+    // overlap seed — accumulated allocate / row0 / ladder profile
+
+    m.def(
+        "seed_profile",
+        []() -> py::dict {
+            const auto profile = seed_profile();
+
+            py::dict result;
+            result["allocate"] = profile.allocate;
+            result["row0"]     = profile.row0;
+            result["ladder"]   = profile.ladder;
+            return result;
+        },
+        "Gets the accumulated compute_overlap_seed allocate / row0 / ladder profile.");
+
+    m.def("reset_seed_profile", &reset_seed_profile, "Resets the accumulated compute_overlap_seed profile.");
 }
 
 }  // namespace tabula

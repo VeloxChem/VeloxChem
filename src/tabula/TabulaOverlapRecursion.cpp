@@ -5,9 +5,52 @@
 
 #include "TabulaOverlapRecursion.hpp"
 
+#include <atomic>
+#include <chrono>
 #include <cstddef>
 
 namespace tabula {  // tabula namespace
+
+namespace {  // unnamed namespace
+
+// accumulated per-section wall time of compute_overlap_seed — for profiling
+std::atomic<double> g_seed_allocate{0.0};
+std::atomic<double> g_seed_row0{0.0};
+std::atomic<double> g_seed_ladder{0.0};
+
+/// @brief The current steady-clock instant.
+inline auto
+seed_now() -> std::chrono::steady_clock::time_point
+{
+    return std::chrono::steady_clock::now();
+}
+
+/// @brief Adds the elapsed wall seconds of an interval to an accumulator.
+inline auto
+seed_add(std::atomic<double>                         &accumulator,
+         const std::chrono::steady_clock::time_point &start,
+         const std::chrono::steady_clock::time_point &end) -> void
+{
+    accumulator.fetch_add(std::chrono::duration<double>(end - start).count(), std::memory_order_relaxed);
+}
+
+}  // namespace
+
+auto
+seed_profile() -> SeedProfile
+{
+    return {g_seed_allocate.load(std::memory_order_relaxed),
+            g_seed_row0.load(std::memory_order_relaxed),
+            g_seed_ladder.load(std::memory_order_relaxed)};
+}
+
+auto
+reset_seed_profile() -> void
+{
+    g_seed_allocate.store(0.0, std::memory_order_relaxed);
+    g_seed_row0.store(0.0, std::memory_order_relaxed);
+    g_seed_ladder.store(0.0, std::memory_order_relaxed);
+}
 
 auto
 compute_overlap_seed(const GtoPairBlock& pair_block) -> std::vector<double>
@@ -30,7 +73,12 @@ compute_overlap_seed(const GtoPairBlock& pair_block) -> std::vector<double>
     // aligned for SIMD
     const auto stride = ((pdim + 7) / 8) * 8;
 
+    const auto t_seed_start = seed_now();
+
     std::vector<double> seed(static_cast<std::size_t>(order + 1) * stride, 0.0);
+
+    const auto t_allocated = seed_now();
+    seed_add(g_seed_allocate, t_seed_start, t_allocated);
 
     if (pdim == 0) return seed;
 
@@ -72,6 +120,9 @@ compute_overlap_seed(const GtoPairBlock& pair_block) -> std::vector<double>
         }
     }
 
+    const auto t_row0 = seed_now();
+    seed_add(g_seed_row0, t_allocated, t_row0);
+
     // rows 1 … L — the seed ladder [0]^m = (−2ρ)·[0]^(m−1), ρ = αγ/(α+γ)
     for (int m = 1; m <= order; m++)
     {
@@ -88,6 +139,8 @@ compute_overlap_seed(const GtoPairBlock& pair_block) -> std::vector<double>
             curr[k] = -2.0 * rho * prev[k];
         }
     }
+
+    seed_add(g_seed_ladder, t_row0, seed_now());
 
     return seed;
 }

@@ -10,7 +10,9 @@ from veloxchem.tabulalib import (tabula_overlap_profile,
                                  md_recursion_profile,
                                  reset_md_recursion_profile,
                                  scatter_profile,
-                                 reset_scatter_profile)
+                                 reset_scatter_profile,
+                                 seed_profile,
+                                 reset_seed_profile)
 
 GEOMETRY_DIR = "/Users/rinkevic/Development/VeloxChem"
 PHASES = ["make_blocks", "pair_setup", "seed", "contract", "md", "transform", "scatter"]
@@ -31,15 +33,23 @@ for molecule_name in ["c240"]:
 
         reset_md_recursion_profile()
         reset_scatter_profile()
+        reset_seed_profile()
         profile = tabula_overlap_profile(molecule, basis, 0.0)
         md = md_recursion_profile()
         scatter = scatter_profile()
+        seed = seed_profile()
 
         total = sum(profile[p] for p in PHASES)
         print(f"\n{molecule_name} / {basis_label}   (thread-summed; total {total * 1e3:.1f} ms)")
         for phase in PHASES:
             ms = profile[phase] * 1e3
             print(f"  {phase:12s} {ms:9.2f} ms  ({ms / (total * 1e3) * 100:5.1f} %)")
+
+        seed_total = profile["seed"] * 1e3
+        print(f"  seed breakdown ({seed_total:.1f} ms):")
+        for part in ("allocate", "row0", "ladder"):
+            ms = seed[part] * 1e3
+            print(f"    {part:10s}  {ms:9.2f} ms  ({ms / seed_total * 100:5.1f} %)")
 
         md_total = profile["md"] * 1e3
         print(f"  md breakdown ({md_total:.1f} ms):")
