@@ -300,7 +300,11 @@ evaluate_task(DenseMatrix       &matrix,
     const auto        bra_components = 2 * l_a + 1;
     const auto        ket_components = 2 * l_c + 1;
 
-    // scatter — each element once into the matrix's upper triangle
+    // scatter — each element once into the matrix's upper triangle, written
+    // straight into the value buffer (the per-element accessor call is not
+    // inlined across translation units)
+    double *const     m   = matrix.values();
+    const std::size_t dim = matrix.columns();
     for (int ca = 0; ca < bra_components; ca++)
     {
         for (int cc = 0; cc < ket_components; cc++)
@@ -321,7 +325,7 @@ evaluate_task(DenseMatrix       &matrix,
 
                     if (diagonal && r > cao) continue;
 
-                    matrix(std::min(r, cao), std::max(r, cao)) = row[cp_base + static_cast<std::size_t>(c)];
+                    m[std::min(r, cao) * dim + std::max(r, cao)] = row[cp_base + static_cast<std::size_t>(c)];
                 }
             }
         }
@@ -363,7 +367,10 @@ evaluate_task_sparse(BlockSparseMatrix         &matrix,
     const auto        ket_components = 2 * l_c + 1;
 
     // scatter — for each kept ket contracted GTO the (A.atom, ket atom) block
-    // is located once, then the component/GTO sub-block is written
+    // is located once, then the component/GTO sub-block is written straight
+    // into the block's value buffer (the per-element accessor call is not
+    // inlined across translation units)
+    double *const values = matrix.values();
     for (int c = 0; c < kept; c++)
     {
         const int  kc       = orig[static_cast<std::size_t>(c)];
@@ -375,6 +382,10 @@ evaluate_task_sparse(BlockSparseMatrix         &matrix,
 
         const bool transpose = A.atom < ket_atom;
         const bool diagonal  = A.atom == ket_atom;
+
+        const auto        blk  = matrix.block(static_cast<std::size_t>(block));
+        double *const     base = values + blk.offset;
+        const std::size_t ncol = blk.columnCount;
 
         for (int ca = 0; ca < bra_components; ca++)
         {
@@ -396,12 +407,12 @@ evaluate_task_sparse(BlockSparseMatrix         &matrix,
 
                     if (transpose)
                     {
-                        matrix.set_value(static_cast<std::size_t>(block), lc, lr, v);
+                        base[lc * ncol + lr] = v;
                     }
                     else
                     {
-                        matrix.set_value(static_cast<std::size_t>(block), lr, lc, v);
-                        if (diagonal) matrix.set_value(static_cast<std::size_t>(block), lc, lr, v);
+                        base[lr * ncol + lc] = v;
+                        if (diagonal) base[lc * ncol + lr] = v;
                     }
                 }
             }
