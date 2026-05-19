@@ -9,13 +9,11 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.tabulalib import (tabula_overlap_profile,
                                  md_recursion_profile,
                                  reset_md_recursion_profile,
-                                 scatter_profile,
-                                 reset_scatter_profile,
                                  seed_profile,
                                  reset_seed_profile)
 
 GEOMETRY_DIR = "/Users/rinkevic/Development/VeloxChem"
-PHASES = ["make_blocks", "pair_setup", "seed", "contract", "md", "transform", "scatter"]
+PHASES = ["make_blocks", "pair_setup", "seed", "contract", "md", "transform", "scatter", "symmetrize"]
 
 
 def read_molecule(name):
@@ -32,11 +30,9 @@ for molecule_name in ["c240"]:
         tabula_overlap_profile(molecule, basis, 0.0)            # warm-up
 
         reset_md_recursion_profile()
-        reset_scatter_profile()
         reset_seed_profile()
         profile = tabula_overlap_profile(molecule, basis, 0.0)
         md = md_recursion_profile()
-        scatter = scatter_profile()
         seed = seed_profile()
 
         total = sum(profile[p] for p in PHASES)
@@ -61,10 +57,3 @@ for molecule_name in ["c240"]:
             if seconds > 0.0:
                 ms = seconds * 1e3
                 print(f"    build d={degree}  {ms:9.2f} ms  ({ms / md_total * 100:5.1f} %)")
-
-        scatter_total = profile["scatter"] * 1e3
-        print(f"  scatter breakdown ({scatter_total:.1f} ms):")
-        print(f"    direct      {scatter['direct'] * 1e3:9.2f} ms  "
-              f"({scatter['direct'] * 1e5 / scatter_total:5.1f} %)")
-        print(f"    transpose   {scatter['transpose'] * 1e3:9.2f} ms  "
-              f"({scatter['transpose'] * 1e5 / scatter_total:5.1f} %)")

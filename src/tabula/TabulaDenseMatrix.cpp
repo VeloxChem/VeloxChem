@@ -106,11 +106,35 @@ DenseMatrix::symmetrize() -> void
 
     const auto sign = (_symmetry == Symmetry::antisymmetric) ? -1.0 : 1.0;
 
-    for (std::size_t i = 0; i < _rows; i++)
+    // cache-blocked, parallel mirror of the upper triangle into the lower:
+    // tiling keeps each source/destination tile pair resident in cache rather
+    // than striding the whole matrix per element. Each tile row `ti` writes a
+    // disjoint set of matrix columns, so the parallel writes do not race.
+    const std::size_t     dimension = _rows;
+    constexpr std::size_t tile      = 64;
+
+    auto *values = _values.data();
+
+    const auto tiles = (dimension + tile - 1) / tile;
+
+#pragma omp parallel for schedule(dynamic)
+    for (std::size_t ti = 0; ti < tiles; ti++)
     {
-        for (std::size_t j = i + 1; j < _columns; j++)
+        const auto i_begin = ti * tile;
+        const auto i_end   = std::min(i_begin + tile, dimension);
+
+        for (std::size_t tj = ti; tj < tiles; tj++)
         {
-            _values[j * _columns + i] = sign * _values[i * _columns + j];
+            const auto j_begin = tj * tile;
+            const auto j_end   = std::min(j_begin + tile, dimension);
+
+            for (std::size_t i = i_begin; i < i_end; i++)
+            {
+                for (std::size_t j = std::max(j_begin, i + 1); j < j_end; j++)
+                {
+                    values[j * dimension + i] = sign * values[i * dimension + j];
+                }
+            }
         }
     }
 }

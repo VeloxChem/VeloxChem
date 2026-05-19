@@ -5,7 +5,7 @@
 
 #include "TabulaOverlapDriver.hpp"
 
-#include <atomic>
+#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <utility>
@@ -34,20 +34,17 @@ seconds(const std::chrono::steady_clock::duration &interval) -> double
     return std::chrono::duration<double>(interval).count();
 }
 
-// accumulated wall time of the overlap scatter, split into the direct
-// matrix(r,c) writes and the transposed matrix(c,r) writes — for profiling
-std::atomic<double> g_scatter_direct{0.0};
-std::atomic<double> g_scatter_transpose{0.0};
-
 /// @brief Evaluates a screened `CGtoPairBlock` into the overlap matrix — the
 /// late-contraction recursion end to end: the seed ladder (a), the
 /// primitive-pair contraction (b), the single-centre MD recursion (c), the
 /// Cartesian-to-spherical assembly (d), and the scatter into the matrix (e).
 ///
-/// An off-diagonal block pair also fills its transpose. When `profile` is
-/// non-null, the per-phase wall times are accumulated into it.
+/// Each element is scattered once into the matrix's upper triangle; the
+/// lower triangle is filled by a single `symmetrize` once every block pair
+/// is done. When `profile` is non-null, the per-phase wall times are
+/// accumulated into it.
 auto
-evaluate_pair_block(DenseMatrix &matrix, const GtoPairBlock &pair_block, const bool diagonal_pair, OverlapProfile *profile) -> void
+evaluate_pair_block(DenseMatrix &matrix, const GtoPairBlock &pair_block, OverlapProfile *profile) -> void
 {
     const auto angular_momentums = pair_block.angular_momentums();
     const auto l_a               = angular_momentums.first;
@@ -100,11 +97,12 @@ evaluate_pair_block(DenseMatrix &matrix, const GtoPairBlock &pair_block, const b
     const auto t_transform = std::chrono::steady_clock::now();
 
     // (e) — scatter the spherical block into the matrix; the orbital indices
-    // carry the AO component stride ([0]) and the per-pair offset ([ij+1])
+    // carry the AO component stride ([0]) and the per-pair offset ([ij+1]).
+    // Each element is written once into the upper triangle — at (min(r,c),
+    // max(r,c)) — and the lower triangle is filled later by `symmetrize`
     const auto &bra_orbitals = pair_block.bra_orbital_indices();
     const auto &ket_orbitals = pair_block.ket_orbital_indices();
 
-    // direct pass — matrix(r, c)
     for (int ca = 0; ca < bra_components; ca++)
     {
         for (int cc = 0; cc < ket_components; cc++)
@@ -116,63 +114,23 @@ evaluate_pair_block(DenseMatrix &matrix, const GtoPairBlock &pair_block, const b
                 const auto r = static_cast<std::size_t>(ca) * bra_orbitals[0] + bra_orbitals[ij + 1];
                 const auto c = static_cast<std::size_t>(cc) * ket_orbitals[0] + ket_orbitals[ij + 1];
 
-                matrix(r, c) = row[ij];
+                matrix(std::min(r, c), std::max(r, c)) = row[ij];
             }
         }
     }
-
-    const auto t_scatter_direct = std::chrono::steady_clock::now();
-
-    // transposed pass — matrix(c, r); an off-diagonal block pair fills the
-    // other triangle too
-    if (!diagonal_pair)
-    {
-        for (int ca = 0; ca < bra_components; ca++)
-        {
-            for (int cc = 0; cc < ket_components; cc++)
-            {
-                const auto *row = spherical.data() + static_cast<std::size_t>(ca * ket_components + cc) * stride;
-
-                for (std::size_t ij = 0; ij < cdim; ij++)
-                {
-                    const auto r = static_cast<std::size_t>(ca) * bra_orbitals[0] + bra_orbitals[ij + 1];
-                    const auto c = static_cast<std::size_t>(cc) * ket_orbitals[0] + ket_orbitals[ij + 1];
-
-                    matrix(c, r) = row[ij];
-                }
-            }
-        }
-    }
-
-    const auto t_scatter_done = std::chrono::steady_clock::now();
-
-    g_scatter_direct.fetch_add(seconds(t_scatter_direct - t_transform), std::memory_order_relaxed);
-    g_scatter_transpose.fetch_add(seconds(t_scatter_done - t_scatter_direct), std::memory_order_relaxed);
 
     if (profile != nullptr)
     {
+        const auto t_scatter = std::chrono::steady_clock::now();
         profile->seed      += seconds(t_seed - t_start);
         profile->contract  += seconds(t_contract - t_seed);
         profile->md        += seconds(t_md - t_contract);
         profile->transform += seconds(t_transform - t_md);
-        profile->scatter   += seconds(t_scatter_done - t_transform);
+        profile->scatter   += seconds(t_scatter - t_transform);
     }
 }
 
 }  // namespace
-
-auto
-scatter_profile() -> ScatterProfile
-{
-    return {g_scatter_direct.load(std::memory_order_relaxed), g_scatter_transpose.load(std::memory_order_relaxed)};
-}
-
-auto
-reset_scatter_profile() -> void
-{
-    g_scatter_direct.store(0.0, std::memory_order_relaxed);
-    g_scatter_transpose.store(0.0, std::memory_order_relaxed);
-}
 
 auto
 OverlapDriver::compute(const CMolecule       &molecule,
@@ -241,11 +199,17 @@ OverlapDriver::compute(const CMolecule       &molecule,
             slot->pair_setup += seconds(std::chrono::steady_clock::now() - t_setup);
         }
 
-        evaluate_pair_block(matrix, pair_block, i == j, slot);
+        evaluate_pair_block(matrix, pair_block, slot);
     }
+
+    // the scatter filled the upper triangle only — mirror it into the lower
+    const auto t_symmetrize = std::chrono::steady_clock::now();
+    matrix.symmetrize();
 
     if (profile != nullptr)
     {
+        profile->symmetrize += seconds(std::chrono::steady_clock::now() - t_symmetrize);
+
         for (const auto &thread_profile : thread_profiles)
         {
             profile->pair_setup += thread_profile.pair_setup;

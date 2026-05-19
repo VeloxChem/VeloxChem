@@ -28,8 +28,11 @@ struct OverlapProfile
     double md{0.0};
     /// @brief Step (d) — the Cartesian-to-spherical assembly.
     double transform{0.0};
-    /// @brief Step (e) — the scatter into the matrix.
+    /// @brief Step (e) — the scatter into the matrix's upper triangle.
     double scatter{0.0};
+    /// @brief Mirroring the upper triangle into the lower — one `symmetrize`
+    /// after every block pair (wall time, not thread-summed).
+    double symmetrize{0.0};
 };
 
 /// @brief Driver for the two-center overlap integral.
@@ -61,24 +64,6 @@ class OverlapDriver
                  const double         threshold = 0.0,
                  OverlapProfile      *profile   = nullptr) const -> DenseMatrix;
 };
-
-/// @brief Accumulated wall time of the overlap scatter, in seconds, summed
-/// over the OpenMP threads — split into the direct `matrix(r,c)` writes and
-/// the transposed `matrix(c,r)` writes an off-diagonal block pair adds.
-struct ScatterProfile
-{
-    /// @brief The direct `matrix(r,c)` writes.
-    double direct{0.0};
-    /// @brief The transposed `matrix(c,r)` writes.
-    double transpose{0.0};
-};
-
-/// @brief Gets the accumulated overlap-scatter profile.
-/// @return The scatter profile.
-auto scatter_profile() -> ScatterProfile;
-
-/// @brief Resets the accumulated overlap-scatter profile.
-auto reset_scatter_profile() -> void;
 
 }  // namespace tabula
 
