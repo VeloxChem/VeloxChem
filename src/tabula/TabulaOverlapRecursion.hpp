@@ -8,7 +8,7 @@
 
 #include <vector>
 
-#include "GtoPairBlock.hpp"
+#include "TabulaGtoPairBlock.hpp"
 
 namespace tabula {  // tabula namespace
 
@@ -22,15 +22,15 @@ namespace tabula {  // tabula namespace
 /// stride is the primitive-pair count padded up to a multiple of 8, so each
 /// row is aligned for SIMD.
 ///
-/// `[0]^0 = c_i·c_j · overlap_factor · (1/2α)^l_a · (−1/2γ)^l_c`, reusing the
-/// pair block's precomputed overlap factors, primitive exponents, and
-/// normalization factors — the combined primitive contraction weight `c_i·c_j`
-/// is premultiplied in, so the contraction step is a plain sum. The ladder is
-/// `[0]^m = (−2ρ)·[0]^(m−1)`, `ρ = αγ/(α+γ)`.
+/// `[0]^0 = weight · (1/2α)^l_a · (−1/2γ)^l_c`, reusing the pair block's
+/// precomputed weights (the primitive normalization and overlap factors
+/// folded into one, the contraction weight `c_i·c_j` premultiplied in) and
+/// primitive exponents — so the contraction step is a plain sum. The ladder
+/// is `[0]^m = (−2ρ)·[0]^(m−1)`, `ρ = αγ/(α+γ)`.
 ///
 /// @param pair_block The basis-function-pair block.
 /// @return The seed-ladder buffer.
-auto compute_overlap_seed(const CGtoPairBlock& pair_block) -> std::vector<double>;
+auto compute_overlap_seed(const GtoPairBlock& pair_block) -> std::vector<double>;
 
 }  // namespace tabula
 

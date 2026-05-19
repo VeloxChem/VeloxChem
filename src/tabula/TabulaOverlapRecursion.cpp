@@ -10,7 +10,7 @@
 namespace tabula {  // tabula namespace
 
 auto
-compute_overlap_seed(const CGtoPairBlock& pair_block) -> std::vector<double>
+compute_overlap_seed(const GtoPairBlock& pair_block) -> std::vector<double>
 {
     // angular momenta — plain ints (a structured binding cannot be captured
     // by an OpenMP simd region)
@@ -34,23 +34,23 @@ compute_overlap_seed(const CGtoPairBlock& pair_block) -> std::vector<double>
 
     if (pdim == 0) return seed;
 
-    const auto bra_exps = pair_block.bra_exponents();
-    const auto ket_exps = pair_block.ket_exponents();
-    const auto overlaps = pair_block.overlap_factors();
-    const auto norms    = pair_block.normalization_factors();
+    const auto* bra_exps = pair_block.bra_exponents();
+    const auto* ket_exps = pair_block.ket_exponents();
+    const auto* weights  = pair_block.weights();
 
-    // row 0 — [0]^0 = c_i·c_j · overlap_factor · (1/2α)^l_a · (−1/2γ)^l_c,
-    // the primitive contraction weight (normalization_factors) premultiplied
-    // in so the contraction step is a plain sum. The powers are applied as
-    // l_a + l_c separate SIMD passes; a runtime-trip inner power loop would
-    // block vectorization of the primitive-pair sweep.
+    // row 0 — [0]^0 = weight · (1/2α)^l_a · (−1/2γ)^l_c, the weight being the
+    // normalization and overlap factors folded into one with the contraction
+    // weight c_i·c_j premultiplied in, so the contraction step is a plain
+    // sum. The powers are applied as l_a + l_c separate SIMD passes; a
+    // runtime-trip inner power loop would block vectorization of the
+    // primitive-pair sweep.
     {
         auto* seed0 = seed.data();
 
 #pragma omp simd
         for (std::size_t k = 0; k < pdim; k++)
         {
-            seed0[k] = norms[k] * overlaps[k];
+            seed0[k] = weights[k];
         }
 
         for (int i = 0; i < l_a; i++)

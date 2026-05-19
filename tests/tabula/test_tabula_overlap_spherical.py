@@ -2,8 +2,8 @@ import numpy as np
 
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
-from veloxchem.veloxchemlib import GtoBlock, GtoPairBlock, OverlapDriver
-from veloxchem.tabulalib import tabula_overlap_spherical
+from veloxchem.veloxchemlib import GtoBlock, OverlapDriver
+from veloxchem.tabulalib import TabulaGtoPairBlock, tabula_overlap_spherical
 
 
 class TestTabulaOverlapSpherical:
@@ -23,7 +23,7 @@ class TestTabulaOverlapSpherical:
 
         # Tabula — the s-block paired with itself
         block = GtoBlock(bas, mol, 0, 3)
-        pair_block = GtoPairBlock(block, block)
+        pair_block = TabulaGtoPairBlock(block, block)
 
         ncgtos = block.number_of_basis_functions()
         orbital_indices = block.orbital_indices()

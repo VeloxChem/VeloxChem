@@ -14,9 +14,9 @@
 
 #include "GtoBlock.hpp"
 #include "GtoFunc.hpp"
-#include "GtoPairBlock.hpp"
 #include "Point.hpp"
 #include "TabulaContraction.hpp"
+#include "TabulaGtoPairBlock.hpp"
 #include "TabulaMDRecursion.hpp"
 #include "TabulaOverlapRecursion.hpp"
 #include "TabulaOverlapScreener.hpp"
@@ -41,7 +41,7 @@ seconds(const std::chrono::steady_clock::duration &interval) -> double
 /// An off-diagonal block pair also fills its transpose. When `profile` is
 /// non-null, the per-phase wall times are accumulated into it.
 auto
-evaluate_pair_block(DenseMatrix &matrix, const CGtoPairBlock &pair_block, const bool diagonal_pair, OverlapProfile *profile) -> void
+evaluate_pair_block(DenseMatrix &matrix, const GtoPairBlock &pair_block, const bool diagonal_pair, OverlapProfile *profile) -> void
 {
     const auto angular_momentums = pair_block.angular_momentums();
     const auto l_a               = angular_momentums.first;
@@ -65,8 +65,8 @@ evaluate_pair_block(DenseMatrix &matrix, const CGtoPairBlock &pair_block, const 
     const auto t_contract = std::chrono::steady_clock::now();
 
     // AC = A − C, per contracted pair
-    const auto bra_coords = pair_block.bra_coordinates();
-    const auto ket_coords = pair_block.ket_coordinates();
+    const auto &bra_coords = pair_block.bra_coordinates();
+    const auto &ket_coords = pair_block.ket_coordinates();
 
     std::vector<double> ac_x(cdim), ac_y(cdim), ac_z(cdim);
     for (std::size_t ij = 0; ij < cdim; ij++)
@@ -95,8 +95,8 @@ evaluate_pair_block(DenseMatrix &matrix, const CGtoPairBlock &pair_block, const 
 
     // (e) — scatter the spherical block into the matrix; the orbital indices
     // carry the AO component stride ([0]) and the per-pair offset ([ij+1])
-    const auto bra_orbitals = pair_block.bra_orbital_indices();
-    const auto ket_orbitals = pair_block.ket_orbital_indices();
+    const auto &bra_orbitals = pair_block.bra_orbital_indices();
+    const auto &ket_orbitals = pair_block.ket_orbital_indices();
 
     for (int ca = 0; ca < bra_components; ca++)
     {
@@ -181,12 +181,18 @@ OverlapDriver::compute(const CMolecule       &molecule,
 
         const auto t_setup = std::chrono::steady_clock::now();
 
-        const auto estimator = make_overlap_screening_estimator(gto_blocks[i].angular_momentum(),
-                                                                gto_blocks[j].angular_momentum());
-
-        // a screened pair block — the negligible contracted-GTO pairs are
-        // dropped at construction
-        const CGtoPairBlock pair_block(gto_blocks[i], gto_blocks[j], estimator, threshold);
+        // threshold <= 0 disables screening — every pair is kept, so the
+        // plain pair block is built directly and the screening pre-pass (and
+        // its per-pair estimator evaluation) is skipped; with screening on a
+        // screened pair block drops the negligible pairs at construction
+        const auto pair_block =
+            (threshold > 0.0)
+                ? GtoPairBlock(gto_blocks[i],
+                               gto_blocks[j],
+                               make_overlap_screening_estimator(gto_blocks[i].angular_momentum(),
+                                                                gto_blocks[j].angular_momentum()),
+                               threshold)
+                : GtoPairBlock(gto_blocks[i], gto_blocks[j]);
 
         if (slot != nullptr)
         {

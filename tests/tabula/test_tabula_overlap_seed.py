@@ -2,8 +2,8 @@ import numpy as np
 
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
-from veloxchem.veloxchemlib import GtoBlock, GtoPairBlock
-from veloxchem.tabulalib import tabula_overlap_seed
+from veloxchem.veloxchemlib import GtoBlock
+from veloxchem.tabulalib import TabulaGtoPairBlock, tabula_overlap_seed
 
 
 class TestTabulaOverlapSeed:
@@ -21,23 +21,23 @@ class TestTabulaOverlapSeed:
 
     def reference_seed(self, pair_block):
 
-        # [0]^0 = c_i*c_j * overlap_factor * (1/2a)^l_a * (-1/2g)^l_c
+        # [0]^0 = weight * (1/2a)^l_a * (-1/2g)^l_c, the weight folding the
+        # normalization and overlap factors (and c_i*c_j) into one
         # [0]^m = (-2 rho) * [0]^(m-1),  rho = a*g/(a+g)
         a = np.array(pair_block.bra_exponents())
         g = np.array(pair_block.ket_exponents())
-        ov = np.array(pair_block.overlap_factors())
-        cc = np.array(pair_block.normalization_factors())
+        w = np.array(pair_block.weights())
         l_a, l_c = pair_block.angular_momentums()
 
         rho = a * g / (a + g)
-        s0 = cc * ov * (0.5 / a)**l_a * (-0.5 / g)**l_c
+        s0 = w * (0.5 / a)**l_a * (-0.5 / g)**l_c
         return np.array([(-2.0 * rho)**m * s0 for m in range(l_a + l_c + 1)])
 
     def test_s_block_seed(self):
 
         mol, bas = self.get_basis()
         block = GtoBlock(bas, mol, 0, 3)          # s functions, 3 primitives
-        pair_block = GtoPairBlock(block, block)   # (0, 0) -> L = 0
+        pair_block = TabulaGtoPairBlock(block, block)   # (0, 0) -> L = 0
 
         seed = tabula_overlap_seed(pair_block)
         ref = self.reference_seed(pair_block)
@@ -51,7 +51,7 @@ class TestTabulaOverlapSeed:
 
         mol, bas = self.get_basis()
         block = GtoBlock(bas, mol, 1, 1)          # p functions, 1 primitive
-        pair_block = GtoPairBlock(block, block)   # (1, 1) -> L = 2
+        pair_block = TabulaGtoPairBlock(block, block)   # (1, 1) -> L = 2
 
         seed = tabula_overlap_seed(pair_block)
         ref = self.reference_seed(pair_block)

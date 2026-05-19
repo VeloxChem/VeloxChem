@@ -2,7 +2,8 @@ import numpy as np
 
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
-from veloxchem.veloxchemlib import GtoBlock, GtoPairBlock
+from veloxchem.veloxchemlib import GtoBlock
+from veloxchem.tabulalib import TabulaGtoPairBlock
 from veloxchem.tabulalib import tabula_overlap_contracted, tabula_overlap_rterms
 
 
@@ -65,7 +66,7 @@ class TestTabulaOverlapRterms:
 
         mol, bas = self.get_basis()
         block = GtoBlock(bas, mol, angmom, npgtos)
-        pair_block = GtoPairBlock(block, block)
+        pair_block = TabulaGtoPairBlock(block, block)
 
         cdim = pair_block.number_of_contracted_pairs()
         l_a, l_c = pair_block.angular_momentums()
