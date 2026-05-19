@@ -11,10 +11,12 @@
 #include <cstddef>
 #include <utility>
 
+#include "GtoPairBlock.hpp"
 #include "TabulaBlockSparseMatrix.hpp"
 #include "TabulaDenseMatrix.hpp"
 #include "TabulaMixedPrecisionBlockSparseMatrix.hpp"
 #include "TabulaOverlapDriver.hpp"
+#include "TabulaOverlapRecursion.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -132,6 +134,37 @@ export_tabula(py::module& m) -> void
         m, "TabulaOverlapDriver", "Driver for the Tabula two-center overlap integral.")
         .def(py::init<>())
         .def("compute", &OverlapDriver::compute, "Computes the overlap matrix.", "molecule"_a, "basis"_a, "threshold"_a = 0.0);
+
+    // overlap recursion — step (a): the seed ladder [0]^m
+
+    m.def(
+        "tabula_overlap_seed",
+        [](const CGtoPairBlock& pair_block) -> py::array_t<double> {
+            const auto seed = compute_overlap_seed(pair_block);
+
+            const auto [l_a, l_c] = pair_block.angular_momentums();
+            const auto order      = l_a + l_c;
+
+            const auto cdim    = pair_block.number_of_contracted_pairs();
+            const auto nppairs = static_cast<std::size_t>(pair_block.number_of_primitive_pairs());
+            const auto pdim    = cdim * nppairs;
+            const auto stride  = ((pdim + 7) / 8) * 8;
+
+            py::array_t<double> result({static_cast<std::size_t>(order + 1), pdim});
+            auto                view = result.mutable_unchecked<2>();
+
+            for (int m = 0; m <= order; m++)
+            {
+                for (std::size_t k = 0; k < pdim; k++)
+                {
+                    view(m, k) = seed[static_cast<std::size_t>(m) * stride + k];
+                }
+            }
+
+            return result;
+        },
+        "Computes the overlap seed ladder [0]^m of a basis-function-pair block.",
+        "pair_block"_a);
 }
 
 }  // namespace tabula
