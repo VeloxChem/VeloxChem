@@ -6,6 +6,8 @@
 #include "TabulaOverlapDriver.hpp"
 
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <utility>
@@ -36,6 +38,10 @@ seconds(const std::chrono::steady_clock::duration &interval) -> double
 
 // per-thread load balance of the most recent compute's block-pair loop
 ThreadBalance g_balance;
+
+// accumulated wall time of the Cartesian-to-spherical transform, keyed by
+// the angular-momentum pair as l_a * 5 + l_c — for profiling
+std::array<std::atomic<double>, 25> g_transform{};
 
 /// @brief Evaluates a screened `CGtoPairBlock` into the overlap matrix — the
 /// late-contraction recursion end to end: the seed ladder (a), the
@@ -101,6 +107,8 @@ evaluate_pair_block(DenseMatrix &matrix, const GtoPairBlock &pair_block, const b
 
     const auto t_transform = std::chrono::steady_clock::now();
 
+    g_transform[static_cast<std::size_t>(l_a * 5 + l_c)].fetch_add(seconds(t_transform - t_md), std::memory_order_relaxed);
+
     // (e) — scatter the spherical block into the matrix; the orbital indices
     // carry the AO component stride ([0]) and the per-pair offset ([ij+1]).
     // Each element is written once into the upper triangle — at (min(r,c),
@@ -145,6 +153,26 @@ auto
 overlap_thread_balance() -> ThreadBalance
 {
     return g_balance;
+}
+
+auto
+transform_profile() -> std::array<double, 25>
+{
+    std::array<double, 25> profile{};
+    for (std::size_t k = 0; k < 25; k++)
+    {
+        profile[k] = g_transform[k].load(std::memory_order_relaxed);
+    }
+    return profile;
+}
+
+auto
+reset_transform_profile() -> void
+{
+    for (auto &accumulator : g_transform)
+    {
+        accumulator.store(0.0, std::memory_order_relaxed);
+    }
 }
 
 auto

@@ -410,6 +410,15 @@ export_tabula(py::module& m) -> void
             return result;
         },
         "Gets the per-thread load balance of the most recent overlap compute.");
+
+    // Cartesian-to-spherical transform — accumulated per-(l_a, l_c) profile
+
+    m.def(
+        "transform_profile",
+        []() { return transform_profile(); },
+        "Gets the accumulated transform wall time per (l_a, l_c), indexed l_a * 5 + l_c.");
+
+    m.def("reset_transform_profile", &reset_transform_profile, "Resets the accumulated transform profile.");
 }
 
 }  // namespace tabula

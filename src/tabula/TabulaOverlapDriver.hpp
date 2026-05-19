@@ -6,6 +6,7 @@
 #ifndef TabulaOverlapDriver_hpp
 #define TabulaOverlapDriver_hpp
 
+#include <array>
 #include <vector>
 
 #include "MolecularBasis.hpp"
@@ -83,6 +84,15 @@ struct ThreadBalance
 /// `OverlapDriver::compute` run.
 /// @return The thread-balance capture.
 auto overlap_thread_balance() -> ThreadBalance;
+
+/// @brief Gets the accumulated Cartesian-to-spherical transform wall time,
+/// in seconds, summed over the OpenMP threads — indexed by the
+/// angular-momentum pair as `l_a * 5 + l_c` (`l = 0 … 4`).
+/// @return The per-`(l_a, l_c)` transform profile.
+auto transform_profile() -> std::array<double, 25>;
+
+/// @brief Resets the accumulated transform profile.
+auto reset_transform_profile() -> void;
 
 }  // namespace tabula
 
