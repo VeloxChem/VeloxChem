@@ -108,11 +108,6 @@ DenseMatrix::symmetrize() -> void
 
     for (std::size_t i = 0; i < _rows; i++)
     {
-        if (_symmetry == Symmetry::antisymmetric)
-        {
-            _values[i * _columns + i] = 0.0;
-        }
-
         for (std::size_t j = i + 1; j < _columns; j++)
         {
             _values[j * _columns + i] = sign * _values[i * _columns + j];

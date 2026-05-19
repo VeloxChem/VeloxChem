@@ -72,13 +72,13 @@ class TestTabulaDenseMatrix:
         mat[0, 1] = 3.0
         mat[0, 2] = -2.0
         mat[1, 2] = 4.0
-        # a stray diagonal value must be cleared by symmetrize
+        # the diagonal is independent storage — symmetrize leaves it untouched
         mat[1, 1] = 9.0
         mat.symmetrize()
         assert mat[1, 0] == -3.0
         assert mat[2, 0] == 2.0
         assert mat[2, 1] == -4.0
-        assert mat[1, 1] == 0.0
+        assert mat[1, 1] == 9.0
 
     def test_to_numpy(self):
 

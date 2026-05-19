@@ -11,7 +11,9 @@
 #include <cstddef>
 #include <utility>
 
+#include "TabulaBlockSparseMatrix.hpp"
 #include "TabulaDenseMatrix.hpp"
+#include "TabulaMixedPrecisionBlockSparseMatrix.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -63,6 +65,65 @@ export_tabula(py::module& m) -> void
                                            obj);
             },
             "Returns a zero-copy NumPy view of the matrix.");
+
+    // tabula::BlockSparseMatrix::Block descriptor
+
+    py::class_<BlockSparseMatrix::Block>(m, "TabulaBlockSparseBlock", "A block descriptor of a Tabula block-sparse matrix.")
+        .def_readonly("group_a", &BlockSparseMatrix::Block::groupA)
+        .def_readonly("group_b", &BlockSparseMatrix::Block::groupB)
+        .def_readonly("row_count", &BlockSparseMatrix::Block::rowCount)
+        .def_readonly("column_count", &BlockSparseMatrix::Block::columnCount)
+        .def_readonly("offset", &BlockSparseMatrix::Block::offset);
+
+    // tabula::BlockSparseMatrix class
+
+    py::class_<BlockSparseMatrix, std::shared_ptr<BlockSparseMatrix>>(
+        m, "TabulaBlockSparseMatrix", "A symmetric block-sparse Tabula matrix.")
+        .def(py::init<>())
+        .def(py::init<std::size_t,
+                      const std::vector<std::vector<std::size_t>>&,
+                      const std::vector<std::pair<std::size_t, std::size_t>>&>(),
+             "dimension"_a,
+             "group_global_ao"_a,
+             "group_pairs"_a)
+        .def("dimension", &BlockSparseMatrix::dimension, "Gets the full-matrix dimension.")
+        .def("number_of_groups", &BlockSparseMatrix::number_of_groups, "Gets the number of AO groups.")
+        .def("number_of_blocks", &BlockSparseMatrix::number_of_blocks, "Gets the number of stored blocks.")
+        .def("block", &BlockSparseMatrix::block, "Gets a stored block descriptor.", "index"_a)
+        .def("group_global_ao", &BlockSparseMatrix::group_global_ao, "Gets a group's global AO indices.", "group"_a)
+        .def("value", &BlockSparseMatrix::value, "Gets a block-local element.", "block_index"_a, "row"_a, "column"_a)
+        .def("set_value", &BlockSparseMatrix::set_value, "Sets a block-local element.", "block_index"_a, "row"_a, "column"_a, "value"_a)
+        .def("stored_element_count", &BlockSparseMatrix::stored_element_count, "Gets the stored scalar count.")
+        .def("to_dense", &BlockSparseMatrix::to_dense, "Reconstructs the dense symmetric matrix.");
+
+    // tabula::MixedPrecisionBlockSparseMatrix::Block descriptor
+
+    py::class_<MixedPrecisionBlockSparseMatrix::Block>(
+        m, "TabulaMixedPrecisionBlock", "A block descriptor of a Tabula mixed-precision block-sparse matrix.")
+        .def_readonly("group_a", &MixedPrecisionBlockSparseMatrix::Block::groupA)
+        .def_readonly("group_b", &MixedPrecisionBlockSparseMatrix::Block::groupB)
+        .def_readonly("row_count", &MixedPrecisionBlockSparseMatrix::Block::rowCount)
+        .def_readonly("column_count", &MixedPrecisionBlockSparseMatrix::Block::columnCount)
+        .def_readonly("offset", &MixedPrecisionBlockSparseMatrix::Block::offset)
+        .def_readonly("is_single_precision", &MixedPrecisionBlockSparseMatrix::Block::isSinglePrecision);
+
+    // tabula::MixedPrecisionBlockSparseMatrix class
+
+    py::class_<MixedPrecisionBlockSparseMatrix, std::shared_ptr<MixedPrecisionBlockSparseMatrix>>(
+        m, "TabulaMixedPrecisionBlockSparseMatrix", "A mixed-precision symmetric block-sparse Tabula matrix.")
+        .def(py::init<>())
+        .def(py::init<const BlockSparseMatrix&, double>(), "source"_a, "precision_threshold"_a)
+        .def("dimension", &MixedPrecisionBlockSparseMatrix::dimension, "Gets the full-matrix dimension.")
+        .def("number_of_blocks", &MixedPrecisionBlockSparseMatrix::number_of_blocks, "Gets the number of stored blocks.")
+        .def("block", &MixedPrecisionBlockSparseMatrix::block, "Gets a stored block descriptor.", "index"_a)
+        .def("group_global_ao", &MixedPrecisionBlockSparseMatrix::group_global_ao, "Gets a group's global AO indices.", "group"_a)
+        .def("value", &MixedPrecisionBlockSparseMatrix::value, "Gets a block-local element.", "block_index"_a, "row"_a, "column"_a)
+        .def("precision_threshold", &MixedPrecisionBlockSparseMatrix::precision_threshold, "Gets the precision threshold.")
+        .def("single_block_count", &MixedPrecisionBlockSparseMatrix::single_block_count, "Gets the single-precision block count.")
+        .def("double_block_count", &MixedPrecisionBlockSparseMatrix::double_block_count, "Gets the double-precision block count.")
+        .def("stored_element_count", &MixedPrecisionBlockSparseMatrix::stored_element_count, "Gets the stored scalar count.")
+        .def("stored_byte_count", &MixedPrecisionBlockSparseMatrix::stored_byte_count, "Gets the stored footprint in bytes.")
+        .def("to_dense", &MixedPrecisionBlockSparseMatrix::to_dense, "Reconstructs the dense symmetric matrix.");
 }
 
 }  // namespace tabula

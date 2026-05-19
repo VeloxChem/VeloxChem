@@ -18,7 +18,8 @@ enum class Symmetry
     general,
     /// @brief Symmetric — M(j,i) == M(i,j).
     symmetric,
-    /// @brief Antisymmetric — M(j,i) == -M(i,j), zero diagonal.
+    /// @brief Antisymmetric — M(j,i) == -M(i,j). The diagonal is independent
+    /// storage and is not constrained to zero.
     antisymmetric
 };
 
@@ -81,8 +82,8 @@ class DenseMatrix
 
     /// @brief Mirrors the upper triangle into the lower one according to the
     /// matrix symmetry — `M(j,i) = M(i,j)` (symmetric) or `-M(i,j)`
-    /// (antisymmetric, with the diagonal forced to zero). A no-op for a
-    /// general matrix. Requires a square matrix.
+    /// (antisymmetric). The diagonal is left untouched. A no-op for a general
+    /// matrix. Requires a square matrix.
     auto symmetrize() -> void;
 
    private:
