@@ -47,6 +47,11 @@ class TestTabulaOverlap:
         # s, p and d functions
         self.check(self.WATER, 'def2-SVP')
 
+    def test_water_def2qzvp(self):
+
+        # s, p, d, f and g functions — the full l = 0..4 transform range
+        self.check(self.WATER, 'def2-QZVP')
+
     def test_screening_threshold(self):
 
         # a small screening threshold keeps the result within tolerance of
