@@ -13,6 +13,7 @@
 
 #include "TabulaBlockSparseMatrix.hpp"
 #include "TabulaDenseMatrix.hpp"
+#include "TabulaGtoBlockScreeningData.hpp"
 #include "TabulaMixedPrecisionBlockSparseMatrix.hpp"
 #include "TabulaOverlapDriver.hpp"
 
@@ -125,6 +126,20 @@ export_tabula(py::module& m) -> void
         .def("stored_element_count", &MixedPrecisionBlockSparseMatrix::stored_element_count, "Gets the stored scalar count.")
         .def("stored_byte_count", &MixedPrecisionBlockSparseMatrix::stored_byte_count, "Gets the stored footprint in bytes.")
         .def("to_dense", &MixedPrecisionBlockSparseMatrix::to_dense, "Reconstructs the dense symmetric matrix.");
+
+    // tabula::GtoBlockScreeningData struct
+
+    py::class_<GtoBlockScreeningData>(
+        m, "TabulaGtoBlockScreeningData", "Per-CGTO screening bounds of a basis-function block.")
+        .def_readonly("max_coefficient", &GtoBlockScreeningData::maxCoefficient,
+                      "Per CGTO, the largest contraction-coefficient magnitude.")
+        .def_readonly("min_exponent", &GtoBlockScreeningData::minExponent,
+                      "Per CGTO, the smallest primitive exponent.")
+        .def_readonly("max_exponent", &GtoBlockScreeningData::maxExponent,
+                      "Per CGTO, the largest primitive exponent.");
+
+    m.def("make_tabula_screening_data", &make_screening_data,
+          "Computes the per-CGTO screening bounds of a basis-function block.", "block"_a);
 
     // tabula::OverlapDriver class
 
