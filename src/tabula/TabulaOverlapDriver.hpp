@@ -67,15 +67,15 @@ class OverlapDriver
                  OverlapProfile      *profile   = nullptr) const -> DenseMatrix;
 };
 
-/// @brief Per-thread load balance of the block-pair parallel loop in the
-/// most recent `OverlapDriver::compute` run.
+/// @brief Per-thread load balance of the task parallel loop in the most
+/// recent `OverlapDriver::compute` run.
 struct ThreadBalance
 {
     /// @brief Wall time of the whole parallel region.
     double wall{0.0};
     /// @brief Busy wall seconds of each OpenMP thread.
     std::vector<double> busy;
-    /// @brief Number of block pairs handled by each OpenMP thread.
+    /// @brief Number of tasks handled by each OpenMP thread.
     std::vector<long> pairs;
 };
 

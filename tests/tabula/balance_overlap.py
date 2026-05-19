@@ -1,9 +1,9 @@
-"""Per-thread load balance of tabula::OverlapDriver's block-pair parallel
-loop, across c240 and a span of def2 bases.
+"""Per-thread load balance of tabula::OverlapDriver's task parallel loop,
+across c240 and a span of def2 bases.
 
 The driver parallelizes one #pragma omp parallel for, schedule(dynamic),
-over the triangular list of basis-function-block pairs — a coarse unit of
-work whose cost varies by orders of magnitude.
+over tasks — each task is one block pair restricted to a bra-CGTO range,
+sized to a roughly uniform contracted-pair count.
 """
 
 from veloxchem.molecule import Molecule
@@ -42,7 +42,7 @@ for molecule_name in ["c240"]:
         utilisation = sum(busy) / (wall * nthreads)
 
         print(f"\n{molecule_name} / {basis_label}   "
-              f"{n_pairs} block pairs, {nthreads} threads")
+              f"{n_pairs} tasks, {nthreads} threads")
         print(f"  region wall      {wall * 1e3:8.2f} ms")
         print(f"  busy  min/mean/max {busy_min * 1e3:7.2f} /"
               f"{busy_mean * 1e3:7.2f} /{busy_max * 1e3:7.2f} ms")
@@ -50,7 +50,7 @@ for molecule_name in ["c240"]:
               f"ideal wall {ideal_wall * 1e3:.2f} ms vs actual {wall * 1e3:.2f} ms")
         print(f"  utilisation      {utilisation * 100:5.1f} %  "
               f"(busy time / (wall x threads))")
-        print("  per thread (busy ms : block pairs):")
+        print("  per thread (busy ms : tasks):")
         for t in range(nthreads):
             bar = "#" * int(round(40 * busy[t] / busy_max)) if busy_max > 0 else ""
             print(f"    t{t:02d}  {busy[t] * 1e3:8.2f} : {pairs[t]:3d}  {bar}")

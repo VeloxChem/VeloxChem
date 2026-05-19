@@ -13,7 +13,7 @@ namespace tabula {  // tabula namespace
 
 GtoPairBlock::GtoPairBlock(const CGtoBlock &bra_gto_block, const CGtoBlock &ket_gto_block)
 {
-    _build(bra_gto_block, ket_gto_block, nullptr, 0.0);
+    _build(bra_gto_block, ket_gto_block, nullptr, 0.0, 0, bra_gto_block.number_of_basis_functions());
 }
 
 GtoPairBlock::GtoPairBlock(const CGtoBlock          &bra_gto_block,
@@ -21,14 +21,21 @@ GtoPairBlock::GtoPairBlock(const CGtoBlock          &bra_gto_block,
                            const ScreeningEstimator &estimator,
                            const double              threshold)
 {
-    _build(bra_gto_block, ket_gto_block, &estimator, threshold);
+    _build(bra_gto_block, ket_gto_block, &estimator, threshold, 0, bra_gto_block.number_of_basis_functions());
+}
+
+GtoPairBlock::GtoPairBlock(const CGtoBlock &bra_gto_block, const CGtoBlock &ket_gto_block, const int bra_begin, const int bra_end)
+{
+    _build(bra_gto_block, ket_gto_block, nullptr, 0.0, bra_begin, bra_end);
 }
 
 auto
 GtoPairBlock::_build(const CGtoBlock          &bra_gto_block,
                      const CGtoBlock          &ket_gto_block,
                      const ScreeningEstimator *estimator,
-                     const double              threshold) -> void
+                     const double              threshold,
+                     const int                 bra_begin,
+                     const int                 bra_end) -> void
 {
     const auto fpi = mathconst::pi_value();
 
@@ -49,6 +56,9 @@ GtoPairBlock::_build(const CGtoBlock          &bra_gto_block,
     const int kcgtos = ket_gto_block.number_of_basis_functions();
     const int kpgtos = ket_gto_block.number_of_primitives();
 
+    // the bra contracted-GTO range this pair block covers
+    const int bra_count = bra_end - bra_begin;
+
     _angular_momentums = {bra_gto_block.angular_momentum(), ket_gto_block.angular_momentum()};
     _nppairs           = bpgtos * kpgtos;
 
@@ -62,7 +72,7 @@ GtoPairBlock::_build(const CGtoBlock          &bra_gto_block,
     std::vector<std::pair<int, int>> pairs;
     if (screened)
     {
-        for (int i = 0; i < bcgtos; i++)
+        for (int i = bra_begin; i < bra_end; i++)
         {
             for (int j = 0; j < kcgtos; j++)
             {
@@ -77,7 +87,7 @@ GtoPairBlock::_build(const CGtoBlock          &bra_gto_block,
         }
     }
 
-    const std::size_t cdim = screened ? pairs.size() : static_cast<std::size_t>(bcgtos) * static_cast<std::size_t>(kcgtos);
+    const std::size_t cdim = screened ? pairs.size() : static_cast<std::size_t>(bra_count) * static_cast<std::size_t>(kcgtos);
     const std::size_t pdim = cdim * static_cast<std::size_t>(_nppairs);
 
     // the contracted-pair data — coordinates and AO indices; element 0 of the
@@ -105,7 +115,7 @@ GtoPairBlock::_build(const CGtoBlock          &bra_gto_block,
     std::vector<double> r2ab(cdim);
     for (std::size_t ij = 0; ij < cdim; ij++)
     {
-        const int i = screened ? pairs[ij].first : static_cast<int>(ij) / kcgtos;
+        const int i = screened ? pairs[ij].first : bra_begin + static_cast<int>(ij) / kcgtos;
         const int j = screened ? pairs[ij].second : static_cast<int>(ij) % kcgtos;
 
         _bra_coordinates[ij]     = bcoords[i];
@@ -134,15 +144,15 @@ GtoPairBlock::_build(const CGtoBlock          &bra_gto_block,
             {
                 const std::size_t pp = (static_cast<std::size_t>(k) * static_cast<std::size_t>(kpgtos) + static_cast<std::size_t>(l)) * cdim;
 
-                for (int i = 0; i < bcgtos; i++)
+                for (int i = bra_begin; i < bra_end; i++)
                 {
                     const double      bexp = bexps[k * bcgtos + i];
                     const double      bnrm = bnorms[k * bcgtos + i];
-                    const std::size_t base = pp + static_cast<std::size_t>(i) * static_cast<std::size_t>(kcgtos);
+                    const std::size_t base = pp + static_cast<std::size_t>(i - bra_begin) * static_cast<std::size_t>(kcgtos);
 
                     const double *kexp_row = kexps.data() + l * kcgtos;
                     const double *knrm_row = knorms.data() + l * kcgtos;
-                    const double *r2_row   = r2ab.data() + static_cast<std::size_t>(i) * static_cast<std::size_t>(kcgtos);
+                    const double *r2_row   = r2ab.data() + static_cast<std::size_t>(i - bra_begin) * static_cast<std::size_t>(kcgtos);
 
 #pragma omp simd
                     for (int j = 0; j < kcgtos; j++)

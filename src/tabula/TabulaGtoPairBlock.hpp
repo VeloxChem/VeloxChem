@@ -64,6 +64,17 @@ class GtoPairBlock
                  const ScreeningEstimator &estimator,
                  const double              threshold);
 
+    /// @brief Creates an unscreened pair block over a sub-range of the bra
+    /// block's contracted GTOs — for splitting one block pair into finer
+    /// units of parallel work. The pair block holds the contracted pairs
+    /// `(i, j)` with `i` in `[bra_begin, bra_end)` and `j` over the whole ket
+    /// block; the orbital indices still address the global AO layout.
+    /// @param bra_gto_block The basis functions block on the bra side.
+    /// @param ket_gto_block The basis functions block on the ket side.
+    /// @param bra_begin The first bra contracted-GTO index of the range.
+    /// @param bra_end The one-past-last bra contracted-GTO index of the range.
+    GtoPairBlock(const CGtoBlock &bra_gto_block, const CGtoBlock &ket_gto_block, const int bra_begin, const int bra_end);
+
     /// @brief Gets the angular momentums of the basis-function pair.
     /// @return The `(l_a, l_c)` angular-momentum pair.
     auto angular_momentums() const -> std::pair<int, int>;
@@ -135,16 +146,21 @@ class GtoPairBlock
     /// @brief The number of primitive pairs per contracted pair.
     int _nppairs{0};
 
-    /// @brief Builds the pair block from two basis-function blocks.
+    /// @brief Builds the pair block from two basis-function blocks, over the
+    /// bra contracted-GTO range `[bra_begin, bra_end)`.
     /// @param bra_gto_block The basis functions block on the bra side.
     /// @param ket_gto_block The basis functions block on the ket side.
     /// @param estimator The screening estimator, or `nullptr` to keep every
     /// contracted-GTO pair.
     /// @param threshold The screening threshold.
+    /// @param bra_begin The first bra contracted-GTO index of the range.
+    /// @param bra_end The one-past-last bra contracted-GTO index of the range.
     auto _build(const CGtoBlock          &bra_gto_block,
                 const CGtoBlock          &ket_gto_block,
                 const ScreeningEstimator *estimator,
-                const double              threshold) -> void;
+                const double              threshold,
+                const int                 bra_begin,
+                const int                 bra_end) -> void;
 };
 
 }  // namespace tabula

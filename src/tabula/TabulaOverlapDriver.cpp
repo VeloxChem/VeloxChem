@@ -44,10 +44,12 @@ ThreadBalance g_balance;
 ///
 /// Each element is scattered once into the matrix's upper triangle; the
 /// lower triangle is filled by a single `symmetrize` once every block pair
-/// is done. When `profile` is non-null, the per-phase wall times are
-/// accumulated into it.
+/// is done. For a `diagonal` pair block (one belonging to a block paired
+/// with itself) a contracted pair and its mirror both occur, so only the
+/// `r ≤ c` half is written — the mirror entry fills the rest. When `profile`
+/// is non-null, the per-phase wall times are accumulated into it.
 auto
-evaluate_pair_block(DenseMatrix &matrix, const GtoPairBlock &pair_block, OverlapProfile *profile) -> void
+evaluate_pair_block(DenseMatrix &matrix, const GtoPairBlock &pair_block, const bool diagonal, OverlapProfile *profile) -> void
 {
     const auto angular_momentums = pair_block.angular_momentums();
     const auto l_a               = angular_momentums.first;
@@ -117,6 +119,10 @@ evaluate_pair_block(DenseMatrix &matrix, const GtoPairBlock &pair_block, Overlap
                 const auto r = static_cast<std::size_t>(ca) * bra_orbitals[0] + bra_orbitals[ij + 1];
                 const auto c = static_cast<std::size_t>(cc) * ket_orbitals[0] + ket_orbitals[ij + 1];
 
+                // a diagonal pair block also produces every mirror (j,i), so
+                // the r > c half is skipped — its mirror writes that slot
+                if (diagonal && r > c) continue;
+
                 matrix(std::min(r, c), std::max(r, c)) = row[ij];
             }
         }
@@ -160,17 +166,50 @@ OverlapDriver::compute(const CMolecule       &molecule,
 
     DenseMatrix matrix(dimension, dimension, Symmetry::symmetric);
 
-    // the triangular basis-function-block pairs are the unit of parallel work
-    // — each pair writes a disjoint AO region of the matrix, so the concurrent
-    // writes do not race
-    std::vector<std::pair<std::size_t, std::size_t>> block_pairs;
+    // the unit of parallel work is a task — one block pair restricted to a
+    // sub-range of the bra block's contracted GTOs. The triangular block
+    // pairs span orders of magnitude in cost and are far too few and uneven
+    // to balance; splitting the bra dimension so each task holds roughly
+    // `target_pairs` contracted pairs turns dozens of coarse units into
+    // thousands of even ones. Each task writes a disjoint AO region, so the
+    // concurrent writes do not race.
+    constexpr int target_pairs = 1 << 16;
+
+    struct Task
+    {
+        std::size_t i;
+        std::size_t j;
+        int         bra_begin;
+        int         bra_end;
+        bool        diagonal;
+        double      cost;
+    };
+
+    std::vector<Task> tasks;
     for (std::size_t i = 0; i < gto_blocks.size(); i++)
     {
         for (std::size_t j = 0; j <= i; j++)
         {
-            block_pairs.push_back({i, j});
+            const int bcgtos = gto_blocks[i].number_of_basis_functions();
+            const int kcgtos = gto_blocks[j].number_of_basis_functions();
+            const int order  = gto_blocks[i].angular_momentum() + gto_blocks[j].angular_momentum();
+
+            // screening keeps a block pair whole; otherwise split the bra
+            // dimension into chunks of about `target_pairs` contracted pairs
+            const int chunk = (threshold > 0.0) ? bcgtos : std::max(1, target_pairs / std::max(1, kcgtos));
+
+            for (int a = 0; a < bcgtos; a += chunk)
+            {
+                const int    b    = std::min(a + chunk, bcgtos);
+                const double cost = static_cast<double>(b - a) * kcgtos * (order + 1) * (order + 2);
+                tasks.push_back({i, j, a, b, i == j, cost});
+            }
         }
     }
+
+    // longest task first — dynamic scheduling then packs the small tasks into
+    // the tail rather than stalling on a late big one
+    std::sort(tasks.begin(), tasks.end(), [](const Task &lhs, const Task &rhs) { return lhs.cost > rhs.cost; });
 
     const auto nthreads = static_cast<std::size_t>(omp_get_max_threads());
 
@@ -181,44 +220,42 @@ OverlapDriver::compute(const CMolecule       &molecule,
         thread_profiles.resize(nthreads);
     }
 
-    // per-thread load-balance capture of the block-pair loop
+    // per-thread load-balance capture of the task loop
     std::vector<double> thread_busy(nthreads, 0.0);
     std::vector<long>   thread_pairs(nthreads, 0);
 
     const auto t_region = std::chrono::steady_clock::now();
 
 #pragma omp parallel for schedule(dynamic)
-    for (int p = 0; p < static_cast<int>(block_pairs.size()); p++)
+    for (int p = 0; p < static_cast<int>(tasks.size()); p++)
     {
         const auto tid    = static_cast<std::size_t>(omp_get_thread_num());
         const auto t_body = std::chrono::steady_clock::now();
 
         OverlapProfile *slot = (profile != nullptr) ? &thread_profiles[tid] : nullptr;
 
-        const auto i = block_pairs[static_cast<std::size_t>(p)].first;
-        const auto j = block_pairs[static_cast<std::size_t>(p)].second;
+        const auto &task = tasks[static_cast<std::size_t>(p)];
 
         const auto t_setup = std::chrono::steady_clock::now();
 
-        // threshold <= 0 disables screening — every pair is kept, so the
-        // plain pair block is built directly and the screening pre-pass (and
-        // its per-pair estimator evaluation) is skipped; with screening on a
-        // screened pair block drops the negligible pairs at construction
+        // threshold <= 0 disables screening — the task's bra range is built
+        // directly; with screening on the whole block pair is built and the
+        // estimator drops the negligible contracted-GTO pairs
         const auto pair_block =
             (threshold > 0.0)
-                ? GtoPairBlock(gto_blocks[i],
-                               gto_blocks[j],
-                               make_overlap_screening_estimator(gto_blocks[i].angular_momentum(),
-                                                                gto_blocks[j].angular_momentum()),
+                ? GtoPairBlock(gto_blocks[task.i],
+                               gto_blocks[task.j],
+                               make_overlap_screening_estimator(gto_blocks[task.i].angular_momentum(),
+                                                                gto_blocks[task.j].angular_momentum()),
                                threshold)
-                : GtoPairBlock(gto_blocks[i], gto_blocks[j]);
+                : GtoPairBlock(gto_blocks[task.i], gto_blocks[task.j], task.bra_begin, task.bra_end);
 
         if (slot != nullptr)
         {
             slot->pair_setup += seconds(std::chrono::steady_clock::now() - t_setup);
         }
 
-        evaluate_pair_block(matrix, pair_block, slot);
+        evaluate_pair_block(matrix, pair_block, task.diagonal, slot);
 
         thread_busy[tid] += seconds(std::chrono::steady_clock::now() - t_body);
         thread_pairs[tid] += 1;
