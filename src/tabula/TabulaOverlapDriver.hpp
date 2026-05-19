@@ -62,6 +62,24 @@ class OverlapDriver
                  OverlapProfile      *profile   = nullptr) const -> DenseMatrix;
 };
 
+/// @brief Accumulated wall time of the overlap scatter, in seconds, summed
+/// over the OpenMP threads — split into the direct `matrix(r,c)` writes and
+/// the transposed `matrix(c,r)` writes an off-diagonal block pair adds.
+struct ScatterProfile
+{
+    /// @brief The direct `matrix(r,c)` writes.
+    double direct{0.0};
+    /// @brief The transposed `matrix(c,r)` writes.
+    double transpose{0.0};
+};
+
+/// @brief Gets the accumulated overlap-scatter profile.
+/// @return The scatter profile.
+auto scatter_profile() -> ScatterProfile;
+
+/// @brief Resets the accumulated overlap-scatter profile.
+auto reset_scatter_profile() -> void;
+
 }  // namespace tabula
 
 #endif /* TabulaOverlapDriver_hpp */

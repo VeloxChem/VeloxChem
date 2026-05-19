@@ -5,6 +5,7 @@
 
 #include "TabulaOverlapDriver.hpp"
 
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <utility>
@@ -32,6 +33,11 @@ seconds(const std::chrono::steady_clock::duration &interval) -> double
 {
     return std::chrono::duration<double>(interval).count();
 }
+
+// accumulated wall time of the overlap scatter, split into the direct
+// matrix(r,c) writes and the transposed matrix(c,r) writes — for profiling
+std::atomic<double> g_scatter_direct{0.0};
+std::atomic<double> g_scatter_transpose{0.0};
 
 /// @brief Evaluates a screened `CGtoPairBlock` into the overlap matrix — the
 /// late-contraction recursion end to end: the seed ladder (a), the
@@ -98,6 +104,7 @@ evaluate_pair_block(DenseMatrix &matrix, const GtoPairBlock &pair_block, const b
     const auto &bra_orbitals = pair_block.bra_orbital_indices();
     const auto &ket_orbitals = pair_block.ket_orbital_indices();
 
+    // direct pass — matrix(r, c)
     for (int ca = 0; ca < bra_components; ca++)
     {
         for (int cc = 0; cc < ket_components; cc++)
@@ -110,27 +117,62 @@ evaluate_pair_block(DenseMatrix &matrix, const GtoPairBlock &pair_block, const b
                 const auto c = static_cast<std::size_t>(cc) * ket_orbitals[0] + ket_orbitals[ij + 1];
 
                 matrix(r, c) = row[ij];
+            }
+        }
+    }
 
-                if (!diagonal_pair)
+    const auto t_scatter_direct = std::chrono::steady_clock::now();
+
+    // transposed pass — matrix(c, r); an off-diagonal block pair fills the
+    // other triangle too
+    if (!diagonal_pair)
+    {
+        for (int ca = 0; ca < bra_components; ca++)
+        {
+            for (int cc = 0; cc < ket_components; cc++)
+            {
+                const auto *row = spherical.data() + static_cast<std::size_t>(ca * ket_components + cc) * stride;
+
+                for (std::size_t ij = 0; ij < cdim; ij++)
                 {
+                    const auto r = static_cast<std::size_t>(ca) * bra_orbitals[0] + bra_orbitals[ij + 1];
+                    const auto c = static_cast<std::size_t>(cc) * ket_orbitals[0] + ket_orbitals[ij + 1];
+
                     matrix(c, r) = row[ij];
                 }
             }
         }
     }
 
+    const auto t_scatter_done = std::chrono::steady_clock::now();
+
+    g_scatter_direct.fetch_add(seconds(t_scatter_direct - t_transform), std::memory_order_relaxed);
+    g_scatter_transpose.fetch_add(seconds(t_scatter_done - t_scatter_direct), std::memory_order_relaxed);
+
     if (profile != nullptr)
     {
-        const auto t_scatter = std::chrono::steady_clock::now();
         profile->seed      += seconds(t_seed - t_start);
         profile->contract  += seconds(t_contract - t_seed);
         profile->md        += seconds(t_md - t_contract);
         profile->transform += seconds(t_transform - t_md);
-        profile->scatter   += seconds(t_scatter - t_transform);
+        profile->scatter   += seconds(t_scatter_done - t_transform);
     }
 }
 
 }  // namespace
+
+auto
+scatter_profile() -> ScatterProfile
+{
+    return {g_scatter_direct.load(std::memory_order_relaxed), g_scatter_transpose.load(std::memory_order_relaxed)};
+}
+
+auto
+reset_scatter_profile() -> void
+{
+    g_scatter_direct.store(0.0, std::memory_order_relaxed);
+    g_scatter_transpose.store(0.0, std::memory_order_relaxed);
+}
 
 auto
 OverlapDriver::compute(const CMolecule       &molecule,

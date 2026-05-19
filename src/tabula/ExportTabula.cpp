@@ -396,6 +396,22 @@ export_tabula(py::module& m) -> void
     m.def("reset_md_recursion_profile",
           &reset_md_recursion_profile,
           "Resets the accumulated compute_one_center_md profile.");
+
+    // overlap scatter — accumulated direct / transposed write profile
+
+    m.def(
+        "scatter_profile",
+        []() -> py::dict {
+            const auto profile = scatter_profile();
+
+            py::dict result;
+            result["direct"]    = profile.direct;
+            result["transpose"] = profile.transpose;
+            return result;
+        },
+        "Gets the accumulated overlap-scatter direct / transposed write profile.");
+
+    m.def("reset_scatter_profile", &reset_scatter_profile, "Resets the accumulated overlap-scatter profile.");
 }
 
 }  // namespace tabula
