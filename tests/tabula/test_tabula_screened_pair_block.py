@@ -8,7 +8,9 @@ from veloxchem.veloxchemlib import GtoBlock, GtoPairBlock
 class TestTabulaScreenedPairBlock:
     """Tests for the screened CGtoPairBlock constructor — built from two
     CGtoBlocks, a screening estimator, and a threshold. A contracted-GTO pair
-    (i, j) is kept when estimator(i, j) >= threshold."""
+    is kept when estimator(bra_data, ket_data, r) >= threshold, where the
+    estimator receives each contracted GTO's screening data and the distance
+    |R| between their centers."""
 
     def get_blocks(self):
 
@@ -26,7 +28,7 @@ class TestTabulaScreenedPairBlock:
         bra, ket = self.get_blocks()
         full = GtoPairBlock(bra, ket)
         # an estimator above the threshold everywhere keeps every pair
-        screened = GtoPairBlock(bra, ket, lambda i, j: 1.0, 0.0)
+        screened = GtoPairBlock(bra, ket, lambda bd, kd, r: 1.0, 0.0)
 
         assert (screened.number_of_contracted_pairs()
                 == full.number_of_contracted_pairs())
@@ -44,7 +46,7 @@ class TestTabulaScreenedPairBlock:
 
         bra, ket = self.get_blocks()
         # an estimator below the threshold everywhere drops every pair
-        screened = GtoPairBlock(bra, ket, lambda i, j: 0.0, 1.0)
+        screened = GtoPairBlock(bra, ket, lambda bd, kd, r: 0.0, 1.0)
 
         assert screened.number_of_contracted_pairs() == 0
 
@@ -52,11 +54,18 @@ class TestTabulaScreenedPairBlock:
 
         bra, ket = self.get_blocks()
         nc = bra.number_of_basis_functions()
-        # keep only the diagonal contracted-GTO pairs (i == j)
+        # keep only the same-center pairs (|R| == 0) — for this s-block each
+        # contracted GTO sits on a distinct atom, so |R| > 0 iff i != j
         screened = GtoPairBlock(bra, ket,
-                                lambda i, j: 1.0 if i == j else 0.0, 0.5)
+                                lambda bd, kd, r: 1.0 if r < 1.0 else 0.0, 0.5)
 
         assert screened.number_of_contracted_pairs() == nc
+        # the screening estimator sees the per-CGTO screening data
+        first = bra.screening_data(0)
+        seen = GtoPairBlock(bra, ket,
+                            lambda bd, kd, r: bd.max_exponent, 0.0)
+        assert seen.number_of_contracted_pairs() > 0
+        assert first.max_exponent > 0.0
         # the primitive-pair count is unaffected by contracted-pair screening
         assert (screened.number_of_primitive_pairs()
                 == GtoPairBlock(bra, ket).number_of_primitive_pairs())

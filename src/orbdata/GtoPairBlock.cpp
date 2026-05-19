@@ -337,10 +337,12 @@ CGtoPairBlock::CGtoPairBlock(const CGtoBlock &bra_gto_block, const CGtoBlock &ke
     });
 }
 
-CGtoPairBlock::CGtoPairBlock(const CGtoBlock                                         &bra_gto_block,
-                             const CGtoBlock                                         &ket_gto_block,
-                             const std::function<double(const size_t, const size_t)> &estimator,
-                             const double                                             threshold)
+CGtoPairBlock::CGtoPairBlock(const CGtoBlock &bra_gto_block,
+                             const CGtoBlock &ket_gto_block,
+                             const std::function<double(const CGtoBlockScreeningData &,
+                                                        const CGtoBlockScreeningData &,
+                                                        const double)> &estimator,
+                             const double threshold)
 
     : _bra_coordinates{}
 
@@ -413,7 +415,13 @@ CGtoPairBlock::CGtoPairBlock(const CGtoBlock                                    
     {
         for (int j = 0; j < kcgtos; j++)
         {
-            if (estimator(static_cast<size_t>(i), static_cast<size_t>(j)) >= threshold)
+            const auto r = std::sqrt(bcoords[i].distance_square(kcoords[j]));
+
+            const auto estimate = estimator(bra_gto_block.screening_data(static_cast<size_t>(i)),
+                                            ket_gto_block.screening_data(static_cast<size_t>(j)),
+                                            r);
+
+            if (estimate >= threshold)
             {
                 pairs.push_back({i, j});
             }

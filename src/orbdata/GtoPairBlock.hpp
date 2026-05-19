@@ -96,13 +96,16 @@ class CGtoPairBlock
     /// @param bra_gto_block The basis functions block on bra side.
     /// @param ket_gto_block The basis function block on ket side.
     /// @param estimator The screening estimate for a bra/ket contracted-GTO
-    /// pair, addressed by their block-local indices.
+    /// pair, given the screening data of the bra and ket contracted GTOs and
+    /// the distance |R| between their centers.
     /// @param threshold The screening threshold — a contracted-GTO pair is
     /// kept when its estimate is at or above this value.
-    CGtoPairBlock(const CGtoBlock                                          &bra_gto_block,
-                  const CGtoBlock                                          &ket_gto_block,
-                  const std::function<double(const size_t, const size_t)>  &estimator,
-                  const double                                              threshold);
+    CGtoPairBlock(const CGtoBlock &bra_gto_block,
+                  const CGtoBlock &ket_gto_block,
+                  const std::function<double(const CGtoBlockScreeningData &,
+                                             const CGtoBlockScreeningData &,
+                                             const double)> &estimator,
+                  const double threshold);
 
     /// @brief The default copy constructor.
     /// @param other The basis function pairs block to be copied.

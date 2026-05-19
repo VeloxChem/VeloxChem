@@ -345,7 +345,9 @@ export_orbdata(py::module &m)
         .def(py::init<const CGtoBlock &, const CGtoBlock &>())
         .def(py::init<const CGtoBlock &,
                       const CGtoBlock &,
-                      const std::function<double(const size_t, const size_t)> &,
+                      const std::function<double(const CGtoBlockScreeningData &,
+                                                 const CGtoBlockScreeningData &,
+                                                 const double)> &,
                       const double>())
         .def(py::init<const std::vector<TPoint<double>> &,
                       const std::vector<TPoint<double>> &,
