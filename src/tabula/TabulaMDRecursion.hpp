@@ -6,10 +6,31 @@
 #ifndef TabulaMDRecursion_hpp
 #define TabulaMDRecursion_hpp
 
+#include <array>
 #include <cstddef>
 #include <vector>
 
 namespace tabula {  // tabula namespace
+
+/// @brief Per-section wall time of `compute_one_center_md`, in seconds,
+/// accumulated across calls and summed over the OpenMP threads.
+struct MDRecursionProfile
+{
+    /// @brief Zero-filling the per-degree buffers.
+    double allocate{0.0};
+    /// @brief Copying the contracted seed ladder into level 0.
+    double seed_copy{0.0};
+    /// @brief Building each degree level; `build_by_degree[d]` is the wall
+    /// time spent on level `d` (the recursion fills degrees `1 … L`).
+    std::array<double, 9> build_by_degree{};
+};
+
+/// @brief Gets the accumulated `compute_one_center_md` profile.
+/// @return The recursion profile.
+auto md_recursion_profile() -> MDRecursionProfile;
+
+/// @brief Resets the accumulated `compute_one_center_md` profile.
+auto reset_md_recursion_profile() -> void;
 
 /// @brief The single-centre McMurchie–Davidson recursion — step (c) of the
 /// late-contraction recursion, generic to any integral.
