@@ -126,10 +126,9 @@ class CphfSolver(LinearSolver):
             of the CPHF equations.
         """
 
-        # TODO: enable ECP
         assert_msg_critical(
             not basis.has_ecp(),
-            f'{type(self).__name__}.compute: ECP is not yet supported')
+            f'{type(self).__name__}.compute_solution_vectors: ECP is not supported')
 
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
@@ -140,7 +139,7 @@ class CphfSolver(LinearSolver):
 
         # check molecule
         # this special method is only implemented for restricted case
-        molecule_sanity_check(molecule, 'restricted')
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -432,6 +431,8 @@ class CphfSolver(LinearSolver):
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
                                               orbrsp_vector_labels, molecule,
                                               basis, dft_dict, pe_dict)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file
@@ -1396,7 +1397,10 @@ class CphfSolver(LinearSolver):
 
         # remove linear dependencies and orthonormalize trial vectors
         if renormalize:
-            if dist_trials.data.ndim > 0 and dist_trials.shape(0) > 0:
+            has_global_rows = self.comm.allreduce(
+                int(dist_trials.data.ndim > 0 and dist_trials.shape(0) > 0),
+                op=MPI.SUM) > 0
+            if has_global_rows:
                 dist_trials = self._remove_linear_dependence_half_size(
                     dist_trials, self.lindep_thresh)
                 dist_trials = (

@@ -6,7 +6,6 @@ import numpy as np
 import pickle
 import pytest
 import math
-import sys
 from unittest.mock import Mock
 
 from veloxchem.veloxchemlib import Point
@@ -19,11 +18,6 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.optimizationdriver import OptimizationDriver
 from veloxchem.inputparser import get_random_string_serial
-
-try:
-    import rdkit
-except ImportError:
-    pass
 
 
 class FakeBasis:
@@ -469,6 +463,27 @@ class TestMolecule:
         basis = MolecularBasis.read(mol, 'sto-3g', ostream=None)
         assert math.isclose(mol.effective_nuclear_repulsion_energy(basis),
                             9.34363815797054450919,
+                            rel_tol=tol,
+                            abs_tol=tol)
+
+    def test_nuclear_repulsion_energy_backward_compatibility(self):
+
+        tol = 1.0e-12
+
+        mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
+        basis = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+        ecp_basis = FakeBasis([2, 0, 0])
+
+        assert math.isclose(mol.nuclear_repulsion_energy(),
+                            9.34363815797054450919,
+                            rel_tol=tol,
+                            abs_tol=tol)
+        assert math.isclose(mol.nuclear_repulsion_energy(basis),
+                            mol.effective_nuclear_repulsion_energy(basis),
+                            rel_tol=tol,
+                            abs_tol=tol)
+        assert math.isclose(mol.nuclear_repulsion_energy(ecp_basis),
+                            mol.effective_nuclear_repulsion_energy(ecp_basis),
                             rel_tol=tol,
                             abs_tol=tol)
 
@@ -1372,9 +1387,9 @@ class TestMolecule:
         assert abs(mol.get_dihedral((2, 3, 4, 5), 'radian') -
                    math.pi / 2.0) < 1e-4
 
-    @pytest.mark.skipif("rdkit" not in sys.modules,
-                        reason="rdkit not available")
     def test_is_water_molecule(self):
+
+        pytest.importorskip('rdkit')
 
         mol = Molecule.read_smiles('O')
         assert mol.is_water_molecule()
@@ -1385,9 +1400,9 @@ class TestMolecule:
         mol = Molecule.read_smiles('OO')
         assert not mol.is_water_molecule()
 
-    @pytest.mark.skipif("rdkit" not in sys.modules,
-                        reason="rdkit not available")
     def test_smiles_to_xyz_returns_xyz_for_both_hydrogen_options(self):
+
+        pytest.importorskip('rdkit')
 
         xyz_with_hydrogen = Molecule.smiles_to_xyz('O', hydrogen=True)
         xyz_without_hydrogen = Molecule.smiles_to_xyz('O', hydrogen=False)
@@ -1397,16 +1412,16 @@ class TestMolecule:
         assert int(xyz_with_hydrogen.splitlines()[0]) == 3
         assert int(xyz_without_hydrogen.splitlines()[0]) == 1
 
-    @pytest.mark.skipif("rdkit" not in sys.modules,
-                        reason="rdkit not available")
     def test_read_smiles_with_multi_components(self):
+
+        pytest.importorskip('rdkit')
 
         mol = Molecule.read_smiles('CCO.C1CCCC1.c1ccccc1')
         assert mol.number_of_atoms() == 36
 
-    @pytest.mark.skipif("rdkit" not in sys.modules,
-                        reason="rdkit not available")
     def test_read_smiles_with_reorder_hydrogens(self):
+
+        pytest.importorskip('rdkit')
 
         # with reorder_hydrogens, the first atom will be C and
         # the second atom will be H
@@ -1422,9 +1437,9 @@ class TestMolecule:
         assert labels[0] == 'H'
         assert labels[1] == 'H'
 
-    @pytest.mark.skipif("rdkit" not in sys.modules,
-                        reason="rdkit not available")
     def test_draw_2d_uses_display(self, monkeypatch):
+
+        pytest.importorskip('rdkit')
 
         ipython_display = pytest.importorskip("IPython.display")
         display_mock = Mock()

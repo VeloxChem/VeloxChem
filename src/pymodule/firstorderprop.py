@@ -77,6 +77,26 @@ class FirstOrderProperties:
 
         self._prop_drv = FirstOrderPropertyDriver(self.comm, self.ostream)
 
+    def _set_dipole_moment(self, dipole_moment):
+        """
+        Stores dipole moment under the canonical property key.
+
+        :param dipole_moment:
+            The dipole moment array for one or multiple states.
+        """
+
+        self.properties['dipole moment'] = deepcopy(dipole_moment)
+
+    def _get_dipole_moment(self):
+        """
+        Gets dipole moment from the canonical property key.
+
+        :return:
+            The dipole moment array.
+        """
+
+        return deepcopy(self.properties['dipole moment'])
+
     def compute_scf_prop(self, molecule, basis, scf_results):
         """
         Computes first-order properties for SCF.
@@ -111,10 +131,7 @@ class FirstOrderProperties:
         dipole_dict = self._prop_drv.compute_electric_dipole_moment(
             molecule, basis, total_density)
 
-        dipole_moment = dipole_dict['total']
-
-        self.properties['dipole moment'] = dipole_moment
-        self.properties['dipole_moment'] = dipole_moment
+        self._set_dipole_moment(dipole_dict['total'])
 
     def get_property(self, key):
         """
@@ -126,6 +143,16 @@ class FirstOrderProperties:
         :return:
             The property.
         """
+
+        dipole_keys = [
+            'dipole moment',
+            'dipole_moment',
+            'electric dipole moment',
+            'electric_dipole_moment',
+        ]
+
+        if key in dipole_keys:
+            return self._get_dipole_moment()
 
         return self.properties[key]
 
@@ -160,7 +187,7 @@ class FirstOrderProperties:
 
         self.ostream.print_blank()
 
-        dip = self.properties['dipole_moment']
+        dip = self._get_dipole_moment()
         if states is None:
             dip_au = list(dip) + [np.linalg.norm(dip)]
             dip_debye = [m * dipole_in_debye() for m in dip_au]

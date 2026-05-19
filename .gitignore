@@ -157,7 +157,4 @@ ConfigMKL.hpp
 /.direnv/
 /compile_commands.json
 
-# generated Python sources
-mklconf.py
-
 veloxchem.sh

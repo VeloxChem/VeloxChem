@@ -1,21 +1,3 @@
-if(CMAKE_CXX_COMPILER_ID MATCHES GNU)
-  set(_mkl_interface_layer_ "GNU,LP64")
-  set(_mkl_threading_layer_ "GNU")
-elseif(CMAKE_CXX_COMPILER_ID MATCHES Clang)
-  set(_mkl_interface_layer_ "LP64")
-  set(_mkl_threading_layer_ "INTEL")
-elseif(CMAKE_CXX_COMPILER_ID MATCHES Intel)
-  set(_mkl_interface_layer_ "LP64")
-  set(_mkl_threading_layer_ "INTEL")
-endif()
-
-# generate MKL runtime configuration function
-configure_file(
-  mklconf.py.in
-  ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/mklconf.py
-  @ONLY
-  )
-
 # we glob the Python files in src/pymodule and let CMake add a rule such that
 # the glob is repeated every time we rebuild.
 # This is NOT RECOMMENDED by CMake
@@ -46,10 +28,6 @@ foreach(_py_path IN LISTS _veloxchemlib_pys)
     )
 endforeach()
 
-list(APPEND _veloxchemlib_pys
-  ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/mklconf.py
-  )
-
 # process commit hash
 set(_vlx_commit "unknown")
 
@@ -78,6 +56,9 @@ if(ENABLE_COMMIT_HASH)
       file(APPEND
           ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/__init__.py
           "\n__commit__ = \"${_vlx_commit}\"\n")
+      list(APPEND
+        _veloxchemlib_pys
+        ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/__init__.py)          
     endif()
   endif()
 endif()
@@ -90,11 +71,10 @@ if(${_vlx_commit} STREQUAL "unknown")
       ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/__init__.py
       COPY_ON_ERROR
       SYMBOLIC)
+  list(APPEND
+      _veloxchemlib_pys
+      ${CMAKE_CURRENT_SOURCE_DIR}/__init__.py)             
 endif()
-
-list(APPEND
-    _veloxchemlib_pys
-    ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/__init__.py)
 
 install(
   FILES

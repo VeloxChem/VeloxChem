@@ -673,8 +673,7 @@ class ScfGradientDriver(GradientDriver):
         if self.timing and self.rank == mpi_master():
             self.ostream.print_info('Gradient timing decomposition')
             for key, val in grad_timing.items():
-                if val > 0.0:
-                    self.ostream.print_info(f'    {key:<25}:  {val:.2f} sec')
+                self.ostream.print_info(f'    {key:<25}:  {val:.2f} sec')
             self.ostream.print_blank()
 
     def compute_analytical_unrestricted(self, molecule, basis, scf_results):
@@ -890,8 +889,7 @@ class ScfGradientDriver(GradientDriver):
         if self.timing and self.rank == mpi_master():
             self.ostream.print_info('Gradient timing decomposition')
             for key, val in grad_timing.items():
-                if val > 0.0:
-                    self.ostream.print_info(f'    {key:<25}:  {val:.2f} sec')
+                self.ostream.print_info(f'    {key:<25}:  {val:.2f} sec')
             self.ostream.print_blank()
 
     def compute_energy(self, molecule, basis, scf_results_not_used=None):

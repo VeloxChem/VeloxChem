@@ -148,6 +148,24 @@ class Mp2Driver:
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
+    @staticmethod
+    def _check_aufbau_occupation(expected, actual, label):
+        assert_msg_critical(
+            np.array_equal(np.asarray(actual), np.asarray(expected)),
+            'Mp2Driver.compute: {} occupation numbers must follow Aufbau '
+            'occupations'.format(label))
+
+    def _assert_aufbau_occupations(self, molecule, basis, mol_orbs):
+        nmo = mol_orbs.number_of_mos()
+        expected_a = molecule.get_aufbau_alpha_occupation(nmo, basis)
+        self._check_aufbau_occupation(expected_a, mol_orbs.occa_to_numpy(),
+                                      'Alpha')
+
+        if mol_orbs.get_orbitals_type() != molorb.rest:
+            expected_b = molecule.get_aufbau_beta_occupation(nmo, basis)
+            self._check_aufbau_occupation(expected_b, mol_orbs.occb_to_numpy(),
+                                          'Beta')
+
     def compute(self, molecule, basis, scf_inp):
         """
         Performs MP2 calculation.
@@ -173,7 +191,8 @@ class Mp2Driver:
 
                 mo_a = scf_results['C_alpha']
                 ene_a = scf_results['E_alpha']
-                occ_a = molecule.get_aufbau_alpha_occupation(ene_a.shape[0], basis)
+                occ_a = molecule.get_aufbau_alpha_occupation(
+                    ene_a.shape[0], basis)
 
                 if scf_type == 'restricted':
                     mol_orbs = MolecularOrbitals([mo_a], [ene_a], [occ_a],
@@ -182,12 +201,14 @@ class Mp2Driver:
                 elif scf_type == 'unrestricted':
                     mo_b = scf_results['C_beta']
                     ene_b = scf_results['E_beta']
-                    occ_b = molecule.get_aufbau_beta_occupation(ene_b.shape[0], basis)
+                    occ_b = molecule.get_aufbau_beta_occupation(
+                        ene_b.shape[0], basis)
                     mol_orbs = MolecularOrbitals([mo_a, mo_b], [ene_a, ene_b],
                                                  [occ_a, occ_b], molorb.unrest)
 
                 elif scf_type == 'restricted_openshell':
-                    occ_b = molecule.get_aufbau_beta_occupation(ene_a.shape[0], basis)
+                    occ_b = molecule.get_aufbau_beta_occupation(
+                        ene_a.shape[0], basis)
                     mol_orbs = MolecularOrbitals([mo_a], [ene_a],
                                                  [occ_a, occ_b],
                                                  molorb.restopen)
@@ -246,6 +267,8 @@ class Mp2Driver:
         assert_msg_critical(
             mol_orbs.get_orbitals_type() != molorb.restopen,
             'Mp2Driver.compute: Restricted open-shell MP2 not implemented')
+
+        self._assert_aufbau_occupations(molecule, basis, mol_orbs)
 
         # compute MP2 in memory
 
@@ -360,6 +383,8 @@ class Mp2Driver:
         assert_msg_critical(
             mol_orbs.get_orbitals_type() != molorb.restopen,
             'Mp2Driver.compute: Restricted open-shell MP2 not implemented')
+
+        self._assert_aufbau_occupations(molecule, basis, mol_orbs)
 
         # screening
 

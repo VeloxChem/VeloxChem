@@ -16,12 +16,12 @@ class TestChemicalElement:
 
     def test_is_chemical_element(self):
 
-        assert is_chemical_element(0) == True
-        assert is_chemical_element(6) == True
-        assert is_chemical_element(86) == True
+        assert is_chemical_element(0) is True
+        assert is_chemical_element(6) is True
+        assert is_chemical_element(86) is True
 
-        assert is_chemical_element(-1) == False
-        assert is_chemical_element(87) == False
+        assert is_chemical_element(-1) is False
+        assert is_chemical_element(87) is False
 
     def test_chemical_element_name(self):
 

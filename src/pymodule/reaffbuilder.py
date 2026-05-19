@@ -94,16 +94,14 @@ class ReactionForceFieldBuilder():
         self.optimize_conformer_snapshots: int = 10
         self.optimize_temp: int = 600
         self.optimize_dist_restraint_offset = 0.5  # Angstrom
-        self.optimize_dist_restraint_k = 100000.0  # kJ mol^-1 nm^-2
+        self.optimize_dist_restraint_k = 1000.0  # kJ mol^-1 nm^-2
         self.mm_opt_constrain_bonds: bool = True
         self.water_model: str = 'cspce'
         self.product_mapping: dict[int, int] | None = None  # one-indexed
         self.mute_scf: bool = True
         self.skip_reaction_matching: bool = False
-        #Todo get a better functional and basis set from here https://pubs.acs.org/doi/10.1021/acs.jctc.3c00558
+
         self.hessian_xc_fun: str = 'B3LYP'
-        #Todo get better basis set once we have f-functionals
-        # Can (should?) be scaled up to def2-TZVPPD, and if only we had our ECP's by now
         self.hessian_basis = 'def2-SV_P_'
 
     def build_forcefields(
@@ -177,11 +175,9 @@ class ReactionForceFieldBuilder():
             forced_forming_bonds = {(bond[0] - 1, bond[1] - 1)
                                     for bond in forced_forming_bonds}
 
-            product_ff, product_mapping = self._match_reactant_and_product(
-                reactant_ff,
-                reactant_ff.molecule.get_element_ids(),
-                product_ff,
-                product_ff.molecule.get_element_ids(),
+            product_mapping = self._match_reactant_and_product(
+                reactant_ff.molecule,
+                product_ff.molecule,
                 forced_breaking_bonds,
                 forced_forming_bonds,
             )
@@ -519,24 +515,19 @@ class ReactionForceFieldBuilder():
     #Match the indices of the reactant and product forcefield generators
     def _match_reactant_and_product(
         self,
-        reactant_ff: MMForceFieldGenerator,
-        rea_elems: list,
-        product_ff: MMForceFieldGenerator,
-        pro_elems: list,
+        reactant: Molecule,
+        product: Molecule,
         breaking_bonds: set[tuple[int, int]],
         forming_bonds: set[tuple[int, int]],
     ):
-        assert len(reactant_ff.atoms) == len(
-            product_ff.atoms
+        assert reactant.number_of_atoms() == product.number_of_atoms(
         ), "The number of atoms in the reactant and product do not match"
         # Turn the reactand and product into graphs
 
         rm = ReactionMatcher(ostream=self.ostream)
         total_mapping, breaking_bonds, forming_bonds = rm.get_mapping(
-            reactant_ff,
-            rea_elems,
-            product_ff,
-            pro_elems,
+            reactant,
+            product,
             breaking_bonds,
             forming_bonds,
         )  # type: ignore
@@ -548,7 +539,7 @@ class ReactionForceFieldBuilder():
         print_mapping = {k + 1: v + 1 for k, v in total_mapping.items()}
         self.ostream.print_info(f"Mapping: {print_mapping}")
         self.ostream.flush()
-        return product_ff, total_mapping
+        return total_mapping
 
         # Merge a list of forcefield generators into a single forcefield generator while taking care of the atom indices
 
@@ -648,6 +639,7 @@ class ReactionForceFieldBuilder():
             if new_key[-1] < new_key[0]:
                 new_key = new_key[::-1]
             new_parameters.update({new_key: val})
+        new_parameters = dict(sorted(new_parameters.items()))
         return new_parameters
 
     def _summarise_reaction(self, reactant, product):
@@ -665,7 +657,8 @@ class ReactionForceFieldBuilder():
         self.ostream.print_header(f"{len(broken_bonds)} breaking bonds:")
 
         if len(broken_bonds) > 0:
-            self.ostream.print_header(f"ReaType  ProType  ID - ReaType  ProType  ID")
+            self.ostream.print_header(
+                f"ReaType  ProType  ID - ReaType  ProType  ID")
         for bond_key in broken_bonds:
             reactant_type0 = reactant.atoms[bond_key[0]]["type"]
             product_type0 = product.atoms[bond_key[0]]["type"]
@@ -679,7 +672,8 @@ class ReactionForceFieldBuilder():
         self.ostream.print_blank()
         self.ostream.print_header(f"{len(formed_bonds)} forming bonds:")
         if len(formed_bonds) > 0:
-            self.ostream.print_header("ReaType  ProType  ID - ReaType  ProType  ID")
+            self.ostream.print_header(
+                "ReaType  ProType  ID - ReaType  ProType  ID")
         for bond_key in formed_bonds:
             reactant_type0 = reactant.atoms[bond_key[0]]["type"]
             product_type0 = product.atoms[bond_key[0]]["type"]

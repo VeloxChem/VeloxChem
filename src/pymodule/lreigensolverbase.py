@@ -548,7 +548,8 @@ class LinearResponseEigenSolverBase(LinearSolver):
                     broadening_type="lorentzian",
                     broadening_value=(1000.0 / hartree_in_wavenumber() *
                                       hartree_in_ev()),
-                    ax=None):
+                    ax=None,
+                    x_unit="nm"):
         """
         Plot the UV-Vis absorption spectrum from the response calculation.
 
@@ -560,6 +561,8 @@ class LinearResponseEigenSolverBase(LinearSolver):
             The broadening value in eV.
         :param ax:
             The matplotlib axis to plot on.
+        :param x_unit:
+            The unit of x-axis. Either 'nm' or 'ev'.
         """
 
         assert_msg_critical(
@@ -572,7 +575,8 @@ class LinearResponseEigenSolverBase(LinearSolver):
         plot_uv_vis_spectrum(rsp_results,
                              broadening_type=broadening_type,
                              broadening_value=broadening_value,
-                             ax=ax)
+                             ax=ax,
+                             x_unit=x_unit)
 
     def plot_xcd(self,
                  rsp_results,

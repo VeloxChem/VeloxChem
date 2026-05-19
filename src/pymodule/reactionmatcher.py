@@ -74,32 +74,37 @@ class ReactionMatcher:
         self.max_time = 600
         self.force_hydrogen_inclusion = True
         self.brute_force_lim = 1000
+        self.rdFMCS_assist_assign = False
+        self.rdRascalMCES_assist_assign = False
         self._reduce_hydrogen = False
+        self._assist_min_depth = 3
 
         self.max_break_attempts_guess = 1e7
-        self._breaking_depth = 1  # how many breaking edges to try
+        self._breaking_depth = -1  # how many breaking edges to try
         self._check_monomorphic = True
         self._assisting_map = {}
 
     def get_mapping(
         self,
-        reactant_ff,
-        rea_elems,
-        product_ff,
-        pro_elems,
-        breaking_bonds,
-        forming_bonds,
+        reactant,
+        product,
+        breaking_bonds=None,
+        forming_bonds=None,
     ):
 
-        self.rea_graph, self.pro_graph, self.assisting_map = self._create_reaction_graphs(
-            reactant_ff, rea_elems, product_ff, pro_elems, breaking_bonds,
-            forming_bonds, self.force_hydrogen_inclusion)
-        
+        self.rea_graph, self.pro_graph = self._create_reaction_graphs(
+            reactant, product, breaking_bonds, forming_bonds,
+            self.force_hydrogen_inclusion)
+
+        self.rea_graph, self.pro_graph, self.assisting_map = self._assign_assist_ids(
+            reactant, product, self.rea_graph, self.pro_graph)
+
         if len(self.assisting_map) == len(self.rea_graph.nodes):
             # inverted_map = {v: k for k, v in self.assisting_map.items()}
-            return self.assisting_map, breaking_bonds, forming_bonds
+            return self.assisting_map, set(), set()
 
-        self._breaking_depth = self._decide_breaking_depth()
+        if self._breaking_depth == -1:
+            self._breaking_depth = self._decide_breaking_depth()
 
         map, breaking_edges, forming_edges = self._find_mapping(
             self.rea_graph.copy(),
@@ -112,9 +117,19 @@ class ReactionMatcher:
                 "No mapping found, retrying with hydrogens included.")
             self.ostream.flush()
             self._reduce_hydrogen = False
-            self.rea_graph, self.pro_graph, self.assisting_map = self._create_reaction_graphs(
-                reactant_ff, rea_elems, product_ff, pro_elems, breaking_bonds,
-                forming_bonds, True)
+            self.rea_graph, self.pro_graph = self._create_reaction_graphs(
+                reactant,
+                product,
+                breaking_bonds,
+                forming_bonds,
+                True,
+            )
+            self.rea_graph, self.pro_graph, self.assisting_map = self._assign_assist_ids(
+                reactant,
+                product,
+                self.rea_graph,
+                self.pro_graph,
+            )
             map, breaking_edges, forming_edges = self._find_mapping(
                 self.rea_graph.copy(),
                 self.pro_graph.copy(),
@@ -134,7 +149,7 @@ class ReactionMatcher:
     def _decide_breaking_depth(self):
         N = len(self.rea_graph.edges)
         _breaking_depth = 1
-        
+
         if N == 1:
             return 1
 
@@ -155,14 +170,12 @@ class ReactionMatcher:
         self.ostream.flush()
         return _breaking_depth
 
-    def _create_reaction_graphs(self, reactant_ff, rea_elems, product_ff,
-                                pro_elems, breaking_bonds, forming_bonds,
-                                force_hydrogen_inclusion):
+    def _create_reaction_graphs(self, reactant, product, breaking_bonds,
+                                forming_bonds, force_hydrogen_inclusion):
 
-        rea_graph = self._prepare_graph(reactant_ff, rea_elems, breaking_bonds,
-                                        forming_bonds)
+        rea_graph = self._prepare_graph(reactant, breaking_bonds, forming_bonds)
 
-        pro_graph = self._prepare_graph(product_ff, pro_elems)
+        pro_graph = self._prepare_graph(product)
 
         if not force_hydrogen_inclusion:
             self._reduce_hydrogen = self._decide_hydrogen_reduction(
@@ -181,21 +194,19 @@ class ReactionMatcher:
                 rea_graph.remove_nodes_from(rea_hydrogens)
                 pro_graph.remove_nodes_from(pro_hydrogens)
 
-        rea_graph, pro_graph, assisting_map = self._assign_assist_ids(
-            rea_graph, pro_graph)
+        return rea_graph, pro_graph
 
-        return rea_graph, pro_graph, assisting_map
-
-    def _prepare_graph(self,
-                       forcefield,
-                       elements,
-                       breaking_bonds=None,
-                       forming_bonds=None):
+    def _prepare_graph(self, molecule, breaking_bonds=None, forming_bonds=None):
         graph = nx.Graph()
-        bonds = list(forcefield.bonds.keys())
+        mat = molecule.get_connectivity_matrix()
+        bonds = set()
+        for i in range(len(mat)):
+            for j in range(i, len(mat)):
+                if mat[i, j]:
+                    bonds.add((i, j))
         # Remove the bonds that are being broken, so that these segments get treated as seperate reactants
 
-        graph.add_nodes_from(forcefield.atoms.keys())
+        graph.add_nodes_from(list(range(len(mat))))
         graph.add_edges_from(bonds)
 
         if breaking_bonds is not None:
@@ -206,6 +217,7 @@ class ReactionMatcher:
             for edge in forming_bonds:
                 graph.add_edge(*edge)
 
+        elements = [float(id) for id in molecule.get_element_ids()]
         for i, elem in enumerate(elements):
             graph.nodes[i]['elem'] = elem
 
@@ -254,7 +266,7 @@ class ReactionMatcher:
                 return False
         return True
 
-    def _assign_assist_ids(self, rea_graph, pro_graph):
+    def _assign_assist_ids(self, reactant, product, rea_graph, pro_graph):
         # Tries to figure out the 'obvious' atom mappings before starting the full graph matching
         # This speeds up the matching significantly for larger molecules
         # Subgraphs of decreasing size in the reactant and product and product are itterated over
@@ -263,6 +275,76 @@ class ReactionMatcher:
         self.ostream.print_info(
             "Searching for matching subgraphs to assign assist ids")
         self.ostream.flush()
+        if self.rdFMCS_assist_assign or self.rdRascalMCES_assist_assign:
+            return self._get_rdkit_assist_ids(reactant, product, rea_graph,
+                                              pro_graph)
+        else:
+            return self._calculate_assist_ids(rea_graph, pro_graph)
+
+    def _get_rdkit_assist_ids(self, reactant, product, rea_graph, pro_graph):
+        try:
+            from rdkit import Chem
+            from rdkit.Chem import rdmolfiles
+            from rdkit.Chem import rdRascalMCES
+            from rdkit.Chem import rdFMCS
+
+            from rdkit.Chem import rdDetermineBonds
+
+            rd_mol1 = Chem.RWMol(
+                rdmolfiles.MolFromXYZBlock(reactant.get_xyz_string()))
+            rd_mol2 = Chem.RWMol(
+                rdmolfiles.MolFromXYZBlock(product.get_xyz_string()))
+
+            rdDetermineBonds.DetermineConnectivity(rd_mol1)
+            rdDetermineBonds.DetermineBondOrders(rd_mol1)
+            rdDetermineBonds.DetermineConnectivity(rd_mol2)
+            rdDetermineBonds.DetermineBondOrders(rd_mol2)
+            if self.rdRascalMCES_assist_assign:
+
+                res = rdRascalMCES.FindMCES(rd_mol1, rd_mol2)
+                if len(res) > 0:
+                    assist_map = {i: j for i, j in res[0].atomMatches()}
+                    for rea_node, pro_node in assist_map.items():
+                        rea_graph.nodes[rea_node]['assist_id'] = rea_node
+                        pro_graph.nodes[pro_node]['assist_id'] = rea_node
+                    self.ostream.print_info(str(res[0].atomMatches()))
+                    self.ostream.print_info(
+                        f"Assigned {len(assist_map)} assist ids: {self._print_mapping(assist_map)}"
+                    )
+                    self.ostream.flush()
+                    self.assisting_map = assist_map
+                    return rea_graph, pro_graph, assist_map
+                return rea_graph, pro_graph, {}
+
+            elif self.rdFMCS_assist_assign:
+
+                mcs = rdFMCS.FindMCS([rd_mol1, rd_mol2])
+                if mcs.numAtoms > 0:
+                    mcs_mol = Chem.MolFromSmarts(mcs.smartsString)
+                    match1 = rd_mol1.GetSubstructMatch(mcs_mol)
+                    match2 = rd_mol2.GetSubstructMatch(mcs_mol)
+                    # target_atm1 = []
+                    assist_map = {}
+                    for atom1, atom2 in zip(match1, match2):
+                        assist_map[atom1] = atom2
+                        rea_graph.nodes[atom1]['assist_id'] = atom1
+                        pro_graph.nodes[atom2]['assist_id'] = atom1
+
+                    self.ostream.print_info(
+                        f"Assigned {len(assist_map)} assist ids: {self._print_mapping(assist_map)}"
+                    )
+                    self.ostream.flush()
+                    self.assisting_map = assist_map
+                    return rea_graph, pro_graph, assist_map
+                return rea_graph, pro_graph, {}
+        except ImportError:
+            self.ostream.print_warning(
+                "rdkit not available, skipping rdkit based assist id assignment. Turn off rdFMCS_assist_assign and rdRascalMCES_assist_assign to use VeloxChem assist id assignment."
+            )
+            self.ostream.flush()
+            return rea_graph, pro_graph, {}
+
+    def _calculate_assist_ids(self, rea_graph, pro_graph):
         H_count = sum(
             [1 for n in rea_graph.nodes if rea_graph.nodes[n]['elem'] == 1.0])
 
@@ -291,7 +373,7 @@ class ReactionMatcher:
         shuffled_indices = [(i * step) % total_nodes
                             for i in range(total_nodes)]
 
-        while depth >= min_depth:
+        while depth >= self._assist_min_depth:
             for rea_id in shuffled_indices:
 
                 # Break early
@@ -415,20 +497,17 @@ class ReactionMatcher:
             for k in sorted(assisting_map)
         }
         self.ostream.print_info(
-            f"Assigned {len(assisting_map)} assist ids: {self._print_mapping(sorted_assisting_map)}")
+            f"Assigned {len(assisting_map)} assist ids: {self._print_mapping(sorted_assisting_map)}"
+        )
         self._assisting_map = sorted_assisting_map
         self.ostream.flush()
         return rea_graph, pro_graph, sorted_assisting_map
 
-    def _find_mapping(self,
-                      A,
-                      B,
-                      forced_breaking_edges=None,
-                      forced_forming_edges=None):
+    def _find_mapping(self, A, B, forced_breaking_edges, forced_forming_edges):
         """
         Find a mapping between the connected components of A and B, while avoiding reconnecting broken edges.
         """
-        
+
         if forced_breaking_edges is None:
             forced_breaking_edges = set()
         if forced_forming_edges is None:
@@ -454,18 +533,23 @@ class ReactionMatcher:
         # B_assist = nx.relabel_nodes(B_assist, self.assisting_map)
 
         unassigned_nodes_A = A.nodes - A_assist.nodes
-        unassigned_elems_count = list(Counter([A.nodes[i]['elem'] for i in unassigned_nodes_A]).values())
+        unassigned_elems_count = list(
+            Counter([A.nodes[i]['elem'] for i in unassigned_nodes_A]).values())
         total_expected_perms = 1
         for elem_count in unassigned_elems_count:
             total_expected_perms *= math.factorial(elem_count)
-            
+
         if total_expected_perms <= self.brute_force_lim:
             unassigned_nodes_B = B.nodes - B_assist.nodes
             permuted_unassigned_nodes_B = list(permutations(unassigned_nodes_B))
             self.ostream.print_info(
                 f"Trying all {len(permuted_unassigned_nodes_B)} permutations of unassigned nodes. Expecting to consider {total_expected_perms} permutations based on element counts."
             )
-            return self._find_brute_force_mapping(A,B,forced_breaking_edges,forced_forming_edges,swapped,unassigned_nodes_A,permuted_unassigned_nodes_B)
+            self.ostream.flush()
+            return self._find_brute_force_mapping(A, B, forced_breaking_edges,
+                                                  forced_forming_edges, swapped,
+                                                  unassigned_nodes_A,
+                                                  permuted_unassigned_nodes_B)
 
         self._start_time = time.time()
         breaking_edges = self._find_breaking_edges(
@@ -525,19 +609,22 @@ class ReactionMatcher:
                 A_assisting.remove_node(n)
 
         return A_assisting
-    
-    def _find_brute_force_mapping(self,A,B,forced_breaking_edges,forced_forming_edges,swapped,unassigned_nodes_A,permuted_unassigned_nodes_B):
+
+    def _find_brute_force_mapping(self, A, B, forced_breaking_edges,
+                                  forced_forming_edges, swapped,
+                                  unassigned_nodes_A,
+                                  permuted_unassigned_nodes_B):
         maps = []
         breaking_edges_list = []
         forming_edges_list = []
         N_changing_bonds = []
         N_changing_H_bonds = []
-        
+
         # Loop through all permutations
         for perm in permuted_unassigned_nodes_B:
             temp_map = {k: v for k, v in zip(unassigned_nodes_A, perm)}
             skip = False
-            
+
             # Check if the map is chemically valid
             for k, v in temp_map.items():
                 if A.nodes[k]['elem'] != B.nodes[v]['elem']:
@@ -545,7 +632,7 @@ class ReactionMatcher:
                     break
             if skip:
                 continue
-            
+
             total_temp_map = copy.copy(temp_map)
             total_temp_map.update(self.assisting_map)
 
@@ -556,8 +643,11 @@ class ReactionMatcher:
 
             breaking_edges = A.edges - B_copy.edges
             forming_edges = B_copy.edges - A.edges
-            # Check if we obey the forced breaking and forming edges
-            if (forced_breaking_edges.issubset(forming_edges) and len(forced_breaking_edges)>0) or (forced_forming_edges.issubset(breaking_edges) and len(forced_forming_edges)>0):
+            # If the forced breaking or forced forming edges are not respected, skip this mapping
+            if (forced_breaking_edges.issubset(forming_edges)
+                    and len(forced_breaking_edges)
+                    > 0) or (forced_forming_edges.issubset(breaking_edges)
+                             and len(forced_forming_edges) > 0):
                 continue
 
             changing_bonds = breaking_edges | forming_edges
@@ -570,7 +660,7 @@ class ReactionMatcher:
                     f"Permutation {self._print_mapping(temp_map)} has a total of {len(changing_bonds)} changing bonds, forming: {self._print_bond_list(forming_edges)}, breaking: {self._print_bond_list(breaking_edges)} of which {n_changing_H_bonds} involve hydrogens."
                 )
                 self.ostream.flush()
-            
+
             maps.append(copy.copy(total_temp_map))
             breaking_edges_list.append(breaking_edges)
             forming_edges_list.append(forming_edges)
@@ -586,15 +676,26 @@ class ReactionMatcher:
             self.ostream.print_info(
                 "Multiple mappings with same least amount of changing bonds found, picking one the most changing H-bonds."
             )
-            least_changing_bonds_H_bond_counts = [N_changing_H_bonds[i] for i in least_changing_bonds_indices]
-            best_H_bond_count = np.array(least_changing_bonds_H_bond_counts).max()
-            least_changing_bonds_index = np.where(least_changing_bonds_H_bond_counts== best_H_bond_count)[0]
-            best_index = least_changing_bonds_indices[least_changing_bonds_index[0]]
-            
+            least_changing_bonds_H_bond_counts = [
+                N_changing_H_bonds[i] for i in least_changing_bonds_indices
+            ]
+            best_H_bond_count = np.array(
+                least_changing_bonds_H_bond_counts).max()
+            least_changing_bonds_index = np.where(
+                least_changing_bonds_H_bond_counts == best_H_bond_count)[0]
+
+            best_index = least_changing_bonds_indices[
+                least_changing_bonds_index[0]]
             if len(least_changing_bonds_index):
                 self.ostream.print_info(
-                    "Multiple equally good mappings found, picking first one."
+                    f"{len(least_changing_bonds_index)} equally good mappings found, picking first one."
                 )
+                for i in least_changing_bonds_index:
+                    temp_i = least_changing_bonds_indices[i]
+                    self.ostream.print_info(
+                        f"Mapping {maps[temp_i]} with breaking bonds: {breaking_edges_list[temp_i]} and forming bonds: {forming_edges_list[temp_i]}"
+                    )
+                self.ostream.flush()
         else:
             best_index = least_changing_bonds_indices[0]
         self.ostream.print_info(
@@ -609,7 +710,6 @@ class ReactionMatcher:
             to_return_map = {v: k for k, v in to_return_map.items()}
         return to_return_map, breaking_edges_list[
             best_index], forming_edges_list[best_index]
-        
 
     def _find_breaking_edges(self, A, A_assist, B, B_assist,
                              forced_forming_edges):
@@ -943,11 +1043,14 @@ class ReactionMatcher:
             )
             return False
         return True
-    
-    def _print_mapping(self,mapping):
+
+    def _print_mapping(self, mapping):
         items = list(mapping.items())
         items.sort()
-        return "{" + ", ".join([f"{k+self.print_starting_index}: {v+self.print_starting_index}" for k,v in items]) + "}"
+        return "{" + ", ".join([
+            f"{k+self.print_starting_index}: {v+self.print_starting_index}"
+            for k, v in items
+        ]) + "}"
 
     def _print_bond_list(self, bonds):
         bonds = list(bonds)

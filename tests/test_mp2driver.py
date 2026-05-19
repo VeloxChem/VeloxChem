@@ -1,11 +1,13 @@
 from pathlib import Path
 import pytest
+from mpi4py import MPI
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.mp2driver import Mp2Driver
 from veloxchem.mpitask import MpiTask
+from veloxchem.molecularorbitals import MolecularOrbitals, molorb
 
 
 class TestMp2Driver:
@@ -94,3 +96,34 @@ class TestMp2Driver:
 
         for key, val in mp2_dict.items():
             assert getattr(mp2_drv, key) == val
+
+    @pytest.mark.solvers
+    @pytest.mark.skipif(
+        MPI.COMM_WORLD.Get_size() > 1,
+        reason='pytest.raises assertions require a single MPI rank')
+    def test_mp2_rejects_non_aufbau_occupations(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'data' / 'h2se.inp')
+
+        task = MpiTask([inpfile, None])
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        occ_alpha = task.molecule.get_aufbau_alpha_occupation(
+            scf_results['E_alpha'].shape[0], task.ao_basis)
+        occ_alpha[task.molecule.number_of_alpha_occupied_orbitals(
+            task.ao_basis) - 1] = 0.0
+        occ_alpha[task.molecule.number_of_alpha_occupied_orbitals(
+            task.ao_basis)] = 1.0
+
+        mol_orbs = MolecularOrbitals([scf_results['C_alpha']],
+                                     [scf_results['E_alpha']], [occ_alpha],
+                                     molorb.rest)
+
+        mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
+
+        with pytest.raises(
+                AssertionError,
+                match='Alpha occupation numbers must follow Aufbau occupations'):
+            mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)

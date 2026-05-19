@@ -35,6 +35,7 @@ from importlib.metadata import version
 import sys
 import numpy as np
 import copy
+from pathlib import Path
 
 from .errorhandler import assert_msg_critical
 from .evbsystembuilder import EvbForceGroup, EvbSystemBuilder
@@ -124,10 +125,13 @@ class EvbReporter():
             self.report_forcegroups = False
         else:
             self.report_forcegroups = True
-            no_ext = '.'.join(forcegroup_file.split('.')[:-1])
-            ext = forcegroup_file.split('.')[-1]
-            rea_fg = no_ext + '_rea.' + ext
-            pro_fg = no_ext + '_pro.' + ext
+            forcegroup_path = Path(forcegroup_file)
+            rea_fg = str(
+                forcegroup_path.with_name(
+                    forcegroup_path.stem + '_rea' + forcegroup_path.suffix))
+            pro_fg = str(
+                forcegroup_path.with_name(
+                    forcegroup_path.stem + '_pro' + forcegroup_path.suffix))
 
             self.FG_out = open(forcegroup_file, 'a' if append else 'w')
             self.rea_FG_out = open(rea_fg, 'a' if append else 'w')
@@ -145,8 +149,8 @@ class EvbReporter():
         self.report_nb_decomp = False
         if len(self.decomp_names)>0:
             self.report_nb_decomp = True
-            dir = '/'.join(energy_file.split('/')[:-1])
-            filename = dir + '/NB_decompositions.csv'
+            output_dir = Path(energy_file).parent
+            filename = str(output_dir / 'NB_decompositions.csv')
             self.decomp_out = open(filename,'a' if append else 'w')
             self.out_streams.append(self.decomp_out)
             if not append:
@@ -178,12 +182,12 @@ class EvbReporter():
                     self.measure_params.add(params[0])
             # self.measure_params = sorted(self.measure_params)
             self.measure_params = sorted(self.measure_params, key=lambda x: (len(x), x))
-            dir = '/'.join(energy_file.split('/')[:-1])
-            filename = dir + '/bonded_E1_decomp.csv'
+            output_dir = Path(energy_file).parent
+            filename = str(output_dir / 'bonded_E1_decomp.csv')
             self.bonded_E1_decomp_out = open(filename, 'a' if append else 'w')
-            filename = dir + '/bonded_E2_decomp.csv'
+            filename = str(output_dir / 'bonded_E2_decomp.csv')
             self.bonded_E2_decomp_out = open(filename, 'a' if append else 'w')
-            filename = dir + '/bonded_params.csv'
+            filename = str(output_dir / 'bonded_params.csv')
             self.bonded_params_out = open(filename, 'a' if append else 'w')
             self.out_streams.append(self.bonded_E1_decomp_out)
             self.out_streams.append(self.bonded_E2_decomp_out)

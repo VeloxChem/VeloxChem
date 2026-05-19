@@ -87,7 +87,8 @@ class TestOrbitalResponse:
                 cphf_coefficients.append(solution_vec)
 
         if task.mpi_rank == mpi_master():
-            nocc = task.molecule.number_of_alpha_electrons()
+            nocc = task.molecule.number_of_alpha_occupied_orbitals(
+                task.ao_basis)
             mo = scf_drv.scf_results['C_alpha']
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]

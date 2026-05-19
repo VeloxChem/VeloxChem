@@ -30,24 +30,40 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from os import environ
+from .rspproperty import ResponseProperty
 
 
-def configure_mkl_rt():
+class THG(ResponseProperty):
     """
-    Run-time configuration of interface and threading layer for the MKL single
-    dynamic library (libmkl_rt.so)
+    Implements the two-photon absorption property.
 
-    See here:
-      - https://tinyurl.com/y4y695ay
-      - https://tinyurl.com/y254ggts
-
-    Invoking this function will set the ``MKL_INTERFACE_LAYER`` and
-    ``MKL_THREADING_LAYER``, regardless of whether MKL is in use or not.
+    :param rsp_dict:
+        The dictionary of response input.
+    :param method_dict:
+        The dictionary of method settings.
     """
 
-    if 'MKL_INTERFACE_LAYER' not in environ:
-        environ['MKL_INTERFACE_LAYER'] = '@_mkl_interface_layer_@'
+    def __init__(self, rsp_dict=None, method_dict=None):
+        """
+        Initializes the THG property.
+        """
 
-    if 'MKL_THREADING_LAYER' not in environ:
-        environ['MKL_THREADING_LAYER'] = '@_mkl_threading_layer_@'
+        if rsp_dict is None:
+            rsp_dict = {}
+        else:
+            rsp_dict = dict(rsp_dict)
+
+        if method_dict is None:
+            method_dict = {}
+        else:
+            method_dict = dict(method_dict)
+
+        rsp_dict['property'] = 'thg'
+        rsp_dict['order'] = 'cubic'
+        rsp_dict['residue'] = 'none'
+        rsp_dict['is_complex'] = 'yes'
+
+        if 'frequencies' not in rsp_dict:
+            rsp_dict['frequencies'] = '0'
+
+        super().__init__(rsp_dict, method_dict)
