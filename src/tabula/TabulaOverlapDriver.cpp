@@ -300,9 +300,9 @@ evaluate_task(DenseMatrix       &matrix,
     const auto        bra_components = 2 * l_a + 1;
     const auto        ket_components = 2 * l_c + 1;
 
-    // scatter — each element once into the matrix's upper triangle, written
-    // straight into the value buffer (the per-element accessor call is not
-    // inlined across translation units)
+    // scatter — write each value into both triangles while it is hot in
+    // cache, so no standalone O(N²) symmetrize pass is needed. The accessor
+    // call is bypassed (not inlined across translation units).
     double *const     m   = matrix.values();
     const std::size_t dim = matrix.columns();
     for (int ca = 0; ca < bra_components; ca++)
@@ -323,9 +323,13 @@ evaluate_task(DenseMatrix       &matrix,
                     const auto cao = static_cast<std::size_t>(cc) * ket.orb_indices[0] +
                                      ket.orb_indices[static_cast<std::size_t>(kc) + 1];
 
+                    // a diagonal block pair produces each unordered AO pair
+                    // once; off-diagonal pairs span disjoint rows/columns
                     if (diagonal && r > cao) continue;
 
-                    m[std::min(r, cao) * dim + std::max(r, cao)] = row[cp_base + static_cast<std::size_t>(c)];
+                    const double v = row[cp_base + static_cast<std::size_t>(c)];
+                    m[r * dim + cao] = v;
+                    if (r != cao) m[cao * dim + r] = v;
                 }
             }
         }
@@ -539,14 +543,10 @@ OverlapDriver::compute(const CMolecule       &molecule,
     g_balance.busy  = thread_busy;
     g_balance.pairs = thread_pairs;
 
-    // the scatter filled the upper triangle only — mirror it into the lower
-    const auto t_symmetrize = std::chrono::steady_clock::now();
-    matrix.symmetrize();
+    // the scatter wrote both triangles — no standalone symmetrize pass
 
     if (profile != nullptr)
     {
-        profile->symmetrize += seconds(std::chrono::steady_clock::now() - t_symmetrize);
-
         for (const auto &thread_profile : thread_profiles)
         {
             profile->screen  += thread_profile.screen;
