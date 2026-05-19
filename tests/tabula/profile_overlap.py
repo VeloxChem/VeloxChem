@@ -1,5 +1,5 @@
 """Per-phase wall-time breakdown of tabula::OverlapDriver::compute, plus the
-per-section breakdown of the single-centre MD recursion.
+per-section breakdown of the overlap seed.
 
 Thread-summed seconds, across c240 and a span of def2 bases.
 """
@@ -7,8 +7,6 @@ Thread-summed seconds, across c240 and a span of def2 bases.
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.tabulalib import (tabula_overlap_profile,
-                                 md_recursion_profile,
-                                 reset_md_recursion_profile,
                                  seed_profile,
                                  reset_seed_profile)
 
@@ -29,10 +27,8 @@ for molecule_name in ["c240"]:
 
         tabula_overlap_profile(molecule, basis, 0.0)            # warm-up
 
-        reset_md_recursion_profile()
         reset_seed_profile()
         profile = tabula_overlap_profile(molecule, basis, 0.0)
-        md = md_recursion_profile()
         seed = seed_profile()
 
         total = sum(profile[p] for p in PHASES)
@@ -46,14 +42,3 @@ for molecule_name in ["c240"]:
         for part in ("allocate", "row0", "ladder"):
             ms = seed[part] * 1e3
             print(f"    {part:10s}  {ms:9.2f} ms  ({ms / seed_total * 100:5.1f} %)")
-
-        md_total = profile["md"] * 1e3
-        print(f"  md breakdown ({md_total:.1f} ms):")
-        print(f"    allocate    {md['allocate'] * 1e3:9.2f} ms  "
-              f"({md['allocate'] * 1e5 / md_total:5.1f} %)")
-        print(f"    seed_copy   {md['seed_copy'] * 1e3:9.2f} ms  "
-              f"({md['seed_copy'] * 1e5 / md_total:5.1f} %)")
-        for degree, seconds in enumerate(md["build_by_degree"]):
-            if seconds > 0.0:
-                ms = seconds * 1e3
-                print(f"    build d={degree}  {ms:9.2f} ms  ({ms / md_total * 100:5.1f} %)")

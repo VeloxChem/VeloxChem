@@ -379,25 +379,6 @@ export_tabula(py::module& m) -> void
         "Computes the overlap matrix and returns the per-phase wall-time breakdown.",
         "molecule"_a, "basis"_a, "threshold"_a = 0.0);
 
-    // single-centre MD recursion — accumulated per-section profile
-
-    m.def(
-        "md_recursion_profile",
-        []() -> py::dict {
-            const auto profile = md_recursion_profile();
-
-            py::dict result;
-            result["allocate"]        = profile.allocate;
-            result["seed_copy"]       = profile.seed_copy;
-            result["build_by_degree"] = profile.build_by_degree;
-            return result;
-        },
-        "Gets the accumulated compute_one_center_md per-section profile.");
-
-    m.def("reset_md_recursion_profile",
-          &reset_md_recursion_profile,
-          "Resets the accumulated compute_one_center_md profile.");
-
     // overlap seed — accumulated allocate / row0 / ladder profile
 
     m.def(
