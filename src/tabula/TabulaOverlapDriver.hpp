@@ -17,12 +17,10 @@ namespace tabula {  // tabula namespace
 /// Intakes a VeloxChem molecule and molecular basis, builds the basis-function
 /// blocks with `gtofunc::make_gto_blocks`, and for each block pair constructs
 /// a screened `CGtoPairBlock` (the overlap screening estimator drops the
-/// negligible contracted-GTO pairs). The overlap matrix is then evaluated on a
-/// late-contraction path — the primitive integrals of each surviving
-/// contracted-GTO pair are summed, weighted by the contraction coefficients.
-///
-/// This is the scaffold; the per-shell-pair primitive recursion is a separate
-/// seam (see `TabulaOverlapDriver.cpp`).
+/// negligible contracted-GTO pairs). The overlap matrix is then evaluated on
+/// the late-contraction recursion path — seed ladder, primitive-pair
+/// contraction, single-centre MD recursion, Cartesian-to-spherical assembly,
+/// and the scatter into the matrix.
 class OverlapDriver
 {
    public:

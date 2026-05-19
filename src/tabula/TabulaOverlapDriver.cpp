@@ -5,7 +5,6 @@
 
 #include "TabulaOverlapDriver.hpp"
 
-#include <algorithm>
 #include <cstddef>
 #include <vector>
 
@@ -13,124 +12,85 @@
 #include "GtoFunc.hpp"
 #include "GtoPairBlock.hpp"
 #include "Point.hpp"
+#include "TabulaContraction.hpp"
+#include "TabulaMDRecursion.hpp"
+#include "TabulaOverlapRecursion.hpp"
 #include "TabulaOverlapScreener.hpp"
+#include "TabulaOverlapTransform.hpp"
 
 namespace tabula {  // tabula namespace
 
 namespace {  // unnamed namespace
 
-// ====================================================================
-//  RECURSION SEAM
-//
-//  This is where Tabula's custom recursion plugs in. The scaffold below
-//  owns the contracted-pair loop, the late contraction, and the AO
-//  scatter; it calls this routine once per primitive pair and expects the
-//  *primitive* overlap integrals back (no contraction coefficients — the
-//  scaffold applies those).
-// ====================================================================
-
-/// @brief Fills `primitive` with the primitive overlap integrals of one
-/// primitive pair, for the `(la, lc)` shell pair.
-///
-/// `primitive` has length `(2*la+1)*(2*lc+1)`, row-major over the bra/ket
-/// solid-harmonic components: element `(ma, mc)` is at `ma*(2*lc+1) + mc`.
-///
-/// STUB — currently zero-filled. The custom recursion replaces this body.
-auto
-compute_primitive_overlap(double*                              primitive,
-                          const int                            la,
-                          const int                            lc,
-                          [[maybe_unused]] const double         alpha,
-                          [[maybe_unused]] const double         beta,
-                          [[maybe_unused]] const TPoint<double>& rA,
-                          [[maybe_unused]] const TPoint<double>& rC) -> void
-{
-    const auto count = (2 * la + 1) * (2 * lc + 1);
-
-    // TODO: custom recursion — primitive overlap for the (la, lc) shell pair.
-    for (int k = 0; k < count; k++)
-    {
-        primitive[k] = 0.0;
-    }
-}
-
 /// @brief Evaluates a screened `CGtoPairBlock` into the overlap matrix — the
-/// late-contraction scaffold.
+/// late-contraction recursion end to end: the seed ladder (a), the
+/// primitive-pair contraction (b), the single-centre MD recursion (c), the
+/// Cartesian-to-spherical assembly (d), and the scatter into the matrix (e).
 ///
-/// For each surviving contracted-GTO pair the primitive integrals are summed
-/// over the primitive pairs, weighted by the pair's contraction coefficient
-/// (`normalization_factors`, the combined bra/ket primitive weight), and the
-/// contracted block is scattered into the global matrix. An off-diagonal
-/// block pair also fills its transpose.
+/// An off-diagonal block pair also fills its transpose.
 auto
-compute_pair_block(DenseMatrix& matrix, const CGtoPairBlock& pairBlock, const bool diagonalPair) -> void
+evaluate_pair_block(DenseMatrix &matrix, const CGtoPairBlock &pair_block, const bool diagonal_pair) -> void
 {
-    const auto [la, lc] = pairBlock.angular_momentums();
+    const auto angular_momentums = pair_block.angular_momentums();
+    const auto l_a               = angular_momentums.first;
+    const auto l_c               = angular_momentums.second;
+    const auto order             = static_cast<std::size_t>(l_a + l_c);
 
-    const auto cdim    = pairBlock.number_of_contracted_pairs();
-    const auto nppairs = pairBlock.number_of_primitive_pairs();
+    const auto cdim = pair_block.number_of_contracted_pairs();
+    if (cdim == 0) return;
 
-    const auto ma = 2 * la + 1;
-    const auto mc = 2 * lc + 1;
+    const auto nppairs = static_cast<std::size_t>(pair_block.number_of_primitive_pairs());
 
-    // basis-function-pair-block SoA data
-    const auto braCoords = pairBlock.bra_coordinates();
-    const auto ketCoords = pairBlock.ket_coordinates();
-    const auto braExps   = pairBlock.bra_exponents();
-    const auto ketExps   = pairBlock.ket_exponents();
-    const auto norms     = pairBlock.normalization_factors();
+    // (a) + (b) — the contracted seed ladder [0]^m
+    const auto seed       = compute_overlap_seed(pair_block);
+    const auto contracted = contract_primitive_pairs(seed, order + 1, cdim, nppairs);
 
-    // orbital indices — [0] is the AO component stride, [ij+1] the per-pair
-    // global orbital offset
-    const auto braOrb = pairBlock.bra_orbital_indices();
-    const auto ketOrb = pairBlock.ket_orbital_indices();
+    // AC = A − C, per contracted pair
+    const auto bra_coords = pair_block.bra_coordinates();
+    const auto ket_coords = pair_block.ket_coordinates();
 
-    std::vector<double> primitive(static_cast<std::size_t>(ma * mc), 0.0);
-    std::vector<double> contracted(static_cast<std::size_t>(ma * mc), 0.0);
-
+    std::vector<double> ac_x(cdim), ac_y(cdim), ac_z(cdim);
     for (std::size_t ij = 0; ij < cdim; ij++)
     {
-        std::fill(contracted.begin(), contracted.end(), 0.0);
+        const auto a = bra_coords[ij].coordinates();
+        const auto c = ket_coords[ij].coordinates();
+        ac_x[ij]     = a[0] - c[0];
+        ac_y[ij]     = a[1] - c[1];
+        ac_z[ij]     = a[2] - c[2];
+    }
 
-        const auto rA = braCoords[ij];
-        const auto rC = ketCoords[ij];
+    // (c) — the single-centre MD recursion [r]^0
+    const auto rterms = compute_one_center_md(contracted, order, cdim, ac_x, ac_y, ac_z);
 
-        // late contraction — sum the primitive integrals over the primitive
-        // pairs, weighted by the contraction coefficients
-        for (int pp = 0; pp < nppairs; pp++)
+    // (d) — the Cartesian-to-spherical assembly
+    const auto stride          = ((cdim + 7) / 8) * 8;
+    const auto bra_components  = 2 * l_a + 1;
+    const auto ket_components  = 2 * l_c + 1;
+
+    std::vector<double> spherical(static_cast<std::size_t>(bra_components * ket_components) * stride, 0.0);
+    overlap_transform(l_a, l_c, rterms.data(), cdim, spherical.data());
+
+    // (e) — scatter the spherical block into the matrix; the orbital indices
+    // carry the AO component stride ([0]) and the per-pair offset ([ij+1])
+    const auto bra_orbitals = pair_block.bra_orbital_indices();
+    const auto ket_orbitals = pair_block.ket_orbital_indices();
+
+    for (int ca = 0; ca < bra_components; ca++)
+    {
+        for (int cc = 0; cc < ket_components; cc++)
         {
-            const auto ijoff = static_cast<std::size_t>(pp) * cdim + ij;
+            const auto *row = spherical.data() + static_cast<std::size_t>(ca * ket_components + cc) * stride;
 
-            const auto alpha  = braExps[ijoff];
-            const auto beta   = ketExps[ijoff];
-            const auto weight = norms[ijoff];
-
-            compute_primitive_overlap(primitive.data(), la, lc, alpha, beta, rA, rC);
-
-            for (int k = 0; k < ma * mc; k++)
+            for (std::size_t ij = 0; ij < cdim; ij++)
             {
-                contracted[k] += weight * primitive[k];
-            }
-        }
+                const auto r = static_cast<std::size_t>(ca) * bra_orbitals[0] + bra_orbitals[ij + 1];
+                const auto c = static_cast<std::size_t>(cc) * ket_orbitals[0] + ket_orbitals[ij + 1];
 
-        // scatter the contracted block into the global matrix
-        for (int ia = 0; ia < ma; ia++)
-        {
-            const auto row = static_cast<std::size_t>(ia) * braOrb[0] + braOrb[ij + 1];
+                matrix(r, c) = row[ij];
 
-            for (int ic = 0; ic < mc; ic++)
-            {
-                const auto col = static_cast<std::size_t>(ic) * ketOrb[0] + ketOrb[ij + 1];
-
-                const auto value = contracted[ia * mc + ic];
-
-                matrix(row, col) = value;
-
-                // an off-diagonal block pair also fills its transpose; a
-                // diagonal pair already visits both (a,c) and (c,a)
-                if (!diagonalPair)
+                if (!diagonal_pair)
                 {
-                    matrix(col, row) = value;
+                    matrix(c, r) = row[ij];
                 }
             }
         }
@@ -140,27 +100,27 @@ compute_pair_block(DenseMatrix& matrix, const CGtoPairBlock& pairBlock, const bo
 }  // namespace
 
 auto
-OverlapDriver::compute(const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) const -> DenseMatrix
+OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, const double threshold) const -> DenseMatrix
 {
-    const auto gtoBlocks = gtofunc::make_gto_blocks(basis, molecule);
+    const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
 
-    const auto dimension = static_cast<std::size_t>(gtofunc::getNumberOfAtomicOrbitals(gtoBlocks));
+    const auto dimension = static_cast<std::size_t>(gtofunc::getNumberOfAtomicOrbitals(gto_blocks));
 
     DenseMatrix matrix(dimension, dimension, Symmetry::symmetric);
 
     // triangular loop over the basis-function-block pairs
-    for (std::size_t i = 0; i < gtoBlocks.size(); i++)
+    for (std::size_t i = 0; i < gto_blocks.size(); i++)
     {
         for (std::size_t j = 0; j <= i; j++)
         {
-            const auto estimator = make_overlap_screening_estimator(gtoBlocks[i].angular_momentum(),
-                                                                    gtoBlocks[j].angular_momentum());
+            const auto estimator = make_overlap_screening_estimator(gto_blocks[i].angular_momentum(),
+                                                                    gto_blocks[j].angular_momentum());
 
             // a screened pair block — the negligible contracted-GTO pairs are
             // dropped at construction
-            const CGtoPairBlock pairBlock(gtoBlocks[i], gtoBlocks[j], estimator, threshold);
+            const CGtoPairBlock pair_block(gto_blocks[i], gto_blocks[j], estimator, threshold);
 
-            compute_pair_block(matrix, pairBlock, i == j);
+            evaluate_pair_block(matrix, pair_block, i == j);
         }
     }
 

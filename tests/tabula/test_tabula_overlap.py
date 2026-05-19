@@ -2,61 +2,58 @@ import numpy as np
 
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
-from veloxchem.tabulalib import TabulaOverlapDriver, TabulaSymmetry
+from veloxchem.veloxchemlib import OverlapDriver
+from veloxchem.tabulalib import TabulaOverlapDriver
 
 
 class TestTabulaOverlap:
-    """Skeleton tests for tabula::OverlapDriver.
+    """Tests for tabula::OverlapDriver — the full late-contraction overlap
+    recursion (seed ladder, contraction, single-centre MD recursion,
+    Cartesian-to-spherical assembly, scatter). The matrix is validated
+    element-wise against VeloxChem's OverlapDriver, which shares the AO
+    ordering."""
 
-    The per-shell-pair primitive recursion is still a stub, so the overlap
-    comes out all zeros. These tests exercise the scaffold — basis-block
-    intake, the screened CGtoPairBlock construction, the contracted-pair loop,
-    the AO scatter, the matrix dimension and symmetry. Once the custom
-    recursion is in, the zero checks become comparisons against VeloxChem's
-    overlap.
-    """
+    WATER = ("O 0.000  0.000  0.000\n"
+             "H 0.000  1.430  1.107\n"
+             "H 0.000 -1.430  1.107")
+
+    def reference(self, mol, bas):
+
+        return OverlapDriver().compute(mol, bas).full_matrix().to_numpy()
+
+    def check(self, xyz, basis_label):
+
+        mol = Molecule.read_str(xyz, 'au')
+        bas = MolecularBasis.read(mol, basis_label, ostream=None)
+
+        tabula_s = TabulaOverlapDriver().compute(mol, bas).to_numpy()
+        vlx_s = self.reference(mol, bas)
+
+        assert tabula_s.shape == vlx_s.shape
+        assert np.allclose(tabula_s, vlx_s, 0.0, 1.0e-10)
 
     def test_h2_sto3g(self):
 
-        mol = Molecule.read_molecule_string(
-            "H 0.0 0.0 0.0\nH 0.0 0.0 0.74", units='angstrom')
-        bas = MolecularBasis.read(mol, 'STO-3G', ostream=None)
-
-        S = TabulaOverlapDriver().compute(mol, bas)
-
-        # H2 / STO-3G -> 2 s-type AOs
-        assert S.rows() == 2 and S.columns() == 2
-        assert S.symmetry() == TabulaSymmetry.symmetric
-        # the primitive recursion is stubbed -> all zeros
-        assert np.allclose(S.to_numpy(), 0.0, 1.0e-13, 1.0e-13)
+        # s functions only
+        self.check("H 0.0 0.0 0.0\nH 0.0 0.0 1.4", 'STO-3G')
 
     def test_water_sto3g(self):
 
-        mol = Molecule.read_molecule_string(
-            "O 0.000  0.000  0.000\n"
-            "H 0.000  0.757  0.587\n"
-            "H 0.000 -0.757  0.587", units='angstrom')
-        bas = MolecularBasis.read(mol, 'STO-3G', ostream=None)
+        # s and p functions
+        self.check(self.WATER, 'STO-3G')
 
-        S = TabulaOverlapDriver().compute(mol, bas)
+    def test_water_def2svp(self):
 
-        # H2O / STO-3G -> O(1s,2s,2p) = 5 + 2 x H(1s) = 2 -> 7 AOs;
-        # exercises the (2l+1)-component scatter of the p-block
-        assert S.rows() == 7 and S.columns() == 7
-        assert S.symmetry() == TabulaSymmetry.symmetric
-        assert np.allclose(S.to_numpy(), 0.0, 1.0e-13, 1.0e-13)
+        # s, p and d functions
+        self.check(self.WATER, 'def2-SVP')
 
-    def test_runs_with_screening_threshold(self):
+    def test_screening_threshold(self):
 
-        mol = Molecule.read_molecule_string(
-            "O 0.000  0.000  0.000\n"
-            "H 0.000  0.757  0.587\n"
-            "H 0.000 -0.757  0.587", units='angstrom')
-        bas = MolecularBasis.read(mol, 'STO-3G', ostream=None)
+        # a small screening threshold keeps the result within tolerance of
+        # the unscreened overlap
+        mol = Molecule.read_str(self.WATER, 'au')
+        bas = MolecularBasis.read(mol, 'def2-SVP', ostream=None)
 
-        # a positive screening threshold drops negligible CGTO pairs at the
-        # screened-CGtoPairBlock construction; the matrix shape is unchanged
-        S = TabulaOverlapDriver().compute(mol, bas, threshold=1.0e-10)
-
-        assert S.rows() == 7 and S.columns() == 7
-        assert S.symmetry() == TabulaSymmetry.symmetric
+        screened = TabulaOverlapDriver().compute(mol, bas, threshold=1.0e-12)
+        assert np.allclose(screened.to_numpy(), self.reference(mol, bas),
+                           0.0, 1.0e-8)
