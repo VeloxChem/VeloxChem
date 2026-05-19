@@ -32,6 +32,7 @@
 
 #include "ExportOrbdata.hpp"
 
+#include <pybind11/functional.h>
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
@@ -330,6 +331,10 @@ export_orbdata(py::module &m)
         .def(py::init<const CGtoPairBlock &>())
         .def(py::init<const CGtoBlock &>())
         .def(py::init<const CGtoBlock &, const CGtoBlock &>())
+        .def(py::init<const CGtoBlock &,
+                      const CGtoBlock &,
+                      const std::function<double(const size_t, const size_t)> &,
+                      const double>())
         .def(py::init<const std::vector<TPoint<double>> &,
                       const std::vector<TPoint<double>> &,
                       const std::vector<double> &,

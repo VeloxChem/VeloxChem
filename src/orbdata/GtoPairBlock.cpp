@@ -337,6 +337,160 @@ CGtoPairBlock::CGtoPairBlock(const CGtoBlock &bra_gto_block, const CGtoBlock &ke
     });
 }
 
+CGtoPairBlock::CGtoPairBlock(const CGtoBlock                                         &bra_gto_block,
+                             const CGtoBlock                                         &ket_gto_block,
+                             const std::function<double(const size_t, const size_t)> &estimator,
+                             const double                                             threshold)
+
+    : _bra_coordinates{}
+
+    , _ket_coordinates{}
+
+    , _bra_exponents{}
+
+    , _ket_exponents{}
+
+    , _norms{}
+
+    , _overlaps{}
+
+    , _bra_orb_indices{}
+
+    , _ket_orb_indices{}
+
+    , _bra_atm_indices{}
+
+    , _ket_atm_indices{}
+
+    , _angular_momentums({-1, -1})
+
+    , _nppairs(-1)
+{
+    // set up pi value
+
+    const auto fpi = mathconst::pi_value();
+
+    // fetch GTOs block data on bra side
+
+    const auto bcoords = bra_gto_block.coordinates();
+
+    const auto bexps = bra_gto_block.exponents();
+
+    const auto bnorms = bra_gto_block.normalization_factors();
+
+    const auto borbidx = bra_gto_block.orbital_indices();
+
+    const auto batmidx = bra_gto_block.atomic_indices();
+
+    // fetch GTOs block data on ket side
+
+    const auto kcoords = ket_gto_block.coordinates();
+
+    const auto kexps = ket_gto_block.exponents();
+
+    const auto knorms = ket_gto_block.normalization_factors();
+
+    const auto korbidx = ket_gto_block.orbital_indices();
+
+    const auto katmidx = ket_gto_block.atomic_indices();
+
+    // set up dimensions
+
+    const auto bcgtos = bra_gto_block.number_of_basis_functions();
+
+    const auto bpgtos = bra_gto_block.number_of_primitives();
+
+    const auto kcgtos = ket_gto_block.number_of_basis_functions();
+
+    const auto kpgtos = ket_gto_block.number_of_primitives();
+
+    // screening pre-pass — keep the contracted-GTO pairs whose screening
+    // estimate is at or above the threshold
+
+    std::vector<std::pair<int, int>> pairs;
+
+    for (int i = 0; i < bcgtos; i++)
+    {
+        for (int j = 0; j < kcgtos; j++)
+        {
+            if (estimator(static_cast<size_t>(i), static_cast<size_t>(j)) >= threshold)
+            {
+                pairs.push_back({i, j});
+            }
+        }
+    }
+
+    // allocate memory for the surviving contracted-GTO pairs
+
+    const auto cdim = pairs.size();
+
+    _bra_coordinates = std::vector<TPoint<double>>(cdim, TPoint<double>({0.0, 0.0, 0.0}));
+
+    _ket_coordinates = std::vector<TPoint<double>>(cdim, TPoint<double>({0.0, 0.0, 0.0}));
+
+    _bra_orb_indices = std::vector<size_t>(cdim + 1, 0);
+
+    _ket_orb_indices = std::vector<size_t>(cdim + 1, 0);
+
+    _bra_atm_indices = std::vector<int>(cdim, -1);
+
+    _ket_atm_indices = std::vector<int>(cdim, -1);
+
+    const auto pdim = cdim * bpgtos * kpgtos;
+
+    _bra_exponents = std::vector<double>(pdim, 0.0);
+
+    _ket_exponents = std::vector<double>(pdim, 0.0);
+
+    _norms = std::vector<double>(pdim, 0.0);
+
+    _overlaps = std::vector<double>(pdim, 0.0);
+
+    // set up GTO pairs data
+
+    const auto bangmom = bra_gto_block.angular_momentum();
+
+    const auto kangmom = ket_gto_block.angular_momentum();
+
+    _bra_orb_indices[0] = borbidx[0];
+
+    _ket_orb_indices[0] = korbidx[0];
+
+    _angular_momentums = {bangmom, kangmom};
+
+    _nppairs = bpgtos * kpgtos;
+
+    for (size_t ij_idx = 0; ij_idx < cdim; ij_idx++)
+    {
+        const auto [i, j] = pairs[ij_idx];
+        const auto r_a    = bcoords[i];
+        const auto r_b    = kcoords[j];
+
+        _bra_coordinates[ij_idx]     = r_a;
+        _ket_coordinates[ij_idx]     = r_b;
+        _bra_orb_indices[ij_idx + 1] = borbidx[i + 1];
+        _ket_orb_indices[ij_idx + 1] = korbidx[j + 1];
+        _bra_atm_indices[ij_idx]     = batmidx[i];
+        _ket_atm_indices[ij_idx]     = katmidx[j];
+
+        const auto r2ab = r_a.distance_square(r_b);
+        std::ranges::for_each(views::rectangular(bpgtos, kpgtos), [&](const auto &index_kl) {
+            const auto [k, l] = index_kl;
+            const auto koff   = k * bcgtos + i;
+            const auto loff   = l * kcgtos + j;
+            const auto ijoff  = (k * kpgtos + l) * cdim + ij_idx;
+
+            _bra_exponents[ijoff] = bexps[koff];
+            _ket_exponents[ijoff] = kexps[loff];
+            _norms[ijoff]         = bnorms[koff] * knorms[loff];
+            const auto fe_ab      = 1.0 / (bexps[koff] + kexps[loff]);
+            const auto fz_ab      = bexps[koff] * kexps[loff] * fe_ab;
+            const auto fact       = fpi * fe_ab;
+            _overlaps[ijoff]      = fact * std::sqrt(fact) * std::exp(-fz_ab * r2ab);
+        });
+    }
+}
+
 CGtoPairBlock::CGtoPairBlock(const CGtoPairBlock &other)
 
     : _bra_coordinates(other._bra_coordinates)
