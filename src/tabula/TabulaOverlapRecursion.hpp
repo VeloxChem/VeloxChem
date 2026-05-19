@@ -48,9 +48,12 @@ auto reset_seed_profile() -> void;
 /// primitive exponents — so the contraction step is a plain sum. The ladder
 /// is `[0]^m = (−2ρ)·[0]^(m−1)`, `ρ = αγ/(α+γ)`.
 ///
+/// The returned reference is to a grow-only thread-local buffer — it stays
+/// valid until the next `compute_overlap_seed` call on the same thread.
+///
 /// @param pair_block The basis-function-pair block.
 /// @return The seed-ladder buffer.
-auto compute_overlap_seed(const GtoPairBlock& pair_block) -> std::vector<double>;
+auto compute_overlap_seed(const GtoPairBlock& pair_block) -> const std::vector<double>&;
 
 }  // namespace tabula
 

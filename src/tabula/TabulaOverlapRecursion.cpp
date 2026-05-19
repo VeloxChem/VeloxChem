@@ -53,7 +53,7 @@ reset_seed_profile() -> void
 }
 
 auto
-compute_overlap_seed(const GtoPairBlock& pair_block) -> std::vector<double>
+compute_overlap_seed(const GtoPairBlock& pair_block) -> const std::vector<double>&
 {
     // angular momenta — plain ints (a structured binding cannot be captured
     // by an OpenMP simd region)
@@ -75,7 +75,14 @@ compute_overlap_seed(const GtoPairBlock& pair_block) -> std::vector<double>
 
     const auto t_seed_start = seed_now();
 
-    std::vector<double> seed(static_cast<std::size_t>(order + 1) * stride, 0.0);
+    // the seed buffer is a grow-only thread-local scratch — every value the
+    // recursion reads is written before use (row 0 and each ladder row write
+    // all pdim primitive pairs of their row), so it needs no zero-fill
+    thread_local std::vector<double> seed;
+    if (const auto need = static_cast<std::size_t>(order + 1) * stride; seed.size() < need)
+    {
+        seed.resize(need);
+    }
 
     const auto t_allocated = seed_now();
     seed_add(g_seed_allocate, t_seed_start, t_allocated);
@@ -123,20 +130,34 @@ compute_overlap_seed(const GtoPairBlock& pair_block) -> std::vector<double>
     const auto t_row0 = seed_now();
     seed_add(g_seed_row0, t_allocated, t_row0);
 
-    // rows 1 … L — the seed ladder [0]^m = (−2ρ)·[0]^(m−1), ρ = αγ/(α+γ)
-    for (int m = 1; m <= order; m++)
+    // rows 1 … L — the seed ladder [0]^m = (−2ρ)·[0]^(m−1). ρ = αγ/(α+γ)
+    // depends only on the exponents, so the row multiplier −2ρ is computed
+    // once and reused for every ladder row instead of being rebuilt per row.
+    if (order > 0)
     {
-        const auto* prev = seed.data() + static_cast<std::size_t>(m - 1) * stride;
-        auto*       curr = seed.data() + static_cast<std::size_t>(m) * stride;
+        thread_local std::vector<double> ladder_factor;
+        if (ladder_factor.size() < pdim) ladder_factor.resize(pdim);
+        auto* factor = ladder_factor.data();
 
 #pragma omp simd
         for (std::size_t k = 0; k < pdim; k++)
         {
-            const auto a   = bra_exps[k];
-            const auto g   = ket_exps[k];
-            const auto rho = a * g / (a + g);
+            const auto a = bra_exps[k];
+            const auto g = ket_exps[k];
 
-            curr[k] = -2.0 * rho * prev[k];
+            factor[k] = -2.0 * a * g / (a + g);
+        }
+
+        for (int m = 1; m <= order; m++)
+        {
+            const auto* prev = seed.data() + static_cast<std::size_t>(m - 1) * stride;
+            auto*       curr = seed.data() + static_cast<std::size_t>(m) * stride;
+
+#pragma omp simd
+            for (std::size_t k = 0; k < pdim; k++)
+            {
+                curr[k] = factor[k] * prev[k];
+            }
         }
     }
 

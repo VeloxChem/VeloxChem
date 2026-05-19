@@ -62,7 +62,7 @@ evaluate_pair_block(DenseMatrix &matrix, const GtoPairBlock &pair_block, const b
     const auto t_start = std::chrono::steady_clock::now();
 
     // (a) + (b) — the contracted seed ladder [0]^m
-    const auto seed = compute_overlap_seed(pair_block);
+    const auto &seed = compute_overlap_seed(pair_block);
 
     const auto t_seed = std::chrono::steady_clock::now();
 
