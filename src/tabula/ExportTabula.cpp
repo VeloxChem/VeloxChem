@@ -19,6 +19,7 @@
 #include "TabulaMixedPrecisionBlockSparseMatrix.hpp"
 #include "TabulaOverlapDriver.hpp"
 #include "TabulaOverlapRecursion.hpp"
+#include "TabulaOverlapTransform.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -252,6 +253,63 @@ export_tabula(py::module& m) -> void
             return result;
         },
         "Computes the single-centre MD recursion terms [r]^0, |r| = l_a+l_c, of a pair block.",
+        "pair_block"_a);
+
+    // overlap recursion — step (d): the assembled spherical overlap block
+
+    m.def(
+        "tabula_overlap_spherical",
+        [](const CGtoPairBlock& pair_block) -> py::array_t<double> {
+            const auto angular_momentums = pair_block.angular_momentums();
+            const auto l_a               = angular_momentums.first;
+            const auto l_c               = angular_momentums.second;
+            const auto order             = static_cast<std::size_t>(l_a + l_c);
+
+            const auto cdim    = pair_block.number_of_contracted_pairs();
+            const auto nppairs = static_cast<std::size_t>(pair_block.number_of_primitive_pairs());
+
+            // steps (a) + (b) — the contracted seed ladder
+            const auto seed       = compute_overlap_seed(pair_block);
+            const auto contracted = contract_primitive_pairs(seed, order + 1, cdim, nppairs);
+
+            // AC = A − C, per contracted pair
+            const auto bra_coords = pair_block.bra_coordinates();
+            const auto ket_coords = pair_block.ket_coordinates();
+
+            std::vector<double> ac_x(cdim), ac_y(cdim), ac_z(cdim);
+            for (std::size_t ij = 0; ij < cdim; ij++)
+            {
+                const auto a = bra_coords[ij].coordinates();
+                const auto c = ket_coords[ij].coordinates();
+                ac_x[ij]     = a[0] - c[0];
+                ac_y[ij]     = a[1] - c[1];
+                ac_z[ij]     = a[2] - c[2];
+            }
+
+            // step (c) — the single-centre MD recursion
+            const auto rterms = compute_one_center_md(contracted, order, cdim, ac_x, ac_y, ac_z);
+
+            // step (d) — the Cartesian-to-spherical assembly
+            const auto stride         = ((cdim + 7) / 8) * 8;
+            const auto component_rows = static_cast<std::size_t>((2 * l_a + 1) * (2 * l_c + 1));
+
+            std::vector<double> spherical(component_rows * stride, 0.0);
+            overlap_transform(l_a, l_c, rterms.data(), cdim, spherical.data());
+
+            py::array_t<double> result({component_rows, cdim});
+            auto                view = result.mutable_unchecked<2>();
+
+            for (std::size_t s = 0; s < component_rows; s++)
+            {
+                for (std::size_t ij = 0; ij < cdim; ij++)
+                {
+                    view(s, ij) = spherical[s * stride + ij];
+                }
+            }
+
+            return result;
+        },
+        "Computes the assembled spherical overlap block of a basis-function-pair block.",
         "pair_block"_a);
 }
 
