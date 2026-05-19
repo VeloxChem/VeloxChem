@@ -5,17 +5,14 @@
 
 #include "ExportTabula.hpp"
 
-#include <pybind11/functional.h>
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
 
 #include <cstddef>
 #include <utility>
 
-#include "GtoBlock.hpp"
 #include "TabulaBlockSparseMatrix.hpp"
 #include "TabulaDenseMatrix.hpp"
-#include "TabulaGtoPairBlock.hpp"
 #include "TabulaMixedPrecisionBlockSparseMatrix.hpp"
 #include "TabulaOverlapDriver.hpp"
 
@@ -140,44 +137,6 @@ export_tabula(py::module& m) -> void
                 return self.compute(molecule, basis, threshold);
             },
             "Computes the overlap matrix.", "molecule"_a, "basis"_a, "threshold"_a = 0.0);
-
-    // tabula::GtoPairBlock class
-
-    py::class_<GtoPairBlock>(m, "TabulaGtoPairBlock", "A Tabula-owned basis-function-pair block.")
-        .def(py::init<const CGtoBlock&, const CGtoBlock&>(), "bra"_a, "ket"_a)
-        .def(py::init<const CGtoBlock&, const CGtoBlock&, const ScreeningEstimator&, double>(),
-             "bra"_a,
-             "ket"_a,
-             "estimator"_a,
-             "threshold"_a)
-        .def("angular_momentums", &GtoPairBlock::angular_momentums, "Gets the (l_a, l_c) angular momentums.")
-        .def("number_of_contracted_pairs", &GtoPairBlock::number_of_contracted_pairs, "Gets the contracted-pair count.")
-        .def("number_of_primitive_pairs", &GtoPairBlock::number_of_primitive_pairs, "Gets the primitive-pair count.")
-        .def("bra_coordinates", &GtoPairBlock::bra_coordinates, "Gets the bra-center coordinates.")
-        .def("ket_coordinates", &GtoPairBlock::ket_coordinates, "Gets the ket-center coordinates.")
-        .def("bra_orbital_indices", &GtoPairBlock::bra_orbital_indices, "Gets the bra-side AO indices.")
-        .def("ket_orbital_indices", &GtoPairBlock::ket_orbital_indices, "Gets the ket-side AO indices.")
-        .def(
-            "bra_exponents",
-            [](const GtoPairBlock& self) -> py::array_t<double> {
-                const auto pdim = self.number_of_contracted_pairs() * static_cast<std::size_t>(self.number_of_primitive_pairs());
-                return py::array_t<double>({pdim}, {sizeof(double)}, self.bra_exponents());
-            },
-            "Gets the primitive-pair bra exponents.")
-        .def(
-            "ket_exponents",
-            [](const GtoPairBlock& self) -> py::array_t<double> {
-                const auto pdim = self.number_of_contracted_pairs() * static_cast<std::size_t>(self.number_of_primitive_pairs());
-                return py::array_t<double>({pdim}, {sizeof(double)}, self.ket_exponents());
-            },
-            "Gets the primitive-pair ket exponents.")
-        .def(
-            "weights",
-            [](const GtoPairBlock& self) -> py::array_t<double> {
-                const auto pdim = self.number_of_contracted_pairs() * static_cast<std::size_t>(self.number_of_primitive_pairs());
-                return py::array_t<double>({pdim}, {sizeof(double)}, self.weights());
-            },
-            "Gets the primitive-pair weights (normalization × overlap factor).");
 
     // overlap driver — per-phase wall-time profile of a compute run
 

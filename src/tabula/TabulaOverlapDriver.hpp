@@ -20,11 +20,11 @@ struct OverlapProfile
 {
     /// @brief `gtofunc::make_gto_blocks`.
     double make_blocks{0.0};
-    /// @brief `GtoPairBlock` construction.
+    /// @brief Per-block primitive-data fetch.
     double pair_setup{0.0};
-    /// @brief The fused overlap kernel — the seed ladder, the primitive-pair
-    /// contraction, the single-centre MD recursion, and the
-    /// Cartesian-to-spherical assembly.
+    /// @brief The fused overlap kernel — the primitive-pair weight, the seed
+    /// ladder, the primitive contraction, the single-centre MD recursion, and
+    /// the Cartesian-to-spherical assembly.
     double kernel{0.0};
     /// @brief The scatter into the matrix's upper triangle.
     double scatter{0.0};
@@ -36,12 +36,9 @@ struct OverlapProfile
 /// @brief Driver for the two-center overlap integral.
 ///
 /// Intakes a VeloxChem molecule and molecular basis, builds the basis-function
-/// blocks with `gtofunc::make_gto_blocks`, and for each block pair constructs
-/// a screened `CGtoPairBlock` (the overlap screening estimator drops the
-/// negligible contracted-GTO pairs). The overlap matrix is then evaluated on
-/// the late-contraction recursion path — seed ladder, primitive-pair
-/// contraction, single-centre MD recursion, Cartesian-to-spherical assembly,
-/// and the scatter into the matrix.
+/// blocks with `gtofunc::make_gto_blocks`, and for each task — one block pair
+/// restricted to a bra contracted-GTO range — runs the fused overlap kernel
+/// directly from the block data and scatters the result into the matrix.
 class OverlapDriver
 {
    public:
@@ -51,9 +48,9 @@ class OverlapDriver
     /// @brief Computes the overlap matrix.
     /// @param molecule The molecule.
     /// @param basis The molecular basis.
-    /// @param threshold The screening threshold — a contracted-GTO pair is
-    /// kept when its overlap screening estimate is at or above this value.
-    /// `0` (the default) keeps every pair.
+    /// @param threshold The screening threshold. Screening is not yet ported
+    /// to the fused-kernel path, so this is currently ignored — every pair is
+    /// kept.
     /// @param profile Optional — when non-null, receives the per-phase
     /// wall-time breakdown of the run.
     /// @return The overlap matrix.

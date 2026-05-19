@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
-#include <utility>
 #include <vector>
 
 #include "omp.h"
@@ -16,9 +15,7 @@
 #include "GtoBlock.hpp"
 #include "GtoFunc.hpp"
 #include "Point.hpp"
-#include "TabulaGtoPairBlock.hpp"
 #include "TabulaOverlapKernel.hpp"
-#include "TabulaOverlapScreener.hpp"
 
 namespace tabula {  // tabula namespace
 
@@ -31,91 +28,128 @@ seconds(const std::chrono::steady_clock::duration &interval) -> double
     return std::chrono::duration<double>(interval).count();
 }
 
-// per-thread load balance of the most recent compute's block-pair loop
+// per-thread load balance of the most recent compute's task loop
 ThreadBalance g_balance;
 
-/// @brief Evaluates a `GtoPairBlock` into the overlap matrix — the fused
-/// overlap kernel (the seed ladder, the primitive-pair contraction, the
-/// single-centre MD recursion, and the Cartesian-to-spherical assembly, in
-/// one tiled pass) followed by the scatter into the matrix.
-///
-/// Each element is scattered once into the matrix's upper triangle; the
-/// lower triangle is filled by a single `symmetrize` once every block pair
-/// is done. For a `diagonal` pair block (one belonging to a block paired
-/// with itself) a contracted pair and its mirror both occur, so only the
-/// `r ≤ c` half is written — the mirror entry fills the rest. When `profile`
-/// is non-null, the per-phase wall times are accumulated into it.
-auto
-evaluate_pair_block(DenseMatrix &matrix, const GtoPairBlock &pair_block, const bool diagonal, OverlapProfile *profile) -> void
+/// @brief One basis-function block's primitive data, fetched once from a
+/// `CGtoBlock` — the fused kernel reads it through an `OverlapBlockData` view.
+struct BlockArrays
 {
-    const auto angular_momentums = pair_block.angular_momentums();
-    const auto l_a               = angular_momentums.first;
-    const auto l_c               = angular_momentums.second;
+    /// @brief The primitive exponents, primitive-major.
+    std::vector<double> exponents;
+    /// @brief The primitive normalization factors.
+    std::vector<double> norms;
+    /// @brief The x / y / z coordinate of each contracted GTO.
+    std::vector<double> x, y, z;
+    /// @brief The AO indices — `[0]` the component stride, `[c+1]` contracted
+    /// GTO `c`'s global AO offset.
+    std::vector<std::size_t> orb_indices;
+    /// @brief The number of contracted GTOs.
+    int ncgtos{0};
+    /// @brief The number of primitives per contracted GTO.
+    int nprims{0};
+    /// @brief The block angular momentum.
+    int angular_momentum{0};
 
-    const auto cdim = pair_block.number_of_contracted_pairs();
+    /// @brief A pointer view of this block, as the kernel consumes it.
+    auto view() const -> OverlapBlockData
+    {
+        return OverlapBlockData{exponents.data(), norms.data(), x.data(), y.data(), z.data(), ncgtos, nprims};
+    }
+};
+
+/// @brief Fetches one basis-function block's primitive data.
+auto
+fetch_block(const CGtoBlock &block) -> BlockArrays
+{
+    BlockArrays arrays;
+    arrays.exponents        = block.exponents();
+    arrays.norms            = block.normalization_factors();
+    arrays.orb_indices      = block.orbital_indices();
+    arrays.ncgtos           = block.number_of_basis_functions();
+    arrays.nprims           = block.number_of_primitives();
+    arrays.angular_momentum = block.angular_momentum();
+
+    const auto coords = block.coordinates();
+    arrays.x.resize(static_cast<std::size_t>(arrays.ncgtos));
+    arrays.y.resize(static_cast<std::size_t>(arrays.ncgtos));
+    arrays.z.resize(static_cast<std::size_t>(arrays.ncgtos));
+    for (int c = 0; c < arrays.ncgtos; c++)
+    {
+        const auto xyz = coords[static_cast<std::size_t>(c)].coordinates();
+        arrays.x[static_cast<std::size_t>(c)] = xyz[0];
+        arrays.y[static_cast<std::size_t>(c)] = xyz[1];
+        arrays.z[static_cast<std::size_t>(c)] = xyz[2];
+    }
+    return arrays;
+}
+
+/// @brief Evaluates one task — one block pair restricted to the bra
+/// contracted-GTO range `[bra_begin, bra_end)` — into the overlap matrix: the
+/// fused overlap kernel followed by the scatter.
+///
+/// Each element is scattered once into the matrix's upper triangle; the lower
+/// triangle is filled by a single `symmetrize` once every task is done. For a
+/// `diagonal` task (a block paired with itself) a contracted pair and its
+/// mirror both occur, so only the `r ≤ c` half is written. When `profile` is
+/// non-null, the per-phase wall times are accumulated into it.
+auto
+evaluate_task(DenseMatrix       &matrix,
+              const BlockArrays &bra,
+              const BlockArrays &ket,
+              const int          bra_begin,
+              const int          bra_end,
+              const bool         diagonal,
+              OverlapProfile    *profile) -> void
+{
+    const int l_a = bra.angular_momentum;
+    const int l_c = ket.angular_momentum;
+
+    const std::size_t cdim =
+        static_cast<std::size_t>(bra_end - bra_begin) * static_cast<std::size_t>(ket.ncgtos);
     if (cdim == 0) return;
 
     const auto t_start = std::chrono::steady_clock::now();
 
-    // AC = A − C, per contracted pair
-    const auto &bra_coords = pair_block.bra_coordinates();
-    const auto &ket_coords = pair_block.ket_coordinates();
-
-    std::vector<double> ac_x(cdim), ac_y(cdim), ac_z(cdim);
-    for (std::size_t ij = 0; ij < cdim; ij++)
-    {
-        const auto a = bra_coords[ij].coordinates();
-        const auto c = ket_coords[ij].coordinates();
-        ac_x[ij]     = a[0] - c[0];
-        ac_y[ij]     = a[1] - c[1];
-        ac_z[ij]     = a[2] - c[2];
-    }
-
-    // (a–d) — the fused overlap kernel: the seed ladder, the primitive-pair
-    // contraction, the single-centre MD recursion, and the
+    // the fused overlap kernel — the primitive-pair weight, the seed ladder,
+    // the primitive contraction, the single-centre MD recursion, and the
     // Cartesian-to-spherical assembly, in one tiled pass
     const auto stride         = ((cdim + 7) / 8) * 8;
     const auto bra_components = 2 * l_a + 1;
     const auto ket_components = 2 * l_c + 1;
 
     std::vector<double> spherical(static_cast<std::size_t>(bra_components * ket_components) * stride, 0.0);
-    overlap_kernel(l_a,
-                   l_c,
-                   pair_block.bra_exponents(),
-                   pair_block.ket_exponents(),
-                   pair_block.weights(),
-                   ac_x.data(),
-                   ac_y.data(),
-                   ac_z.data(),
-                   cdim,
-                   pair_block.number_of_primitive_pairs(),
-                   spherical.data());
+    overlap_kernel(l_a, l_c, bra.view(), bra_begin, bra_end, ket.view(), spherical.data());
 
     const auto t_kernel = std::chrono::steady_clock::now();
 
-    // (e) — scatter the spherical block into the matrix; the orbital indices
-    // carry the AO component stride ([0]) and the per-pair offset ([ij+1]).
-    // Each element is written once into the upper triangle — at (min(r,c),
-    // max(r,c)) — and the lower triangle is filled later by `symmetrize`
-    const auto &bra_orbitals = pair_block.bra_orbital_indices();
-    const auto &ket_orbitals = pair_block.ket_orbital_indices();
-
+    // scatter the spherical block into the matrix; the orbital indices carry
+    // the AO component stride ([0]) and the per-GTO offset ([·+1]). The
+    // contracted pair (i, j) is column (i-bra_begin)·kcgtos + j
+    const int kcgtos = ket.ncgtos;
     for (int ca = 0; ca < bra_components; ca++)
     {
         for (int cc = 0; cc < ket_components; cc++)
         {
             const auto *row = spherical.data() + static_cast<std::size_t>(ca * ket_components + cc) * stride;
 
-            for (std::size_t ij = 0; ij < cdim; ij++)
+            for (int i = bra_begin; i < bra_end; i++)
             {
-                const auto r = static_cast<std::size_t>(ca) * bra_orbitals[0] + bra_orbitals[ij + 1];
-                const auto c = static_cast<std::size_t>(cc) * ket_orbitals[0] + ket_orbitals[ij + 1];
+                const auto r = static_cast<std::size_t>(ca) * bra.orb_indices[0] +
+                               bra.orb_indices[static_cast<std::size_t>(i) + 1];
+                const std::size_t cp_base = static_cast<std::size_t>(i - bra_begin) * static_cast<std::size_t>(kcgtos);
 
-                // a diagonal pair block also produces every mirror (j,i), so
-                // the r > c half is skipped — its mirror writes that slot
-                if (diagonal && r > c) continue;
+                for (int j = 0; j < kcgtos; j++)
+                {
+                    const auto c = static_cast<std::size_t>(cc) * ket.orb_indices[0] +
+                                   ket.orb_indices[static_cast<std::size_t>(j) + 1];
 
-                matrix(std::min(r, c), std::max(r, c)) = row[ij];
+                    // a diagonal task also produces every mirror (j,i), so the
+                    // r > c half is skipped — its mirror writes that slot
+                    if (diagonal && r > c) continue;
+
+                    matrix(std::min(r, c), std::max(r, c)) = row[cp_base + static_cast<std::size_t>(j)];
+                }
             }
         }
     }
@@ -142,6 +176,9 @@ OverlapDriver::compute(const CMolecule       &molecule,
                        const double           threshold,
                        OverlapProfile        *profile) const -> DenseMatrix
 {
+    // screening is not yet ported to the fused-kernel path — every pair is kept
+    static_cast<void>(threshold);
+
     const auto t_blocks = std::chrono::steady_clock::now();
 
     const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
@@ -155,13 +192,28 @@ OverlapDriver::compute(const CMolecule       &molecule,
 
     DenseMatrix matrix(dimension, dimension, Symmetry::symmetric);
 
+    // fetch each basis-function block's primitive data once — the kernel reads
+    // it directly, so there is no per-pair block to construct
+    const auto t_setup = std::chrono::steady_clock::now();
+
+    std::vector<BlockArrays> blocks;
+    blocks.reserve(gto_blocks.size());
+    for (const auto &block : gto_blocks)
+    {
+        blocks.push_back(fetch_block(block));
+    }
+
+    if (profile != nullptr)
+    {
+        profile->pair_setup += seconds(std::chrono::steady_clock::now() - t_setup);
+    }
+
     // the unit of parallel work is a task — one block pair restricted to a
-    // sub-range of the bra block's contracted GTOs. The triangular block
-    // pairs span orders of magnitude in cost and are far too few and uneven
-    // to balance; splitting the bra dimension so each task holds roughly
-    // `target_pairs` contracted pairs turns dozens of coarse units into
-    // thousands of even ones. Each task writes a disjoint AO region, so the
-    // concurrent writes do not race.
+    // sub-range of the bra block's contracted GTOs. The triangular block pairs
+    // span orders of magnitude in cost; splitting the bra dimension so each
+    // task holds roughly `target_pairs` contracted pairs turns dozens of
+    // coarse units into thousands of even ones. Each task writes a disjoint AO
+    // region, so the concurrent writes do not race.
     constexpr int target_pairs = 1 << 16;
 
     struct Task
@@ -175,17 +227,15 @@ OverlapDriver::compute(const CMolecule       &molecule,
     };
 
     std::vector<Task> tasks;
-    for (std::size_t i = 0; i < gto_blocks.size(); i++)
+    for (std::size_t i = 0; i < blocks.size(); i++)
     {
         for (std::size_t j = 0; j <= i; j++)
         {
-            const int bcgtos = gto_blocks[i].number_of_basis_functions();
-            const int kcgtos = gto_blocks[j].number_of_basis_functions();
-            const int order  = gto_blocks[i].angular_momentum() + gto_blocks[j].angular_momentum();
+            const int bcgtos = blocks[i].ncgtos;
+            const int kcgtos = blocks[j].ncgtos;
+            const int order  = blocks[i].angular_momentum + blocks[j].angular_momentum;
 
-            // screening keeps a block pair whole; otherwise split the bra
-            // dimension into chunks of about `target_pairs` contracted pairs
-            const int chunk = (threshold > 0.0) ? bcgtos : std::max(1, target_pairs / std::max(1, kcgtos));
+            const int chunk = std::max(1, target_pairs / std::max(1, kcgtos));
 
             for (int a = 0; a < bcgtos; a += chunk)
             {
@@ -225,26 +275,7 @@ OverlapDriver::compute(const CMolecule       &molecule,
 
         const auto &task = tasks[static_cast<std::size_t>(p)];
 
-        const auto t_setup = std::chrono::steady_clock::now();
-
-        // threshold <= 0 disables screening — the task's bra range is built
-        // directly; with screening on the whole block pair is built and the
-        // estimator drops the negligible contracted-GTO pairs
-        const auto pair_block =
-            (threshold > 0.0)
-                ? GtoPairBlock(gto_blocks[task.i],
-                               gto_blocks[task.j],
-                               make_overlap_screening_estimator(gto_blocks[task.i].angular_momentum(),
-                                                                gto_blocks[task.j].angular_momentum()),
-                               threshold)
-                : GtoPairBlock(gto_blocks[task.i], gto_blocks[task.j], task.bra_begin, task.bra_end);
-
-        if (slot != nullptr)
-        {
-            slot->pair_setup += seconds(std::chrono::steady_clock::now() - t_setup);
-        }
-
-        evaluate_pair_block(matrix, pair_block, task.diagonal, slot);
+        evaluate_task(matrix, blocks[task.i], blocks[task.j], task.bra_begin, task.bra_end, task.diagonal, slot);
 
         thread_busy[tid] += seconds(std::chrono::steady_clock::now() - t_body);
         thread_pairs[tid] += 1;
@@ -264,9 +295,8 @@ OverlapDriver::compute(const CMolecule       &molecule,
 
         for (const auto &thread_profile : thread_profiles)
         {
-            profile->pair_setup += thread_profile.pair_setup;
-            profile->kernel     += thread_profile.kernel;
-            profile->scatter    += thread_profile.scatter;
+            profile->kernel  += thread_profile.kernel;
+            profile->scatter += thread_profile.scatter;
         }
     }
 
