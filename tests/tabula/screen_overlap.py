@@ -1,7 +1,8 @@
-"""Screened overlap — tabula::OverlapDriver at a range of thresholds.
+"""Screened block-sparse overlap — tabula::OverlapDriver::computeSparse.
 
-For each (molecule, basis) it times the overlap at several screening
-thresholds and reports the maximum element deviation from VeloxChem's
+For each (molecule, basis) it times the block-sparse overlap at several
+screening thresholds and reports the stored footprint (vs the dense
+dimension^2) and the maximum element deviation from VeloxChem's
 (unscreened) overlap — which a sound screener bounds by the threshold.
 
 Run inside the VeloxChem environment.
@@ -55,7 +56,7 @@ def max_abs_difference(a, b):
 
 
 print(f"{'molecule':9s} {'basis':12s} {'threshold':>11s} "
-      f"{'tabula/s':>11s} {'max-dev':>11s}", flush=True)
+      f"{'tabula/s':>11s} {'stored':>8s} {'max-dev':>11s}", flush=True)
 
 for molecule_name in MOLECULES:
     molecule = read_molecule(molecule_name)
@@ -66,11 +67,15 @@ for molecule_name in MOLECULES:
 
         for threshold in THRESHOLDS:
             t, matrix = best_time(
-                lambda: TabulaOverlapDriver().compute(molecule, basis, threshold))
-            dev = max_abs_difference(matrix.to_numpy(), reference)
+                lambda: TabulaOverlapDriver().compute_sparse(molecule, basis, threshold))
+
+            dimension = matrix.dimension()
+            stored = matrix.stored_element_count() / (dimension * dimension)
+            dev = max_abs_difference(matrix.to_dense().to_numpy(), reference)
             del matrix
             gc.collect()
+
             print(f"{molecule_name:9s} {basis_label:12s} {threshold:11.0e} "
-                  f"{t:11.4f} {dev:11.2e}", flush=True)
+                  f"{t:11.4f} {stored * 100:7.1f}% {dev:11.2e}", flush=True)
         del reference
         gc.collect()

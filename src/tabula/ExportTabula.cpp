@@ -136,7 +136,13 @@ export_tabula(py::module& m) -> void
             [](const OverlapDriver& self, const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) {
                 return self.compute(molecule, basis, threshold);
             },
-            "Computes the overlap matrix.", "molecule"_a, "basis"_a, "threshold"_a = 0.0);
+            "Computes the overlap matrix.", "molecule"_a, "basis"_a, "threshold"_a = 0.0)
+        .def(
+            "compute_sparse",
+            [](const OverlapDriver& self, const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) {
+                return self.computeSparse(molecule, basis, threshold);
+            },
+            "Computes the overlap matrix in block-sparse storage.", "molecule"_a, "basis"_a, "threshold"_a = 0.0);
 
     // overlap driver — per-phase wall-time profile of a compute run
 

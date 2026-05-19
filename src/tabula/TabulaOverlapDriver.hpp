@@ -10,6 +10,7 @@
 
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
+#include "TabulaBlockSparseMatrix.hpp"
 #include "TabulaDenseMatrix.hpp"
 
 namespace tabula {  // tabula namespace
@@ -60,6 +61,22 @@ class OverlapDriver
                  const CMolecularBasis& basis,
                  const double         threshold = 0.0,
                  OverlapProfile      *profile   = nullptr) const -> DenseMatrix;
+
+    /// @brief Computes the overlap matrix in block-sparse storage.
+    ///
+    /// Only the atom-pair blocks whose conservative overlap estimate clears
+    /// the threshold are stored; the rest of the matrix is dropped, giving an
+    /// O(N) footprint for an extended molecule. `0` keeps every atom pair.
+    /// @param molecule The molecule.
+    /// @param basis The molecular basis.
+    /// @param threshold The screening threshold.
+    /// @param profile Optional — when non-null, receives the per-phase
+    /// wall-time breakdown of the run.
+    /// @return The block-sparse overlap matrix.
+    auto computeSparse(const CMolecule&     molecule,
+                       const CMolecularBasis& basis,
+                       const double         threshold = 0.0,
+                       OverlapProfile      *profile   = nullptr) const -> BlockSparseMatrix;
 };
 
 /// @brief Per-thread load balance of the task parallel loop in the most
