@@ -33,6 +33,7 @@
 #include "GtoBlock.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <ranges>
 
 #include "ErrorHandler.hpp"
@@ -57,6 +58,8 @@ CGtoBlock::CGtoBlock()
     , _angular_momentum{-1}
 
     , _npgtos{0}
+
+    , _screening_data{}
 {
 }
 
@@ -81,7 +84,10 @@ CGtoBlock::CGtoBlock(const std::vector<TPoint<double>> &coordinates,
     , _angular_momentum(angular_momentum)
 
     , _npgtos(npgtos)
+
+    , _screening_data{}
 {
+    _compute_screening_data();
 }
 
 CGtoBlock::CGtoBlock(const CMolecularBasis &basis, const CMolecule &molecule, const int angular_momentum, const int npgtos)
@@ -99,6 +105,8 @@ CGtoBlock::CGtoBlock(const CMolecularBasis &basis, const CMolecule &molecule, co
     , _angular_momentum{-1}
 
     , _npgtos{0}
+
+    , _screening_data{}
 {
     if (const auto gtos = basis.basis_functions(angular_momentum, npgtos); !gtos.empty())
     {
@@ -128,6 +136,8 @@ CGtoBlock::CGtoBlock(const CMolecularBasis &basis, const CMolecule &molecule, co
                 _norms[j * ncgtos + i]     = fnorms[j];
             });
         });
+
+        _compute_screening_data();
     }
 }
 
@@ -149,6 +159,8 @@ CGtoBlock::CGtoBlock(const CMolecularBasis  &basis,
     , _angular_momentum{-1}
 
     , _npgtos{0}
+
+    , _screening_data{}
 {
     if (const auto gtos = basis.basis_functions(atoms, angular_momentum, npgtos); !gtos.empty())
     {
@@ -178,6 +190,8 @@ CGtoBlock::CGtoBlock(const CMolecularBasis  &basis,
                 _norms[j * ncgtos + i]     = fnorms[j];
             });
         });
+
+        _compute_screening_data();
     }
 }
 
@@ -196,6 +210,8 @@ CGtoBlock::CGtoBlock(const CGtoBlock &other)
     , _angular_momentum(other._angular_momentum)
 
     , _npgtos(other._npgtos)
+
+    , _screening_data(other._screening_data)
 {
 }
 
@@ -214,6 +230,8 @@ CGtoBlock::CGtoBlock(CGtoBlock &&other) noexcept
     , _angular_momentum(std::move(other._angular_momentum))
 
     , _npgtos(std::move(other._npgtos))
+
+    , _screening_data(std::move(other._screening_data))
 {
 }
 
@@ -233,6 +251,8 @@ CGtoBlock::operator=(const CGtoBlock &other) -> CGtoBlock &
     _angular_momentum = other._angular_momentum;
 
     _npgtos = other._npgtos;
+
+    _screening_data = other._screening_data;
 
     return *this;
 }
@@ -255,6 +275,8 @@ CGtoBlock::operator=(CGtoBlock &&other) noexcept -> CGtoBlock &
         _angular_momentum = std::move(other._angular_momentum);
 
         _npgtos = std::move(other._npgtos);
+
+        _screening_data = std::move(other._screening_data);
     }
 
     return *this;
@@ -562,4 +584,50 @@ auto
 CGtoBlock::number_of_basis_functions() const -> int
 {
     return static_cast<int>(_coordinates.size());
+}
+
+auto
+CGtoBlock::screening_data(const size_t index) const -> CGtoBlockScreeningData
+{
+    return _screening_data[index];
+}
+
+auto
+CGtoBlock::_compute_screening_data() -> void
+{
+    // primitive-major SoA: element (primitive p, contracted GTO c) is at
+    // p * ncgtos + c
+
+    const auto ncgtos = static_cast<int>(_coordinates.size());
+
+    _screening_data.assign(static_cast<size_t>(ncgtos), CGtoBlockScreeningData{});
+
+    for (int c = 0; c < ncgtos; c++)
+    {
+        double max_coef = 0.0;
+        double min_exp  = 0.0;
+        double max_exp  = 0.0;
+
+        for (int p = 0; p < _npgtos; p++)
+        {
+            const auto idx = static_cast<size_t>(p * ncgtos + c);
+
+            max_coef = std::max(max_coef, std::abs(_norms[idx]));
+
+            const auto exponent = _exponents[idx];
+
+            if (p == 0)
+            {
+                min_exp = exponent;
+                max_exp = exponent;
+            }
+            else
+            {
+                min_exp = std::min(min_exp, exponent);
+                max_exp = std::max(max_exp, exponent);
+            }
+        }
+
+        _screening_data[static_cast<size_t>(c)] = CGtoBlockScreeningData{max_coef, min_exp, max_exp};
+    }
 }

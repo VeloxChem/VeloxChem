@@ -2,12 +2,12 @@ import numpy as np
 
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
-from veloxchem.veloxchemlib import GtoBlock, make_tabula_screening_data
+from veloxchem.veloxchemlib import GtoBlock
 
 
 class TestTabulaScreeningData:
-    """Tests for tabula::make_screening_data — the per-CGTO screening bounds
-    (max contraction-coefficient magnitude, min/max exponent) of a CGtoBlock."""
+    """Tests for CGtoBlock.screening_data — the per-contracted-GTO screening
+    bounds (max contraction-coefficient magnitude, min/max exponent)."""
 
     def get_block(self, angmom, npgtos):
 
@@ -28,19 +28,15 @@ class TestTabulaScreeningData:
         exps = np.array(block.exponents()).reshape(npg, nc)
         norms = np.array(block.normalization_factors()).reshape(npg, nc)
 
-        data = make_tabula_screening_data(block)
-
-        assert len(data.max_coefficient) == nc
-        assert len(data.min_exponent) == nc
-        assert len(data.max_exponent) == nc
-
-        # the screening bounds are the per-CGTO column reductions
-        assert np.allclose(data.max_coefficient,
-                           np.max(np.abs(norms), axis=0), 0.0, 1.0e-13)
-        assert np.allclose(data.min_exponent,
-                           np.min(exps, axis=0), 0.0, 1.0e-13)
-        assert np.allclose(data.max_exponent,
-                           np.max(exps, axis=0), 0.0, 1.0e-13)
+        # the screening bounds of each contracted GTO are its column reductions
+        for c in range(nc):
+            data = block.screening_data(c)
+            assert np.isclose(data.max_coefficient,
+                              np.max(np.abs(norms[:, c])), 0.0, 1.0e-13)
+            assert np.isclose(data.min_exponent,
+                              np.min(exps[:, c]), 0.0, 1.0e-13)
+            assert np.isclose(data.max_exponent,
+                              np.max(exps[:, c]), 0.0, 1.0e-13)
 
     def test_contracted_s_block(self):
 
@@ -51,6 +47,7 @@ class TestTabulaScreeningData:
 
         # s functions, 1 primitive each -> min exponent == max exponent
         block = self.get_block(0, 1)
-        data = make_tabula_screening_data(block)
-        assert np.allclose(data.min_exponent, data.max_exponent, 0.0, 1.0e-13)
+        for c in range(block.number_of_basis_functions()):
+            data = block.screening_data(c)
+            assert data.min_exponent == data.max_exponent
         self.check_block(0, 1)

@@ -35,6 +35,7 @@
 
 #include <vector>
 
+#include "GtoBlockScreeningData.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "Point.hpp"
@@ -158,7 +159,16 @@ class CGtoBlock
     /// @return The number of basis functions in basis functions block.
     auto number_of_basis_functions() const -> int;
 
+    /// @brief Gets the screening bounds of a selected contracted GTO.
+    /// @param index The block-local index of the contracted GTO.
+    /// @return The screening bounds of the contracted GTO.
+    auto screening_data(const size_t index) const -> CGtoBlockScreeningData;
+
    private:
+    /// @brief Computes the per-contracted-GTO screening bounds from the
+    /// block's primitive exponents and normalization factors.
+    auto _compute_screening_data() -> void;
+
     /// @brief The vector of Cartesian coordinates of basis functions.
     std::vector<TPoint<double>> _coordinates;
 
@@ -179,6 +189,10 @@ class CGtoBlock
 
     /// @brief The number of primitive basis functions in basis function.
     int _npgtos;
+
+    /// @brief The per-contracted-GTO screening bounds, one entry per basis
+    /// function in the block.
+    std::vector<CGtoBlockScreeningData> _screening_data;
 };
 
 #endif /* GtoBlock_hpp */

@@ -307,6 +307,17 @@ export_orbdata(py::module &m)
         .def("__copy__", [](const CMolecularBasis &self) { return CMolecularBasis(self); })
         .def("__deepcopy__", [](const CMolecularBasis &self, py::dict) { return CMolecularBasis(self); });
 
+    // CGtoBlockScreeningData struct
+    py::class_<CGtoBlockScreeningData>(m, "GtoBlockScreeningData")
+        .def(py::init<>())
+        .def_readonly("max_coefficient", &CGtoBlockScreeningData::max_coefficient,
+                      "The largest contraction-coefficient magnitude of the contracted GTO.")
+        .def_readonly("min_exponent", &CGtoBlockScreeningData::min_exponent,
+                      "The smallest primitive exponent of the contracted GTO.")
+        .def_readonly("max_exponent", &CGtoBlockScreeningData::max_exponent,
+                      "The largest primitive exponent of the contracted GTO.")
+        .def("__eq__", [](const CGtoBlockScreeningData &self, const CGtoBlockScreeningData &other) { return self == other; });
+
     // CGtoBlock class
     PyClass<CGtoBlock>(m, "GtoBlock")
         .def(py::init<>())
@@ -321,6 +332,7 @@ export_orbdata(py::module &m)
         .def("angular_momentum", &CGtoBlock::angular_momentum, "Gets angular momentum of GTOs block.")
         .def("number_of_primitives", &CGtoBlock::number_of_primitives, "Gets number of primitive GTOs in basis function.")
         .def("number_of_basis_functions", &CGtoBlock::number_of_basis_functions, "Gets number of GTOs in basis function block.")
+        .def("screening_data", &CGtoBlock::screening_data, "Gets the screening bounds of a selected contracted GTO.")
         .def("__eq__", [](const CGtoBlock &self, const CGtoBlock &other) { return self == other; })
         .def("__copy__", [](const CGtoBlock &self) { return CGtoBlock(self); })
         .def("__deepcopy__", [](const CGtoBlock &self, py::dict) { return CGtoBlock(self); });
