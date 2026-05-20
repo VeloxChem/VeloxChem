@@ -1,0 +1,68 @@
+import numpy as np
+
+from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
+from veloxchem import NuclearPotentialDriver
+from veloxchem.tabulalib import TabulaNuclearAttractionDriver
+
+
+WATER = (
+    "O 0.000  0.000 -1.000\n"
+    "H 0.000  1.400 -2.100\n"
+    "H 0.000 -1.400 -2.100"
+)
+
+
+def _vlx_numpy(matrix):
+    return matrix.full_matrix().to_numpy()
+
+
+def _reference(driver, mol, bas):
+    # tolerate either binding argument order
+    try:
+        return _vlx_numpy(driver.compute(mol, bas))
+    except Exception:
+        return _vlx_numpy(driver.compute(bas, mol))
+
+
+def _reference_external(driver, mol, bas, mags, coords):
+    try:
+        return _vlx_numpy(driver.compute(mol, bas, mags, coords))
+    except Exception:
+        return _vlx_numpy(driver.compute(mags, coords, bas, mol))
+
+
+class TestTabulaNuclearAttraction:
+    """Validates NuclearAttractionDriver against VeloxChem's
+    NuclearPotentialDriver. Tabula matches VeloxChem's positive convention
+    (Σ_N Z_N (a|1/|r−N||b), no physical minus). Agreement sits at the Boys
+    floor — not bit-exact, as the two Boys implementations differ."""
+
+    def _setup(self, basis_label):
+        mol = Molecule.read_str(WATER, "au")
+        bas = MolecularBasis.read(mol, basis_label, ostream=None)
+        return mol, bas
+
+    def test_water_svp(self):
+        # s / p / d
+        mol, bas = self._setup("def2-svp")
+        tab = TabulaNuclearAttractionDriver().compute(mol, bas).to_numpy()
+        ref = _reference(NuclearPotentialDriver(), mol, bas)
+        assert np.allclose(tab, ref, 0.0, 1.0e-9)
+
+    def test_water_qzvp(self):
+        # exercises the d / f / g (maxL=4) kernels
+        mol, bas = self._setup("def2-qzvp")
+        tab = TabulaNuclearAttractionDriver().compute(mol, bas).to_numpy()
+        ref = _reference(NuclearPotentialDriver(), mol, bas)
+        assert np.allclose(tab, ref, 0.0, 1.0e-8)
+
+    def test_external_charges(self):
+        # the QM/MM point-charge path
+        mol, bas = self._setup("def2-qzvp")
+        mags = [-0.834, 0.417, 0.417]
+        coords = [[1.5, 1.0, 0.5], [-1.0, 2.0, -0.5], [0.3, -1.4, 1.2]]
+
+        tab = TabulaNuclearAttractionDriver().compute_external(mol, bas, mags, coords).to_numpy()
+        ref = _reference_external(NuclearPotentialDriver(), mol, bas, mags, coords)
+        assert np.allclose(tab, ref, 0.0, 1.0e-8)

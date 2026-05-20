@@ -1,0 +1,207 @@
+//
+//  Tabula — custom-recursion molecular-integral machinery.
+//  Two-center nuclear-attraction kernel — the shared, table-driven
+//  three-phase engine that interprets the generated `(l_a, l_c)` tables.
+//
+
+#include "TabulaNuclearAttractionKernel.hpp"
+
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
+#include "MathConst.hpp"
+#include "TabulaBoys.hpp"
+#include "TabulaNuclearAttractionTable.hpp"
+
+namespace tabula {  // tabula namespace
+
+namespace {  // unnamed namespace
+
+/// @brief The ket contracted-GTO tile width. Caps the expanded-V scratch
+/// (`ev_count · tile` doubles, thread-local, grow-only) and is the phase-3
+/// SIMD axis.
+constexpr int tile = 64;
+
+/// @brief `x` raised to a small non-negative integer power.
+inline auto
+ipow(const double x, const int n) -> double
+{
+    double result = 1.0;
+    for (int i = 0; i < n; i++) result *= x;
+    return result;
+}
+
+}  // namespace
+
+auto
+nuclear_attraction_kernel(const int              l_a,
+                          const int              l_c,
+                          const KernelBlockData &bra,
+                          const int              bra_begin,
+                          const int              bra_end,
+                          const KernelBlockData &ket,
+                          const ChargeSet       &charges,
+                          double                *spherical) -> void
+{
+    const detail::NuclearTable &t = detail::nuclear_table(l_a, l_c);
+
+    const double      two_pi  = 2.0 * mathconst::pi_value();
+    const int         ev      = t.ev_count;
+    const int         max_rac = l_a + l_c;       // largest R_AC power
+    // The v- and u-recurrences each lift a Q per reduction, so the Q-monomial
+    // degree reaches a + c = l_a + l_c (not just the bra's l_a).
+    const int         max_q   = l_a + l_c;
+    const std::size_t cdim    = static_cast<std::size_t>(bra_end - bra_begin) * static_cast<std::size_t>(ket.ncgtos);
+    const std::size_t stride  = ((cdim + 7) / 8) * 8;
+    const int         ket_components = 2 * l_c + 1;
+
+    // expanded-V grid (ev × tile) and the per-lane-charge accumulator (ev) —
+    // thread-local, grow-only
+    thread_local std::vector<double> v_grid;
+    thread_local std::vector<double> acc;
+    if (v_grid.size() < static_cast<std::size_t>(ev) * tile) v_grid.resize(static_cast<std::size_t>(ev) * tile);
+    if (acc.size() < static_cast<std::size_t>(ev)) acc.resize(static_cast<std::size_t>(ev));
+    double *const vg = v_grid.data();
+    double *const ac = acc.data();
+
+    // per-tile lane geometry and R_AC power tables
+    double acx[tile], acy[tile], acz[tile], r2[tile];
+    double powx[9 * tile], powy[9 * tile], powz[9 * tile];
+
+    double boys_v[16];
+    double qxp[9], qyp[9], qzp[9];
+
+    for (int i = bra_begin; i < bra_end; i++)
+    {
+        const double      bx      = bra.x[i];
+        const double      by      = bra.y[i];
+        const double      bz      = bra.z[i];
+        const std::size_t ij_base = static_cast<std::size_t>(i - bra_begin) * static_cast<std::size_t>(ket.ncgtos);
+
+        for (int j0 = 0; j0 < ket.ncgtos; j0 += tile)
+        {
+            const int w = (j0 + tile < ket.ncgtos) ? tile : (ket.ncgtos - j0);
+
+            // AC = A − C, per ket contracted GTO of the tile, and its powers
+            for (int jj = 0; jj < w; jj++)
+            {
+                const double dx = bx - ket.x[j0 + jj];
+                const double dy = by - ket.y[j0 + jj];
+                const double dz = bz - ket.z[j0 + jj];
+                acx[jj] = dx;
+                acy[jj] = dy;
+                acz[jj] = dz;
+                r2[jj]  = dx * dx + dy * dy + dz * dz;
+                powx[jj] = 1.0;
+                powy[jj] = 1.0;
+                powz[jj] = 1.0;
+            }
+            for (int k = 1; k <= max_rac; k++)
+            {
+                for (int jj = 0; jj < w; jj++)
+                {
+                    powx[k * tile + jj] = powx[(k - 1) * tile + jj] * acx[jj];
+                    powy[k * tile + jj] = powy[(k - 1) * tile + jj] * acy[jj];
+                    powz[k * tile + jj] = powz[(k - 1) * tile + jj] * acz[jj];
+                }
+            }
+
+            // ── Phase 1 — charge sum into the contracted expanded-V grid ──
+            for (int e = 0; e < ev; e++)
+                for (int jj = 0; jj < w; jj++) vg[e * tile + jj] = 0.0;
+
+            for (int kb = 0; kb < bra.nprims; kb++)
+            {
+                const double a      = bra.exponents[static_cast<std::size_t>(kb) * bra.ncgtos + i];
+                const double bn     = bra.norms[static_cast<std::size_t>(kb) * bra.ncgtos + i];
+                const double ia_pow = ipow(0.5 / a, l_a);  // (1/2α)^l_a
+
+                for (int lk = 0; lk < ket.nprims; lk++)
+                {
+                    const double *ke = ket.exponents + static_cast<std::size_t>(lk) * ket.ncgtos + j0;
+                    const double *kn = ket.norms + static_cast<std::size_t>(lk) * ket.ncgtos + j0;
+
+                    // scalar over ket lanes — the Boys function is scalar
+                    for (int jj = 0; jj < w; jj++)
+                    {
+                        const double g    = ke[jj];
+                        const double zeta = a + g;
+                        const double mu   = a * g / zeta;     // reduced exponent aγ/ζ
+                        const double goz  = g / zeta;         // γ/ζ
+                        const double sac  = std::exp(-mu * r2[jj]);
+                        const double pref = (two_pi / zeta) * ia_pow * ipow(-0.5 / g, l_c);
+                        const double w0   = bn * kn[jj] * pref * sac;
+
+                        for (int e = 0; e < ev; e++) ac[e] = 0.0;
+
+                        for (int c = 0; c < charges.count; c++)
+                        {
+                            const double qx = (bx - charges.x[c]) - goz * acx[jj];
+                            const double qy = (by - charges.y[c]) - goz * acy[jj];
+                            const double qz = (bz - charges.z[c]) - goz * acz[jj];
+                            const double T  = zeta * (qx * qx + qy * qy + qz * qz);
+
+                            boys(t.max_order, T, boys_v);
+
+                            qxp[0] = 1.0;
+                            qyp[0] = 1.0;
+                            qzp[0] = 1.0;
+                            for (int k = 1; k <= max_q; k++)
+                            {
+                                qxp[k] = qxp[k - 1] * qx;
+                                qyp[k] = qyp[k - 1] * qy;
+                                qzp[k] = qzp[k - 1] * qz;
+                            }
+
+                            const double zc = charges.magnitudes[c];
+                            for (int e = 0; e < ev; e++)
+                            {
+                                ac[e] += zc * boys_v[t.ev_order[e]] * qxp[t.ev_qx[e]] * qyp[t.ev_qy[e]] * qzp[t.ev_qz[e]];
+                            }
+                        }
+
+                        for (int e = 0; e < ev; e++)
+                        {
+                            const double scale = ipow(mu, t.ev_mu_power[e]) * ipow(goz, t.ev_goz_power[e]) *
+                                                 ipow(-2.0 * zeta, t.ev_order[e]);
+                            vg[e * tile + jj] += w0 * scale * ac[e];
+                        }
+                    }
+                }
+            }
+
+            // ── Phase 3 — pure-R_AC M·V per contracted pair → spherical ──
+            int r = 0;
+            for (int k = 0; k < t.component_count; k++)
+            {
+                const int     out_row = (t.component_bra_m[k] + l_a) * ket_components + (t.component_ket_m[k] + l_c);
+                double *const out     = spherical + static_cast<std::size_t>(out_row) * stride + ij_base +
+                                    static_cast<std::size_t>(j0);
+
+                for (int jj = 0; jj < w; jj++) out[jj] = 0.0;
+
+                while (r < t.m_row_count && t.m_fields[6 * r] == k)
+                {
+                    const int     ev_index = t.m_fields[6 * r + 1] | (static_cast<int>(t.m_fields[6 * r + 2]) << 8);
+                    const int     rx       = t.m_fields[6 * r + 3];
+                    const int     ry       = t.m_fields[6 * r + 4];
+                    const int     rz       = t.m_fields[6 * r + 5];
+                    const double  coef     = t.m_coef[r];
+                    const double *vev      = vg + static_cast<std::size_t>(ev_index) * tile;
+                    const double *px       = powx + static_cast<std::size_t>(rx) * tile;
+                    const double *py       = powy + static_cast<std::size_t>(ry) * tile;
+                    const double *pz       = powz + static_cast<std::size_t>(rz) * tile;
+
+#pragma omp simd
+                    for (int jj = 0; jj < w; jj++) out[jj] += coef * px[jj] * py[jj] * pz[jj] * vev[jj];
+
+                    r++;
+                }
+            }
+        }
+    }
+}
+
+}  // namespace tabula

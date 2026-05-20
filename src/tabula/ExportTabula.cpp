@@ -8,8 +8,10 @@
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
 
+#include <array>
 #include <cstddef>
 #include <utility>
+#include <vector>
 
 #include "TabulaBlockSparseMatrix.hpp"
 #include "TabulaBoys.hpp"
@@ -17,6 +19,7 @@
 #include "TabulaDenseMatrix.hpp"
 #include "TabulaKineticDriver.hpp"
 #include "TabulaMixedPrecisionBlockSparseMatrix.hpp"
+#include "TabulaNuclearAttractionDriver.hpp"
 #include "TabulaOverlapDriver.hpp"
 
 namespace py = pybind11;
@@ -337,6 +340,81 @@ export_tabula(py::module& m) -> void
             return result;
         },
         "Gets the per-thread load balance of the most recent Coulomb compute.");
+
+    // tabula::NuclearAttractionDriver class
+
+    py::class_<NuclearAttractionDriver, std::shared_ptr<NuclearAttractionDriver>>(
+        m, "TabulaNuclearAttractionDriver", "Driver for the Tabula two-center nuclear-attraction integral.")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const NuclearAttractionDriver& self, const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) {
+                return self.compute(molecule, basis, threshold);
+            },
+            "Computes the nuclear-attraction matrix over the molecule's nuclei.",
+            "molecule"_a, "basis"_a, "threshold"_a = 0.0)
+        .def(
+            "compute_sparse",
+            [](const NuclearAttractionDriver& self, const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) {
+                return self.computeSparse(molecule, basis, threshold);
+            },
+            "Computes the nuclear-attraction matrix in block-sparse storage, over the nuclei.",
+            "molecule"_a, "basis"_a, "threshold"_a = 0.0)
+        .def(
+            "compute_external",
+            [](const NuclearAttractionDriver&            self,
+               const CMolecule&                          molecule,
+               const CMolecularBasis&                    basis,
+               const std::vector<double>&                magnitudes,
+               const std::vector<std::array<double, 3>>& coordinates,
+               const double                              threshold) {
+                return self.compute(molecule, basis, magnitudes, coordinates, threshold);
+            },
+            "Computes the matrix over external point charges (coordinates in au).",
+            "molecule"_a, "basis"_a, "magnitudes"_a, "coordinates"_a, "threshold"_a = 0.0)
+        .def(
+            "compute_external_sparse",
+            [](const NuclearAttractionDriver&            self,
+               const CMolecule&                          molecule,
+               const CMolecularBasis&                    basis,
+               const std::vector<double>&                magnitudes,
+               const std::vector<std::array<double, 3>>& coordinates,
+               const double                              threshold) {
+                return self.computeSparse(molecule, basis, magnitudes, coordinates, threshold);
+            },
+            "Block-sparse variant over external point charges.",
+            "molecule"_a, "basis"_a, "magnitudes"_a, "coordinates"_a, "threshold"_a = 0.0);
+
+    m.def(
+        "tabula_nuclear_attraction_profile",
+        [](const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) -> py::dict {
+            KernelProfile profile;
+            NuclearAttractionDriver().compute(molecule, basis, threshold, &profile);
+
+            py::dict result;
+            result["make_blocks"] = profile.make_blocks;
+            result["pair_setup"]  = profile.pair_setup;
+            result["screen"]      = profile.screen;
+            result["kernel"]      = profile.kernel;
+            result["scatter"]     = profile.scatter;
+            result["symmetrize"]  = profile.symmetrize;
+            return result;
+        },
+        "Computes the nuclear-attraction matrix and returns the per-phase wall-time breakdown.",
+        "molecule"_a, "basis"_a, "threshold"_a = 0.0);
+
+    m.def(
+        "nuclear_attraction_thread_balance",
+        []() -> py::dict {
+            const auto balance = nuclear_attraction_thread_balance();
+
+            py::dict result;
+            result["wall"]  = balance.wall;
+            result["busy"]  = balance.busy;
+            result["pairs"] = balance.pairs;
+            return result;
+        },
+        "Gets the per-thread load balance of the most recent nuclear-attraction compute.");
 
     // tabula::boys — the Coulomb / nuclear-attraction integral seed
 
