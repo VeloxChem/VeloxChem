@@ -53,6 +53,35 @@ nuclear_attraction_kernel(const int              l_a,
     // The v- and u-recurrences each lift a Q per reduction, so the Q-monomial
     // degree reaches a + c = l_a + l_c (not just the bra's l_a).
     const int         max_q   = l_a + l_c;
+
+    // largest µ / (γ/ζ) powers over the expanded V — for the per-(prim,lane)
+    // power tables that replace the V-fold's per-ev ipow calls
+    int max_mu = 0, max_goz = 0;
+    for (int e = 0; e < ev; e++)
+    {
+        if (t.ev_mu_power[e] > max_mu) max_mu = t.ev_mu_power[e];
+        if (t.ev_goz_power[e] > max_goz) max_goz = t.ev_goz_power[e];
+    }
+
+    // charge data and per-(prim,lane) charge-batch buffers, laid out
+    // [order][charge] / [k][charge] so the per-ev reduction over charges
+    // vectorizes. Thread-local, grow-only.
+    const int     nc  = charges.count;
+    const double *chm = charges.magnitudes;
+    const double *chx = charges.x;
+    const double *chy = charges.y;
+    const double *chz = charges.z;
+
+    thread_local std::vector<double> cb_qx, cb_qy, cb_qz, cb_T, cb_boys, cb_qxp, cb_qyp, cb_qzp;
+    const auto grow = [](std::vector<double> &v, std::size_t n) { if (v.size() < n) v.resize(n); };
+    grow(cb_qx, nc);
+    grow(cb_qy, nc);
+    grow(cb_qz, nc);
+    grow(cb_T, nc);
+    grow(cb_boys, static_cast<std::size_t>(t.max_order + 1) * nc);
+    grow(cb_qxp, static_cast<std::size_t>(max_q + 1) * nc);
+    grow(cb_qyp, static_cast<std::size_t>(max_q + 1) * nc);
+    grow(cb_qzp, static_cast<std::size_t>(max_q + 1) * nc);
     const std::size_t cdim    = static_cast<std::size_t>(bra_end - bra_begin) * static_cast<std::size_t>(ket.ncgtos);
     const std::size_t stride  = ((cdim + 7) / 8) * 8;
     const int         ket_components = 2 * l_c + 1;
@@ -71,7 +100,6 @@ nuclear_attraction_kernel(const int              l_a,
     double powx[9 * tile], powy[9 * tile], powz[9 * tile];
 
     double boys_v[16];
-    double qxp[9], qyp[9], qzp[9];
 
     for (int i = bra_begin; i < bra_end; i++)
     {
@@ -134,38 +162,70 @@ nuclear_attraction_kernel(const int              l_a,
                         const double pref = (two_pi / zeta) * ia_pow * ipow(-0.5 / g, l_c);
                         const double w0   = bn * kn[jj] * pref * sac;
 
-                        for (int e = 0; e < ev; e++) ac[e] = 0.0;
+                        const double axj = acx[jj], ayj = acy[jj], azj = acz[jj];
 
-                        for (int c = 0; c < charges.count; c++)
+                        // Q and T per charge
+                        for (int c = 0; c < nc; c++)
                         {
-                            const double qx = (bx - charges.x[c]) - goz * acx[jj];
-                            const double qy = (by - charges.y[c]) - goz * acy[jj];
-                            const double qz = (bz - charges.z[c]) - goz * acz[jj];
-                            const double T  = zeta * (qx * qx + qy * qy + qz * qz);
+                            const double qx = (bx - chx[c]) - goz * axj;
+                            const double qy = (by - chy[c]) - goz * ayj;
+                            const double qz = (bz - chz[c]) - goz * azj;
+                            cb_qx[c] = qx;
+                            cb_qy[c] = qy;
+                            cb_qz[c] = qz;
+                            cb_T[c]  = zeta * (qx * qx + qy * qy + qz * qz);
+                        }
 
-                            boys(t.max_order, T, boys_v);
+                        // Boys per charge, laid out [order][charge]
+                        for (int c = 0; c < nc; c++)
+                        {
+                            boys(t.max_order, cb_T[c], boys_v);
+                            for (int o = 0; o <= t.max_order; o++) cb_boys[static_cast<std::size_t>(o) * nc + c] = boys_v[o];
+                        }
 
-                            qxp[0] = 1.0;
-                            qyp[0] = 1.0;
-                            qzp[0] = 1.0;
-                            for (int k = 1; k <= max_q; k++)
+                        // Q-powers, laid out [k][charge]
+                        for (int c = 0; c < nc; c++)
+                        {
+                            cb_qxp[c] = 1.0;
+                            cb_qyp[c] = 1.0;
+                            cb_qzp[c] = 1.0;
+                        }
+                        for (int k = 1; k <= max_q; k++)
+                        {
+                            const std::size_t cur = static_cast<std::size_t>(k) * nc;
+                            const std::size_t prv = static_cast<std::size_t>(k - 1) * nc;
+                            for (int c = 0; c < nc; c++)
                             {
-                                qxp[k] = qxp[k - 1] * qx;
-                                qyp[k] = qyp[k - 1] * qy;
-                                qzp[k] = qzp[k - 1] * qz;
-                            }
-
-                            const double zc = charges.magnitudes[c];
-                            for (int e = 0; e < ev; e++)
-                            {
-                                ac[e] += zc * boys_v[t.ev_order[e]] * qxp[t.ev_qx[e]] * qyp[t.ev_qy[e]] * qzp[t.ev_qz[e]];
+                                cb_qxp[cur + c] = cb_qxp[prv + c] * cb_qx[c];
+                                cb_qyp[cur + c] = cb_qyp[prv + c] * cb_qy[c];
+                                cb_qzp[cur + c] = cb_qzp[prv + c] * cb_qz[c];
                             }
                         }
 
+                        // charge sum per ev — vectorized reduction over charges
                         for (int e = 0; e < ev; e++)
                         {
-                            const double scale = ipow(mu, t.ev_mu_power[e]) * ipow(goz, t.ev_goz_power[e]) *
-                                                 ipow(-2.0 * zeta, t.ev_order[e]);
+                            const double *Bo = &cb_boys[static_cast<std::size_t>(t.ev_order[e]) * nc];
+                            const double *Qx = &cb_qxp[static_cast<std::size_t>(t.ev_qx[e]) * nc];
+                            const double *Qy = &cb_qyp[static_cast<std::size_t>(t.ev_qy[e]) * nc];
+                            const double *Qz = &cb_qzp[static_cast<std::size_t>(t.ev_qz[e]) * nc];
+                            double s = 0.0;
+#pragma omp simd reduction(+ : s)
+                            for (int c = 0; c < nc; c++) s += chm[c] * Bo[c] * Qx[c] * Qy[c] * Qz[c];
+                            ac[e] = s;
+                        }
+
+                        // power tables — replace the per-ev ipow in the fold
+                        double       mupow[17], gozpow[17], seedpow[17];
+                        const double neg2zeta = -2.0 * zeta;
+                        mupow[0] = gozpow[0] = seedpow[0] = 1.0;
+                        for (int k = 1; k <= max_mu; k++) mupow[k] = mupow[k - 1] * mu;
+                        for (int k = 1; k <= max_goz; k++) gozpow[k] = gozpow[k - 1] * goz;
+                        for (int k = 1; k <= t.max_order; k++) seedpow[k] = seedpow[k - 1] * neg2zeta;
+
+                        for (int e = 0; e < ev; e++)
+                        {
+                            const double scale = mupow[t.ev_mu_power[e]] * gozpow[t.ev_goz_power[e]] * seedpow[t.ev_order[e]];
                             vg[e * tile + jj] += w0 * scale * ac[e];
                         }
                     }

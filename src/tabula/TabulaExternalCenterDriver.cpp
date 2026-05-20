@@ -122,7 +122,7 @@ ket_kept(const int                     l_a,
     const double dx = A.x - B.x;
     const double dy = A.y - B.y;
     const double dz = A.z - B.z;
-    return op.estimate(l_a, l_c, A, B, dx * dx + dy * dy + dz * dz) >= threshold;
+    return op.estimate(l_a, l_c, A, B, dx * dx + dy * dy + dz * dz, op.charge_factor) >= threshold;
 }
 
 /// @brief Screens the ket atom spans against bra span `A`, gathers the

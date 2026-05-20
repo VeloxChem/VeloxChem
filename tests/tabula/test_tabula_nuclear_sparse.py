@@ -30,3 +30,21 @@ class TestTabulaNuclearAttractionSparse:
 
         assert reconstructed.shape == dense.shape
         assert np.allclose(reconstructed, dense, 0.0, 1.0e-12)
+
+    def test_screened_within_threshold(self):
+        # a stretched hydrogen chain — far-atom blocks screen out (the bra–ket
+        # overlap decays); the conservative point-source bound is sound, so the
+        # deviation from the unscreened matrix stays within the threshold
+        xyz = "\n".join(f"H 0.0 0.0 {i * 2.6:.3f}" for i in range(16))
+        mol, bas, dense = self._setup(xyz, "def2-svp")
+        dimension = dense.shape[0]
+
+        for threshold in (1.0e-9, 1.0e-6):
+            sparse = TabulaNuclearAttractionDriver().compute_sparse(mol, bas, threshold)
+            reconstructed = sparse.to_dense().to_numpy()
+
+            deviation = float(np.max(np.abs(reconstructed - dense)))
+            assert deviation <= threshold
+
+            # screening dropped far blocks — the footprint is below the dense one
+            assert sparse.stored_element_count() < dimension * dimension

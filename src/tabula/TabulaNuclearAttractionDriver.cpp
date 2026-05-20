@@ -7,9 +7,10 @@
 
 #include "TabulaNuclearAttractionDriver.hpp"
 
-#include <limits>
+#include <cmath>
 #include <string>
 
+#include "MathConst.hpp"
 #include "TabulaChargeSet.hpp"
 #include "TabulaNuclearAttractionKernel.hpp"
 
@@ -20,13 +21,43 @@ namespace {  // unnamed namespace
 // per-thread load balance of the most recent nuclear-attraction compute
 ThreadBalance g_balance;
 
-/// @brief Phase-1 placeholder screening estimate — returns a value above any
-/// threshold, so no atom span is dropped. Sound (it never under-estimates); a
-/// real point-source estimate replaces it in the screening pass.
+/// @brief A deliberately conservative upper bound on the nuclear-attraction
+/// magnitude of the shell-pair sub-block (bra span `A`, ket span `B`, separated
+/// by `r²`), scaled by `charge_factor = Σ_N |Z_N|`.
+///
+/// Dense `compute` is the validated default; this gates the optional
+/// block-sparse path. It bounds **every** charge's contribution by the
+/// worst-case charge sitting at the bra–ket overlap centre — the near-field
+/// nuclear seed `(2π/ζ)·(−2ζ)^m·F_m`, with `F_m ≤ 1`, the geometric factor
+/// `(2ζ_max·r)^m ≥ (2ζ)^m·R_AC^m` (`R_AC ≤ r`), and the bra–ket overlap decay
+/// `exp(−ρ_min·r²)` (the screenable factor) — then multiplies by `Σ|Z_N|`. It
+/// over-counts (most charges are far and contribute less), so it never
+/// under-shoots; screening on it is sound, if loose.
 auto
-nuclear_estimate(int, int, const AtomSpan&, const AtomSpan&, double) -> double
+nuclear_estimate(const int l_a, const int l_c, const AtomSpan& A, const AtomSpan& B, const double r2, const double charge_factor)
+    -> double
 {
-    return std::numeric_limits<double>::max();
+    const int    m        = l_a + l_c;
+    const double r        = std::sqrt(r2);
+    const double zeta_min = A.exp_min + B.exp_min;
+    const double zeta_max = A.exp_max + B.exp_max;
+    const double rho_min  = A.exp_min * B.exp_min / (A.exp_min + B.exp_min);  // slowest decay
+
+    double estimate = charge_factor * A.cmax * B.cmax;
+
+    const double geom = 2.0 * zeta_max * r;
+    for (int t = 0; t < m; t++) estimate *= geom;
+
+    estimate *= 2.0 * mathconst::pi_value() / zeta_min;  // point-source kernel, F_m ≤ 1
+    estimate *= std::exp(-rho_min * r2);                  // bra–ket overlap decay
+
+    const double ia = 0.5 / A.exp_min;
+    for (int t = 0; t < l_a; t++) estimate *= ia;
+
+    const double ib = 0.5 / B.exp_min;
+    for (int t = 0; t < l_c; t++) estimate *= ib;
+
+    return estimate;
 }
 
 /// @brief Owning storage for a charge set — the `ChargeSet` view borrows it.
@@ -37,6 +68,14 @@ struct ChargeArrays
     auto view() const -> ChargeSet
     {
         return ChargeSet{mag.data(), x.data(), y.data(), z.data(), static_cast<int>(mag.size())};
+    }
+
+    /// @brief `Σ_N |Z_N|` — the charge factor the screening estimate scales by.
+    auto charge_factor() const -> double
+    {
+        double s = 0.0;
+        for (const double z : mag) s += std::abs(z);
+        return s;
     }
 };
 
@@ -87,8 +126,8 @@ NuclearAttractionDriver::compute(const CMolecule&       molecule,
                                  const double           threshold,
                                  KernelProfile         *profile) const -> DenseMatrix
 {
-    const ExternalCenterOperator op{nuclear_attraction_kernel, nuclear_estimate};
     const auto                   charges = from_nuclei(molecule);
+    const ExternalCenterOperator op{nuclear_attraction_kernel, nuclear_estimate, charges.charge_factor()};
     return external_center_compute(molecule, basis, threshold, op, charges.view(), profile, g_balance);
 }
 
@@ -98,8 +137,8 @@ NuclearAttractionDriver::computeSparse(const CMolecule&       molecule,
                                        const double           threshold,
                                        KernelProfile         *profile) const -> BlockSparseMatrix
 {
-    const ExternalCenterOperator op{nuclear_attraction_kernel, nuclear_estimate};
     const auto                   charges = from_nuclei(molecule);
+    const ExternalCenterOperator op{nuclear_attraction_kernel, nuclear_estimate, charges.charge_factor()};
     return external_center_compute_sparse(molecule, basis, threshold, op, charges.view(), profile, g_balance);
 }
 
@@ -111,8 +150,8 @@ NuclearAttractionDriver::compute(const CMolecule&                          molec
                                  const double                              threshold,
                                  KernelProfile                            *profile) const -> DenseMatrix
 {
-    const ExternalCenterOperator op{nuclear_attraction_kernel, nuclear_estimate};
     const auto                   charges = from_external(magnitudes, coordinates);
+    const ExternalCenterOperator op{nuclear_attraction_kernel, nuclear_estimate, charges.charge_factor()};
     return external_center_compute(molecule, basis, threshold, op, charges.view(), profile, g_balance);
 }
 
@@ -124,8 +163,8 @@ NuclearAttractionDriver::computeSparse(const CMolecule&                         
                                        const double                              threshold,
                                        KernelProfile                            *profile) const -> BlockSparseMatrix
 {
-    const ExternalCenterOperator op{nuclear_attraction_kernel, nuclear_estimate};
     const auto                   charges = from_external(magnitudes, coordinates);
+    const ExternalCenterOperator op{nuclear_attraction_kernel, nuclear_estimate, charges.charge_factor()};
     return external_center_compute_sparse(molecule, basis, threshold, op, charges.view(), profile, g_balance);
 }
 

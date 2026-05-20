@@ -25,14 +25,23 @@ namespace tabula {  // tabula namespace
 using ExternalKernelFn =
     void (*)(int, int, const KernelBlockData&, int, int, const KernelBlockData&, const ChargeSet&, double*);
 
+/// @brief A conservative upper bound on an external-center operator's block
+/// magnitude — like `EstimateFn` but with the charge factor `Σ|Z_N|` (the
+/// charge sum that scales the bound; the point-source kernel is bounded
+/// charge-position-independently).
+using ExternalEstimateFn = double (*)(int, int, const AtomSpan&, const AtomSpan&, double, double);
+
 /// @brief The operator-specific halves of an external-center driver — the
-/// fused kernel and the screening estimate. Everything else is shared.
+/// fused kernel, the screening estimate, and the charge factor the estimate
+/// scales by. Everything else is shared.
 struct ExternalCenterOperator
 {
     /// @brief The fused `(l_a, l_c)` kernel dispatch.
     ExternalKernelFn kernel;
     /// @brief The screening upper-bound estimate.
-    EstimateFn estimate;
+    ExternalEstimateFn estimate;
+    /// @brief `Σ_N |Z_N|` — the charge factor the estimate scales by.
+    double charge_factor;
 };
 
 /// @brief Computes an external-center integral matrix for `op` — the shared
