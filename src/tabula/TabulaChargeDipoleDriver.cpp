@@ -9,6 +9,7 @@
 #include <cmath>
 
 #include "MathConst.hpp"
+#include "TabulaChargeDipoleFieldKernel.hpp"
 #include "TabulaChargeDipoleKernel.hpp"
 #include "TabulaDipoleSet.hpp"
 
@@ -160,6 +161,38 @@ ChargeDipoleDriver::computeSparse(const CMolecule&                          mole
     const auto dipoles = from_dipoles(moments, coordinates);
     const auto op      = make_op(dipoles);
     return external_center_compute_sparse(molecule, basis, threshold, op, profile, g_balance);
+}
+
+auto
+ChargeDipoleDriver::computeField(const CMolecule&                          molecule,
+                                 const CMolecularBasis&                    basis,
+                                 const DenseMatrix&                        density,
+                                 const std::vector<std::array<double, 3>>& coordinates) const
+    -> std::vector<std::array<double, 3>>
+{
+    std::vector<double> px, py, pz;
+    px.reserve(coordinates.size());
+    py.reserve(coordinates.size());
+    pz.reserve(coordinates.size());
+    for (const auto& c : coordinates)
+    {
+        px.push_back(c[0]);
+        py.push_back(c[1]);
+        pz.push_back(c[2]);
+    }
+    const int           np = static_cast<int>(coordinates.size());
+    const double* const xp = px.data();
+    const double* const yp = py.data();
+    const double* const zp = pz.data();
+
+    // the points are bound into the closure; px/py/pz outlive the synchronous compute
+    const FieldKernelFn kernel = [xp, yp, zp, np](int l_a, int l_c, const KernelBlockData& bra, int bra_begin,
+                                                  int bra_end, const KernelBlockData& ket, const double* density_block,
+                                                  double weight, double* field) {
+        charge_dipole_field_kernel(l_a, l_c, bra, bra_begin, bra_end, ket, xp, yp, zp, np, density_block, weight, field);
+    };
+
+    return external_center_field_compute(molecule, basis, density, kernel, np, g_balance);
 }
 
 auto

@@ -10,6 +10,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstring>
 #include <utility>
 #include <vector>
 
@@ -72,7 +73,20 @@ export_tabula(py::module& m) -> void
                                            self.values(),
                                            obj);
             },
-            "Returns a zero-copy NumPy view of the matrix.");
+            "Returns a zero-copy NumPy view of the matrix.")
+        .def_static(
+            "from_numpy",
+            [](py::array_t<double, py::array::c_style | py::array::forcecast> array) -> DenseMatrix {
+                const auto info = array.request();
+                if (info.ndim != 2) throw std::runtime_error("from_numpy expects a 2D array");
+                const auto rows = static_cast<std::size_t>(info.shape[0]);
+                const auto cols = static_cast<std::size_t>(info.shape[1]);
+                DenseMatrix matrix(rows, cols, Symmetry::general, false);
+                std::memcpy(matrix.values(), info.ptr, rows * cols * sizeof(double));
+                return matrix;
+            },
+            "Creates a Tabula matrix copying a 2D NumPy array.",
+            "array"_a);
 
     // tabula::BlockSparseMatrix::Block descriptor
 
@@ -448,7 +462,29 @@ export_tabula(py::module& m) -> void
                 return self.computeSparse(molecule, basis, moments, coordinates, threshold);
             },
             "Computes the charge-dipole matrix in block-sparse storage, over point dipoles.",
-            "molecule"_a, "basis"_a, "moments"_a, "coordinates"_a, "threshold"_a = 0.0);
+            "molecule"_a, "basis"_a, "moments"_a, "coordinates"_a, "threshold"_a = 0.0)
+        .def(
+            "compute_field",
+            [](const ChargeDipoleDriver&                 self,
+               const CMolecule&                          molecule,
+               const CMolecularBasis&                    basis,
+               const DenseMatrix&                        density,
+               const std::vector<std::array<double, 3>>& coordinates) -> py::array_t<double> {
+                const auto field = self.computeField(molecule, basis, density, coordinates);
+                const auto n     = static_cast<py::ssize_t>(field.size());
+                py::array_t<double> out({n, static_cast<py::ssize_t>(3)});
+                auto                r = out.mutable_unchecked<2>();
+                for (py::ssize_t i = 0; i < n; i++)
+                {
+                    r(i, 0) = field[static_cast<std::size_t>(i)][0];
+                    r(i, 1) = field[static_cast<std::size_t>(i)][1];
+                    r(i, 2) = field[static_cast<std::size_t>(i)][2];
+                }
+                return out;
+            },
+            "Computes the electric field E_i(R_N) = Sum_ac (a|(r_i-R_N)/|r-R_N|^3|c) D_ac of an AO density "
+            "matrix at external points (coordinates in au); returns an (n_points, 3) array.",
+            "molecule"_a, "basis"_a, "density"_a, "coordinates"_a);
 
     m.def(
         "charge_dipole_thread_balance",

@@ -6,6 +6,7 @@ from veloxchem import NuclearPotentialGeom010Driver
 from veloxchem.tabulalib import (
     TabulaNuclearAttractionDriver,
     TabulaChargeDipoleDriver,
+    TabulaDenseMatrix,
 )
 
 
@@ -156,3 +157,69 @@ class TestTabulaChargeDipole:
         exact = drv.compute(mol, bas, moments, coords, 0.0).to_numpy()  # explicit exact dense
         assert np.allclose(auto, exact, 0.0, 1.0e-12)
         assert not np.array_equal(auto, exact)
+
+    @staticmethod
+    def _density(n):
+        # an arbitrary symmetric "density" (the field contraction is linear in D,
+        # so correctness needs no physical density)
+        rng = np.random.default_rng(0)
+        a = rng.standard_normal((n, n))
+        return a + a.T
+
+    def test_field_finite_difference(self):
+        # E_i(R) = d/dR_i <D, V(R)>, V(R) = <D, nuclear(unit charge @ R)>
+        mol, bas = self._setup()
+        nuc = TabulaNuclearAttractionDriver()
+        cdp = TabulaChargeDipoleDriver()
+        n = nuc.compute(mol, bas, 0.0).to_numpy().shape[0]
+        D = self._density(n)
+        coords = [r for (_, r) in SITES]
+
+        E = cdp.compute_field(mol, bas, TabulaDenseMatrix.from_numpy(D), coords)
+        assert E.shape == (len(coords), 3)
+
+        def V(R):
+            return float(np.sum(D * nuc.compute_external(mol, bas, [1.0], [R], 0.0).to_numpy()))
+
+        h = 2.0e-4
+        fd = np.zeros_like(E)
+        for k, R in enumerate(coords):
+            for ax in range(3):
+                rp, rm = list(R), list(R)
+                rp[ax] += h
+                rm[ax] -= h
+                fd[k, ax] = (V(rp) - V(rm)) / (2.0 * h)
+        assert np.allclose(E, fd, 0.0, 1.0e-6)
+
+    def test_field_vs_veloxchem(self):
+        # E_i(R) = <D, geom010 field component i at R>, per point (single-site)
+        mol, bas = self._setup()
+        cdp = TabulaChargeDipoleDriver()
+        n = cdp.compute(mol, bas, [[1.0, 0.0, 0.0]], [[0.0, 0.0, 0.0]], 0.0).to_numpy().shape[0]
+        D = self._density(n)
+        coords = [r for (_, r) in SITES]
+
+        E = cdp.compute_field(mol, bas, TabulaDenseMatrix.from_numpy(D), coords)
+
+        g010 = NuclearPotentialGeom010Driver()
+        ref = np.zeros_like(E)
+        for k, R in enumerate(coords):
+            mats = g010.compute(mol, bas, [1.0], [R])
+            for ax in range(3):
+                sm = mats.matrix("XYZ"[ax]).full_matrix()
+                ref[k, ax] = np.sum(D * np.array(sm.to_numpy(), copy=True))
+        assert np.allclose(E, ref, 0.0, 1.0e-9)
+
+    def test_field_dual_of_matrix(self):
+        # the two modes are transposes: E_i(R) = <D, matrix(unit moment axis i @ R)>
+        mol, bas = self._setup()
+        cdp = TabulaChargeDipoleDriver()
+        R = [0.7, -0.5, 1.1]
+        n = cdp.compute(mol, bas, [[1.0, 0.0, 0.0]], [R], 0.0).to_numpy().shape[0]
+        D = self._density(n)
+
+        E = cdp.compute_field(mol, bas, TabulaDenseMatrix.from_numpy(D), [R])[0]
+        for ax in range(3):
+            unit = [[1.0 if k == ax else 0.0 for k in range(3)]]
+            M = cdp.compute(mol, bas, unit, [R], 0.0).to_numpy()
+            assert abs(E[ax] - float(np.sum(D * M))) < 1.0e-11

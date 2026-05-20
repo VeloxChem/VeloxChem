@@ -10,7 +10,9 @@
 #ifndef TabulaExternalCenterDriver_hpp
 #define TabulaExternalCenterDriver_hpp
 
+#include <array>
 #include <functional>
+#include <vector>
 
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
@@ -71,6 +73,32 @@ auto external_center_compute_sparse(const CMolecule&              molecule,
                                     const ExternalCenterOperator& op,
                                     KernelProfile*                profile,
                                     ThreadBalance&                balance) -> BlockSparseMatrix;
+
+/// @brief A field-contraction kernel call — one (bra-block, ket-block) pair's
+/// contribution to the per-point field, given the gathered density block, the
+/// block-pair multiplicity, and the field accumulator. The external points are
+/// bound into the closure.
+using FieldKernelFn =
+    std::function<void(int, int, const KernelBlockData&, int, int, const KernelBlockData&, const double*, double, double*)>;
+
+/// @brief Contracts an external-center field operator against a density matrix
+/// to the field at each external point — the transpose of the matrix path. It
+/// sweeps the atom-block-pair triangle (off-diagonal doubled, since the field
+/// and density are symmetric), gathers each pair's density sub-block, runs the
+/// field `kernel`, and reduces the per-thread per-point accumulators.
+/// @param molecule The molecule.
+/// @param basis The molecular basis.
+/// @param density The AO density matrix.
+/// @param kernel The field-contraction kernel (its points bound).
+/// @param n_points The number of external points.
+/// @param balance Receives the task loop's per-thread load balance.
+/// @return The field at each point — `n_points` entries of `{Ex, Ey, Ez}`.
+auto external_center_field_compute(const CMolecule&       molecule,
+                                   const CMolecularBasis& basis,
+                                   const DenseMatrix&     density,
+                                   const FieldKernelFn&   kernel,
+                                   int                    n_points,
+                                   ThreadBalance&         balance) -> std::vector<std::array<double, 3>>;
 
 }  // namespace tabula
 

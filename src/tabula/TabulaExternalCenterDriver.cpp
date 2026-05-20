@@ -639,4 +639,106 @@ external_center_compute_sparse(const CMolecule&              molecule,
     return matrix;
 }
 
+auto
+external_center_field_compute(const CMolecule&       molecule,
+                             const CMolecularBasis& basis,
+                             const DenseMatrix&     density,
+                             const FieldKernelFn&   kernel,
+                             const int              n_points,
+                             ThreadBalance&         balance) -> std::vector<std::array<double, 3>>
+{
+    const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
+
+    std::vector<BlockArrays> blocks;
+    blocks.reserve(gto_blocks.size());
+    for (const auto& block : gto_blocks)
+    {
+        blocks.push_back(fetch_block(block));
+    }
+
+    const auto tasks = build_tasks(blocks);
+
+    const auto        nthreads = static_cast<std::size_t>(omp_get_max_threads());
+    const std::size_t np       = static_cast<std::size_t>(n_points);
+
+    // each thread accumulates the full per-point field (axis-major), reduced after
+    std::vector<std::vector<double>> thread_field(nthreads, std::vector<double>(3 * np, 0.0));
+    std::vector<double>              thread_busy(nthreads, 0.0);
+    std::vector<long>                thread_pairs(nthreads, 0);
+
+    const double* const d    = density.values();
+    const std::size_t   n_ao = density.columns();
+
+    const auto t_region = std::chrono::steady_clock::now();
+
+#pragma omp parallel
+    {
+        std::vector<double> dblk;
+
+#pragma omp for schedule(dynamic)
+        for (int p = 0; p < static_cast<int>(tasks.size()); p++)
+        {
+            const auto tid    = static_cast<std::size_t>(omp_get_thread_num());
+            const auto t_body = std::chrono::steady_clock::now();
+
+            const auto &task = tasks[static_cast<std::size_t>(p)];
+            const auto &bra  = blocks[task.i];
+            const auto &A    = bra.spans[task.span];
+            const auto &ket  = blocks[task.j];
+
+            const int la        = bra.angular_momentum;
+            const int lc        = ket.angular_momentum;
+            const int k_bra     = A.cgto_end - A.cgto_begin;
+            const int k_ket     = ket.ncgtos;
+            const int bra_comps = 2 * la + 1;
+            const int ket_comps = 2 * lc + 1;
+
+            const std::size_t cdim = static_cast<std::size_t>(k_bra) * static_cast<std::size_t>(k_ket);
+            dblk.resize(static_cast<std::size_t>(bra_comps) * ket_comps * cdim);
+
+            // gather the density sub-block, component-major (out_row = ca·ket_comps + cc)
+            for (int ca = 0; ca < bra_comps; ca++)
+            {
+                for (int cc = 0; cc < ket_comps; cc++)
+                {
+                    const std::size_t out_row = static_cast<std::size_t>(ca) * ket_comps + cc;
+                    for (int il = 0; il < k_bra; il++)
+                    {
+                        const int         i_cgto = A.cgto_begin + il;
+                        const std::size_t ao_a   = static_cast<std::size_t>(ca) * bra.orb_indices[0] +
+                                                 bra.orb_indices[static_cast<std::size_t>(i_cgto) + 1];
+                        for (int jj = 0; jj < k_ket; jj++)
+                        {
+                            const std::size_t ao_c = static_cast<std::size_t>(cc) * ket.orb_indices[0] +
+                                                     ket.orb_indices[static_cast<std::size_t>(jj) + 1];
+                            dblk[out_row * cdim + static_cast<std::size_t>(il) * k_ket + jj] = d[ao_a * n_ao + ao_c];
+                        }
+                    }
+                }
+            }
+
+            const double weight = task.diagonal ? 1.0 : 2.0;
+            kernel(la, lc, bra.view(), A.cgto_begin, A.cgto_end, ket.view(), dblk.data(), weight, thread_field[tid].data());
+
+            thread_busy[tid] += seconds(std::chrono::steady_clock::now() - t_body);
+            thread_pairs[tid] += 1;
+        }
+    }
+
+    balance.wall  = seconds(std::chrono::steady_clock::now() - t_region);
+    balance.busy  = thread_busy;
+    balance.pairs = thread_pairs;
+
+    std::vector<std::array<double, 3>> result(np, {0.0, 0.0, 0.0});
+    for (const auto& tf : thread_field)
+    {
+        for (std::size_t pt = 0; pt < np; pt++)
+        {
+            for (int a = 0; a < 3; a++) result[pt][static_cast<std::size_t>(a)] += tf[static_cast<std::size_t>(a) * np + pt];
+        }
+    }
+
+    return result;
+}
+
 }  // namespace tabula

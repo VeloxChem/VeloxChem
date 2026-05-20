@@ -57,6 +57,21 @@ class ChargeDipoleDriver
                        const std::vector<std::array<double, 3>>& coordinates,
                        const double                              threshold = 0.0,
                        KernelProfile                            *profile   = nullptr) const -> BlockSparseMatrix;
+
+    /// @brief Computes the electric field of an AO density at a set of external
+    /// points — `E_i(R_N) = Σ_ac (a|(r_i−R_N)/|r−R_N|³|c) D_ac`. The transpose
+    /// of `compute`: the same field integral, contracted with the density on the
+    /// AO side instead of with dipole moments on the point side.
+    /// @param molecule The molecule (supplies the basis-function centres).
+    /// @param basis The molecular basis.
+    /// @param density The AO density matrix `D`.
+    /// @param coordinates The external point positions, in atomic units.
+    /// @return The field at each point — one `{Ex, Ey, Ez}` per coordinate.
+    auto computeField(const CMolecule&                          molecule,
+                      const CMolecularBasis&                    basis,
+                      const DenseMatrix&                        density,
+                      const std::vector<std::array<double, 3>>& coordinates) const
+        -> std::vector<std::array<double, 3>>;
 };
 
 /// @brief Gets the per-thread balance captured by the most recent
