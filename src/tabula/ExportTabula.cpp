@@ -351,8 +351,9 @@ export_tabula(py::module& m) -> void
             [](const NuclearAttractionDriver& self, const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) {
                 return self.compute(molecule, basis, threshold);
             },
-            "Computes the nuclear-attraction matrix over the molecule's nuclei.",
-            "molecule"_a, "basis"_a, "threshold"_a = 0.0)
+            "Computes the nuclear-attraction matrix over the molecule's nuclei. "
+            "threshold < 0 (default) auto-screens large molecules; 0 is exact dense.",
+            "molecule"_a, "basis"_a, "threshold"_a = -1.0)
         .def(
             "compute_sparse",
             [](const NuclearAttractionDriver& self, const CMolecule& molecule, const CMolecularBasis& basis, const double threshold) {
@@ -370,8 +371,9 @@ export_tabula(py::module& m) -> void
                const double                              threshold) {
                 return self.compute(molecule, basis, magnitudes, coordinates, threshold);
             },
-            "Computes the matrix over external point charges (coordinates in au).",
-            "molecule"_a, "basis"_a, "magnitudes"_a, "coordinates"_a, "threshold"_a = 0.0)
+            "Computes the matrix over external point charges (coordinates in au). "
+            "threshold < 0 (default) auto-screens large molecules; 0 is exact dense.",
+            "molecule"_a, "basis"_a, "magnitudes"_a, "coordinates"_a, "threshold"_a = -1.0)
         .def(
             "compute_external_sparse",
             [](const NuclearAttractionDriver&            self,

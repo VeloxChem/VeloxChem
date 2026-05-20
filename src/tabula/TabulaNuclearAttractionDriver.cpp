@@ -21,6 +21,24 @@ namespace {  // unnamed namespace
 // per-thread load balance of the most recent nuclear-attraction compute
 ThreadBalance g_balance;
 
+// Auto-screen defaults for the dense path: a molecule of at least this many
+// atoms gets a conservative screen by default, so the dense `compute` does not
+// form every (mostly negligible) atom-pair block on a large, extended system.
+constexpr int    auto_screen_min_atoms = 100;
+constexpr double auto_screen_threshold = 1.0e-12;
+
+/// @brief Resolves the effective screening threshold. A negative `threshold`
+/// (the default) selects automatically — a conservative screen for large
+/// molecules, exact (0) otherwise; `0` forces exact dense, `> 0` is explicit.
+/// `auto_screen_threshold` is sound and ~1e-14 relative, so the auto-screened
+/// dense matrix is effectively lossless.
+auto
+resolve_threshold(const CMolecule& molecule, const double threshold) -> double
+{
+    if (threshold >= 0.0) return threshold;
+    return (molecule.number_of_atoms() >= auto_screen_min_atoms) ? auto_screen_threshold : 0.0;
+}
+
 /// @brief A deliberately conservative upper bound on the nuclear-attraction
 /// magnitude of the shell-pair sub-block (bra span `A`, ket span `B`, separated
 /// by `r²`), scaled by `charge_factor = Σ_N |Z_N|`.
@@ -128,7 +146,7 @@ NuclearAttractionDriver::compute(const CMolecule&       molecule,
 {
     const auto                   charges = from_nuclei(molecule);
     const ExternalCenterOperator op{nuclear_attraction_kernel, nuclear_estimate, charges.charge_factor()};
-    return external_center_compute(molecule, basis, threshold, op, charges.view(), profile, g_balance);
+    return external_center_compute(molecule, basis, resolve_threshold(molecule, threshold), op, charges.view(), profile, g_balance);
 }
 
 auto
@@ -152,7 +170,7 @@ NuclearAttractionDriver::compute(const CMolecule&                          molec
 {
     const auto                   charges = from_external(magnitudes, coordinates);
     const ExternalCenterOperator op{nuclear_attraction_kernel, nuclear_estimate, charges.charge_factor()};
-    return external_center_compute(molecule, basis, threshold, op, charges.view(), profile, g_balance);
+    return external_center_compute(molecule, basis, resolve_threshold(molecule, threshold), op, charges.view(), profile, g_balance);
 }
 
 auto

@@ -30,9 +30,12 @@ class NuclearAttractionDriver
     NuclearAttractionDriver() = default;
 
     /// @brief Computes the nuclear-attraction matrix over the molecule's nuclei.
+    /// @param threshold The screening threshold. Negative (the default) selects
+    /// automatically — a conservative screen for large molecules (≥ 100 atoms),
+    /// exact otherwise; `0` forces exact dense; `> 0` is an explicit screen.
     auto compute(const CMolecule&       molecule,
                  const CMolecularBasis& basis,
-                 const double           threshold = 0.0,
+                 const double           threshold = -1.0,
                  KernelProfile         *profile   = nullptr) const -> DenseMatrix;
 
     /// @brief Computes the matrix in block-sparse storage, over the nuclei.
@@ -42,12 +45,13 @@ class NuclearAttractionDriver
                        KernelProfile         *profile   = nullptr) const -> BlockSparseMatrix;
 
     /// @brief Computes the matrix over an explicit set of external point
-    /// charges — the QM/MM use. `coordinates` are in atomic units.
+    /// charges — the QM/MM use. `coordinates` are in atomic units. `threshold`
+    /// follows the same auto/exact/explicit convention as the nuclei overload.
     auto compute(const CMolecule&                       molecule,
                  const CMolecularBasis&                 basis,
                  const std::vector<double>&             magnitudes,
                  const std::vector<std::array<double, 3>>& coordinates,
-                 const double                           threshold = 0.0,
+                 const double                           threshold = -1.0,
                  KernelProfile                         *profile   = nullptr) const -> DenseMatrix;
 
     /// @brief Block-sparse variant over external point charges.

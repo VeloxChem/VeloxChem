@@ -72,9 +72,9 @@ def main():
             bas = MolecularBasis.read(mol, basis_label, ostream=None)
             drv = TabulaNuclearAttractionDriver()
 
-            dense = drv.compute(mol, bas)
+            dense = drv.compute(mol, bas, 0.0)  # explicit exact (bypass the auto-screen default)
             n = dense.rows()
-            t_dense = best_time(lambda: drv.compute(mol, bas))
+            t_dense = best_time(lambda: drv.compute(mol, bas, 0.0))
             t_vlx = best_time(lambda: vlx_compute(mol, bas))
             t_sparse = best_time(lambda: drv.compute_sparse(mol, bas, SCREEN_THRESHOLD))
 

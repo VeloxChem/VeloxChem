@@ -66,3 +66,25 @@ class TestTabulaNuclearAttraction:
         tab = TabulaNuclearAttractionDriver().compute_external(mol, bas, mags, coords).to_numpy()
         ref = _reference_external(NuclearPotentialDriver(), mol, bas, mags, coords)
         assert np.allclose(tab, ref, 0.0, 1.0e-8)
+
+    def test_auto_exact_for_small_molecule(self):
+        # a small molecule (< 100 atoms): the auto default (threshold < 0) is
+        # exact dense, bit-for-bit identical to an explicit threshold of 0
+        mol, bas = self._setup("def2-svp")
+        drv = TabulaNuclearAttractionDriver()
+        auto = drv.compute(mol, bas).to_numpy()
+        exact = drv.compute(mol, bas, 0.0).to_numpy()
+        assert np.array_equal(auto, exact)
+
+    def test_auto_screen_for_large_molecule(self):
+        # a 100-atom stretched H chain (>= 100 atoms) triggers the auto-screen
+        # default; the screened-dense matrix stays within the conservative auto
+        # threshold of the exact one, and did drop far blocks
+        xyz = "\n".join(f"H 0.0 0.0 {i * 2.6:.3f}" for i in range(100))
+        mol = Molecule.read_str(xyz, "au")
+        bas = MolecularBasis.read(mol, "def2-svp", ostream=None)
+        drv = TabulaNuclearAttractionDriver()
+        auto = drv.compute(mol, bas).to_numpy()        # default: auto-screen
+        exact = drv.compute(mol, bas, 0.0).to_numpy()  # explicit exact dense
+        assert np.allclose(auto, exact, 0.0, 1.0e-12)
+        assert not np.array_equal(auto, exact)
