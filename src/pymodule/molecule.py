@@ -2009,36 +2009,40 @@ def _Molecule_contains_water_molecule(self):
 
 
 @staticmethod
-def _Molecule_read_name(mol_name):
+def _Molecule_read_name(mol_name, verbose=False):
     """
     Reads molecule from its name as a string using PubChem data.
 
     :param mol_name:
         The molecule name string.
+    :param verbose:
+        The information printout level.
 
     :return:
         The molecule.
     """
 
-    smiles_str = Molecule.name_to_smiles(mol_name)
+    smiles_str = Molecule.name_to_smiles(mol_name, verbose=verbose)
     mol = Molecule.read_smiles(smiles_str)
 
     return mol
 
 
 @staticmethod
-def _Molecule_name_to_smiles(mol_name):
+def _Molecule_name_to_smiles(mol_name, verbose=False):
     """
     Returns SMILES-string for a given molecule name using PubChem data.
 
     :param mol_name:
         The molecule name string.
+    :param verbose:
+        The information printout level.
 
     :return smiles_str:
         The SMILES-string of the molecule
     """
 
-    smiles_str, title, cid = get_data_from_name(mol_name)
+    smiles_str, title, cid = get_data_from_name(mol_name, verbose=verbose)
 
     return smiles_str
 
