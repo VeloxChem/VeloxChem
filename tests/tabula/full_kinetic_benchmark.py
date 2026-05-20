@@ -29,15 +29,15 @@ GEOMETRY = {
     "ubiquitin": "/Users/rinkevic/Downloads/ubiquitin.xyz",
 }
 
-FULL_BASES = ["DEF2-SVP", "DEF2-SVPD", "DEF2-TZVP", "DEF2-TZVPD", "DEF2-QZVP", "DEF2-QZVPD",
-              "CC-PVDZ", "CC-PVTZ", "CC-PVQZ", "AUG-CC-PVDZ", "AUG-CC-PVTZ", "AUG-CC-PVQZ"]
+FULL_BASES = ["def2-SVP", "def2-SVPD", "def2-TZVP", "def2-TZVPD", "def2-QZVP", "def2-QZVPD",
+              "cc-pVDZ", "cc-pVTZ", "cc-pVQZ", "aug-cc-pVDZ", "aug-cc-pVTZ", "aug-cc-pVQZ"]
 
 PLAN = [
     ("c60",       FULL_BASES),
     ("c240",      FULL_BASES),
     ("taxol",     FULL_BASES),
     ("olestra",   FULL_BASES),
-    ("ubiquitin", ["DEF2-SVP", "DEF2-SVPD", "CC-PVDZ", "AUG-CC-PVDZ"]),
+    ("ubiquitin", ["def2-SVP", "def2-SVPD", "cc-pVDZ", "aug-cc-pVDZ"]),
 ]
 
 REPETITIONS = 5
@@ -76,9 +76,8 @@ def max_abs_difference(a, b):
     return worst
 
 
-print(f"{'molecule':10s} {'basis':12s} {'n_AO':>7s} "
-      f"{'tabula/s':>10s} {'vlx/s':>10s} {'VLX/Tab':>8s} "
-      f"{'sparse/s':>10s} {'stored':>8s} {'max-diff':>10s}", flush=True)
+print("| molecule  | basis       | n_AO | dense/ms | VLX/ms | VLX/Tab | sparse/ms | VLX/Tab(sp) | stored | max-diff |", flush=True)
+print("|-----------|-------------|-----:|--------:|-------:|--------:|----------:|------------:|-------:|---------:|", flush=True)
 
 for molecule_name, bases in PLAN:
     molecule = read_molecule(GEOMETRY[molecule_name])
@@ -105,13 +104,14 @@ for molecule_name, bases in PLAN:
                 deviation = max_abs_difference(tabula_values, veloxchem_full)
                 del tabula_matrix, tabula_values, veloxchem_full
                 gc.collect()
-                deviation_text = f"{deviation:10.2e}"
+                deviation_text = f"{deviation:.0e}"
             else:
-                deviation_text = f"{'-':>10s}"
+                deviation_text = "-"
 
-            print(f"{molecule_name:10s} {basis_label:12s} {dimension:7d} "
-                  f"{tabula_time:10.4f} {veloxchem_time:10.4f} {ratio:7.2f}x "
-                  f"{sparse_time:10.4f} {stored * 100:7.1f}% {deviation_text}", flush=True)
+            print(f"| {molecule_name:9s} | {basis_label:11s} | {dimension:5d} | "
+                  f"{tabula_time*1e3:6.1f} | {veloxchem_time*1e3:6.1f} | {ratio:5.2f}x | "
+                  f"{sparse_time*1e3:7.1f} | {veloxchem_time/sparse_time:8.2f}x | {stored*100:4.1f}% | {deviation_text} |",
+                  flush=True)
         except Exception as error:
             print(f"{molecule_name:10s} {basis_label:12s}  FAILED: {error}", flush=True)
             gc.collect()
