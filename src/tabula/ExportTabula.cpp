@@ -435,8 +435,8 @@ export_tabula(py::module& m) -> void
                 return self.compute(molecule, basis, moments, coordinates, threshold);
             },
             "Computes the charge-dipole matrix Sum_N d_N . (a|(r-N)/|r-N|^3|c) over point dipoles "
-            "(moments and coordinates in au); 0 (default) is exact dense.",
-            "molecule"_a, "basis"_a, "moments"_a, "coordinates"_a, "threshold"_a = 0.0)
+            "(moments and coordinates in au). threshold < 0 (default) auto-screens large molecules; 0 is exact dense.",
+            "molecule"_a, "basis"_a, "moments"_a, "coordinates"_a, "threshold"_a = -1.0)
         .def(
             "compute_sparse",
             [](const ChargeDipoleDriver&                 self,

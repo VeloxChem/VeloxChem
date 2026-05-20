@@ -109,3 +109,50 @@ class TestTabulaChargeDipole:
         dense = drv.compute(mol, bas, moments, coords, 0.0).to_numpy()
         sparse = drv.compute_sparse(mol, bas, moments, coords, 1.0e-12).to_dense().to_numpy()
         assert np.allclose(dense, sparse, 0.0, 1.0e-12)
+
+    def test_screening_sound(self):
+        # a stretched H chain: a moderate screen drops far bra-ket blocks, and
+        # the screened matrix stays within the (sound, conservative) threshold
+        xyz = "\n".join(f"H 0.0 0.0 {i * 2.6:.3f}" for i in range(60))
+        mol = Molecule.read_str(xyz, "au")
+        bas = MolecularBasis.read(mol, "def2-svp", ostream=None)
+        coords = [[0.5, 0.3, 10.0], [-0.4, 0.2, 70.0]]
+        moments = [[0.3, -0.4, 0.5], [0.1, 0.2, -0.3]]
+        drv = TabulaChargeDipoleDriver()
+
+        exact = drv.compute(mol, bas, moments, coords, 0.0).to_numpy()
+        threshold = 1.0e-9
+        sparse = drv.compute_sparse(mol, bas, moments, coords, threshold)
+        screened = sparse.to_dense().to_numpy()
+
+        # sound: the screened matrix stays within the threshold of exact
+        assert np.allclose(screened, exact, 0.0, threshold)
+        # and screening actually dropped far blocks
+        dim = exact.shape[0]
+        assert sparse.stored_element_count() < dim * dim
+
+    def test_auto_exact_for_small_molecule(self):
+        # a small molecule (< 100 atoms): the auto default (threshold < 0) is
+        # exact dense, bit-for-bit identical to an explicit threshold of 0
+        mol, bas = self._setup()
+        moments = [m for (m, _) in SITES]
+        coords = [r for (_, r) in SITES]
+        drv = TabulaChargeDipoleDriver()
+        auto = drv.compute(mol, bas, moments, coords).to_numpy()
+        exact = drv.compute(mol, bas, moments, coords, 0.0).to_numpy()
+        assert np.array_equal(auto, exact)
+
+    def test_auto_screen_for_large_molecule(self):
+        # a 100-atom stretched H chain (>= 100 atoms) triggers the auto-screen
+        # default; the screened-dense matrix stays within the conservative auto
+        # threshold of the exact one, and did drop far blocks
+        xyz = "\n".join(f"H 0.0 0.0 {i * 2.6:.3f}" for i in range(100))
+        mol = Molecule.read_str(xyz, "au")
+        bas = MolecularBasis.read(mol, "def2-svp", ostream=None)
+        coords = [[0.5, 0.3, 20.0], [-0.4, 0.2, 200.0]]
+        moments = [[0.3, -0.4, 0.5], [0.1, 0.2, -0.3]]
+        drv = TabulaChargeDipoleDriver()
+        auto = drv.compute(mol, bas, moments, coords).to_numpy()        # default: auto-screen
+        exact = drv.compute(mol, bas, moments, coords, 0.0).to_numpy()  # explicit exact dense
+        assert np.allclose(auto, exact, 0.0, 1.0e-12)
+        assert not np.array_equal(auto, exact)

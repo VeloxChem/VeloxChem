@@ -7,8 +7,8 @@
 #include "TabulaChargeDipoleDriver.hpp"
 
 #include <cmath>
-#include <limits>
 
+#include "MathConst.hpp"
 #include "TabulaChargeDipoleKernel.hpp"
 #include "TabulaDipoleSet.hpp"
 
@@ -18,6 +18,24 @@ namespace {  // unnamed namespace
 
 // per-thread load balance of the most recent charge-dipole compute
 ThreadBalance g_balance;
+
+// Auto-screen defaults for the dense path: a molecule of at least this many
+// atoms gets a conservative screen by default, so the dense `compute` does not
+// sum every (mostly negligible) shell-pair block over all dipoles on a large,
+// extended system.
+constexpr int    auto_screen_min_atoms = 100;
+constexpr double auto_screen_threshold = 1.0e-12;
+
+/// @brief Resolves the effective screening threshold. A negative `threshold`
+/// (the default) selects automatically — a conservative screen for large
+/// molecules, exact (0) otherwise; `0` forces exact dense, `> 0` is explicit.
+/// `auto_screen_threshold` is sound and effectively lossless.
+auto
+resolve_threshold(const CMolecule& molecule, const double threshold) -> double
+{
+    if (threshold >= 0.0) return threshold;
+    return (molecule.number_of_atoms() >= auto_screen_min_atoms) ? auto_screen_threshold : 0.0;
+}
 
 /// @brief Owning storage for a dipole set — the `DipoleSet` view borrows it.
 struct DipoleArrays
@@ -67,13 +85,40 @@ from_dipoles(const std::vector<std::array<double, 3>>& moments, const std::vecto
     return a;
 }
 
-/// @brief Screening estimate — keep-all for now (sound: never under-shoots, so
-/// the block-sparse path matches dense). A tighter dipole-field bound is a
-/// later optimization; until then a positive threshold keeps every block.
+/// @brief A deliberately conservative upper bound on the charge-dipole
+/// magnitude of the shell-pair sub-block (bra span `A`, ket span `B`, separated
+/// by `r²`), scaled by `charge_factor = Σ_N |d_N|`.
+///
+/// The field `(a|(r−N)/|r−N|³|c)` is `∇_N` of the nuclear potential, which in
+/// the recursion reaches one order higher (the `+1` Q-shift) with the same
+/// near-field form. So this is the nuclear bound (`(2π/ζ)·(2ζ_max·r)^m·F_m ≤ 1`,
+/// bra–ket overlap decay, spherical prefactors) with the geometric order raised
+/// by one — sound (over-counts, never under-shoots), if loose.
 auto
-dipole_estimate(int, int, const AtomSpan&, const AtomSpan&, double, double) -> double
+dipole_estimate(const int l_a, const int l_c, const AtomSpan& A, const AtomSpan& B, const double r2, const double charge_factor)
+    -> double
 {
-    return std::numeric_limits<double>::max();
+    const int    m        = l_a + l_c + 1;  // one higher than nuclear (the ∇_Q shift)
+    const double r        = std::sqrt(r2);
+    const double zeta_min = A.exp_min + B.exp_min;
+    const double zeta_max = A.exp_max + B.exp_max;
+    const double rho_min  = A.exp_min * B.exp_min / (A.exp_min + B.exp_min);  // slowest decay
+
+    double estimate = charge_factor * A.cmax * B.cmax;
+
+    const double geom = 2.0 * zeta_max * r;
+    for (int t = 0; t < m; t++) estimate *= geom;
+
+    estimate *= 2.0 * mathconst::pi_value() / zeta_min;  // point-source kernel, F_m ≤ 1
+    estimate *= std::exp(-rho_min * r2);                  // bra–ket overlap decay
+
+    const double ia = 0.5 / A.exp_min;
+    for (int t = 0; t < l_a; t++) estimate *= ia;
+
+    const double ib = 0.5 / B.exp_min;
+    for (int t = 0; t < l_c; t++) estimate *= ib;
+
+    return estimate;
 }
 
 /// @brief The external-center operator for a dipole set — the charge-dipole
@@ -101,7 +146,7 @@ ChargeDipoleDriver::compute(const CMolecule&                          molecule,
 {
     const auto dipoles = from_dipoles(moments, coordinates);
     const auto op      = make_op(dipoles);
-    return external_center_compute(molecule, basis, threshold, op, profile, g_balance);
+    return external_center_compute(molecule, basis, resolve_threshold(molecule, threshold), op, profile, g_balance);
 }
 
 auto

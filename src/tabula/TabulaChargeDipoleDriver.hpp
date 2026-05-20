@@ -39,15 +39,15 @@ class ChargeDipoleDriver
     /// @param basis The molecular basis.
     /// @param moments The dipole vector `d_N` of each site, in atomic units.
     /// @param coordinates The site positions, in atomic units; one per moment.
-    /// @param threshold The screening threshold; `0` (the default) is exact
-    /// dense. Screening is not yet tightened for this operator — a positive
-    /// threshold currently keeps every block.
+    /// @param threshold The screening threshold. Negative (the default) selects
+    /// automatically — a conservative screen for large molecules (≥ 100 atoms),
+    /// exact otherwise; `0` forces exact dense; `> 0` is an explicit screen.
     /// @param profile Optional — receives the per-phase wall-time breakdown.
     auto compute(const CMolecule&                          molecule,
                  const CMolecularBasis&                    basis,
                  const std::vector<std::array<double, 3>>& moments,
                  const std::vector<std::array<double, 3>>& coordinates,
-                 const double                              threshold = 0.0,
+                 const double                              threshold = -1.0,
                  KernelProfile                            *profile   = nullptr) const -> DenseMatrix;
 
     /// @brief Computes the matrix in block-sparse storage, over the dipoles.
