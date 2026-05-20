@@ -27,15 +27,18 @@ namespace tabula {  // tabula namespace
 /// @param bra The bra basis-function block data.
 /// @param bra_begin The first bra contracted-GTO index of the task range.
 /// @param bra_end The one-past-last bra contracted-GTO index of the range.
-/// @param ket The ket basis-function block data (the full ket block — dense).
-/// @param point_x The x coordinate of each external point.
+/// @param ket The ket basis-function block data.
+/// @param ket_begin The first ket contracted-GTO index to process.
+/// @param ket_end The one-past-last ket contracted-GTO index to process.
+/// @param point_x The x coordinate of each external point (compacted by the
+/// caller to those that survive screening).
 /// @param point_y The y coordinate of each external point.
 /// @param point_z The z coordinate of each external point.
 /// @param n_points The number of external points.
 /// @param density_block The gathered density sub-block, component-major:
-/// `density_block[out_row·cdim + (i−bra_begin)·ket.ncgtos + jj]`, with
-/// `out_row = (bra-component)·(2l_c+1) + (ket-component)` and
-/// `cdim = (bra_end−bra_begin)·ket.ncgtos`.
+/// `density_block[out_row·cdim + (i−bra_begin)·k_ket + (jj−ket_begin)]`, with
+/// `out_row = (bra-component)·(2l_c+1) + (ket-component)`,
+/// `k_ket = ket_end−ket_begin`, and `cdim = (bra_end−bra_begin)·k_ket`.
 /// @param weight The block-pair multiplicity (1 on the diagonal, 2 off it —
 /// the field and the density are both symmetric).
 /// @param field The field accumulator, axis-major: `field[axis·n_points + N]`.
@@ -46,6 +49,8 @@ auto charge_dipole_field_kernel(int                    l_a,
                                 int                    bra_begin,
                                 int                    bra_end,
                                 const KernelBlockData &ket,
+                                int                    ket_begin,
+                                int                    ket_end,
                                 const double          *point_x,
                                 const double          *point_y,
                                 const double          *point_z,

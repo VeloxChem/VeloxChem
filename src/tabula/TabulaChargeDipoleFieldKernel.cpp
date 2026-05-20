@@ -42,6 +42,8 @@ charge_dipole_field_kernel(const int              l_a,
                            const int              bra_begin,
                            const int              bra_end,
                            const KernelBlockData &ket,
+                           const int              ket_begin,
+                           const int              ket_end,
                            const double          *point_x,
                            const double          *point_y,
                            const double          *point_z,
@@ -127,7 +129,8 @@ charge_dipole_field_kernel(const int              l_a,
     }
 
     const int         ket_components = 2 * l_c + 1;
-    const std::size_t cdim           = static_cast<std::size_t>(bra_end - bra_begin) * static_cast<std::size_t>(ket.ncgtos);
+    const int         k_ket          = ket_end - ket_begin;
+    const std::size_t cdim           = static_cast<std::size_t>(bra_end - bra_begin) * static_cast<std::size_t>(k_ket);
 
     for (int i = bra_begin; i < bra_end; i++)
     {
@@ -136,7 +139,7 @@ charge_dipole_field_kernel(const int              l_a,
         const double      by      = bra.y[i];
         const double      bz      = bra.z[i];
 
-        for (int jj = 0; jj < ket.ncgtos; jj++)
+        for (int jj = ket_begin; jj < ket_end; jj++)
         {
             const double dx  = bx - ket.x[jj];
             const double dy  = by - ket.y[jj];
@@ -267,8 +270,8 @@ charge_dipole_field_kernel(const int              l_a,
                     const int     mc      = swap ? braM : ketM;
                     const int     out_row = (ma + l_a) * ket_components + (mc + l_c);
                     const double  dval    = density_block[static_cast<std::size_t>(out_row) * cdim +
-                                                       i_local * static_cast<std::size_t>(ket.ncgtos) +
-                                                       static_cast<std::size_t>(jj)];
+                                                       i_local * static_cast<std::size_t>(k_ket) +
+                                                       static_cast<std::size_t>(jj - ket_begin)];
 
                     while (r < ta.m_row_count && ta.m_fields[6 * r] == k)
                     {

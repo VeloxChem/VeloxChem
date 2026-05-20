@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <limits>
 #include <utility>
@@ -640,12 +641,17 @@ external_center_compute_sparse(const CMolecule&              molecule,
 }
 
 auto
-external_center_field_compute(const CMolecule&       molecule,
-                             const CMolecularBasis& basis,
-                             const DenseMatrix&     density,
-                             const FieldKernelFn&   kernel,
-                             const int              n_points,
-                             ThreadBalance&         balance) -> std::vector<std::array<double, 3>>
+external_center_field_compute(const CMolecule&         molecule,
+                              const CMolecularBasis&   basis,
+                              const DenseMatrix&       density,
+                              const FieldKernelFn      kernel,
+                              const ExternalEstimateFn estimate,
+                              const double*            point_x,
+                              const double*            point_y,
+                              const double*            point_z,
+                              const int                n_points,
+                              const double             threshold,
+                              ThreadBalance&           balance) -> std::vector<std::array<double, 3>>
 {
     const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
 
@@ -660,6 +666,7 @@ external_center_field_compute(const CMolecule&       molecule,
 
     const auto        nthreads = static_cast<std::size_t>(omp_get_max_threads());
     const std::size_t np       = static_cast<std::size_t>(n_points);
+    const bool        screen   = threshold > 0.0;
 
     // each thread accumulates the full per-point field (axis-major), reduced after
     std::vector<std::vector<double>> thread_field(nthreads, std::vector<double>(3 * np, 0.0));
@@ -689,36 +696,54 @@ external_center_field_compute(const CMolecule&       molecule,
             const int la        = bra.angular_momentum;
             const int lc        = ket.angular_momentum;
             const int k_bra     = A.cgto_end - A.cgto_begin;
-            const int k_ket     = ket.ncgtos;
             const int bra_comps = 2 * la + 1;
             const int ket_comps = 2 * lc + 1;
 
-            const std::size_t cdim = static_cast<std::size_t>(k_bra) * static_cast<std::size_t>(k_ket);
-            dblk.resize(static_cast<std::size_t>(bra_comps) * ket_comps * cdim);
+            const double  weight = task.diagonal ? 1.0 : 2.0;
+            double *const E      = thread_field[tid].data();
 
-            // gather the density sub-block, component-major (out_row = ca·ket_comps + cc)
-            for (int ca = 0; ca < bra_comps; ca++)
+            for (const auto &B : ket.spans)
             {
-                for (int cc = 0; cc < ket_comps; cc++)
+                const int         k_ket = B.cgto_end - B.cgto_begin;
+                const std::size_t cdim  = static_cast<std::size_t>(k_bra) * static_cast<std::size_t>(k_ket);
+                dblk.resize(static_cast<std::size_t>(bra_comps) * ket_comps * cdim);
+
+                // gather the density sub-block (out_row = ca·ket_comps + cc) and Σ|D|
+                double dsum = 0.0;
+                for (int ca = 0; ca < bra_comps; ca++)
                 {
-                    const std::size_t out_row = static_cast<std::size_t>(ca) * ket_comps + cc;
-                    for (int il = 0; il < k_bra; il++)
+                    for (int cc = 0; cc < ket_comps; cc++)
                     {
-                        const int         i_cgto = A.cgto_begin + il;
-                        const std::size_t ao_a   = static_cast<std::size_t>(ca) * bra.orb_indices[0] +
-                                                 bra.orb_indices[static_cast<std::size_t>(i_cgto) + 1];
-                        for (int jj = 0; jj < k_ket; jj++)
+                        const std::size_t out_row = static_cast<std::size_t>(ca) * ket_comps + cc;
+                        for (int il = 0; il < k_bra; il++)
                         {
-                            const std::size_t ao_c = static_cast<std::size_t>(cc) * ket.orb_indices[0] +
-                                                     ket.orb_indices[static_cast<std::size_t>(jj) + 1];
-                            dblk[out_row * cdim + static_cast<std::size_t>(il) * k_ket + jj] = d[ao_a * n_ao + ao_c];
+                            const std::size_t ao_a = static_cast<std::size_t>(ca) * bra.orb_indices[0] +
+                                                     bra.orb_indices[static_cast<std::size_t>(A.cgto_begin + il) + 1];
+                            for (int jl = 0; jl < k_ket; jl++)
+                            {
+                                const std::size_t ao_c = static_cast<std::size_t>(cc) * ket.orb_indices[0] +
+                                                         ket.orb_indices[static_cast<std::size_t>(B.cgto_begin + jl) + 1];
+                                const double v = d[ao_a * n_ao + ao_c];
+                                dblk[out_row * cdim + static_cast<std::size_t>(il) * k_ket + jl] = v;
+                                dsum += std::abs(v);
+                            }
                         }
                     }
                 }
-            }
 
-            const double weight = task.diagonal ? 1.0 : 2.0;
-            kernel(la, lc, bra.view(), A.cgto_begin, A.cgto_end, ket.view(), dblk.data(), weight, thread_field[tid].data());
+                // density-weighted shell-pair screen: skip (A,B) whose field bound
+                // (largest field element scaled by Σ|D_ac|) is negligible for any
+                // point. Same-atom pairs are exempt — the estimate's R_AB^m factor
+                // degenerates at R_AB = 0, and they carry the dominant near-field.
+                if (screen && A.atom != B.atom)
+                {
+                    const double dx = A.x - B.x, dy = A.y - B.y, dz = A.z - B.z;
+                    if (dsum * estimate(la, lc, A, B, dx * dx + dy * dy + dz * dz, 1.0) < threshold) continue;
+                }
+
+                kernel(la, lc, bra.view(), A.cgto_begin, A.cgto_end, ket.view(), B.cgto_begin, B.cgto_end, point_x,
+                       point_y, point_z, n_points, dblk.data(), weight, E);
+            }
 
             thread_busy[tid] += seconds(std::chrono::steady_clock::now() - t_body);
             thread_pairs[tid] += 1;

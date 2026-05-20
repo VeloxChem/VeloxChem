@@ -469,8 +469,9 @@ export_tabula(py::module& m) -> void
                const CMolecule&                          molecule,
                const CMolecularBasis&                    basis,
                const DenseMatrix&                        density,
-               const std::vector<std::array<double, 3>>& coordinates) -> py::array_t<double> {
-                const auto field = self.computeField(molecule, basis, density, coordinates);
+               const std::vector<std::array<double, 3>>& coordinates,
+               const double                              threshold) -> py::array_t<double> {
+                const auto field = self.computeField(molecule, basis, density, coordinates, threshold);
                 const auto n     = static_cast<py::ssize_t>(field.size());
                 py::array_t<double> out({n, static_cast<py::ssize_t>(3)});
                 auto                r = out.mutable_unchecked<2>();
@@ -483,8 +484,9 @@ export_tabula(py::module& m) -> void
                 return out;
             },
             "Computes the electric field E_i(R_N) = Sum_ac (a|(r_i-R_N)/|r-R_N|^3|c) D_ac of an AO density "
-            "matrix at external points (coordinates in au); returns an (n_points, 3) array.",
-            "molecule"_a, "basis"_a, "density"_a, "coordinates"_a);
+            "matrix at external points (coordinates in au); returns an (n_points, 3) array. "
+            "threshold = 0 (default) is exact; > 0 screens shell-pairs and points.",
+            "molecule"_a, "basis"_a, "density"_a, "coordinates"_a, "threshold"_a = 0.0);
 
     m.def(
         "charge_dipole_thread_balance",

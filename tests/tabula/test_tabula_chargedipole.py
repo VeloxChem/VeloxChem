@@ -210,6 +210,25 @@ class TestTabulaChargeDipole:
                 ref[k, ax] = np.sum(D * np.array(sm.to_numpy(), copy=True))
         assert np.allclose(E, ref, 0.0, 1.0e-9)
 
+    def test_field_screening_sound(self):
+        # a stretched H chain: the density-weighted shell-pair screen drops the
+        # bra-ket-distant pairs, and the screened field stays within threshold
+        xyz = "\n".join(f"H 0.0 0.0 {i * 2.6:.3f}" for i in range(40))
+        mol = Molecule.read_str(xyz, "au")
+        bas = MolecularBasis.read(mol, "def2-svp", ostream=None)
+        cdp = TabulaChargeDipoleDriver()
+        n = cdp.compute(mol, bas, [[1.0, 0.0, 0.0]], [[0.0, 0.0, 0.0]], 0.0).to_numpy().shape[0]
+        D = self._density(n)
+        Dt = TabulaDenseMatrix.from_numpy(D)
+        coords = [[0.5, 0.3, 13.0], [-0.4, 0.2, 50.0], [1.0, 1.0, 90.0]]
+
+        threshold = 1.0e-9
+        exact = cdp.compute_field(mol, bas, Dt, coords, 0.0)
+        screened = cdp.compute_field(mol, bas, Dt, coords, threshold)
+
+        assert np.allclose(screened, exact, 0.0, threshold)  # sound
+        assert not np.array_equal(screened, exact)           # screening dropped shell-pairs
+
     def test_field_dual_of_matrix(self):
         # the two modes are transposes: E_i(R) = <D, matrix(unit moment axis i @ R)>
         mol, bas = self._setup()

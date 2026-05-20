@@ -66,11 +66,15 @@ class ChargeDipoleDriver
     /// @param basis The molecular basis.
     /// @param density The AO density matrix `D`.
     /// @param coordinates The external point positions, in atomic units.
+    /// @param threshold The screening threshold; `0` (the default) is exact —
+    /// every shell-pair against every point. A positive value drops shell-pairs
+    /// and points whose conservative field-contribution bound is below it.
     /// @return The field at each point — one `{Ex, Ey, Ez}` per coordinate.
     auto computeField(const CMolecule&                          molecule,
                       const CMolecularBasis&                    basis,
                       const DenseMatrix&                        density,
-                      const std::vector<std::array<double, 3>>& coordinates) const
+                      const std::vector<std::array<double, 3>>& coordinates,
+                      const double                              threshold = 0.0) const
         -> std::vector<std::array<double, 3>>;
 };
 
