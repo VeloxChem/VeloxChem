@@ -188,6 +188,30 @@ ChargeDipoleDriver::computeField(const CMolecule&                          molec
 }
 
 auto
+ChargeDipoleDriver::computeFieldSparse(const CMolecule&                          molecule,
+                                       const CMolecularBasis&                    basis,
+                                       const BlockSparseMatrix&                  density,
+                                       const std::vector<std::array<double, 3>>& coordinates,
+                                       const double                              threshold) const
+    -> std::vector<std::array<double, 3>>
+{
+    std::vector<double> px, py, pz;
+    px.reserve(coordinates.size());
+    py.reserve(coordinates.size());
+    pz.reserve(coordinates.size());
+    for (const auto& c : coordinates)
+    {
+        px.push_back(c[0]);
+        py.push_back(c[1]);
+        pz.push_back(c[2]);
+    }
+    const int np = static_cast<int>(coordinates.size());
+
+    return external_center_field_compute_sparse(molecule, basis, density, &charge_dipole_field_kernel, dipole_estimate,
+                                                px.data(), py.data(), pz.data(), np, threshold, g_balance);
+}
+
+auto
 charge_dipole_thread_balance() -> ThreadBalance
 {
     return g_balance;

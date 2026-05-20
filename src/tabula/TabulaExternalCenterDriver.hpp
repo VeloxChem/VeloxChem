@@ -125,6 +125,23 @@ auto external_center_field_compute(const CMolecule&         molecule,
                                    double                   threshold,
                                    ThreadBalance&           balance) -> std::vector<std::array<double, 3>>;
 
+/// @brief The block-sparse-density variant of `external_center_field_compute` —
+/// contracts the field operator against a block-sparse density. It skips every
+/// atom-pair whose density block is not stored (the sparsity win), reading the
+/// surviving blocks straight from the sparse buffer; otherwise identical. The
+/// density's groups are the molecule's atoms (group == atom).
+auto external_center_field_compute_sparse(const CMolecule&         molecule,
+                                          const CMolecularBasis&   basis,
+                                          const BlockSparseMatrix& density,
+                                          const FieldKernelFn      kernel,
+                                          const ExternalEstimateFn estimate,
+                                          const double*            point_x,
+                                          const double*            point_y,
+                                          const double*            point_z,
+                                          int                      n_points,
+                                          double                   threshold,
+                                          ThreadBalance&           balance) -> std::vector<std::array<double, 3>>;
+
 }  // namespace tabula
 
 #endif /* TabulaExternalCenterDriver_hpp */

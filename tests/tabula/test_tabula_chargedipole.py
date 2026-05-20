@@ -229,6 +229,38 @@ class TestTabulaChargeDipole:
         assert np.allclose(screened, exact, 0.0, threshold)  # sound
         assert not np.array_equal(screened, exact)           # screening dropped shell-pairs
 
+    def test_field_sparse_matches_dense(self):
+        # the block-sparse-density field equals the dense field of the densified
+        # density (a symmetric matrix stands in for the density; linear in D)
+        mol, bas = self._setup()
+        nuc = TabulaNuclearAttractionDriver()
+        cdp = TabulaChargeDipoleDriver()
+        d_sparse = nuc.compute_sparse(mol, bas, 0.0)
+        d_dense = d_sparse.to_dense()
+        coords = [r for (_, r) in SITES]
+
+        e_sparse = cdp.compute_field_sparse(mol, bas, d_sparse, coords)
+        e_dense = cdp.compute_field(mol, bas, d_dense, coords)
+        assert np.allclose(e_sparse, e_dense, 0.0, 1.0e-12)
+
+    def test_field_sparse_screened_density(self):
+        # a screened sparse density drops far atom-pairs; the sparse field skips
+        # them and matches the dense field of the densified (dropped = 0) density
+        xyz = "\n".join(f"H 0.0 0.0 {i * 2.6:.3f}" for i in range(40))
+        mol = Molecule.read_str(xyz, "au")
+        bas = MolecularBasis.read(mol, "def2-svp", ostream=None)
+        nuc = TabulaNuclearAttractionDriver()
+        cdp = TabulaChargeDipoleDriver()
+        d_sparse = nuc.compute_sparse(mol, bas, 1.0e-6)
+        dim = d_sparse.dimension()
+        assert d_sparse.stored_element_count() < dim * dim  # density actually screened
+
+        d_dense = d_sparse.to_dense()
+        coords = [[0.5, 0.3, 13.0], [-0.4, 0.2, 50.0]]
+        e_sparse = cdp.compute_field_sparse(mol, bas, d_sparse, coords)
+        e_dense = cdp.compute_field(mol, bas, d_dense, coords)
+        assert np.allclose(e_sparse, e_dense, 0.0, 1.0e-12)
+
     def test_field_dual_of_matrix(self):
         # the two modes are transposes: E_i(R) = <D, matrix(unit moment axis i @ R)>
         mol, bas = self._setup()

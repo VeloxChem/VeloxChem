@@ -486,6 +486,29 @@ export_tabula(py::module& m) -> void
             "Computes the electric field E_i(R_N) = Sum_ac (a|(r_i-R_N)/|r-R_N|^3|c) D_ac of an AO density "
             "matrix at external points (coordinates in au); returns an (n_points, 3) array. "
             "threshold = 0 (default) is exact; > 0 screens shell-pairs and points.",
+            "molecule"_a, "basis"_a, "density"_a, "coordinates"_a, "threshold"_a = 0.0)
+        .def(
+            "compute_field_sparse",
+            [](const ChargeDipoleDriver&                 self,
+               const CMolecule&                          molecule,
+               const CMolecularBasis&                    basis,
+               const BlockSparseMatrix&                  density,
+               const std::vector<std::array<double, 3>>& coordinates,
+               const double                              threshold) -> py::array_t<double> {
+                const auto field = self.computeFieldSparse(molecule, basis, density, coordinates, threshold);
+                const auto n     = static_cast<py::ssize_t>(field.size());
+                py::array_t<double> out({n, static_cast<py::ssize_t>(3)});
+                auto                r = out.mutable_unchecked<2>();
+                for (py::ssize_t i = 0; i < n; i++)
+                {
+                    r(i, 0) = field[static_cast<std::size_t>(i)][0];
+                    r(i, 1) = field[static_cast<std::size_t>(i)][1];
+                    r(i, 2) = field[static_cast<std::size_t>(i)][2];
+                }
+                return out;
+            },
+            "Computes the electric field of a block-sparse AO density (atom-grouped) at external points; "
+            "returns an (n_points, 3) array. Atom-pairs whose density block is not stored are skipped.",
             "molecule"_a, "basis"_a, "density"_a, "coordinates"_a, "threshold"_a = 0.0);
 
     m.def(

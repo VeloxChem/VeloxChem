@@ -766,4 +766,155 @@ external_center_field_compute(const CMolecule&         molecule,
     return result;
 }
 
+auto
+external_center_field_compute_sparse(const CMolecule&         molecule,
+                                     const CMolecularBasis&   basis,
+                                     const BlockSparseMatrix& density,
+                                     const FieldKernelFn      kernel,
+                                     const ExternalEstimateFn estimate,
+                                     const double*            point_x,
+                                     const double*            point_y,
+                                     const double*            point_z,
+                                     const int                n_points,
+                                     const double             threshold,
+                                     ThreadBalance&           balance) -> std::vector<std::array<double, 3>>
+{
+    const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
+
+    std::vector<BlockArrays> blocks;
+    blocks.reserve(gto_blocks.size());
+    for (const auto& block : gto_blocks)
+    {
+        blocks.push_back(fetch_block(block));
+    }
+
+    const auto tasks = build_tasks(blocks);
+
+    // index the sparse density: the stored block per atom-pair (ga ≥ gb), and
+    // each global AO's local position within its atom group
+    const std::size_t n_groups = density.number_of_groups();
+    std::vector<long> block_of(n_groups * n_groups, -1);
+    for (std::size_t b = 0; b < density.number_of_blocks(); b++)
+    {
+        const auto desc = density.block(b);
+        block_of[desc.groupA * n_groups + desc.groupB] = static_cast<long>(b);
+    }
+    std::vector<std::size_t> ao_local(density.dimension(), 0);
+    for (std::size_t g = 0; g < n_groups; g++)
+    {
+        const auto aos = density.group_global_ao(g);
+        for (std::size_t l = 0; l < aos.size(); l++) ao_local[aos[l]] = l;
+    }
+
+    const auto        nthreads = static_cast<std::size_t>(omp_get_max_threads());
+    const std::size_t np       = static_cast<std::size_t>(n_points);
+    const bool        screen   = threshold > 0.0;
+
+    std::vector<std::vector<double>> thread_field(nthreads, std::vector<double>(3 * np, 0.0));
+    std::vector<double>              thread_busy(nthreads, 0.0);
+    std::vector<long>                thread_pairs(nthreads, 0);
+
+    const double* const dvals = density.values();
+
+    const auto t_region = std::chrono::steady_clock::now();
+
+#pragma omp parallel
+    {
+        std::vector<double> dblk;
+
+#pragma omp for schedule(dynamic)
+        for (int p = 0; p < static_cast<int>(tasks.size()); p++)
+        {
+            const auto tid    = static_cast<std::size_t>(omp_get_thread_num());
+            const auto t_body = std::chrono::steady_clock::now();
+
+            const auto &task = tasks[static_cast<std::size_t>(p)];
+            const auto &bra  = blocks[task.i];
+            const auto &A    = bra.spans[task.span];
+            const auto &ket  = blocks[task.j];
+
+            const int la        = bra.angular_momentum;
+            const int lc        = ket.angular_momentum;
+            const int k_bra     = A.cgto_end - A.cgto_begin;
+            const int bra_comps = 2 * la + 1;
+            const int ket_comps = 2 * lc + 1;
+
+            const double  weight = task.diagonal ? 1.0 : 2.0;
+            double *const E      = thread_field[tid].data();
+
+            for (const auto &B : ket.spans)
+            {
+                const auto        atom_a = static_cast<std::size_t>(A.atom);
+                const auto        atom_b = static_cast<std::size_t>(B.atom);
+                const std::size_t ga     = std::max(atom_a, atom_b);
+                const std::size_t gb     = std::min(atom_a, atom_b);
+                const long        blk    = block_of[ga * n_groups + gb];
+                if (blk < 0) continue;  // density block not stored — atom-pair negligible
+
+                const auto          desc  = density.block(static_cast<std::size_t>(blk));
+                const double* const dblock = dvals + desc.offset;
+                const std::size_t   ncol  = desc.columnCount;
+                const bool          ahi   = atom_a >= atom_b;  // A is the row group (ga)
+
+                const int         k_ket = B.cgto_end - B.cgto_begin;
+                const std::size_t cdim  = static_cast<std::size_t>(k_bra) * static_cast<std::size_t>(k_ket);
+                dblk.resize(static_cast<std::size_t>(bra_comps) * ket_comps * cdim);
+
+                // gather the density sub-block from the sparse block (transpose
+                // local indices when A is the lower-numbered atom), and Σ|D|
+                double dsum = 0.0;
+                for (int ca = 0; ca < bra_comps; ca++)
+                {
+                    for (int cc = 0; cc < ket_comps; cc++)
+                    {
+                        const std::size_t out_row = static_cast<std::size_t>(ca) * ket_comps + cc;
+                        for (int il = 0; il < k_bra; il++)
+                        {
+                            const std::size_t ao_a = static_cast<std::size_t>(ca) * bra.orb_indices[0] +
+                                                     bra.orb_indices[static_cast<std::size_t>(A.cgto_begin + il) + 1];
+                            const std::size_t la_loc = ao_local[ao_a];
+                            for (int jl = 0; jl < k_ket; jl++)
+                            {
+                                const std::size_t ao_c = static_cast<std::size_t>(cc) * ket.orb_indices[0] +
+                                                         ket.orb_indices[static_cast<std::size_t>(B.cgto_begin + jl) + 1];
+                                const std::size_t lc_loc = ao_local[ao_c];
+                                const double      v = ahi ? dblock[la_loc * ncol + lc_loc] : dblock[lc_loc * ncol + la_loc];
+                                dblk[out_row * cdim + static_cast<std::size_t>(il) * k_ket + jl] = v;
+                                dsum += std::abs(v);
+                            }
+                        }
+                    }
+                }
+
+                if (screen && A.atom != B.atom)
+                {
+                    const double dx = A.x - B.x, dy = A.y - B.y, dz = A.z - B.z;
+                    if (dsum * estimate(la, lc, A, B, dx * dx + dy * dy + dz * dz, 1.0) < threshold) continue;
+                }
+
+                kernel(la, lc, bra.view(), A.cgto_begin, A.cgto_end, ket.view(), B.cgto_begin, B.cgto_end, point_x,
+                       point_y, point_z, n_points, dblk.data(), weight, E);
+            }
+
+            thread_busy[tid] += seconds(std::chrono::steady_clock::now() - t_body);
+            thread_pairs[tid] += 1;
+        }
+    }
+
+    balance.wall  = seconds(std::chrono::steady_clock::now() - t_region);
+    balance.busy  = thread_busy;
+    balance.pairs = thread_pairs;
+
+    std::vector<std::array<double, 3>> result(np, {0.0, 0.0, 0.0});
+    for (const auto& tf : thread_field)
+    {
+        for (std::size_t pt = 0; pt < np; pt++)
+        {
+            for (int a = 0; a < 3; a++) result[pt][static_cast<std::size_t>(a)] += tf[static_cast<std::size_t>(a) * np + pt];
+        }
+    }
+
+    return result;
+}
+
 }  // namespace tabula

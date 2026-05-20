@@ -76,6 +76,24 @@ class ChargeDipoleDriver
                       const std::vector<std::array<double, 3>>& coordinates,
                       const double                              threshold = 0.0) const
         -> std::vector<std::array<double, 3>>;
+
+    /// @brief Computes the electric field of a block-sparse AO density at a set
+    /// of external points — the sparse-density counterpart of `computeField`.
+    /// Atom-pairs whose density block is not stored are skipped. The density's
+    /// groups must be the molecule's atoms (as `compute_sparse` produces).
+    /// @param molecule The molecule.
+    /// @param basis The molecular basis.
+    /// @param density The block-sparse AO density matrix `D`.
+    /// @param coordinates The external point positions, in atomic units.
+    /// @param threshold An additional shell-pair screen on the stored blocks;
+    /// `0` (the default) keeps every stored block.
+    /// @return The field at each point — one `{Ex, Ey, Ez}` per coordinate.
+    auto computeFieldSparse(const CMolecule&                          molecule,
+                            const CMolecularBasis&                    basis,
+                            const BlockSparseMatrix&                  density,
+                            const std::vector<std::array<double, 3>>& coordinates,
+                            const double                              threshold = 0.0) const
+        -> std::vector<std::array<double, 3>>;
 };
 
 /// @brief Gets the per-thread balance captured by the most recent
