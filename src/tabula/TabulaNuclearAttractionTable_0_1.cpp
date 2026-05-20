@@ -40,8 +40,8 @@ static constexpr std::int8_t comp_ket_0_1[] = {
 static constexpr std::uint8_t mfields_0_1[] = {
     0,0,0,0,1,0,0,2,0,0,0,0,1,0,0,0,0,1,1,1,0,0,0,0,2,0,0,1,0,0,2,3,0,0,0,0,
 };
-static constexpr double mcoef_0_1[] = {
-    -2.0,-1.0,-2.0,-1.0,-2.0,-1.0,
+static constexpr std::uint16_t mcoefidx_0_1[] = {
+    1,2,1,2,1,2,
 };
 
 }  // namespace
@@ -51,7 +51,7 @@ nuclear_table_0_1() -> const NuclearTable&
 {
     static constexpr NuclearTable t{0, 1, 4, 1, 3, 6,
         ev_order_0_1, ev_mu_0_1, ev_goz_0_1, ev_qx_0_1, ev_qy_0_1, ev_qz_0_1,
-        comp_bra_0_1, comp_ket_0_1, mfields_0_1, mcoef_0_1};
+        comp_bra_0_1, comp_ket_0_1, mfields_0_1, mcoefidx_0_1};
     return t;
 }
 

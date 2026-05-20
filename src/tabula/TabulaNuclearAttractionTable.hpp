@@ -16,7 +16,8 @@ namespace detail {  // detail namespace
 /// @brief A pointer view of one (l_a, l_c) nuclear-attraction table.
 /// Expanded-V entries carry the seed order, the µ / γ-over-ζ powers,
 /// and the lifted Q-monomial; the M rows are a pure-R_AC polynomial
-/// (`component, evIndex-lo, evIndex-hi, R_AC x/y/z`, six bytes/row).
+/// (`component, evIndex-lo, evIndex-hi, R_AC x/y/z`, six bytes/row) plus
+/// a uint16 index into the shared coefficient dictionary.
 struct NuclearTable
 {
     int l_a, l_c;
@@ -24,11 +25,14 @@ struct NuclearTable
     const std::uint8_t *ev_order, *ev_mu_power, *ev_goz_power, *ev_qx, *ev_qy, *ev_qz;
     const std::int8_t *component_bra_m, *component_ket_m;
     const std::uint8_t *m_fields;
-    const double *m_coef;
+    const std::uint16_t *m_coef_idx;
 };
 
 /// @brief The nuclear-attraction table for an (l_a, l_c) pair, l = 0 … 4.
 auto nuclear_table(int l_a, int l_c) -> const NuclearTable&;
+
+/// @brief The shared coefficient dictionary the M rows index into.
+auto nuclear_coef_dict() -> const double*;
 
 }  // namespace detail
 

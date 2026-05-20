@@ -45,7 +45,11 @@ nuclear_attraction_kernel(const int              l_a,
                           const ChargeSet       &charges,
                           double                *spherical) -> void
 {
-    const detail::NuclearTable &t = detail::nuclear_table(l_a, l_c);
+    // Only l_a ≤ l_c tables are stored; for l_a > l_c use the (l_c, l_a) table
+    // with the bra/ket roles swapped (the block is the transpose).
+    const bool                  swap      = l_a > l_c;
+    const detail::NuclearTable &t         = detail::nuclear_table(swap ? l_c : l_a, swap ? l_a : l_c);
+    const double *const         coef_dict = detail::nuclear_coef_dict();
 
     const double      two_pi  = 2.0 * mathconst::pi_value();
     const int         ev      = t.ev_count;
@@ -124,8 +128,10 @@ nuclear_attraction_kernel(const int              l_a,
     double *const vg = v_grid.data();
     double *const ac = acc.data();
 
-    // per-tile lane geometry and R_AC power tables
+    // per-tile lane geometry and R_AC power tables. `acx` holds the *table*
+    // R_AC (flipped when swapped); `ranx` the table-bra centre for R_AN.
     double acx[tile], acy[tile], acz[tile], r2[tile];
+    double ranx[tile], rany[tile], ranz[tile];
     double powx[9 * tile], powy[9 * tile], powz[9 * tile];
 
     double boys_v[16];
@@ -144,13 +150,16 @@ nuclear_attraction_kernel(const int              l_a,
             // AC = A − C, per ket contracted GTO of the tile, and its powers
             for (int jj = 0; jj < w; jj++)
             {
-                const double dx = bx - ket.x[j0 + jj];
+                const double dx = bx - ket.x[j0 + jj];  // A − C
                 const double dy = by - ket.y[j0 + jj];
                 const double dz = bz - ket.z[j0 + jj];
-                acx[jj] = dx;
-                acy[jj] = dy;
-                acz[jj] = dz;
-                r2[jj]  = dx * dx + dy * dy + dz * dz;
+                r2[jj]   = dx * dx + dy * dy + dz * dz;
+                acx[jj]  = swap ? -dx : dx;              // table R_AC
+                acy[jj]  = swap ? -dy : dy;
+                acz[jj]  = swap ? -dz : dz;
+                ranx[jj] = swap ? ket.x[j0 + jj] : bx;  // table-bra centre (R_AN)
+                rany[jj] = swap ? ket.y[j0 + jj] : by;
+                ranz[jj] = swap ? ket.z[j0 + jj] : bz;
                 powx[jj] = 1.0;
                 powy[jj] = 1.0;
                 powz[jj] = 1.0;
@@ -171,9 +180,8 @@ nuclear_attraction_kernel(const int              l_a,
 
             for (int kb = 0; kb < bra.nprims; kb++)
             {
-                const double a      = bra.exponents[static_cast<std::size_t>(kb) * bra.ncgtos + i];
-                const double bn     = bra.norms[static_cast<std::size_t>(kb) * bra.ncgtos + i];
-                const double ia_pow = ipow(0.5 / a, l_a);  // (1/2α)^l_a
+                const double a  = bra.exponents[static_cast<std::size_t>(kb) * bra.ncgtos + i];
+                const double bn = bra.norms[static_cast<std::size_t>(kb) * bra.ncgtos + i];
 
                 for (int lk = 0; lk < ket.nprims; lk++)
                 {
@@ -183,22 +191,27 @@ nuclear_attraction_kernel(const int              l_a,
                     // scalar over ket lanes — the Boys function is scalar
                     for (int jj = 0; jj < w; jj++)
                     {
-                        const double g    = ke[jj];
-                        const double zeta = a + g;
-                        const double mu   = a * g / zeta;     // reduced exponent aγ/ζ
-                        const double goz  = g / zeta;         // γ/ζ
-                        const double sac  = std::exp(-mu * r2[jj]);
-                        const double pref = (two_pi / zeta) * ia_pow * ipow(-0.5 / g, l_c);
-                        const double w0   = bn * kn[jj] * pref * sac;
+                        const double g     = ke[jj];
+                        const double zeta  = a + g;
+                        const double mu    = a * g / zeta;     // reduced exponent aγ/ζ (symmetric)
+                        // bra/ket exponents in the table's convention — swapped
+                        // for l_a > l_c, where the (l_c, l_a) table is used
+                        const double alpha = swap ? g : a;
+                        const double gamma = swap ? a : g;
+                        const double goz   = gamma / zeta;     // (table γ)/ζ
+                        const double sac   = std::exp(-mu * r2[jj]);
+                        const double pref  = (two_pi / zeta) * ipow(0.5 / alpha, t.l_a) * ipow(-0.5 / gamma, t.l_c);
+                        const double w0    = bn * kn[jj] * pref * sac;
 
                         const double axj = acx[jj], ayj = acy[jj], azj = acz[jj];
+                        const double rnx = ranx[jj], rny = rany[jj], rnz = ranz[jj];
 
-                        // Q and T per charge
+                        // Q and T per charge — Q = R_AN − (γ/ζ)·R_AC (table convention)
                         for (int c = 0; c < nc; c++)
                         {
-                            const double qx = (bx - chx[c]) - goz * axj;
-                            const double qy = (by - chy[c]) - goz * ayj;
-                            const double qz = (bz - chz[c]) - goz * azj;
+                            const double qx = (rnx - chx[c]) - goz * axj;
+                            const double qy = (rny - chy[c]) - goz * ayj;
+                            const double qz = (rnz - chz[c]) - goz * azj;
                             cb_qx[c] = qx;
                             cb_qy[c] = qy;
                             cb_qz[c] = qz;
@@ -283,7 +296,13 @@ nuclear_attraction_kernel(const int              l_a,
             int r = 0;
             for (int k = 0; k < t.component_count; k++)
             {
-                const int     out_row = (t.component_bra_m[k] + l_a) * ket_components + (t.component_ket_m[k] + l_c);
+                // map the table component to our (l_a, l_c) output; swapped, the
+                // table's (bra, ket) projections are our (l_c, l_a) → transpose
+                const int     braM    = t.component_bra_m[k];
+                const int     ketM    = t.component_ket_m[k];
+                const int     ma      = swap ? ketM : braM;
+                const int     mc      = swap ? braM : ketM;
+                const int     out_row = (ma + l_a) * ket_components + (mc + l_c);
                 double *const out     = spherical + static_cast<std::size_t>(out_row) * stride + ij_base +
                                     static_cast<std::size_t>(j0);
 
@@ -295,7 +314,7 @@ nuclear_attraction_kernel(const int              l_a,
                     const int     rx       = t.m_fields[6 * r + 3];
                     const int     ry       = t.m_fields[6 * r + 4];
                     const int     rz       = t.m_fields[6 * r + 5];
-                    const double  coef     = t.m_coef[r];
+                    const double  coef     = coef_dict[t.m_coef_idx[r]];
                     const double *vev      = vg + static_cast<std::size_t>(ev_index) * tile;
                     const double *px       = powx + static_cast<std::size_t>(rx) * tile;
                     const double *py       = powy + static_cast<std::size_t>(ry) * tile;
