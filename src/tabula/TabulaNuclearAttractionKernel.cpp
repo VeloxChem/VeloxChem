@@ -72,7 +72,7 @@ nuclear_attraction_kernel(const int              l_a,
     const double *chy = charges.y;
     const double *chz = charges.z;
 
-    thread_local std::vector<double> cb_qx, cb_qy, cb_qz, cb_T, cb_boys, cb_qxp, cb_qyp, cb_qzp;
+    thread_local std::vector<double> cb_qx, cb_qy, cb_qz, cb_T, cb_boys, cb_qxp, cb_qyp, cb_qzp, cb_chmbo, cb_qm;
     const auto grow = [](std::vector<double> &v, std::size_t n) { if (v.size() < n) v.resize(n); };
     grow(cb_qx, nc);
     grow(cb_qy, nc);
@@ -82,6 +82,35 @@ nuclear_attraction_kernel(const int              l_a,
     grow(cb_qxp, static_cast<std::size_t>(max_q + 1) * nc);
     grow(cb_qyp, static_cast<std::size_t>(max_q + 1) * nc);
     grow(cb_qzp, static_cast<std::size_t>(max_q + 1) * nc);
+
+    // Distinct Q-monomial map (a per-(l_a,l_c) property; built once per call).
+    // Many expanded-V entries share a Q-monomial (differing only in seed
+    // order), so the charge sum precomputes the shared `chm·Boys` and Q-product
+    // factors and reduces each ev with one multiply instead of four.
+    const int                qstride = max_q + 1;
+    thread_local std::vector<int> qmono_of_ev, qm_qx, qm_qy, qm_qz, qm_seen;
+    qmono_of_ev.resize(ev);
+    qm_qx.clear();
+    qm_qy.clear();
+    qm_qz.clear();
+    qm_seen.assign(static_cast<std::size_t>(qstride) * qstride * qstride, -1);
+    for (int e = 0; e < ev; e++)
+    {
+        const int key = (t.ev_qx[e] * qstride + t.ev_qy[e]) * qstride + t.ev_qz[e];
+        int       idx = qm_seen[static_cast<std::size_t>(key)];
+        if (idx < 0)
+        {
+            idx               = static_cast<int>(qm_qx.size());
+            qm_seen[static_cast<std::size_t>(key)] = idx;
+            qm_qx.push_back(t.ev_qx[e]);
+            qm_qy.push_back(t.ev_qy[e]);
+            qm_qz.push_back(t.ev_qz[e]);
+        }
+        qmono_of_ev[e] = idx;
+    }
+    const int dqm = static_cast<int>(qm_qx.size());
+    grow(cb_chmbo, static_cast<std::size_t>(t.max_order + 1) * nc);
+    grow(cb_qm, static_cast<std::size_t>(dqm) * nc);
     const std::size_t cdim    = static_cast<std::size_t>(bra_end - bra_begin) * static_cast<std::size_t>(ket.ncgtos);
     const std::size_t stride  = ((cdim + 7) / 8) * 8;
     const int         ket_components = 2 * l_c + 1;
@@ -202,16 +231,34 @@ nuclear_attraction_kernel(const int              l_a,
                             }
                         }
 
-                        // charge sum per ev — vectorized reduction over charges
+                        // fold the charge magnitude into Boys, once per order
+                        for (int o = 0; o <= t.max_order; o++)
+                        {
+                            const double     *Bo  = &cb_boys[static_cast<std::size_t>(o) * nc];
+                            double           *cBo = &cb_chmbo[static_cast<std::size_t>(o) * nc];
+#pragma omp simd
+                            for (int c = 0; c < nc; c++) cBo[c] = chm[c] * Bo[c];
+                        }
+
+                        // the Q-product, once per distinct Q-monomial
+                        for (int d = 0; d < dqm; d++)
+                        {
+                            const double *Qx  = &cb_qxp[static_cast<std::size_t>(qm_qx[d]) * nc];
+                            const double *Qy  = &cb_qyp[static_cast<std::size_t>(qm_qy[d]) * nc];
+                            const double *Qz  = &cb_qzp[static_cast<std::size_t>(qm_qz[d]) * nc];
+                            double       *QMd = &cb_qm[static_cast<std::size_t>(d) * nc];
+#pragma omp simd
+                            for (int c = 0; c < nc; c++) QMd[c] = Qx[c] * Qy[c] * Qz[c];
+                        }
+
+                        // charge sum per ev — one multiply per term
                         for (int e = 0; e < ev; e++)
                         {
-                            const double *Bo = &cb_boys[static_cast<std::size_t>(t.ev_order[e]) * nc];
-                            const double *Qx = &cb_qxp[static_cast<std::size_t>(t.ev_qx[e]) * nc];
-                            const double *Qy = &cb_qyp[static_cast<std::size_t>(t.ev_qy[e]) * nc];
-                            const double *Qz = &cb_qzp[static_cast<std::size_t>(t.ev_qz[e]) * nc];
-                            double s = 0.0;
+                            const double *Bo  = &cb_chmbo[static_cast<std::size_t>(t.ev_order[e]) * nc];
+                            const double *QMe = &cb_qm[static_cast<std::size_t>(qmono_of_ev[e]) * nc];
+                            double        s   = 0.0;
 #pragma omp simd reduction(+ : s)
-                            for (int c = 0; c < nc; c++) s += chm[c] * Bo[c] * Qx[c] * Qy[c] * Qz[c];
+                            for (int c = 0; c < nc; c++) s += Bo[c] * QMe[c];
                             ac[e] = s;
                         }
 
