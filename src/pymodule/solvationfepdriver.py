@@ -163,8 +163,8 @@ class SolvationFepDriver:
         self.lambdas_stage2 = [1.0, 0.8, 0.6, 0.4, 0.3, 0.2, 0.15, 0.10, 0.05, 0.03, 0.0]
         # Fixed lambda vector for stage 3 with 6 lambdas
         self.lambdas_stage3 = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
-        # Fixed lambda vector for stage 4 with 5 lambdas
-        self.lambdas_stage4 = [1.0, 0.8, 0.5, 0.2, 0.0] 
+        # Fixed lambda vector for stage 4 with 3 lambdas
+        self.lambdas_stage4 = [1.0, 0.5, 0.0] 
 
         # Storage for potential energies across stages
         self.u_kn_matrices = []
@@ -262,7 +262,6 @@ class SolvationFepDriver:
         
         # To run with pre-built OMM system objects
         if system_xml is not None and system_pdb is not None:
-            self.ostream.print_info(f"Using pre-build OpenMM system from ")
             self.system_pdb = system_pdb
             self.system_xml = system_xml
             self.solute_pdb = solute_pdb
@@ -776,19 +775,8 @@ class SolvationFepDriver:
 
     def _calculate_free_energy(self, u_kn):
 
-        mbar = MBAR(u_kn, N_k=self.N_k, n_bootstraps=50, solver_protocol='robust') 
+        mbar = MBAR(u_kn, N_k = self.N_k, n_bootstraps=50, solver_protocol='robust') 
         delta_f = mbar.compute_free_energy_differences(uncertainty_method='bootstrap')
-
-        # Extract the overlap matrix
-        try:
-            # pymbar 4.x syntax (Primary)
-            overlap_results = mbar.compute_overlap()
-            overlap_matrix = overlap_results['matrix']
-        except AttributeError:
-            # pymbar 3.x fallback
-            overlap_matrix, _ = mbar.computeOverlap()
-
-        self.overlap_matrix.append(overlap_matrix)
 
         return delta_f
 

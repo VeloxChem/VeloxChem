@@ -47,10 +47,8 @@ from .evbsystembuilder import EvbSystemBuilder
 from .evbfepdriver import EvbFepDriver
 from .reaffbuilder import ReactionForceFieldBuilder
 from .evbdataprocessing import EvbDataProcessing
-from .evbsystembuilder import EvbForceGroup
 from .solvationbuilder import SolvationBuilder
 from .errorhandler import assert_msg_critical
-from .sanitychecks import molecule_sanity_check
 
 try:
     import openmm as mm
@@ -96,7 +94,7 @@ class EvbDriver():
 
         self.t_label = int(time.time())
         self.water_model = 'cspce'
-        
+
         self.ffbuilder = ReactionForceFieldBuilder(ostream=self.ostream)
 
     def build_and_run_default_water_EVB(
@@ -153,15 +151,11 @@ class EvbDriver():
             optimize_mol (bool): If True, does an xtb optimization of every provided molecule object before reparameterisation. Defaults to False.
             optimize_ff (bool): If True, does an mm optimization of the combined reactant and product after reparameterisation. Defaults to True.
         """
-        
 
         self.ffbuilder.water_model = self.water_model
 
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, self.reactants, self.products, self.product_mapping = self.ffbuilder.build_forcefields(
-            reactant=reactant,
-            product=product,
-            **kwargs
-        )
+            reactant=reactant, product=product, **kwargs)
 
     def build_systems(
         self,
@@ -172,8 +166,8 @@ class EvbDriver():
         """Build OpenMM systems for the given configurations with interpolated forcefields for each lambda value. Saves the systems as xml files, the topology as a pdb file and the options as a json file to the disk.
 
         Args:
-            configurations (list[str] | list[dict]): The given configurations for which to perform an FEP. The first configuration will be regarded as the reference configuration. 
-            Lambda (list[float] | np.ndarray): The Lambda vector to be used for the FEP. Should start with 0, end with 1 and be monotonically increasing. 
+            configurations (list[str] | list[dict]): The given configurations for which to perform an FEP. The first configuration will be regarded as the reference configuration.
+            Lambda (list[float] | np.ndarray): The Lambda vector to be used for the FEP. Should start with 0, end with 1 and be monotonically increasing.
                 Defaults to None, in which case default values will be assigned depending on if debugging is enabled or not.
                 If a string is given, the return value of default_system_configurations() will be used. See this function for default configurations.
             constraints (dict | list[dict] | None, optional): Dictionary of harmonic bond, angle or (improper) torsion forces to apply over in every FEP frame. Defaults to None.
@@ -215,9 +209,9 @@ class EvbDriver():
         Lambda = [round(lam, 3) for lam in Lambda]
         self.Lambda = Lambda
 
-        #Per configuration
+        # Per configuration
         for conf in self.configurations:
-            #create folders,
+            # create folders,
             data_folder = f"EVB_{self.name}_{conf['name']}_data_{self.t_label}"
             while Path(data_folder).exists():
                 self.t_label += 1
@@ -241,9 +235,9 @@ class EvbDriver():
                 str(data_folder_path / "product_struct.xyz"))
 
             MMForceFieldGenerator.save_forcefield(
-                self.reactant, str(data_folder_path / f"reactant_ff_data.json"))
+                self.reactant, str(data_folder_path / "reactant_ff_data.json"))
             MMForceFieldGenerator.save_forcefield(
-                self.product, str(data_folder_path / f"product_ff_data.json"))
+                self.product, str(data_folder_path / "product_ff_data.json"))
 
             if conf.get('solvent', None) is None and conf.get('pressure',
                                                               -1) > 0:
@@ -305,7 +299,7 @@ class EvbDriver():
                             name: str,
                             load_systems=False,
                             load_pdb=False):
-        """Load a configuration from a data folder for which the systems have already been generated, such that an FEP can be performed. 
+        """Load a configuration from a data folder for which the systems have already been generated, such that an FEP can be performed.
         The topology, initial positions, temperature and Lambda vector will be loaded from the data folder.
 
         Args:
@@ -338,7 +332,8 @@ class EvbDriver():
         }
         if load_systems:
             sysbuilder = EvbSystemBuilder()
-            systems = sysbuilder.load_systems_from_xml(str(Path(data_folder) / "run"))
+            systems = sysbuilder.load_systems_from_xml(
+                str(Path(data_folder) / "run"))
             conf["systems"] = systems
         else:
             systems = []
@@ -429,10 +424,14 @@ class EvbDriver():
                                                  time_sub_sample)
         self.ostream.flush()
 
-        if alpha is not None: dp.alpha = alpha
-        if H12 is not None: dp.H12 = H12
-        if alpha_guess is not None: dp.alpha_guess = alpha_guess
-        if H12_guess is not None: dp.H12_guess = H12_guess
+        if alpha is not None:
+            dp.alpha = alpha
+        if H12 is not None:
+            dp.H12 = H12
+        if alpha_guess is not None:
+            dp.alpha_guess = alpha_guess
+        if H12_guess is not None:
+            dp.H12_guess = H12_guess
         if dE_range is not None:
             dp.coordinate_bins = np.linspace(dE_range[0], dE_range[1], 200)
 
@@ -696,16 +695,30 @@ class EvbDriver():
             def save_group(data, group):
                 for k, v in data.items():
                     if isinstance(v, dict):
+                        # Recurse into nested dicts as HDF5 subgroups
                         subgroup = group.create_group(k)
                         save_group(v, subgroup)
-                    elif isinstance(v, np.ndarray) or isinstance(v, list):
-                        group.create_dataset(k, data=v)
-                    elif isinstance(v, set):
-                        group.create_dataset(k, data=list(v))
-                    elif isinstance(v, object):
-                        continue
-                    else:
+                    elif isinstance(v, (np.ndarray, list, set)):
+                        # sets are unordered so convert to list first; np.array handles both
+                        group.create_dataset(
+                            k,
+                            data=np.array(list(v) if isinstance(v, set) else v))
+                    elif isinstance(v, (bool, int, float, str, bytes, np.generic)):
+                        # np.generic covers numpy scalars (np.float64, np.int32, etc.)
                         group[k] = v
+                    elif hasattr(v, '__dict__'):
+                        # Custom objects: recurse into their attributes as a subgroup
+                        subgroup = group.create_group(k)
+                        save_group(vars(v), subgroup)
+                    else:
+                        # Last resort: let h5py try; fall back to repr string if it fails
+                        try:
+                            group[k] = v
+                        except TypeError:
+                            group.attrs[k] = repr(v)
+                            self.ostream.print_warning(
+                                f"Key '{k}': stored {type(v).__name__} as string repr"
+                            )
 
             save_group(data, file)
 
@@ -737,7 +750,7 @@ class EvbDriver():
             if conf.get("solvent", None) is not None:
 
                 sol_script = (
-                    f'sol = resname("SOL");\n'
+                    'sol = resname("SOL");\n'
                     'close_sol = (within(5, rea) and resname("SOL"));\n')
             pdb_script = ""
             if conf.get('pdb', None) is not None:
@@ -889,7 +902,7 @@ class EvbDriver():
             }
         else:
             try:
-                solvent = SolvationBuilder()._solvent_properties(name)
+                solvent_prop_not_used = SolvationBuilder()._solvent_properties(name)
                 conf = {
                     "name": name,
                     "solvent": name,
@@ -898,7 +911,8 @@ class EvbDriver():
                     "padding": 1.5,
                     "ion_count": 0,
                 }
-            except:
+            except ValueError:
+                # _solvent_properties raises ValueError for unrecognized names
                 raise ValueError(f"Unknown system configuration {name}")
 
         return conf

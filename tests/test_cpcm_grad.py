@@ -68,3 +68,31 @@ class TestGradCpcm:
                              [1.3513638, 0.59962406, 1.99483228]])
 
         self.run_grad(mol, 'b3lyp', 'def2-svp', ref_grad, ['N', 1.8], 1.0e-3)
+
+    def run_grad_with_ecp(self, molecule, basis_label, ref_grad, tol):
+
+        basis = MolecularBasis.read(molecule, basis_label)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.solvation_model = 'cpcm'
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(molecule, basis)
+
+        grad_drv = ScfGradientDriver(scf_drv)
+        grad_drv.compute(molecule, basis, scf_results)
+        grad = grad_drv.get_gradient()
+
+        assert np.max(np.abs(grad - ref_grad)) < tol
+
+    def test_auh(self):
+
+        xyzstr = """2
+        xyz
+        Au 0 0 0
+        H  0 0 1.55
+        """
+        mol = Molecule.read_xyz_string(xyzstr)
+
+        ref_grad = np.array([[0, 0, 0.0128007496], [0, 0, -0.0128007496]])
+
+        self.run_grad_with_ecp(mol, 'def2-svp', ref_grad, 1.0e-5)

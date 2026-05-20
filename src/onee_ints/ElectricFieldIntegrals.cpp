@@ -365,8 +365,6 @@ computeElectricFieldIntegrals(const CMolecule& molecule, const CMolecularBasis& 
 
     std::vector<double> efield(max_prim_pair_count);
 
-    auto nthreads = omp_get_max_threads();
-
     const double delta[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
 
     const int d_cart_inds[6][2] = {

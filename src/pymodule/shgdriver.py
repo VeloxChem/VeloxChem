@@ -47,7 +47,6 @@ from .distributedarray import DistributedArray
 from .firstorderprop import FirstOrderProperties
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check)
-from .errorhandler import assert_msg_critical
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
 
@@ -155,7 +154,7 @@ class ShgDriver(NonlinearSolver):
             self.lindep_thresh = self.conv_thresh * 1.0e-6
 
         # check molecule
-        molecule_sanity_check(molecule)
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -185,13 +184,6 @@ class ShgDriver(NonlinearSolver):
             self._print_header(title)
 
         start_time = time.time()
-
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            'SHG Driver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             S = scf_results['S']
@@ -433,7 +425,7 @@ class ShgDriver(NonlinearSolver):
         F0 = self.comm.bcast(F0, root=mpi_master())
         norb = self.comm.bcast(norb, root=mpi_master())
 
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(ao_basis)
 
         eri_dict = self._init_eri(molecule, ao_basis)
 
@@ -461,12 +453,9 @@ class ShgDriver(NonlinearSolver):
         for (wb, wc) in freqpairs:
 
             Na = {
-                'x': ComplexResponseSolver.get_full_solution_vector(Nx[('x',
-                                                                  (wb + wc))]),
-                'y': ComplexResponseSolver.get_full_solution_vector(Nx[('y',
-                                                                  (wb + wc))]),
-                'z': ComplexResponseSolver.get_full_solution_vector(Nx[('z',
-                                                                  (wb + wc))]),
+                'x': ComplexResponseSolver.get_full_solution_vector(Nx[('x', (wb + wc))]),
+                'y': ComplexResponseSolver.get_full_solution_vector(Nx[('y', (wb + wc))]),
+                'z': ComplexResponseSolver.get_full_solution_vector(Nx[('z', (wb + wc))]),
             }
 
             Nb = {
@@ -544,7 +533,7 @@ class ShgDriver(NonlinearSolver):
             A dictonary with all the first-order response vectors in
             distributed form
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param nocc:
             Number of occupied orbitals
         :param norb:
@@ -690,7 +679,7 @@ class ShgDriver(NonlinearSolver):
         :param F0:
             The Fock matrix in MO basis
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param molecule:
             The molecule
         :param ao_basis:

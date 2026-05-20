@@ -38,15 +38,14 @@ import math
 import copy
 import h5py
 import time
+from random import getrandbits
 from pathlib import Path
 
 from .veloxchemlib import mpi_master, hartree_in_kjpermol, bohr_in_angstrom
 from .outputstream import OutputStream
 from .openmmdynamics import OpenMMDynamics
 from .errorhandler import assert_msg_critical
-from .sanitychecks import molecule_sanity_check
 from .mmforcefieldgenerator import MMForceFieldGenerator
-from .evbdriver import EvbDriver
 from .molecule import Molecule
 from .scfrestdriver import ScfRestrictedDriver
 from .molecularbasis import MolecularBasis
@@ -60,7 +59,7 @@ try:
 except ImportError:
     pass
 
-# All positions are in Angstrom unless otherwise stated
+# All positions are in Angsrom unless otherwise stated
 
 
 class TransitionStateGuesser():
@@ -101,7 +100,6 @@ class TransitionStateGuesser():
         self.save_results_file = True
 
         timing_str = str(int(time.time()))
-        # folder_name is only used when save_intermediates=True
         self.folder_name = f'ts_data_{timing_str}'
         self.results_file = f'ts_results_{timing_str}.h5'
 
@@ -124,7 +122,7 @@ class TransitionStateGuesser():
         self.max_qm_conformers = 5
         self.mute_scf = True
 
-        self.sys_builder_configuration = conf = {
+        self.sys_builder_configuration = {
             "name": "vacuum",
             "bonded_integration": True,
             "soft_core_coulomb_pes": True,
@@ -132,6 +130,8 @@ class TransitionStateGuesser():
             "soft_core_coulomb_int": False,
             "soft_core_lj_int": False,
         }
+
+        self._reaction_matcher_assist_min_depth = None
 
         self.ffbuilder = ReactionForceFieldBuilder(ostream=self.ostream)
         self.ffbuilder.calculate_resp = False
@@ -177,6 +177,9 @@ class TransitionStateGuesser():
             self.ostream.flush()
             self.ostream.mute()
 
+        if self._reaction_matcher_assist_min_depth is not None:
+            self.ffbuilder._reaction_matcher_assist_min_depth = int(self._reaction_matcher_assist_min_depth)
+
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_forcefields(
             reactant=reactant,
             product=product,
@@ -206,9 +209,9 @@ class TransitionStateGuesser():
             )
             self.ostream.flush()
             self.reactant.save_forcefield_as_json(
-                self.reactant, f"{self.folder_name}/reactant.json")
+                self.reactant, str(Path(self.folder_name) / "reactant.json"))
             self.product.save_forcefield_as_json(
-                self.product, f"{self.folder_name}/product.json")
+                self.product, str(Path(self.folder_name) / "product.json"))
 
         rea_bonds = set(self.reactant.bonds.keys())
         pro_bonds = set(self.product.bonds.keys())
@@ -243,21 +246,19 @@ class TransitionStateGuesser():
             self.ostream.print_blank()
             self.ostream.flush()
             sysbuilder.ostream.unmute()
-
         if self.save_intermediates:
-            systems_dir = self.folder_name + "/systems"
+            systems_dir = str(Path(self.folder_name) / "systems")
             os.makedirs(systems_dir, exist_ok=True)
-            self.ostream.print_info(
-                f"Saving systems as xml to {systems_dir}")
+            self.ostream.print_info(f"Saving systems as xml to {systems_dir}")
             self.ostream.flush()
             sysbuilder.save_systems_as_xml(self.systems, systems_dir)
-
         self.results.update({'lambda_vec': self.lambda_vector})
 
     def scan_mm(self):
 
+        self.folder = Path().cwd() / self.folder_name
+
         # pdbs are saved in angstrom
-        exception = None
 
         rea_int = mm.VerletIntegrator(1)
         rea_sim = mmapp.Simulation(
@@ -273,6 +274,7 @@ class TransitionStateGuesser():
         )
 
         # pos in angstrom
+        # pos = self.initial_positions
         rea_init_pos = self.reactant.molecule.get_coordinates_in_angstrom()
         pro_init_pos = self.product.molecule.get_coordinates_in_angstrom()
         scan_dict = {}
@@ -300,6 +302,7 @@ class TransitionStateGuesser():
                     backward_init_pos=pro_init_pos,
                 )
 
+                #     # Find peak
                 searched_conformers_indices = []
                 V, E1, E2, conf_indices = self._get_best_mm_E_from_scan_dict(
                     scan_dict)
@@ -385,52 +388,43 @@ class TransitionStateGuesser():
                         V, E1, E2, conf_indices = self._get_best_mm_E_from_scan_dict(
                             scan_dict)
                         discont_indices = self._check_discontinuities(E1, E2)
-
-        except Exception as e:
-            self.ostream.print_warning(f"Error in the ff scan: {e}")
-            self.ostream.flush()
-            exception = e
-
-        if exception is None:
-            max_mm_energy = None
-            for i, (l, mm_result) in enumerate(scan_dict.items()):
-                min_local_E = None
-                for j, conformer in enumerate(mm_result):
-                    if min_local_E is None or conformer['v'] < min_local_E:
-                        min_local_E = conformer['v']
-                        min_local_conformer_index = j
-
-                if max_mm_energy is None or min_local_E > max_mm_energy:
-                    max_mm_xyz = mm_result[min_local_conformer_index]['xyz']
-                    max_mm_energy = min_local_E
-                    max_mm_lambda = l
-                    min_mm_conformer_index = min_local_conformer_index
-
-            self.ostream.print_info(
-                f"Found highest MM E: {max_mm_energy:.3f} at Lammba: {max_mm_lambda} and conformer index: {min_mm_conformer_index}."
-            )
-            self.ostream.print_blank()
-            self.results.update({
-                'scan': scan_dict,
-                'max_mm_xyz': max_mm_xyz,
-                'max_mm_lambda': max_mm_lambda,
-                'min_mm_conformer_index': min_mm_conformer_index,
-            })
-            self.molecule = Molecule.read_xyz_string(max_mm_xyz)
-            self.molecule.set_multiplicity(self.mol_multiplicity)
-            self.molecule.set_charge(self.mol_charge)
-            if self.save_results_file:
-                self.save_results(self.results_file, self.results)
-            return self.results
-        else:
+        except Exception:
+            err_str = "The MM scan crashed. Saving results in self.results and raising exception"
+            self.ostream.print_warning(err_str)
             self.ostream.flush()
             self.results.update({'scan': scan_dict})
-            self.ostream.print_warning(
-                "The force field scan crashed. Saving results in self.results and raising exception"
-            )
-            if self.save_results_file:
-                self.save_results(self.results_file, self.results)
-            raise exception
+            raise
+
+        max_mm_energy = None
+        for i, (l, mm_result) in enumerate(scan_dict.items()):
+            min_local_E = None
+            for j, conformer in enumerate(mm_result):
+                if min_local_E is None or conformer['v'] < min_local_E:
+                    min_local_E = conformer['v']
+                    min_local_conformer_index = j
+
+            if max_mm_energy is None or min_local_E > max_mm_energy:
+                max_mm_xyz = mm_result[min_local_conformer_index]['xyz']
+                max_mm_energy = min_local_E
+                max_mm_lambda = l
+                min_mm_conformer_index = min_local_conformer_index
+
+        self.ostream.print_info(
+            f"Found highest MM E: {max_mm_energy:.3f} at Lambda: {max_mm_lambda} and conformer index: {min_mm_conformer_index}."
+        )
+        self.ostream.print_blank()
+        self.results.update({
+            'scan': scan_dict,
+            'max_mm_xyz': max_mm_xyz,
+            'max_mm_lambda': max_mm_lambda,
+            'min_mm_conformer_index': min_mm_conformer_index,
+        })
+        self.molecule = Molecule.read_xyz_string(max_mm_xyz)
+        self.molecule.set_multiplicity(self.mol_multiplicity)
+        self.molecule.set_charge(self.mol_charge)
+        if self.save_results_file:
+            self.save_results(self.results_file, self.results)
+        return self.results
 
     def _check_discontinuities(self, E1, E2):
         discont_indices = []
@@ -474,11 +468,11 @@ class TransitionStateGuesser():
             e1 = result[arg]['e1']
             e2 = result[arg]['e2']
             v = result[arg]['v']
-            e_int = result[arg]['e_int']
+            # e_int = result[arg]['e_int']
             pos = result[arg]['pos']
             n_conf = len(result)
 
-            self._print_mm_iter(l, e1, e2, v, e_int, n_conf)
+            self._print_mm_iter(l, e1, e2, v, n_conf)
 
         if self.mm_scan_backward and not skip_backward:
             self.ostream.print_info(
@@ -503,10 +497,10 @@ class TransitionStateGuesser():
                 e1 = result[arg]['e1']
                 e2 = result[arg]['e2']
                 v = result[arg]['v']
-                e_int = result[arg]['e_int']
+                # e_int = result[arg]['e_int']
                 pos = result[arg]['pos']
                 n_conf = len(result)
-                self._print_mm_iter(l, e1, e2, v, e_int, n_conf)
+                self._print_mm_iter(l, e1, e2, v, n_conf)
                 self.ostream.flush()
 
         self.ostream.print_blank()
@@ -545,40 +539,59 @@ class TransitionStateGuesser():
         prosim,
         conformer_search,
     ):
+        result = {}
+        # else:
         opm_dyn = OpenMMDynamics()
         opm_dyn.ostream.mute()
+        # platform settings for small molecule
         opm_dyn.openmm_platform = "CPU"
+        # opm_dyn.create_system_from_molecule(mol, ff_gen)
+        if self.save_intermediates:
+            pdb_name = str(Path(self.folder_name) / f'conf_top_{l}.pdb')
+        else:
+            pdb_name = f'topology_{getrandbits(32):08x}.pdb'
 
-        # Set positions directly in memory — no file I/O at all.
-        # _InMemoryPDB holds topology + positions as an OpenMM Quantity,
-        # which is the only interface conformational_sampling uses from self.pdb.
-        opm_dyn.set_positions_from_array(init_pos, topology)
+        pdb_not_used = mmapp.PDBFile.writeFile(
+            topology,
+            init_pos * mmunit.angstrom,
+            pdb_name,
+        )
+        opm_dyn.pdb = mmapp.PDBFile(pdb_name)
         opm_dyn.system = system
 
-        snapshots = self.conformer_snapshots if conformer_search else 1
+        if conformer_search:
+            snapshots = self.conformer_snapshots
+        else:
+            snapshots = 1
+
         conformers_dict = opm_dyn.conformational_sampling(
             ensemble='NVT',
             nsteps=self.mm_steps * snapshots,
             snapshots=snapshots,
             temperature=self.mm_temperature,
         )
+        if not self.save_intermediates:
+            os.remove(pdb_name)
 
         result = []
         for e_int, temp_mol in zip(conformers_dict['energies'],
                                    conformers_dict['molecules']):
             pos = temp_mol.get_coordinates_in_angstrom()
             v, e1, e2 = self._recalc_mm_energy(pos, l, reasim, prosim)
-            # Centre positions so conformers are translation-invariant
-            pos -= pos.mean(axis=0)
+            avg_x = np.mean(pos[:, 0])
+            avg_y = np.mean(pos[:, 1])
+            avg_z = np.mean(pos[:, 2])
+            pos -= [avg_x, avg_y, avg_z]
             xyz = temp_mol.get_xyz_string()
-            result.append({
+            temp_result = {
                 'v': v,
                 'e1': e1,
                 'e2': e2,
                 'e_int': e_int,
                 'pos': pos,
-                'xyz': xyz,
-            })
+                'xyz': xyz
+            }
+            result.append(temp_result)
 
         return result
 
@@ -613,9 +626,10 @@ class TransitionStateGuesser():
             for l in results['scan'].keys():
 
                 min_qm_conf_E = None
-                min_conf_index = 0
+                # min_conf_index = 0
                 scan = sorted(results['scan'][l], key=lambda x: x['v'])
                 results['scan'][l] = scan
+                # Pick out lowest 5 conformers from scan
 
                 scan_range = min(self.max_qm_conformers, len(scan))
                 for i, conformer in enumerate(scan[:scan_range]):
@@ -626,7 +640,7 @@ class TransitionStateGuesser():
                         continue
                     if min_qm_conf_E is None or qm_E < min_qm_conf_E:
                         min_qm_conf_E = qm_E
-                        min_conf_index = i
+                        # min_conf_index = i
 
                     if ref is None:
                         ref = qm_E
@@ -638,10 +652,11 @@ class TransitionStateGuesser():
                 if max_qm_energy is None or min_qm_conf_E > max_qm_energy:
                     max_qm_energy = min_qm_conf_E
                     max_qm_lambda = l
+                    # min_qm_conf_index = min_conf_index
+                    # max_qm_xyz = scan[min_conf_index]['xyz']
                 qm_scan = results['scan'][l][:scan_range]
                 rest = results['scan'][l][scan_range:]
-                sorted_qm_scan = sorted(qm_scan,
-                                        key=lambda x: x['qm_energy'])
+                sorted_qm_scan = sorted(qm_scan, key=lambda x: x['qm_energy'])
                 results['scan'][l] = sorted_qm_scan + rest
 
             self.ostream.print_blank()
@@ -664,12 +679,16 @@ class TransitionStateGuesser():
             self.molecule = Molecule.read_xyz_string(max_qm_xyz)
             self.molecule.set_multiplicity(self.mol_multiplicity)
             self.molecule.set_charge(self.mol_charge)
-        except Exception as e:
-            self.ostream.print_warning(f"Error in the QM scan: {e}")
+        except Exception:
+            err_str = "The QM scan crashed. Saving results in self.results and raising exception"
+            self.ostream.print_warning(err_str)
             self.ostream.flush()
             self.results.update(results)
+            raise
+
         if self.save_results_file:
             self.save_results(self.results_file, self.results)
+
         return self.results
 
     def _get_qm_energy(self, xyz):
@@ -720,21 +739,17 @@ class TransitionStateGuesser():
             import ipywidgets
             from IPython.display import display as ipy_display
         except ImportError:
-            raise ImportError(
-                'ipywidgets is required for this functionality.')
+            raise ImportError('ipywidgets is required for this functionality.')
 
         ostream = OutputStream(sys.stdout)
 
         if ts_results is None:
             if filename is not None:
-                try:
-                    ostream.print_info(f"Loading results from {filename}")
-                    ts_results = TransitionStateGuesser.load_results(
-                        filename,
-                        ostream,
-                    )
-                except Exception as e:
-                    raise e
+                ostream.print_info(f"Loading results from {filename}")
+                ts_results = TransitionStateGuesser.load_results(
+                    filename,
+                    ostream,
+                )
             else:
                 raise ValueError(
                     "No results provided. Provide either ts_results or filename."
@@ -743,7 +758,7 @@ class TransitionStateGuesser():
         scan = ts_results['scan']
         lambda_vec = [round(float(l), 3) for l in ts_results['lambda_vec']]
 
-        if scan[0][0].get('qm_energy', None) is not None:
+        if scan[lambda_vec[0]][0].get('qm_energy', None) is not None:
             final_lambda = round(float(ts_results.get('max_qm_lambda', 0)), 3)
         else:
             final_lambda = round(float(ts_results['max_mm_lambda']), 3)
@@ -771,40 +786,16 @@ class TransitionStateGuesser():
 
         initial_best = _best_conformer_index(final_lambda)
 
-        lambda_slider = ipywidgets.SelectionSlider(
+        step_selector = ipywidgets.SelectionSlider(
             options=lambda_vec,
             description='Lambda',
             value=final_lambda,
         )
-        conformer_dropdown = ipywidgets.Dropdown(
-            options=list(range(1, len(scan[final_lambda]) + 1)),
+        conformer_selector = ipywidgets.Dropdown(
+            options=list(range(1,
+                               len(scan[final_lambda]) + 1)),
             description='Conf. ID',
             value=initial_best + 1,
-        )
-
-        def _on_lambda_change(change):
-            step = change['new']
-            options = list(range(1, len(scan[step]) + 1))
-            best = _best_conformer_index(step)
-            conformer_dropdown.options = options
-            conformer_dropdown.value = best + 1
-
-        lambda_slider.observe(_on_lambda_change, names='value')
-
-        import threading
-
-        max_conformers = max(len(scan[step]) for step in lambda_vec)
-
-        step_slider = ipywidgets.SelectionSlider(
-            options=lambda_vec,
-            description='Lambda',
-            value=final_lambda,
-        )
-        conformer_slider = ipywidgets.IntSlider(
-            min=1,
-            max=max_conformers,
-            value=initial_best + 1,
-            description='Conf. ID',
         )
 
         def _render_interact(step, conformer_id):
@@ -822,99 +813,88 @@ class TransitionStateGuesser():
                 **mol_show_kwargs,
             )
 
-        w = ipywidgets.interactive(
-            _render_interact,
-            step=step_slider,
-            conformer_id=conformer_slider,
-        )
+        # Hide the output until the delayed update has populated it.  Keeping
+        # the output in the layout avoids a visible resize flicker when it is
+        # revealed.
+        out_widget = ipywidgets.Output()
+        out_widget.layout.visibility = 'hidden'
+        window = ipywidgets.VBox([
+            step_selector,
+            conformer_selector,
+            out_widget,
+        ])
 
-        # display='none' reserves no space (unlike visibility='hidden') so
-        # the widget appears as just the sliders until the clean render is ready.
-        out_widget = w.children[-1]
-        out_widget.layout.display = 'none'
+        lambda_change_in_progress = [False]
 
-        ipy_display(w)
+        def _render_current_selection():
+            with out_widget:
+                out_widget.clear_output(wait=True)
+                _render_interact(step_selector.value, conformer_selector.value)
+
+        def _on_lambda_change(change):
+            lambda_change_in_progress[0] = True
+            try:
+                step = change['new']
+                options = list(range(1, len(scan[step]) + 1))
+                best = _best_conformer_index(step)
+                conformer_selector.options = options
+                conformer_selector.value = best + 1
+            finally:
+                lambda_change_in_progress[0] = False
+            _render_current_selection()
+
+        def _on_conformer_change(change):
+            if not lambda_change_in_progress[0]:
+                _render_current_selection()
+
+        step_selector.observe(_on_lambda_change, names='value')
+        conformer_selector.observe(_on_conformer_change, names='value')
+
+        ipy_display(window)
+
+        def _finish_render():
+            out_widget.layout.visibility = 'visible'
 
         def _do_render():
-            import time
-            # Short pause so the browser can process execute_reply and render
-            # the widget before our comm message arrives.
-            time.sleep(0.3)
             try:
-                # w.update() re-runs the function with the current widget
-                # values via the same comm pathway as a user interaction, so
-                # py3Dmol's script executes correctly.  No slider toggling
-                # needed — one clean render at the correct position.
-                w.update()
-                time.sleep(0.5)
+                # Render once the widget output has reached the frontend, so
+                # py3Dmol's script runs against an existing output area.
+                _render_current_selection()
             except Exception:
                 pass
             finally:
-                out_widget.layout.display = ''
+                _schedule_callback(_finish_render, delay=0.5)
 
-        # Start _do_render from a post_execute hook so the timer begins the
-        # moment the cell finishes, not after a fixed worst-case delay.
+        def _schedule_callback(callback, delay=0.0):
+            try:
+                loop = _ip.kernel.io_loop
+                loop.call_later(delay, callback)
+                return
+            except Exception:
+                pass
+
+            if delay > 0.0:
+                time.sleep(delay)
+            callback()
+
+        # Schedule _do_render from a post_execute hook so the delay begins when
+        # the cell finishes and the widget output area has been sent to the
+        # frontend.
         try:
             from IPython import get_ipython as _get_ipython
             _ip = _get_ipython()
-        except Exception:
+        except ImportError:
             _ip = None
 
         if _ip is not None:
+
             def _on_post_execute():
                 _ip.events.unregister('post_execute', _on_post_execute)
-                threading.Thread(target=_do_render, daemon=True).start()
+                _schedule_callback(_do_render, delay=0.3)
+
             _ip.events.register('post_execute', _on_post_execute)
         else:
-            threading.Thread(target=_do_render, daemon=True).start()
-
-    @staticmethod
-    def _show_lambda_iteration(
-        step,
-        lambda_vec,
-        scan,
-        bonds=None,
-        forming_bonds=None,
-        breaking_bonds=None,
-        **mol_show_kwargs,
-    ):
-
-        try:
-            import ipywidgets
-        except ImportError:
-            raise ImportError(
-                'ipywidgets is required for this functionality.')
-
-        options = list(range(1, len(scan[step]) + 1))
-        best_index = 0
-        min_energy = None
-        if scan[0][0].get('qm_energy', None) is not None:
-            for i, conf in enumerate(scan[step]):
-                qm_E = conf.get('qm_energy', None)
-                if min_energy is None or (qm_E is not None
-                                          and qm_E < min_energy):
-                    min_energy = qm_E
-                    best_index = i
-        else:
-            for i, conf in enumerate(scan[step]):
-                if min_energy is None or conf['v'] < min_energy:
-                    min_energy = conf['v']
-                    best_index = i
-        ipywidgets.interact(
-            TransitionStateGuesser._show_conformer_iteration,
-            step=ipywidgets.fixed(step),
-            conformer_id=ipywidgets.Dropdown(
-                options=options,
-                description='Conf. ID',
-                value=best_index + 1,
-            ),
-            lambda_vec=ipywidgets.fixed(lambda_vec),
-            scan=ipywidgets.fixed(scan),
-            bonds=ipywidgets.fixed(bonds),
-            forming_bonds=ipywidgets.fixed(forming_bonds),
-            breaking_bonds=ipywidgets.fixed(breaking_bonds),
-            **mol_show_kwargs,
-        )
+            _schedule_callback(_do_render, delay=0.3)
 
     @staticmethod
     def _show_conformer_iteration(
@@ -934,15 +914,14 @@ class TransitionStateGuesser():
         try:
             import matplotlib.pyplot as plt
         except ImportError:
-            raise ImportError(
-                'matplotlib is required for this functionality.')
+            raise ImportError('matplotlib is required for this functionality.')
 
         mm_energies, _, _, _ = TransitionStateGuesser._get_best_mm_E_from_scan_dict(
             scan)
         mm_min = np.min(mm_energies)
         rel_mm_energies = np.asarray(mm_energies) - mm_min
 
-        lam_index = np.where(lambda_vec == np.array(step))[0][0]
+        lam_index = lambda_vec.index(step)
         xyz_i = scan[step][conformer_id - 1]['xyz']
         total_steps = len(rel_mm_energies) - 1
         x = np.linspace(0, lambda_vec[-1], 100)
@@ -955,8 +934,8 @@ class TransitionStateGuesser():
             qm_min = np.min(qm_energies)
             rel_qm_energies = np.asarray(qm_energies) - qm_min
             print("  {:>9} {:>18} {:>19}  ".format("conformer",
-                                                    "MM energy [kJ/mol]",
-                                                    "QM energy [kJ/mol]"))
+                                                   "MM energy [kJ/mol]",
+                                                   "QM energy [kJ/mol]"))
 
             for i, conf in enumerate(scan[step]):
                 conf_str = f"{i+1}"
@@ -987,8 +966,7 @@ class TransitionStateGuesser():
                 print(print_str)
 
         else:
-            print("  {:>9} {:>19}  ".format("conformer",
-                                             "MM energy [kJ/mol]"))
+            print("  {:>9} {:>19}  ".format("conformer", "MM energy [kJ/mol]"))
             rel_qm_energies = None
             for i, conf in enumerate(scan[step]):
                 conf_str = f"{i+1}"
@@ -1076,27 +1054,11 @@ class TransitionStateGuesser():
         ax1.set_xticks(lambda_vec[::2])
         fig.tight_layout()
         plt.show()
-        fig.savefig('ts.svg', format='svg')
         mol = Molecule.read_xyz_string(xyz_i)
         offset = 0.07
         add = 0.1
         breaking_width = offset + add * (1 - step)
         forming_width = offset + add * (step)
-
-        # Hide py3Dmol's red warning div before it appears so it never
-        # flashes.  py3Dmol always inserts the warning element first and
-        # removes it via JavaScript; this CSS makes it invisible from the
-        # start so the removal is imperceptible.
-        try:
-            from IPython.display import display as _ipy_display, HTML as _HTML
-            _ipy_display(
-                _HTML(
-                    '<style>[id^="3dmolwarning_"]'
-                    '{display:none!important}</style>'
-                )
-            )
-        except Exception:
-            pass
 
         if bonds is not None and (forming_bonds is not None
                                   or breaking_bonds is not None):
@@ -1210,8 +1172,7 @@ class TransitionStateGuesser():
 
             max_qm_xyz = results.get('max_qm_xyz', None)
             max_qm_lambda = results.get('max_qm_lambda', None)
-            min_qm_conformer_index = results.get('min_qm_conformer_index',
-                                                  None)
+            min_qm_conformer_index = results.get('min_qm_conformer_index', None)
             if max_qm_xyz is not None:
                 hf.create_dataset('max_qm_xyz', data=[max_qm_xyz])
                 hf.create_dataset('max_qm_lambda',
@@ -1223,9 +1184,10 @@ class TransitionStateGuesser():
 
             scan_grp = hf.create_group('scan')
             for l, conf_scan in results['scan'].items():
-                l_grp = scan_grp.create_group(f'{l}')
+                l_grp = scan_grp.create_group(f'{round(l,3)}')
                 for i, conf in enumerate(conf_scan):
                     conf_grp = l_grp.create_group(str(i))
+                    # v e1 e2 e_int xyz qm
                     conf_grp.create_dataset('v', data=conf['v'], dtype='f')
                     conf_grp.create_dataset('e1', data=conf['e1'], dtype='f')
                     conf_grp.create_dataset('e2', data=conf['e2'], dtype='f')
@@ -1263,7 +1225,9 @@ class TransitionStateGuesser():
             }
 
             # Lambda vector
-            results['lambda_vec'] = [float(l) for l in hf['lambda_vec'][()]]
+            results['lambda_vec'] = [
+                round(float(l), 3) for l in hf['lambda_vec'][()]
+            ]
 
             # Reactant and product forcefields and xyz
             reactant_ff = MMForceFieldGenerator.load_forcefield_from_json_string(
@@ -1309,7 +1273,7 @@ class TransitionStateGuesser():
                     if 'qm_energy' in conf_grp:
                         conf['qm_energy'] = conf_grp['qm_energy'][()]
                     conf_scan.append(conf)
-                results['scan'][float(l)] = conf_scan
+                results['scan'][round(float(l), 3)] = conf_scan
 
         return results
 
@@ -1351,7 +1315,7 @@ class TransitionStateGuesser():
         self.ostream.print_header(60 * '-')
         self.ostream.flush()
 
-    def _print_mm_iter(self, l, e1, e2, v, e_int, n_conf=None):
+    def _print_mm_iter(self, l, e1, e2, v, n_conf=None):
 
         valstr = "{:6.2f}   {:10.2f}   {:10.2f}   {:9.2f}   {:6}".format(
             l, e1, e2, v, n_conf)
@@ -1362,7 +1326,7 @@ class TransitionStateGuesser():
         if self.mute_scf:
             self.ostream.print_info("Disable mute_scf to see detailed output.")
         self.ostream.print_blank()
-        self.ostream.print_header(f"Starting QM scan")
+        self.ostream.print_header("Starting QM scan")
         self.ostream.print_blank()
         self.ostream.print_header("QM parameters:")
         self.ostream.print_header(f"Basis:       {self.qm_basis:>10}")
@@ -1387,6 +1351,8 @@ class TransitionStateGuesser():
         self.ostream.print_header(valstr)
         self.ostream.flush()
 
+    # todo add option for reading geometry (bond distances, angles, etc.) from transition state instead of averaging them
+    # todo add option for recalculating charges from ts_mol
     def get_ts_ffgen(self,
                      reaffgen=None,
                      proffgen=None,
@@ -1444,6 +1410,7 @@ class TransitionStateGuesser():
             if id in reaparams.keys() and id in proparams.keys():
                 reaparam = reaparams[id]
                 proparam = proparams[id]
+                # todo change this to measurement from molecule
                 eq = (1 -
                       l) * reaparam['equilibrium'] + l * proparam['equilibrium']
                 fc = (1 - l) * reaparam['force_constant'] + l * proparam[
@@ -1472,6 +1439,7 @@ class TransitionStateGuesser():
         ts_params = {}
         for dict, scaling in zip([rea_dihedrals, pro_dihedrals], [1 - l, l]):
             for id, param in dict.items():
+                # todo reassign value of phase?
                 new_param = copy.copy(param)
                 if new_param.get('multiple'):
                     new_param['barrier'] = [

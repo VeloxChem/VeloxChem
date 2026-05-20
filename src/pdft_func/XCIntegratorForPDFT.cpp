@@ -115,10 +115,6 @@ integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
 
     auto ptr_aoFockMatrix = &aoFockMatrix;
@@ -129,7 +125,7 @@ integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
 
     auto ptr_xcFunctional = &xcFunctional;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
                             ptr_gto_blocks, densityMatrixPointer, ptr_aoFockMatrix, ptr_tensorWxc, \
                             ptr_twoBodyDensityMatrix, ptr_activeMOs, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, naos, nele, xcene)
@@ -214,7 +210,7 @@ integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < n_gto_blocks; i_block++)
+            for (int i_block = 0, idx = 0; i_block < static_cast<int>(n_gto_blocks); i_block++)
             {
                 const auto& gto_block = ptr_gto_blocks[i_block];
 
@@ -381,10 +377,6 @@ integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMatrix,
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
 
     auto ptr_aoFockMatrix = &aoFockMatrix;
@@ -395,7 +387,7 @@ integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMatrix,
 
     auto ptr_xcFunctional = &xcFunctional;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
                             ptr_gto_blocks, densityMatrixPointer, ptr_aoFockMatrix, ptr_tensorWxc, \
                             ptr_twoBodyDensityMatrix, ptr_activeMOs, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, naos, nele, xcene)
@@ -483,7 +475,7 @@ integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMatrix,
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < n_gto_blocks; i_block++)
+            for (int i_block = 0, idx = 0; i_block < static_cast<int>(n_gto_blocks); i_block++)
             {
                 const auto& gto_block = ptr_gto_blocks[i_block];
 

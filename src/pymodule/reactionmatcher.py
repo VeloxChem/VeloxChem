@@ -32,7 +32,6 @@
 
 from mpi4py import MPI
 from networkx.algorithms.isomorphism import GraphMatcher
-from networkx.algorithms.isomorphism import categorical_node_match
 from itertools import permutations
 import networkx as nx
 import numpy as np
@@ -77,6 +76,7 @@ class ReactionMatcher:
         self.rdFMCS_assist_assign = False
         self.rdRascalMCES_assist_assign = False
         self._reduce_hydrogen = False
+        self._assist_min_depth = 3
 
         self.max_break_attempts_guess = 1e7
         self._breaking_depth = -1  # how many breaking edges to try
@@ -100,7 +100,7 @@ class ReactionMatcher:
 
         if len(self.assisting_map) == len(self.rea_graph.nodes):
             # inverted_map = {v: k for k, v in self.assisting_map.items()}
-            return self.assisting_map, breaking_bonds, forming_bonds
+            return self.assisting_map, set(), set()
 
         if self._breaking_depth == -1:
             self._breaking_depth = self._decide_breaking_depth()
@@ -344,13 +344,13 @@ class ReactionMatcher:
             return rea_graph, pro_graph, {}
 
     def _calculate_assist_ids(self, rea_graph, pro_graph):
-        H_count = sum(
-            [1 for n in rea_graph.nodes if rea_graph.nodes[n]['elem'] == 1.0])
+        # H_count = sum(
+        #     [1 for n in rea_graph.nodes if rea_graph.nodes[n]['elem'] == 1.0])
 
         # # Upper bound for a starting guess. A linear molecule would need at least N/2 range to cover the entire molecule
         # depth = int((len(rea_graph.nodes) - H_count) / 4)
 
-        min_depth = 3
+        # min_depth = 3
         assisting_map = {}
         rea_cc = list(nx.connected_components(rea_graph))
         range_spans_cc = [False] * len(rea_cc)
@@ -372,7 +372,7 @@ class ReactionMatcher:
         shuffled_indices = [(i * step) % total_nodes
                             for i in range(total_nodes)]
 
-        while depth >= min_depth:
+        while depth >= self._assist_min_depth:
             for rea_id in shuffled_indices:
 
                 # Break early
@@ -449,7 +449,7 @@ class ReactionMatcher:
                     # map = GM.mapping
                     assisting_map.update(map)
                     self.ostream.print_info(
-                        f"Found matching subgraph between reactant atom {rea_id+ self.print_starting_index} and product atom {pro_id+self.print_starting_index} at depth {depth} with mapping: {self._print_mapping(map)}."
+                        f"Found matching subgraph between reactant atom {rea_id + self.print_starting_index} and product atom {pro_id + self.print_starting_index} at depth {depth} with mapping: {self._print_mapping(map)}."
                     )
                     self.ostream.flush()
                     for rea_node, pro_node in map.items():
@@ -544,6 +544,7 @@ class ReactionMatcher:
             self.ostream.print_info(
                 f"Trying all {len(permuted_unassigned_nodes_B)} permutations of unassigned nodes. Expecting to consider {total_expected_perms} permutations based on element counts."
             )
+            self.ostream.flush()
             return self._find_brute_force_mapping(A, B, forced_breaking_edges,
                                                   forced_forming_edges, swapped,
                                                   unassigned_nodes_A,
@@ -571,7 +572,7 @@ class ReactionMatcher:
         if forming_edges is None:
             if not self._check_monomorphic:
                 self.ostream.print_info(
-                    f"Could not find forming edges from subgraph isomorphism, attempting subgraph monomorphism"
+                    "Could not find forming edges from subgraph isomorphism, attempting subgraph monomorphism"
                 )
                 self.ostream.flush()
                 self._check_monomorphic = True
@@ -589,7 +590,7 @@ class ReactionMatcher:
         GM = self.get_graph_matcher(A, B)
         map = next(GM.isomorphisms_iter())
 
-        self._check_time(f"finding mapping.")
+        self._check_time("finding mapping.")
         if swapped:
             # if we swapped A and B, we need to swap the mapping back
             self.ostream.print_info(
@@ -641,7 +642,7 @@ class ReactionMatcher:
 
             breaking_edges = A.edges - B_copy.edges
             forming_edges = B_copy.edges - A.edges
-            # Check if we obey the forced breaking and forming edges
+            # If the forced breaking or forced forming edges are not respected, skip this mapping
             if (forced_breaking_edges.issubset(forming_edges)
                     and len(forced_breaking_edges)
                     > 0) or (forced_forming_edges.issubset(breaking_edges)
@@ -681,12 +682,19 @@ class ReactionMatcher:
                 least_changing_bonds_H_bond_counts).max()
             least_changing_bonds_index = np.where(
                 least_changing_bonds_H_bond_counts == best_H_bond_count)[0]
+
             best_index = least_changing_bonds_indices[
                 least_changing_bonds_index[0]]
-
             if len(least_changing_bonds_index):
                 self.ostream.print_info(
-                    "Multiple equally good mappings found, picking first one.")
+                    f"{len(least_changing_bonds_index)} equally good mappings found, picking first one."
+                )
+                for i in least_changing_bonds_index:
+                    temp_i = least_changing_bonds_indices[i]
+                    self.ostream.print_info(
+                        f"Mapping {maps[temp_i]} with breaking bonds: {breaking_edges_list[temp_i]} and forming bonds: {forming_edges_list[temp_i]}"
+                    )
+                self.ostream.flush()
         else:
             best_index = least_changing_bonds_indices[0]
         self.ostream.print_info(
@@ -747,9 +755,9 @@ class ReactionMatcher:
     def _recurse_breaking_edges(self, A, A_assist, B, B_assist, depth,
                                 B_composition, forced_forming_edges):
         """
-        Search the minimal amount of edges that need to be removed from A so that all connected components of A are subgraphs of B. 
+        Search the minimal amount of edges that need to be removed from A so that all connected components of A are subgraphs of B.
         Searches recursively up to given depth. Returns None if no edges are found at a given depth, or when the time limit is exceeded.
-        In looping, it prioritizes breaking bonds involving combinations of elements that are more abundant in A then in B. 
+        In looping, it prioritizes breaking bonds involving combinations of elements that are more abundant in A then in B.
         After that, it prioritizes breaking bonds involving Hydrogen atoms.
         """
 
@@ -878,7 +886,7 @@ class ReactionMatcher:
                 if edge is not None:
                     break
             if edge is None:
-                self.ostream.print_info(f"Bond not found, aborting")
+                self.ostream.print_info("Bond not found, aborting")
                 self.ostream.flush()
                 return None
         return forming_edges
@@ -914,7 +922,7 @@ class ReactionMatcher:
 
     def _connected_components_are_subgraphs(self, A, B):
         """
-        Check if all connected components of A are subgraphs of B. If true, return a list of GraphMatchers for each connected component and their corresponding subgraphs. 
+        Check if all connected components of A are subgraphs of B. If true, return a list of GraphMatchers for each connected component and their corresponding subgraphs.
         Otherwise return None.
         """
         cc_A = list(nx.connected_components(A))

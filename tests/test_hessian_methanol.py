@@ -44,6 +44,16 @@ class TestHessianMethanol:
 
             assert max_rel_diff_freqs < 0.02
 
+            ref_ir_intens = np.array([
+                128.9167, 66.1455, 65.0787, 0.5474, 28.7916, 2.5639, 6.1060,
+                6.6203, 63.3375, 72.5923, 25.9392, 36.6984
+            ])
+
+            max_rel_diff_ir_intens = np.max(
+                np.abs(vibanalysis_drv.ir_intensities / ref_ir_intens - 1.0))
+
+            assert max_rel_diff_ir_intens < 0.02
+
     @pytest.mark.timeconsuming
     def test_numerical_hessian_methanol(self):
 

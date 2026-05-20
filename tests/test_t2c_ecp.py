@@ -1,7 +1,7 @@
 from pathlib import Path
 import numpy as np
 
-from veloxchem.veloxchemlib import ECPDriver
+from veloxchem.veloxchemlib import EcpDriver
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.molecule import Molecule
 from veloxchem.submatrix import SubMatrix
@@ -9,7 +9,7 @@ from veloxchem.veloxchemlib import BaseCorePotential
 from veloxchem.veloxchemlib import AtomCorePotential
 
 
-class TestECPDriver:
+class TestEcpDriver:
 
     def get_auh2_svp_data(self):
 
@@ -82,7 +82,7 @@ class TestECPDriver:
         
         atom_pot = AtomCorePotential(lpot, [spot, ppot, dpot], [0, 1, 2], 60);
         
-        ecp_drv = ECPDriver()
+        ecp_drv = EcpDriver()
         ecp_mat = ecp_drv.compute(mol_auh2, bas_svp, atom_pot)
         
         # load reference overlap data
@@ -135,7 +135,7 @@ class TestECPDriver:
         
         atom_pot = AtomCorePotential(lpot, [spot, ppot, dpot, fpot, gpot], [0, 1, 2, 3, 4], 60);
         
-        ecp_drv = ECPDriver()
+        ecp_drv = EcpDriver()
         ecp_mat = ecp_drv.compute(mol_gdh3, bas_svp, atom_pot)
         
         # load reference overlap data
@@ -147,7 +147,7 @@ class TestECPDriver:
         indexes = np.triu_indices(5)
         basdims = [0, 16, 43, 63, 84, 93]
         
-        print(ref_mat.shape)
+        #print(ref_mat.shape)
         
         # check individual overlap submatrices
         for i, j in zip(indexes[0], indexes[1]):
@@ -190,7 +190,7 @@ class TestECPDriver:
         
         atom_pot = AtomCorePotential(lpot, [spot, ppot, dpot, fpot, gpot], [0, 1, 2, 3, 4], 60);
         
-        ecp_drv = ECPDriver()
+        ecp_drv = EcpDriver()
         ecp_mat = ecp_drv.compute(mol_gdh3, bas_tzvpp, atom_pot)
         
         # load reference overlap data
@@ -202,7 +202,7 @@ class TestECPDriver:
         indexes = np.triu_indices(5)
         basdims = [0, 19, 58, 98, 126, 144]
         
-        print(ref_mat.shape)
+        #print(ref_mat.shape)
         
         # check individual overlap submatrices
         for i, j in zip(indexes[0], indexes[1]):
@@ -253,7 +253,7 @@ class TestECPDriver:
         
         #print(bas_svp.info_str('TEST'))
         
-        ecp_drv = ECPDriver()
+        ecp_drv = EcpDriver()
         ecp_mat = ecp_drv.compute(mol_aucl, bas_svp, atom_pot)
        
         #print(np.max(ecp_mat.full_matrix().to_numpy()))

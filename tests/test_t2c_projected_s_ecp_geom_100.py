@@ -95,8 +95,8 @@ class TestProjectedSECPGeom100Driver:
                     rmat.set_values(
                         np.ascontiguousarray(ref_mat[k, sbra:ebra, sket:eket]))
                     # compare submatrices
-                    print("(k,i,j) = ", k, " ", i, " ", j)
-                    print(np.max(np.abs(cmat.to_numpy()-rmat.to_numpy())))
+                    #print("(k,i,j) = ", k, " ", i, " ", j)
+                    #print(np.max(np.abs(cmat.to_numpy()-rmat.to_numpy())))
                     assert cmat == rmat
             smat = fmat.full_matrix()
             fref = SubMatrix([0, 0, 42, 42])
@@ -142,8 +142,8 @@ class TestProjectedSECPGeom100Driver:
                     rmat.set_values(
                         np.ascontiguousarray(ref_mat[k, sbra:ebra, sket:eket]))
                     # compare submatrices
-                    print("(k,i,j) = ", k, " ", i, " ", j)
-                    print(np.max(np.abs(cmat.to_numpy()-rmat.to_numpy())))
+                    #print("(k,i,j) = ", k, " ", i, " ", j)
+                    #print(np.max(np.abs(cmat.to_numpy()-rmat.to_numpy())))
                     #assert cmat == rmat
             smat = fmat.full_matrix()
             fref = SubMatrix([0, 0, 42, 42])
@@ -189,8 +189,8 @@ class TestProjectedSECPGeom100Driver:
                     rmat.set_values(
                         np.ascontiguousarray(ref_mat[k, sbra:ebra, sket:eket]))
                     # compare submatrices
-                    print("(k,i,j) = ", k, " ", i, " ", j)
-                    print(np.max(np.abs(cmat.to_numpy()-rmat.to_numpy())))
+                    #print("(k,i,j) = ", k, " ", i, " ", j)
+                    #print(np.max(np.abs(cmat.to_numpy()-rmat.to_numpy())))
                     #assert cmat == rmat
             smat = fmat.full_matrix()
             fref = SubMatrix([0, 0, 42, 42])
@@ -213,7 +213,7 @@ class TestProjectedSECPGeom100Driver:
         npyfile = str(here / 'data' / 'auh2.primitive.s.p.au.ecp.only.s.geom.100.h3.npy')
         ref_mat = -np.load(npyfile)
 
-        print(bas_prim.info_str("Basis Info"))
+        #print(bas_prim.info_str("Basis Info"))
 
         # dimension of molecular basis
         basdims = [0, 3, 12]
