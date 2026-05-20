@@ -308,12 +308,13 @@ nuclear_attraction_kernel(const int              l_a,
 
                 for (int jj = 0; jj < w; jj++) out[jj] = 0.0;
 
-                while (r < t.m_row_count && t.m_fields[6 * r] == k)
+                while (r < t.m_row_count && static_cast<int>(t.m_fields[r] & 0x7Fu) == k)
                 {
-                    const int     ev_index = t.m_fields[6 * r + 1] | (static_cast<int>(t.m_fields[6 * r + 2]) << 8);
-                    const int     rx       = t.m_fields[6 * r + 3];
-                    const int     ry       = t.m_fields[6 * r + 4];
-                    const int     rz       = t.m_fields[6 * r + 5];
+                    const auto    f        = t.m_fields[r];  // component | ev<<7 | racx<<19 | racy<<23 | racz<<27
+                    const int     ev_index = static_cast<int>((f >> 7) & 0xFFFu);
+                    const int     rx       = static_cast<int>((f >> 19) & 0xFu);
+                    const int     ry       = static_cast<int>((f >> 23) & 0xFu);
+                    const int     rz       = static_cast<int>((f >> 27) & 0xFu);
                     const double  coef     = coef_dict[t.m_coef_idx[r]];
                     const double *vev      = vg + static_cast<std::size_t>(ev_index) * tile;
                     const double *px       = powx + static_cast<std::size_t>(rx) * tile;

@@ -21,7 +21,8 @@ struct ChargeDipoleTable
     int ev_count, max_order, component_count, m_row_count;
     const std::uint8_t *ev_order, *ev_mu_power, *ev_goz_power, *ev_qx, *ev_qy, *ev_qz;
     const std::int8_t *component_bra_m, *component_ket_m;
-    const std::uint8_t *m_fields;
+    // packed per row: component (bits 0-6), ev index (7-18), rac x/y/z (19-22, 23-26, 27-30)
+    const std::uint32_t *m_fields;
     const std::uint16_t *m_coef_idx;
 };
 

@@ -37,8 +37,8 @@ static constexpr std::int8_t comp_bra_0_0_0[] = {
 static constexpr std::int8_t comp_ket_0_0_0[] = {
     0,
 };
-static constexpr std::uint8_t mfields_0_0_0[] = {
-    0,0,0,0,0,0,
+static constexpr std::uint32_t mfields_0_0_0[] = {
+    0,
 };
 static constexpr std::uint16_t mcoefidx_0_0_0[] = {
     0,

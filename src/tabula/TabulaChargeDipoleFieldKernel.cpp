@@ -273,12 +273,13 @@ charge_dipole_field_kernel(const int              l_a,
                                                        i_local * static_cast<std::size_t>(k_ket) +
                                                        static_cast<std::size_t>(jj - ket_begin)];
 
-                    while (r < ta.m_row_count && ta.m_fields[6 * r] == k)
+                    while (r < ta.m_row_count && static_cast<int>(ta.m_fields[r] & 0x7Fu) == k)
                     {
-                        const int    ev_index = ta.m_fields[6 * r + 1] | (static_cast<int>(ta.m_fields[6 * r + 2]) << 8);
-                        const int    rx       = ta.m_fields[6 * r + 3];
-                        const int    ry       = ta.m_fields[6 * r + 4];
-                        const int    rz       = ta.m_fields[6 * r + 5];
+                        const auto   f        = ta.m_fields[r];  // component | ev<<7 | racx<<19 | racy<<23 | racz<<27
+                        const int    ev_index = static_cast<int>((f >> 7) & 0xFFFu);
+                        const int    rx       = static_cast<int>((f >> 19) & 0xFu);
+                        const int    ry       = static_cast<int>((f >> 23) & 0xFu);
+                        const int    rz       = static_cast<int>((f >> 27) & 0xFu);
                         const double coef     = coef_dict[ta.m_coef_idx[r]];
                         dweight[a][ev_index] += coef * powx[rx] * powy[ry] * powz[rz] * dval;
                         r++;
