@@ -127,7 +127,8 @@ ket_kept(const int                     l_a,
 
 /// @brief Screens the ket atom spans against bra span `A`, gathers the
 /// surviving ket contracted GTOs into a contiguous block, and runs the fused
-/// kernel over the charges. Returns the kept ket contracted-GTO count.
+/// kernel (which sums over its bound point sources). Returns the kept ket
+/// contracted-GTO count.
 auto
 screen_and_kernel(const BlockArrays            &bra,
                   const AtomSpan               &A,
@@ -135,7 +136,6 @@ screen_and_kernel(const BlockArrays            &bra,
                   const double                  threshold,
                   const bool                    restrict_ket_le_bra,
                   const ExternalCenterOperator &op,
-                  const ChargeSet              &charges,
                   std::vector<int>             &orig,
                   std::vector<double>          &spherical,
                   KernelProfile                *profile) -> int
@@ -197,7 +197,7 @@ screen_and_kernel(const BlockArrays            &bra,
 
     if (spherical.size() < components * stride) spherical.resize(components * stride);
 
-    op.kernel(l_a, l_c, bra.view(), A.cgto_begin, A.cgto_end, ket_view, charges, spherical.data());
+    op.kernel(l_a, l_c, bra.view(), A.cgto_begin, A.cgto_end, ket_view, spherical.data());
 
     if (profile != nullptr)
     {
@@ -218,13 +218,12 @@ evaluate_task(DenseMatrix                  &matrix,
               const bool                    diagonal,
               const double                  threshold,
               const ExternalCenterOperator &op,
-              const ChargeSet              &charges,
               KernelProfile                *profile) -> void
 {
     thread_local std::vector<int>    orig;
     thread_local std::vector<double> spherical;
 
-    const int kept = screen_and_kernel(bra, A, ket, threshold, false, op, charges, orig, spherical, profile);
+    const int kept = screen_and_kernel(bra, A, ket, threshold, false, op, orig, spherical, profile);
     if (kept == 0) return;
 
     const auto t_kernel = std::chrono::steady_clock::now();
@@ -282,7 +281,6 @@ evaluate_task_sparse(BlockSparseMatrix              &matrix,
                      const bool                      diagonal_block_pair,
                      const double                    threshold,
                      const ExternalCenterOperator   &op,
-                     const ChargeSet                &charges,
                      const std::vector<std::size_t> &ao_local,
                      const std::vector<long>        &block_of,
                      const std::size_t               n_atoms,
@@ -291,7 +289,7 @@ evaluate_task_sparse(BlockSparseMatrix              &matrix,
     thread_local std::vector<int>    orig;
     thread_local std::vector<double> spherical;
 
-    const int kept = screen_and_kernel(bra, A, ket, threshold, diagonal_block_pair, op, charges, orig, spherical, profile);
+    const int kept = screen_and_kernel(bra, A, ket, threshold, diagonal_block_pair, op, orig, spherical, profile);
     if (kept == 0) return;
 
     const auto t_kernel = std::chrono::steady_clock::now();
@@ -399,7 +397,6 @@ external_center_compute(const CMolecule&              molecule,
                         const CMolecularBasis&        basis,
                         const double                  threshold,
                         const ExternalCenterOperator& op,
-                        const ChargeSet&              charges,
                         KernelProfile*                profile,
                         ThreadBalance&                balance) -> DenseMatrix
 {
@@ -457,7 +454,7 @@ external_center_compute(const CMolecule&              molecule,
 
         const auto &task = tasks[static_cast<std::size_t>(p)];
 
-        evaluate_task(matrix, blocks[task.i], blocks[task.i].spans[task.span], blocks[task.j], task.diagonal, threshold, op, charges, slot);
+        evaluate_task(matrix, blocks[task.i], blocks[task.i].spans[task.span], blocks[task.j], task.diagonal, threshold, op, slot);
 
         thread_busy[tid] += seconds(std::chrono::steady_clock::now() - t_body);
         thread_pairs[tid] += 1;
@@ -485,7 +482,6 @@ external_center_compute_sparse(const CMolecule&              molecule,
                                const CMolecularBasis&        basis,
                                const double                  threshold,
                                const ExternalCenterOperator& op,
-                               const ChargeSet&              charges,
                                KernelProfile*                profile,
                                ThreadBalance&                balance) -> BlockSparseMatrix
 {
@@ -617,7 +613,6 @@ external_center_compute_sparse(const CMolecule&              molecule,
                              task.diagonal,
                              threshold,
                              op,
-                             charges,
                              ao_local,
                              block_of,
                              n_atoms,

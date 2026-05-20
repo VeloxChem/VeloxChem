@@ -1,18 +1,20 @@
 //
 //  Tabula — custom-recursion molecular-integral machinery.
 //  Shared external-center driver core — operator-agnostic scaffolding for
-//  integrals over two Gaussian centers and a set of external point charges
-//  (nuclear attraction; later, charge–dipole). Sibling of the two-center
-//  core; differs only in that the kernel call carries the charge set.
+//  integrals over two Gaussian centers and a set of external point sources
+//  (nuclear attraction's charges; charge–dipole's dipoles). Sibling of the
+//  two-center core; the kernel closure carries its own source set, so the
+//  scaffolding never names it.
 //
 
 #ifndef TabulaExternalCenterDriver_hpp
 #define TabulaExternalCenterDriver_hpp
 
+#include <functional>
+
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "TabulaBlockSparseMatrix.hpp"
-#include "TabulaChargeSet.hpp"
 #include "TabulaDenseMatrix.hpp"
 #include "TabulaKernelBlockData.hpp"
 #include "TabulaThreadBalance.hpp"
@@ -20,10 +22,11 @@
 
 namespace tabula {  // tabula namespace
 
-/// @brief A fused external-center kernel dispatch — like `KernelFn` but with
-/// the point-charge set the kernel sums over.
+/// @brief A fused external-center kernel call — the `(l_a, l_c)` dispatch with
+/// its point-source set already bound (the closure captures the charges or
+/// dipoles), so the shared scaffolding stays source-agnostic.
 using ExternalKernelFn =
-    void (*)(int, int, const KernelBlockData&, int, int, const KernelBlockData&, const ChargeSet&, double*);
+    std::function<void(int, int, const KernelBlockData&, int, int, const KernelBlockData&, double*)>;
 
 /// @brief A conservative upper bound on an external-center operator's block
 /// magnitude — like `EstimateFn` but with the charge factor `Σ|Z_N|` (the
@@ -49,8 +52,7 @@ struct ExternalCenterOperator
 /// @param molecule The molecule.
 /// @param basis The molecular basis.
 /// @param threshold The screening threshold; `0` keeps every atom span.
-/// @param op The operator's fused kernel and screening estimate.
-/// @param charges The point charges to sum over.
+/// @param op The operator's fused kernel (source-bound) and screening estimate.
 /// @param profile Optional — receives the per-phase wall-time breakdown.
 /// @param balance Receives the task loop's per-thread load balance.
 /// @return The dense integral matrix.
@@ -58,7 +60,6 @@ auto external_center_compute(const CMolecule&              molecule,
                              const CMolecularBasis&        basis,
                              const double                  threshold,
                              const ExternalCenterOperator& op,
-                             const ChargeSet&              charges,
                              KernelProfile*                profile,
                              ThreadBalance&                balance) -> DenseMatrix;
 
@@ -68,7 +69,6 @@ auto external_center_compute_sparse(const CMolecule&              molecule,
                                     const CMolecularBasis&        basis,
                                     const double                  threshold,
                                     const ExternalCenterOperator& op,
-                                    const ChargeSet&              charges,
                                     KernelProfile*                profile,
                                     ThreadBalance&                balance) -> BlockSparseMatrix;
 

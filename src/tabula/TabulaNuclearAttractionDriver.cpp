@@ -136,6 +136,20 @@ from_external(const std::vector<double>& magnitudes, const std::vector<std::arra
     return a;
 }
 
+/// @brief The external-center operator for a charge set — the nuclear kernel
+/// with the charges bound into the closure, the screening estimate, and the
+/// charge factor. The view `cs` borrows `charges`, which must outlive the
+/// compute (it does — both are locals of the calling driver method).
+auto
+make_op(const ChargeArrays& charges) -> ExternalCenterOperator
+{
+    const ChargeSet cs = charges.view();
+    return ExternalCenterOperator{
+        [cs](int l_a, int l_c, const KernelBlockData& bra, int bra_begin, int bra_end, const KernelBlockData& ket,
+             double* spherical) { nuclear_attraction_kernel(l_a, l_c, bra, bra_begin, bra_end, ket, cs, spherical); },
+        nuclear_estimate, charges.charge_factor()};
+}
+
 }  // namespace
 
 auto
@@ -144,9 +158,9 @@ NuclearAttractionDriver::compute(const CMolecule&       molecule,
                                  const double           threshold,
                                  KernelProfile         *profile) const -> DenseMatrix
 {
-    const auto                   charges = from_nuclei(molecule);
-    const ExternalCenterOperator op{nuclear_attraction_kernel, nuclear_estimate, charges.charge_factor()};
-    return external_center_compute(molecule, basis, resolve_threshold(molecule, threshold), op, charges.view(), profile, g_balance);
+    const auto charges = from_nuclei(molecule);
+    const auto op      = make_op(charges);
+    return external_center_compute(molecule, basis, resolve_threshold(molecule, threshold), op, profile, g_balance);
 }
 
 auto
@@ -155,9 +169,9 @@ NuclearAttractionDriver::computeSparse(const CMolecule&       molecule,
                                        const double           threshold,
                                        KernelProfile         *profile) const -> BlockSparseMatrix
 {
-    const auto                   charges = from_nuclei(molecule);
-    const ExternalCenterOperator op{nuclear_attraction_kernel, nuclear_estimate, charges.charge_factor()};
-    return external_center_compute_sparse(molecule, basis, threshold, op, charges.view(), profile, g_balance);
+    const auto charges = from_nuclei(molecule);
+    const auto op      = make_op(charges);
+    return external_center_compute_sparse(molecule, basis, threshold, op, profile, g_balance);
 }
 
 auto
@@ -168,9 +182,9 @@ NuclearAttractionDriver::compute(const CMolecule&                          molec
                                  const double                              threshold,
                                  KernelProfile                            *profile) const -> DenseMatrix
 {
-    const auto                   charges = from_external(magnitudes, coordinates);
-    const ExternalCenterOperator op{nuclear_attraction_kernel, nuclear_estimate, charges.charge_factor()};
-    return external_center_compute(molecule, basis, resolve_threshold(molecule, threshold), op, charges.view(), profile, g_balance);
+    const auto charges = from_external(magnitudes, coordinates);
+    const auto op      = make_op(charges);
+    return external_center_compute(molecule, basis, resolve_threshold(molecule, threshold), op, profile, g_balance);
 }
 
 auto
@@ -181,9 +195,9 @@ NuclearAttractionDriver::computeSparse(const CMolecule&                         
                                        const double                              threshold,
                                        KernelProfile                            *profile) const -> BlockSparseMatrix
 {
-    const auto                   charges = from_external(magnitudes, coordinates);
-    const ExternalCenterOperator op{nuclear_attraction_kernel, nuclear_estimate, charges.charge_factor()};
-    return external_center_compute_sparse(molecule, basis, threshold, op, charges.view(), profile, g_balance);
+    const auto charges = from_external(magnitudes, coordinates);
+    const auto op      = make_op(charges);
+    return external_center_compute_sparse(molecule, basis, threshold, op, profile, g_balance);
 }
 
 auto

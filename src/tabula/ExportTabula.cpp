@@ -15,6 +15,7 @@
 
 #include "TabulaBlockSparseMatrix.hpp"
 #include "TabulaBoys.hpp"
+#include "TabulaChargeDipoleDriver.hpp"
 #include "TabulaCoulombDriver.hpp"
 #include "TabulaDenseMatrix.hpp"
 #include "TabulaKineticDriver.hpp"
@@ -417,6 +418,50 @@ export_tabula(py::module& m) -> void
             return result;
         },
         "Gets the per-thread load balance of the most recent nuclear-attraction compute.");
+
+    // tabula::ChargeDipoleDriver class
+
+    py::class_<ChargeDipoleDriver, std::shared_ptr<ChargeDipoleDriver>>(
+        m, "TabulaChargeDipoleDriver", "Driver for the Tabula two-center charge-dipole integral.")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const ChargeDipoleDriver&                 self,
+               const CMolecule&                          molecule,
+               const CMolecularBasis&                    basis,
+               const std::vector<std::array<double, 3>>& moments,
+               const std::vector<std::array<double, 3>>& coordinates,
+               const double                              threshold) {
+                return self.compute(molecule, basis, moments, coordinates, threshold);
+            },
+            "Computes the charge-dipole matrix Sum_N d_N . (a|(r-N)/|r-N|^3|c) over point dipoles "
+            "(moments and coordinates in au); 0 (default) is exact dense.",
+            "molecule"_a, "basis"_a, "moments"_a, "coordinates"_a, "threshold"_a = 0.0)
+        .def(
+            "compute_sparse",
+            [](const ChargeDipoleDriver&                 self,
+               const CMolecule&                          molecule,
+               const CMolecularBasis&                    basis,
+               const std::vector<std::array<double, 3>>& moments,
+               const std::vector<std::array<double, 3>>& coordinates,
+               const double                              threshold) {
+                return self.computeSparse(molecule, basis, moments, coordinates, threshold);
+            },
+            "Computes the charge-dipole matrix in block-sparse storage, over point dipoles.",
+            "molecule"_a, "basis"_a, "moments"_a, "coordinates"_a, "threshold"_a = 0.0);
+
+    m.def(
+        "charge_dipole_thread_balance",
+        []() -> py::dict {
+            const auto balance = charge_dipole_thread_balance();
+
+            py::dict result;
+            result["wall"]  = balance.wall;
+            result["busy"]  = balance.busy;
+            result["pairs"] = balance.pairs;
+            return result;
+        },
+        "Gets the per-thread load balance of the most recent charge-dipole compute.");
 
     // tabula::boys — the Coulomb / nuclear-attraction integral seed
 
