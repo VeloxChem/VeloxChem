@@ -71,7 +71,7 @@ class TransitionDensityTracker:
     def initialize_reference(self, system, lrscf_controller, mode):
         self._ref_exc = lrscf_controller.getExcitationVectors(self.lrscf_type)
         self._ref_geom = system.getGeometry().copy()
-        self._ref_coeff = self._get_current_coefficients(system, mode)
+        self._ref_coeff = lrscf_controller.getCoefficients()
 
     def track(self, system, lrscf_controller, mode, active_reference_state=None):
         """
@@ -232,12 +232,12 @@ class TransitionDensityTracker:
 
         self._ref_exc = lrscf_controller.getExcitationVectors(self.lrscf_type)
         self._ref_geom = system.getGeometry().copy()
-        self._ref_coeff = self._get_current_coefficients(system, mode)
+        self._ref_coeff = lrscf_controller.getCoefficients()
     
     def initialize_reference(self, system, lrscf_controller, mode):
         self._ref_exc = lrscf_controller.getExcitationVectors(self.lrscf_type)
         self._ref_geom = system.getGeometry().copy()
-        self._ref_coeff = self._get_current_coefficients(system, mode)
+        self._ref_coeff = lrscf_controller.getCoefficients()
 
     def _second_largest(self, values):
         vals = np.asarray(values, dtype=float)
@@ -261,9 +261,10 @@ class TransitionDensityTracker:
 
         return abs(exc_ha[state_a - 1] - exc_ha[state_b - 1]) < float(threshold)
 
-    def _get_current_coefficients(self, system, mode):
-        if mode == "restricted":
-            return system.getElectronicStructure_R().coeff()
-        es = system.getElectronicStructure_U()
-        return np.stack((es.alphaCoeff(), es.betaCoeff()))
+    # def _get_current_coefficients(self, system, mode):
+    #     if mode == "restricted":
+    #         #Here get the coefficients from LRSCF controller
+    #         return system.getElectronicStructure_R().coeff()
+    #     es = system.getElectronicStructure_U()
+    #     return np.stack((es.alphaCoeff(), es.betaCoeff()))
         
