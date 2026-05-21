@@ -2619,7 +2619,7 @@ class OpenMMDynamics:
         centroid = np.mean(coords, axis=0)
         rg_sq = np.mean(np.sum((coords - centroid) ** 2, axis=1))
         
-        return np.sqrt(rg_sq)
+        return max(np.sqrt(rg_sq), 1.5)
 
     def _create_system_from_multiple_molecules(
         self, molecules, pdb_file='system.pdb', spacing_factor=1.5, max_attempts=1000, write_pdb = True
