@@ -114,8 +114,17 @@ class InterpolationDriver():
         
         self.z_matrix = z_matrix
         self.impes_dict = None
+
         self.sum_of_weights = None
         self.sum_of_weights_grad = None
+
+        # Raw and normalized Shepard-weight bookkeeping.
+        self.raw_weights_array = None
+        self.normalized_weights_array = None
+        self.raw_sum_of_weights = None
+        self.used_weight_fallback = False
+        self.weight_eps = 1.0e-12
+
         self.print = False
         self.store_weights = False
         # symmetry metadata tuple produced during database-point generation
@@ -145,6 +154,7 @@ class InterpolationDriver():
         self.use_inverse_bond_length = True
         self.use_cosine_dihedral = False
         self.use_tc_weights = False
+        self.use_mass_weight = False
 
         # Optional runtime profiling for interpolation bottleneck analysis.
         self.runtime_profile_enabled = False
@@ -190,6 +200,7 @@ class InterpolationDriver():
                     'use_inverse_bond_length': ('bool', 'whether to use inverse bond lengths in the Z-matrix'),
                     'use_cosine_dihedral':('bool', 'wether to use cosine and sin for the diehdral in the Z-matrix'),
                     'use_tc_weights':('bool', 'weither to use target coustomized weights'),
+                    'use_mass_weight':('bool', 'weither to use mass weighting in coordinates'),
                 'labels': ('seq_fixed_str', 'the list of QM data point labels'),
             }
         }
@@ -521,6 +532,7 @@ class InterpolationDriver():
         self.dw_dalpha_list = []
         self.dw_dX_dalpha_list = []
 
+        weight_fallback_metrics = []
         masses = self.molecule.get_masses().copy()
         masses_cart = np.repeat(masses, 3)
         sqrt_masses = np.sqrt(masses_cart)
@@ -579,9 +591,12 @@ class InterpolationDriver():
                 self.impes_coordinate.internal_coordinates_values,
             )
             compute_potential_acc += time() - potential_t0
-        
-            gradient = sqrt_masses * gradient_mw.reshape(-1)
-            gradient = gradient.reshape(gradient_mw.shape)
+
+            gradient = gradient_mw
+            if self.use_mass_weight:
+
+                gradient = sqrt_masses * gradient_mw.reshape(-1)
+                gradient = gradient.reshape(gradient_mw.shape)
             gradients.append(gradient)
             averaged_int_dists.append(qm_data_point.internal_coordinates_values)
 
@@ -592,6 +607,7 @@ class InterpolationDriver():
             self.potentials.append(potential)
             self.gradients.append(gradient)
             weight_gradients_cart.append(weight_grad_cart)
+            weight_fallback_metrics.append(float(abs(distance)) if np.isfinite(distance) else np.inf)
 
         self._add_runtime_timing('shepard.point_eval_loop', time() - eval_loop_t0)
         self._add_runtime_timing('shepard.compute_potential', compute_potential_acc)
@@ -605,24 +621,91 @@ class InterpolationDriver():
         # --- 1.  raw (unnormalised) weights and their gradients ----------------------
         w_i          = np.array(weights_cart, dtype=np.float64)        # ← rename
         grad_w_i     = np.array(weight_gradients_cart, dtype=np.float64)   # shape (n_pts, natms, 3)
-   
-        S            = w_i.sum()                        # Σ wᵢ
-        sum_grad_w   = grad_w_i.sum(axis=0)            # Σ ∇wᵢ      shape (natms, 3)
+        
+        # --- 2. Normalize raw weights -----------------------------------------------
+        S_raw = float(np.sum(w_i))
+        sum_grad_w_raw = grad_w_i.sum(axis=0)
 
-        eps = 1e-12
+        eps = float(getattr(self, "weight_eps", 1.0e-12))
+        finite_positive = np.isfinite(w_i) & (w_i > 0.0)
 
-        if S > eps:
-            W_i = w_i / S
-            grad_W_i = (grad_w_i * S - w_i[:, None, None] * sum_grad_w) / S**2
+        used_weight_fallback = False
+        used_weight_rescale = False
+        weight_rescale_factor = 1.0
+
+        if np.any(finite_positive):
+            # Scale-invariant Shepard normalization.
+            # This preserves relative locality even when all raw weights are tiny.
+            max_w = float(np.max(w_i[finite_positive]))
+
+            if np.isfinite(S_raw) and S_raw > eps:
+                w_norm = w_i
+                grad_w_norm = grad_w_i
+            else:
+                used_weight_rescale = True
+                weight_rescale_factor = max_w
+                w_norm = np.where(finite_positive, w_i / max_w, 0.0)
+                grad_w_norm = grad_w_i / max_w
+
+            S_norm = float(np.sum(w_norm))
+            if (not np.isfinite(S_norm)) or S_norm <= 0.0:
+                raise RuntimeError(
+                    "InterpolationDriver.shepard_interpolation: failed to normalize "
+                    "finite positive Shepard weights."
+                )
+
+            sum_grad_w_norm = grad_w_norm.sum(axis=0)
+            W_i = w_norm / S_norm
+
+            grad_W_i = (
+                grad_w_norm * S_norm
+                - w_norm[:, None, None] * sum_grad_w_norm[None, :, :]
+            ) / (S_norm * S_norm)
+
         else:
-            # fallback if all raw weights are numerically zero
-            n_pts = len(w_i)
-            W_i = np.full_like(w_i, 1.0 / n_pts)
+            # No finite positive Shepard support remains.
+            # Preferred scientific behavior: raise and trigger database expansion.
+            # Compatibility behavior below uses nearest datapoint instead of uniform mixing.
+            used_weight_fallback = True
+
+            metric = np.asarray(weight_fallback_metrics, dtype=np.float64)
+            finite_metric = np.isfinite(metric)
+
+            if not np.any(finite_metric):
+                raise RuntimeError(
+                    "InterpolationDriver.shepard_interpolation: no finite positive "
+                    "Shepard weights and no finite distances. The structure is outside "
+                    "the interpolation domain."
+                )
+
+            nearest = int(np.argmin(np.where(finite_metric, metric, np.inf)))
+
+            W_i = np.zeros_like(w_i, dtype=np.float64)
+            W_i[nearest] = 1.0
             grad_W_i = np.zeros_like(grad_w_i)
 
-        self.sum_of_weights = S
-        self.sum_of_weights_grad = sum_grad_w
-        
+            S_norm = 1.0
+            sum_grad_w_norm = np.zeros_like(sum_grad_w_raw)
+
+        self.raw_sum_of_weights = S_raw
+        self.sum_of_weights = S_raw
+        self.sum_of_weights_grad = sum_grad_w_raw
+        self.effective_sum_of_weights = S_norm
+        self.effective_sum_of_weights_grad = sum_grad_w_norm
+        self.weight_rescale_factor = weight_rescale_factor
+        self.used_weight_rescale = bool(used_weight_rescale)
+        self.raw_weights_array = w_i.copy()
+        self.normalized_weights_array = W_i.copy()
+        self.used_weight_fallback = bool(used_weight_fallback)
+        self.weight_eps = eps
+        # print('S', S_norm, W_i, np.sum(W_i))
+        if used_weight_fallback:
+            print("[InterpolationDriver] Shepard fallback branch used")
+            print("  raw weights:", w_i)
+            print("  raw sum S:", S_raw)
+            print("  normalized weights:", W_i)
+            print("  sum normalized weights:", W_i.sum())
+                
         # --- 3.  accumulate energy and gradient --------------------------------------
         potentials   = np.array(potentials, dtype=np.float64)        # Uᵢ
         gradients    = np.array(gradients,  dtype=np.float64)        # ∇Uᵢ  shape (n_pts, natms, 3)
@@ -978,7 +1061,7 @@ class InterpolationDriver():
         return trust_radius_weight_gradient
 
     
-    def trust_radius_weight_gradient_gradient(self, confidence_radius, distance, distance_vector):
+    def trust_radius_weight_gradient_gradient(self, confidence_radius, distance, distance_vector, scale2):
         
         R = confidence_radius
         D = distance**2
@@ -1001,14 +1084,14 @@ class InterpolationDriver():
         term2 = 2.0 * ((p * u**(p - 1.0) + q * u**(q - 1.0)) * (p * u**p + q * u**q)) / (denom_base**3)
         
         # Common scaling factor analytically pulled out of the original expressions
-        multiplier = (4.0 * v) / (R**3)
+        multiplier = (4.0 * scale2* v) / (R**3)
         
         trust_radius_weight_gradient_gradient = multiplier * (term1 - term2)
 
         return trust_radius_weight_gradient_gradient
     
 
-    def shepard_weight_gradient(self, distance_vector, distance, confidence_radius):
+    def shepard_weight_gradient(self, distance_vector, distance, scale2, confidence_radius):
         
         R = confidence_radius
         D = distance**2
@@ -1028,7 +1111,7 @@ class InterpolationDriver():
         
         numerator = p * u**(p - 1.0) + q * u**(q - 1.0)
         
-        weight_gradient = -2.0 * (numerator / (R**2 * denom_base**2)) * v
+        weight_gradient = -2.0 * scale2 * (numerator / (R**2 * denom_base**2)) * v
         
         return denom_base, weight_gradient
     
@@ -1351,8 +1434,13 @@ class InterpolationDriver():
 
         rotated_current = (R_x @ Yc.T).T
         distance_vector_sub =  Xc - rotated_current
-        distance = np.linalg.norm(distance_vector_sub)
+        # scale = 1.0 / distance_vector_sub.shape[0]
+        # distance = scale * np.linalg.norm(distance_vector_sub)
+        # distance_vector_sub *= scale**2
 
+        n_dof = distance_vector_sub.size
+        scale2 = 1.0 / n_dof**(2.0 * 0.25)
+        distance = np.sqrt(scale2 * np.dot(distance_vector_sub.ravel(),distance_vector_sub.ravel()))
         
         dihedral_dist = 0.0
         if distance < 1e-8:
@@ -1367,6 +1455,7 @@ class InterpolationDriver():
             denominator_base, weight_gradient_sub_base = self.shepard_weight_gradient(
                 distance_vector_sub,
                 distance,
+                scale2,
                 data_point.confidence_radius,
             )
             if self.use_tc_weights:
@@ -1407,6 +1496,7 @@ class InterpolationDriver():
                         data_point.confidence_radius,
                         distance,
                         distance_vector_sub,
+                        scale2,
                     )
 
                     dw_dalhpa_i = gate * dw_base_dR
@@ -1425,6 +1515,7 @@ class InterpolationDriver():
                         data_point.confidence_radius,
                         distance,
                         distance_vector_sub,
+                        scale2,
                     )
 
                 if store_alpha_gradients:
@@ -2924,7 +3015,7 @@ z
 
             sigma = self._imp_coordinate_sigma(section, idx, q_ref)
             disp[idx] = abs(float(dq_eff[idx])) / max(float(sigma), 1.0e-12)
-        print('current disp', disp)
+
         return disp
 
 

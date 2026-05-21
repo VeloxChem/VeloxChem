@@ -234,6 +234,7 @@ class IMForceFieldGenerator:
         self.roots_z_matrix = {}
         self.int_coord_bond_information = None
         self.symmetry_dihedral_lists = {}
+        self.symmetry_information = None
         self.all_rotatable_bonds = None
 
         self.reaction_structures = None
@@ -292,6 +293,7 @@ class IMForceFieldGenerator:
         self.use_inverse_bond_length = True
         self.use_cosine_dihedral = False
         self.use_tc_weights = True
+        self.use_mass_weight = False
 
         # variables for the forcefield generation and database expansion
         self.dynamics_settings = None
@@ -640,7 +642,8 @@ class IMForceFieldGenerator:
                                         'imforcefield_file':self.imforcefieldfiles[root],
                                         'use_inverse_bond_length':self.use_inverse_bond_length,
                                         'use_cosine_dihedral':self.use_cosine_dihedral,
-                                        'use_tc_weights':self.use_tc_weights
+                                        'use_tc_weights':self.use_tc_weights,
+                                        'use_mass_weight':self.use_mass_weight,
                                     })
        
                 _, z_matrix = int_driver.read_labels()
@@ -874,12 +877,16 @@ class IMForceFieldGenerator:
 
 
             # Build datapoint in sampling DB using same label and geometry metadata
-            masses = mol.get_masses().copy()
-            inv_sqrt = 1.0 / np.sqrt(np.repeat(masses, 3))
-            grad_vec = g[0].reshape(-1)
-            hess_mat = h[0].reshape(grad_vec.size, grad_vec.size)
-            mw_grad = inv_sqrt * grad_vec
-            mw_hess = (inv_sqrt[:, None] * hess_mat) * inv_sqrt[None, :]
+            inv_sqrt = None
+            mw_grad = g[0].reshape(-1)
+            mw_hess = h[0].reshape(grad_vec.size, grad_vec.size)
+            if sampling_settings["use_mass_weight"]:
+                masses = mol.get_masses().copy()
+                inv_sqrt = 1.0 / np.sqrt(np.repeat(masses, 3))
+                grad_vec = g[0].reshape(-1)
+                hess_mat = h[0].reshape(grad_vec.size, grad_vec.size)
+                mw_grad = inv_sqrt * grad_vec
+                mw_hess = (inv_sqrt[:, None] * hess_mat) * inv_sqrt[None, :]
 
             samp_dp = InterpolationDatapoint(self.roots_z_matrix[root])
             samp_dp.update_settings(sampling_settings)
@@ -971,6 +978,7 @@ class IMForceFieldGenerator:
                                 'use_inverse_bond_length':self.use_inverse_bond_length,
                                 'use_cosine_dihedral':self.use_cosine_dihedral,
                                 'use_tc_weights':self.use_tc_weights,
+                                'use_mass_weight':self.use_mass_weight,
                             }
             self.sampling_states_interpolation_settings[self.roots_to_follow[0]] = self.states_interpolation_settings[self.roots_to_follow[0]].copy()
             self.sampling_states_interpolation_settings[self.roots_to_follow[0]]['imforcefield_file'] = self.sampling_imforcefieldfiles[self.roots_to_follow[0]]
@@ -2187,6 +2195,15 @@ class IMForceFieldGenerator:
             for mol_basis in entries:
                 if not mol_basis[5]:
                     label_counter = 0
+
+                imp_int_constraints = {'bonds': [], 'angles': [], 'dihedrals': [], 'impropers': []}
+                for constraint in mol_basis[-1]:
+                    if len(constraint) == 2:
+                        imp_int_constraints["bonds"].append(constraint)
+                    if len(constraint) == 3:
+                        imp_int_constraints["angles"].append(constraint)
+                    if len(constraint) == 4:
+                        imp_int_constraints["dihedrals"].append(constraint)
                 
                 energies, scf_results, rsp_results = self._compute_energy(drivers[0], mol_basis[0], mol_basis[1])
 
@@ -2197,10 +2214,11 @@ class IMForceFieldGenerator:
                 gradients = self._compute_gradient(drivers[1], mol_basis[0], mol_basis[1], scf_results, rsp_results)
                 hessians = self._compute_hessian(drivers[2], mol_basis[0], mol_basis[1])
 
-
-                masses = mol_basis[0].get_masses().copy()
-                masses_cart = np.repeat(masses, 3)
-                inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
+                inv_sqrt_masses = None
+                if self.use_mass_weight:
+                    masses = mol_basis[0].get_masses().copy()
+                    masses_cart = np.repeat(masses, 3)
+                    inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
 
                 for number in range(len(energies)):
                     target_root = mol_basis[4][number]
@@ -2221,8 +2239,11 @@ class IMForceFieldGenerator:
                     hess = hessians[number].copy()
                     grad_vec = grad.reshape(-1)         # (3N,)
                     hess_mat = hess.reshape(grad_vec.size, grad_vec.size)
-                    mw_grad_vec = inv_sqrt_masses * grad_vec
-                    mw_hess_mat = (inv_sqrt_masses[:, None] * hess_mat) * inv_sqrt_masses[None, :]
+                    mw_grad_vec = grad_vec
+                    mw_hess_mat = hess_mat
+                    if self.use_mass_weight:
+                        mw_grad_vec = inv_sqrt_masses * grad_vec
+                        mw_hess_mat = (inv_sqrt_masses[:, None] * hess_mat) * inv_sqrt_masses[None, :]
                     
     
                     if mol_basis[5] == False:
@@ -2231,7 +2252,7 @@ class IMForceFieldGenerator:
                     impes_coordinate = InterpolationDatapoint(z_matrix)
                     impes_coordinate.update_settings(interpolation_settings[target_root])
                     impes_coordinate.cartesian_coordinates = mol_basis[0].get_coordinates_in_bohr()
-                    impes_coordinate.imp_int_coordinates = {'bonds': [], 'angles': [], 'dihedrals': [], 'impropers': []}
+                    impes_coordinate.imp_int_coordinates = imp_int_constraints
                     impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
                     impes_coordinate.energy = energies[number]
                     impes_coordinate.gradient =  mw_grad_vec.reshape(grad.shape)

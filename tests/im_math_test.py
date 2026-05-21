@@ -167,6 +167,7 @@ def _settings(weightfunction_type="cartesian", use_tc_weights=False):
         "confidence_radius": 0.5,
         "use_inverse_bond_length": True,
         "use_cosine_dihedral": False,
+        "use_mass_weight": False,
         "use_tc_weights": bool(use_tc_weights),
     }
 
@@ -237,7 +238,12 @@ def _make_datapoint(
     confidence_radius,
     important=True,
 ):
-    inv_sqrt_masses = 1.0 / np.sqrt(np.repeat(molecule.get_masses(), 3))
+    use_mass_weight = bool(settings.get("use_mass_weight", False))
+
+    inv_sqrt_masses = None
+    if use_mass_weight:
+        inv_sqrt_masses = 1.0 / np.sqrt(np.repeat(molecule.get_masses(), 3))
+    
     energy, gradient, hessian = _surface_values(coords, center)
 
     dp = InterpolationDatapoint(z_matrix)
@@ -245,8 +251,19 @@ def _make_datapoint(
     dp.cartesian_coordinates = np.array(coords, dtype=np.float64, copy=True)
     dp.inv_sqrt_masses = inv_sqrt_masses
     dp.energy = float(energy)
-    dp.gradient = (inv_sqrt_masses * gradient.reshape(-1)).reshape(gradient.shape)
-    dp.hessian = inv_sqrt_masses[:, None] * hessian * inv_sqrt_masses[None, :]
+    gradient_flat = gradient.reshape(-1)
+    hessian_mat = hessian.reshape(gradient_flat.size, gradient_flat.size)
+
+    if use_mass_weight:
+        gradient_flat = inv_sqrt_masses * gradient_flat
+        hessian_mat = (
+            inv_sqrt_masses[:, None]
+            * hessian_mat
+            * inv_sqrt_masses[None, :]
+        )
+
+    dp.gradient = gradient_flat.reshape(gradient.shape)
+    dp.hessian = hessian_mat.reshape(hessian.shape)
     dp.confidence_radius = float(confidence_radius)
     dp.point_label = str(label)
     dp.imp_int_coordinates = (
