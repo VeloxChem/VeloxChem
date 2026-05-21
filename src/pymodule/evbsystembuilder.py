@@ -35,26 +35,21 @@ import numpy as np
 import networkx as nx
 from networkx.algorithms.isomorphism import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
-import typing
 from pathlib import Path
 import copy
 import math
 import sys
-import os
-import itertools
 from enum import Enum, auto
 
 from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom, Point
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .mmforcefieldgenerator import MMForceFieldGenerator
-from .atomtypeidentifier import AtomTypeIdentifier
 from .solvationbuilder import SolvationBuilder
 from .molecule import Molecule
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_arccos
 from .waterparameters import get_water_parameters
-from .openmmdynamics import OpenMMDynamics
 
 try:
     import openmm as mm
@@ -64,7 +59,7 @@ except ImportError:
     pass
 
 
-class ReactionSystemBuilder():
+class EvbSystemBuilder():
 
     def __init__(self, comm=None, ostream=None):
         '''
@@ -98,19 +93,24 @@ class ReactionSystemBuilder():
         self.morse_D_default: float = 500  # kj/mol, default dissociation energy if none is given
         self.morse_couple: float = 1  # kj/mol, scaling for the morse potential to emulate a coupling between two overlapping bonded states
 
+        # self.centroid_k: float = 50000  # kj/mol nm, force constant for the position restraints
+        # self.centroid_offset: float = -0.2 #A
+        # self.centroid_complete_ligand: bool = True # If false, the centroid force will only be applied to the reacting atoms, if true, the complete ligand will be used for the centroid force
+
         self.posres_residue_radius: float = -1  # A, cutoff measured from the com of the ligand for which residues to add to the position restraints, -1 includes the whole molecule
         self.posres_k = 1000  # kj/mol nm^2, default in gromacs
-        self.carbon_k = 100  # kj/mol nm, centroid for bringing the system and CNT or graphene close
 
+        # self.restraint_r_default: float = 0.5  # nm, default position restraint distance if none is given
+        # self.restraint_r_offset: float = 0.1  # nm, distance added to the measured distance in a structure to set the position restraint distance
         self.coul14_scale: float = 0.833
         self.lj14_scale: float = 0.5
         self.nb_cutoff: float = 1.  # nm, minimal cutoff for the nonbonded force
 
         self.pressure: float = -1.
-        self.solvent: str = None  #type: ignore
+        self.solvent: str = None  # type: ignore
         self.padding: float = 1.5
         self.no_reactant: bool = False
-        self.E_field: list[float] = [0, 0, 0]  # V/m
+        self.E_field: list[float] = [0, 0, 0]
         self.neutralize: bool = False
 
         self.soft_core_coulomb_pes_static = False
@@ -138,8 +138,6 @@ class ReactionSystemBuilder():
 
         self.k = 4.184 * hartree_in_kcalpermol() * 0.1 * bohr_in_angstrom(
         )  # Coulombic pre-factor
-        F = 96485.3321233100184  # C/mol, Faraday constant
-        self.E_field_factor = F * 10**-12  # Conversion factor from V/m to kJ/(e nm mol)
 
         self.deg_to_rad: float = np.pi / 180
 
@@ -162,8 +160,8 @@ class ReactionSystemBuilder():
         self.decompose_bonded = True
         self.decompose_nb: list | None = None
         self.keywords = {
-            "temperature": float,  #-> system dependent
-            "nb_cutoff": float,  #-> 
+            "temperature": float,  # -> system dependent
+            "nb_cutoff": float,  # ->
             # "bonded_integration": bool,
             "bonded_integration_bond_fac": float,
             "bonded_integration_angle_fac": float,
@@ -280,17 +278,18 @@ class ReactionSystemBuilder():
 
         # assert False, "Rethink CNT/graphene input"
 
-        if self.CNT or self.graphene or self.solvent:
+        if self.solvent:
             box = self._configure_pbc(system, topology, nb_force, box)  # A
+            # todo what about the box, and especially giving it to the solvator
             box = self._add_solvent(system, vlx_mol, self.solvent, topology,
                                     nb_force, self.neutralize, self.padding,
                                     box)
 
         if self.pressure > 0:
-            barostat = self._add_barostat(system)
+            barostat_not_used = self._add_barostat(system)
 
         E_field = None
-        if np.any(abs(np.array(self.E_field)) > 0.001):
+        if np.any(np.array(self.E_field) > 0.001):
             E_field = self._add_E_field(system, self.E_field)
 
         self.topology: mmapp.Topology = topology
@@ -350,49 +349,38 @@ class ReactionSystemBuilder():
         if self.no_reactant:
             return system, topology, system_mol, reaction_atoms
 
-        total_mapping = {}
-        residues = []
         for res_dict in self.pdb_active_res:
             # all atoms already exist in the topology, pdb: top, matching chain id with removed_chain
             # the pdb residue should be checked against the reactant, and an index mapping should be found out #todo
             # these should be added to the reaction_atoms
-            chain = [c for c in topology.chains() if c.id == res_dict['chain']][0]
+            chain = [c for c in topology.chains()
+                     if c.id == res_dict['chain']][0]
             residue = [
-                r for r in chain.residues()
-                if int(r.id) == res_dict['residue']
+                r for r in chain.residues() if int(r.id) == res_dict['residue']
             ][0]
-            residues.append(residue)
 
-        #test
+            mapping = self._get_mapped_atom_ids_from_residue(residue)
+            res_atoms = [atom for atom in residue.atoms()]
 
-        iterator = self._get_mapped_atom_ids_from_residues(residues)
+            for id in mapping.keys():
+                self.reactant.atoms[id]['pdb'] = 'sys'
+            for vlx_id, res_id in mapping.items():
+                reaction_atoms.update({
+                    vlx_id:
+                    [atom for atom in res_atoms if atom.index == res_id][0]
+                })
 
-        mapping = next(iterator)
+            system = self._delete_pdb_forces(system,
+                                             [atom.index for atom in res_atoms])
 
-        res_atoms = [atom for residue in residues for atom in residue.atoms()]
-
-        for id in mapping.keys():
-            self.reactant.atoms[id]['pdb'] = 'sys'
-        for vlx_id, res_id in mapping.items():
-            reaction_atoms.update({
-                vlx_id: [atom for atom in res_atoms if atom.index == res_id][0]
-            })
-
-        system = self._delete_pdb_forces(system,
-                                         [atom.index for atom in res_atoms])
-
-        self.ostream.print_info(
-            f"Reacting residues with {len(res_atoms)} atoms added to reaction_atoms"
-        )
-        self.ostream.flush()
-
-        for id in self.reactant.atoms.keys():
-            if self.reactant.atoms[id].get('pdb') != 'sys':
-                self.reactant.atoms[id]['pdb'] = 'unmapped'
+            self.ostream.print_info(
+                f"Reacting residue {residue.name} {residue.id} with {len(res_atoms)} atoms added to reaction_atoms"
+            )
+            self.ostream.flush()
 
         return system, topology, system_mol, reaction_atoms
 
-    def _get_mapped_atom_ids_from_residues(self, residues):
+    def _get_mapped_atom_ids_from_residue(self, residue):
         # create a graph of the residue
         # if the bonds are not available, create them based on proximity from the positions
 
@@ -401,44 +389,31 @@ class ReactionSystemBuilder():
         vlx_ids = list(self.reactant.atoms.keys())
         vlx_bonds = list(self.reactant.bonds.keys())
         residue_elements = [
-            atom.element.atomic_number for residue in residues
-            for atom in residue.atoms()
+            atom.element.atomic_number for atom in residue.atoms()
         ]
-        residue_ids = [
-            atom.index for residue in residues for atom in residue.atoms()
-        ]
+        residue_ids = [atom.index for atom in residue.atoms()]
 
         # Depending on how the residue is stored in the PDB, the bonds might not be available.
         # In that case, the bonds are derived from the connectivity-matrix of a newly created molecule
-
-        mol = Molecule()
-        for id, element in zip(residue_ids, residue_elements):
-            coord = self.positions[id]
-            mol.add_atom(int(element), Point(coord), 'angstrom')
-        connectivity_matrix = mol.get_connectivity_matrix()
-        residue_bonds = []
-        for i, id in enumerate(residue_ids):
-            if np.all(connectivity_matrix[i]) == 0:
-                if int(residue_elements[i]) == 1:
-                    # unconnected hydrogen, connect to closest heavy atom
-                    heavy_indices = [
-                        j for j, elem in enumerate(residue_elements)
-                        if int(elem) != 1
-                    ]
-                    if len(heavy_indices) == 0:
+        residue_bonds = [bond for bond in residue.bonds()]
+        if len(residue_bonds) == 0:
+            residue_bonds = []
+            mol = Molecule()
+            for id, element in zip(residue_ids, residue_elements):
+                coord = self.positions[id]
+                mol.add_atom(int(element), Point(coord), 'angstrom')
+            connectivity_matrix = mol.get_connectivity_matrix()
+            for i, id in enumerate(residue_ids):
+                for j, jd in enumerate(residue_ids):
+                    if i >= j:
                         continue
-                    distances = np.linalg.norm(
-                        mol.get_coordinates_in_angstrom()[heavy_indices] -
-                        mol.get_coordinates_in_angstrom()[i],
-                        axis=1)
-                    closest_heavy = heavy_indices[np.argmin(distances)]
-                    residue_bonds.append((id, residue_ids[closest_heavy]))
-
-            for j, jd in enumerate(residue_ids):
-                if i >= j:
-                    continue
-                if connectivity_matrix[i, j] == 1:
-                    residue_bonds.append((id, jd))
+                    if connectivity_matrix[i, j] == 1:
+                        residue_bonds.append((id, jd))
+        else:
+            residue_bonds = [(bond.atom1.index, bond.atom2.index)
+                             for bond in residue.bonds()
+                             if bond.atom1.index in residue_ids
+                             and bond.atom2.index in residue_ids]
 
         vlx_graph = nx.Graph()
         vlx_graph.add_nodes_from(vlx_ids)
@@ -458,7 +433,8 @@ class ReactionSystemBuilder():
             raise ValueError(
                 f"Could not find subgraph isomorphism between the residue {residue.name} {residue.index} and the reactant molecule"
             )
-        return GM.subgraph_isomorphisms_iter()
+        mapping = next(GM.subgraph_isomorphisms_iter())
+        return mapping
 
     def _delete_pdb_forces(self, system, del_indices):
         # set the right force groups, give descriptive names to the pdb forces, and delete all contributions that solely have the given indices
@@ -514,12 +490,10 @@ class ReactionSystemBuilder():
             2 * self.padding + 0.1 *
             (max(self.positions[:, 2]) - min(self.positions[:, 2]))
         ]
-
         dims = ['x', 'y', 'z']
-
         for i in range(3):
             if box[i] == -1:
-                box[i] = max(minim)
+                box[i] = minim[i]
             else:
                 self.ostream.print_info(
                     f"Box size calculation for {dims[i]}-component is being overridden by graphene or CNT with value of {box[i]}"
@@ -556,121 +530,6 @@ class ReactionSystemBuilder():
         self.ostream.flush()
         return box
 
-    def _equilibrate_carbon(self, system, nb_force, topology,
-                            initial_positions):
-        initial_positions = np.array(initial_positions)
-        # a graphene sheet is at z =0
-        # a CNT lies along the X-axis
-        # before anything, center the molecule in the x and y direction
-        # rotate the molecule with the next face down
-        # move the molecule as close/far away as necessary
-        # check minimal z after rotation
-
-        I = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-        Rx = np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]])
-        Ry = np.array([[0, 0, 1], [0, 1, 0], [-1, 0, 0]])
-        Rz = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
-        # Generate 6 rotations so that every 'face' of the molecule once faces down to the graphene sheet
-        rotations = [[I], [Rx], [Rx, Rx], [Rx, Rx, Rx], [Ry], [Ry, Ry, Ry]]
-        # In case of a CNT, you'd technically get 12 unique orientations, all of the above ones, and with Rz applied to them
-
-        # Shift the reactant to the center
-        rea_indices = [atom.index for atom in self.reaction_atoms.values()]
-        rea_positions = np.array([initial_positions[i] for i in rea_indices])
-        avg_x = np.mean(rea_positions[:, 0])
-        avg_y = np.mean(rea_positions[:, 1])
-        avg_z = np.mean(rea_positions[:, 2])
-        center = np.array([avg_x, avg_y, avg_z])
-        self.ostream.print_info(f"Shifting reactant with {center}")
-        for i in rea_indices:
-            initial_positions[i] -= center
-
-        systems = self._interpolate_system(
-            system,
-            [0, 1],
-            nb_force,
-            E_field_force=None,
-        )
-        rea_system = systems[0]
-
-        if self.CNT:
-            carbon_ext_force = mm.CustomExternalForce("carbon_k*abs(z+y)")
-        else:
-            carbon_ext_force = mm.CustomExternalForce("carbon_k*abs(z)")
-        carbon_ext_force.setName("Carbon external equilibration force")
-        carbon_ext_force.addGlobalParameter("carbon_k", self.carbon_k)
-
-        reaction_particles_indices = [
-            atom.index for atom in self.reaction_atoms.values()
-        ]
-        for i in reaction_particles_indices:
-            carbon_ext_force.addParticle(i)
-
-        # with open("added_carbon", mode="w", encoding="utf-8") as output:
-        #     output.write(mm.XmlSerializer.serialize(system))
-        all_conformers = {
-            'energies': [],
-            'geometries': [],
-            'molecules': [],
-        }
-        for i in range(6):
-            positions = copy.copy(initial_positions)
-
-            pdb_name = f'added_carbon.pdb'
-            self.ostream.print_info(f"Rotating around {rotations[i]}")
-            minz = 100
-            for j in rea_indices:
-                new_point = []
-                for rot in rotations[i]:
-                    old_point = positions[j]
-                    new_point = rot @ old_point
-
-                    positions[j] = new_point
-                if new_point[2] < minz:
-                    minz = new_point[2]
-
-            if self.CNT:
-                shift = np.array([0, 0, minz - self.CNT_radius_nm * 10 - 5])
-            else:
-                shift = np.array([0, 0, minz - 5])
-            self.ostream.print_info(
-                f"Shifting reactant with {shift} for rotation {i}")
-            self.ostream.flush()
-            for j in rea_indices:
-                positions[j] -= shift
-
-            pdb = mmapp.PDBFile.writeFile(
-                topology,
-                positions * mmunit.angstrom,
-                pdb_name,
-            )
-            opm_dyn = OpenMMDynamics(ostream=self.ostream)
-            opm_dyn.pdb = mmapp.PDBFile(pdb_name)
-            opm_dyn.system = rea_system
-
-            conformers_dict = opm_dyn.conformational_sampling(
-                ensemble='NVT',
-                # temperature=00,
-                # snapshots=10
-                # nsteps=self.mm_steps * snapshots,
-            )
-            all_conformers['energies'] += conformers_dict['energies']
-            all_conformers['geometries'] += conformers_dict['geometries']
-            all_conformers['molecules'] += conformers_dict['molecules']
-            self.ostream.print_info(f"Saving pdbs")
-            # for e,mol in zip(conformers_dict['energies'],conformers_dict['molecules']):
-            #     mmapp.PDBFile.writeFile(
-            #     topology,
-            #     mol.get_coordinates_in_angstrom(),
-            #     f"pdb/conf_{i}_{e}.pdb",
-            # )
-        if os.path.exists("added_carbon.pdb"):
-            os.remove("added_carbon.pdb")
-        min_conf_i = np.argmin(all_conformers['energies'])
-        min_mol = all_conformers['molecules'][min_conf_i]
-        positions = min_mol.get_coordinates_in_angstrom()
-        return positions, min_mol
-
     def _add_reactant(self, system, topology, nb_force):
         reaction_chain = topology.addChain()
         reaction_residue = topology.addResidue(name="REA", chain=reaction_chain)
@@ -680,17 +539,17 @@ class ReactionSystemBuilder():
 
             for id, atom in self.reactant.atoms.items():
                 # if the pdb field is sys, the atom is already in the system and added to the nbforce
-                if atom.get('pdb') == 'sys' or atom.get('pdb') == 'unmapped':
+                if atom.get('pdb') == 'sys':
                     continue
                 mm_element = mmapp.Element.getBySymbol(elements[id])
                 name = f"{elements[id]}{id}"
                 system.addParticle(mm_element.mass)
                 nb_force.addParticle(
                     0, 1, 0
-                )  #Placeholder values, actual values depend on lambda and will be set later
+                )  # Placeholder values, actual values depend on lambda and will be set later
 
                 # If a pdb field is defined, the atom is already in the topoolgy and hence also in the reaction_atoms
-                if not atom.get('pdb') == None:
+                if atom.get('pdb') is not None:
                     continue
                 reaction_atom = topology.addAtom(
                     name,
@@ -699,7 +558,7 @@ class ReactionSystemBuilder():
                 )
                 self.reaction_atoms[id] = reaction_atom
 
-            #Make sure the solute does not interact with itself through the default nonbonded force, as there will be another nonbonded force to take care of this
+            # Make sure the solute does not interact with itself through the default nonbonded force, as there will be another nonbonded force to take care of this
             # exception_params = [{nb_force.getExceptionParameters(i)[0],nb_force.getExceptionParameters(i)[1]} for i in range(nb_force.getNumExceptions())]
             atom_indices = [atom.index for atom in self.reaction_atoms.values()]
             set_exceptions = []
@@ -732,8 +591,8 @@ class ReactionSystemBuilder():
             self.ostream.flush()
 
             for bond in self.reactant.bonds.keys():
-                if not (self.reactant.atoms[bond[0]].get('pdb') == None
-                        and self.reactant.atoms[bond[1]].get('pdb') == None):
+                if not (self.reactant.atoms[bond[0]].get('pdb') is None
+                        and self.reactant.atoms[bond[1]].get('pdb') is None):
                     continue
                 topology.addBond(
                     self.reaction_atoms[bond[0]],
@@ -861,20 +720,19 @@ class ReactionSystemBuilder():
             return 4 * (_m % M * N + _n % N)
 
         index = 0
-        # mol_positions = system_mol.get_coordinates_in_angstrom()
-        # middle_x = (max(mol_positions[:, 0]) + min(mol_positions[:, 0])) / 2
-        # middle_y = (max(mol_positions[:, 1]) + min(mol_positions[:, 1])) / 2
-        # min_z = min(mol_positions[:, 2])
-        # min_y = min(mol_positions[:, 1])
-
-        # if self.graphene:
-        #     x_offset = middle_x - X / 2
-        #     y_offset = middle_y - Y / 2
-        #     z_offset = min_z - 5
-        # else:
-        #     x_offset = middle_x - X / 2
-        #     y_offset = min_y - 0.7 * (R + 1)
-        #     z_offset = min_z - 0.7 * (R + 1)
+        mol_positions = system_mol.get_coordinates_in_angstrom()
+        middle_x = (max(mol_positions[:, 0]) + min(mol_positions[:, 0])) / 2
+        middle_y = (max(mol_positions[:, 1]) + min(mol_positions[:, 1])) / 2
+        min_z = min(mol_positions[:, 2])
+        min_y = min(mol_positions[:, 1])
+        if self.graphene:
+            x_offset = middle_x - X / 2
+            y_offset = middle_y - Y / 2
+            z_offset = min_z - 5
+        else:
+            x_offset = middle_x - X / 2
+            y_offset = min_y - 0.7 * (R + 1)
+            z_offset = min_z - 0.7 * (R + 1)
 
         for m in range(0, M):
             for n in range(0, N):
@@ -889,8 +747,7 @@ class ReactionSystemBuilder():
                         coord = np.array(
                             [coord[0], R * math.sin(phi), R * math.cos(phi)]
                         )  # A, X/2 factor is to center the CNT in the middle of the box. The X length is used to get the proper box size
-
-                    # coord += np.array([x_offset, y_offset, z_offset])
+                    coord += np.array([x_offset, y_offset, z_offset])
 
                     mm_element = mmapp.Element.getByAtomicNumber(atomic_number)
                     name = index
@@ -1336,57 +1193,6 @@ class ReactionSystemBuilder():
 
     def _interpolate_system(self, system, lambda_vec, nb_force, E_field_force):
         systems = {}
-        rea_charge = [atom['charge'] for atom in self.reactant.atoms.values()]
-        rea_pdb_charge = [
-            atom['charge'] for atom in self.reactant.atoms.values()
-            if atom.get('pdb') != 'unmapped'
-        ]
-
-        if round(sum(rea_charge), 5).is_integer() and len(rea_pdb_charge) > 0:
-            rea_formal_charge = int(round(sum(rea_charge)))
-            rea_offset = rea_formal_charge - sum(rea_pdb_charge)
-            rea_offset_per_atom = rea_offset / len(rea_pdb_charge)
-            if abs(rea_offset) > 0.01:
-                self.ostream.print_info(
-                    f"Total reactant charge is {rea_formal_charge} but charge sum of the pdb atoms is {sum(rea_pdb_charge)}"
-                )
-                self.ostream.print_info(
-                    f"Applying an offset of {rea_offset_per_atom:.4f} to {len(rea_pdb_charge)} reactant pdb atoms"
-                )
-        elif len(rea_pdb_charge) == 0:
-            rea_offset_per_atom = 0
-        else:
-            rea_offset_per_atom = 0
-            self.ostream.print_warning(
-                f"Total reactant charge is {sum(rea_charge)} and is not sufficiently close to a whole number, skipping charge offset"
-            )
-
-        pro_charge = [atom['charge'] for atom in self.product.atoms.values()]
-        pro_pdb_charge = [
-            pro_atom['charge'] for rea_atom, pro_atom in zip(
-                self.reactant.atoms.values(), self.product.atoms.values())
-            if rea_atom.get('pdb') != 'unmapped'
-        ]
-
-        if round(sum(pro_charge), 5).is_integer() and len(pro_pdb_charge) > 0:
-            pro_formal_charge = int(round(sum(pro_charge)))
-            pro_offset = pro_formal_charge - sum(pro_pdb_charge)
-            pro_offset_per_atom = pro_offset / len(pro_pdb_charge)
-            if abs(pro_offset) > 0.01:
-                self.ostream.print_info(
-                    f"Total product charge is {pro_formal_charge} but charge sum of the pdb atoms is {sum(pro_pdb_charge)}"
-                )
-                self.ostream.print_info(
-                    f"Applying an offset of {pro_offset_per_atom:.4f} to {len(pro_pdb_charge)} product pdb atoms"
-                )
-        elif len(pro_pdb_charge) == 0:
-            pro_offset_per_atom = 0
-        else:
-            pro_offset_per_atom = 0
-            self.ostream.print_warning(
-                f"Total product charge is {sum(pro_charge)} and is not sufficiently close to a whole number, skipping charge offset"
-            )
-
         for lam in lambda_vec:
             total_charge = 0
             if not self.no_reactant:
@@ -1394,11 +1200,10 @@ class ReactionSystemBuilder():
                 for i, (reactant_atom, product_atom) in enumerate(
                         zip(self.reactant.atoms.values(),
                             self.product.atoms.values())):
-                    if reactant_atom.get('pdb') == 'unmapped':
+                    if reactant_atom.get('pdb') == 'cap':
                         continue
-                    rea_charge = reactant_atom["charge"] + rea_offset_per_atom
-                    pro_charge = product_atom["charge"] + pro_offset_per_atom
-                    charge = (1 - lam) * rea_charge + lam * pro_charge
+                    charge = (1 - lam) * reactant_atom[
+                        "charge"] + lam * product_atom["charge"]
                     total_charge += charge
                     sigma = (1 - lam) * reactant_atom[
                         "sigma"] + lam * product_atom["sigma"]
@@ -1448,7 +1253,7 @@ class ReactionSystemBuilder():
                 systems.update(self._add_nb_decompositions(pro_system, 'pro'))
             else:
                 self.ostream.print_info(
-                    f"Skipping nonbonded force decompositions")
+                    "Skipping nonbonded force decompositions")
             self.ostream.flush()
 
         if self.decompose_bonded:
@@ -1594,7 +1399,7 @@ class ReactionSystemBuilder():
             solcoul.setParticleParameters(atom_id, 0, 1, 0)
             sollj.setParticleParameters(atom_id, 0, 1, 0)
 
-        #set the charges or epsilons of all solvent atoms to 0
+        # set the charges or epsilons of all solvent atoms to 0
         for atom_id in self.solvent_atom_ids:
             charge, sigma, epsilon = nbforce.getParticleParameters(atom_id)
             sollj.setParticleParameters(atom_id, 0, sigma, epsilon)
@@ -1615,7 +1420,7 @@ class ReactionSystemBuilder():
             f"decomp_{state_name}_solvent_LJ": lj_system
         })
 
-        #Remove all solvent solvent interactions in the other forces
+        # Remove all solvent solvent interactions in the other forces
 
         for to_decompose in self.decompose_nb:
 
@@ -1639,7 +1444,7 @@ class ReactionSystemBuilder():
                         lj_dec.addException(atom_id, solvent_atom, 0, sig, eps)
                         coul_dec.addException(atom_id, solvent_atom, qq, 1, 0)
 
-                #Everything is handeled by the exceptions, so the default parameters can be set to 0
+                # Everything is handeled by the exceptions, so the default parameters can be set to 0
                 lj_dec.setParticleParameters(atom_id, 0, 1, 0)
                 coul_dec.setParticleParameters(atom_id, 0, 1, 0)
 
@@ -1699,16 +1504,12 @@ class ReactionSystemBuilder():
 
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
-        assert len(
-            E_field) == 3, f"Electric field {E_field} should have 3 components"
 
-        E_field_force = mm.CustomExternalForce("-k*q*(Ex*x+Ey*y+Ez*z)")
+        E_field_force = mm.CustomExternalForce("-q*(Ex*x+Ey*y+Ez*z)")
         E_field_force.addGlobalParameter("Ex", E_field[0])
         E_field_force.addGlobalParameter("Ey", E_field[1])
         E_field_force.addGlobalParameter("Ez", E_field[2])
         E_field_force.addPerParticleParameter("q")
-        # Convert to molecular units
-        E_field_force.addGlobalParameter('k', self.E_field_factor)
         E_field_force.setName("Electric field")
         system.addForce(E_field_force)
         for i in range(system.getNumParticles()):
@@ -1762,7 +1563,7 @@ class ReactionSystemBuilder():
             atom_ids = self._key_to_id(key, self.reaction_atoms)
             fcA = fcB = 0
             eqA = eqB = 1
-            if key in self.reactant.bonds and not key in self.product.bonds:
+            if key in self.reactant.bonds and key not in self.product.bonds:
                 bondA = self.reactant.bonds[key]
                 fcA = bondA['force_constant']
                 eqA = bondA['equilibrium']
@@ -1815,8 +1616,8 @@ class ReactionSystemBuilder():
 
         for key in bond_keys:
 
-            breaking = key in self.reactant.bonds and not key in self.product.bonds
-            forming = not key in self.reactant.bonds and key in self.product.bonds
+            breaking = key in self.reactant.bonds and key not in self.product.bonds
+            forming = key not in self.reactant.bonds and key in self.product.bonds
             if not (breaking or forming):
                 continue
 
@@ -2248,7 +2049,7 @@ class ReactionSystemBuilder():
 
         atom_keys = self.reactant.atoms.keys()
 
-        #Loop over all atoms, and check if their id's are part of any exceptions
+        # Loop over all atoms, and check if their id's are part of any exceptions
         for i in atom_keys:
             for j in atom_keys:
                 if i < j:
@@ -2365,8 +2166,9 @@ class ReactionSystemBuilder():
             if i != base_particle:
                 exclusions.add(i)
             if current_level > 0:
-                ReactionSystemBuilder._add_exclusions_to_set(
-                    bonded12, exclusions, base_particle, i, current_level - 1)
+                EvbSystemBuilder._add_exclusions_to_set(bonded12, exclusions,
+                                                        base_particle, i,
+                                                        current_level - 1)
 
     def _create_constraint_forces(self, lam):
 
@@ -2610,8 +2412,8 @@ class EvbForceGroup(Enum):
         return set(range(1, max_ind))
 
     @classmethod
-    #Simple method for printing a descrpitive header to be used in force group logging files
     def get_header(cls):
+        # Simple method for printing a descrpitive header to be used in force group logging files
         header = ""
         # pes_forcegroups = cls.pes_force_groups()
         for fg in cls:

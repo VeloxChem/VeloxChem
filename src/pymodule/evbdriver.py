@@ -47,10 +47,8 @@ from .reactionsystembuilder import ReactionSystemBuilder
 from .evbfepdriver import EvbFepDriver
 from .reaffbuilder import ReactionForceFieldBuilder
 from .evbdataprocessing import EvbDataProcessing
-from .reactionsystembuilder import EvbForceGroup
 from .solvationbuilder import SolvationBuilder
 from .errorhandler import assert_msg_critical
-from .sanitychecks import molecule_sanity_check
 
 try:
     import openmm as mm
@@ -89,7 +87,6 @@ class EvbDriver():
         self.reactant: MMForceFieldGenerator = None
         self.product: MMForceFieldGenerator = None
 
-        self.name: str = None
         self.results = None
         self.system_confs: list[dict] = []
         self.mute_scf = True
@@ -110,7 +107,7 @@ class EvbDriver():
         self.ostream.print_header("Building forcefields")
         self.ostream.flush()
 
-        self.build_force_fields(
+        self.build_ff_from_molecules(
             reactant,
             product,
             ordered_input=True,
@@ -133,14 +130,8 @@ class EvbDriver():
 
         self.ostream.flush()
 
-    # Backwards compatibility for publication notebook: https://github.com/VeloxChem/vlx-notebook/blob/main/workflow/EVB.ipynb
-
     def build_ff_from_molecules(self, reactant: Molecule | list[Molecule],
                                 product: Molecule | list[Molecule], **kwargs):
-        self.build_force_fields(reactant, product, **kwargs)
-
-    def build_force_fields(self, reactant: Molecule | list[Molecule],
-                           product: Molecule | list[Molecule], **kwargs):
         """_summary_
 
         Args:
@@ -174,8 +165,8 @@ class EvbDriver():
         """Build OpenMM systems for the given configurations with interpolated forcefields for each lambda value. Saves the systems as xml files, the topology as a pdb file and the options as a json file to the disk.
 
         Args:
-            configurations (list[str] | list[dict]): The given configurations for which to perform an FEP. The first configuration will be regarded as the reference configuration. 
-            Lambda (list[float] | np.ndarray): The Lambda vector to be used for the FEP. Should start with 0, end with 1 and be monotonically increasing. 
+            configurations (list[str] | list[dict]): The given configurations for which to perform an FEP. The first configuration will be regarded as the reference configuration.
+            Lambda (list[float] | np.ndarray): The Lambda vector to be used for the FEP. Should start with 0, end with 1 and be monotonically increasing.
                 Defaults to None, in which case default values will be assigned depending on if debugging is enabled or not.
                 If a string is given, the return value of default_system_configurations() will be used. See this function for default configurations.
             constraints (dict | list[dict] | None, optional): Dictionary of harmonic bond, angle or (improper) torsion forces to apply over in every FEP frame. Defaults to None.
@@ -217,15 +208,13 @@ class EvbDriver():
         Lambda = [round(lam, 3) for lam in Lambda]
         self.Lambda = Lambda
 
-        #Per configuration
+        # Per configuration
         for conf in self.configurations:
-            #create folders,
-            # Todo: better folder naming
-            self_name = self.name if self.name is not None else "None"
-            data_folder = f"EVB{self_name}_{conf['name']}_data_{self.t_label}"
+            # create folders,
+            data_folder = f"{conf['name']}_data_{self.t_label}"
             while Path(data_folder).exists():
                 self.t_label += 1
-                data_folder = f"EVB{self_name}_{conf['name']}_data_{self.t_label}"
+                data_folder = f"{conf['name']}_data_{self.t_label}"
 
             run_folder = str(Path(data_folder) / "run")
             conf["data_folder"] = data_folder
@@ -244,10 +233,10 @@ class EvbDriver():
             self.product.molecule.write_xyz_file(
                 str(data_folder_path / "product_struct.xyz"))
 
-            # MMForceFieldGenerator.save_forcefield(
-            #     self.reactant, str(data_folder_path / f"reactant_ff_data.json"))
-            # MMForceFieldGenerator.save_forcefield(
-            #     self.product, str(data_folder_path / f"product_ff_data.json"))
+            MMForceFieldGenerator.save_forcefield_as_json(
+                self.reactant, str(data_folder_path / "reactant_ff_data.json"))
+            MMForceFieldGenerator.save_forcefield_as_json(
+                self.product, str(data_folder_path / "product_ff_data.json"))
 
             if conf.get('solvent', None) is None and conf.get('pressure',
                                                               -1) > 0:
@@ -309,7 +298,7 @@ class EvbDriver():
                             name: str,
                             load_systems=False,
                             load_pdb=False):
-        """Load a configuration from a data folder for which the systems have already been generated, such that an FEP can be performed. 
+        """Load a configuration from a data folder for which the systems have already been generated, such that an FEP can be performed.
         The topology, initial positions, temperature and Lambda vector will be loaded from the data folder.
 
         Args:
@@ -341,7 +330,7 @@ class EvbDriver():
             "Lambda": Lambda
         }
         if load_systems:
-            sysbuilder = ReactionSystemBuilder()
+            sysbuilder = EvbSystemBuilder()
             systems = sysbuilder.load_systems_from_xml(
                 str(Path(data_folder) / "run"))
             conf["systems"] = systems
@@ -368,7 +357,17 @@ class EvbDriver():
         platform=None,
         platform_properties=None,
     ):
-        """Run the the FEP calculations for all configurations in self.system_confs."""
+        """Run the the FEP calculations for all configurations in self.system_confs.
+
+        Args:
+            equil_steps (int, optional): The amount of timesteps to equilibrate at the beginning af each Lambda frame. Equilibration is done with frozen H-bonds. Defaults to 5000.
+            sample_steps (int, optional): The amount of steps to sample. Defaults to 100000.
+            write_step (int, optional): Per how many steps to take a sample and save its data as well as the trajectory point. Defaults to 1000.
+            initial_equil_steps (int, optional): The amount of timesteps to add to the equilibration at the first Lambda frame. Defaults to 5000.
+            step_size (float, optional): The step size during the sampling in picoseconds. Defaults to 0.001.
+            equil_step_size (float, optional): The step size during the equilibration in picoseconds. Is typically larger then step_size as equilibration is done with frozen H-bonds. Defaults to 0.002.
+            initial_equil_step_size (float, optional): The step size during initial equilibration in picoseconds. Defaults to 0.002.
+        """
 
         for conf in self.system_confs:
             self.ostream.print_blank()
@@ -424,10 +423,14 @@ class EvbDriver():
                                                  time_sub_sample)
         self.ostream.flush()
 
-        if alpha is not None: dp.alpha = alpha
-        if H12 is not None: dp.H12 = H12
-        if alpha_guess is not None: dp.alpha_guess = alpha_guess
-        if H12_guess is not None: dp.H12_guess = H12_guess
+        if alpha is not None:
+            dp.alpha = alpha
+        if H12 is not None:
+            dp.H12 = H12
+        if alpha_guess is not None:
+            dp.alpha_guess = alpha_guess
+        if H12_guess is not None:
+            dp.H12_guess = H12_guess
         if dE_range is not None:
             dp.coordinate_bins = np.linspace(dE_range[0], dE_range[1], 200)
 
@@ -435,7 +438,7 @@ class EvbDriver():
         results = dp.compute(results, barrier, free_energy)
         self.results = results
         self.print_results()
-        self._save_dict_as_h5(results, f"results_{self.name}")
+        self._save_dict_as_h5(results, f"results")
         self.ostream.flush()
         return self.results
 
@@ -699,8 +702,7 @@ class EvbDriver():
                         group.create_dataset(
                             k,
                             data=np.array(list(v) if isinstance(v, set) else v))
-                    elif isinstance(v,
-                                    (bool, int, float, str, bytes, np.generic)):
+                    elif isinstance(v, (bool, int, float, str, bytes, np.generic)):
                         # np.generic covers numpy scalars (np.float64, np.int32, etc.)
                         group[k] = v
                     elif hasattr(v, '__dict__'):
@@ -747,7 +749,7 @@ class EvbDriver():
             if conf.get("solvent", None) is not None:
 
                 sol_script = (
-                    f'sol = resname("SOL");\n'
+                    'sol = resname("SOL");\n'
                     'close_sol = (within(5, rea) and resname("SOL"));\n')
             pdb_script = ""
             if conf.get('pdb', None) is not None:
@@ -899,7 +901,7 @@ class EvbDriver():
             }
         else:
             try:
-                solvent = SolvationBuilder()._solvent_properties(name)
+                solvent_prop_not_used = SolvationBuilder()._solvent_properties(name)
                 conf = {
                     "name": name,
                     "solvent": name,
@@ -908,7 +910,8 @@ class EvbDriver():
                     "padding": 1.5,
                     "ion_count": 0,
                 }
-            except:
+            except ValueError:
+                # _solvent_properties raises ValueError for unrecognized names
                 raise ValueError(f"Unknown system configuration {name}")
 
         return conf
