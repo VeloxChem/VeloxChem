@@ -879,7 +879,7 @@ class IMForceFieldGenerator:
             # Build datapoint in sampling DB using same label and geometry metadata
             inv_sqrt = None
             mw_grad = g[0].reshape(-1)
-            mw_hess = h[0].reshape(grad_vec.size, grad_vec.size)
+            mw_hess = h[0].reshape(g[0].reshape(-1).size,  g[0].reshape(-1).size)
             if sampling_settings["use_mass_weight"]:
                 masses = mol.get_masses().copy()
                 inv_sqrt = 1.0 / np.sqrt(np.repeat(masses, 3))
