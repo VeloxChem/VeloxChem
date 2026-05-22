@@ -211,10 +211,10 @@ class EvbDriver():
         # Per configuration
         for conf in self.configurations:
             # create folders,
-            data_folder = f"{conf['name']}_data_{self.t_label}"
+            data_folder = f"{conf['name']}_{self.t_label}"
             while Path(data_folder).exists():
                 self.t_label += 1
-                data_folder = f"{conf['name']}_data_{self.t_label}"
+                data_folder = f"{conf['name']}_{self.t_label}"
 
             run_folder = str(Path(data_folder) / "run")
             conf["data_folder"] = data_folder
@@ -702,7 +702,8 @@ class EvbDriver():
                         group.create_dataset(
                             k,
                             data=np.array(list(v) if isinstance(v, set) else v))
-                    elif isinstance(v, (bool, int, float, str, bytes, np.generic)):
+                    elif isinstance(v,
+                                    (bool, int, float, str, bytes, np.generic)):
                         # np.generic covers numpy scalars (np.float64, np.int32, etc.)
                         group[k] = v
                     elif hasattr(v, '__dict__'):
@@ -901,7 +902,8 @@ class EvbDriver():
             }
         else:
             try:
-                solvent_prop_not_used = SolvationBuilder()._solvent_properties(name)
+                solvent_prop_not_used = SolvationBuilder()._solvent_properties(
+                    name)
                 conf = {
                     "name": name,
                     "solvent": name,

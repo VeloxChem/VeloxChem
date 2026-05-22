@@ -316,6 +316,8 @@ class ReactionSystemBuilder():
             topology)
 
         for t, template in enumerate(templates):
+            # if template.name == 'HOH':
+            #     continue
             for i, atom in enumerate(template.atoms):
                 forcefield.registerAtomType({
                     'name':
@@ -328,6 +330,7 @@ class ReactionSystemBuilder():
                     atom.element
                 })
                 template.atoms[i].type = f'evb_{atom.name}_{t}'
+            template.overrideLevel = 1
             forcefield.registerResidueTemplate(template)
 
         nbforce = forcefield.getGenerators()[2]
@@ -344,7 +347,7 @@ class ReactionSystemBuilder():
         )
 
         self.positions = system_mol.get_coordinates_in_angstrom()
-        self._add_posres(system, posres_atoms, self.positions)
+        # self._add_posres(system, posres_atoms, self.positions)
 
         reaction_atoms = {}
         if self.no_reactant:
@@ -356,10 +359,10 @@ class ReactionSystemBuilder():
             # all atoms already exist in the topology, pdb: top, matching chain id with removed_chain
             # the pdb residue should be checked against the reactant, and an index mapping should be found out #todo
             # these should be added to the reaction_atoms
-            chain = [c for c in topology.chains() if c.id == res_dict['chain']][0]
+            chain = [c for c in topology.chains()
+                     if c.id == res_dict['chain']][0]
             residue = [
-                r for r in chain.residues()
-                if int(r.id) == res_dict['residue']
+                r for r in chain.residues() if int(r.id) == res_dict['residue']
             ][0]
             residues.append(residue)
 
@@ -415,6 +418,7 @@ class ReactionSystemBuilder():
         for id, element in zip(residue_ids, residue_elements):
             coord = self.positions[id]
             mol.add_atom(int(element), Point(coord), 'angstrom')
+        mol.write_xyz_file('residue.xyz')
         connectivity_matrix = mol.get_connectivity_matrix()
         residue_bonds = []
         for i, id in enumerate(residue_ids):
@@ -432,7 +436,6 @@ class ReactionSystemBuilder():
                         mol.get_coordinates_in_angstrom()[i],
                         axis=1)
                     closest_heavy = heavy_indices[np.argmin(distances)]
-                    residue_bonds.append((id, residue_ids[closest_heavy]))
 
             for j, jd in enumerate(residue_ids):
                 if i >= j:
@@ -449,14 +452,22 @@ class ReactionSystemBuilder():
         res_graph = nx.Graph()
         res_graph.add_nodes_from(residue_ids)
         res_graph.add_edges_from(residue_bonds)
+
         for i, elem in zip(residue_ids, residue_elements):
             res_graph.nodes[i]['elem'] = elem
 
+        self.ostream.print_info(
+            f"Created vlx graph with {len(vlx_ids)} nodes and {len(vlx_bonds)} edges"
+        )
+        self.ostream.print_info(
+            f"Created residue graph with {len(residue_ids)} nodes and {len(residue_bonds)} edges"
+        )
+        self.ostream.flush()
         GM = GraphMatcher(vlx_graph, res_graph,
                           categorical_node_match('elem', ''))
         if not GM.subgraph_is_isomorphic():
             raise ValueError(
-                f"Could not find subgraph isomorphism between the residue {residue.name} {residue.index} and the reactant molecule"
+                f"Could not find subgraph isomorphism between the residue and the reactant molecule"
             )
         return GM.subgraph_isomorphisms_iter()
 
@@ -742,26 +753,26 @@ class ReactionSystemBuilder():
 
         return
 
-    def _add_posres(self, system, atoms, positions):
-        posres_expr = "posres_k*periodicdistance(x, y, z, x0, y0, z0)^2"
-        posres_force = mm.CustomExternalForce(posres_expr)
-        posres_force.setName("protein_ligand_posres")
-        posres_force.setForceGroup(EvbForceGroup.POSRES.value)
-        posres_force.addGlobalParameter('posres_k', self.posres_k)
-        posres_force.addPerParticleParameter('x0')
-        posres_force.addPerParticleParameter('y0')
-        posres_force.addPerParticleParameter('z0')
-        count = 0
-        for atom in atoms:
-            if atom.element is not mmapp.element.hydrogen:
-                index = atom.index
-                position = self.positions[index]
-                posres_force.addParticle(index, position * 0.1)
-                count += 1
+    # def _add_posres(self, system, atoms, positions):
+    #     posres_expr = "posres_k*periodicdistance(x, y, z, x0, y0, z0)^2"
+    #     posres_force = mm.CustomExternalForce(posres_expr)
+    #     posres_force.setName("protein_ligand_posres")
+    #     posres_force.setForceGroup(EvbForceGroup.POSRES.value)
+    #     posres_force.addGlobalParameter('posres_k', self.posres_k)
+    #     posres_force.addPerParticleParameter('x0')
+    #     posres_force.addPerParticleParameter('y0')
+    #     posres_force.addPerParticleParameter('z0')
+    #     count = 0
+    #     for atom in atoms:
+    #         if atom.element is not mmapp.element.hydrogen:
+    #             index = atom.index
+    #             position = self.positions[index]
+    #             posres_force.addParticle(index, position * 0.1)
+    #             count += 1
 
-        self.ostream.print_info(f"Adding {count} particles to posres force")
-        self.ostream.flush()
-        system.addForce(posres_force)
+    #     self.ostream.print_info(f"Adding {count} particles to posres force")
+    #     self.ostream.flush()
+    #     system.addForce(posres_force)
 
     def _add_CNT_graphene(self, system, nb_force, topology, system_mol):
 

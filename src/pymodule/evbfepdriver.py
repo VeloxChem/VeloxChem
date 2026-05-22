@@ -128,8 +128,6 @@ class EvbFepDriver():
         self.pdb_temperatures = []
 
         self.pdb = None
-        self.pdb_posres_equil = False  # if True, an extra equilibration will be performed every lambda with posres turned on
-        self.posres_k = -1
         self._safe_step_batch = 10
 
         self.keywords = {
@@ -232,12 +230,6 @@ class EvbFepDriver():
             "pdb_equil_start_temp": {
                 "type": int
             },
-            "pdb_posres_equil": {
-                "type": bool
-            },
-            "posres_k": {
-                "type": float
-            }
         }
 
     def run_FEP(
@@ -414,8 +406,6 @@ class EvbFepDriver():
                 f"Perfoming PDB warmup with T-vector {np.array(self.pdb_temperatures)}"
             )
             self.ostream.flush()
-            self.ostream.print_info("Turning posres force off")
-            simulation.context.setParameter('posres_k', 0)
             for T in self.pdb_temperatures:
                 simulation.integrator.setTemperature(T)
 
@@ -459,8 +449,6 @@ class EvbFepDriver():
 
     def _equilibrate(self, system, l, positions, velocities=None):
         simulation = self._get_simulation(system, self.equil_step_size)
-        if self.pdb is not None:
-            simulation.context.setParameter('posres_k', 0)
         simulation.context.setPositions(positions)
         if velocities is not None:
             simulation.context.setVelocities(velocities)
@@ -505,16 +493,6 @@ class EvbFepDriver():
                 enforcePeriodicBox=True,
             )
             simulation.reporters.append(equil_traj_reporter)
-
-        if self.pdb is not None and self.pdb_posres_equil:
-            self.ostream.print_info("Turning posres force on")
-            self.ostream.flush()
-            simulation.context.setParameter('posres_k', self.posres_k)
-            self._safe_step(simulation, self.equil_NVT_steps,
-                            "NVT posres equilibration")
-            self.ostream.print_info("Turning posres force off")
-            self.ostream.flush()
-            simulation.context.setParameter('posres_k', 0)
 
         if self.isobaric:
             barostat = self._get_barostat(simulation)
@@ -574,8 +552,6 @@ class EvbFepDriver():
         sz = self.step_size * mmunit.picoseconds
         simulation.integrator.setStepSize(sz)
         simulation.context.setState(initial_state)
-        if self.pdb is not None:
-            simulation.context.setParameter('posres_k', 0)
         if l == 0:
             append = False
         else:
