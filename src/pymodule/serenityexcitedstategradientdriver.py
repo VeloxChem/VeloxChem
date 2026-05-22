@@ -340,12 +340,12 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         new_state = int(info["new_state"])
         info["gradient_recomputed"] = False
         info["reference_updated"] = False
-        if info["assignment_confident"] and new_state != old_state:
+        if new_state != old_state:
             self.set_state_deriv_index(new_state)
             if recompute_on_switch:
                 self.gradient = self._compute_analytical_master(molecule)
                 info["gradient_recomputed"] = True
-        if update_reference and info["assignment_confident"]:
+        if update_reference:
             self.state_tracker.accept_reference(
                 self._last_tracking_system,
                 self.last_lrscf_controller,

@@ -150,77 +150,70 @@ class TransitionDensityTracker:
         # We call Serenity's tracker to build the transition-density overlap matrix.
         # We do not rely on getNewState(), because the Python-side assignment below
         # follows a stored reference character by column.
-        tden.track()
+        swapped: bool = tden.track()
 
-        ovlp = np.array(tden.getOvlpMatrix(), dtype=float)
+        # ovlp = np.array(tden.getOvlpMatrix(), dtype=float)
 
-        n_current, n_reference = ovlp.shape
-        assert_msg_critical(
-            ref_state <= n_reference,
-            "TransitionDensityTracker: reference state is outside overlap matrix."
-        )
+        # n_current, n_reference = ovlp.shape
+        # assert_msg_critical(
+        #     ref_state <= n_reference,
+        #     "TransitionDensityTracker: reference state is outside overlap matrix."
+        # )
 
-        # Serenity matrix convention:
-        # rows    = current roots
-        # columns = reference roots
-        #
-        # To follow reference character ref_state, search the corresponding column.
-        column = ovlp[:, ref_state - 1]
+        # # Serenity matrix convention:
+        # # rows    = current roots
+        # # columns = reference roots
+        # #
+        # # To follow reference character ref_state, search the corresponding column.
+        # column = ovlp[:, ref_state - 1]
 
-        new_state = int(np.argmax(column)) + 1
-        max_overlap = float(column[new_state - 1])
-        second_overlap = self._second_largest(column)
+        # new_state = int(np.argmax(column)) + 1
+        # max_overlap = float(column[new_state - 1])
+        # second_overlap = self._second_largest(column)
 
-        if max_overlap > 0.0:
-            ratio = float(second_overlap / max_overlap)
-        else:
-            ratio = np.inf
+        # if max_overlap > 0.0:
+        #     ratio = float(second_overlap / max_overlap)
+        # else:
+        #     ratio = np.inf
 
-        swapped = (new_state != ref_state)
+        # swapped = (new_state != ref_state)
 
-        degenerate = self._states_are_degenerate(
-            lrscf_controller,
-            ref_state,
-            new_state,
-            degeneracy_threshold,
-        )
+        # degenerate = self._states_are_degenerate(
+        #     lrscf_controller,
+        #     ref_state,
+        #     new_state,
+        #     degeneracy_threshold,
+        # )
 
-        if degenerate:
-            # Same as Serenity's own conservative behavior: do not relabel roots
-            # inside the degeneracy window.
-            new_state = ref_state
-            swapped = False
+        # if degenerate:
+        #     # Same as Serenity's own conservative behavior: do not relabel roots
+        #     # inside the degeneracy window.
+        #     new_state = ref_state
+        #     swapped = False
 
-        lo, hi = self.overlap_ratio_bounds
+        # lo, hi = self.overlap_ratio_bounds
 
-        assignment_confident = (
-            max_overlap >= self.min_overlap and
-            ratio <= hi and
-            not degenerate
-        )
+        # assignment_confident = (
+        #     max_overlap >= self.min_overlap and
+        #     ratio <= hi and
+        #     not degenerate
+        # )
 
-        # Serenity's geometry-optimization logic updates the reference only in a
-        # controlled overlap-ratio window, and not directly after a switch.
-        reference_update_recommended = (
-            not swapped and
-            not degenerate and
-            max_overlap >= self.min_overlap and
-            lo <= ratio <= hi
-        )
+        # # Serenity's geometry-optimization logic updates the reference only in a
+        # # controlled overlap-ratio window, and not directly after a switch.
+        # reference_update_recommended = (
+        #     not swapped and
+        #     not degenerate and
+        #     max_overlap >= self.min_overlap and
+        #     lo <= ratio <= hi
+        # )
 
         self.last_info = {
             "initialized": False,
             "swapped": swapped,
             "old_state": ref_state,
-            "new_state": int(new_state),
+            "new_state": int(tden.getNewState()),
             "reference_state": ref_state,
-            "max_overlap": max_overlap,
-            "second_overlap": second_overlap,
-            "overlap_ratio": ratio,
-            "overlap_matrix": ovlp,
-            "assignment_confident": assignment_confident,
-            "reference_update_recommended": reference_update_recommended,
-            "degenerate": degenerate,
         }
 
         return dict(self.last_info)
