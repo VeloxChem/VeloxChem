@@ -45,9 +45,11 @@ import hashlib
 import logging
 import os
 import time
+import itertools
 from collections import Counter
 from dataclasses import dataclass
 from typing import Optional
+import uuid
 
 import h5py
 import re
@@ -56,6 +58,9 @@ import numpy as np
 import pandas as pd
 import veloxchem as vlx
 from networkx.algorithms import isomorphism
+from pathlib import Path
+from rdkit import Chem
+from rdkit.Chem import Draw, AllChem
 
 
 log = logging.getLogger(__name__)
@@ -749,6 +754,47 @@ def _mol_from_smiles(smiles: str, charge: int = 0,
     vx_mol.set_multiplicity(resolved_mult)
     return vx_mol
 
+def _scalar_from_h5(value):
+    """Convert HDF5 scalar/bytes/numpy scalar to plain Python type."""
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
+
+
+def _load_gibbs_from_h5(path: str) -> GibbsResult:
+    """Load a previously saved GibbsResult from HDF5."""
+    kwargs = {}
+    solvation_data = {}
+
+    with h5py.File(path, "r") as f:
+        for key in f.keys():
+            val = _scalar_from_h5(f[key][()])
+
+            if key.startswith("solvation_data_"):
+                solvation_name = key[len("solvation_data_"):]
+                solvation_data[solvation_name] = float(val)
+            else:
+                kwargs[key] = val
+
+    # normalize types expected by GibbsResult
+    kwargs["g_total"] = float(kwargs.get("g_total", 0.0))
+    kwargs["charge"] = int(kwargs.get("charge", 0))
+    kwargs["multiplicity"] = int(kwargs.get("multiplicity", 1))
+    kwargs["scf_solvent"] = float(kwargs.get("scf_solvent", 0.0))
+    kwargs["scf_vacuum"] = float(kwargs.get("scf_vacuum", 0.0))
+    kwargs["g_corr"] = float(kwargs.get("g_corr", 0.0))
+    kwargs["geometry_xyz"] = str(kwargs.get("geometry_xyz", ""))
+    kwargs["is_fragmented"] = bool(kwargs.get("is_fragmented", False))
+    kwargs["skeleton_smiles"] = str(kwargs.get("skeleton_smiles", ""))
+    kwargs["atom_symbols"] = str(kwargs.get("atom_symbols", ""))
+    kwargs["bond_edges"] = str(kwargs.get("bond_edges", ""))
+    kwargs["label"] = str(kwargs.get("label", ""))
+    kwargs["mm_corr_available"] = bool(kwargs.get("mm_corr_available", True))
+    kwargs["solvation_data"] = solvation_data
+
+    return GibbsResult(**kwargs)
 
 def _save_to_h5(path: str, result: GibbsResult) -> None:
     """Persist a GibbsResult to HDF5.  Warns if overwriting."""
@@ -763,25 +809,35 @@ def _save_to_h5(path: str, result: GibbsResult) -> None:
             except TypeError:
                 f.create_dataset(key, data=str(val))
 
+def _run_sp(mol_obj,basis_name: str, xcfun: str, ri_jk: bool, dispersion: bool, solvation: Optional[str], mult: int, tmp_prefix: str, solvent: Optional[str] = None, return_objects: bool = False,
+) -> dict:
+    """Run one DFT single-point and return the SCF result dictionary.
 
-def _run_sp(mol_obj, basis_name: str, xcfun: str, ri_jk: bool,
-            dispersion: bool, solvation: Optional[str],
-            mult: int, tmp_prefix: str, solvent: Optional[str] = None) -> dict:
-    """Run one DFT single-point and return the SCF result dictionary."""
+    If return_objects=True, also return the SCF driver and basis object so
+    density matrices can be reused for spin-density plotting without rerunning SCF.
+    """
     drv = vlx.ScfUnrestrictedDriver() if mult > 1 else vlx.ScfRestrictedDriver()
-    drv.xcfun           = xcfun
-    drv.conv_thresh     = 1e-6
-    drv.ri_jk           = ri_jk
-    drv.max_iter        = 200
-    drv.dispersion      = dispersion
-    drv.solvation_model = solvation   # None -> vacuum
-    
+    drv.xcfun = xcfun
+    drv.conv_thresh = 1e-6
+    drv.ri_jk = ri_jk
+    drv.max_iter = 200
+    drv.dispersion = dispersion
+    drv.solvation_model = solvation
+
     if mult > 1:
         drv.level_shifting = 0.3
+
     drv.filename = tmp_prefix
     drv.ostream.mute()
+
     basis = vlx.MolecularBasis.read(mol_obj, basis_name)
-    return drv.compute(mol_obj, basis)
+    results = drv.compute(mol_obj, basis)
+
+    if return_objects:
+        results["scf_driver"] = drv
+        results["basis"] = basis
+
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -1311,7 +1367,106 @@ class RedoxCalculator:
     # ------------------------------------------------------------------
     # Named solvation interface
     # ------------------------------------------------------------------
+    def calculate_spin_density_and_plot_from_scf(self, result: GibbsResult, mol_obj, basis, scf_driver,
+        file_tag: str, state_name: str, out_subdir: str = "spin_density", threshold: float = 0.02) -> Optional[str]: 
+        
+        if result is None:
+            return None
 
+        atom_spin = np.zeros(mol_obj.number_of_atoms())
+
+        if result.multiplicity != 1:
+            D_alpha = scf_driver.scf_tensors["D_alpha"]
+            D_beta = scf_driver.scf_tensors["D_beta"]
+            S = scf_driver.scf_tensors["S"]
+
+            ao_spin = np.diag((D_alpha - D_beta) @ S)
+            ao_labels = basis.get_ao_basis_map(mol_obj)
+
+            for ao_idx, label in enumerate(ao_labels):
+                match = re.match(r"\s*(\d+)\s+[A-Z][a-z]?\s+", str(label))
+                if match is None:
+                    raise ValueError(f"Could not parse AO label: {label!r}")
+
+                atom_idx = int(match.group(1)) - 1
+                atom_spin[atom_idx] += ao_spin[ao_idx]
+
+        atom_symbols = [
+            x.strip()
+            for x in result.atom_symbols.split(",")
+            if x.strip()
+        ]
+
+        bond_edges = ast.literal_eval(result.bond_edges) if result.bond_edges else []
+
+        rw = Chem.RWMol()
+
+        for symbol in atom_symbols:
+            atom = Chem.Atom(symbol)
+            atom.SetNoImplicit(True)
+            rw.AddAtom(atom)
+
+        for i, j in bond_edges:
+            rw.AddBond(int(i), int(j), Chem.BondType.SINGLE)
+
+        mol_rd = rw.GetMol()
+        AllChem.Compute2DCoords(mol_rd)
+
+        n = min(mol_rd.GetNumAtoms(), len(atom_spin))
+
+        for atom in mol_rd.GetAtoms():
+            idx = atom.GetIdx()
+            if idx < n:
+                atom.SetProp("atomNote", f"{idx}\n{atom_spin[idx]:+.2f}")
+
+        max_spin = max(abs(x) for x in atom_spin[:n]) if n else 1.0
+        if max_spin < 1e-8:
+            max_spin = 1.0
+
+        highlight_atoms = []
+        highlight_colors = {}
+        highlight_radii = {}
+
+        for i, spin in enumerate(atom_spin[:n]):
+            if abs(spin) < threshold:
+                continue
+
+            intensity = min(abs(spin) / max_spin, 1.0)
+
+            highlight_atoms.append(i)
+            highlight_radii[i] = 0.35 + 0.35 * intensity
+
+            if spin > 0:
+                highlight_colors[i] = (
+                    1.0,
+                    1.0 - intensity,
+                    1.0 - intensity,
+                )
+            else:
+                highlight_colors[i] = (
+                    1.0 - intensity,
+                    1.0 - intensity,
+                    1.0,
+                )
+
+        img = Draw.MolToImage(
+            mol_rd,
+            size=(800, 550),
+            highlightAtoms=highlight_atoms,
+            highlightAtomColors=highlight_colors,
+            highlightAtomRadii=highlight_radii,
+        )
+
+        out_dir = Path(self.output_folder) / out_subdir
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        filename = f"{file_tag}_{state_name}_spin.png"
+        path = out_dir / filename
+
+        img.save(str(path))
+
+        return str(path)
+    
     def _conformer_search(
         self,
         input_data,
@@ -1327,13 +1482,34 @@ class RedoxCalculator:
         and is applied independently to each charge state passed in.
         """        
         conf = vlx.ConformerGenerator()
-        conf.implicit_solvent_model = "gbn"
-        conf.partial_charges = input_data.get_partial_charges(input_data.get_charge())
-        conformers_dict = conf.generate(input_data)
-        molecules = conformers_dict.get("molecules", [])
-        n_to_opt = min(max_conformers, len(molecules))
-        #Untill counter is added to ConformerGenerator, no selection on amount of condformers is done
+
+        dihedrals_candidates, _, _ = conf._get_dihedral_candidates(input_data, 'MOL', None)
+        dih_angles = [i[1] for i in dihedrals_candidates]
+        dihedrals_combinations = list(itertools.product(*dih_angles))
+
+        n = len(dihedrals_combinations)
+        
+        if n < 10000:
+            conf.partial_charges = input_data.get_partial_charges(input_data.get_charge())
+            conf.top_file_name = f"conf_{uuid.uuid4().hex[:8]}"
+            conformers_dict = conf.generate(input_data)
+            molecules = conformers_dict.get("molecules", [])
+        else:
+            print("Too many conformer combinations; using OpenMM conformational sampling.")
+            ff_gen = vlx.MMForceFieldGenerator()
+            ff_gen.create_topology(input_data, resp=False)
+            omm = vlx.OpenMMDynamics()
+            omm.create_system_from_molecule(input_data, ff_gen, solvent="implicit")
+            sampled = omm.conformational_sampling(nsteps=10000, snapshots=100)
+            molecules = sampled.get("molecules", [])
+
+        if not molecules:
+            print("Conformer search produced no molecules")
+            return input_data
+
         all_opt_results = []
+        n_to_opt = min(max_conformers, len(molecules))
+
         for i, molecule in enumerate(molecules[:n_to_opt], start=1):
             print(f"Optimizing conformer {i}...")
 
@@ -1395,93 +1571,7 @@ class RedoxCalculator:
         mol.set_charge(input_data.get_charge())
         mol.set_multiplicity(input_data.get_multiplicity())
         return mol
-    
-        #TODO counter is not implemented in conformerGenerator thus this is commented out for now
         
-        '''
-        if n < 10000:
-            conf.partial_charges = molecule.get_partial_charges(molecule.get_charge())
-            conformers_dict = conf.generate(input_data)
-            geometries = conformers_dict.get("geometries", [])
-        else:
-            print("Too many conformer combinations; using OpenMM conformational sampling.")
-            ff_gen = vlx.MMForceFieldGenerator()
-            ff_gen.create_topology(input_data, resp=False)
-            omm = vlx.OpenMMDynamics()
-            omm.create_system_from_molecule(input_data, ff_gen, solvent="implicit")
-            sampled = omm.conformational_sampling(nsteps=10000, snapshots=100)
-            geometries = sampled.get("geometries", [])
-
-        if not geometries:
-            print("Conformer search produced no geometries; using input geometry.")
-            return input_data
-
-        all_opt_results = []
-        n_to_opt = min(max_conformers, len(geometries))
-
-        for i, xyz in enumerate(geometries[:n_to_opt], start=1):
-            print(f"Optimizing conformer {i}...")
-
-            molecule = vlx.Molecule.read_xyz_string(xyz)
-            molecule.set_charge(input_data.get_charge())
-            molecule.set_multiplicity(input_data.get_multiplicity())
-
-            basis = vlx.MolecularBasis.read(molecule, basis_label)
-            scf_drv = (
-                vlx.ScfUnrestrictedDriver()
-                if molecule.get_multiplicity() > 1
-                else vlx.ScfRestrictedDriver()
-            )
-            scf_drv.xcfun = "blyp"
-            scf_drv.ri_jk = False
-            if hasattr(scf_drv, "ri_coulomb"):
-                scf_drv.ri_coulomb = True
-            scf_drv.max_iter = 100
-            scf_drv.conv_thresh = 1.0e-4
-            scf_drv.ostream.mute()
-
-            if use_solvent:
-                scf_drv.solvation_model = "cpcm"
-                if hasattr(scf_drv, "cpcm_epsilon"):
-                    scf_drv.cpcm_epsilon = solvent_epsilon
-
-            try:
-                scf_results = scf_drv.compute(molecule, basis)
-                opt_drv = vlx.OptimizationDriver(scf_drv)
-                opt_drv.conv_energy = 1.0e-3
-                opt_drv.conv_grms = 3.0e-4
-                opt_drv.conv_gmax = 1.2e-3
-                opt_drv.max_iter = 50
-                opt_drv.conv_maxiter = True
-                opt_drv.restart = False
-                opt_drv.ostream.mute()
-
-                result = opt_drv.compute(molecule, basis, scf_results)
-                final_energy = result["opt_energies"][-1]
-                final_geometry = result["final_geometry"]
-
-                all_opt_results.append(
-                    {
-                        "conformer_index": i,
-                        "energy_au": final_energy,
-                        "final_geometry": final_geometry,
-                        "final_molecule": result.get("final_molecule"),
-                        "opt_results": result,
-                    }
-                )
-            except Exception as exc:
-                log.warning("Conformer %d pre-optimization failed: %s", i, exc)
-
-        if not all_opt_results:
-            log.warning("All conformer pre-optimizations failed; using input geometry.")
-            return input_data
-
-        all_opt_results.sort(key=lambda x: x["energy_au"])
-        mol = vlx.Molecule.read_xyz_string(all_opt_results[0]["final_geometry"])
-        mol.set_charge(input_data.get_charge())
-        mol.set_multiplicity(input_data.get_multiplicity())
-        return mol
-        '''
         
     def register_solvation(
         self,
@@ -1691,7 +1781,13 @@ class RedoxCalculator:
     # ------------------------------------------------------------------
     # Core QC: composite Gibbs energy for one state
     # ------------------------------------------------------------------
-    def compute_gibbs(self, mol_obj, label: str = "", file_tag: str = "",) -> Optional[GibbsResult]:
+    def compute_gibbs(
+        self,
+        mol_obj,
+        label: str = "",
+        file_tag: str = "",
+        reuse_existing: bool = True,
+    ) -> Optional[GibbsResult]:
         """
         Compute the composite Gibbs free energy for one electronic state.
 
@@ -1728,28 +1824,34 @@ class RedoxCalculator:
 
         """
         charge = int(mol_obj.get_charge())
-        mult   = _valid_multiplicity(mol_obj, charge)
+        mult = _valid_multiplicity(mol_obj, charge)
         mol_obj.set_multiplicity(mult)
 
-        formula        = _mol_formula(mol_obj)
+        formula = _mol_formula(mol_obj)
         suffix = f"_{file_tag}" if file_tag else ""
         file_name_base = f"{formula}_q{charge}_m{mult}_{label}{suffix}"
+        h5_path = os.path.join(self.output_folder, f"{file_name_base}.h5")
+
+        if reuse_existing and os.path.exists(h5_path):
+            try:
+                log.info("compute_gibbs skip: loading existing state from %s", h5_path)
+                return _load_gibbs_from_h5(h5_path)
+            except Exception as exc:
+                log.warning(
+                    "Existing HDF5 could not be read for %s (%s). Recomputing.",
+                    h5_path,
+                    exc,
+                )
 
         log.info("compute_gibbs start: %s", file_name_base)
 
-        # All VeloxChem SCF scratch files (*.h5, *_scf.h5) and geomeTRIC
-        # optimisation files are written to a single TemporaryDirectory so
-        # they are cleaned up automatically on success or failure.
-        # Only the final result HDF5 is written to output_folder.
         import tempfile
         with tempfile.TemporaryDirectory() as tmpdir:
             return self._compute_gibbs_in_tmpdir(
                 mol_obj, label, file_name_base, charge, mult, tmpdir,
             )
-
-    def _compute_gibbs_in_tmpdir(
-        self, mol_obj, label, file_name_base, charge, mult, tmpdir,
-    ):
+        
+    def _compute_gibbs_in_tmpdir(self, mol_obj, label, file_name_base, charge, mult, tmpdir):
         """Inner implementation of compute_gibbs running inside a temp dir."""
 
         # ---- DFT geometry optimisation --------------------------------
@@ -1901,24 +2003,20 @@ class RedoxCalculator:
                 g_corr = 0.0
             mm_corr_ok = (g_corr != 0.0)
 
-            # ---- DFT single-points -----------------------------------
-            log.info("  [%s] Step 4: solvent single-point (%s/%s)",
-                     label, self.xcfun_sp, self.basis_sp)
-            sp_solv = _run_sp(
-                opt_mol, self.basis_sp, self.xcfun_sp,
-                self.ri_jk, self.sp_dispersion, self.solvation_model,
-                mult, os.path.join(tmpdir, "sp_solv"),
-            )
-            log.info("  [%s] Step 4 done: E_solvent = %.6f au",
-                     label, sp_solv["scf_energy"])
+            # ---- DFT single-points --------------------------------------
+            log.info("  [%s] Step 4: solvent single-point (%s/%s)", label, self.xcfun_sp, self.basis_sp)
+
+            sp_solv = _run_sp(opt_mol, self.basis_sp, self.xcfun_sp, self.ri_jk, self.sp_dispersion, self.solvation_model, mult,
+                os.path.join(tmpdir, "sp_solv"), return_objects=(mult != 1))
+
+            log.info("  [%s] Step 4 done: E_solvent = %.6f au", label, sp_solv["scf_energy"])
+
             log.info("  [%s] Step 5: vacuum single-point", label)
-            sp_vac = _run_sp(
-                opt_mol, self.basis_sp, self.xcfun_sp,
-                self.ri_jk, self.sp_dispersion, None,
-                mult, os.path.join(tmpdir, "sp_vac"),
-            )
-            log.info("  [%s] Step 5 done: E_vacuum = %.6f au",
-                     label, sp_vac["scf_energy"])
+
+            sp_vac = _run_sp(opt_mol, self.basis_sp, self.xcfun_sp, self.ri_jk,
+                self.sp_dispersion, None, mult, os.path.join(tmpdir, "sp_vac"))
+
+            log.info("  [%s] Step 5 done: E_vacuum = %.6f au", label, sp_vac["scf_energy"])
 
             # Sanity check: solvation energy = E_solvent - E_vacuum should
             # always be negative (solvent stabilises the molecule).
@@ -1974,6 +2072,34 @@ class RedoxCalculator:
                 label             = label,
                 mm_corr_available = mm_corr_ok,
             )
+            if result.multiplicity != 1:
+                try:
+                    state_name = (
+                        str(result.label)
+                        .replace("+", "plus")
+                        .replace("-", "minus")
+                        .replace("/", "_")
+                        .replace("\\", "_")
+                        .replace(" ", "_")
+                    )
+
+                    spin_path = self.calculate_spin_density_and_plot_from_scf(
+                        result=result,
+                        mol_obj=opt_mol,
+                        basis=sp_solv["basis"],
+                        scf_driver=sp_solv["scf_driver"],
+                        file_tag=file_name_base,
+                        state_name=state_name,
+                    )
+
+                    log.info("Saved spin-density image: %s", spin_path)
+
+                except Exception as exc:
+                    log.warning(
+                        "Spin-density plot failed for %s: %s",
+                        result.label,
+                        exc,
+                    )
 
             # Attach any pre-registered named solvation values
             base_label = label.split("_site")[0]
@@ -2047,9 +2173,7 @@ class RedoxCalculator:
         ]:
             m_tmp = vlx.Molecule.read_xyz_string(init_xyz)
             m_tmp.set_charge(init_charge + dq)
-            m_tmp.set_multiplicity(
-                _valid_multiplicity(m_tmp, init_charge + dq)
-            )
+            m_tmp.set_multiplicity(_valid_multiplicity(m_tmp, init_charge + dq))
 
             m_seed = self._conformer_search(m_tmp)
             setattr(
