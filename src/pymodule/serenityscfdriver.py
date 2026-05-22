@@ -118,6 +118,8 @@ class SerenityScfDriver:
         self._active_geom_signature = None
         self._last_scf_geom_signature = None
         self._last_grad_geom_signature = None
+        
+        self.max_cycles = 100
 
         self._energy = None
         self._gradient = None
@@ -436,6 +438,7 @@ class SerenityScfDriver:
         settings.basis.densFitJ = self.densfit_j
         settings.grid.accuracy = self.grid_accuracy
         settings.grid.smallGridAccuracy = self.small_grid_accuracy
+        settings.scf.maxCycles = self.max_cycles
 
         if mode == 'restricted':
             settings.scfMode = spy.SCF_MODES.RESTRICTED
