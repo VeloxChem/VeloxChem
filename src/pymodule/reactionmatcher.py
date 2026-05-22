@@ -35,7 +35,6 @@ from networkx.algorithms.isomorphism import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
 from itertools import permutations
 import networkx as nx
-import numpy as np
 import time
 import sys
 import copy
@@ -82,7 +81,6 @@ class ReactionMatcher:
         self.max_break_attempts_guess = 1e7
         self._breaking_depth = -1  # how many breaking edges to try
         self._check_monomorphic = True
-        self._assisting_map = {}
 
     def get_mapping(
         self,
@@ -159,10 +157,12 @@ class ReactionMatcher:
             return math.exp(lg)
 
         while estimate_attempts(
-                N, _breaking_depth) < self.max_break_attempts_guess:
+                N, _breaking_depth+1) < self.max_break_attempts_guess:
             _breaking_depth += 1
             if _breaking_depth == N:
                 break
+        _breaking_depth = max(_breaking_depth, 1)
+
 
         self.ostream.print_info(
             f"Set max breaking depth to {_breaking_depth} from max breaking attempts {self.max_break_attempts_guess}"
@@ -384,20 +384,13 @@ class ReactionMatcher:
 
                 rea_subgraph = self._get_range_subgraph(rea_graph, rea_id,
                                                         depth)
-                cc_i = -1
-                for i, cc in enumerate(rea_cc):
-                    if rea_id in cc:
-                        if len(cc) == len(rea_subgraph.nodes):
-                            # Break if the subgraph spans the entire connected component because there won't be an isomorphism
-                            range_spans_cc[i] = True
-                            cc_i = i
-                            break
-
-                if range_spans_cc[cc_i]:
+                cc_i = next(i for i, cc in enumerate(rea_cc) if rea_id in cc)
+                if len(rea_cc[cc_i]) == len(rea_subgraph.nodes):
+                    range_spans_cc[cc_i] = True
                     if all(range_spans_cc):
                         range_spans_cc = [False] * len(rea_cc)
-                        # break
-                    # continue
+                        break
+                    continue
 
                 if self.verbose:
                     self.ostream.print_info(
@@ -486,9 +479,10 @@ class ReactionMatcher:
                         if rea_H_indices is not None and pro_H_indices is not None:
                             if len(rea_H_indices) == len(pro_H_indices):
                                 for i, j in zip(rea_H_indices, pro_H_indices):
-                                    rea_graph.nodes[i]['assist_id'] = i
-                                    pro_graph.nodes[j]['assist_id'] = i
-                                    assisting_map.update({i: j})
+                                    if i in rea_graph.nodes and j in pro_graph.nodes:
+                                        rea_graph.nodes[i]['assist_id'] = i
+                                        pro_graph.nodes[j]['assist_id'] = i
+                                        assisting_map.update({i: j})
                     break
             depth -= 1
 
@@ -499,7 +493,6 @@ class ReactionMatcher:
         self.ostream.print_info(
             f"Assigned {len(assisting_map)} assist ids: {self._print_mapping(sorted_assisting_map)}"
         )
-        self._assisting_map = sorted_assisting_map
         self.ostream.flush()
         return rea_graph, pro_graph, sorted_assisting_map
 
@@ -667,37 +660,28 @@ class ReactionMatcher:
             N_changing_bonds.append(len(changing_bonds))
             N_changing_H_bonds.append(n_changing_H_bonds)
 
-        # The best mapping is the one with the least amount of changing bonds
-        # If there is a tie, the tie-breaker is the one with the most changing H-bonds
-        # If there is still a tie, pick the first one
-        least_changing_bonds_indices = np.where(
-            N_changing_bonds == np.array(N_changing_bonds).min())[0]
-        if len(least_changing_bonds_indices) > 1:
-            self.ostream.print_info(
-                "Multiple mappings with same least amount of changing bonds found, picking one the most changing H-bonds."
-            )
-            least_changing_bonds_H_bond_counts = [
-                N_changing_H_bonds[i] for i in least_changing_bonds_indices
-            ]
-            best_H_bond_count = np.array(
-                least_changing_bonds_H_bond_counts).max()
-            least_changing_bonds_index = np.where(
-                least_changing_bonds_H_bond_counts == best_H_bond_count)[0]
+        if not maps:
+            self.ostream.print_info("No valid permutation found in brute force mapping.")
+            self.ostream.flush()
+            return None, None, None
 
-            best_index = least_changing_bonds_indices[
-                least_changing_bonds_index[0]]
-            if len(least_changing_bonds_index):
+        # Best mapping: fewest changing bonds; tie-breaker: most H-bonds changing
+        best_index = min(range(len(maps)),
+                         key=lambda i: (N_changing_bonds[i], -N_changing_H_bonds[i]))
+
+        min_bonds = N_changing_bonds[best_index]
+        tied_indices = [i for i in range(len(maps)) if N_changing_bonds[i] == min_bonds]
+        if len(tied_indices) > 1:
+            self.ostream.print_info(
+                "Multiple mappings with same least changing bonds found, "
+                "picking the one with most H-bond changes."
+            )
+            for i in tied_indices:
                 self.ostream.print_info(
-                    f"{len(least_changing_bonds_index)} equally good mappings found, picking first one."
+                    f"Mapping {maps[i]} with breaking bonds: {breaking_edges_list[i]} "
+                    f"and forming bonds: {forming_edges_list[i]}"
                 )
-                for i in least_changing_bonds_index:
-                    temp_i = least_changing_bonds_indices[i]
-                    self.ostream.print_info(
-                        f"Mapping {maps[temp_i]} with breaking bonds: {breaking_edges_list[temp_i]} and forming bonds: {forming_edges_list[temp_i]}"
-                    )
-                self.ostream.flush()
-        else:
-            best_index = least_changing_bonds_indices[0]
+        self.ostream.flush()
         self.ostream.print_info(
             f"Picking mapping {maps[best_index]} with breaking bonds: {breaking_edges_list[best_index]} and forming bonds: {forming_edges_list[best_index]}"
         )
@@ -959,14 +943,6 @@ class ReactionMatcher:
         for g in cc_A:
             A_sub = A.subgraph(g)
             GM = self.get_graph_matcher(B, A_sub)
-            if self._check_monomorphic:
-                self._mono_count += 1
-                if not GM.subgraph_is_monomorphic():
-                    return False
-            else:
-                self._iso_count += 1
-                if not GM.subgraph_is_isomorphic():
-                    return False
 
             # find mapping that leaves least amount of connected components
             if self._check_monomorphic:
@@ -976,7 +952,10 @@ class ReactionMatcher:
                 iterator = GM.subgraph_isomorphisms_iter()
                 self._iso_count += 1
 
-            best_map = next(iterator)
+            try:
+                best_map = next(iterator)
+            except StopIteration:
+                return False
 
             B_copy = nx.Graph(B)
             B_copy.remove_nodes_from(best_map.keys())
