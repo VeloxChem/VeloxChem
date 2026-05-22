@@ -14,7 +14,6 @@ except ImportError:
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .mmhessiandriver import MMHessianDriver
-from .partial_hessian_extractor import PartialHessianExtractor
 
 
 class PHFParameterizer:
@@ -109,8 +108,13 @@ class PHFParameterizer:
         self._dihedral_constants = {}
         self._improper_constants = {}
         self._deferred_angles = set()
+        self._scalar_impropers = []
+        self._coupled_improper_angles = {}
 
-        self._extractor = PartialHessianExtractor()
+        # Multi-term dihedral: if |kd| is below this threshold (kJ/mol) fall
+        # back to GAFF rather than writing a near-zero PHF value.
+        self._multi_term_kd_tol = 0.1
+
         self._engine = MMHessianDriver()
 
     # ------------------------------------------------------------------
@@ -155,29 +159,35 @@ class PHFParameterizer:
 
         if fit_bonds is not None:
             _s = {self._canonical_bond(b) for b in fit_bonds}
-            self._bonds = [b for b in self._bonds
-                           if self._canonical_bond(b) in _s]
+            self._bonds = [
+                b for b in self._bonds if self._canonical_bond(b) in _s
+            ]
 
         if fit_angles is not None:
             _s = {self._canonical_angle(a) for a in fit_angles}
-            self._angles = [a for a in self._angles
-                            if self._canonical_angle(a) in _s]
+            self._angles = [
+                a for a in self._angles if self._canonical_angle(a) in _s
+            ]
 
         if fit_dihedrals is not None:
             _s = {self._canonical_dihedral(d) for d in fit_dihedrals}
-            self._dihedrals = [d for d in self._dihedrals
-                               if self._canonical_dihedral(d) in _s]
+            self._dihedrals = [
+                d for d in self._dihedrals if self._canonical_dihedral(d) in _s
+            ]
 
         if fit_impropers is not None:
             _s = {self._canonical_dihedral(i) for i in fit_impropers}
-            self._impropers = [i for i in self._impropers
-                               if self._canonical_dihedral(i) in _s]
+            self._impropers = [
+                i for i in self._impropers if self._canonical_dihedral(i) in _s
+            ]
 
         openmm_system, positions_nm = self._build_openmm_system(ff_gen)
         self._engine.set_system(openmm_system, positions_nm)
 
         self._fit_dihedrals(hessian)
         self._engine.update_dihedral_constants(self._dihedral_constants)
+
+        self._prepare_improper_angle_groups()
 
         self._fit_angles(hessian)
         if equivalent_atoms is not None:
@@ -201,7 +211,11 @@ class PHFParameterizer:
 
         if katachi:
             bond_eq, angle_eq = self.apply_katachi_bonds_angles(
-                self._bonds, self._angles, positions_nm, openmm_system)
+                self._bonds or [],
+                self._angles or [],
+                positions_nm,
+                openmm_system,
+                equivalent_atoms=equivalent_atoms)
             if equivalent_atoms is not None:
                 self._average_equivalent_bond_equilibria(
                     bond_eq, equivalent_atoms)
@@ -351,33 +365,48 @@ class PHFParameterizer:
         # Acyclic dihedrals: scalar path (Eq. 13)
         for dihedral in acyclic:
             i, _j, _k, l = dihedral
-            h_qm = self._extractor.extract(hessian, i, l)
-            h_unit = self._engine.compute_h_unit('dihedral', dihedral)
-            if not np.any(h_unit):  # dihedral absent from OpenMM system
+            h_qm = self.extract_partial_hessian(hessian, i, l)
+            multi = self._engine.count_dihedral_terms(dihedral) > 1
+            h_unit = self._engine.compute_h_unit('dihedral',
+                                                 dihedral,
+                                                 first_term_only=multi)
+            if not np.any(h_unit):
                 continue
             h0 = self._engine.compute_h0('dihedral', dihedral)
-            self._dihedral_constants[dihedral] = self.solve_dihedral(
-                h_qm, h0, h_unit)
+            kd = self.solve_dihedral(h_qm, h0, h_unit)
+            if multi and abs(kd) < self._multi_term_kd_tol:
+                continue  # near-zero fit — keep GAFF values
+            self._dihedral_constants[dihedral] = kd
 
         # Coupled dihedrals only: 6-membered ring path (Eq. 17)
         for (i, l), group in coupled_dihedrals.items():
             h_units_all = [
-                self._engine.compute_h_unit('dihedral', d) for d in group
+                self._engine.compute_h_unit(
+                    'dihedral',
+                    d,
+                    first_term_only=self._engine.count_dihedral_terms(d) > 1)
+                for d in group
             ]
             present = [(d, hu) for d, hu in zip(group, h_units_all)
                        if np.any(hu)]
             if not present:
                 continue
             present_dihedrals, h_units = zip(*present)
-            h_qm = self._extractor.extract(hessian, i, l)
+            h_qm = self.extract_partial_hessian(hessian, i, l)
             zero_targets = [('dihedral', d) for d in present_dihedrals]
             h0 = self._engine.compute_h0_zeroing(zero_targets, (i, l))
             if len(present_dihedrals) == 1:
-                self._dihedral_constants[present_dihedrals[0]] = (
-                    self.solve_dihedral(h_qm, h0, h_units[0]))
+                kd = self.solve_dihedral(h_qm, h0, h_units[0])
+                multi = self._engine.count_dihedral_terms(
+                    present_dihedrals[0]) > 1
+                if not (multi and abs(kd) < self._multi_term_kd_tol):
+                    self._dihedral_constants[present_dihedrals[0]] = kd
             else:
                 k_values = self.solve_coupled(h_qm, h0, list(h_units))
                 for dihedral, k_d in zip(present_dihedrals, k_values):
+                    multi = self._engine.count_dihedral_terms(dihedral) > 1
+                    if multi and abs(float(k_d)) < self._multi_term_kd_tol:
+                        continue
                     self._dihedral_constants[dihedral] = float(k_d)
 
         # Mixed dihedral+angle: 5-membered ring path
@@ -386,7 +415,11 @@ class PHFParameterizer:
             angles = members['angles']
 
             d_hunits = [
-                self._engine.compute_h_unit('dihedral', d) for d in dihedrals
+                self._engine.compute_h_unit(
+                    'dihedral',
+                    d,
+                    first_term_only=self._engine.count_dihedral_terms(d) > 1)
+                for d in dihedrals
             ]
             a_hunits = [self._engine.compute_h_unit('angle', a) for a in angles]
 
@@ -410,14 +443,16 @@ class PHFParameterizer:
             dihedrals_set = set(dihedrals)
             zero_targets = [('dihedral', c) if c in dihedrals_set else
                             ('angle', c) for c in coords]
-            h_qm = self._extractor.extract(hessian, i, l)
+            h_qm = self.extract_partial_hessian(hessian, i, l)
             h0 = self._engine.compute_h0_zeroing(zero_targets, (i, l))
 
             if len(coords) == 1:
                 coord = coords[0]
                 if coord in dihedrals_set:
-                    self._dihedral_constants[coord] = self.solve_dihedral(
-                        h_qm, h0, h_units[0])
+                    kd = self.solve_dihedral(h_qm, h0, h_units[0])
+                    multi = self._engine.count_dihedral_terms(coord) > 1
+                    if not (multi and abs(kd) < self._multi_term_kd_tol):
+                        self._dihedral_constants[coord] = kd
                 else:
                     self._angle_constants[coord] = self.solve_angle(
                         h_qm, h0, h_units[0])
@@ -425,6 +460,9 @@ class PHFParameterizer:
                 k_values = self.solve_coupled(h_qm, h0, list(h_units))
                 n_d = len(present_d)
                 for (d, _), k_d in zip(present_d, k_values[:n_d]):
+                    multi = self._engine.count_dihedral_terms(d) > 1
+                    if multi and abs(float(k_d)) < self._multi_term_kd_tol:
+                        continue
                     self._dihedral_constants[d] = float(k_d)
                 for (a, _), k_a in zip(present_a, k_values[n_d:]):
                     self._angle_constants[a] = float(k_a)
@@ -440,28 +478,103 @@ class PHFParameterizer:
             if angle in self._deferred_angles:
                 continue
             i, _j, k = angle
-            h_qm = self._extractor.extract(hessian, i, k)
+            h_qm = self.extract_partial_hessian(hessian, i, k)
             h_unit = self._engine.compute_h_unit('angle', angle)
             h0 = self._engine.compute_h0('angle', angle)
             self._angle_constants[angle] = self.solve_angle(h_qm, h0, h_unit)
+
+    def _prepare_improper_angle_groups(self):
+        """
+        Identify improper–angle pairs that share the same terminal atom pair
+        (i, l) and therefore must be solved simultaneously (eq. 21).
+
+        Must be called after _fit_dihedrals (so angles already resolved in
+        the 5-ring coupled path are present in _angle_constants) and before
+        _fit_angles (so coupled angles can be added to _deferred_angles).
+
+        Populates _scalar_impropers and _coupled_improper_angles for use
+        by _fit_impropers.
+        """
+        angle_by_terminal = {}
+        for angle in self._angles:
+            a, _b, c = angle
+            for key in [(a, c), (c, a)]:
+                angle_by_terminal.setdefault(key, []).append(angle)
+
+        self._scalar_impropers = []
+        self._coupled_improper_angles = {}
+
+        for improper in self._impropers:
+            i, _j, _k, l = improper
+            # Exclude angles already fitted in the 5-ring dihedral phase.
+            candidates = [
+                a for a in angle_by_terminal.get((i, l), [])
+                if a not in self._angle_constants
+            ]
+            if not candidates:
+                self._scalar_impropers.append(improper)
+            else:
+                self._coupled_improper_angles[improper] = candidates
+                for a in candidates:
+                    self._deferred_angles.add(a)
 
     def _fit_impropers(self, hessian: np.ndarray):
         """
         Stage 3: fit k_imp for each improper torsion i-j-k-l.
         Terminal atom pair used: (i, l), same convention as proper dihedrals.
+
+        Impropers whose terminal pair is shared with an angle are solved
+        simultaneously with that angle (eq. 21), writing both k_imp and k_a.
+        Purely scalar impropers use the single-unknown path (eq. 13-analogue).
+
         H'_0 includes dihedral and angle contributions via already-fitted
         k_d and k_a values. No nonbonded contribution: AMBER impropers
         do not have 1-4 scaled interactions.
         """
-        for improper in self._impropers:
+        for improper in self._scalar_impropers:
             i, _j, _k, l = improper
-            h_qm = self._extractor.extract(hessian, i, l)
+            h_qm = self.extract_partial_hessian(hessian, i, l)
             h_unit = self._engine.compute_h_unit('improper', improper)
-            if not np.any(h_unit):  # improper absent from OpenMM system
+            if not np.any(h_unit):
                 continue
             h0 = self._engine.compute_h0('improper', improper)
-            k_imp = self.solve_improper(h_qm, h0, h_unit)
-            self._improper_constants[improper] = k_imp
+            self._improper_constants[improper] = self.solve_improper(
+                h_qm, h0, h_unit)
+
+        for improper, angles in self._coupled_improper_angles.items():
+            i, _j, _k, l = improper
+            h_qm = self.extract_partial_hessian(hessian, i, l)
+            h_unit_imp = self._engine.compute_h_unit('improper', improper)
+            h_units_a = [
+                self._engine.compute_h_unit('angle', a) for a in angles
+            ]
+
+            present_a = [(a, hu) for a, hu in zip(angles, h_units_a)
+                         if np.any(hu)]
+
+            if not np.any(h_unit_imp):
+                # Improper absent from system; fit any remaining angles solo.
+                for a, hu in present_a:
+                    h0_a = self._engine.compute_h0('angle', a)
+                    self._angle_constants[a] = self.solve_angle(h_qm, h0_a, hu)
+                continue
+
+            if not present_a:
+                # All coupled angles absent; fit improper alone.
+                h0 = self._engine.compute_h0('improper', improper)
+                self._improper_constants[improper] = self.solve_improper(
+                    h_qm, h0, h_unit_imp)
+                continue
+
+            present_angles, a_hunits = zip(*present_a)
+            zero_targets = ([('improper', improper)] +
+                            [('angle', a) for a in present_angles])
+            h0 = self._engine.compute_h0_zeroing(zero_targets, (i, l))
+            k_values = self.solve_coupled(h_qm, h0,
+                                          [h_unit_imp] + list(a_hunits))
+            self._improper_constants[improper] = float(k_values[0])
+            for a, k_a in zip(present_angles, k_values[1:]):
+                self._angle_constants[a] = float(k_a)
 
     def _fit_bonds(self, hessian: np.ndarray):
         """
@@ -472,7 +585,7 @@ class PHFParameterizer:
         """
         for bond in self._bonds:
             i, j = bond
-            h_qm = self._extractor.extract(hessian, i, j)
+            h_qm = self.extract_partial_hessian(hessian, i, j)
             h_unit = self._engine.compute_h_unit('bond', bond)
             h0 = self._engine.compute_h0('bond', bond)
             k_b = self.solve_bond(h_qm, h0, h_unit)
@@ -521,9 +634,8 @@ class PHFParameterizer:
         groups: dict = {}
         for angle in self._angle_constants:
             i, j, k = angle
-            key = self._canonical_angle((equivalent_atoms[i],
-                                         equivalent_atoms[j],
-                                         equivalent_atoms[k]))
+            key = self._canonical_angle(
+                (equivalent_atoms[i], equivalent_atoms[j], equivalent_atoms[k]))
             groups.setdefault(key, []).append(angle)
 
         for group in groups.values():
@@ -548,7 +660,8 @@ class PHFParameterizer:
         groups: dict = {}
         for bond in self._bond_constants:
             i, j = bond
-            key = self._canonical_bond((equivalent_atoms[i], equivalent_atoms[j]))
+            key = self._canonical_bond(
+                (equivalent_atoms[i], equivalent_atoms[j]))
             groups.setdefault(key, []).append(bond)
 
         for group in groups.values():
@@ -572,7 +685,8 @@ class PHFParameterizer:
         groups: dict = {}
         for bond in bond_eq:
             i, j = bond
-            key = self._canonical_bond((equivalent_atoms[i], equivalent_atoms[j]))
+            key = self._canonical_bond(
+                (equivalent_atoms[i], equivalent_atoms[j]))
             groups.setdefault(key, []).append(bond)
 
         for group in groups.values():
@@ -597,9 +711,8 @@ class PHFParameterizer:
         groups: dict = {}
         for angle in angle_eq:
             i, j, k = angle
-            key = self._canonical_angle((equivalent_atoms[i],
-                                         equivalent_atoms[j],
-                                         equivalent_atoms[k]))
+            key = self._canonical_angle(
+                (equivalent_atoms[i], equivalent_atoms[j], equivalent_atoms[k]))
             groups.setdefault(key, []).append(angle)
 
         for group in groups.values():
@@ -636,10 +749,13 @@ class PHFParameterizer:
         denominator = np.sum(h_unit**2)
 
         if abs(denominator) < 1e-30:
-            raise ValueError(
-                "Denominator in PHF solve is effectively zero. "
-                "The h_unit block is all-zero for this internal coordinate, "
-                "which means the geometry has this term contributing nothing.")
+            self.ostream.print_warning(
+                "Denominator in PHF solve is effectively zero. Returning 0 fc ")
+            # raise ValueError(
+            #     "Denominator in PHF solve is effectively zero. "
+            #     "The h_unit block is all-zero for this internal coordinate, "
+            #     "which means the geometry has this term contributing nothing.")
+            return 0.0
 
         return float(numerator / denominator)
 
@@ -655,6 +771,7 @@ class PHFParameterizer:
         Terminal atom pair is (i, l) for dihedral i-j-k-l.
         h0 contains only the nonbonded 1-4 contribution between i and l.
         """
+
         return self._solve_fc(h_qm, h0, h_unit)
 
     def solve_angle(
@@ -777,7 +894,8 @@ class PHFParameterizer:
         angles: list,
         positions_nm: np.ndarray,
         system,
-        max_iter: int = 50,
+        equivalent_atoms=None,
+        max_iter: int = 500,
     ) -> 'tuple[dict, dict]':
         """
         Iteratively adjust bond and angle equilibrium values so the MM
@@ -789,6 +907,12 @@ class PHFParameterizer:
         impropers, bonds), because this method is called after all fitting
         is complete and self._system holds those values.
 
+        Per the paper, D_i is computed per atom-type equivalence group:
+        the MM values of all equivalent coordinates are averaged to give
+        one representative Xi(MM) per group, and one D_i per group is
+        applied uniformly to all members.  When equivalent_atoms is None
+        every coordinate is treated as its own group (no averaging).
+
         Convergence criteria (from the paper):
           bonds:  max|D_i| < 0.0001 Å = 1e-5 nm
           angles: max|D_i| < 0.0028 rad
@@ -797,6 +921,9 @@ class PHFParameterizer:
         ----------
         bonds  : list of (i, j) tuples
         angles : list of (i, j, k) tuples
+        equivalent_atoms : list of str or None
+            Atom-type labels (one per atom, zero-based).  Atoms sharing a
+            label are treated as equivalent.
 
         Returns
         -------
@@ -807,9 +934,35 @@ class PHFParameterizer:
         from .reactionsystembuilder import ReactionSystemBuilder
 
         BOND_THR = 1e-5  # nm  (0.0001 Å)
-        ANGLE_THR = 0.002  # rad
+        ANGLE_THR = 0.0028  # rad
 
-        # QM reference geometry
+        # Build equivalence-group keys.  With no labels each coord is its
+        # own group so the per-group average collapses to the scalar value.
+        if equivalent_atoms is not None:
+
+            def _bkey(b):
+                i, j = b
+                return self._canonical_bond(
+                    (equivalent_atoms[i], equivalent_atoms[j]))
+
+            def _akey(a):
+                i, j, k = a
+                return self._canonical_angle(
+                    (equivalent_atoms[i], equivalent_atoms[j],
+                     equivalent_atoms[k]))
+        else:
+            _bkey = lambda b: b
+            _akey = lambda a: a
+
+        bond_groups = {}
+        for b in bonds:
+            bond_groups.setdefault(_bkey(b), []).append(b)
+
+        angle_groups = {}
+        for a in angles:
+            angle_groups.setdefault(_akey(a), []).append(a)
+
+        # QM reference geometry (individual values)
         bond_eq_qm = {
             b:
             ReactionSystemBuilder.measure_length(positions_nm[b[0]],
@@ -824,7 +977,18 @@ class PHFParameterizer:
                                                 angle_unit='radian')
             for a in angles
         }
-        # Working system copy — equilibria updated each iteration
+
+        # Fixed per-group QM averages — the Xi(QM) reference for D_i.
+        bond_qm_avg = {
+            key: float(np.mean([bond_eq_qm[b] for b in members]))
+            for key, members in bond_groups.items()
+        }
+        angle_qm_avg = {
+            key: float(np.mean([angle_eq_qm[a] for a in members]))
+            for key, members in angle_groups.items()
+        }
+
+        # Working system copy — equilibria updated each iteration.
         system = copy.deepcopy(system)
         self._engine._apply_current_best_estimates(system)
 
@@ -833,11 +997,11 @@ class PHFParameterizer:
         for a in angles:
             self._engine._set_angle_eq(system, a, angle_eq_qm[a])
 
-        # Current equilibria (start from QM values already in the system)
+        # Current equilibria start from individual QM values.
         bond_eq = dict(bond_eq_qm)
         angle_eq = dict(angle_eq_qm)
 
-        for i in range(max_iter):
+        for _ in range(max_iter):
             pos_mm = self._run_mm_minimisation(positions_nm, system)
 
             bond_mm = {
@@ -854,8 +1018,18 @@ class PHFParameterizer:
                 for a in angles
             }
 
-            bond_d = {b: bond_eq_qm[b] - bond_mm[b] for b in bonds}
-            angle_d = {a: angle_eq_qm[a] - angle_mm[a] for a in angles}
+            # D_i = Xi(QM)_avg - Xi(MM)_avg  per equivalence group (paper step 2).
+            bond_d = {
+                key:
+                bond_qm_avg[key] - float(np.mean([bond_mm[b] for b in members]))
+                for key, members in bond_groups.items()
+            }
+            angle_d = {
+                key:
+                angle_qm_avg[key] -
+                float(np.mean([angle_mm[a] for a in members]))
+                for key, members in angle_groups.items()
+            }
 
             max_bond_d = max((abs(v) for v in bond_d.values()), default=0.0)
             max_angle_d = max((abs(v) for v in angle_d.values()), default=0.0)
@@ -863,11 +1037,43 @@ class PHFParameterizer:
             if max_bond_d < BOND_THR and max_angle_d < ANGLE_THR:
                 break
 
-            for b in bonds:
-                bond_eq[b] += bond_d[b]
-                self._engine._set_bond_eq(system, b, bond_eq[b])
-            for a in angles:
-                angle_eq[a] += angle_d[a]
-                self._engine._set_angle_eq(system, a, angle_eq[a])
+            # Apply the group correction uniformly to every member.
+            # _set_bond_eq / _set_angle_eq return the value actually written
+            # to the OpenMM system (clamped to a physical range), so we
+            # capture the return value to keep bond_eq / angle_eq consistent
+            # with the system state across iterations.
+            for key, members in bond_groups.items():
+                for b in members:
+                    bond_eq[b] += bond_d[key]
+                    bond_eq[b] = self._engine._set_bond_eq(
+                        system, b, bond_eq[b])
+            for key, members in angle_groups.items():
+                for a in members:
+                    angle_eq[a] += angle_d[key]
+                    angle_eq[a] = self._engine._set_angle_eq(
+                        system, a, angle_eq[a])
 
         return bond_eq, angle_eq
+
+    def extract_partial_hessian(self, hessian: np.ndarray, atom_i: int,
+                                atom_j: int) -> np.ndarray:
+        """
+        Extract the 3x3 cross-derivative block d^2E / (d_coords_i d_coords_j)
+        from the full Hessian matrix.
+
+        Parameters
+        ----------
+        hessian : np.ndarray, shape (3N, 3N)
+            Full Cartesian Hessian matrix in any consistent unit.
+        atom_i : int
+            Zero-based index of the first atom.
+        atom_j : int
+            Zero-based index of the second atom.
+
+        Returns
+        -------
+        np.ndarray, shape (3, 3)
+        """
+        row = 3 * atom_i
+        col = 3 * atom_j
+        return hessian[row:row + 3, col:col + 3].copy()

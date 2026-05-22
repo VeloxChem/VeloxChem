@@ -3031,12 +3031,12 @@ class MMForceFieldGenerator:
             for key, k in phf_results['dihedrals'].items():
                 dih = self.dihedrals[key]
                 if dih['multiple']:
-                    # PHF yields one scalar per dihedral tuple; distribute
-                    # it equally across all terms of a multi-term dihedral.
-                    dih['barrier'] = [k] * len(dih['barrier'])
-                    dih['comment'] = [
-                        c + ' from Hessian (PHF)' for c in dih['comment']
-                    ]
+                    # PHF fits the first Fourier term only; remaining terms are zeroed.
+                    dih['barrier'] = [k] + [0.0] * (len(dih['barrier']) - 1)
+                    dih['comment'] = (
+                        [dih['comment'][0] + ' from Hessian (PHF)'] +
+                        [c + ' zeroed by PHF' for c in dih['comment'][1:]]
+                    )
                 else:
                     dih['barrier'] = k
                     dih['comment'] += ' from Hessian (PHF)'

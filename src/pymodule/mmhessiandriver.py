@@ -44,8 +44,8 @@ class MMHessianDriver:
     _DISPLACEMENT = 1e-4  # nm — step size for finite differences
 
     # Conversion factor: kJ/mol/nm^2 -> Hartree/Bohr^2
-    @staticmethod
-    def _to_hartree_bohr2() -> float:
+
+    def _to_hartree_bohr2(self, ) -> float:
         from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
         bohr_to_nm = bohr_in_angstrom() * 0.1
         return bohr_to_nm**2 / hartree_in_kjpermol()
@@ -100,6 +100,18 @@ class MMHessianDriver:
         """
         self._system = openmm_system
         self._positions_nm = positions_nm.copy()
+
+    def count_dihedral_terms(self, indices: tuple) -> int:
+        """Return the number of PeriodicTorsionForce entries for this dihedral."""
+        i, j, kk, l = indices
+        n = 0
+        for force in self._system.getForces():
+            if isinstance(force, mm.PeriodicTorsionForce):
+                for idx in range(force.getNumTorsions()):
+                    a1, a2, a3, a4, *_ = force.getTorsionParameters(idx)
+                    if (a1, a2, a3, a4) in [(i, j, kk, l), (l, kk, j, i)]:
+                        n += 1
+        return n
 
     def update_dihedral_constants(self, dihedral_constants: dict):
         """Called by PHFParameterizer after Stage 1 (dihedral fitting)."""
@@ -188,7 +200,8 @@ class MMHessianDriver:
         return 0.5 * (hessian + hessian.T) * self._to_hartree_bohr2()
 
     def compute_h_unit(self, coord_type: str,
-                       atom_indices: tuple) -> np.ndarray:
+                       atom_indices: tuple,
+                       first_term_only: bool = False) -> np.ndarray:
         """
         Compute h_unit: the 3x3 partial Hessian with the target force
         constant set to 1.0 and all nonbonded parameters zeroed.
@@ -199,6 +212,11 @@ class MMHessianDriver:
             'dihedral', 'angle', or 'bond'.
         atom_indices : tuple
             Full atom index tuple — (i,j,k,l), (i,j,k), or (i,j).
+        first_term_only : bool
+            When True and coord_type is 'dihedral', only the first
+            PeriodicTorsionForce entry for this atom-quad is set to 1.0;
+            all other terms remain at zero.  Used for multi-term dihedrals
+            so that PHF fits one representative force constant.
 
         Returns
         -------
@@ -207,7 +225,11 @@ class MMHessianDriver:
         system = copy.deepcopy(self._system)
         self._zero_nonbonded(system)
         self._zero_all_bonded(system)
-        self._set_target_force_constant(system, coord_type, atom_indices, k=1.0)
+        if first_term_only and coord_type == 'dihedral':
+            self._set_first_dihedral_term_k(system, atom_indices, 1.0)
+        else:
+            self._set_target_force_constant(system, coord_type, atom_indices,
+                                            k=1.0)
         pair = self._terminal_pair(coord_type, atom_indices)
         return self._numerical_partial_hessian(system, pair)
 
@@ -269,8 +291,7 @@ class MMHessianDriver:
     # Private helpers — parameter manipulation
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _terminal_pair(coord_type: str, atom_indices: tuple) -> tuple:
+    def _terminal_pair(self, coord_type: str, atom_indices: tuple) -> tuple:
         """Return the (a, b) terminal atom pair used for block extraction."""
         if coord_type == 'dihedral':
             return (atom_indices[0], atom_indices[3])
@@ -283,8 +304,7 @@ class MMHessianDriver:
         else:
             raise ValueError(f"Unknown coord_type: {coord_type!r}")
 
-    @staticmethod
-    def _zero_nonbonded(system: 'mm.System'):
+    def _zero_nonbonded(self, system: 'mm.System'):
         """
         Set all partial charges to 0.0 and all vdW well-depths (epsilon)
         to 0.0 in the NonbondedForce. sigma is left unchanged to avoid
@@ -299,8 +319,7 @@ class MMHessianDriver:
                     idx1, idx2, _, sigma, _ = force.getExceptionParameters(i)
                     force.setExceptionParameters(i, idx1, idx2, 0.0, sigma, 0.0)
 
-    @staticmethod
-    def _zero_all_bonded(system: 'mm.System'):
+    def _zero_all_bonded(self, system: 'mm.System'):
         """
         Set all bonded force constants to 0.0.
         Used when computing h_unit so that only the target term contributes.
@@ -345,8 +364,7 @@ class MMHessianDriver:
         elif coord_type == 'bond':
             self._set_bond_k(system, atom_indices, k)
 
-    @staticmethod
-    def _set_dihedral_k(system: 'mm.System', indices: tuple, k: float):
+    def _set_dihedral_k(self, system: 'mm.System', indices: tuple, k: float):
         i, j, kk, l = indices
         for force in system.getForces():
             if isinstance(force, mm.PeriodicTorsionForce):
@@ -364,10 +382,32 @@ class MMHessianDriver:
                             phase,
                             k * unit.kilojoules_per_mole,
                         )
-        pass
 
-    @staticmethod
-    def _set_angle_k(system: 'mm.System', indices: tuple, k: float):
+    def _set_first_dihedral_term_k(self, system: 'mm.System', indices: tuple,
+                                   k: float):
+        """Set first matching torsion entry to k, zero all subsequent matches."""
+        i, j, kk, l = indices
+        found = False
+        for force in system.getForces():
+            if isinstance(force, mm.PeriodicTorsionForce):
+                for idx in range(force.getNumTorsions()):
+                    a1, a2, a3, a4, per, phase, _ = force.getTorsionParameters(
+                        idx)
+                    if (a1, a2, a3, a4) in [(i, j, kk, l), (l, kk, j, i)]:
+                        k_set = k if not found else 0.0
+                        force.setTorsionParameters(
+                            idx,
+                            a1,
+                            a2,
+                            a3,
+                            a4,
+                            per,
+                            phase,
+                            k_set * unit.kilojoules_per_mole,
+                        )
+                        found = True
+
+    def _set_angle_k(self, system: 'mm.System', indices: tuple, k: float):
         i, j, kk = indices
         for force in system.getForces():
             if isinstance(force, mm.HarmonicAngleForce):
@@ -383,8 +423,7 @@ class MMHessianDriver:
                             k * unit.kilojoules_per_mole / unit.radian**2,
                         )
 
-    @staticmethod
-    def _set_improper_k(system: 'mm.System', indices: tuple, k: float):
+    def _set_improper_k(self, system: 'mm.System', indices: tuple, k: float):
         central = indices[0]  # VeloxChem: central atom is first
         peripheral = set(indices[1:])  # the other three atoms
         for force in system.getForces():
@@ -398,8 +437,7 @@ class MMHessianDriver:
                                                    phase,
                                                    k * unit.kilojoules_per_mole)
 
-    @staticmethod
-    def _set_bond_k(system: 'mm.System', indices: tuple, k: float):
+    def _set_bond_k(self, system: 'mm.System', indices: tuple, k: float):
         i, j = indices
         for force in system.getForces():
             if isinstance(force, mm.HarmonicBondForce):
@@ -414,9 +452,8 @@ class MMHessianDriver:
                             k * unit.kilojoules_per_mole / unit.nanometer**2,
                         )
 
-    @staticmethod
-    def _compute_dihedral_angle(positions: np.ndarray, a: int, b: int, c: int,
-                                d: int) -> float:
+    def _compute_dihedral_angle(self, positions: np.ndarray, a: int, b: int,
+                                c: int, d: int) -> float:
         """Return the signed torsion angle in radians for atoms a-b-c-d."""
         r_ab = positions[b] - positions[a]
         r_bc = positions[c] - positions[b]
@@ -426,8 +463,8 @@ class MMHessianDriver:
         u_bc = r_bc / np.linalg.norm(r_bc)
         return float(np.arctan2(np.dot(np.cross(n1, n2), u_bc), np.dot(n1, n2)))
 
-    @staticmethod
-    def _set_dihedral_phase(system: 'mm.System', indices: tuple, phi_qm: float):
+    def _set_dihedral_phase(self, system: 'mm.System', indices: tuple,
+                            phi_qm: float):
         """Set phase δ = n × φ_QM for every matching PeriodicTorsionForce entry."""
         i, j, kk, l = indices
         for force in system.getForces():
@@ -440,8 +477,7 @@ class MMHessianDriver:
                                                    per * phi_qm * unit.radian,
                                                    k_val)
 
-    @staticmethod
-    def _set_improper_phase(system: 'mm.System', indices: tuple,
+    def _set_improper_phase(self, system: 'mm.System', indices: tuple,
                             omega_qm: float):
         """Set phase δ = n × ω_QM for every matching improper torsion entry."""
         central = indices[0]
@@ -456,8 +492,8 @@ class MMHessianDriver:
                                                    per * omega_qm * unit.radian,
                                                    k_val)
 
-    @staticmethod
-    def _find_improper_atom_order(system: 'mm.System', indices: tuple) -> tuple:
+    def _find_improper_atom_order(self, system: 'mm.System',
+                                  indices: tuple) -> tuple:
         """Return the (a1, a2, a3=central, a4) ordering from PeriodicTorsionForce."""
         central = indices[0]
         peripheral = set(indices[1:])
@@ -469,10 +505,14 @@ class MMHessianDriver:
                         return (a1, a2, a3, a4)
         return indices  # fallback: no matching entry found
 
-    @staticmethod
-    def _set_bond_eq(system: 'mm.System', indices: tuple, r0_nm: float):
+    def _set_bond_eq(self, system: 'mm.System', indices: tuple, r0_nm: float):
         """Update the equilibrium bond length (in nm) for the given bond."""
         i, j = indices
+        if r0_nm <= 0.0:
+            self.ostream.print_warning(
+                f"Negative equilibrium bond length given: {r0_nm} nm. Setting to 0."
+            )
+            r0_nm = 0.0
         for force in system.getForces():
             if isinstance(force, mm.HarmonicBondForce):
                 for idx in range(force.getNumBonds()):
@@ -480,11 +520,23 @@ class MMHessianDriver:
                     if {a1, a2} == {i, j}:
                         force.setBondParameters(idx, a1, a2,
                                                 r0_nm * unit.nanometer, k_val)
+        return r0_nm
 
-    @staticmethod
-    def _set_angle_eq(system: 'mm.System', indices: tuple, theta0_rad: float):
+    def _set_angle_eq(self, system: 'mm.System', indices: tuple,
+                      theta0_rad: float):
         """Update the equilibrium angle (in radians) for the given angle."""
         i, j, kk = indices
+        if theta0_rad < 0.0:
+            self.ostream.print_warning(
+                f"Negative equilibrium angle given: {theta0_rad} rad. Setting to 0."
+            )
+            theta0_rad = 0.0
+        elif theta0_rad > np.pi:
+            self.ostream.print_warning(
+                f"Equilibrium angle greater than 180° given: {theta0_rad} rad. Setting to π."
+            )
+            theta0_rad = np.pi
+
         for force in system.getForces():
             if isinstance(force, mm.HarmonicAngleForce):
                 for idx in range(force.getNumAngles()):
@@ -493,6 +545,7 @@ class MMHessianDriver:
                         force.setAngleParameters(idx, a1, a2, a3,
                                                  theta0_rad * unit.radian,
                                                  k_val)
+        return theta0_rad
 
     def _apply_current_best_estimates(self, system: 'mm.System'):
         """
@@ -500,7 +553,12 @@ class MMHessianDriver:
         system copy before computing H'_0. Called in compute_h0 only.
         """
         for (i, j, kk, l), k_val in self._dihedral_constants.items():
-            self._set_dihedral_k(system, (i, j, kk, l), k_val)
+            if self.count_dihedral_terms((i, j, kk, l)) > 1:
+                # Multi-term: zero all terms, then set only the first.
+                self._set_dihedral_k(system, (i, j, kk, l), 0.0)
+                self._set_first_dihedral_term_k(system, (i, j, kk, l), k_val)
+            else:
+                self._set_dihedral_k(system, (i, j, kk, l), k_val)
         for (i, j, kk, l), k_val in self._improper_constants.items():
             self._set_improper_k(system, (i, j, kk, l), k_val)
         for (i, j, kk), k_val in self._angle_constants.items():
