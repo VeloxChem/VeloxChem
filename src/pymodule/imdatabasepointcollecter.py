@@ -851,7 +851,8 @@ class IMDatabasePointCollecter:
         self.sampling_interpolation_settings = sampling_interpolation_settings
         self.dynamics_settings_interpolation_run = dynamics_settings
 
-        self.use_mass_weight = interpolation_settings.get('use_mass_weight', False) if interpolation_settings else False
+    
+        self.use_mass_weight = interpolation_settings[list(interpolation_settings.keys())[0]].get('use_mass_weight', False) if interpolation_settings else False
 
         if 'print_step' in dynamics_settings:
             self.print_step = int(dynamics_settings['print_step'])
@@ -1312,6 +1313,8 @@ class IMDatabasePointCollecter:
             drv.qm_data_points = self.sampling_qm_data_point_dict[root]
 
             drv.mark_runtime_data_cache_dirty()
+            if len(self.sampling_qm_data_point_dict[root]) > 0:
+                drv.impes_coordinate.eq_bond_lengths = self.sampling_qm_data_point_dict[root][0].eq_bond_lengths
           
             self.sampling_impes_drivers[root] = drv
     
@@ -1339,6 +1342,9 @@ class IMDatabasePointCollecter:
 
         driver_object.qm_data_points = self.qm_data_point_dict[root]
         driver_object.labels = self.sorted_state_spec_im_labels[root]
+        
+        if len(self.qm_data_point_dict[root]) > 0:
+            driver_object.impes_coordinate.eq_bond_lengths = self.qm_data_point_dict[root][0].eq_bond_lengths
         
 
         driver_object.mark_runtime_data_cache_dirty()
@@ -3602,6 +3608,7 @@ class IMDatabasePointCollecter:
                     impes_coordinate.update_settings(self.interpolation_settings[mol_basis[4][number]])
                     impes_coordinate.cartesian_coordinates = mol_basis[0].get_coordinates_in_bohr()
                     impes_coordinate.imp_int_coordinates = mol_basis[6]
+                    impes_coordinate.eq_bond_lengths = self.qm_data_point_dict[mol_basis[4][number]][0].eq_bond_lengths
                     impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
                     impes_coordinate.energy = energies[number]
                     impes_coordinate.gradient = mw_grad_vec.reshape(gradients[number].shape)
@@ -3610,13 +3617,15 @@ class IMDatabasePointCollecter:
 
                     impes_coordinate.confidence_radius = float(self.use_opt_confidence_radius[2])
 
-                    if mol_basis[5]:
-                            new_label = f'{label}_symmetry_{label_counter}'
+                    # if mol_basis[5]:
+                    #         new_label = f'{label}_symmetry_{label_counter}'
 
                     if not mol_basis[5]:
                         category_label = label
                         if impes_coordinate.use_inverse_bond_length:
                             category_label += "_rinv"
+                        elif impes_coordinate.use_eq_bond_length:
+                            category_label += "_eq"
                         else:
                             category_label += "_r"
                         if impes_coordinate.use_cosine_dihedral:
@@ -3697,6 +3706,7 @@ class IMDatabasePointCollecter:
 
         # Geometry + transformed tensors
         dp.cartesian_coordinates = np.array(template_point.cartesian_coordinates, copy=True)
+        dp.eq_bond_lengths = None if template_point.eq_bond_lengths is None else np.array(template_point.eq_bond_lengths, copy=True)
         dp.imp_int_coordinates = copy.deepcopy(
             getattr(
                 template_point,
@@ -3741,6 +3751,9 @@ class IMDatabasePointCollecter:
             
         driver_object.qm_data_points = self.sampling_qm_data_point_dict[root]
         driver_object.labels = self.sorted_state_spec_im_labels[root]
+        
+        if len(self.sampling_qm_data_point_dict[root]) > 0:
+            driver_object.impes_coordinate.eq_bond_lengths = self.sampling_qm_data_point_dict[root][0].eq_bond_lengths
 
         driver_object.mark_runtime_data_cache_dirty()
 
@@ -3870,6 +3883,8 @@ class IMDatabasePointCollecter:
         drv.exponent_p = exponent_p_q[0]
         drv.exponent_q = exponent_p_q[1]
 
+        drv.impes_coordinate.eq_bond_lengths = datapoints_eval[0].eq_bond_lengths
+        
         if len(datapoints_eval) > 0 and hasattr(datapoints_eval[0], "inv_sqrt_masses"):
             drv.impes_coordinate.inv_sqrt_masses = datapoints_eval[0].inv_sqrt_masses
         elif getattr(self, "inv_sqrt_masses", None) is not None:

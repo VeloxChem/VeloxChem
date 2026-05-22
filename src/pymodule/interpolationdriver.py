@@ -152,6 +152,7 @@ class InterpolationDriver():
         # Name lables for the QM data points
         self.labels = None
         self.use_inverse_bond_length = True
+        self.use_eq_bond_length = False
         self.use_cosine_dihedral = False
         self.use_tc_weights = False
         self.use_mass_weight = False
@@ -198,6 +199,7 @@ class InterpolationDriver():
                 'imforcefield_file':
                     ('str', 'the name of the chk file with QM data'),
                     'use_inverse_bond_length': ('bool', 'whether to use inverse bond lengths in the Z-matrix'),
+                    'use_eq_bond_length': ('bool', 'whether to use eq bond lengths in the Z-matrix'),
                     'use_cosine_dihedral':('bool', 'wether to use cosine and sin for the diehdral in the Z-matrix'),
                     'use_tc_weights':('bool', 'weither to use target coustomized weights'),
                     'use_mass_weight':('bool', 'weither to use mass weighting in coordinates'),
@@ -371,6 +373,10 @@ class InterpolationDriver():
         if self.impes_coordinate.use_inverse_bond_length:
             remove_from_label += "_rinv"
             z_matrix_label += '_rinv'
+        
+        elif self.impes_coordinate.use_eq_bond_length:
+            remove_from_label += "_eq"
+            z_matrix_label += '_eq'
         
         else:
             remove_from_label += "_r"

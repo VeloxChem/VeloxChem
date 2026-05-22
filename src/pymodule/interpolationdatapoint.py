@@ -116,10 +116,13 @@ class InterpolationDatapoint:
 
         self.confidence_radius = None
         self.use_inverse_bond_length = True
+        self.use_eq_bond_length = False
         self.use_cosine_dihedral = False
         self.use_vectorized_b_matrix = True
         self.use_vectorized_internal_coordinates_values = True
         self.identify_imp_int_coord = True
+        
+        self.eq_bond_lengths = None
         
         # internal_coordinates is a list of geomeTRIC objects which represent
         # different types of internal coordinates (distances, angles, dihedrals)
@@ -140,6 +143,9 @@ class InterpolationDatapoint:
                 'use_inverse_bond_length':
                     ('bool',
                      'use the inverse bond lengths'),
+                'use_eq_bond_length':
+                    ('bool',
+                     'use the log bond lengths'),
                 'use_cosine_dihedral':
                     ('bool', 'use the cosine of dihedrals'
                      ),
@@ -248,6 +254,22 @@ class InterpolationDatapoint:
         }
 
         return self._b_matrix_row_cache
+    
+    def _get_eq_bond_lengths_array(self, n_bonds):
+        """
+        Returns equilibrium bond lengths with shape validation.
+        """
+        assert_msg_critical(
+            self.eq_bond_lengths is not None,
+            'InterpolationDatapoint: No equilibrium bond lengths are defined.'
+        )
+        eq_values = np.asarray(self.eq_bond_lengths, dtype=np.float64).reshape(-1)
+        assert_msg_critical(
+            eq_values.size == int(n_bonds),
+            'InterpolationDatapoint: Equilibrium bond-length size mismatch '
+            f'(expected {int(n_bonds)}, got {eq_values.size}).'
+        )
+        return eq_values
 
     def _calculate_b_matrix_vectorized(self):
         """
@@ -268,7 +290,8 @@ class InterpolationDatapoint:
 
         use_original = (
             self.use_inverse_bond_length or
-            self.use_cosine_dihedral
+            self.use_cosine_dihedral or
+            self.use_eq_bond_length
         )
         if use_original:
             self.original_b_matrix = derivatives.copy()
@@ -279,13 +302,18 @@ class InterpolationDatapoint:
         row_cache = self._get_b_matrix_row_cache()
 
         bond_rows = row_cache['bond_rows']
-        if bond_rows.size > 0 and (self.use_inverse_bond_length):
+        if bond_rows.size > 0 and (self.use_inverse_bond_length or self.use_eq_bond_length):
             bond_values = np.array(
                 [self.internal_coordinates[idx].value(coords) for idx in bond_rows],
                 dtype=np.float64)
 
             if self.use_inverse_bond_length:
                 row_scale[bond_rows] = -1.0 / np.square(bond_values)
+            elif self.use_eq_bond_length:
+                eq_values = self._get_eq_bond_lengths_array(bond_rows.size)
+                _, dq_dr, _ = self._switched_bond_transform(
+                    bond_values, eq_values, eps_inner=0.005, eps_outer=0.01)
+                row_scale[bond_rows] = dq_dr
 
         if self.use_cosine_dihedral:
             dihedral_rows = row_cache['dihedral_rows']
@@ -302,7 +330,7 @@ class InterpolationDatapoint:
 
         if self.inv_sqrt_masses is not None:
             self.b_matrix = self.b_matrix * self.inv_sqrt_masses
-            if self.use_inverse_bond_length:
+            if self.use_inverse_bond_length or self.use_eq_bond_length:
                 self.original_b_matrix = self.original_b_matrix
 
     def calculate_b_matrix(self):
@@ -326,6 +354,12 @@ class InterpolationDatapoint:
         # self.b2_matrix = np.zeros((len(self.z_matrix), n_atoms * 3, n_atoms * 3))
         self.b2_matrix = np.zeros((len(self.z_matrix), n_atoms * 3, n_atoms * 3))
 
+        eq_bond_values = None
+        if self.use_eq_bond_length:
+            bond_rows = self._get_b_matrix_row_cache()['bond_rows']
+            eq_bond_values = self._get_eq_bond_lengths_array(bond_rows.size)
+
+        
         prev_dihedral = None
         bond_counter = 0
         for i, z in enumerate(self.z_matrix):
@@ -343,6 +377,15 @@ class InterpolationDatapoint:
                     for m in range(n_atoms):
                         for n in range(n_atoms):
                             self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += 2 * r_inv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
+
+                elif self.use_eq_bond_length:
+                    r = q.value(coords)
+                    _, r_deriv_2, r_deriv_3 = self._switched_bond_transform(
+                        r, eq_bond_values[bond_counter], eps_inner=0.005, eps_outer=0.01)
+                    self.b2_matrix[i] = r_deriv_2 * second_derivative
+                    for m in range(n_atoms):
+                        for n in range(n_atoms):
+                            self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += r_deriv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
 
                 else:
                     self.b2_matrix[i] = second_derivative
@@ -679,6 +722,16 @@ class InterpolationDatapoint:
         if bond_rows.size > 0:
             if self.use_inverse_bond_length:
                 int_coords[bond_rows] = 1.0 / base_values[bond_rows]
+            elif self.use_eq_bond_length:
+               
+                eq_values = self._get_eq_bond_lengths_array(bond_rows.size)
+                q_values, _, _ = self._switched_bond_transform(
+                    base_values[bond_rows],
+                    eq_values,
+                    eps_inner=0.005,
+                    eps_outer=0.01)
+                int_coords[bond_rows] = q_values
+                # print(int_coords, base_values)
 
         if self.use_cosine_dihedral:
             dihedral_rows = row_cache['dihedral_rows']
@@ -693,6 +746,83 @@ class InterpolationDatapoint:
                     int_coords[second_rows] = np.sin(dihedral_values[~dihedral_first])
 
         self.internal_coordinates_values = int_coords
+    
+    def smoothstep5(self, t):
+        return 1.0 - 10.0*t**3 + 15.0*t**4 - 6.0*t**5
+
+    def dsmoothstep5_dt(self, t):
+        return -30.0*t**2 + 60.0*t**3 - 30.0*t**4
+
+    def d2smoothstep5_dt2(self, t):
+        return -60.0*t + 180.0*t**2 - 120.0*t**3
+
+
+    def _switched_bond_transform(self, r, r_eq, eps_inner=0.05, eps_outer=0.15):
+        """
+        Returns q(r), dq/dr, d2q/dr2 for a bond coordinate that is
+        smoothly switched from local r behavior near equilibrium to 1/r outside.
+        """
+        r_input = np.asarray(r, dtype=np.float64)
+        r_eq_input = np.asarray(r_eq, dtype=np.float64)
+        scalar_input = (r_input.ndim == 0 and r_eq_input.ndim == 0)
+
+        r_arr, r_eq_arr = np.broadcast_arrays(np.atleast_1d(r_input),
+                                              np.atleast_1d(r_eq_input))
+        r_arr = r_arr.astype(np.float64, copy=False)
+        r_eq_arr = r_eq_arr.astype(np.float64, copy=False)
+
+        L = r_arr - r_eq_arr
+        dL = np.ones_like(r_arr)
+        d2L = np.zeros_like(r_arr)
+
+
+        R = - np.square(r_eq_arr) * (1.0 / r_arr - 1.0 / r_eq_arr)
+        dR = np.square(r_eq_arr) / np.square(r_arr)
+        d2R = -np.square(r_eq_arr) * 2.0 / np.power(r_arr, 3)
+
+        x = np.log(r_arr / r_eq_arr)
+        y = np.square(x)
+
+        y1 = np.log(1.0 + eps_inner)**2
+        y2 = np.log(1.0 + eps_outer)**2
+        denom = y2 - y1
+
+        s = np.ones_like(y)
+        ds = np.zeros_like(y)
+        d2s = np.zeros_like(y)
+
+        mask_inner = (y <= y1)
+        mask_outer = (y >= y2)
+        mask_transition = (~mask_inner) & (~mask_outer)
+
+        if np.any(mask_transition):
+            t = (y[mask_transition] - y1) / denom
+            P = self.smoothstep5(t)
+            dP = self.dsmoothstep5_dt(t)
+            d2P = self.d2smoothstep5_dt2(t)
+
+            dy_dr = 2.0 * x[mask_transition] / r_arr[mask_transition]
+            d2y_dr2 = 2.0 * (1.0 - x[mask_transition]) / np.square(r_arr[mask_transition])
+            dt_dr = dy_dr / denom
+            d2t_dr2 = d2y_dr2 / denom
+
+            s[mask_transition] = P
+            ds[mask_transition] = dP * dt_dr
+            d2s[mask_transition] = d2P * np.square(dt_dr) + dP * d2t_dr2
+
+        s[mask_outer] = 0.0
+        ds[mask_outer] = 0.0
+        d2s[mask_outer] = 0.0
+
+        q = s * L + (1.0 - s) * R
+
+        dq_dr = ds * (L - R) + s * dL + (1.0 - s) * dR
+        d2q_dr2 = d2s * (L - R) + 2.0 * ds * (dL - dR) + s * d2L + (1.0 - s) * d2R
+
+        if scalar_input:
+            return float(q[0]), float(dq_dr[0]), float(d2q_dr2[0])
+
+        return q, dq_dr, d2q_dr2
 
     def compute_internal_coordinates_values(self):
         """
@@ -775,6 +905,8 @@ class InterpolationDatapoint:
 
             if self.use_inverse_bond_length:
                 label += "_rinv"
+            elif self.use_eq_bond_length:
+                label += "_eq"
             else:
                 label += "_r"
 
@@ -840,7 +972,18 @@ class InterpolationDatapoint:
                 h5f.create_dataset(full_label,
                                    data=self.internal_coordinates_values,
                                    compression='gzip')
-                
+            
+            if not self.use_eq_bond_length and self.eq_bond_lengths is None:
+                assert_msg_critical(
+                    self.eq_bond_lengths is not None,
+                    'InterpolationDatapoint: No eq bond lenths are defined.')
+
+            else:
+                # write internal coordinates
+                full_label = label + "_eq_bond_lengths"
+                h5f.create_dataset(full_label,
+                                   data=self.eq_bond_lengths,
+                                   compression='gzip')   
 
             assert_msg_critical(
                 self.confidence_radius is not None,
@@ -916,6 +1059,8 @@ class InterpolationDatapoint:
 
             if self.use_inverse_bond_length:
                 label += "_rinv"
+            elif self.use_eq_bond_length:
+                label += "_eq"
             else:
                 label += "_r"
 
@@ -930,6 +1075,7 @@ class InterpolationDatapoint:
             cart_hess_label = label + "_cartesian_hessian"
             cart_grad_label = label + "_cartesian_gradient"
             coords_label = label + "_internal_coordinates"
+            eq_bond_length_label = label + "_eq_bond_lengths"
             cart_coords_label = label + "_cartesian_coordinates"
             confidence_radius_label = label + "_confidence_radius"
         
@@ -951,6 +1097,7 @@ class InterpolationDatapoint:
             self.internal_hessian = np.array(h5f.get(hessian_label))
             self.hessian = np.array(h5f.get(cart_hess_label))
             self.internal_coordinates_values = np.array(h5f.get(coords_label))
+            self.eq_bond_lengths = np.array(h5f.get(eq_bond_length_label))
             self.cartesian_coordinates = np.array(h5f.get(cart_coords_label))
             self.confidence_radius = np.array(h5f.get(confidence_radius_label))
 
@@ -1018,6 +1165,8 @@ class InterpolationDatapoint:
         """
         if use_inverse_bond_length:
             label += "_rinv"
+        if use_eq_bond_length:
+            label += "_eq"
         else:
             label += "_r"
 
@@ -1032,6 +1181,7 @@ class InterpolationDatapoint:
             label + "_gradient",
             label + "_hessian",
             label + "_internal_coordinates",
+            label + "eq_bond_lengths",
             label + "_cartesian_coordinates",
             label + "_cartesian_gradient",
             label + "_cartesian_hessian",
@@ -1066,6 +1216,8 @@ class InterpolationDatapoint:
         with h5py.File(fname, 'r+') as h5f:
             if self.use_inverse_bond_length:
                 label += "_rinv"
+            elif self.use_eq_bond_length:
+                label += "_eq"
             else:
                 label += "_r"
 

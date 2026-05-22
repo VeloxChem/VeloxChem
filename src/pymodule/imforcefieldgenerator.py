@@ -291,9 +291,13 @@ class IMForceFieldGenerator:
         self.confidence_radius = 0.5
         self.imforcefieldfiles = None
         self.use_inverse_bond_length = True
+        self.use_eq_bond_length = False
         self.use_cosine_dihedral = False
         self.use_tc_weights = True
         self.use_mass_weight = False
+        
+        self.eq_bond_length = None
+        self.eq_bond_length_irc_bonds = None
 
         # variables for the forcefield generation and database expansion
         self.dynamics_settings = None
@@ -385,39 +389,6 @@ class IMForceFieldGenerator:
                                 "hessian": None,
                             }
     
-    def _mode_signature(self):
-        """
-        Return compact mode info used to parametrize tests and debug mismatches.
-        """
-        if self.use_inverse_bond_length:
-            bond_mode = "inverse"
-        else:
-            bond_mode = "plain_r"
-
-        return {
-            "bond_mode": bond_mode,
-            "weightfunction_type": str(self.weightfunction_type),
-            "use_cosine_dihedral": bool(self.use_cosine_dihedral),
-            "use_tc_weights": bool(self.use_tc_weights),
-        }
-
-    def _label_count_per_root(self):
-        """
-        Read current number of labels from each root HDF5.
-        Used by tests to assert add-point side effects.
-        """
-        counts = {}
-        for root in self.roots_to_follow:
-            fpath = self.states_interpolation_settings[root]["imforcefield_file"]
-            if not os.path.exists(fpath):
-                counts[int(root)] = 0
-                continue
-            drv = InterpolationDriver(self.roots_z_matrix[root])
-            drv.update_settings(self.states_interpolation_settings[root])
-            drv.imforcefield_file = fpath
-            labels, _ = drv.read_labels()
-            counts[int(root)] = int(len(labels))
-        return counts
 
     def define_z_matrix_dict(self, molecule, add_coordinates=None):
         g_molecule = geometric.molecule.Molecule()
@@ -629,7 +600,8 @@ class IMForceFieldGenerator:
                         root=self.roots_to_follow[0],
                         include_existing_root_zmat=True,
                     )
-
+                    if self.use_eq_bond_length:
+                        self.eq_bond_length_irc_bonds = merge_info['added_coordinates']['bonds']
                     self.roots_z_matrix[self.roots_to_follow[0]] = merge_info["global_z_matrix"]  
             elif root not in self.roots_z_matrix:
                 # generate the z-matrix based for the interpolation database provided
@@ -641,6 +613,7 @@ class IMForceFieldGenerator:
                                         'confidence_radius':self.confidence_radius,
                                         'imforcefield_file':self.imforcefieldfiles[root],
                                         'use_inverse_bond_length':self.use_inverse_bond_length,
+                                        'use_eq_bond_length':self.use_eq_bond_length,
                                         'use_cosine_dihedral':self.use_cosine_dihedral,
                                         'use_tc_weights':self.use_tc_weights,
                                         'use_mass_weight':self.use_mass_weight,
@@ -891,7 +864,7 @@ class IMForceFieldGenerator:
             samp_dp = InterpolationDatapoint(self.roots_z_matrix[root])
             samp_dp.update_settings(sampling_settings)
             samp_dp.cartesian_coordinates = ref_dp.cartesian_coordinates
-            samp_dp.mapping_masks = getattr(ref_dp, 'mapping_masks', None)
+            samp_dp.eq_bond_lengths = ref_dp.eq_bond_lengths
             samp_dp.imp_int_coordinates = getattr(ref_dp, 'imp_int_coordinates', [])
             samp_dp.inv_sqrt_masses = inv_sqrt
             samp_dp.energy = e[0]
@@ -976,6 +949,7 @@ class IMForceFieldGenerator:
                                 'confidence_radius':self.confidence_radius,
                                 'imforcefield_file':imforcefieldfile,
                                 'use_inverse_bond_length':self.use_inverse_bond_length,
+                                'use_eq_bond_length':self.use_eq_bond_length,
                                 'use_cosine_dihedral':self.use_cosine_dihedral,
                                 'use_tc_weights':self.use_tc_weights,
                                 'use_mass_weight':self.use_mass_weight,
@@ -2020,6 +1994,9 @@ class IMForceFieldGenerator:
                     qm_data_point.update_settings(im_settings[root])
                     qm_data_point.read_hdf5(current_datafile, label)
                     
+                    if impes_driver.impes_coordinate.eq_bond_lengths is None:
+                            impes_driver.impes_coordinate.eq_bond_lengths = qm_data_point.eq_bond_lengths
+                    
                     old_label = qm_data_point.point_label
                     impes_driver.qm_data_points.append(qm_data_point)
                         
@@ -2176,8 +2153,22 @@ class IMForceFieldGenerator:
         adjusted_molecule = {'gs': [], 'es': []}
 
         for entries in molecule_specific_information:
+            molecule = entries[0]
             states = entries[2]
             symmetry_point = False
+            
+            if self.eq_bond_length is None:
+                self.eq_bond_length = []
+                for idx, element in enumerate(self.roots_z_matrix[0]['bonds']):
+                    
+                    if len(element) == 2 and self.use_minimized_structures[0] and self.eq_bond_length_irc_bonds is not None and element not in self.eq_bond_length_irc_bonds:
+                        self.eq_bond_length.append(molecule.get_distance([element[0] + 1, element[1] + 1], 'bohr'))
+                    elif len(element) == 2 and self.use_minimized_structures[0] and self.eq_bond_length_irc_bonds is not None and element in self.eq_bond_length_irc_bonds:
+                        self.eq_bond_length.append(molecule_specific_information[-1][0].get_distance([element[0] + 1, element[1] + 1], 'bohr'))
+                    elif len(element) == 2 and self.use_minimized_structures[0]:
+                        self.eq_bond_length.append(molecule.get_distance([element[0] + 1, element[1] + 1], 'bohr'))
+                    elif len(element) == 2:
+                        self.eq_bond_length.append(0.0)
 
             if 0 in entries[2]:
                 adjusted_molecule['gs'].append((entries[0], entries[1], 1, None, [0], symmetry_point, entries[3])) 
@@ -2252,6 +2243,7 @@ class IMForceFieldGenerator:
                     impes_coordinate = InterpolationDatapoint(z_matrix)
                     impes_coordinate.update_settings(interpolation_settings[target_root])
                     impes_coordinate.cartesian_coordinates = mol_basis[0].get_coordinates_in_bohr()
+                    impes_coordinate.eq_bond_lengths = self.eq_bond_length
                     impes_coordinate.imp_int_coordinates = imp_int_constraints
                     impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
                     impes_coordinate.energy = energies[number]
