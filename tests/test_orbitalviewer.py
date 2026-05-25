@@ -12,6 +12,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.orbitalviewer import OrbitalViewer
 from veloxchem.visualizationdriver import VisualizationDriver
 from veloxchem.cubicgrid import CubicGrid
+from veloxchem.errorhandler import VeloxChemError
 
 
 class TestOrbitalViewer:
@@ -186,7 +187,7 @@ class TestOrbitalViewer:
         orbviewer.orbital_color_scheme = 'invalid'
 
         with pytest.raises(
-                AssertionError,
+                VeloxChemError,
                 match="orbital_color_scheme must be 'default' or 'alternative'"
         ):
             orbviewer._get_orbital_colors()

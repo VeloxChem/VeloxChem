@@ -1,10 +1,11 @@
 from mpi4py import MPI
 from pathlib import Path
+import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.outputstream import OutputStream
-from veloxchem.tpadriver import TpaDriver
+from veloxchem.tpadriverbase import TpaDriverBase
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.rsptpa import TPA
@@ -43,24 +44,36 @@ class TestTPA:
         if task.mpi_rank == mpi_master():
             tpa_result = tpa_prop.rsp_property
 
-            for key in ref_result:
-                assert abs(tpa_result[key][(w, -w, w)].real /
-                           ref_result[key].real - 1.0) < 1.0e-6
-                assert abs(tpa_result[key][(w, -w, w)].imag /
-                           ref_result[key].imag - 1.0) < 1.0e-6
+            for key, ref_val in ref_result['tpa_terms'].items():
+                calc_val = tpa_result['tpa_terms'][key][(w, -w, w)]
+                assert abs(calc_val.real / ref_val.real - 1.0) < 1.0e-6
+                assert abs(calc_val.imag / ref_val.imag - 1.0) < 1.0e-6
+
+            ref_val = ref_result['gamma']
+            calc_val = tpa_result['gamma'][(w, -w, w)]
+            assert abs(calc_val.real / ref_val.real - 1.0) < 1.0e-6
+            assert abs(calc_val.imag / ref_val.imag - 1.0) < 1.0e-6
+
+            ref_sigma = ref_result['cross_sections']
+            calc_sigma = tpa_result['cross_sections']
+            assert np.max(np.abs(
+                np.array(calc_sigma) - np.array(ref_sigma))) < 1.0e-8
 
     def test_tpa_full(self):
 
         w = 0.05
 
         ref_result = {
-            't4_dict': -39.81102482 - 0.37943318j,
-            't3_dict': -92.30945471 - 1.15690967j,
-            'NaX3NyNz': -154.11176435 - 1.18509718j,
-            'NaA3NxNy': -51.38898554 - 0.10346488j,
-            'NaX2Nyz': 621.17712859 + 10.77037598j,
-            'NxA2Nyz': 621.79142488 + 2.18017301j,
+            'tpa_terms': {
+                't4_dict': -39.81102482 - 0.37943318j,
+                't3_dict': -92.30945471 - 1.15690967j,
+                'NaX3NyNz': -154.11176435 - 1.18509718j,
+                'NaA3NxNy': -51.38898554 - 0.10346488j,
+                'NaX2Nyz': 621.17712859 + 10.77037598j,
+                'NxA2Nyz': 621.79142488 + 2.18017301j,
+            },
             'gamma': 905.34732406 + 10.12564409j,
+            'cross_sections': [0.000100942184],
         }
 
         here = Path(__file__).parent
@@ -73,10 +86,13 @@ class TestTPA:
         w = 0.05
 
         ref_result = {
-            't3_dict': -35.37827126 - 0.92778160j,
-            'NaX2Nyz': 230.17180603 + 7.10669620j,
-            'NxA2Nyz': 230.43358578 + 2.16388980j,
+            'tpa_terms': {
+                't3_dict': -35.37827126 - 0.92778160j,
+                'NaX2Nyz': 230.17180603 + 7.10669620j,
+                'NxA2Nyz': 230.43358578 + 2.16388980j,
+            },
             'gamma': 425.22712055 + 8.34280441j,
+            'cross_sections': [0.000083169119],
         }
 
         here = Path(__file__).parent
@@ -101,7 +117,7 @@ class TestTPA:
             'memory_tracing': True,
         }
 
-        tpa_drv = TpaDriver(MPI.COMM_WORLD, OutputStream(None))
+        tpa_drv = TpaDriverBase(MPI.COMM_WORLD, OutputStream(None))
 
         for key, val in tpa_dict.items():
             assert getattr(tpa_drv, key) != val

@@ -1,14 +1,16 @@
+from pathlib import Path
 import numpy as np
 import pytest
-from pathlib import Path
+from mpi4py import MPI
 
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
-from veloxchem.oneeints import compute_electric_dipole_integrals
-from veloxchem.orbitallocalization import OrbitalLocalization
+from veloxchem.orbitallocalization import OrbitalLocalizationDriver
+from veloxchem.outputstream import OutputStream
+from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.errorhandler import VeloxChemError
 
 
-@pytest.mark.solvers
 class TestOrbitalLocalization:
 
     @staticmethod
@@ -21,114 +23,98 @@ class TestOrbitalLocalization:
         """
         molecule = Molecule.from_xyz_string(h2o_xyz)
         basis = MolecularBasis.read(molecule, "def2-svp")
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_res = scf_drv.compute(molecule, basis)
 
-        # Load reference
-        C_occ_path = Path(__file__).parent / "data" / "orbloc_h2o_svp_C_occ.npy"
-        C_occ = np.load(C_occ_path)
-        S_path = Path(__file__).parent / "data" / "orbloc_h2o_svp_S.npy"
-        S = np.load(S_path)
+        n_occ = molecule.number_of_alpha_occupied_orbitals(basis)
 
-        return molecule, basis, C_occ, S
+        return molecule, basis, scf_res, n_occ
 
-    @staticmethod
-    def _compute_dipoles(molecule, basis):
-        coords = molecule.get_coordinates_in_bohr()
-        nuclear_charges = molecule.get_element_ids()
-
-        origin = np.sum(coords.T * nuclear_charges,
-                        axis=1) / np.sum(nuclear_charges)
-
-        dip_ints = compute_electric_dipole_integrals(molecule, basis, origin)
-
-        return dip_ints
-
-    @staticmethod
-    def _get_atom_map(molecule, basis):
-        atom_map_raw = basis.get_ao_basis_map(molecule)
-        return [
-            int(atom_map_raw[i].split()[0]) for i in range(len(atom_map_raw))
-        ]
-
-    @staticmethod
-    def _align_phases(C_ref, C_test):
+    def _align_phases(self, C_ref, C_test):
         # This is indeed necessary, since even though the representation
         # between the MOs is "identical", there can still be a global phase
         # for each individual MO.
         C_aligned = C_test.copy()
+        unmatched = set(range(C_ref.shape[1]))
+
         for i in range(C_ref.shape[1]):
-            overlap = np.dot(C_ref[:, i], C_test[:, i])
-            if overlap < 0:
-                C_aligned[:, i] *= -1.0
+            for j in list(unmatched):
+                if np.max(np.abs(C_ref[:, i] - C_test[:, j])) < 1e-6:
+                    C_aligned[:, i] = C_test[:, j]
+                    unmatched.remove(j)
+                    break
+                elif np.max(np.abs(C_ref[:, i] + C_test[:, j])) < 1e-6:
+                    C_aligned[:, i] = -C_test[:, j]
+                    unmatched.remove(j)
+                    break
+
         return C_aligned
 
-    def test_boys(self):
-        molecule, basis, C, S = self._build_system()
-        dip_ints = self._compute_dipoles(molecule, basis)
+    @pytest.mark.parametrize(
+        "method, pm_projector, ref_name",
+        [
+            ("boys", None, "orbloc_boys_C"),
+            ("pm", "mulliken", "orbloc_pm_mulliken_C"),
+            ("pm", "lowdin", "orbloc_pm_lowdin_C"),
+        ],
+    )
+    def test_localization(self, method, pm_projector, ref_name):
+        molecule, basis, scf_res, n_occ = self._build_system()
 
-        loc = OrbitalLocalization()
-        loc.silent = True
-        C_loc = loc.boys(C.copy(), dip_ints)
+        loc = OrbitalLocalizationDriver()
+        loc.method = method
+        if pm_projector is not None:
+            loc.pm_projector = pm_projector
+        loc.ostream.mute()
 
-        # Load reference
-        ref_path = Path(__file__).parent / "data" / "orbloc_boys_C.npy"
-        C_ref = np.load(ref_path)
+        for mo_range in [None, (1, n_occ)]:
+            C_loc = loc.compute(molecule, basis, scf_res, mo_range=mo_range)
+            C_loc = C_loc["loc_orbs"].alpha_to_numpy()
 
-        # Align phases
-        C_loc = self._align_phases(C_ref, C_loc)
+            # Load reference
+            ref_path = Path(__file__).parent / "data" / f"{ref_name}.npy"
+            C_ref_occ = np.load(ref_path)
+            C_ref = np.zeros(C_loc.shape)
+            C_ref[:, :n_occ] = C_ref_occ[:, :]
 
-        # Compare
-        np.testing.assert_allclose(C_loc, C_ref, atol=1e-6)
+            # Align phases
+            C_loc = self._align_phases(C_ref, C_loc)
 
-        # Orthonormality check
-        identity_matrix = np.eye(C.shape[1])
-        np.testing.assert_allclose(np.matmul(C_loc.T, np.matmul(S, C_loc)),
-                                   identity_matrix,
-                                   atol=1e-8)
+            # Compare
+            np.testing.assert_allclose(C_loc, C_ref, atol=1e-6)
 
-    def test_pipek_mezey_mulliken(self):
-        molecule, basis, C, S = self._build_system()
-        atom_map = self._get_atom_map(molecule, basis)
+    @pytest.mark.parametrize("method", ["boys", "pm"])
+    def test_compute_does_not_mutate_scf_orbitals(self, method):
+        molecule, basis, scf_res, n_occ = self._build_system()
+        C_alpha = scf_res["C_alpha"].copy()
 
-        loc = OrbitalLocalization()
-        loc.silent = True
-        C_loc = loc.pipek_mezey(C.copy(), S, atom_map, projector="mulliken")
+        loc = OrbitalLocalizationDriver()
+        loc.method = method
+        loc.ostream.mute()
+        loc.compute(molecule, basis, scf_res, mo_range=(1, n_occ))
 
-        # Load reference
-        ref_path = Path(__file__).parent / "data" / "orbloc_pm_mulliken_C.npy"
-        C_ref = np.load(ref_path)
+        np.testing.assert_allclose(scf_res["C_alpha"], C_alpha, atol=0.0)
 
-        # Align phases
-        C_loc = self._align_phases(C_ref, C_loc)
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason="pytest.raises only valid in serial")
+    def test_mo_range_requires_uniform_occupations(self):
+        molecule, basis, scf_res, n_occ = self._build_system()
 
-        # Compare
-        np.testing.assert_allclose(C_loc, C_ref, atol=1e-6)
+        loc = OrbitalLocalizationDriver()
+        loc.ostream.mute()
 
-        # Orthonormality check
-        identity_matrix = np.eye(C.shape[1])
-        np.testing.assert_allclose(np.matmul(C_loc.T, np.matmul(S, C_loc)),
-                                   identity_matrix,
-                                   atol=1e-8)
+        with pytest.raises(VeloxChemError, match="same occupation number"):
+            loc.compute(molecule, basis, scf_res,
+                        mo_range=(n_occ, n_occ + 1))
 
-    def test_pipek_mezey_lowdin(self):
-        molecule, basis, C, S = self._build_system()
-        atom_map = self._get_atom_map(molecule, basis)
+    @pytest.mark.parametrize("method", ["boys", "pm"])
+    def test_compute_uses_configured_ostream(self, method, capsys):
+        molecule, basis, scf_res, n_occ = self._build_system()
 
-        loc = OrbitalLocalization()
-        loc.silent = True
-        C_loc = loc.pipek_mezey(C.copy(), S, atom_map, projector="lowdin")
+        loc = OrbitalLocalizationDriver(OutputStream(None))
+        loc.method = method
+        loc.compute(molecule, basis, scf_res, mo_range=(1, n_occ))
 
-        # Load reference
-        ref_path = Path(__file__).parent / "data" / "orbloc_pm_lowdin_C.npy"
-        C_ref = np.load(ref_path)
-
-        # Align phases
-        C_loc = self._align_phases(C_ref, C_loc)
-
-        # Compare
-        np.testing.assert_allclose(C_loc, C_ref, atol=1e-6)
-
-        # Orthonormality check
-        identity_matrix = np.eye(C.shape[1])
-        np.testing.assert_allclose(np.matmul(C_loc.T, np.matmul(S, C_loc)),
-                                   identity_matrix,
-                                   atol=1e-8)
+        captured = capsys.readouterr()
+        assert captured.out == ""

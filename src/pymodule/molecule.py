@@ -1447,7 +1447,8 @@ def _Molecule_show(self,
                    forming_bonds=None,
                    breaking_bonds=None,
                    forming_width=0.15,
-                   breaking_width=0.15):
+                   breaking_width=0.15,
+                   label_font_size=16):
     """
     Creates a 3D view with py3dmol.
 
@@ -1475,6 +1476,8 @@ def _Molecule_show(self,
         The radius of forming bonds.
     :param breaking_width:
         The radius of breaking bonds.
+    :param label_font_size:
+        The font size for atom labels and indices.
     """
 
     try:
@@ -1608,6 +1611,7 @@ def _Molecule_show(self,
                         'fontColor': 0x000000,
                         'backgroundColor': 0xffffff,
                         'backgroundOpacity': 0.0,
+                        'fontSize': label_font_size,
                     })
         viewer.setViewStyle({"style": "outline", "width": 0.05})
         viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
@@ -2005,36 +2009,40 @@ def _Molecule_contains_water_molecule(self):
 
 
 @staticmethod
-def _Molecule_read_name(mol_name):
+def _Molecule_read_name(mol_name, verbose=False):
     """
     Reads molecule from its name as a string using PubChem data.
 
     :param mol_name:
         The molecule name string.
+    :param verbose:
+        The information printout level.
 
     :return:
         The molecule.
     """
 
-    smiles_str = Molecule.name_to_smiles(mol_name)
+    smiles_str = Molecule.name_to_smiles(mol_name, verbose=verbose)
     mol = Molecule.read_smiles(smiles_str)
 
     return mol
 
 
 @staticmethod
-def _Molecule_name_to_smiles(mol_name):
+def _Molecule_name_to_smiles(mol_name, verbose=False):
     """
     Returns SMILES-string for a given molecule name using PubChem data.
 
     :param mol_name:
         The molecule name string.
+    :param verbose:
+        The information printout level.
 
     :return smiles_str:
         The SMILES-string of the molecule
     """
 
-    smiles_str, title, cid = get_data_from_name(mol_name)
+    smiles_str, title, cid = get_data_from_name(mol_name, verbose=verbose)
 
     return smiles_str
 

@@ -186,14 +186,15 @@ class AtomTypeIdentifier:
 
     def element_is_metal(self, element):
         return self.element_id_is_metal(chemical_element_identifier(element))
-    
+
     def element_id_is_metal(self, elem_id):
-        return ((elem_id in [3, 4, 11, 12, 13]) or
+        return (
+            (elem_id in [3, 4, 11, 12, 13]) or
             (19 <= elem_id and elem_id <= 31) or
             (37 <= elem_id and elem_id <= 50) or
             (55 <= elem_id and elem_id <= 83) or
             (87 <= elem_id and elem_id <= 116))
-        
+
     def detect_closed_cyclic_structures(self):
         """
         Detects closed cyclic structures in a molecule and determines their
@@ -690,7 +691,7 @@ class AtomTypeIdentifier:
         phosphorus_type = None
 
         # hypervalent phosphorus, 4 subst.
-        if (info['NumConnectedAtoms'] == 4 ):
+        if (info['NumConnectedAtoms'] == 4):
             connected_to_metal = any([self.element_is_metal(elem.upper()) for elem in connected_symbols])
             if 'O' in connected_symbols or connected_to_metal:
                 phosphorus_type = {'opls': 'opls_900P', 'gaff': 'p5'}

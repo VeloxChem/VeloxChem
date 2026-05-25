@@ -13,6 +13,7 @@ from veloxchem.scfgradientdriver import ScfGradientDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.scfrestopendriver import ScfRestrictedOpenDriver
+from veloxchem.errorhandler import VeloxChemError
 
 
 @pytest.mark.solvers
@@ -140,7 +141,7 @@ class TestScfGradientDriverMiscellaneous:
             molecule, basis)
         grad_drv = ScfGradientDriver(scf_drv)
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Not implemented for restricted open-shell'):
             grad_drv.compute(molecule, basis)
 
@@ -154,7 +155,7 @@ class TestScfGradientDriverMiscellaneous:
 
         grad_drv = ScfGradientDriver(scf_drv)
 
-        with pytest.raises(AssertionError, match='Invalid basis set for RI-J'):
+        with pytest.raises(VeloxChemError, match='Invalid basis set for RI-J'):
             grad_drv.compute(molecule, basis, scf_results)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
@@ -167,7 +168,7 @@ class TestScfGradientDriverMiscellaneous:
 
         grad_drv = ScfGradientDriver(scf_drv)
 
-        with pytest.raises(AssertionError, match='Invalid basis set for RI-J'):
+        with pytest.raises(VeloxChemError, match='Invalid basis set for RI-J'):
             grad_drv.compute(molecule, basis, scf_results)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
@@ -180,7 +181,7 @@ class TestScfGradientDriverMiscellaneous:
 
         grad_drv = ScfGradientDriver(scf_drv)
 
-        with pytest.raises(AssertionError, match='RI-JK is not yet supported'):
+        with pytest.raises(VeloxChemError, match='RI-JK is not yet supported'):
             grad_drv.compute(molecule, basis, scf_results)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
@@ -193,7 +194,7 @@ class TestScfGradientDriverMiscellaneous:
 
         grad_drv = ScfGradientDriver(scf_drv)
 
-        with pytest.raises(AssertionError, match='RI-JK is not yet supported'):
+        with pytest.raises(VeloxChemError, match='RI-JK is not yet supported'):
             grad_drv.compute(molecule, basis, scf_results)
 
     def test_restricted_gradient_timing_output_path(self):
@@ -246,7 +247,7 @@ class TestScfGradientDriverMiscellaneous:
 
         monkeypatch.setattr(scf_drv, 'compute', fake_compute)
 
-        with pytest.raises(AssertionError, match='SCF did not converge'):
+        with pytest.raises(VeloxChemError, match='SCF did not converge'):
             grad_drv.compute_energy(molecule, basis)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
@@ -261,7 +262,7 @@ class TestScfGradientDriverMiscellaneous:
 
         grad_drv = ScfGradientDriver(scf_drv)
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Cannot use SMD in gradient calculation'):
             grad_drv.compute_analytical_unrestricted(molecule, basis,
                                                      scf_results)

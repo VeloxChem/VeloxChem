@@ -158,6 +158,7 @@ from .tpatransitiondriver import TpaTransitionDriver
 from .threepatransitiondriver import ThreePATransitionDriver
 from .tpafulldriver import TpaFullDriver
 from .tpareddriver import TpaReducedDriver
+from .tpareddriver import TpaReducedDriver as TpaDriver
 from .espchargesdriver import EspChargesDriver
 from .respchargesdriver import RespChargesDriver
 from .rspproperty import ResponseProperty
@@ -178,6 +179,7 @@ from .subcommunicators import SubCommunicators
 from .peforcefieldgenerator import PEForceFieldGenerator
 from .firstorderpropdriver import FirstOrderPropertyDriver
 from .firstorderprop import FirstOrderProperties
+from .excitedstatemomentdriver import ExcitedStateMomentDriver
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .tddftgradientdriver import TddftGradientDriver
 from .hessiandriver import HessianDriver
@@ -220,7 +222,10 @@ from .tsguesser import TransitionStateGuesser
 from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
-from .orbitallocalization import OrbitalLocalization
+from .orbitallocalization import OrbitalLocalizationDriver
+from .ensembleparser import EnsembleParser
+from .ensembledriver import EnsembleDriver
+from .spectrumaverager import SpectrumAverager
 # for backward compatibility only
 from .cppsolver import ComplexResponseSolver as ComplexResponse
 from .tdacppsolver import ComplexResponseTdaSolver as ComplexResponseTDA

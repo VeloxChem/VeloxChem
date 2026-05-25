@@ -41,13 +41,13 @@ from .outputstream import OutputStream
 from .distributedarray import DistributedArray
 from .cppsolver import ComplexResponseSolver
 from .linearsolver import LinearSolver
-from .tpadriver import TpaDriver
+from .tpadriverbase import TpaDriverBase
 from .checkpoint import check_distributed_focks
 from .checkpoint import read_distributed_focks
 from .checkpoint import write_distributed_focks
 
 
-class TpaReducedDriver(TpaDriver):
+class TpaReducedDriver(TpaDriverBase):
     """
     Implements the reduced isotropic cubic response driver for two-photon
     absorption (TPA)
@@ -101,7 +101,7 @@ class TpaReducedDriver(TpaDriver):
             A dictonary with all the first-order response vectors in
             distributed form
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param nocc:
             Number of occupied orbitals
         :param norb:
@@ -218,7 +218,7 @@ class TpaReducedDriver(TpaDriver):
         :param F0_a:
             The Fock matrix in MO basis
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param molecule:
             The molecule
         :param ao_basis:
@@ -507,7 +507,7 @@ class TpaReducedDriver(TpaDriver):
         :param Nxy:
             A dict of the two index response vectors in distributed form
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param nocc:
             Number of occupied orbitals
         :param norb:
@@ -665,7 +665,7 @@ class TpaReducedDriver(TpaDriver):
         :param density_list:
             A list of tranformed compounded densities
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param molecule:
             The molecule
         :param ao_basis:
@@ -1001,14 +1001,14 @@ class TpaReducedDriver(TpaDriver):
 
         freqs = rsp_results['frequencies']
 
-        title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format('', 'Frequency', 'Real',
-                                                        'Imaginary')
+        title = '{:<8s}{:>14s}{:>21s}{:>22s}'.format('', 'Photon Energy', 'Real',
+                                                     'Imaginary')
         width = len(title)
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_header(('-' * len(title)).ljust(width))
 
         for w in freqs:
-            self._print_component('gamma', w, gamma[w, -w, w], width)
+            self._print_component('gamma', w, gamma[(w, -w, w)], width)
 
         self.ostream.print_blank()
 
