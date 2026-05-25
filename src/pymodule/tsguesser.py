@@ -115,6 +115,20 @@ class TransitionStateGuesser():
         self.mm_conformer_equivalence_threshold = 1e-1  # kJ/mol
         self.mm_scan_backward = False
 
+        # Implicit solvation during conformational sampling.
+        # Set implicit_solvent_model to one of 'gbn', 'gbn2', 'obc1', 'obc2',
+        # 'hct' to enable GB solvation; None runs in vacuum (default).
+        self.implicit_solvent_model: str | None = None
+        self.solute_dielectric: float = 1.0
+        self.solvent_dielectric: float = 78.39
+
+        # Named solvent for the QM SMD calculation, used automatically when
+        # implicit_solvent_model is set and do_qm_scan is True.
+        # Must be a solvent name recognised by VeloxChem's SMD driver
+        # (e.g. 'water', 'ethanol', 'acetonitrile'). Defaults to 'water'.
+        # Note: XTB does not support SMD; a warning is emitted in that case.
+        self.smd_solvent: str = 'water'
+
         self.scf_drv = None
         self.qm_xcfun = "PBE0"
         self.qm_basis = 'def2-svp'
@@ -156,7 +170,8 @@ class TransitionStateGuesser():
         """
         self.results = {}
         # Build forcefields and systems
-
+        if self.implicit_solvent_model is not None:
+            self.ffbuilder.calculate_resp = True
         self.build_forcefields(reactant, product, **build_forcefields_kwargs)
         self.build_systems(constraints)
 
@@ -178,7 +193,8 @@ class TransitionStateGuesser():
             self.ostream.mute()
 
         if self._reaction_matcher_assist_min_depth is not None:
-            self.ffbuilder._reaction_matcher_assist_min_depth = int(self._reaction_matcher_assist_min_depth)
+            self.ffbuilder._reaction_matcher_assist_min_depth = int(
+                self._reaction_matcher_assist_min_depth)
 
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_forcefields(
             reactant=reactant,
@@ -235,11 +251,18 @@ class TransitionStateGuesser():
             )
             self.ostream.flush()
 
+        configuration = dict(self.sys_builder_configuration)
+        if self.implicit_solvent_model is not None:
+            configuration[
+                'implicit_solvent_model'] = self.implicit_solvent_model
+            configuration['solute_dielectric'] = self.solute_dielectric
+            configuration['solvent_dielectric'] = self.solvent_dielectric
+
         self.systems, self.topology, _ = sysbuilder.build_systems(
             self.reactant,
             self.product,
             list(self.lambda_vector),
-            self.sys_builder_configuration,
+            configuration,
             constraints,
         )
         if self.mute_ff_build:
@@ -699,6 +722,29 @@ class TransitionStateGuesser():
             scf_drv = ScfRestrictedDriver()
             scf_drv.xcfun = self.qm_xcfun
             self.scf_drv = scf_drv
+
+            # When MM implicit solvation is active, mirror it on the QM driver via
+            # SMD.  Duck-type on solvation_model: SCF drivers expose it, XTB does
+            # not.  If the attribute is absent we warn and skip rather than error.
+            if self.implicit_solvent_model is not None:
+                if hasattr(self.scf_drv, 'solvation_model'):
+                    self.scf_drv.solvation_model = 'smd'
+                    self.scf_drv.smd_solvent = self.smd_solvent
+                else:
+                    self.ostream.print_warning(
+                        'QM driver does not support SMD solvation. '
+                        'Implicit solvation will not be applied to the QM scan. '
+                        'Use an SCF driver instead of XTB to enable SMD.')
+                    self.ostream.flush()
+        if self.implicit_solvent_model is not None:
+            if hasattr(
+                    self.scf_drv,
+                    'solvation_model') and self.scf_drv.solvation_model is None:
+                self.ostream.print_warning(
+                    'Implicit solvation turned on, but explicitly provided SCF'
+                    'driver has no solvation model activated. Continuing without QM solvation.'
+                    'Provide an SCF driver with a solvation model activated to enable QM solvation.'
+                )
 
         if self.mute_scf:
             self.scf_drv.ostream.mute()
@@ -1303,6 +1349,15 @@ class TransitionStateGuesser():
         self.ostream.print_header(f"folder name: {self.folder_name:>20}")
         self.ostream.print_header(
             f"saving MD traj:        {str(self.save_mm_traj):>10}")
+        if self.implicit_solvent_model is not None:
+            self.ostream.print_header(
+                f"implicit solvent:      {self.implicit_solvent_model:>10}")
+            self.ostream.print_header(
+                f"solvent dielectric:    {self.solvent_dielectric:>10.2f}")
+            self.ostream.print_header(
+                f"solute dielectric:     {self.solute_dielectric:>10.2f}")
+        else:
+            self.ostream.print_header(f"implicit solvent:           vacuum")
         self.ostream.print_blank()
         valstr = '{} | {} | {} | {} | {}'.format(
             'Lambda',
@@ -1332,6 +1387,11 @@ class TransitionStateGuesser():
         self.ostream.print_header(f"Basis:       {self.qm_basis:>10}")
         self.ostream.print_header(f"DFT xc fun:  {self.qm_xcfun:>10}")
         self.ostream.print_header(f"Max conf.:   {self.max_qm_conformers:>10}")
+        if self.implicit_solvent_model is not None:
+            self.ostream.print_header(f"Solvation:          SMD")
+            self.ostream.print_header(f"SMD solvent: {self.smd_solvent:>10}")
+        else:
+            self.ostream.print_header(f"Solvation:       vacuum")
         self.ostream.print_blank()
         self.ostream.flush()
         valsltr = '{} | {} | {} | {}'.format(
