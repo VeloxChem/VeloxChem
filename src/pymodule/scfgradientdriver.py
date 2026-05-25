@@ -122,6 +122,10 @@ class ScfGradientDriver(GradientDriver):
             not self.scf_driver.ri_jk,
             f'{type(self).__name__}.compute: RI-JK is not yet supported')
 
+        assert_msg_critical(
+            self.scf_driver.electric_field is None,
+            f'{type(self).__name__}.compute: electric_field is not supported')
+
         scf_results = self.scf_driver.scf_results
         if scf_results is None:
             # run SCF if needed
@@ -673,8 +677,7 @@ class ScfGradientDriver(GradientDriver):
         if self.timing and self.rank == mpi_master():
             self.ostream.print_info('Gradient timing decomposition')
             for key, val in grad_timing.items():
-                if val > 0.0:
-                    self.ostream.print_info(f'    {key:<25}:  {val:.2f} sec')
+                self.ostream.print_info(f'    {key:<25}:  {val:.2f} sec')
             self.ostream.print_blank()
 
     def compute_analytical_unrestricted(self, molecule, basis, scf_results):
@@ -866,6 +869,7 @@ class ScfGradientDriver(GradientDriver):
             grad_timing['XC_grad'] += time.time() - t0
 
         # Embedding contribution to the gradient
+
         self._add_embedding_gradient(molecule, basis, Da + Db, grad_timing)
 
         # CPCM contribution to gradient
@@ -890,8 +894,7 @@ class ScfGradientDriver(GradientDriver):
         if self.timing and self.rank == mpi_master():
             self.ostream.print_info('Gradient timing decomposition')
             for key, val in grad_timing.items():
-                if val > 0.0:
-                    self.ostream.print_info(f'    {key:<25}:  {val:.2f} sec')
+                self.ostream.print_info(f'    {key:<25}:  {val:.2f} sec')
             self.ostream.print_blank()
 
     def compute_energy(self, molecule, basis, scf_results_not_used=None):

@@ -41,7 +41,7 @@ from .veloxchemlib import make_matrix, mat_t, partition_atoms
 from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
                            NuclearPotentialGeom100Driver,
                            NuclearPotentialGeom010Driver, FockGeom1000Driver,
-                           ECPGradientDriver)
+                           EcpGradientDriver)
 from .matrices import Matrices
 from .matrix import Matrix
 from .profiler import Profiler
@@ -766,7 +766,7 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
 
         # ECP contribution
         if basis.has_ecp():
-            ecp_grad_drv = ECPGradientDriver()
+            ecp_grad_drv = EcpGradientDriver()
 
             core_electrons = basis.get_number_of_ecp_core_electrons()
             ecp_atom_indices = [

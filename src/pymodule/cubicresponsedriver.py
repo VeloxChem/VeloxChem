@@ -208,7 +208,7 @@ class CubicResponseDriver(NonlinearSolver):
             self.lindep_thresh = self.conv_thresh * 1.0e-6
 
         # check molecule
-        molecule_sanity_check(molecule)
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -234,13 +234,6 @@ class CubicResponseDriver(NonlinearSolver):
             self._print_header('Cubic Response Driver Setup')
 
         start_time = time.time()
-
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            'CubicResponseDriver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             S = scf_results['S']
@@ -476,7 +469,7 @@ class CubicResponseDriver(NonlinearSolver):
         F0 = self.comm.bcast(F0, root=mpi_master())
         norb = self.comm.bcast(norb, root=mpi_master())
 
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(ao_basis)
 
         eri_dict = self._init_eri(molecule, ao_basis)
 
@@ -526,18 +519,14 @@ class CubicResponseDriver(NonlinearSolver):
 
         for (wb, wc, wd) in freqtriples:
 
-            Na = ComplexResponseSolver.get_full_solution_vector(Nx[('A',
-                                                              (wb + wc + wd))])
+            Na = ComplexResponseSolver.get_full_solution_vector(Nx[('A', (wb + wc + wd))])
             Nb = ComplexResponseSolver.get_full_solution_vector(Nx[('B', wb)])
             Nc = ComplexResponseSolver.get_full_solution_vector(Nx[('C', wc)])
             Nd = ComplexResponseSolver.get_full_solution_vector(Nx[('D', wd)])
 
-            Nbc = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BC', wb, wc),
-                                                                wb + wc)])
-            Nbd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BD', wb, wd),
-                                                                wb + wd)])
-            Ncd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('CD', wc, wd),
-                                                                wc + wd)])
+            Nbc = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BC', wb, wc), wb + wc)])
+            Nbd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BD', wb, wd), wb + wd)])
+            Ncd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('CD', wc, wd), wc + wd)])
 
             if self.rank == mpi_master():
 
@@ -812,12 +801,9 @@ class CubicResponseDriver(NonlinearSolver):
             Nc = ComplexResponseSolver.get_full_solution_vector(Nx[('C', wc)])
             Nd = ComplexResponseSolver.get_full_solution_vector(Nx[('D', wd)])
 
-            Nbc = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BC', wb, wc),
-                                                                wb + wc)])
-            Nbd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BD', wb, wd),
-                                                                wb + wd)])
-            Ncd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('CD', wc, wd),
-                                                                wc + wd)])
+            Nbc = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BC', wb, wc), wb + wc)])
+            Nbd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BD', wb, wd), wb + wd)])
+            Ncd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('CD', wc, wd), wc + wd)])
 
             if self.rank != mpi_master():
                 continue
@@ -872,7 +858,7 @@ class CubicResponseDriver(NonlinearSolver):
             A dictonary with all the first-order response vectors in
             distributed form
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param nocc:
             Number of occupied orbitals
         :param nocc:
@@ -1008,7 +994,7 @@ class CubicResponseDriver(NonlinearSolver):
         :param Nxy:
             A dict of the two index response vectors in distributed form
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param nocc:
             Number of occupied orbitals
         :param norb:
@@ -1027,12 +1013,9 @@ class CubicResponseDriver(NonlinearSolver):
             Nc = ComplexResponseSolver.get_full_solution_vector(Nx[('C', wc)])
             Nd = ComplexResponseSolver.get_full_solution_vector(Nx[('D', wd)])
 
-            Nbc = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BC', wb, wc),
-                                                                wb + wc)])
-            Nbd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BD', wb, wd),
-                                                                wb + wd)])
-            Ncd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('CD', wc, wd),
-                                                                wc + wd)])
+            Nbc = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BC', wb, wc), wb + wc)])
+            Nbd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('BD', wb, wd), wb + wd)])
+            Ncd = ComplexResponseSolver.get_full_solution_vector(Nxy[(('CD', wc, wd), wc + wd)])
 
             if self.rank == mpi_master():
 
@@ -1135,7 +1118,7 @@ class CubicResponseDriver(NonlinearSolver):
         :param F0:
             The Fock matrix in MO basis
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param molecule:
             The molecule
         :param ao_basis:
@@ -1233,7 +1216,7 @@ class CubicResponseDriver(NonlinearSolver):
         :param F0:
             The Fock matrix in MO basis
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param molecule:
             The molecule
         :param ao_basis:
@@ -1352,8 +1335,7 @@ class CubicResponseDriver(NonlinearSolver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
-            Na = ComplexResponseSolver.get_full_solution_vector(Nx[('A',
-                                                              (wb + wc + wd))])
+            Na = ComplexResponseSolver.get_full_solution_vector(Nx[('A', (wb + wc + wd))])
             Nb = ComplexResponseSolver.get_full_solution_vector(Nx[('B', wb)])
             Nc = ComplexResponseSolver.get_full_solution_vector(Nx[('C', wc)])
             Nd = ComplexResponseSolver.get_full_solution_vector(Nx[('D', wd)])

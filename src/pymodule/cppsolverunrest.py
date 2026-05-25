@@ -43,8 +43,9 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
-from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
+from .checkpoint import check_rsp_hdf5
 from .inputparser import parse_seq_fixed
+from .resultsio import write_rsp_solution_with_multiple_keys
 
 
 class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
@@ -218,6 +219,10 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
         nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
         nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_unrestricted(
+                nocc_a, nocc_b, norb), 'response space')
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
         # DFT information
@@ -351,6 +356,8 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
                                               rsp_vector_labels, molecule,
                                               basis, dft_dict, pe_dict)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file
@@ -741,6 +748,7 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
                             'Response solution vectors written to file: ' +
                             final_h5_fname)
                         self.ostream.print_blank()
+                        self.ostream.flush()
 
                     ret_dict = {
                         'a_operator': self.a_operator,
@@ -756,8 +764,13 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
 
                     # write spectrum to h5 file
                     if final_h5_fname is not None:
+                        h5_ret_dict = {
+                            key: value
+                            for key, value in ret_dict.items()
+                            if key != 'solutions'
+                        }
                         self.write_cpp_rsp_results_to_hdf5(
-                            final_h5_fname, ret_dict)
+                            final_h5_fname, h5_ret_dict)
 
                     return ret_dict
                 else:
@@ -985,20 +998,39 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
         assert_msg_critical(self.property in ['absorption', 'ecd'],
                             'get_cpp_property_densities: Invalid CPP property')
 
-        assert_msg_critical(
-            ('x', w) in cpp_results['solutions'] and
-            ('y', w) in cpp_results['solutions'] and
-            ('z', w) in cpp_results['solutions'],
-            f'get_cpp_property_densities: Could not find frequency {w} in ' +
-            'CPP results')
+        if 'solutions' in cpp_results:
+            assert_msg_critical(
+                ('x', w) in cpp_results['solutions'] and
+                ('y', w) in cpp_results['solutions'] and
+                ('z', w) in cpp_results['solutions'],
+                f'get_cpp_property_densities: Could not find frequency {w} in ' +
+                'CPP results')
 
-        # solution vectors
-        cpp_solution_vector_x = self.get_full_solution_vector(
-            cpp_results['solutions'][('x', w)])
-        cpp_solution_vector_y = self.get_full_solution_vector(
-            cpp_results['solutions'][('y', w)])
-        cpp_solution_vector_z = self.get_full_solution_vector(
-            cpp_results['solutions'][('z', w)])
+            # solution vectors
+            cpp_solution_vector_x = self.get_full_solution_vector(
+                cpp_results['solutions'][('x', w)])
+            cpp_solution_vector_y = self.get_full_solution_vector(
+                cpp_results['solutions'][('y', w)])
+            cpp_solution_vector_z = self.get_full_solution_vector(
+                cpp_results['solutions'][('z', w)])
+
+        else:
+            if self.rank == mpi_master():
+                assert_msg_critical(
+                    f'x_x_{w:.8f}' in cpp_results and
+                    f'y_y_{w:.8f}' in cpp_results and
+                    f'z_z_{w:.8f}' in cpp_results,
+                    f'get_cpp_property_densities: Could not find frequency {w} in ' +
+                    'CPP results')
+
+                # solution vectors
+                cpp_solution_vector_x = cpp_results[f'x_x_{w:.8f}']
+                cpp_solution_vector_y = cpp_results[f'y_y_{w:.8f}']
+                cpp_solution_vector_z = cpp_results[f'z_z_{w:.8f}']
+            else:
+                cpp_solution_vector_x = None
+                cpp_solution_vector_y = None
+                cpp_solution_vector_z = None
 
         # property gradient for a operator
         a_grad_alpha = self.get_complex_prop_grad(self.a_operator,

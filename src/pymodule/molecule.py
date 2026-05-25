@@ -108,13 +108,13 @@ def _Molecule_smiles_to_xyz(smiles_str,
                 reordering = []
                 for atom in mol_full.GetAtoms():
                     # add non-hydrogen atom
-                    if (atom.GetAtomicNum() != 1 and
-                            atom.GetIdx() not in reordering):
+                    if (atom.GetAtomicNum() != 1
+                            and atom.GetIdx() not in reordering):
                         reordering.append(atom.GetIdx())
                         for nbr in atom.GetNeighbors():
                             # add neighboring hydrogen atoms
-                            if (nbr.GetAtomicNum() == 1 and
-                                    nbr.GetIdx() not in reordering):
+                            if (nbr.GetAtomicNum() == 1
+                                    and nbr.GetIdx() not in reordering):
                                 reordering.append(nbr.GetIdx())
                 for atom in mol_full.GetAtoms():
                     # For completeness, add remaining atoms
@@ -537,18 +537,42 @@ def _Molecule_effective_nuclear_repulsion_energy(self, basis):
 
 def _Molecule_nuclear_repulsion_energy(self, basis=None):
     """
-    Deprecated compatibility shim for effective nuclear repulsion energy.
+    Computes nuclear potential energy of a molecule.
 
     :param basis:
-        Deprecated. Use effective_nuclear_repulsion_energy(basis) instead.
+        Optional AO basis set object (for taking care of ECP core electrons).
     :return:
-        This function always raises.
+        The nuclear potential energy.
     """
 
-    assert_msg_critical(
-        False,
-        'Molecule.nuclear_repulsion_energy is deprecated; use Molecule.effective_nuclear_repulsion_energy(basis)'
-    )
+    coords_in_au = self.get_coordinates_in_bohr()
+    elem_ids = self.get_element_ids()
+
+    natoms = coords_in_au.shape[0]
+    e_nuc = 0.0
+
+    if basis is not None:
+        core_electrons = basis.get_number_of_ecp_core_electrons()
+        assert_msg_critical(
+            len(core_electrons) == natoms,
+            'Molecule.nuclear_repulsion_energy: ECP core electron list must match number of atoms'
+        )
+        assert_msg_critical(
+            np.all(np.array(core_electrons) >= 0),
+            'Molecule.nuclear_repulsion_energy: ECP core electrons must be non-negative'
+        )
+        elem_ids -= core_electrons
+
+    for i in range(natoms):
+        z_i = elem_ids[i]
+
+        for j in range(i + 1, natoms):
+            z_j = elem_ids[j]
+
+            distance = np.linalg.norm(coords_in_au[j] - coords_in_au[i])
+            e_nuc += z_i * z_j / distance
+
+    return e_nuc
 
 
 def _Molecule_get_effective_nuclear_charges(self, basis):
@@ -1423,7 +1447,8 @@ def _Molecule_show(self,
                    forming_bonds=None,
                    breaking_bonds=None,
                    forming_width=0.15,
-                   breaking_width=0.15):
+                   breaking_width=0.15,
+                   label_font_size=16):
     """
     Creates a 3D view with py3dmol.
 
@@ -1451,6 +1476,8 @@ def _Molecule_show(self,
         The radius of forming bonds.
     :param breaking_width:
         The radius of breaking bonds.
+    :param label_font_size:
+        The font size for atom labels and indices.
     """
 
     try:
@@ -1584,6 +1611,7 @@ def _Molecule_show(self,
                         'fontColor': 0x000000,
                         'backgroundColor': 0xffffff,
                         'backgroundOpacity': 0.0,
+                        'fontSize': label_font_size,
                     })
         viewer.setViewStyle({"style": "outline", "width": 0.05})
         viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
@@ -1979,36 +2007,40 @@ def _Molecule_contains_water_molecule(self):
 
 
 @staticmethod
-def _Molecule_read_name(mol_name):
+def _Molecule_read_name(mol_name, verbose=False):
     """
     Reads molecule from its name as a string using PubChem data.
 
     :param mol_name:
         The molecule name string.
+    :param verbose:
+        The information printout level.
 
     :return:
         The molecule.
     """
 
-    smiles_str = Molecule.name_to_smiles(mol_name)
+    smiles_str = Molecule.name_to_smiles(mol_name, verbose=verbose)
     mol = Molecule.read_smiles(smiles_str)
 
     return mol
 
 
 @staticmethod
-def _Molecule_name_to_smiles(mol_name):
+def _Molecule_name_to_smiles(mol_name, verbose=False):
     """
     Returns SMILES-string for a given molecule name using PubChem data.
 
     :param mol_name:
         The molecule name string.
+    :param verbose:
+        The information printout level.
 
     :return smiles_str:
         The SMILES-string of the molecule
     """
 
-    smiles_str, title, cid = get_data_from_name(mol_name)
+    smiles_str, title, cid = get_data_from_name(mol_name, verbose=verbose)
 
     return smiles_str
 

@@ -1,23 +1,16 @@
 from pathlib import Path
 from mpi4py import MPI
 import pytest
-import sys
 
 from veloxchem.conformergenerator import ConformerGenerator
 from veloxchem.molecule import Molecule
 
-try:
-    import openmm
-    import rdkit
-except ImportError:
-    pass
+pytest.importorskip("openmm")
+pytest.importorskip("rdkit")
 
 
 class TestConformerGenerator:
 
-    @pytest.mark.skipif("openmm" not in sys.modules or
-                        "rdkit" not in sys.modules,
-                        reason="openmm or rdkit not available")
     def test_conformergenerator(self):
 
         molecule = Molecule.read_xyz_string("""
@@ -125,9 +118,6 @@ class TestConformerGenerator:
                 for suffix in ['.xml', '.pdb']:
                     top_fpath.with_suffix(suffix).unlink()
 
-    @pytest.mark.skipif("openmm" not in sys.modules or
-                        "rdkit" not in sys.modules,
-                        reason="openmm or rdkit not available")
     def test_conformergenerator_with_macrocycle(self):
 
         # PubChem CID 6000

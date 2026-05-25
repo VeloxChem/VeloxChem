@@ -474,7 +474,7 @@ CFockDriver::set_block_size_factor(const int factor) -> void
 auto
 CFockDriver::_get_nao(const CMatrix& mat) const -> int
 {
-    return mat.number_of_rows();
+    return static_cast<int>(mat.number_of_rows());
 }
 
 auto
@@ -484,7 +484,7 @@ CFockDriver::_get_nao(const CMatrices& mats) const -> int
 
     auto mat_ptr = mats.matrix(keys[0]);
 
-    return mat_ptr->number_of_rows();
+    return static_cast<int>(mat_ptr->number_of_rows());
 }
 
 auto

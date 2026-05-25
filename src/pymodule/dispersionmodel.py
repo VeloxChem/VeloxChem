@@ -33,7 +33,7 @@
 import numpy as np
 import sys
 
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, print_exception_if_debug
 
 try:
     from dftd4.interface import DampingParam as D4Param
@@ -127,7 +127,8 @@ class DispersionModel:
         try:
             disp_res = disp_model.get_dispersion(D4Param(method=disp_xc_label),
                                                  grad=True)
-        except Exception as e:
+        except Exception:
+            print_exception_if_debug()
             errmsg = 'DispersionModel: Could not get dispersion correction for'
             errmsg += f' {xc_label}. Please use a more recent version of'
             errmsg += ' dftd4-python.\n'

@@ -128,6 +128,26 @@ class OrbitalViewer:
         return ('Unable to import ipywidgets or IPython.display.\n' +
                 'Please install jupyter notebook via pip or conda.')
 
+    def _get_orbital_colors(self):
+        """
+        Gets the positive and negative orbital colors for the active scheme.
+
+        :return:
+            A tuple with positive and negative orbital colors.
+        """
+
+        valid_color_schemes = {
+            'default': (0x0000ff, 0xff0000),
+            'alternative': (0x62a0ea, 0xe5a50a),
+        }
+
+        errmsg = ('OrbitalViewer: orbital_color_scheme must be '
+                  '\'default\' or \'alternative\'')
+        assert_msg_critical(self.orbital_color_scheme in valid_color_schemes,
+                            errmsg)
+
+        return valid_color_schemes[self.orbital_color_scheme]
+
     def initialize(self, molecule, basis):
         """
         Initializes molecule and cubic grid; pre-computes atomic orbitals.
@@ -380,6 +400,21 @@ class OrbitalViewer:
                 ]
 
         return np_orb
+
+    def visualize(self, molecule, basis, mo_inp, label='', width=600, height=450):
+        """
+        Visualizes the orbitals, with a widget to choose which.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param mo_inp:
+            The MolecularOrbitals input (filename of h5 file storing the
+            MolecularOrbitals, or a MolecularOrbitals object).
+        """
+
+        self._plot_using_py3dmol(molecule, basis, mo_inp, label, width, height)
 
     def plot(self, molecule, basis, mo_inp, label='', width=600, height=450):
         """
@@ -726,11 +761,8 @@ class OrbitalViewer:
         isovalue = self.orbital_isovalue
         opacity = self.orbital_opacity
         wireframe = False
-
-        if self.orbital_color_scheme == 'default':
-            color = 0x0000ff
-        elif self.orbital_color_scheme == 'alternative':
-            color = 0x62a0ea
+        positive_color, negative_color = self._get_orbital_colors()
+        color = positive_color
 
         # Find if the user changed the defaults
         if self._plt_iso_one:
@@ -752,11 +784,7 @@ class OrbitalViewer:
 
         # Find if the user changed the defaults
         isovalue = -isovalue
-
-        if self.orbital_color_scheme == 'default':
-            color = 0xff0000
-        elif self.orbital_color_scheme == 'alternative':
-            color = 0xe5a50a
+        color = negative_color
 
         if self._plt_iso_two:
             isovalue = self._plt_iso_two.level
@@ -990,12 +1018,7 @@ class OrbitalViewer:
 
         isovalue = self.orbital_isovalue
         opacity = self.orbital_opacity
-        if self.orbital_color_scheme == 'default':
-            positive_color = 0x0000ff
-            negative_color = 0xff0000
-        elif self.orbital_color_scheme == 'alternative':
-            positive_color = 0x62a0ea
-            negative_color = 0xe5a50a
+        positive_color, negative_color = self._get_orbital_colors()
 
         viewer.addVolumetricData(orbital_cube_str, "cube", {
             "isoval": isovalue,
