@@ -170,7 +170,8 @@ class TransitionStateGuesser():
         """
         self.results = {}
         # Build forcefields and systems
-
+        if self.implicit_solvent_model is not None:
+            self.ffbuilder.calculate_resp = True
         self.build_forcefields(reactant, product, **build_forcefields_kwargs)
         self.build_systems(constraints)
 
@@ -1356,8 +1357,7 @@ class TransitionStateGuesser():
             self.ostream.print_header(
                 f"solute dielectric:     {self.solute_dielectric:>10.2f}")
         else:
-            self.ostream.print_header(
-                f"implicit solvent:           vacuum")
+            self.ostream.print_header(f"implicit solvent:           vacuum")
         self.ostream.print_blank()
         valstr = '{} | {} | {} | {} | {}'.format(
             'Lambda',
@@ -1389,8 +1389,7 @@ class TransitionStateGuesser():
         self.ostream.print_header(f"Max conf.:   {self.max_qm_conformers:>10}")
         if self.implicit_solvent_model is not None:
             self.ostream.print_header(f"Solvation:          SMD")
-            self.ostream.print_header(
-                f"SMD solvent: {self.smd_solvent:>10}")
+            self.ostream.print_header(f"SMD solvent: {self.smd_solvent:>10}")
         else:
             self.ostream.print_header(f"Solvation:       vacuum")
         self.ostream.print_blank()
