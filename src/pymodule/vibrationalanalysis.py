@@ -447,6 +447,8 @@ class VibrationalAnalysis:
             hessian = self.hessian
 
         masses = molecule.get_masses()
+        if self.hessian_driver.atom_pairs is not None:
+            masses = [masses[i] for i in atoms]
 
         # modify masses according to the isotopes
         if self.isotopes is not None:
