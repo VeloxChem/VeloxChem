@@ -104,6 +104,23 @@ class ConformerGenerator:
 
         self.use_gromacs_files = False
 
+    def count_conformer_combinations(self, molecule):
+        top_file_name = self.top_file_name
+        if top_file_name is None:
+            top_file_name = "MOL"
+
+        # Avoid RESP unless explicitly desired/provided
+        partial_charges = self.partial_charges
+        if partial_charges is None:
+            partial_charges = molecule.get_partial_charges(molecule.get_charge())
+
+        dihedrals_candidates, _, _ = self._get_dihedral_candidates(molecule, top_file_name, partial_charges)
+
+        if not dihedrals_candidates:
+            return 1
+
+        return int(np.prod([len(angles) for _, angles in dihedrals_candidates]))
+
     def _analyze_equiv(self, molecule):
 
         idtf = AtomTypeIdentifier()
