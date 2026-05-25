@@ -159,6 +159,11 @@ class EvbSystemBuilder():
         self.water_model: str
         self.decompose_bonded = True
         self.decompose_nb: list | None = None
+
+        self.implicit_solvent_model: str | None = None
+        self.solute_dielectric: float = 1.0
+        self.solvent_dielectric: float = 78.39
+
         self.keywords = {
             "temperature": float,  # -> system dependent
             "nb_cutoff": float,  # ->
@@ -197,6 +202,9 @@ class EvbSystemBuilder():
             "CNT_radius_nm": float,
             "decompose_nb": list,
             "decompose_bonded": bool,
+            "implicit_solvent_model": str,
+            "solute_dielectric": float,
+            "solvent_dielectric": float,
         }
 
     def build_systems(
@@ -287,6 +295,17 @@ class EvbSystemBuilder():
 
         if self.pressure > 0:
             barostat_not_used = self._add_barostat(system)
+
+        if self.implicit_solvent_model is not None:
+            assert_msg_critical(
+                not self.solvent,
+                'EvbSystemBuilder: implicit_solvent_model and solvent (explicit) '
+                'cannot be used simultaneously.')
+            assert_msg_critical(
+                not self.CNT and not self.graphene,
+                'EvbSystemBuilder: implicit_solvent_model is not compatible '
+                'with CNT or graphene environments.')
+            self._add_implicit_solvent(system, topology, nb_force)
 
         E_field = None
         if np.any(np.array(self.E_field) > 0.001):
@@ -1191,8 +1210,89 @@ class EvbSystemBuilder():
         system.addForce(barostat)
         return barostat
 
+    def _add_implicit_solvent(self, system, topology, nb_force):
+        """Add a GB implicit solvent force to the system.
+
+        Mirrors the logic in OpenMM's implicit solvent XML scripts: selects the
+        appropriate CustomGBForce subclass, obtains per-atom radii and scaling
+        factors from getStandardParameters (element-based Bondi radii), reads
+        charges from the existing NonbondedForce, and attaches the finalized
+        force to the system.
+
+        :param system: the OpenMM System to add the force to.
+        :param topology: the OpenMM Topology (all atoms must already be added).
+        :param nb_force: the NonbondedForce already present in the system.
+        """
+        assert_msg_critical('openmm' in sys.modules,
+                            'openmm is required for EvbSystemBuilder.')
+
+        from openmm.app.internal.customgbforces import (
+            GBSAGBnForce,
+            GBSAGBn2Force,
+            GBSAOBC1Force,
+            GBSAOBC2Force,
+            GBSAHCTForce,
+        )
+
+        model_map = {
+            'gbn': GBSAGBnForce,
+            'gbn2': GBSAGBn2Force,
+            'obc1': GBSAOBC1Force,
+            'obc2': GBSAOBC2Force,
+            'hct': GBSAHCTForce,
+        }
+
+        model_key = self.implicit_solvent_model.lower()
+        assert_msg_critical(
+            model_key in model_map,
+            f'EvbSystemBuilder: unknown implicit_solvent_model '
+            f'"{self.implicit_solvent_model}". '
+            f'Valid options are: {list(model_map.keys())}')
+
+        ForceClass = model_map[model_key]
+
+        gb_force = ForceClass(
+            solventDielectric=self.solvent_dielectric,
+            soluteDielectric=self.solute_dielectric,
+            SA='ACE',
+        )
+
+        # getStandardParameters returns [[radius, scalingFactor], ...] per atom,
+        # using element-based Bondi radii derived from the topology.
+        std_params = ForceClass.getStandardParameters(topology)
+        for i, gb_params in enumerate(std_params):
+            charge = nb_force.getParticleParameters(i)[0]
+            gb_force.addParticle([charge] + list(gb_params))
+
+        gb_force.finalize()
+        gb_force.setNonbondedMethod(mm.CustomNonbondedForce.NoCutoff)
+
+        # Required by OpenMM when GB is active: set reaction-field dielectric
+        # of the NonbondedForce to 1 so it does not double-count dielectric
+        # screening.
+        nb_force.setReactionFieldDielectric(1)
+
+        system.addForce(gb_force)
+        self.ostream.print_info(
+            f'Added implicit solvent ({self.implicit_solvent_model}) with '
+            f'solvent_dielectric={self.solvent_dielectric}, '
+            f'solute_dielectric={self.solute_dielectric}')
+        self.ostream.flush()
+
     def _interpolate_system(self, system, lambda_vec, nb_force, E_field_force):
         systems = {}
+
+        # Locate the GB force once so we can keep its per-particle charges in
+        # sync with the interpolated NB charges before each deepcopy.
+        gb_force = None
+        if self.implicit_solvent_model is not None:
+            gb_candidates = [
+                f for f in system.getForces()
+                if isinstance(f, mm.CustomGBForce)
+            ]
+            if gb_candidates:
+                gb_force = gb_candidates[0]
+
         for lam in lambda_vec:
             total_charge = 0
             if not self.no_reactant:
@@ -1219,6 +1319,14 @@ class EvbSystemBuilder():
 
                     nb_force.setParticleParameters(self.reaction_atoms[i].index,
                                                    charge, sigma, epsilon)
+
+                    # Mirror the interpolated charge into the GB force so each
+                    # deepcopy carries the correct lambda-dependent charge.
+                    if gb_force is not None:
+                        atom_index = self.reaction_atoms[i].index
+                        gb_params = list(gb_force.getParticleParameters(atom_index))
+                        gb_params[0] = charge
+                        gb_force.setParticleParameters(atom_index, gb_params)
 
             # Add the interpolated charge to the E_field for both the system and environment
             for i in range(system.getNumParticles()):
