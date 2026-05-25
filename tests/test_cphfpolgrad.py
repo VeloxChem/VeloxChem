@@ -9,7 +9,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lrsolver import LinearResponseSolver
-from veloxchem.cppsolver import ComplexResponse
+from veloxchem.cppsolver import ComplexResponseSolver
 from veloxchem.polorbitalresponse import PolOrbitalResponse
 
 
@@ -21,7 +21,7 @@ class TestCphfPolgrad:
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun
         scf_drv.ostream.mute()
-        scf_tensors = scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
 
         # linear response
         rsp_settings = {'conv_thresh': 1.0e-5, 'frequencies': (0.0, 0.4)}
@@ -30,15 +30,15 @@ class TestCphfPolgrad:
         lr_drv.b_operator = "electric dipole"
         lr_drv.update_settings(rsp_settings)
         lr_drv.ostream.mute()
-        lr_results = lr_drv.compute(molecule, basis, scf_tensors)
+        lr_results = lr_drv.compute(molecule, basis, scf_results)
 
         # test real analytical gradient
         cphfpolgrad_solver = PolOrbitalResponse()
         cphfpolgrad_settings = {'conv_thresh':2e-7, 'frequencies': (0.0, 0.4)}
         cphfpolgrad_solver.update_settings(cphfpolgrad_settings)
         cphfpolgrad_solver.ostream.mute()
-        cphfpolgrad_solver.compute(molecule, basis, scf_tensors, lr_results)
-        cphfpolgrad_solver.compute_omega(molecule, basis, scf_tensors, lr_results)
+        cphfpolgrad_solver.compute(molecule, basis, scf_results, lr_results)
+        cphfpolgrad_solver.compute_omega(molecule, basis, scf_results, lr_results)
 
         # get CPHF lambda coefficients from dist array
         dist_cphf_coefficients = cphfpolgrad_solver.cphf_results['dist_cphf_ov']
@@ -87,17 +87,17 @@ class TestCphfPolgrad:
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun
         scf_drv.ostream.mute()
-        scf_tensors = scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
 
         # linear response
         rsp_settings = {'conv_thresh': 1.0e-5, 'frequencies': (0.0, 0.4),
                         'damping': 0.5}
-        lr_drv = ComplexResponse()
+        lr_drv = ComplexResponseSolver()
         lr_drv.a_operator = "electric dipole"
         lr_drv.b_operator = "electric dipole"
         lr_drv.update_settings(rsp_settings)
         lr_drv.ostream.mute()
-        lr_results = lr_drv.compute(molecule, basis, scf_tensors)
+        lr_results = lr_drv.compute(molecule, basis, scf_results)
 
         # test complex analytical gradient
         cphfpolgrad_solver = PolOrbitalResponse()
@@ -105,8 +105,8 @@ class TestCphfPolgrad:
                                 'is_complex': 'yes', 'damping': 0.5}
         cphfpolgrad_solver.update_settings(cphfpolgrad_settings)
         cphfpolgrad_solver.ostream.mute()
-        cphfpolgrad_solver.compute(molecule, basis, scf_tensors, lr_results)
-        cphfpolgrad_solver.compute_omega(molecule, basis, scf_tensors, lr_results)
+        cphfpolgrad_solver.compute(molecule, basis, scf_results, lr_results)
+        cphfpolgrad_solver.compute_omega(molecule, basis, scf_results, lr_results)
 
         # get CPHF lambda coefficients from dist. array
         dist_cphf_coefficients = cphfpolgrad_solver.cphf_results['dist_cphf_ov']

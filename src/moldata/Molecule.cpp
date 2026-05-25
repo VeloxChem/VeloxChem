@@ -552,6 +552,36 @@ CMolecule::get_covalent_radii() const -> std::vector<double>
 }
 
 auto
+CMolecule::shift_origin(const int atom) const -> CMolecule
+{
+    const auto rxyz = _coordinates.at(atom).coordinates();
+    
+    std::vector<TPoint<double>> coords;
+    
+    for (int i = 0; i < number_of_atoms(); i++)
+    {
+        if (i == atom)
+        {
+            coords.push_back(TPoint<double>({0.0, 0.0, 0.0})); 
+        }
+        else
+        {
+            const auto lxyz = _coordinates.at(i).coordinates();
+            
+            coords.push_back(TPoint<double>({lxyz[0] - rxyz[0], lxyz[1] - rxyz[1], lxyz[2] - rxyz[2]}));
+        }
+    }
+    
+    CMolecule new_mol(_identifiers, coords, "au", _atom_basis_labels);
+    
+    new_mol.set_charge(_charge);
+    
+    new_mol.set_multiplicity(_multiplicity);
+    
+    return new_mol; 
+}
+
+auto
 CMolecule::_is_angstrom(const std::string &unit) const -> bool
 {
     if (unit.length() >= 3)

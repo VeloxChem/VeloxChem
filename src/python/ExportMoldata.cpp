@@ -284,10 +284,6 @@ export_moldata(py::module &m)
              "unit"_a = std::string("au"))
         .def("set_atom_coordinates", &CMolecule::set_atom_coordinates, "Sets coordinates (x,y,z) of atom.", "iatom"_a, "xyz"_a)
         .def("atom_indices", &CMolecule::atom_indices, "Gets indices of atoms with requested atomic label.")
-        .def("nuclear_repulsion_energy",
-             &CMolecule::nuclear_repulsion_energy,
-             "Gets nuclear repulsion energy for molecule assuming point charge "
-             "model for nucleus.")
         .def("check_proximity",
              &CMolecule::check_proximity,
              "Checks if proximity requirement is satisfied by all pairs of atoms "

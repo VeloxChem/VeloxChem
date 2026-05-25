@@ -34,8 +34,8 @@ from contextlib import redirect_stderr
 from io import StringIO
 from pathlib import Path
 import numpy as np
-import h5py
 import tempfile
+import re
 
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
@@ -46,12 +46,13 @@ from .xtbdriver import XtbDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
 from .lrsolver import LinearResponseSolver
-from .cppsolver import ComplexResponse
+from .cppsolver import ComplexResponseSolver
 from .veloxchemlib import (mpi_master, bohr_in_angstrom, avogadro_constant,
                            fine_structure_constant, electron_mass_in_amu,
                            amu_in_kg, speed_of_light_in_vacuum_in_SI)
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, get_random_string_serial
+from .resultsio import write_results_to_hdf5
 from .sanitychecks import raman_sanity_check
 
 with redirect_stderr(StringIO()) as fg_err:
@@ -141,6 +142,9 @@ class VibrationalAnalysis:
         self.rr_damping = None
         self.frequencies = (0, )
 
+        # Dictionary to define the isotopes
+        self.isotopes = None
+
         # Excited-state index in case of
         # excited-state vibrational analysis.
         self.state_deriv_index = None
@@ -226,6 +230,8 @@ class VibrationalAnalysis:
                 ('bool', 'whether to print Raman depolarization ratio'),
                 'temperature': ('float', 'the temperature'),
                 'pressure': ('float', 'the pressure'),
+                'isotopes': ('str',
+                             'atomic masses in amu for isotope analysis'),
                 'state_deriv_index': ('int', 'excited state index'),
                 'frequencies': ('seq_range',
                                 'frequencies of external electric field'),
@@ -290,7 +296,7 @@ class VibrationalAnalysis:
         self.rsp_dict = dict(rsp_dict)
         self.polgrad_dict = dict(polgrad_dict)
 
-    def compute(self, molecule, ao_basis=None, min_basis=None):
+    def compute(self, molecule, ao_basis=None):
         """
         Drives the computation of the vibrational analysis and
         associated properties.
@@ -299,8 +305,6 @@ class VibrationalAnalysis:
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
 
         :returns:
             The dictionary with vibrational analysis results.
@@ -333,9 +337,13 @@ class VibrationalAnalysis:
             self.frequency_analysis(molecule)
             vib_results['gibbs_free_energy'] = self.gibbs_free_energy
             vib_results['free_energy_summary'] = self.free_energy_summary
+            vib_results['hessian'] = self.hessian
             vib_results['vib_frequencies'] = self.vib_frequencies
-            # normalized
-            vib_results['normal_modes'] = self.normal_modes
+            vib_results['number_of_modes'] = len(self.vib_frequencies)
+            # Keep the in-memory representation aligned with current HDF5
+            # storage until downstream consumers are updated together.
+            vib_results['normal_modes'] = self.normal_modes.reshape(
+                len(self.vib_frequencies), molecule.number_of_atoms(), 3)
 
             # calculate force constants
             (self.reduced_masses,
@@ -345,6 +353,7 @@ class VibrationalAnalysis:
 
             # calculate the gradient of the dipole moment for IR intensities
             if self.do_ir:
+                vib_results['dipole_gradient'] = self.dipole_gradient
                 self.ir_intensities = self.calculate_ir_intensity(
                     self.raw_normal_modes)
                 vib_results['ir_intensities'] = self.ir_intensities
@@ -354,8 +363,14 @@ class VibrationalAnalysis:
                 (self.raman_activities, self.int_pol, self.int_depol,
                  self.depol_ratio) = self.calculate_raman_activity(
                      self.raw_normal_modes)
+                vib_results['number_of_external_frequencies'] = len(
+                    self.frequencies)
                 vib_results['external_frequencies'] = self.frequencies
                 vib_results['raman_activities'] = self.raman_activities
+                vib_results['polarizability_gradient'] = (
+                    self.polarizability_gradient)
+                vib_results['raman_type'] = (
+                    'resonance' if self.do_resonance_raman else 'normal')
                 if self.depol_ratio is not None:
                     vib_results['depolarization_ratios'] = self.depol_ratio
             elif (self.do_raman or self.do_resonance_raman) and self.is_xtb:
@@ -371,7 +386,7 @@ class VibrationalAnalysis:
             self.print_vibrational_analysis(molecule)
 
             # create binary file and save vibrational analysis results
-            self._write_final_hdf5(molecule)
+            self._write_final_hdf5(vib_results)
 
             return vib_results
         else:
@@ -393,6 +408,11 @@ class VibrationalAnalysis:
                    '  vibrational analysis. Please install the latest\n' +
                    '  geometric via pip or conda.\n')
         assert_msg_critical(hasattr(geometric, 'normal_modes'), err_msg)
+
+        title = 'Free Energy Analysis'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
 
         # number of atoms, elements, and coordinates
 
@@ -426,6 +446,40 @@ class VibrationalAnalysis:
 
             hessian = self.hessian
 
+        masses = molecule.get_masses()
+
+        # modify masses according to the isotopes
+        if self.isotopes is not None:
+
+            for entry in self.isotopes.split(','):
+                m = re.search(r'^(.*)\((.*)\)$', entry.strip())
+                assert_msg_critical(
+                    m is not None,
+                    'VibrationalAnalysis.frequency_analysis: Invalid input ' +
+                    'for isotopes')
+
+                label = m.group(1).strip()
+                mass = m.group(2).strip()
+
+                if label.isdigit():
+                    assert_msg_critical(
+                        (int(label) == float(label) and int(label) >= 1
+                         and int(label) <= natm),
+                        'VibrationalAnalysis.frequency_analysis: Invalid ' +
+                        'input for one-based atom index')
+                    masses[int(label) - 1] = float(mass)
+                    self.ostream.print_info(f'Using isotope mass {mass} for ' +
+                                            f'atom {label}')
+
+                elif isinstance(label, str):
+                    self.ostream.print_info(
+                        f'Using isotope mass {mass} for {label}')
+                    for iatom in range(natm):
+                        if label.lower() == elem[iatom].lower():
+                            masses[iatom] = float(mass)
+
+            self.ostream.print_blank()
+
         try:
             temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         except TypeError:
@@ -440,6 +494,7 @@ class VibrationalAnalysis:
                 coords,
                 hessian,
                 elem,
+                mass=masses,
                 energy=self.elec_energy,
                 temperature=self.temperature,
                 pressure=self.pressure,
@@ -474,11 +529,6 @@ class VibrationalAnalysis:
             vdata_file.is_file(),
             'VibrationalAnalysis.frequency_analysis: cannot find vdata file ' +
             f'{str(vdata_file)}')
-
-        title = 'Free Energy Analysis'
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
 
         text = []
         with vdata_file.open() as fh:
@@ -723,7 +773,7 @@ class VibrationalAnalysis:
         # check if both normal and resonance Raman requested
         raman_sanity_check(self)
 
-        scf_tensors = self.scf_driver.scf_tensors
+        scf_results = self.scf_driver.scf_results
 
         # set up the polarizability gradient driver
         polgrad_drv = PolarizabilityGradient(self.scf_driver, self.comm,
@@ -744,16 +794,16 @@ class VibrationalAnalysis:
         # perform a linear response calculation
         if self.do_resonance_raman:
             polgrad_drv.is_complex = True
-            lr_drv = ComplexResponse(self.comm, self.ostream)
+            lr_drv = ComplexResponseSolver(self.comm, self.ostream)
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
             lr_drv.damping = polgrad_drv.damping
             # get absorption cross section from CPP calculations
-            lr_drv.cpp_flag = 'absorption'
+            lr_drv.property = 'absorption'
             # don't save the solution vectors
             lr_drv.save_solutions = False
             if 'frequencies' not in self.rsp_dict:
                 lr_drv.frequencies = polgrad_drv.frequencies
-            lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
+            lr_results = lr_drv.compute(molecule, ao_basis, scf_results)
         else:
             lr_drv = LinearResponseSolver(self.comm, self.ostream)
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
@@ -761,10 +811,10 @@ class VibrationalAnalysis:
             lr_drv.save_solutions = False
             if 'frequencies' not in self.rsp_dict:
                 lr_drv.frequencies = self.frequencies
-            lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
+            lr_results = lr_drv.compute(molecule, ao_basis, scf_results)
 
         # compute polarizability gradient
-        polgrad = polgrad_drv.compute(molecule, ao_basis, scf_tensors,
+        polgrad = polgrad_drv.compute(molecule, ao_basis, scf_results,
                                       lr_results)
 
         # save the gradient
@@ -867,7 +917,7 @@ class VibrationalAnalysis:
 
             if self.do_raman and (self.raman_activities is not None):
                 freq_unit = ' a.u.'
-                #freqs = list(self.raman_activities.keys())
+                # freqs = list(self.raman_activities.keys())
                 freqs = list(self.frequencies)
                 for i, freq in enumerate(freqs):
                     if freq == 0.0:
@@ -966,7 +1016,7 @@ class VibrationalAnalysis:
             pass
 
         number_of_modes = len(self.vib_frequencies)
-        #freqs = list(self.raman_activities.keys())
+        # freqs = list(self.raman_activities.keys())
         freqs = list(self.frequencies)
 
         title = 'Resonance Raman'
@@ -998,24 +1048,24 @@ class VibrationalAnalysis:
             # TODO figure out how to (maybe) also print depolarization infor
             # with resonance Raman
 
-            #if self.print_depolarization_ratio:
-            #    column_string = '{:>16s}  {:>24s} {:>20s} {:>24s} {:>14s}'.format(
-            #        'Frequency', 'Raman activity', 'Parallel',
-            #        'Perpendicular', 'Depol. ratio')
-            #    unit_string = f'{"(a.u)":16s}  {"(A**4/amu)":24s} {"(A**4/amu)":20s} {"(A**4/amu)"}'
-            #    self.ostream.print_header(column_string.ljust(width))
-            #    self.ostream.print_header(unit_string.ljust(width))
-            #    self.ostream.print_header('-' * width)
+            # if self.print_depolarization_ratio:
+            #     column_string = '{:>16s}  {:>24s} {:>20s} {:>24s} {:>14s}'.format(
+            #         'Frequency', 'Raman activity', 'Parallel',
+            #         'Perpendicular', 'Depol. ratio')
+            #     unit_string = f'{"(a.u)":16s}  {"(A**4/amu)":24s} {"(A**4/amu)":20s} {"(A**4/amu)"}'
+            #     self.ostream.print_header(column_string.ljust(width))
+            #     self.ostream.print_header(unit_string.ljust(width))
+            #     self.ostream.print_header('-' * width)
 
-            #    # loop through the external frequencies
-            #    for i, freq in enumerate(freqs):
-            #        raman_str = '{:16.6f} {:18.4f} {:18.4f} {:18.4f} {:18.4f}'.format(
-            #            freq, self.raman_activities[i,k], self.int_pol[i,k],
-            #            self.int_depol[i,k], self.depol_ratio[i,k])
-            #        self.ostream.print_header(raman_str.ljust(width))
+            #     # loop through the external frequencies
+            #     for i, freq in enumerate(freqs):
+            #         raman_str = '{:16.6f} {:18.4f} {:18.4f} {:18.4f} {:18.4f}'.format(
+            #             freq, self.raman_activities[i,k], self.int_pol[i,k],
+            #             self.int_depol[i,k], self.depol_ratio[i,k])
+            #         self.ostream.print_header(raman_str.ljust(width))
 
-            #    self.ostream.print_blank()
-            #    self.ostream.print_blank()
+            #     self.ostream.print_blank()
+            #     self.ostream.print_blank()
 
         self.ostream.flush()
 
@@ -1032,7 +1082,7 @@ class VibrationalAnalysis:
             return
 
         number_of_modes = len(self.vib_frequencies)
-        #freqs = list(self.raman_activities.keys())
+        # freqs = list(self.raman_activities.keys())
         freqs = list(self.frequencies)
 
         # open output file
@@ -1224,78 +1274,42 @@ class VibrationalAnalysis:
             index for index, element in enumerate(lst) if element in targets
         ]
 
-    def _write_final_hdf5(self, molecule):
+    def _write_final_hdf5(self, vib_results):
         """
         Writes final HDF5 file that contains results
         from vibrational analysis
 
-        :param molecule:
-            The molecule.
+        :param vib_results:
+            The vibrational analysis results dictionary.
         """
 
         if self.filename is not None:
             results_h5_file = f"{self.filename}.h5"
-            self.write_vib_results_to_hdf5(molecule, results_h5_file)
+            self.write_vib_results_to_hdf5(results_h5_file, vib_results)
 
-    def write_vib_results_to_hdf5(self, molecule, fname):
+    def write_vib_results_to_hdf5(self, fname, vib_results):
         """
         Writes vibrational analysis results to HDF5 file.
 
-        :param molecule:
-            The molecule.
         :param fname:
             Name of the HDF5 file.
+        :param vib_results:
+            The vibrational analysis results dictionary.
         """
 
         if not (fname and isinstance(fname, str) and Path(fname).is_file()):
             return
 
-        hf = h5py.File(fname, 'a')
+        write_results_to_hdf5(fname,
+                              'vib',
+                              vib_results,
+                              value_label='vibrational result')
 
-        vib_group = 'vib/'
-
-        natm = molecule.number_of_atoms()
-        nmodes = len(self.vib_frequencies)
-        nfreqs = len(self.frequencies)
-
-        nuc_rep = molecule.nuclear_repulsion_energy()
-        hf.create_dataset(vib_group + 'nuclear_repulsion', data=nuc_rep)
-
-        hf.create_dataset(vib_group + "number_of_modes",
-                          data=np.array([nmodes]))
-
-        hf.create_dataset(vib_group + 'normal_modes',
-                          data=np.array(
-                              self.normal_modes.reshape(nmodes, natm, 3)))
-
-        hf.create_dataset(vib_group + 'hessian', data=self.hessian)
-        hf.create_dataset(vib_group + 'dipole_gradient',
-                          data=self.dipole_gradient)
-        hf.create_dataset(vib_group + 'vib_frequencies',
-                          data=np.array(self.vib_frequencies))
-        hf.create_dataset(vib_group + 'force_constants',
-                          data=np.array(self.force_constants))
-        hf.create_dataset(vib_group + 'reduced_masses',
-                          data=np.array(self.reduced_masses))
-        if self.do_ir:
-            hf.create_dataset(vib_group + 'ir_intensities',
-                              data=np.array(self.ir_intensities))
-
-        if self.do_raman or self.do_resonance_raman:
-            hf.create_dataset(vib_group + "number_of_external_frequencies",
-                              data=np.array([nfreqs]))
-            hf.create_dataset(vib_group + 'external_frequencies',
-                              data=np.array(self.frequencies))
-            ra = [s for s in self.raman_activities]
-            hf.create_dataset(vib_group + 'raman_activities', data=np.array(ra))
-
-            raman_type = 'normal'
-            if self.do_resonance_raman:
-                raman_type = 'resonance'
-            hf.create_dataset(vib_group + 'raman_type',
-                              data=np.bytes_([raman_type]))
-
-        hf.close()
+        valstr = 'Vibrational analysis results written to file: '
+        valstr += fname
+        self.ostream.print_info(valstr)
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def print_header(self):
         """
@@ -1360,7 +1374,6 @@ class VibrationalAnalysis:
         import matplotlib.pyplot as plt
         import matplotlib.lines as mlines
 
-        #if ax is None:
         fig, ax = plt.subplots(figsize=(8, 5))
         ax2 = ax.twinx()
 
@@ -1465,17 +1478,17 @@ class VibrationalAnalysis:
         # 1. vib_results from vis_drv.compute: use freq key 0
         # 2. vib_results from reading final h5: use freq key '0'
 
-        #assert_msg_critical(
-        #    '0' in raman_results or 0 in raman_results,
-        #    'plot_raman: Could not find frequency 0 in raman_activities')
+        # assert_msg_critical(
+        #     '0' in raman_results or 0 in raman_results,
+        #     'plot_raman: Could not find frequency 0 in raman_activities')
 
-        #assert_msg_critical(
-        #    not ('0' in raman_results and 0 in raman_results),
-        #    'plot_raman: Duplicate entry of frequency 0 and "0" in raman_activities'
-        #)
+        # assert_msg_critical(
+        #     not ('0' in raman_results and 0 in raman_results),
+        #     'plot_raman: Duplicate entry of frequency 0 and "0" in raman_activities'
+        # )
 
-        #raman_act_key = '0' if '0' in raman_results else 0
-        #raman_act = raman_results[raman_act_key]
+        # raman_act_key = '0' if '0' in raman_results else 0
+        # raman_act = raman_results[raman_act_key]
 
         raman_type = 'Raman'
         if self.do_resonance_raman:
@@ -1594,22 +1607,22 @@ class VibrationalAnalysis:
             # an axis in the function call. This function will now
             # return separate figures. -JHA
 
-            #fig, axs = plt.subplots(2, 1, figsize=(8, 10))
+            # fig, axs = plt.subplots(2, 1, figsize=(8, 10))
             # Increase the height space between subplots
-            #fig.subplots_adjust(hspace=0.3)
+            # fig.subplots_adjust(hspace=0.3)
+
             self.plot_ir(vib_results,
                          broadening_type=broadening_type,
                          broadening_value=broadening_value,
                          scaling_factor=scaling_factor,
                          invert_axes=invert_axes)
-            #             ax=axs[0])
+
             if 'raman_activities' in vib_results:
                 self.plot_raman(vib_results,
                                 broadening_type=broadening_type,
                                 broadening_value=broadening_value,
                                 scaling_factor=scaling_factor,
                                 invert_axes=invert_axes)
-                #ax=axs[1])
 
         else:
             assert_msg_critical(False, 'Invalid plot type')
@@ -1783,15 +1796,15 @@ class VibrationalAnalysis:
     @staticmethod
     def gaussian_broadening(x, y, xmin, xmax, xstep, br):
         # Eq. 8.164 in Norman, Ruud, and Saue
-        #br_g = br / np.sqrt(4.0 * 2.0 * np.log(2))
+        # br_g = br / np.sqrt(4.0 * 2.0 * np.log(2))
         # calculate sigma from HWHM
         br_g = br * np.sqrt(2) / np.sqrt(np.log(2))
         xi = np.arange(xmin, xmax, xstep)
         yi = np.zeros(len(xi))
         for i in range(len(xi)):
             for k in range(len(y)):
-                #yi[i] = yi[i] + y[k] * np.exp(-((xi[i] - x[k])**2) /
-                #                              (2 * br_g**2))
+                # yi[i] = yi[i] + y[k] * np.exp(-((xi[i] - x[k])**2) /
+                #                               (2 * br_g**2))
                 yi[i] = (yi[i] + y[k] * np.sqrt(2) / (br_g * np.sqrt(np.pi)) *
                          np.exp(-(2.0 * (xi[i] - x[k])**2) / br_g**2))
         return xi, yi

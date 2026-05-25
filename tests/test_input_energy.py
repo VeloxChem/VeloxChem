@@ -55,6 +55,7 @@ class TestInputEnergy:
 
             @scf
             restart: no
+            acc_type: l2_diis
             @end
 
             @molecule

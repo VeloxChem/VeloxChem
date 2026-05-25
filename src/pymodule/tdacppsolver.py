@@ -45,12 +45,12 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check,
+                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
-from .checkpoint import (check_rsp_hdf5, write_rsp_hdf5,
-                         write_rsp_solution_with_multiple_keys)
+from .checkpoint import check_rsp_hdf5, write_rsp_hdf5
 from .inputparser import parse_seq_fixed
+from .resultsio import write_rsp_solution_with_multiple_keys
 
 try:
     import matplotlib.pyplot as plt
@@ -59,7 +59,7 @@ except ImportError:
     pass
 
 
-class ComplexResponseTDA(LinearSolver):
+class ComplexResponseTdaSolver(LinearSolver):
     """
     Implements the complex linear response solver using the Tamm-Dancoff approximation.
 
@@ -98,7 +98,7 @@ class ComplexResponseTDA(LinearSolver):
         self.b_operator = 'electric dipole'
         self.b_components = 'xyz'
 
-        self.cpp_flag = None
+        self.property = None
 
         self.frequencies = (0,)
         self.damping = 1000.0 / hartree_in_wavenumber()
@@ -127,26 +127,26 @@ class ComplexResponseTDA(LinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def set_cpp_flag(self, flag):
+    def set_cpp_property(self, prop):
         """
-        Sets CPP flag (absorption or ecd).
+        Sets CPP property (absorption or ecd).
 
-        :param flag:
-            The flag (absorption or ecd).
+        :param prop:
+            The CPP property (absorption or ecd).
         """
 
-        assert_msg_critical(flag.lower() in ['absorption', 'ecd'],
-                            f'{type(self).__name__}: invalid CPP flag')
+        assert_msg_critical(prop.lower() in ['absorption', 'ecd'],
+                            f'{type(self).__name__}: invalid CPP property')
 
-        self.cpp_flag = flag.lower()
+        self.property = prop.lower()
 
-        if self.cpp_flag == 'absorption':
+        if self.property == 'absorption':
             self.a_operator = 'electric dipole'
             self.a_components = 'xyz'
             self.b_operator = 'electric dipole'
             self.b_components = 'xyz'
 
-        elif self.cpp_flag == 'ecd':
+        elif self.property == 'ecd':
             self.a_operator = 'magnetic dipole'
             self.a_components = 'xyz'
             self.b_operator = 'linear momentum'
@@ -305,8 +305,12 @@ class ComplexResponseTDA(LinearSolver):
         self.nonlinear = False
         self._dist_fock_ger = None
 
+        # make sure that cpp_property is properly set
+        if self.property is not None:
+            self.set_cpp_property(self.property)
+
         # check molecule
-        molecule_sanity_check(molecule)
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -314,6 +318,9 @@ class ComplexResponseTDA(LinearSolver):
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute')
@@ -340,21 +347,17 @@ class ComplexResponseTDA(LinearSolver):
                                n_freqs=len(self.frequencies))
 
         self.start_time = tm.time()
-
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            f'{type(self).__name__}: not implemented for unrestricted case')
-
         if self.rank == mpi_master():
             orb_ene = scf_results['E_alpha']
         else:
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
         norb = orb_ene.shape[0]
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_restricted(nocc, norb),
+            'response space')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -366,7 +369,7 @@ class ComplexResponseTDA(LinearSolver):
         pe_dict = self._init_pe(molecule, basis)
 
         # CPCM information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
 
         # right-hand side (gradient)
         if self.rank == mpi_master():
@@ -438,6 +441,8 @@ class ComplexResponseTDA(LinearSolver):
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
                                               rsp_vector_labels, molecule,
                                               basis, dft_dict, pe_dict)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file
@@ -454,13 +459,14 @@ class ComplexResponseTDA(LinearSolver):
 
             bger_loc = bger.get_full_matrix(root=mpi_master())
 
-            tdens = self._get_trans_densities(bger_loc, scf_results, molecule)
+            tdens = self._get_trans_densities(bger_loc, scf_results, molecule,
+                                              basis)
 
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
                                       dft_dict, pe_dict)
 
             if self.rank == mpi_master():
-                sig_mat = self._get_sigmas(fock, scf_results, molecule,
+                sig_mat = self._get_sigmas(fock, scf_results, molecule, basis,
                                            bger_loc)
             else:
                 sig_mat = None
@@ -681,13 +687,13 @@ class ComplexResponseTDA(LinearSolver):
                 root=mpi_master())
 
             tdens = self._get_trans_densities(new_trials_ger_loc, scf_results,
-                                              molecule)
+                                              molecule, basis)
 
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
                                       dft_dict, pe_dict)
 
             if self.rank == mpi_master():
-                sig_mat = self._get_sigmas(fock, scf_results, molecule,
+                sig_mat = self._get_sigmas(fock, scf_results, molecule, basis,
                                            new_trials_ger_loc)
             else:
                 sig_mat = None
@@ -764,6 +770,7 @@ class ComplexResponseTDA(LinearSolver):
                             'Response solution vectors written to file: ' +
                             final_h5_fname)
                         self.ostream.print_blank()
+                        self.ostream.flush()
 
                     ret_dict = {
                         'a_operator': self.a_operator,
@@ -812,7 +819,7 @@ class ComplexResponseTDA(LinearSolver):
         else:
             return None
 
-    def _get_trans_densities(self, trial_mat, tensors, molecule):
+    def _get_trans_densities(self, trial_mat, tensors, molecule, basis):
         """
         Computes the transition densities.
 
@@ -830,7 +837,7 @@ class ComplexResponseTDA(LinearSolver):
         # form transition densities
 
         if self.rank == mpi_master():
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             norb = tensors['C_alpha'].shape[1]
             nvir = norb - nocc
 
@@ -847,7 +854,7 @@ class ComplexResponseTDA(LinearSolver):
 
         return tdens
 
-    def _get_sigmas(self, fock, tensors, molecule, trial_mat):
+    def _get_sigmas(self, fock, tensors, molecule, basis, trial_mat):
         """
         Computes the sigma vectors.
 
@@ -864,7 +871,7 @@ class ComplexResponseTDA(LinearSolver):
             The sigma vectors as 2D Numpy array.
         """
 
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         norb = tensors['C_alpha'].shape[1]
         nvir = norb - nocc
 
@@ -965,10 +972,10 @@ class ComplexResponseTDA(LinearSolver):
             A dictionary containing the spectrum.
         """
 
-        if self.cpp_flag == 'absorption':
+        if self.property == 'absorption':
             return self._get_absorption_spectrum(rsp_results, x_unit)
 
-        elif self.cpp_flag == 'ecd':
+        elif self.property == 'ecd':
             return self._get_ecd_spectrum(rsp_results, x_unit)
 
         return None
@@ -1121,7 +1128,7 @@ class ComplexResponseTDA(LinearSolver):
             x_data = np.array(cpp_spec['x_data'])
             y_data = np.array(cpp_spec['y_data'])
 
-        if self.cpp_flag == 'absorption':
+        if self.property == 'absorption':
             assert_msg_critical(
                 '[a.u.]' in cpp_spec['y_label'],
                 f'{type(self).__name__}.plot: In valid unit in y_label')
@@ -1144,14 +1151,14 @@ class ComplexResponseTDA(LinearSolver):
 
         y_max = np.max(np.abs(y_data))
 
-        if self.cpp_flag == 'absorption':
+        if self.property == 'absorption':
             # Note: use epsilon for absorption
             ax.set_ylabel(r'$\epsilon$ [L mol$^{-1}$ cm$^{-1}$]')
             ax.set_title("Absorption Spectrum")
 
             ax.set_ylim(0.0, y_max * 1.1)
 
-        elif self.cpp_flag == 'ecd':
+        elif self.property == 'ecd':
             ax.set_ylabel(r'$\Delta \epsilon$ [L mol$^{-1}$ cm$^{-1}$]')
             ax.set_title("ECD Spectrum")
 
@@ -1201,7 +1208,10 @@ class ComplexResponseTDA(LinearSolver):
             dist_new_b.data -= dist_new_proj.data
 
         if renormalize:
-            if dist_new_b.data.ndim > 0 and dist_new_b.shape(0) > 0:
+            has_global_rows = self.comm.allreduce(
+                int(dist_new_b.data.ndim > 0 and dist_new_b.shape(0) > 0),
+                op=MPI.SUM) > 0
+            if has_global_rows:
                 dist_new_b = self.remove_linear_dependence(
                     dist_new_b, self.lindep_thresh)
 
@@ -1258,10 +1268,10 @@ class ComplexResponseTDA(LinearSolver):
 
         self._print_response_functions(rsp_results, ostream)
 
-        if self.cpp_flag == 'absorption':
+        if self.property == 'absorption':
             self._print_absorption_results(rsp_results, ostream)
 
-        elif self.cpp_flag == 'ecd':
+        elif self.property == 'ecd':
             self._print_ecd_results(rsp_results, ostream)
 
     def _print_response_functions(self, rsp_results, ostream=None):
@@ -1472,6 +1482,8 @@ class ComplexResponseTDA(LinearSolver):
         success = self.comm.bcast(success, root=mpi_master())
 
         if success:
+            self._write_settings_to_checkpoint(self.checkpoint_file)
+
             if self.nonlinear:
                 dist_arrays = [
                     self._dist_bger, self._dist_e2bger, self._dist_fock_ger
@@ -1620,8 +1632,8 @@ class ComplexResponseTDA(LinearSolver):
             A dictionary containing property densities at given frequency.
         """
 
-        assert_msg_critical(self.cpp_flag in ['absorption', 'ecd'],
-                            'get_cpp_property_densities: Invalid cpp_flag')
+        assert_msg_critical(self.property in ['absorption', 'ecd'],
+                            'get_cpp_property_densities: Invalid CPP property')
 
         assert_msg_critical(
             ('x', w) in cpp_results['solutions'] and
@@ -1644,20 +1656,20 @@ class ComplexResponseTDA(LinearSolver):
                                                  basis, scf_results)
 
         if self.rank == mpi_master():
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             norb = scf_results['E_alpha'].shape[0]
             nvir = norb - nocc
 
             mo_occ = scf_results['C_alpha'][:, :nocc].copy()
             mo_vir = scf_results['C_alpha'][:, nocc:].copy()
 
-            if self.cpp_flag == 'absorption':
+            if self.property == 'absorption':
                 # vector representation of absorption cross-section
                 vec = (a_prop_grad[0] * cpp_solution_vector_x +
                        a_prop_grad[1] * cpp_solution_vector_y +
                        a_prop_grad[2] * cpp_solution_vector_z).imag / 3.0
                 vec *= 4.0 * np.pi * w * fine_structure_constant()
-            elif self.cpp_flag == 'ecd':
+            elif self.property == 'ecd':
                 # vector representation of Delta epsilon
                 vec = (a_prop_grad[0] * cpp_solution_vector_x / w +
                        a_prop_grad[1] * cpp_solution_vector_y / w +

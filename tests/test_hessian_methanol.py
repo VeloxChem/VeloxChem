@@ -35,14 +35,24 @@ class TestHessianMethanol:
 
         if scf_drv.rank == mpi_master():
             ref_vib_freqs = np.array([
-                340.790, 1076.524, 1145.529, 1177.911, 1369.222, 1470.513,
-                1475.423, 1496.391, 2992.404, 3054.107, 3142.856, 3897.554
+                340.605, 1076.485, 1145.587, 1177.917, 1369.167, 1470.522,
+                1475.389, 1496.336, 2992.628, 3054.415, 3142.981, 3897.690
             ])
 
             max_rel_diff_freqs = np.max(
                 np.abs(vibanalysis_drv.vib_frequencies / ref_vib_freqs - 1.0))
 
             assert max_rel_diff_freqs < 0.02
+
+            ref_ir_intens = np.array([
+                128.9167, 66.1455, 65.0787, 0.5474, 28.7916, 2.5639, 6.1060,
+                6.6203, 63.3375, 72.5923, 25.9392, 36.6984
+            ])
+
+            max_rel_diff_ir_intens = np.max(
+                np.abs(vibanalysis_drv.ir_intensities / ref_ir_intens - 1.0))
+
+            assert max_rel_diff_ir_intens < 0.02
 
     @pytest.mark.timeconsuming
     def test_numerical_hessian_methanol(self):

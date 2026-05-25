@@ -44,7 +44,8 @@ from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .inputparser import parse_input, print_keywords
-from .errorhandler import assert_msg_critical, safe_solve
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_solve
 
 
 class EspChargesDriver:
@@ -1042,7 +1043,7 @@ class EspChargesDriver:
         # nuclear contribution
 
         coords = molecule.get_coordinates_in_bohr()
-        elem_ids = molecule.get_element_ids()
+        elem_ids = molecule.get_effective_nuclear_charges(basis)
 
         for a in range(molecule.number_of_atoms()):
             esp += elem_ids[a] / np.sqrt(

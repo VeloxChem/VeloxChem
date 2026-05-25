@@ -24,7 +24,7 @@ class TestNumericalGradient:
         if scf_drv.rank == mpi_master():
             D = scf_results['D_alpha']
             mo = scf_results['C_alpha']
-            nocc = mol.number_of_alpha_electrons()
+            nocc = mol.number_of_alpha_occupied_orbitals(bas)
             nvir = mo.shape[1] - nocc
 
             mo_occ = mo[:, :nocc].copy()

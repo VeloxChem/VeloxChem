@@ -103,6 +103,8 @@ class CNuclearPotentialGeom0X0Driver
     /// @param iatom The index of selected atom.
     /// @return The nuclear potential matrix.
     auto compute(const CMolecularBasis &basis, const CMolecule &molecule, const int iatom) const -> CMatrices;
+
+    auto compute(const CMolecularBasis &basis, const CMolecule &molecule, const int iatom, const double alternative_charge) const -> CMatrices;
 };
 
 template <int N>
@@ -173,6 +175,34 @@ auto
 CNuclearPotentialGeom0X0Driver<N>::compute(const CMolecularBasis &basis, const CMolecule &molecule, const int iatom) const -> CMatrices
 {
     const auto charge = molecule.charges()[iatom];
+
+    std::vector<double> multipoles;
+
+    if constexpr (N == 1)
+    {
+        multipoles = std::vector<double>({charge, charge, charge});
+    }
+
+    if constexpr (N == 2)
+    {
+        multipoles = std::vector<double>({charge, charge, charge, charge, charge, charge});
+    }
+
+    auto coords = molecule.atom_coordinates(iatom, "au");
+
+    return compute(multipoles,
+                   {
+                       coords,
+                   },
+                   basis,
+                   molecule);
+}
+
+template <int N>
+auto
+CNuclearPotentialGeom0X0Driver<N>::compute(const CMolecularBasis &basis, const CMolecule &molecule, const int iatom, const double alternative_charge) const -> CMatrices
+{
+    const auto charge = alternative_charge;
 
     std::vector<double> multipoles;
 

@@ -128,6 +128,26 @@ class OrbitalViewer:
         return ('Unable to import ipywidgets or IPython.display.\n' +
                 'Please install jupyter notebook via pip or conda.')
 
+    def _get_orbital_colors(self):
+        """
+        Gets the positive and negative orbital colors for the active scheme.
+
+        :return:
+            A tuple with positive and negative orbital colors.
+        """
+
+        valid_color_schemes = {
+            'default': (0x0000ff, 0xff0000),
+            'alternative': (0x62a0ea, 0xe5a50a),
+        }
+
+        errmsg = ('OrbitalViewer: orbital_color_scheme must be '
+                  '\'default\' or \'alternative\'')
+        assert_msg_critical(self.orbital_color_scheme in valid_color_schemes,
+                            errmsg)
+
+        return valid_color_schemes[self.orbital_color_scheme]
+
     def initialize(self, molecule, basis):
         """
         Initializes molecule and cubic grid; pre-computes atomic orbitals.
@@ -381,6 +401,21 @@ class OrbitalViewer:
 
         return np_orb
 
+    def visualize(self, molecule, basis, mo_inp, label='', width=600, height=450):
+        """
+        Visualizes the orbitals, with a widget to choose which.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param mo_inp:
+            The MolecularOrbitals input (filename of h5 file storing the
+            MolecularOrbitals, or a MolecularOrbitals object).
+        """
+
+        self._plot_using_py3dmol(molecule, basis, mo_inp, label, width, height)
+
     def plot(self, molecule, basis, mo_inp, label='', width=600, height=450):
         """
         Plots the orbitals, with a widget to choose which.
@@ -429,6 +464,9 @@ class OrbitalViewer:
                     if MolecularOrbitals.check_label_validity(
                             mo_inp, new_label):
                         label = new_label
+                    elif MolecularOrbitals.check_label_validity(
+                            mo_inp, new_label + '_'):
+                        label = new_label + '_'
                 mo_object = MolecularOrbitals.read_hdf5(mo_inp, label=label)
             else:
                 mo_object = MolecularOrbitals.read_hdf5(mo_inp)
@@ -441,13 +479,16 @@ class OrbitalViewer:
 
         self._is_uhf = (mo_object.get_orbitals_type() == molorb.unrest)
 
+        nalpha = molecule.number_of_alpha_occupied_orbitals(self._basis)
+        nbeta = molecule.number_of_beta_occupied_orbitals(self._basis)
+
         # i_orb is an instance variable accessed by MultiPsi
-        self._i_orb = molecule.number_of_alpha_electrons() - 1
+        self._i_orb = nalpha - 1
         self._mo_coefs = mo_object.alpha_to_numpy()
 
         # In some cases (for example NTOs) the number of orbitals is less than
         # the number of electrons. In this case, print the middle orbital
-        if self._mo_coefs.shape[1] < molecule.number_of_alpha_electrons():
+        if self._mo_coefs.shape[1] < nalpha:
             self._i_orb = self._mo_coefs.shape[1] // 2
         if self._is_uhf:
             self._mo_coefs_beta = mo_object.beta_to_numpy()
@@ -465,9 +506,6 @@ class OrbitalViewer:
         self._this_plot += self._plt_iso_one
         self._this_plot += self._plt_iso_two
         self._this_plot.display()
-
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
 
         # Create orbital list:
         orb_ene = mo_object.ea_to_numpy()
@@ -723,11 +761,8 @@ class OrbitalViewer:
         isovalue = self.orbital_isovalue
         opacity = self.orbital_opacity
         wireframe = False
-
-        if self.orbital_color_scheme == 'default':
-            color = 0x0000ff
-        elif self.orbital_color_scheme == 'alternative':
-            color = 0x62a0ea
+        positive_color, negative_color = self._get_orbital_colors()
+        color = positive_color
 
         # Find if the user changed the defaults
         if self._plt_iso_one:
@@ -749,11 +784,7 @@ class OrbitalViewer:
 
         # Find if the user changed the defaults
         isovalue = -isovalue
-
-        if self.orbital_color_scheme == 'default':
-            color = 0xff0000
-        elif self.orbital_color_scheme == 'alternative':
-            color = 0xe5a50a
+        color = negative_color
 
         if self._plt_iso_two:
             isovalue = self._plt_iso_two.level
@@ -808,6 +839,9 @@ class OrbitalViewer:
                     if MolecularOrbitals.check_label_validity(
                             mo_inp, new_label):
                         label = new_label
+                    elif MolecularOrbitals.check_label_validity(
+                            mo_inp, new_label + '_'):
+                        label = new_label + '_'
                 mo_object = MolecularOrbitals.read_hdf5(mo_inp, label=label)
             else:
                 mo_object = MolecularOrbitals.read_hdf5(mo_inp)
@@ -820,21 +854,21 @@ class OrbitalViewer:
 
         self._is_uhf = (mo_object.get_orbitals_type() == molorb.unrest)
 
+        nalpha = molecule.number_of_alpha_occupied_orbitals(self._basis)
+        nbeta = molecule.number_of_beta_occupied_orbitals(self._basis)
+
         # i_orb is an instance variable accessed by MultiPsi
-        self._i_orb = molecule.number_of_alpha_electrons() - 1
+        self._i_orb = nalpha - 1
         self._mo_coefs = mo_object.alpha_to_numpy()
 
         # In some cases (for example NTOs) the number of orbitals is less than
         # the number of electrons. In this case, print the middle orbital
-        if self._mo_coefs.shape[1] < molecule.number_of_alpha_electrons():
+        if self._mo_coefs.shape[1] < nalpha:
             self._i_orb = self._mo_coefs.shape[1] // 2
         if self._is_uhf:
             self._mo_coefs_beta = mo_object.beta_to_numpy()
         else:
             self._mo_coefs_beta = self._mo_coefs
-
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
 
         # Create orbital list:
         orb_ene = mo_object.ea_to_numpy()
@@ -984,12 +1018,7 @@ class OrbitalViewer:
 
         isovalue = self.orbital_isovalue
         opacity = self.orbital_opacity
-        if self.orbital_color_scheme == 'default':
-            positive_color = 0x0000ff
-            negative_color = 0xff0000
-        elif self.orbital_color_scheme == 'alternative':
-            positive_color = 0x62a0ea
-            negative_color = 0xe5a50a
+        positive_color, negative_color = self._get_orbital_colors()
 
         viewer.addVolumetricData(orbital_cube_str, "cube", {
             "isoval": isovalue,

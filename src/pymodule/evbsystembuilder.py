@@ -35,22 +35,20 @@ import numpy as np
 import networkx as nx
 from networkx.algorithms.isomorphism import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
-import typing
 from pathlib import Path
 import copy
 import math
 import sys
-import itertools
 from enum import Enum, auto
 
 from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom, Point
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .mmforcefieldgenerator import MMForceFieldGenerator
-from .atomtypeidentifier import AtomTypeIdentifier
 from .solvationbuilder import SolvationBuilder
 from .molecule import Molecule
-from .errorhandler import assert_msg_critical, safe_arccos
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_arccos
 from .waterparameters import get_water_parameters
 
 try:
@@ -109,7 +107,7 @@ class EvbSystemBuilder():
         self.nb_cutoff: float = 1.  # nm, minimal cutoff for the nonbonded force
 
         self.pressure: float = -1.
-        self.solvent: str = None  #type: ignore
+        self.solvent: str = None  # type: ignore
         self.padding: float = 1.5
         self.no_reactant: bool = False
         self.E_field: list[float] = [0, 0, 0]
@@ -124,12 +122,15 @@ class EvbSystemBuilder():
         self.soft_core_coulomb_int = False
         self.soft_core_lj_int = False
 
-        self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
+        # self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
         self.bonded_integration_bond_fac: float = 0.2  # Scaling factor for the bonded integration forces.
         self.bonded_integration_angle_fac: float = 0.1  # Scaling factor for the bonded integration forces.
-        self.torsion_lambda_switch: float = 0.4  # The minimum (1-maximum) lambda value at which to start turning on (have turned of) the proper torsion for the product (reactant)
+        self.torsion_lambda_switch: float = 0.25  # The minimum (1-maximum) lambda value at which to start turning on (have turned of) the proper torsion for the product (reactant)
 
         self.int_nb_const_exceptions = True  # If the exceptions for the integration nonbonded force should be kept constant over the entire simulation
+
+        self.dynamic_bond_tightening = 3.25  # Power for tigthening breaking and forming bonds during the integration
+        self.dynamic_bond_fc_factor = 0.8  # Force constant factor for the dynamic bond tightening
 
         self.verbose = False
 
@@ -159,9 +160,9 @@ class EvbSystemBuilder():
         self.decompose_bonded = True
         self.decompose_nb: list | None = None
         self.keywords = {
-            "temperature": float,
-            "nb_cutoff": float,
-            "bonded_integration": bool,
+            "temperature": float,  # -> system dependent
+            "nb_cutoff": float,  # ->
+            # "bonded_integration": bool,
             "bonded_integration_bond_fac": float,
             "bonded_integration_angle_fac": float,
             "torsion_lambda_switch": float,
@@ -172,6 +173,8 @@ class EvbSystemBuilder():
             "soft_core_coulomb_int": bool,
             "soft_core_lj_int": bool,
             "int_nb_const_exceptions": bool,
+            "dynamic_bond_tightening": float,
+            "dynamic_bond_fc_factor": float,
             "pressure": float,
             "solvent": str,
             "padding": float,
@@ -202,7 +205,7 @@ class EvbSystemBuilder():
         product: MMForceFieldGenerator,
         Lambda: list,
         configuration: dict,
-        constraints: list = [],
+        constraints: list | None = None,
     ):
 
         assert_msg_critical('openmm' in sys.modules,
@@ -227,7 +230,9 @@ class EvbSystemBuilder():
         self.ostream.flush()
         self.reactant = reactant
         self.product = product
-        self.constraints = constraints
+
+        if constraints is not None:
+            self.constraints = constraints
 
         if self.pdb is None:
             system = mm.System()
@@ -254,7 +259,10 @@ class EvbSystemBuilder():
             ][0]
 
         nb_force.setName("NonbondedForce")
-        nb_force.setNonbondedMethod(mm.NonbondedForce.PME)
+        if self.solvent:
+            nb_force.setNonbondedMethod(mm.NonbondedForce.PME)
+        else:
+            nb_force.setNonbondedMethod(mm.NonbondedForce.NoCutoff)
         cmm_remover.setName("CMMotionRemover")
         if not self.no_force_groups:
             nb_force.setForceGroup(EvbForceGroup.NB_FORCE_INT.value)
@@ -267,18 +275,18 @@ class EvbSystemBuilder():
         box = None
         if self.CNT or self.graphene:
             box = self._add_CNT_graphene(system, nb_force, topology, vlx_mol)
-        box = self._configure_pbc(system, topology, nb_force, box)  # A
 
         # assert False, "Rethink CNT/graphene input"
 
         if self.solvent:
-            #todo what about the box, and especially giving it to the solvator
+            box = self._configure_pbc(system, topology, nb_force, box)  # A
+            # todo what about the box, and especially giving it to the solvator
             box = self._add_solvent(system, vlx_mol, self.solvent, topology,
                                     nb_force, self.neutralize, self.padding,
                                     box)
 
         if self.pressure > 0:
-            barostat = self._add_barostat(system)
+            barostat_not_used = self._add_barostat(system)
 
         E_field = None
         if np.any(np.array(self.E_field) > 0.001):
@@ -538,10 +546,10 @@ class EvbSystemBuilder():
                 system.addParticle(mm_element.mass)
                 nb_force.addParticle(
                     0, 1, 0
-                )  #Placeholder values, actual values depend on lambda and will be set later
+                )  # Placeholder values, actual values depend on lambda and will be set later
 
                 # If a pdb field is defined, the atom is already in the topoolgy and hence also in the reaction_atoms
-                if not atom.get('pdb') == None:
+                if atom.get('pdb') is not None:
                     continue
                 reaction_atom = topology.addAtom(
                     name,
@@ -550,7 +558,7 @@ class EvbSystemBuilder():
                 )
                 self.reaction_atoms[id] = reaction_atom
 
-            #Make sure the solute does not interact with itself through the default nonbonded force, as there will be another nonbonded force to take care of this
+            # Make sure the solute does not interact with itself through the default nonbonded force, as there will be another nonbonded force to take care of this
             # exception_params = [{nb_force.getExceptionParameters(i)[0],nb_force.getExceptionParameters(i)[1]} for i in range(nb_force.getNumExceptions())]
             atom_indices = [atom.index for atom in self.reaction_atoms.values()]
             set_exceptions = []
@@ -583,8 +591,8 @@ class EvbSystemBuilder():
             self.ostream.flush()
 
             for bond in self.reactant.bonds.keys():
-                if not (self.reactant.atoms[bond[0]].get('pdb') == None
-                        and self.reactant.atoms[bond[1]].get('pdb') == None):
+                if not (self.reactant.atoms[bond[0]].get('pdb') is None
+                        and self.reactant.atoms[bond[1]].get('pdb') is None):
                     continue
                 topology.addBond(
                     self.reaction_atoms[bond[0]],
@@ -1040,7 +1048,8 @@ class EvbSystemBuilder():
             solvent_chain = topology.addChain()
             solvent_ff = MMForceFieldGenerator(ostream=self.ostream)
 
-            solvent_ff.create_topology(vlx_solvent_molecule,water_model=self.water_model)
+            solvent_ff.create_topology(vlx_solvent_molecule,
+                                       water_model=self.water_model)
 
             atom_types = [atom['type'] for atom in solvent_ff.atoms.values()]
             if 'ow' in atom_types and 'hw' in atom_types and len(
@@ -1244,7 +1253,7 @@ class EvbSystemBuilder():
                 systems.update(self._add_nb_decompositions(pro_system, 'pro'))
             else:
                 self.ostream.print_info(
-                    f"Skipping nonbonded force decompositions")
+                    "Skipping nonbonded force decompositions")
             self.ostream.flush()
 
         if self.decompose_bonded:
@@ -1275,6 +1284,7 @@ class EvbSystemBuilder():
         improper = self._create_improper_torsion_forces(lam)
 
         if not pes:
+            system.addForce(dynamic_bonded_harmonic)
             syslj, syscoul = self._create_nonbonded_forces(
                 lam,
                 lj_soft_core=self.soft_core_lj_int,
@@ -1286,6 +1296,7 @@ class EvbSystemBuilder():
             system.addForce(syslj)
             system.addForce(syscoul)
         else:
+            system.addForce(morse)
             syslj_static, syscoul_static = self._create_nonbonded_forces(
                 lam,
                 lj_soft_core=self.soft_core_lj_pes_static,
@@ -1313,10 +1324,7 @@ class EvbSystemBuilder():
 
         bond_constraint, constant_force, angle_constraint, torsion_constraint = self._create_constraint_forces(
             lam)
-        if not pes:
-            system.addForce(dynamic_bonded_harmonic)
-        else:
-            system.addForce(morse)
+
         system.addForce(static_bonded_harmonic)
         system.addForce(angle)
         system.addForce(torsion)
@@ -1391,7 +1399,7 @@ class EvbSystemBuilder():
             solcoul.setParticleParameters(atom_id, 0, 1, 0)
             sollj.setParticleParameters(atom_id, 0, 1, 0)
 
-        #set the charges or epsilons of all solvent atoms to 0
+        # set the charges or epsilons of all solvent atoms to 0
         for atom_id in self.solvent_atom_ids:
             charge, sigma, epsilon = nbforce.getParticleParameters(atom_id)
             sollj.setParticleParameters(atom_id, 0, sigma, epsilon)
@@ -1412,7 +1420,7 @@ class EvbSystemBuilder():
             f"decomp_{state_name}_solvent_LJ": lj_system
         })
 
-        #Remove all solvent solvent interactions in the other forces
+        # Remove all solvent solvent interactions in the other forces
 
         for to_decompose in self.decompose_nb:
 
@@ -1436,7 +1444,7 @@ class EvbSystemBuilder():
                         lj_dec.addException(atom_id, solvent_atom, 0, sig, eps)
                         coul_dec.addException(atom_id, solvent_atom, qq, 1, 0)
 
-                #Everything is handeled by the exceptions, so the default parameters can be set to 0
+                # Everything is handeled by the exceptions, so the default parameters can be set to 0
                 lj_dec.setParticleParameters(atom_id, 0, 1, 0)
                 coul_dec.setParticleParameters(atom_id, 0, 1, 0)
 
@@ -1555,7 +1563,7 @@ class EvbSystemBuilder():
             atom_ids = self._key_to_id(key, self.reaction_atoms)
             fcA = fcB = 0
             eqA = eqB = 1
-            if key in self.reactant.bonds and not key in self.product.bonds:
+            if key in self.reactant.bonds and key not in self.product.bonds:
                 bondA = self.reactant.bonds[key]
                 fcA = bondA['force_constant']
                 eqA = bondA['equilibrium']
@@ -1575,8 +1583,21 @@ class EvbSystemBuilder():
                 eqA = 0.5 * (s1 + s2)
 
                 fcA = fcB * self.bonded_integration_bond_fac
+
+            p = self.dynamic_bond_tightening
             eq = eqA * (1 - lam) + eqB * lam
+
+            # Apply bond tightening. This causes breaking and forming bonds to be more tightly bonded for intermediate lambda values
+            min_eq = min(eqA, eqB)
+            dif_eq = abs(eqA - eqB)
+            if dif_eq > 0:
+                eq = (((eq - min_eq) / dif_eq)**p * dif_eq) + min_eq
+
+            gamma = self.dynamic_bond_fc_factor
+            fc_scaling = 4 * (lam - 0.5)**2 * (1 - gamma) + gamma
+
             fc = fcA * (1 - lam) + fcB * lam
+            fc = fc * fc_scaling
             self._add_bond(harmonic_force, atom_ids, eq, fc)
 
         return harmonic_force
@@ -1595,8 +1616,8 @@ class EvbSystemBuilder():
 
         for key in bond_keys:
 
-            breaking = key in self.reactant.bonds and not key in self.product.bonds
-            forming = not key in self.reactant.bonds and key in self.product.bonds
+            breaking = key in self.reactant.bonds and key not in self.product.bonds
+            forming = key not in self.reactant.bonds and key in self.product.bonds
             if not (breaking or forming):
                 continue
 
@@ -1653,6 +1674,7 @@ class EvbSystemBuilder():
                 continue
             if (key in self.reactant.angles.keys()
                     and key in self.product.angles.keys()):
+
                 angleA = self.reactant.angles[key]
                 angleB = self.product.angles[key]
 
@@ -1661,12 +1683,13 @@ class EvbSystemBuilder():
 
                 fcB = angleB['force_constant']
                 eqB = angleB['equilibrium']
+
             elif key in self.reactant.angles.keys():
                 # take angle from reactant, and from product structure
                 angleA = self.reactant.angles[key]
+
                 fcA = angleA['force_constant']
                 eqA = angleA['equilibrium']
-
                 if model_broken:
                     coords = self.product.molecule.get_coordinates_in_angstrom()
                     eqB = self.measure_angle(coords[key[0]],
@@ -1681,7 +1704,6 @@ class EvbSystemBuilder():
                     eqB = eqA
                     fcB = 0
             else:
-
                 angleB = self.product.angles[key]
                 eqB = angleB['equilibrium']
                 fcB = angleB['force_constant']
@@ -1725,36 +1747,44 @@ class EvbSystemBuilder():
                     and key in self.product.dihedrals.keys()):
                 dihedA = self.reactant.dihedrals[key]
                 dihedB = self.product.dihedrals[key]
+                # if the torsion on one side of the reaction completely disapears, then turn of the torsion much earlier / turn it on later
                 if dihedA['barrier'] == 0 or dihedB['barrier'] == 0:
-                    x0 = self.torsion_lambda_switch
-                    a = -1 / x0
-                    b = 1
-                    reascale = a * lam + b
-                    a = 1 / (1 - x0)
-                    b = 1 - a
-                    proscale = a * lam + b
+                    reascale, proscale = self._get_lambda_scaling(
+                        lam, self.torsion_lambda_switch)
                 else:
                     reascale = 1 - lam
                     proscale = lam
                 self._add_torsion(fourier_force, dihedA, atom_ids, reascale)
                 self._add_torsion(fourier_force, dihedB, atom_ids, proscale)
             else:
-                # Create a linear switching function that turns on the proper torsions only past a certain lambda value
+
+                # if the torsion on one side of the reaction completely disapears, then turn of the torsion much earlier / turn it on later
+                reascale, proscale = self._get_lambda_scaling(
+                    lam, self.torsion_lambda_switch)
                 if key in self.reactant.dihedrals.keys():
-                    x0 = self.torsion_lambda_switch
-                    a = -1 / x0
-                    b = 1
-                    scale = a * lam + b
+                    scale = reascale
                     dihed = self.reactant.dihedrals[key]
                 else:
-                    x0 = self.torsion_lambda_switch
-                    a = 1 / (1 - x0)
-                    b = 1 - a
-                    scale = a * lam + b
+                    scale = proscale
                     dihed = self.product.dihedrals[key]
                 if scale > 0:
                     self._add_torsion(fourier_force, dihed, atom_ids, scale)
         return fourier_force
+
+    # Create a linear switching function that turns the force on only past the lambda-switch
+    def _get_lambda_scaling(self, lam, lambda_switch):
+        if lambda_switch == 0:
+            return 1 - lam, lam
+        if lambda_switch == 1:
+            return 0, 0
+
+        a = -1 / lambda_switch
+        b = 1
+        reascale = max(0, a * lam + b)
+        a = 1 / (1 - lambda_switch)
+        b = 1 - a
+        proscale = max(0, a * lam + b)
+        return reascale, proscale
 
     def _create_improper_torsion_forces(self, lam):
 
@@ -1778,13 +1808,8 @@ class EvbSystemBuilder():
                 dihedB = self.product.impropers[key]
 
                 if dihedA['barrier'] == 0 or dihedB['barrier'] == 0:
-                    x0 = self.torsion_lambda_switch
-                    a = -1 / x0
-                    b = 1
-                    reascale = a * lam + b
-                    a = 1 / (1 - x0)
-                    b = 1 - a
-                    proscale = a * lam + b
+                    reascale, proscale = self._get_lambda_scaling(
+                        lam, self.torsion_lambda_switch)
                 else:
                     reascale = 1 - lam
                     proscale = lam
@@ -1800,17 +1825,13 @@ class EvbSystemBuilder():
                                   proscale,
                                   improper=True)
             else:
+                reascale, proscale = self._get_lambda_scaling(
+                    lam, self.torsion_lambda_switch)
                 if key in self.reactant.impropers.keys():
-                    x0 = self.torsion_lambda_switch
-                    a = -1 / x0
-                    b = 1
-                    scale = a * lam + b
+                    scale = reascale
                     dihed = self.reactant.impropers[key]
                 else:
-                    x0 = self.torsion_lambda_switch
-                    a = 1 / (1 - x0)
-                    b = 1 - a
-                    scale = a * lam + b
+                    scale = proscale
                     dihed = self.product.impropers[key]
                 if scale > 0:
                     self._add_torsion(fourier_force,
@@ -1902,8 +1923,8 @@ class EvbSystemBuilder():
             "CoullinB   = k * ( ( qqB / rqBdiv^3 ) * r^2 - 3 * ( qqB / rqBdiv^2 ) * r + 3 * ( qqB / rqBdiv ) );"
             "rqAdiv     = select(rqA,rqA,1);"
             "rqBdiv     = select(rqB,rqB,1);"
-            "rqA        = alphaq * ( 1 + sigmaq * qqA )  * 1 ^ pow;"
-            "rqB        = alphaq * ( 1 + sigmaq * qqB )  * 1 ^ pow;"
+            "rqA        = alphaq * ( 1 + sigmaq * qqA );"
+            "rqB        = alphaq * ( 1 + sigmaq * qqB );"
             "CoulA      = k*qqA/r; "
             "CoulB      = k*qqB/r; "
             ""
@@ -1934,8 +1955,8 @@ class EvbSystemBuilder():
             # if rljA = 0, returns 1, otherwise returns rljA. Prevents division by 0 while the step factor is already 0
             "rljAdiv    = select(rljA,rljA,1);"
             "rljBdiv    = select(rljB,rljB,1);"
-            "rljA       = alphalj * ( (26/7 ) * A6  * 1 ) ^ pow;"
-            "rljB       = alphalj * ( (26/7 ) * B6  * 1 ) ^ pow;"
+            "rljA       = alphalj * ( (26/7 ) * A6 ) ^ pow;"
+            "rljB       = alphalj * ( (26/7 ) * B6 ) ^ pow;"
             "LjA        = A12 / r^12 - A6 / r^6;"
             "LjB        = B12 / r^12 - B6 / r^6;"
             "A12        = 4 * epsilonA * sigmaA ^ 12; "
@@ -1967,8 +1988,11 @@ class EvbSystemBuilder():
     # This causes all exceptdions to be constant. This will include constant 1-4 interactions between atoms that bonded in either the reactant or the product, but not in the other.
 
     # Broken exceptions will add exceptions for bonds that are changing between the reactant and product.
-    # This is weaker then merge_exceptions, as it will not include 1-4 interactions between atoms that are not bonded, even if they are bonded on the other side of the reaction.
+    # This is weaker then merge_exceptions, as it will not add 1-4 interactions between atoms that are not bonded, even if they are bonded on the other side of the reaction.
     # This is used to remove the nonbonded interactions that are modelled by other forces
+
+    # Only changing bonds will only add nonbonded interactions for atom pairs that are part of changing bonds.
+    # Exclude changing bonds will do the opposite
 
     # Turning both off gives the proper reactant or product for lam=0 or 1
     def _create_nonbonded_forces(
@@ -2025,7 +2049,7 @@ class EvbSystemBuilder():
 
         atom_keys = self.reactant.atoms.keys()
 
-        #Loop over all atoms, and check if their id's are part of any exceptions
+        # Loop over all atoms, and check if their id's are part of any exceptions
         for i in atom_keys:
             for j in atom_keys:
                 if i < j:
@@ -2299,7 +2323,7 @@ class EvbSystemBuilder():
             return 180.0 * phi_in_radian / math.pi
         else:
             return phi_in_radian
-        
+
     def save_systems_as_xml(self, systems: dict, folder: str):
         """Save the systems as xml files to the given folder.
 
@@ -2388,8 +2412,8 @@ class EvbForceGroup(Enum):
         return set(range(1, max_ind))
 
     @classmethod
-    #Simple method for printing a descrpitive header to be used in force group logging files
     def get_header(cls):
+        # Simple method for printing a descrpitive header to be used in force group logging files
         header = ""
         # pes_forcegroups = cls.pes_force_groups()
         for fg in cls:

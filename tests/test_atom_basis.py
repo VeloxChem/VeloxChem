@@ -37,7 +37,7 @@ class TestAtomBasis:
             self.get_hydrogen_svp_1s(),
             self.get_hydrogen_svp_2s(),
             self.get_hydrogen_svp_1p()
-        ], 'DEF2-SVP', '', 1)
+        ], 'DEF2-SVP', 1)
 
     def get_lithium_svp_1s(self):
 
@@ -89,7 +89,7 @@ class TestAtomBasis:
             self.get_lithium_svp_3s(),
             self.get_lithium_svp_1p(),
             self.get_lithium_svp_2p()
-        ], 'DEF2-SVP', '', 3)
+        ], 'DEF2-SVP', 3)
 
     def test_pickle(self):
 
@@ -116,29 +116,17 @@ class TestAtomBasis:
         bas.set_name('DEF2-SVP(NEW)')
         assert bas.get_name() == 'DEF2-SVP(NEW)'
 
-    def test_set_and_get_ecp_label(self):
+    def test_has_ecp(self):
 
         bas = self.get_hydrogen_svp()
 
-        assert bas.get_ecp_label() == ''
-
-        bas.set_ecp_label('DEF2-ECP')
-        assert bas.get_ecp_label() == 'DEF2-ECP'
-
-    def test_need_ecp(self):
-
-        bas = self.get_hydrogen_svp()
-
-        assert bas.need_ecp() is False
-
-        bas.set_ecp_label('DEF2-ECP')
-        assert bas.need_ecp() is True
+        assert bas.has_ecp() is False
 
     def test_add(self):
 
         bas_a = self.get_hydrogen_svp()
 
-        bas_b = AtomBasis([], 'DEF2-SVP', '', 1)
+        bas_b = AtomBasis([], 'DEF2-SVP', 1)
         bas_b.add(self.get_hydrogen_svp_1s())
         bas_b.add(self.get_hydrogen_svp_2s())
         bas_b.add(self.get_hydrogen_svp_1p())
@@ -152,7 +140,7 @@ class TestAtomBasis:
 
         bas_b = AtomBasis(
             [self.get_hydrogen_svp_1s(),
-             self.get_hydrogen_svp_2s()], 'DEF2-SVP(Valence)', '', 1)
+             self.get_hydrogen_svp_2s()], 'DEF2-SVP(Valence)', 1)
 
         assert bas_b == bas_v
 

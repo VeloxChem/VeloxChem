@@ -109,7 +109,7 @@ class ConformerGenerator:
         idtf = AtomTypeIdentifier()
         idtf.ostream.mute()
 
-        atom_type = idtf.generate_gaff_atomtypes(molecule)
+        atom_type_not_used = idtf.generate_gaff_atomtypes(molecule)
 
         idtf.identify_equivalences()
         equivalent_charges = idtf.equivalent_charges
@@ -229,6 +229,24 @@ class ConformerGenerator:
         # convert to zero based index
         rotatable_bonds_zero_based = [(i - 1, j - 1) for (i, j) in rotatable_bonds]
         rotatable_dihedrals_dict = {}
+
+        # Due to size limit in mmforcefieldgenerator's cycle detection, we need
+        # to do another check and see if a rotatable bond is in a larger cycle.
+        # This check involves disconnecting i-j and finding all atoms that are
+        # connected to j. A rotatable bond in a macrocycle is rotatable in the
+        # force field, but not rotatable for conformeregnerator since we do
+        # rigid rotation here.
+        rotatable_bonds_zero_based_refined = []
+        conn_matrix = molecule.get_connectivity_matrix()
+        for (atom_i, atom_j) in rotatable_bonds_zero_based:
+            conn_mat_copy = np.copy(conn_matrix)
+            conn_mat_copy[atom_i, atom_j] = 0
+            conn_mat_copy[atom_j, atom_i] = 0
+            atoms_connected_to_j = molecule.find_connected_atoms(
+                atom_j, conn_mat_copy)
+            if atom_i not in atoms_connected_to_j:
+                rotatable_bonds_zero_based_refined.append((atom_i, atom_j))
+        rotatable_bonds_zero_based = rotatable_bonds_zero_based_refined
 
         def get_max_periodicity(periodicity):
             if isinstance(periodicity, list):
@@ -401,7 +419,7 @@ class ConformerGenerator:
 
         coords_nm = molecule.get_coordinates_in_angstrom() * 0.1
         simulation.context.setPositions(coords_nm * nanometer)
-        #freeze atoms if specified
+        # freeze atoms if specified
         if self.freeze_atoms is not None:
             for atom_idx in self.freeze_atoms:
                 simulation.system.setParticleMass(atom_idx, 0.0 * dalton)
@@ -477,8 +495,8 @@ class ConformerGenerator:
         comm = self._comm
         rank = self._comm.Get_rank()
         size = self._comm.Get_size()
-        #default partial charges are RESP charges: self.resp_charges is True and partial_charges is None as default 
-        #if the user provides partial charges, then skip RESP charges calculation
+        # default partial charges are RESP charges: self.resp_charges is True and partial_charges is None as default
+        # if the user provides partial charges, then skip RESP charges calculation
         if self.resp_charges and (self.partial_charges is None):
             basis = MolecularBasis.read(molecule, "6-31g*")
             self.partial_charges = self.resp_charges_driver.compute(

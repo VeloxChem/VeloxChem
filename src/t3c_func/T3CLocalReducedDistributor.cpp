@@ -58,10 +58,6 @@ CT3CLocalReducedDistributor::distribute(const CSimdArray<double>&        buffer,
     
     const auto mask_indices = _t3_values->mask_indices();
     
-    // set up size of buffer
-    
-    const auto nrows = _t3_values->width();
-    
     // reference indexes on bra side
 
     const auto refp = a_indices[ibra_gto + 1];
@@ -69,10 +65,6 @@ CT3CLocalReducedDistributor::distribute(const CSimdArray<double>&        buffer,
     // dimensions of bra and ket orbital indexes
 
     const auto adim = a_indices[0];
-
-    const auto cdim = c_indices[0];
-
-    const auto ddim = d_indices[0];
     
     // set up angular components
 

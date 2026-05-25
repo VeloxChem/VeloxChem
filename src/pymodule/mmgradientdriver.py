@@ -86,4 +86,7 @@ class MMGradientDriver(GradientDriver):
 
         self.mm_driver.compute(molecule)
 
-        return self.mm_driver.get_energy()
+        mm_energy = self.mm_driver.get_energy()
+        mm_energy = self.comm.bcast(mm_energy, root=mpi_master())
+
+        return mm_energy

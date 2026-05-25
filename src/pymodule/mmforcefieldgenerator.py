@@ -52,7 +52,8 @@ from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
 from .optimizationdriver import OptimizationDriver
 from .inputparser import parse_input
-from .errorhandler import assert_msg_critical, safe_arccos
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_arccos
 from .seminario import Seminario
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
@@ -94,6 +95,18 @@ class MMForceFieldGenerator:
         - scan_geometries: The optimized geometries from QM scan (list of list).
         - target_dihedrals: The target dihedral angles for parameterization.
         - workdir: The working directory.
+        - force_field: The force field to use for sigma/epsilon lookup.
+          Supported values: 'gaff' (default), 'opls'.
+          Set via   mmgen.force_field = 'opls'   before calling create_topology().
+          OPLS-AA sigma/epsilon parameters are sourced from an embedded table
+          transcribed from GROMACS 2026.1 oplsaa.ff/ffnonbonded.itp.
+          Atoms with no OPLS-AA equivalent (opls: None in atomtypeidentifier)
+          fall back to GAFF sigma/epsilon with a printed warning.
+          OPLS-AA also sets comb_rule=3 and fudgeLJ=fudgeQQ=0.5 in the .top file.
+          Note: full OPLS-AA sigma/epsilon lookup requires a bundled OPLS-AA
+          parameter file; until that is available the code falls back to GAFF
+          parameters and emits a warning for any atom type that has no OPLS-AA
+          equivalent (i.e. where atomtypeidentifier set 'opls': None).
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -172,6 +185,19 @@ class MMForceFieldGenerator:
         # Summary of fitting
         self.fitting_summary = None
 
+        # Force field selection: 'gaff' (default), 'opls',
+        # 'openff-2.0.0', 'openff-2.1.0', or 'openff-2.2.0'.
+        # Set via   mmgen.force_field = 'openff-2.0.0'   before create_topology().
+        # OPLS-AA uses geometric-mean LJ mixing (comb_rule 3 in GROMACS); this
+        # is applied automatically in write_top() when force_field == 'opls'.
+        # sigma/epsilon values are looked up from an embedded table derived from
+        # GROMACS 2026.1 oplsaa.ff/ffnonbonded.itp via get_oplsaa_data_dict().
+        # Atoms with no OPLS-AA equivalent fall back to GAFF with a warning.
+        # OpenFF 2.x (Sage) uses SMIRKS-based typing via SmirnoffTyper;
+        # all bonded and nonbonded parameters come directly from the toolkit.
+        # Requires:  pip install openff-toolkit openff-forcefields
+        self.force_field = 'gaff'
+
     def update_settings(self, ffg_dict, resp_dict=None):
         """
         Updates settings in force field generator.
@@ -203,6 +229,7 @@ class MMForceFieldGenerator:
             'partial_charges': 'seq_fixed',
             'original_top_file': 'str',
             'keep_files': 'bool',
+            'force_field': 'str',
         }
 
         parse_input(self, ffg_keywords, ffg_dict)
@@ -350,19 +377,24 @@ class MMForceFieldGenerator:
                       scan_range=[0, 360],
                       n_points=7):
         """
-        Changes the dihedral constants for a specific rotatable bond in order to
-        fit the QM scan.
+        Runs a constrained QM scan for one rotatable bond.
 
         :param scf_driver:
-            The SCF driver. If None is provided it will use HF.
+            The SCF driver used to obtain the reference wavefunction.
         :param basis:
-            The AO basis set. If None is provided it will use 6-31G*.
+            The AO basis set.
         :param rotatable_bond:
-            The list of indices of the rotatable bond. (1-indexed)
+            The rotatable bond as a pair of 1-based atom indices.
+        :param scf_results:
+            Optional SCF results. If not provided, an SCF calculation is run.
         :param scan_range:
-            List with the range of dihedral angles. Default is [0, 360].
+            Two-element list with the start and end dihedral angles in degrees.
         :param n_points:
-            The number of points to be calculated. Default is 19.
+            The number of scan points.
+
+        :return:
+            A dictionary with scan angles, scan energies, scan geometries, and
+            the target dihedral indices.
         """
 
         assert_msg_critical(
@@ -386,6 +418,11 @@ class MMForceFieldGenerator:
         dihedral_indices_one_based = [
             [i + 1, j + 1, k + 1, l + 1] for i, j, k, l in dihedral_indices
         ]
+
+        assert_msg_critical(
+            len(dihedral_indices) > 0,
+            'MMForceFieldGenerator.scan_dihedral: rotatable_bond was not '
+            'found among dihedrals')
 
         # Print a header
         header = 'VeloxChem Dihedral Scan'
@@ -470,17 +507,25 @@ class MMForceFieldGenerator:
                                  show_diff=False,
                                  verbose=True):
         """
-        Changes the dihedral constants for a specific rotatable bond in order to
-        fit the QM scan.
+        Fits dihedral parameters for one rotatable bond to QM scan data.
 
         :param rotatable_bond:
-            The list of indices of the rotatable bond. (1-indexed)
+            The rotatable bond as a pair of 1-based atom indices.
+        :param scan_results:
+            Precomputed scan data returned by :meth:`scan_dihedral`.
         :param scan_file:
-            The file with the QM scan. If None is provided it a QM scan will be performed.
+            Path to an XYZ scan file. Exactly one of ``scan_results`` and
+            ``scan_file`` must be provided.
         :param visualize:
-            Whether the dihedral scans should be visualized.
+            Whether to display the fitted and reference scans.
         :param fit_extrema:
-            Whether the dihedral parameters should be fitted to the QM scan extrema.
+            Whether to fit only extrema rather than the full scan.
+        :param initial_validation:
+            Whether to validate the original force field before fitting.
+        :param show_diff:
+            Whether to display the QM-MM difference when visualizing.
+        :param verbose:
+            Whether to print progress and validation details.
         """
 
         try:
@@ -498,20 +543,31 @@ class MMForceFieldGenerator:
 
         # double check dihedral angle if scan file is provided
         if scan_file is not None:
-            with open(scan_file, 'r') as fh:
-                for line in fh:
-                    if line.startswith('Scan'):
-                        # Scan Cycle 1/19 ; Dihedral 3-4-6-7 = 0.00 ; Iteration 17 Energy -1089.05773546
-                        # Extract the dihedral indices
-                        scanned_dih = [
-                            int(i) for i in (
-                                line.split('Dihedral')[1].split()[0].split('-'))
-                        ]
-                        assert_msg_critical(
-                            sorted(scanned_dih[1:3]) == sorted(rotatable_bond),
-                            'MMForceFieldGenerator.reparameterize_dihedrals: ' +
-                            'The rotatable bond does not match the scan file')
-                        break
+            scan_lines = None
+            scan_path = Path(scan_file)
+            if self.rank == mpi_master():
+                with scan_path.open('r') as fh:
+                    scan_lines = fh.readlines()
+            scan_lines = self.comm.bcast(scan_lines, root=mpi_master())
+
+            scanned_dih = None
+            for line in scan_lines:
+                if line.startswith('Scan'):
+                    # Scan Cycle 1/19 ; Dihedral 3-4-6-7 = 0.00 ; Iteration 17 Energy -1089.05773546
+                    # Extract the dihedral indices
+                    scanned_dih = [
+                        int(i)
+                        for i in line.split('Dihedral')[1].split()[0].split('-')
+                    ]
+                    assert_msg_critical(
+                        sorted(scanned_dih[1:3]) == sorted(rotatable_bond),
+                        'MMForceFieldGenerator.reparameterize_dihedrals: ' +
+                        'The rotatable bond does not match the scan file')
+                    break
+            assert_msg_critical(
+                scanned_dih is not None,
+                'MMForceFieldGenerator.reparameterize_dihedrals: scan file '
+                'does not contain any Scan records')
 
         # Identify the dihedral indices for the rotatable bond
         dihedral_indices = []
@@ -529,6 +585,11 @@ class MMForceFieldGenerator:
         dihedral_indices_one_based = [
             [i + 1, j + 1, k + 1, l + 1] for i, j, k, l in dihedral_indices
         ]
+
+        assert_msg_critical(
+            len(dihedral_indices) > 0,
+            'MMForceFieldGenerator.reparameterize_dihedrals: rotatable_bond '
+            'was not found among dihedrals')
 
         # Print a header
         header = 'VeloxChem Dihedral Reparameterization'
@@ -550,9 +611,11 @@ class MMForceFieldGenerator:
                     f"{scanned_dih[0]}-{scanned_dih[1]}-{scanned_dih[2]}-{scanned_dih[3]}",
                     f"{scanned_dih[3]}-{scanned_dih[2]}-{scanned_dih[1]}-{scanned_dih[0]}"
             ]:
-                raise ValueError(
-                    'The scan file name does not match the dihedral indices. Format should be 1-2-3-4.xyz'
-                )
+                assert_msg_critical(
+                    False,
+                    'MMForceFieldGenerator.reparameterize_dihedrals: scan '
+                    'file name does not match dihedral indices. Format '
+                    'should be 1-2-3-4.xyz')
             self.read_qm_scan_xyz_files([scan_file])
         else:
             # process scan results
@@ -560,6 +623,8 @@ class MMForceFieldGenerator:
             self.scan_energies = scan_results['scan_energies']
             self.scan_geometries = scan_results['scan_geometries']
             self.target_dihedrals = scan_results['target_dihedrals']
+
+        target_scan_index = self._get_target_scan_index(rotatable_bond)
 
         # Group dihedrals by their types
         dihedral_groups = defaultdict(list)
@@ -606,7 +671,7 @@ class MMForceFieldGenerator:
         phases_array = np.array(phases, dtype=float)
         periodicities_array = np.array(periodicities, dtype=float)
         phases_array_rad = np.deg2rad(phases_array)
-        dihedral_angles_rad = np.deg2rad(self.scan_dih_angles[0])
+        dihedral_angles_rad = np.deg2rad(self.scan_dih_angles[target_scan_index])
 
         # Set the dihedral barriers to zero for the scan
         for i, j, k, l in dihedral_indices:
@@ -624,7 +689,8 @@ class MMForceFieldGenerator:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        initial_data = self.validate_force_field(0, verbose=verbose)
+        initial_data = self.validate_force_field(target_scan_index,
+                                                 verbose=verbose)
 
         qm_energies = np.array(initial_data['qm_scan_kJpermol'])
         mm_baseline = np.array(initial_data['mm_scan_kJpermol'])
@@ -693,8 +759,7 @@ class MMForceFieldGenerator:
             residuals = (qm_energies_rel - mm_energies_fit_rel)
             residuals += barriers_to_fit[-1]
 
-            # Return the squared residuals for optimization
-            return residuals**2
+            return residuals
 
         # Print initial barriers
         self.ostream.print_info(
@@ -862,6 +927,29 @@ class MMForceFieldGenerator:
             'standard_deviation': self.fitting_summary['standard_deviation'],
         }
 
+    def _get_target_scan_index(self, rotatable_bond):
+        """Gets the scan index matching a requested rotatable bond.
+
+        :param rotatable_bond:
+            The rotatable bond as a pair of 1-based atom indices.
+        :return:
+            The index of the matching scan entry.
+        """
+
+        matching_indices = []
+
+        for idx, dihedral in enumerate(self.target_dihedrals):
+            central_bond = sorted([dihedral[1] + 1, dihedral[2] + 1])
+            if central_bond == sorted(rotatable_bond):
+                matching_indices.append(idx)
+
+        assert_msg_critical(
+            len(matching_indices) > 0,
+            'MMForceFieldGenerator.reparameterize_dihedrals: The rotatable '
+            'bond does not match the scan data')
+
+        return matching_indices[0]
+
     def read_qm_scan_xyz_files(self, scan_xyz_files, inp_dir=None):
         """
         Reads QM scan xyz files.
@@ -885,7 +973,8 @@ class MMForceFieldGenerator:
         self.ostream.print_info('Reading QM scan from file...')
 
         for xyz in scan_xyz_files:
-            xyz_fname = str(inp_dir / xyz)
+            xyz_path = inp_dir / xyz
+            xyz_fname = str(xyz_path)
 
             self.ostream.print_info(f'  {xyz_fname}')
 
@@ -897,7 +986,7 @@ class MMForceFieldGenerator:
 
             xyz_lines = None
             if self.rank == mpi_master():
-                with open(xyz_fname, 'r') as f_xyz:
+                with xyz_path.open('r') as f_xyz:
                     xyz_lines = f_xyz.readlines()
             xyz_lines = self.comm.bcast(xyz_lines, root=mpi_master())
 
@@ -922,6 +1011,7 @@ class MMForceFieldGenerator:
             # read energies and dihedral angles
 
             pattern = re.compile(r'\AScan')
+            dih_inds = None
 
             for line in xyz_lines:
                 if re.search(pattern, line):
@@ -932,6 +1022,15 @@ class MMForceFieldGenerator:
                         for i in line.split('Dihedral')[1].split()[0].split('-')
                     ]
                     dih_inds = [i, j, k, l] if i < l else [l, k, j, i]
+            assert_msg_critical(
+                dih_inds is not None,
+                'MMForceFieldGenerator.read_qm_scan_xyz_files: QM scan file '
+                f'{xyz_fname} does not contain any Scan records')
+            assert_msg_critical(
+                len(geometries) == len(energies) == len(dih_angles),
+                'MMForceFieldGenerator.read_qm_scan_xyz_files: inconsistent '
+                'number of geometries, energies, and dihedral angles in QM '
+                f'scan file {xyz_fname}')
             self.scan_energies.append(energies)
             self.scan_dih_angles.append(dih_angles)
             self.target_dihedrals.append(dih_inds)
@@ -1062,6 +1161,391 @@ class MMForceFieldGenerator:
 
         return data
 
+    @staticmethod
+    def get_oplsaa_data_dict():
+        """
+        Returns a dictionary of OPLS-AA nonbonded (sigma, epsilon) parameters
+        keyed by OPLS type string (e.g. 'opls_135').
+
+        Data sourced from the GROMACS oplsaa.ff/ffnonbonded.itp file
+        (GROMACS 2026.1, https://github.com/gromacs/gromacs).
+        Units: sigma in nm, epsilon in kJ/mol (GROMACS convention).
+
+        References:
+          W. L. Jorgensen, D. S. Maxwell, J. Tirado-Rives,
+          J. Am. Chem. Soc. 118, 11225-11236 (1996).
+          W. L. Jorgensen, N. A. McDonald, J. Phys. Chem. B 102, 8049 (1998).
+          E. K. Watkins, W. L. Jorgensen, J. Phys. Chem. A 105, 4118 (2001).
+        """
+
+        # fmt: off
+        # Each entry: (sigma [nm], epsilon [kJ/mol])
+        # Transcribed verbatim from GROMACS 2026.1 oplsaa.ff/ffnonbonded.itp
+        _raw = {
+            'opls_001': (3.75000e-01, 4.39320e-01),
+            'opls_002': (2.96000e-01, 8.78640e-01),
+            'opls_003': (3.25000e-01, 7.11280e-01),
+            'opls_004': (0.00000e+00, 0.00000e+00),
+            'opls_032': (3.55000e-01, 1.04600e+00),
+            'opls_033': (0.00000e+00, 0.00000e+00),
+            'opls_035': (3.55000e-01, 1.04600e+00),
+            'opls_038': (3.55000e-01, 1.04600e+00),
+            'opls_040': (3.25000e-01, 7.11280e-01),
+            'opls_041': (0.00000e+00, 0.00000e+00),
+            'opls_042': (3.25000e-01, 7.11280e-01),
+            'opls_062': (3.00000e-01, 7.11280e-01),
+            'opls_108': (3.00000e-01, 7.11280e-01),
+            'opls_135': (3.50000e-01, 2.76144e-01),
+            'opls_136': (3.50000e-01, 2.76144e-01),
+            'opls_137': (3.50000e-01, 2.76144e-01),
+            'opls_138': (3.50000e-01, 2.76144e-01),
+            'opls_139': (3.50000e-01, 2.76144e-01),
+            'opls_140': (2.50000e-01, 1.25520e-01),
+            'opls_141': (3.55000e-01, 3.17984e-01),
+            'opls_142': (3.55000e-01, 3.17984e-01),
+            'opls_143': (3.55000e-01, 3.17984e-01),
+            'opls_144': (2.42000e-01, 1.25520e-01),
+            'opls_145': (3.55000e-01, 2.92880e-01),
+            'opls_146': (2.42000e-01, 1.25520e-01),
+            'opls_147': (3.55000e-01, 2.92880e-01),
+            'opls_148': (3.50000e-01, 2.76144e-01),
+            'opls_149': (3.50000e-01, 2.76144e-01),
+            'opls_151': (3.40000e-01, 1.25520e+00),
+            'opls_154': (3.12000e-01, 7.11280e-01),
+            'opls_155': (0.00000e+00, 0.00000e+00),
+            'opls_157': (3.50000e-01, 2.76144e-01),
+            'opls_158': (3.50000e-01, 2.76144e-01),
+            'opls_159': (3.50000e-01, 2.76144e-01),
+            'opls_164': (2.94000e-01, 2.55224e-01),
+            'opls_166': (3.55000e-01, 2.92880e-01),
+            'opls_167': (3.07000e-01, 7.11280e-01),
+            'opls_168': (0.00000e+00, 0.00000e+00),
+            'opls_169': (3.07000e-01, 7.11280e-01),
+            'opls_170': (0.00000e+00, 0.00000e+00),
+            'opls_171': (3.07000e-01, 7.11280e-01),
+            'opls_172': (0.00000e+00, 0.00000e+00),
+            'opls_178': (3.55000e-01, 3.17984e-01),
+            'opls_179': (2.90000e-01, 5.85760e-01),
+            'opls_180': (2.90000e-01, 5.85760e-01),
+            'opls_181': (3.50000e-01, 2.76144e-01),
+            'opls_182': (3.50000e-01, 2.76144e-01),
+            'opls_183': (3.50000e-01, 2.76144e-01),
+            'opls_184': (3.50000e-01, 2.76144e-01),
+            'opls_185': (3.50000e-01, 2.76144e-01),
+            'opls_186': (2.90000e-01, 5.85760e-01),
+            'opls_187': (3.07000e-01, 7.11280e-01),
+            'opls_188': (0.00000e+00, 0.00000e+00),
+            'opls_200': (3.60000e-01, 1.77820e+00),
+            'opls_201': (3.70000e-01, 1.04600e+00),
+            'opls_202': (3.60000e-01, 1.48532e+00),
+            'opls_203': (3.55000e-01, 1.04600e+00),
+            'opls_204': (0.00000e+00, 0.00000e+00),
+            'opls_205': (0.00000e+00, 0.00000e+00),
+            'opls_206': (3.50000e-01, 2.76144e-01),
+            'opls_207': (3.50000e-01, 2.76144e-01),
+            'opls_208': (3.50000e-01, 2.76144e-01),
+            'opls_209': (3.50000e-01, 2.76144e-01),
+            'opls_210': (3.50000e-01, 2.76144e-01),
+            'opls_211': (3.50000e-01, 2.76144e-01),
+            'opls_212': (3.50000e-01, 2.76144e-01),
+            'opls_222': (3.55000e-01, 1.04600e+00),
+            'opls_226': (3.40000e-01, 1.25520e+00),
+            'opls_231': (3.75000e-01, 4.39320e-01),
+            'opls_232': (3.75000e-01, 4.39320e-01),
+            'opls_233': (3.75000e-01, 4.39320e-01),
+            'opls_234': (3.75000e-01, 4.39320e-01),
+            'opls_235': (3.75000e-01, 4.39320e-01),
+            'opls_236': (2.96000e-01, 8.78640e-01),
+            'opls_237': (3.25000e-01, 7.11280e-01),
+            'opls_238': (3.25000e-01, 7.11280e-01),
+            'opls_239': (3.25000e-01, 7.11280e-01),
+            'opls_240': (0.00000e+00, 0.00000e+00),
+            'opls_241': (0.00000e+00, 0.00000e+00),
+            'opls_247': (3.75000e-01, 4.39320e-01),
+            'opls_248': (2.96000e-01, 8.78640e-01),
+            'opls_249': (3.25000e-01, 7.11280e-01),
+            'opls_250': (0.00000e+00, 0.00000e+00),
+            'opls_251': (3.25000e-01, 7.11280e-01),
+            'opls_252': (3.75000e-01, 4.39320e-01),
+            'opls_253': (2.96000e-01, 8.78640e-01),
+            'opls_254': (0.00000e+00, 0.00000e+00),
+            'opls_260': (3.55000e-01, 2.92880e-01),
+            'opls_261': (3.65000e-01, 6.27600e-01),
+            'opls_262': (3.20000e-01, 7.11280e-01),
+            'opls_263': (3.55000e-01, 2.92880e-01),
+            'opls_264': (3.40000e-01, 1.25520e+00),
+            'opls_265': (3.25000e-01, 7.11280e-01),
+            'opls_266': (3.55000e-01, 2.92880e-01),
+            'opls_267': (3.75000e-01, 4.39320e-01),
+            'opls_268': (3.00000e-01, 7.11280e-01),
+            'opls_269': (2.96000e-01, 8.78640e-01),
+            'opls_270': (0.00000e+00, 0.00000e+00),
+            'opls_271': (3.75000e-01, 4.39320e-01),
+            'opls_272': (2.96000e-01, 8.78640e-01),
+            'opls_279': (2.42000e-01, 6.27600e-02),
+            'opls_280': (3.75000e-01, 4.39320e-01),
+            'opls_281': (2.96000e-01, 8.78640e-01),
+            'opls_282': (2.42000e-01, 6.27600e-02),
+            'opls_287': (3.25000e-01, 7.11280e-01),
+            'opls_288': (3.25000e-01, 7.11280e-01),
+            'opls_289': (0.00000e+00, 0.00000e+00),
+            'opls_290': (0.00000e+00, 0.00000e+00),
+            'opls_291': (3.50000e-01, 2.76144e-01),
+            'opls_296': (3.50000e-01, 2.76144e-01),
+            'opls_300': (3.25000e-01, 7.11280e-01),
+            'opls_301': (0.00000e+00, 0.00000e+00),
+            'opls_302': (2.25000e-01, 2.09200e-01),
+            'opls_303': (3.25000e-01, 7.11280e-01),
+            'opls_304': (0.00000e+00, 0.00000e+00),
+            'opls_311': (3.25000e-01, 7.11280e-01),
+            'opls_312': (3.50000e-01, 3.34720e-01),
+            'opls_313': (3.25000e-01, 7.11280e-01),
+            'opls_314': (0.00000e+00, 0.00000e+00),
+            'opls_315': (3.50000e-01, 3.34720e-01),
+            'opls_316': (2.50000e-01, 2.09200e-01),
+            'opls_317': (3.50000e-01, 3.34720e-01),
+            'opls_318': (2.50000e-01, 2.09200e-01),
+            'opls_319': (3.25000e-01, 7.11280e-01),
+            'opls_320': (3.75000e-01, 4.39320e-01),
+            'opls_321': (3.25000e-01, 7.11280e-01),
+            'opls_322': (3.75000e-01, 4.39320e-01),
+            'opls_323': (3.50000e-01, 3.34720e-01),
+            'opls_324': (3.50000e-01, 3.34720e-01),
+            'opls_325': (0.00000e+00, 0.00000e+00),
+            'opls_326': (2.96000e-01, 8.78640e-01),
+            'opls_327': (0.00000e+00, 0.00000e+00),
+            'opls_328': (2.96000e-01, 8.78640e-01),
+            'opls_329': (2.50000e-01, 2.09200e-01),
+            'opls_330': (2.50000e-01, 2.09200e-01),
+            'opls_331': (3.50000e-01, 3.34720e-01),
+            'opls_332': (2.50000e-01, 2.09200e-01),
+            'opls_333': (3.25000e-01, 7.11280e-01),
+            'opls_334': (3.75000e-01, 4.39320e-01),
+            'opls_335': (3.25000e-01, 7.11280e-01),
+            'opls_336': (3.50000e-01, 3.34720e-01),
+            'opls_337': (3.50000e-01, 3.34720e-01),
+            'opls_338': (3.50000e-01, 3.34720e-01),
+            'opls_339': (0.00000e+00, 0.00000e+00),
+            'opls_340': (2.96000e-01, 8.78640e-01),
+            'opls_341': (3.25000e-01, 7.11280e-01),
+            'opls_342': (0.00000e+00, 0.00000e+00),
+            'opls_343': (0.00000e+00, 0.00000e+00),
+            'opls_344': (2.50000e-01, 2.09200e-01),
+            'opls_345': (2.50000e-01, 2.09200e-01),
+            'opls_346': (3.25000e-01, 7.11280e-01),
+            'opls_347': (3.50000e-01, 3.34720e-01),
+            'opls_348': (3.25000e-01, 7.11280e-01),
+            'opls_349': (3.50000e-01, 3.34720e-01),
+            'opls_350': (3.50000e-01, 3.34720e-01),
+            'opls_351': (3.50000e-01, 3.34720e-01),
+            'opls_352': (3.25000e-01, 7.11280e-01),
+            'opls_353': (3.50000e-01, 3.34720e-01),
+            'opls_354': (3.25000e-01, 7.11280e-01),
+            'opls_355': (2.50000e-01, 2.09200e-01),
+            'opls_356': (3.25000e-01, 7.11280e-01),
+            'opls_357': (0.00000e+00, 0.00000e+00),
+            'opls_358': (0.00000e+00, 0.00000e+00),
+            'opls_359': (2.50000e-01, 2.09200e-01),
+            'opls_360': (0.00000e+00, 0.00000e+00),
+            'opls_361': (3.25000e-01, 7.11280e-01),
+            'opls_362': (3.50000e-01, 3.34720e-01),
+            'opls_363': (3.25000e-01, 7.11280e-01),
+            'opls_364': (3.50000e-01, 3.34720e-01),
+            'opls_365': (3.50000e-01, 3.34720e-01),
+            'opls_366': (3.75000e-01, 4.39320e-01),
+            'opls_367': (0.00000e+00, 0.00000e+00),
+            'opls_368': (3.25000e-01, 7.11280e-01),
+            'opls_369': (0.00000e+00, 0.00000e+00),
+            'opls_370': (2.96000e-01, 8.78640e-01),
+            'opls_371': (3.50000e-01, 3.34720e-01),
+            'opls_372': (2.50000e-01, 2.09200e-01),
+            'opls_373': (3.50000e-01, 3.34720e-01),
+            'opls_374': (2.50000e-01, 2.09200e-01),
+            'opls_375': (3.50000e-01, 3.34720e-01),
+            'opls_376': (2.50000e-01, 2.09200e-01),
+            'opls_377': (3.25000e-01, 7.11280e-01),
+            'opls_378': (3.75000e-01, 4.39320e-01),
+            'opls_379': (3.25000e-01, 7.11280e-01),
+            'opls_380': (3.50000e-01, 3.34720e-01),
+            'opls_381': (3.50000e-01, 3.34720e-01),
+            'opls_382': (3.50000e-01, 3.34720e-01),
+            'opls_383': (0.00000e+00, 0.00000e+00),
+            'opls_384': (2.96000e-01, 8.78640e-01),
+            'opls_385': (0.00000e+00, 0.00000e+00),
+            'opls_386': (3.25000e-01, 7.11280e-01),
+            'opls_387': (0.00000e+00, 0.00000e+00),
+            'opls_388': (0.00000e+00, 0.00000e+00),
+            'opls_389': (2.50000e-01, 2.09200e-01),
+            'opls_390': (2.50000e-01, 2.09200e-01),
+            'opls_391': (3.50000e-01, 3.34720e-01),
+            'opls_392': (2.50000e-01, 2.09200e-01),
+            'opls_393': (3.74000e-01, 8.36800e-01),
+            'opls_394': (2.96000e-01, 8.78640e-01),
+            'opls_395': (3.00000e-01, 7.11280e-01),
+            'opls_396': (3.55000e-01, 2.76144e-01),
+            'opls_440': (3.74000e-01, 8.36800e-01),
+            'opls_441': (3.15000e-01, 8.36800e-01),
+            'opls_442': (2.90000e-01, 5.85760e-01),
+            'opls_443': (3.50000e-01, 2.76144e-01),
+            'opls_444': (2.50000e-01, 1.25520e-01),
+            'opls_445': (3.74000e-01, 8.36800e-01),
+            'opls_446': (3.15000e-01, 8.36800e-01),
+            'opls_447': (2.90000e-01, 5.85760e-01),
+            'opls_450': (3.74000e-01, 8.36800e-01),
+            'opls_451': (3.15000e-01, 8.36800e-01),
+            'opls_452': (2.90000e-01, 5.85760e-01),
+            'opls_465': (3.75000e-01, 4.39320e-01),
+            'opls_466': (2.96000e-01, 8.78640e-01),
+            'opls_467': (3.00000e-01, 7.11280e-01),
+            'opls_468': (3.50000e-01, 2.76144e-01),
+            'opls_469': (2.42000e-01, 6.27600e-02),
+            'opls_470': (3.75000e-01, 4.39320e-01),
+            'opls_471': (3.75000e-01, 4.39320e-01),
+            'opls_472': (3.55000e-01, 2.92880e-01),
+            'opls_473': (3.00000e-01, 7.11280e-01),
+            'opls_474': (3.55000e-01, 1.04600e+00),
+            'opls_475': (2.96000e-01, 7.11280e-01),
+            'opls_478': (3.25000e-01, 7.11280e-01),
+            'opls_479': (0.00000e+00, 0.00000e+00),
+            'opls_480': (3.25000e-01, 7.11280e-01),
+            'opls_481': (0.00000e+00, 0.00000e+00),
+            'opls_500': (3.55000e-01, 2.92880e-01),
+            'opls_501': (3.55000e-01, 2.92880e-01),
+            'opls_502': (3.55000e-01, 2.92880e-01),
+            'opls_503': (3.25000e-01, 7.11280e-01),
+            'opls_504': (0.00000e+00, 0.00000e+00),
+            'opls_505': (3.50000e-01, 2.76144e-01),
+            'opls_506': (3.55000e-01, 2.92880e-01),
+            'opls_507': (3.55000e-01, 2.92880e-01),
+            'opls_508': (3.55000e-01, 2.92880e-01),
+            'opls_509': (3.55000e-01, 2.92880e-01),
+            'opls_510': (3.55000e-01, 2.92880e-01),
+            'opls_511': (3.25000e-01, 7.11280e-01),
+            'opls_512': (3.25000e-01, 7.11280e-01),
+            'opls_513': (0.00000e+00, 0.00000e+00),
+            'opls_514': (3.55000e-01, 2.92880e-01),
+            'opls_515': (3.50000e-01, 2.76144e-01),
+            'opls_516': (3.50000e-01, 2.76144e-01),
+            'opls_517': (3.55000e-01, 3.17984e-01),
+            'opls_518': (3.55000e-01, 3.17984e-01),
+            'opls_520': (3.25000e-01, 7.11280e-01),
+            'opls_521': (3.55000e-01, 2.92880e-01),
+            'opls_522': (3.55000e-01, 2.92880e-01),
+            'opls_523': (3.55000e-01, 2.92880e-01),
+            'opls_524': (2.42000e-01, 1.25520e-01),
+            'opls_525': (2.42000e-01, 1.25520e-01),
+            'opls_526': (2.42000e-01, 1.25520e-01),
+            'opls_527': (3.25000e-01, 7.11280e-01),
+            'opls_528': (3.55000e-01, 2.92880e-01),
+            'opls_529': (2.42000e-01, 1.25520e-01),
+            'opls_530': (3.25000e-01, 7.11280e-01),
+            'opls_531': (3.55000e-01, 2.92880e-01),
+            'opls_532': (3.55000e-01, 2.92880e-01),
+            'opls_533': (3.55000e-01, 2.92880e-01),
+            'opls_534': (2.42000e-01, 1.25520e-01),
+            'opls_535': (2.42000e-01, 1.25520e-01),
+            'opls_536': (2.42000e-01, 1.25520e-01),
+            'opls_537': (3.25000e-01, 7.11280e-01),
+            'opls_538': (3.55000e-01, 2.92880e-01),
+            'opls_539': (3.55000e-01, 2.92880e-01),
+            'opls_540': (2.42000e-01, 1.25520e-01),
+            'opls_541': (2.42000e-01, 1.25520e-01),
+            'opls_542': (3.25000e-01, 7.11280e-01),
+            'opls_543': (3.55000e-01, 2.92880e-01),
+            'opls_544': (3.55000e-01, 2.92880e-01),
+            'opls_545': (0.00000e+00, 0.00000e+00),
+            'opls_546': (2.42000e-01, 1.25520e-01),
+            'opls_547': (2.42000e-01, 1.25520e-01),
+            'opls_548': (3.25000e-01, 7.11280e-01),
+            'opls_549': (3.25000e-01, 7.11280e-01),
+            'opls_550': (3.55000e-01, 2.92880e-01),
+            'opls_551': (3.55000e-01, 2.92880e-01),
+            'opls_552': (3.55000e-01, 2.92880e-01),
+            'opls_553': (0.00000e+00, 0.00000e+00),
+            'opls_554': (2.42000e-01, 1.25520e-01),
+            'opls_555': (2.42000e-01, 1.25520e-01),
+            'opls_556': (2.42000e-01, 1.25520e-01),
+            'opls_557': (3.25000e-01, 7.11280e-01),
+            'opls_558': (3.55000e-01, 2.92880e-01),
+            'opls_559': (3.25000e-01, 7.11280e-01),
+            'opls_560': (3.55000e-01, 2.92880e-01),
+            'opls_561': (3.55000e-01, 2.92880e-01),
+            'opls_562': (0.00000e+00, 0.00000e+00),
+            'opls_563': (2.42000e-01, 1.25520e-01),
+            'opls_564': (2.42000e-01, 1.25520e-01),
+            'opls_565': (2.42000e-01, 1.25520e-01),
+            'opls_566': (2.90000e-01, 5.85760e-01),
+            'opls_567': (3.55000e-01, 2.92880e-01),
+            'opls_568': (3.55000e-01, 3.17984e-01),
+            'opls_569': (2.42000e-01, 1.25520e-01),
+            'opls_570': (2.42000e-01, 1.25520e-01),
+            'opls_571': (2.90000e-01, 5.85760e-01),
+            'opls_572': (3.55000e-01, 2.92880e-01),
+            'opls_573': (3.25000e-01, 7.11280e-01),
+            'opls_574': (3.55000e-01, 2.92880e-01),
+            'opls_575': (3.55000e-01, 2.92880e-01),
+            'opls_576': (2.42000e-01, 1.25520e-01),
+            'opls_577': (2.42000e-01, 1.25520e-01),
+            'opls_578': (2.42000e-01, 1.25520e-01),
+            'opls_579': (2.90000e-01, 5.85760e-01),
+            'opls_580': (3.25000e-01, 7.11280e-01),
+            'opls_581': (3.55000e-01, 2.92880e-01),
+            'opls_582': (3.55000e-01, 2.92880e-01),
+            'opls_583': (3.55000e-01, 2.92880e-01),
+            'opls_584': (2.42000e-01, 1.25520e-01),
+            'opls_585': (2.42000e-01, 1.25520e-01),
+            'opls_586': (2.42000e-01, 1.25520e-01),
+            'opls_587': (3.25000e-01, 7.11280e-01),
+            'opls_588': (3.55000e-01, 2.92880e-01),
+            'opls_589': (3.55000e-01, 2.92880e-01),
+            'opls_633': (3.55000e-01, 1.04600e+00),
+            'opls_634': (3.55000e-01, 2.92880e-01),
+            'opls_635': (3.25000e-01, 7.11280e-01),
+            'opls_636': (3.55000e-01, 2.92880e-01),
+            'opls_637': (3.55000e-01, 2.92880e-01),
+            'opls_638': (2.42000e-01, 1.25520e-01),
+            'opls_639': (2.42000e-01, 1.25520e-01),
+            'opls_640': (2.42000e-01, 1.25520e-01),
+            'opls_700': (3.55000e-01, 3.17984e-01),
+            'opls_711': (3.50000e-01, 2.76144e-01),
+            'opls_712': (3.50000e-01, 2.76144e-01),
+            'opls_713': (3.50000e-01, 2.76144e-01),
+            'opls_719': (2.85000e-01, 2.55224e-01),
+            'opls_720': (3.55000e-01, 2.92880e-01),
+            'opls_721': (2.85000e-01, 2.55224e-01),
+            'opls_722': (3.47000e-01, 1.96648e+00),
+            'opls_724': (3.55000e-01, 2.92880e-01),
+            'opls_725': (3.25000e-01, 2.59408e-01),
+            'opls_726': (2.94000e-01, 2.55224e-01),
+            'opls_727': (3.55000e-01, 2.92880e-01),
+            'opls_728': (2.85000e-01, 2.55224e-01),
+            'opls_729': (3.55000e-01, 2.92880e-01),
+            'opls_730': (3.47000e-01, 1.96648e+00),
+            'opls_731': (3.55000e-01, 2.92880e-01),
+            'opls_732': (3.67000e-01, 2.42672e+00),
+            'opls_733': (3.50000e-01, 2.76144e-01),
+            'opls_734': (3.55000e-01, 1.04600e+00),
+            'opls_749': (3.25000e-01, 7.11280e-01),
+            'opls_750': (3.20000e-01, 7.11280e-01),
+            'opls_751': (3.25000e-01, 7.11280e-01),
+            'opls_752': (2.25000e-01, 2.09200e-01),
+            'opls_753': (3.20000e-01, 7.11280e-01),
+            'opls_754': (3.30000e-01, 2.76144e-01),
+            'opls_760': (3.25000e-01, 5.02080e-01),
+            'opls_761': (2.96000e-01, 7.11280e-01),
+            'opls_771': (2.96000e-01, 8.78640e-01),
+            'opls_772': (3.75000e-01, 4.39320e-01),
+            'opls_773': (3.00000e-01, 7.11280e-01),
+            'opls_787': (3.15000e-01, 7.11280e-01),
+            'opls_788': (2.86000e-01, 8.78640e-01),
+            'opls_900': (3.30000e-01, 7.11280e-01),
+            'opls_901': (3.30000e-01, 7.11280e-01),
+            'opls_902': (3.30000e-01, 7.11280e-01),
+        }
+        # fmt: on
+
+        return _raw
+
     def create_topology(self,
                         molecule,
                         basis=None,
@@ -1082,6 +1566,11 @@ class MMForceFieldGenerator:
         :param resp:
             If RESP charges should be computed.
             If False partial charges will be set to zero.
+        :param water_model:
+            The explicit water model to use for isolated water molecules.
+        :param use_xml:
+            Whether to read GAFF parameters from the XML dataset instead of the
+            legacy data file.
         """
 
         ff_data_dict = None
@@ -1151,10 +1640,17 @@ class MMForceFieldGenerator:
         self.equivalent_atoms = atomtypeidentifier.equivalent_atoms
         self.equivalent_charges = atomtypeidentifier.equivalent_charges
 
+        contains_water = molecule.contains_water_molecule()
+        is_water = molecule.is_water_molecule()
         use_water_model = ((water_model is not None) and
-                           molecule.is_water_molecule())
+                           (is_water or contains_water))
+        assert_msg_critical(
+            (not is_water) or (water_model is not None),
+            'MMForceFieldGenerator: explicit water_model is required for isolated water molecules.'
+        )
+        skip_resp = (not resp) or ((water_model is not None) and is_water)
 
-        if (not resp) or use_water_model:
+        if skip_resp:
             # skip RESP charges calculation
             self.partial_charges = np.zeros(self.molecule.number_of_atoms())
             msg = 'RESP calculation disabled: All partial charges are set to zero.'
@@ -1247,52 +1743,83 @@ class MMForceFieldGenerator:
 
         # Read the force field and include the data in the topology dictionary.
 
-        # Atomtypes analysis
+        if self.force_field.startswith('openff'):
+            self.print_references(None, False, False, False, False)
+            # Check OpenFF version, if no version is set, use 2.2.0
+            if self.force_field.strip().lower() == ('openff'):
+                    self.force_field = 'openff-2.2.0'
+                    self.ostream.print_info("No OpenFF version explicitly specified. Defaulting to 'openff-2.2.0'.")
+                    self.ostream.print_blank()
+                    self.ostream.flush()
+            # OpenFF Sage: all parameters come from SmirnoffTyper
+            # via SMIRKS-based assignment — bypass the individual populate_*
+            # methods entirely.
+            (
+                self.atoms,
+                self.bonds,
+                self.angles,
+                self.dihedrals,
+                self.rotatable_bonds,
+                self.impropers,
+            ) = self.populate_from_openff(
+                coords,
+                bond_indices,
+                angle_indices,
+                dihedral_indices,
+                list(atomtypeidentifier.equivalent_atoms),
+            )
 
-        self.atoms = self.populate_atoms(
-            use_xml,
-            ff_data_dict,
-            ff_data_lines,
-            gaff_version,
-            list(atomtypeidentifier.equivalent_atoms),
-        )
+        else:
+            # GAFF / OPLS path — use the existing populate_* methods.
 
-        self.bonds = self.populate_bonds(
-            use_xml,
-            ff_data_dict,
-            ff_data_lines,
-            coords,
-            bond_indices,
-        )
+            # Atomtypes analysis
 
-        self.angles = self.populate_angles(
-            use_xml,
-            ff_data_dict,
-            ff_data_lines,
-            coords,
-            angle_indices,
-        )
+            self.atoms = self.populate_atoms(
+                use_xml,
+                ff_data_dict,
+                ff_data_lines,
+                gaff_version,
+                list(atomtypeidentifier.equivalent_atoms),
+            )
 
-        # Dihedrals analysis
-        self.dihedrals, self.rotatable_bonds = self.populate_dihedrals(
-            use_xml,
-            ff_data_dict,
-            ff_data_lines,
-            dihedral_indices,
-            atomtypeidentifier,
-        )
+            self.bonds = self.populate_bonds(
+                use_xml,
+                ff_data_dict,
+                ff_data_lines,
+                coords,
+                bond_indices,
+            )
 
-        self.impropers = self.populate_impropers(
-            use_xml,
-            ff_data_dict,
-            ff_data_lines,
-            n_atoms,
-            angle_indices,
-        )
+            self.angles = self.populate_angles(
+                use_xml,
+                ff_data_dict,
+                ff_data_lines,
+                coords,
+                angle_indices,
+            )
+
+            # Dihedrals analysis
+            self.dihedrals, self.rotatable_bonds = self.populate_dihedrals(
+                use_xml,
+                ff_data_dict,
+                ff_data_lines,
+                dihedral_indices,
+                atomtypeidentifier,
+            )
+
+            self.impropers = self.populate_impropers(
+                use_xml,
+                ff_data_dict,
+                ff_data_lines,
+                n_atoms,
+                angle_indices,
+            )
 
         # Process water model if requested
         if use_water_model:
             self.apply_water_model(water_model)
+        else:
+            self._check_ow_hw_atoms()
 
         self.ostream.flush()
 
@@ -1313,10 +1840,10 @@ class MMForceFieldGenerator:
                 if k in [i, j]:
                     continue
                 if self.connectivity_matrix[j, k] == 1:
-                    inds = (i, j, k) if i < k else (k, j, i)
+                    inds = self._canonicalize_zero_based_angle_key((i, j, k))
                     angle_indices.add(inds)
                 if self.connectivity_matrix[k, i] == 1:
-                    inds = (k, i, j) if k < j else (j, i, k)
+                    inds = self._canonicalize_zero_based_angle_key((k, i, j))
                     angle_indices.add(inds)
         angle_indices = sorted(list(angle_indices))
 
@@ -1329,10 +1856,12 @@ class MMForceFieldGenerator:
                 if l in [i, j, k]:
                     continue
                 if self.connectivity_matrix[k, l] == 1:
-                    inds = (i, j, k, l) if i < l else (l, k, j, i)
+                    inds = self._canonicalize_zero_based_dihedral_key(
+                        (i, j, k, l))
                     dihedral_indices.add(inds)
                 if self.connectivity_matrix[l, i] == 1:
-                    inds = (l, i, j, k) if l < k else (k, j, i, l)
+                    inds = self._canonicalize_zero_based_dihedral_key(
+                        (l, i, j, k))
                     dihedral_indices.add(inds)
         dihedral_indices = sorted(list(dihedral_indices))
 
@@ -1370,7 +1899,7 @@ class MMForceFieldGenerator:
 
         assert_msg_critical(
             water_model.lower() in self.water_parameters,
-            f"Error: '{water_model}' is not available. Available models " +
+            f"MMForceFieldGenerator: '{water_model}' is not available. Available models " +
             f"are: {list(self.water_parameters.keys())}")
 
         self.ostream.print_info(f'Using water model parameters for {water_model}.')
@@ -1379,36 +1908,72 @@ class MMForceFieldGenerator:
 
         water_params = self.water_parameters[water_model.lower()]
 
-        labels = self.molecule.get_labels()
-        hydrogen_indices = [idx for idx, label in enumerate(labels) if label == 'H']
-        oxygen_indices = [idx for idx, label in enumerate(labels) if label == 'O']
+        # labels = self.molecule.get_labels()
+        atoms = self.atoms
 
-        self.atoms = {}
-        self.bonds = {}
-        self.angles = {}
+        hydrogen_indices = [idx for idx, atom in atoms.items() if atom['type'] == 'hw']
+        oxygen_indices = [idx for idx, atom in atoms.items() if atom['type'] == 'ow']
 
-        # update unique atom types
-        self.unique_atom_types = [water_params['hw']['type'],
-                                  water_params['ow']['type']]
+        water_bonds = [idx for idx, bond in self.bonds.items() if (idx[0] in oxygen_indices or idx[1] in oxygen_indices)]
+        water_angles = [idx for idx, angle in self.angles.items() if (idx[1] in oxygen_indices)]
 
-        # update atom parameters
-        label_to_atomtype_mapping = {'O': 'ow', 'H': 'hw'}
-        for i, label in enumerate(labels):
-            self.atoms[i] = deepcopy(water_params[label_to_atomtype_mapping[label]])
+        for hydrogen_idx in hydrogen_indices:
+            self.atoms[hydrogen_idx]['sigma'] = water_params['hw']['sigma']
+            self.atoms[hydrogen_idx]['epsilon'] = water_params['hw']['epsilon']
 
-        # update hydrogen atom names to 'H1' and 'H2'
-        for idx, h_ind in enumerate(hydrogen_indices):
-            self.atoms[h_ind]['name'] = f'H{idx + 1}'
+            # Do not overwrite partial charges if the molecule is part of a larger system
+            # This can cause the total charge to become a non-integer
+            if self.molecule.is_water_molecule():
+                self.atoms[hydrogen_idx]['charge'] = water_params['hw']['charge']
 
-        # update O-H bonds
-        i = oxygen_indices[0]
-        for j in hydrogen_indices:
-            self.bonds[(i, j)] = deepcopy(water_params['bonds'])
+        for oxygen_idx in oxygen_indices:
+            self.atoms[oxygen_idx]['sigma'] = water_params['ow']['sigma']
+            self.atoms[oxygen_idx]['epsilon'] = water_params['ow']['epsilon']
 
-        # update H-O-H angle
-        j = oxygen_indices[0]
-        i, k = hydrogen_indices
-        self.angles[(i, j, k)] = deepcopy(water_params['angles'])
+            if self.molecule.is_water_molecule():
+                self.atoms[oxygen_idx]['charge'] = water_params['ow']['charge']
+
+        for bond_idx in water_bonds:
+            self.bonds[bond_idx].update(water_params['bonds'])
+
+        for angle_idx in water_angles:
+            self.angles[angle_idx].update(water_params['angles'])
+
+    def _check_ow_hw_atoms(self):
+        """
+        Checks if ow/hw atom types exist in the system.
+        """
+
+        hydrogen_indices = [idx for idx, atom in self.atoms.items() if atom['type'] == 'hw']
+        oxygen_indices = [idx for idx, atom in self.atoms.items() if atom['type'] == 'ow']
+
+        # We have updated the ow/hw sigma/epsilon parameters in database/gaff-2.11.xml.
+        # By default, if no water model is used, the ow/hw sigma/epsilon parameters
+        # will follow the cSPE/E model (JCTC 2010, 6, 607).
+
+        # Here we double check the ow/hw sigma/epsilon parameters.
+        cspce_ow_sigma = self.water_parameters['cspce']['ow']['sigma']
+        cspce_ow_epsilon = self.water_parameters['cspce']['ow']['epsilon']
+        cspce_hw_sigma = self.water_parameters['cspce']['hw']['sigma']
+        cspce_hw_epsilon = self.water_parameters['cspce']['hw']['epsilon']
+
+        for idx in oxygen_indices:
+            assert_msg_critical(
+                (self.atoms[idx]['sigma'] == cspce_ow_sigma and
+                    self.atoms[idx]['epsilon'] == cspce_ow_epsilon),
+                "MMForceFieldGenerator: Incorrect 'ow' sigma/epsilon parameters.")
+
+        for idx in hydrogen_indices:
+            assert_msg_critical(
+                (self.atoms[idx]['sigma'] == cspce_hw_sigma and
+                    self.atoms[idx]['epsilon'] == cspce_hw_epsilon),
+                "MMForceFieldGenerator: Incorrect 'hw' sigma/epsilon parameters.")
+
+        if hydrogen_indices or oxygen_indices:
+            warnmsg = 'MMForceFieldGenerator: ow/hw atom types identified. '
+            warnmsg += 'Using sigma and epsilon parameters from the cSPE/E model. '
+            warnmsg += '(JCTC 2010, 6, 607)'
+            self.ostream.print_warning(warnmsg)
 
     def populate_impropers(self, use_xml, ff_data_dict, ff_data_lines, n_atoms,
                            angle_indices):
@@ -1651,6 +2216,7 @@ class MMForceFieldGenerator:
                        equivalent_atoms):
 
         use_gaff = False
+        use_opls = False
         use_uff = False
         use_tm = False
 
@@ -1663,6 +2229,40 @@ class MMForceFieldGenerator:
 
         for i, atom_type in enumerate(self.atom_types_dict.values()):
             atom_type_found = False
+
+            # OPLS-AA branch: look up sigma/epsilon from the embedded parameter table.
+            if self.force_field == 'opls' and 'opls' in atom_type:
+                oplstype = atom_type.get('opls')
+                if oplstype is None:
+                    # atomtypeidentifier.py set 'opls': None — no standard
+                    # OPLS-AA equivalent for this GAFF type.  Fall through to
+                    # GAFF below and warn the user.
+                    gafftype_str = (atom_type['gaff'].strip()
+                                    if 'gaff' in atom_type else '?')
+                    warnmsg = (
+                        f'MMForceFieldGenerator: no OPLS-AA type for GAFF '
+                        f'type {gafftype_str!r} (atom index {i + 1}). '
+                        'Falling back to GAFF sigma/epsilon parameters.')
+                    self.ostream.print_warning(warnmsg)
+                else:
+                    oplsaa_dict = self.get_oplsaa_data_dict()
+                    if oplstype in oplsaa_dict:
+                        sigma, epsilon = oplsaa_dict[oplstype]
+                        comment = 'OPLS-AA'
+                        atom_type_found = True
+                        use_opls = True
+                        atom_type = oplstype
+                    else:
+                        # Type is named but absent from our embedded table —
+                        # warn and fall through to GAFF.
+                        gafftype_str = (atom_type['gaff'].strip()
+                                        if 'gaff' in atom_type else '?')
+                        warnmsg = (
+                            f'MMForceFieldGenerator: OPLS-AA type {oplstype!r}'
+                            f' (GAFF {gafftype_str!r}, atom index {i + 1}) '
+                            'not found in parameter table. '
+                            'Falling back to GAFF sigma/epsilon parameters.')
+                        self.ostream.print_warning(warnmsg)
 
             if 'gaff' in atom_type:
                 # Note: need strip() for converting e.g. 'c ' to 'c'
@@ -1732,11 +2332,245 @@ class MMForceFieldGenerator:
                 'comment': comment,
             }
 
-        self.print_references(gaff_version, use_gaff, use_uff, use_tm)
+        self.print_references(gaff_version, use_gaff, use_opls, use_uff, use_tm)
 
         return atoms
 
-    def print_references(self, gaff_version, use_gaff, use_uff, use_tm):
+    def populate_from_openff(self, coords, bond_indices, angle_indices,
+                             dihedral_indices, equivalent_atoms):
+        """
+        Parametrize all bonded and nonbonded terms using an OpenFF Sage
+        force field via SmirnoffTyper.
+
+        Builds a hybrid RDKit molecule: uses VeloxChem's exact connectivity 
+        to prevent dropped bonds, attempts 3D bond order perception for exact 
+        SMIRKS matching, and falls back to a GAFF-aromaticity graph on failure.
+        """
+        # Enforce OpenFF Element Limits 
+        allowed_elements = {
+            'C', 'H', 'O', 'N', 'P', 'S', 'F', 'Cl', 'Br', 'I', 'Xe',
+            'Li', 'Na', 'K', 'Rb', 'Cs'
+        }
+        unsupported = set(label.strip() for label in self.molecule.get_labels()) - allowed_elements
+        if unsupported:
+            assert_msg_critical(
+                False,
+                f"MMForceFieldGenerator: OpenFF Sage does not support elements "
+                f"{unsupported}. Please switch to 'gaff' to use UFF/literature fallbacks."
+            )
+
+        from rdkit import Chem
+        from .smirnofftyper import SmirnoffTyper
+
+        # Build RDKit Mol Skeleton (Bypass DetermineConnectivity) 
+        elem_symbols = self.molecule.get_labels()
+        n_atoms      = self.molecule.number_of_atoms()
+        total_charge = int(round(self.molecule.get_charge()))
+        conn         = self.connectivity_matrix
+
+        rw = Chem.RWMol()
+        for elem in elem_symbols:
+            rw.AddAtom(Chem.Atom(elem.strip()))
+
+        # Add only SINGLE bonds to establish the exact graph topology
+        for i in range(n_atoms):
+            for j in range(i + 1, n_atoms):
+                if conn[i, j] == 1:
+                    rw.AddBond(i, j, Chem.BondType.SINGLE)
+
+        rdmol = rw.GetMol()
+
+        # Add the 3D conformer so DetermineBondOrders can measure lengths
+        conf = Chem.Conformer(n_atoms)
+        for i in range(n_atoms):
+            # coords is passed in Angstroms from create_topology
+            conf.SetAtomPosition(i, (float(coords[i][0]), float(coords[i][1]), float(coords[i][2])))
+        rdmol.AddConformer(conf)
+
+        # Assign True Bond Orders and Formal Charges
+        if n_atoms == 1:
+            rdmol.GetAtomWithIdx(0).SetFormalCharge(total_charge)
+            rdmol.UpdatePropertyCache(strict=False)
+        else:
+            from rdkit.Chem import rdDetermineBonds
+            try:
+                # Safely assigns DOUBLE/TRIPLE bonds and exact formal charges!
+                rdDetermineBonds.DetermineBondOrders(rdmol, charge=total_charge)
+            except Exception as e:
+                # ── 3. The Ultimate Fallback (GAFF-Aromaticity Method) ──
+                self.ostream.print_warning(
+                    f"RDKit bond order perception failed ({e}). Falling back to "
+                    "GAFF-based aromaticity graph. WARNING: OpenFF may assign "
+                    "generic parameters for complex double/triple bonds."
+                )
+                
+                _GAFF_AROM = frozenset([
+                    'ca', 'cp', 'cq',       # aromatic C (benzene-like)
+                    'cc', 'cd',             # aromatic C in non-pure-aromatic rings
+                    'nb',                   # aromatic N (no H, pyridine-like)
+                    'nc', 'nd',             # aromatic N conjugated
+                    'na',                   # aromatic N-H (pyrrole-like)
+                    'pb', 'pc', 'pd',       # aromatic P
+                ])
+                gaff_types = [t.strip() for t in self.atom_types]
+                is_arom = [gaff_types[i] in _GAFF_AROM for i in range(n_atoms)]
+
+                for i in range(n_atoms):
+                    atom = rdmol.GetAtomWithIdx(i)
+                    atom.SetIsAromatic(is_arom[i])
+                    atom.SetNoImplicit(True)
+
+                for bond in rdmol.GetBonds():
+                    i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+                    if is_arom[i] and is_arom[j]:
+                        bond.SetBondType(Chem.BondType.AROMATIC)
+
+                san_flags = (Chem.SanitizeFlags.SANITIZE_ALL ^ 
+                             Chem.SanitizeFlags.SANITIZE_SETAROMATICITY)
+                Chem.SanitizeMol(rdmol, catchErrors=False, sanitizeOps=san_flags)
+
+        # Load FF and assign all parameters 
+        ff_name     = self.force_field
+        offxml_path = getattr(self, 'openff_offxml_path', None)
+        typer = SmirnoffTyper(ff_name=ff_name, offxml_path=offxml_path)
+        raw   = typer.assign_all(rdmol, bond_indices, angle_indices,
+                                 dihedral_indices)
+
+        # Atoms 
+        atom_names  = self.get_atom_names()
+        atom_masses = self.molecule.get_masses()
+        atoms = {}
+        for i in range(n_atoms):
+            vdw = raw['atoms'].get(i, {'sigma': 0.0, 'epsilon': 0.0})
+            atoms[i] = {
+                'type':            f'openff_{i}',
+                'name':            atom_names[i],
+                'mass':            atom_masses[i],
+                'charge':          self.partial_charges[i],
+                'sigma':           vdw['sigma'],
+                'epsilon':         vdw['epsilon'],
+                'equivalent_atom': equivalent_atoms[i],
+                'comment':         'OpenFF',
+            }
+
+        # Bonds 
+        bonds = {}
+        for ij, bp in raw['bonds'].items():
+            i, j = ij
+            r = bp['length']
+            
+            # Distance in nm
+            r_eq = np.linalg.norm(coords[i] - coords[j]) * 0.1
+
+            # Override with QM geometry if requested
+            if self.eq_param:
+                if abs(r - r_eq) > self.r_thresh:
+                    msg = f'Updated bond length {i + 1}-{j + 1} (OpenFF) to {r_eq:.3f} nm'
+                    self.ostream.print_info(msg)
+                r = r_eq
+
+            bonds[ij] = {
+                'type':           'harmonic',
+                'equilibrium':    r,
+                'force_constant': bp['k'],
+                'comment':        f'openff bond {ij[0]+1}-{ij[1]+1}',
+            }
+
+        # Angles 
+        angles = {}
+        for ijk, ap in raw['angles'].items():
+            i, j, k = ijk
+            theta = ap['angle']
+            
+            # Angle in degrees
+            a = coords[i] - coords[j]
+            b = coords[k] - coords[j]
+            theta_eq = safe_arccos(
+                np.dot(a, b) / np.linalg.norm(a) /
+                np.linalg.norm(b)) * 180 / np.pi
+
+            # Override with QM geometry if requested
+            if self.eq_param:
+                if abs(theta - theta_eq) > self.theta_thresh:
+                    msg = f'Updated bond angle {i + 1}-{j + 1}-{k + 1} (OpenFF) to {theta_eq:.3f} deg'
+                    self.ostream.print_info(msg)
+                theta = theta_eq
+
+            angles[ijk] = {
+                'type':           'harmonic',
+                'equilibrium':    theta,  
+                'force_constant': ap['k'],
+                'comment':        f'openff angle {ijk[0]+1}-{ijk[1]+1}-{ijk[2]+1}',
+            }
+
+        # Proper dihedrals 
+        dihedrals       = {}
+        candidate_bonds = set()
+        for ijkl, terms in raw['propers'].items():
+            barriers      = [t['k']           for t in terms]
+            phases        = [t['phase']       for t in terms]   # degrees
+            periodicities = [t['periodicity'] for t in terms]
+            comments      = [f'openff proper {ijkl[0]+1}-{ijkl[1]+1}-'
+                              f'{ijkl[2]+1}-{ijkl[3]+1}'] * len(terms)
+
+            if any(k != 0.0 for k in barriers):
+                j, k = ijkl[1], ijkl[2]
+                candidate_bonds.add((min(j, k), max(j, k)))
+
+            multiple = len(barriers) > 1
+            if multiple:
+                dihedrals[ijkl] = {
+                    'type':        'Fourier',
+                    'multiple':    True,
+                    'barrier':     barriers,
+                    'phase':       phases,
+                    'periodicity': periodicities,
+                    'comment':     comments,
+                }
+            else:
+                dihedrals[ijkl] = {
+                    'type':        'Fourier',
+                    'multiple':    False,
+                    'barrier':     barriers[0],
+                    'phase':       phases[0],
+                    'periodicity': periodicities[0],
+                    'comment':     comments[0],
+                }
+
+        rotatable_bonds = []
+        for (j, k) in sorted(candidate_bonds):
+            if self.is_bond_in_ring(j, k):
+                continue
+            j_conns = int(self.connectivity_matrix[j].sum())
+            k_conns = int(self.connectivity_matrix[k].sum())
+            if j_conns <= 1 or k_conns <= 1:
+                continue
+            rotatable_bonds.append([j + 1, k + 1])   
+
+        # Improper Dihedrals
+        impropers = {}
+        for ijkl, terms in raw['impropers'].items():
+            if not terms:
+                continue
+            term   = terms[0]
+            centre = ijkl[1]
+            a, b, c = ijkl[0], ijkl[2], ijkl[3]
+            imp_entry = {
+                'type':        'Fourier',
+                'multiple':    False,
+                'barrier':     term['k'],         
+                'phase':       term['phase'],      
+                'periodicity': term['periodicity'],
+                'comment':     f'openff improper center={centre+1}',
+            }
+            # Write all three permutations so GROMACS gets the full restoring force
+            for pa, pb, pc in [(a, b, c), (b, a, c), (c, a, b)]:
+                key = (centre, pa, pb, pc)
+                impropers[key] = dict(imp_entry)
+
+        return atoms, bonds, angles, dihedrals, rotatable_bonds, impropers
+    
+    def print_references(self, gaff_version, use_gaff, use_opls, use_uff, use_tm):
         if use_gaff:
             if gaff_version is not None:
                 self.ostream.print_info(
@@ -1746,6 +2580,20 @@ class MMForceFieldGenerator:
             gaff_ref = 'J. Wang, R. M. Wolf, J. W. Caldwell, P. A. Kollman,'
             gaff_ref += ' D. A. Case, J. Comput. Chem. 2004, 25, 1157-1174.'
             self.ostream.print_reference('Reference: ' + gaff_ref)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        if use_opls:
+            self.ostream.print_info('Using OPLS-AA parameters.')
+            opls_ref1 = ('W. L. Jorgensen, D. S. Maxwell, J. Tirado-Rives, '
+                         'J. Am. Chem. Soc. 1996, 118, 11225-11236.')
+            opls_ref2 = ('W. L. Jorgensen, N. A. McDonald, '
+                         'J. Phys. Chem. B 1998, 102, 8049-8059.')
+            opls_ref3 = ('E. K. Watkins, W. L. Jorgensen, '
+                         'J. Phys. Chem. A 2001, 105, 4118-4125.')
+            self.ostream.print_reference('References: ' + opls_ref1)
+            self.ostream.print_reference('           ' + opls_ref2)
+            self.ostream.print_reference('           ' + opls_ref3)
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -1762,6 +2610,17 @@ class MMForceFieldGenerator:
             tm_ref = 'F. Šebesta, V. Sláma, J. Melcr, Z. Futera, and J. V. Burda.'
             tm_ref += ' J. Chem. Theory Comput. 2016, 12, 3681-3688.'
             self.ostream.print_reference('Reference: ' + tm_ref)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        if self.force_field.startswith('openff'):
+            self.ostream.print_info(f'Using OpenFF (Sage) parameters.')
+            off_ref = 'S. Boothroyd, P. K. Behara, O. C. Madin, D. F. Hahn, H. Jang, '
+            off_ref += 'V. Gapsys, J. R. Wagner, J. T. Horton, D. L. Dotson, '
+            off_ref += 'M. W. Thompson, et al. J. Chem. Theory Comput. 2023, 19, 3251-3275.'
+            self.ostream.print_reference('Reference: ' + off_ref)
+            github_ref = 'OpenFF Force Fields, https://github.com/openforcefield/openff-forcefields (MIT)'
+            self.ostream.print_reference('Source:    ' + github_ref)
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -2100,8 +2959,7 @@ class MMForceFieldGenerator:
                         periodicity = int(
                             dihedral_data[f'periodicity{dih_param_idx}'])
                         barrier = float(dihedral_data[f'k{dih_param_idx}'])
-                        phase = float(dihedral_data[f'phase{dih_param_idx}']
-                                     ) / np.pi * 180.0
+                        phase = float(dihedral_data[f'phase{dih_param_idx}']) / np.pi * 180.0
 
                         dihedral_barriers.append(barrier)
                         dihedral_phases.append(phase)
@@ -2121,7 +2979,12 @@ class MMForceFieldGenerator:
                     try:
                         periodicity = int(dihedral_ff[3])
                     except ValueError:
-                        periodicity = int(float(dihedral_ff[3]))
+                        try:
+                            periodicity = int(float(dihedral_ff[3]))
+                        except ValueError:
+                            raise ValueError(
+                                'Invalid periodicity value: '
+                                f'{dihedral_ff[3]}') from None
 
                     dihedral_barriers.append(barrier)
                     dihedral_phases.append(phase)
@@ -2297,10 +3160,6 @@ class MMForceFieldGenerator:
 
         :param bond:
             The bond to be added. As a list of 1-based atom indices.
-        :param force_constant:
-            The force constant of the bond. Default is 250000.00 kJ/mol/nm^2.
-        :param equilibrium:
-            The equilibrium distance of the bond. If none it will be calculated.
         """
 
         # Extract indices from the list
@@ -2327,15 +3186,15 @@ class MMForceFieldGenerator:
 
     def add_dihedral(self, dihedral, barrier=0.0, phase=0, periodicity=1):
         """
-        Adds a dihedral to the an existing dihedral in the topology
-        converting it in a multiple dihedral.
+        Adds a Fourier term to an existing proper dihedral.
 
         :param dihedral:
-            The dihedral to be added. As a list of 1-based atom indices.
+            The target dihedral as four 1-based atom indices. Reversed order is
+            also accepted.
         :param barrier:
-            The barrier of the dihedral. Default is 1.00 kJ/mol.
+            The barrier height in kJ/mol.
         :param phase:
-            The phase of the dihedral. Default is 0.00 degrees.
+            The phase angle in degrees.
         :param periodicity:
             The periodicity of the dihedral. Default is 1.
         """
@@ -2389,26 +3248,167 @@ class MMForceFieldGenerator:
         self.ostream.print_info(msg)
         self.ostream.flush()
 
-    def get_dihedral_params(self, atom_indices_for_dihedral):
+    @staticmethod
+    def _to_zero_based_indices(atom_indices):
+        """Converts one-based atom indices to zero-based tuple indices."""
+
+        assert_msg_critical(
+            all(index > 0 for index in atom_indices),
+            'MMForceFieldGenerator: one-based atom indices must be greater than 0'
+        )
+        return tuple(index - 1 for index in atom_indices)
+
+    @staticmethod
+    def _canonicalize_zero_based_bond_key(key):
+        """Canonicalizes a zero-based bond key."""
+
+        key = tuple(key)
+        assert_msg_critical(
+            all(index >= 0 for index in key),
+            'MMForceFieldGenerator: zero-based atom indices must be non-negative'
+        )
+        assert_msg_critical(
+            len(set(key)) == len(key),
+            'MMForceFieldGenerator: atom indices in a bond must be unique')
+        return tuple(sorted(key))
+
+    @staticmethod
+    def _canonicalize_zero_based_angle_key(key):
+        """Canonicalizes a zero-based angle key."""
+
+        key = tuple(key)
+        assert_msg_critical(
+            all(index >= 0 for index in key),
+            'MMForceFieldGenerator: zero-based atom indices must be non-negative'
+        )
+        assert_msg_critical(
+            len(set(key)) == len(key),
+            'MMForceFieldGenerator: atom indices in an angle must be unique')
+        return key if key[0] < key[2] else key[::-1]
+
+    @staticmethod
+    def _canonicalize_zero_based_dihedral_key(key):
+        """Canonicalizes a zero-based dihedral key."""
+
+        key = tuple(key)
+        assert_msg_critical(
+            all(index >= 0 for index in key),
+            'MMForceFieldGenerator: zero-based atom indices must be non-negative'
+        )
+        assert_msg_critical(
+            len(set(key)) == len(key),
+            'MMForceFieldGenerator: atom indices in a dihedral must be unique')
+        return key if key[0] < key[3] else key[::-1]
+
+    @staticmethod
+    def _canonicalize_one_based_bond_key(atom_indices_for_bond):
+        """Canonicalizes one-based bond indices to the zero-based storage key."""
+
+        key = MMForceFieldGenerator._to_zero_based_indices(
+            atom_indices_for_bond)
+        return MMForceFieldGenerator._canonicalize_zero_based_bond_key(key)
+
+    @staticmethod
+    def _canonicalize_one_based_angle_key(atom_indices_for_angle):
+        """Canonicalizes one-based angle indices to the zero-based storage key."""
+
+        key = MMForceFieldGenerator._to_zero_based_indices(
+            atom_indices_for_angle)
+        return MMForceFieldGenerator._canonicalize_zero_based_angle_key(key)
+
+    @staticmethod
+    def _canonicalize_one_based_dihedral_key(atom_indices_for_dihedral):
+        """Canonicalizes one-based dihedral indices to the zero-based storage key."""
+
+        key = MMForceFieldGenerator._to_zero_based_indices(
+            atom_indices_for_dihedral)
+        return MMForceFieldGenerator._canonicalize_zero_based_dihedral_key(key)
+
+    def set_bond_params(self, atom_indices_for_bond, bond_params):
         """
-        Gets dihedral parameters.
+        Sets bond parameters.
 
-        :param atom_indices_for_dihedral:
-            One-based atom indices for the dihedral.
-
-        :return:
-            The dihedral parameters in a dictionary.
+        :param atom_indices_for_bond:
+            One-based atom indices for the bond.
+        :param bond_params:
+            The bond parameters in a dictionary.
         """
 
         assert_msg_critical(
-            len(atom_indices_for_dihedral) == 4,
-            'MMForceFieldGenerator.get_dihedral_params: ' +
-            'Expecting a tuple of four atom indices')
+            len(atom_indices_for_bond) == 2,
+            'MMForceFieldGenerator.set_bond_params: ' +
+            'Expecting a tuple of two atom indices')
 
-        # convert 1-based indices to 0-based indices
-        key = tuple([x - 1 for x in atom_indices_for_dihedral])
+        assert_msg_critical(
+            isinstance(bond_params,
+                       dict), 'MMForceFieldGenerator.set_bond_params: ' +
+            'Expecting a dictionary of bond parameters')
 
-        return dict(self.dihedrals[key])
+        key = self._canonicalize_one_based_bond_key(atom_indices_for_bond)
+
+        self.bonds[key] = dict(bond_params)
+
+    def get_bond_params(self, atom_indices_for_bond):
+        """
+        Gets bond parameters.
+
+        :param atom_indices_for_bond:
+            One-based atom indices for the bond.
+        :return:
+            The bond parameters in a dictionary.
+        """
+
+        assert_msg_critical(
+            len(atom_indices_for_bond) == 2,
+            'MMForceFieldGenerator.set_bond_params: ' +
+            'Expecting a tuple of two atom indices')
+
+        key = self._canonicalize_one_based_bond_key(atom_indices_for_bond)
+
+        return deepcopy(self.bonds[key])
+
+    def set_angle_params(self, atom_indices_for_angle, angle_params):
+        """
+        Sets angle parameters.
+
+        :param atom_indices_for_angle:
+            One-based atom indices for the angle.
+        :param angle_params:
+            The angle parameters in a dictionary.
+        """
+
+        assert_msg_critical(
+            len(atom_indices_for_angle) == 3,
+            'MMForceFieldGenerator.set_angle_params: ' +
+            'Expecting a tuple of three atom indices')
+
+        assert_msg_critical(
+            isinstance(angle_params,
+                       dict), 'MMForceFieldGenerator.set_angle_params: ' +
+            'Expecting a dictionary of angle parameters')
+
+        key = self._canonicalize_one_based_angle_key(atom_indices_for_angle)
+
+        self.angles[key] = dict(angle_params)
+
+    def get_angle_params(self, atom_indices_for_angle):
+        """
+        Gets angle parameters.
+
+        :param atom_indices_for_angle:
+            One-based atom indices for the angle.
+        :return:
+            The angle parameters in a dictionary.
+        """
+
+        assert_msg_critical(
+            len(atom_indices_for_angle) == 3,
+            'MMForceFieldGenerator.set_angle_params: ' +
+            'Expecting a tuple of three atom indices')
+
+        key = self._canonicalize_one_based_angle_key(atom_indices_for_angle)
+
+        return deepcopy(self.angles[key])
 
     def set_dihedral_params(self, atom_indices_for_dihedral, dihedral_params):
         """
@@ -2430,10 +3430,30 @@ class MMForceFieldGenerator:
                        dict), 'MMForceFieldGenerator.set_dihedral_params: ' +
             'Expecting a dictionary of dihedral parameters')
 
-        # convert 1-based indices to 0-based indices
-        key = tuple([x - 1 for x in atom_indices_for_dihedral])
+        key = self._canonicalize_one_based_dihedral_key(
+            atom_indices_for_dihedral)
 
         self.dihedrals[key] = dict(dihedral_params)
+
+    def get_dihedral_params(self, atom_indices_for_dihedral):
+        """
+        Gets dihedral parameters.
+
+        :param atom_indices_for_dihedral:
+            One-based atom indices for the dihedral.
+        :return:
+            The dihedral parameters in a dictionary.
+        """
+
+        assert_msg_critical(
+            len(atom_indices_for_dihedral) == 4,
+            'MMForceFieldGenerator.set_dihedral_params: ' +
+            'Expecting a tuple of four atom indices')
+
+        key = self._canonicalize_one_based_dihedral_key(
+            atom_indices_for_dihedral)
+
+        return deepcopy(self.dihedrals[key])
 
     def check_rotatable_bonds(self, rotatable_bonds_types):
         """
@@ -2466,8 +3486,7 @@ class MMForceFieldGenerator:
                 continue
 
             # Check if any side atom of the bond is involved in a triple bond
-            if (bond[0] in ['c1', 'n1', 'cg', 'ch'
-                           ]) or (bond[1] in ['c1', 'n1', 'cg', 'ch']):
+            if (bond[0] in ['c1', 'n1', 'cg', 'ch']) or (bond[1] in ['c1', 'n1', 'cg', 'ch']):
                 bonds_to_delete.append((i, j))
                 continue
 
@@ -2763,9 +3782,20 @@ class MMForceFieldGenerator:
                 cur_str += '        fudgeLJ   fudgeQQ\n'
                 f_top.write(cur_str)
                 gen_pairs = 'yes' if self.gen_pairs else 'no'
+                # OPLS-AA use geometric-mean LJ mixing
+                # (comb_rule 3) and equal 1-4 scaling (fudgeLJ = fudgeQQ = 0.5).
+                # GAFF/AMBER and OpenFF uses Lorentz-Berthelot mixing (comb_rule 2) and
+                # fudgeQQ = 1/1.2.
+                if self.force_field in ('opls',):
+                    comb_rule = 3
+                    fudgeLJ = 0.5
+                    fudgeQQ = 0.5
+                else:
+                    comb_rule = self.comb_rule
+                    fudgeLJ = self.fudgeLJ
+                    fudgeQQ = self.fudgeQQ
                 f_top.write('{}{:16}{:>18}{:21.6f}{:10.6f}\n'.format(
-                    self.nbfunc, self.comb_rule, gen_pairs, self.fudgeLJ,
-                    self.fudgeQQ))
+                    self.nbfunc, comb_rule, gen_pairs, fudgeLJ, fudgeQQ))
 
             # include itp
 
@@ -2784,10 +3814,13 @@ class MMForceFieldGenerator:
 
     def write_itp(self, itp_file, mol_name=None):
         """
-        Writes an ITP file with the original parameters.
+        Writes a GROMACS ITP file for the current force field.
 
         :param itp_file:
             The ITP file path.
+        :param mol_name:
+            The residue and molecule name written to the file. Defaults to
+            ``MOL``.
         """
 
         itp_filename = str(itp_file)
@@ -2805,17 +3838,35 @@ class MMForceFieldGenerator:
             line_str = ';name   bond_type     mass     charge'
             line_str += '   ptype   sigma         epsilon\n'
             f_itp.write(line_str)
-            # TODO: Make unique_atom_types and atom['type'] more consistent
-            for at in self.unique_atom_types:
+            # For OPLS, opls_NNN types are already defined in the system-wide
+            # oplsaa.ff/ffnonbonded.itp and must NOT be redeclared in the
+            # molecule itp. For GAFF/UFF, types are non-standard and must be
+            # declared explicitly.
+            if self.force_field == 'opls':
+                pass
+            elif self.force_field.startswith('openff'):
+                # Each OpenFF atom has a unique type (openff_N) carrying its
+                # own sigma/epsilon — write one line per atom directly.
                 for i, atom in self.atoms.items():
-                    # Note: need strip() for converting e.g. 'c ' to 'c'
-                    if (atom['type'].strip() == at.strip()) or (atom['type'].strip() + '_unknown' == at.strip()):
-                        line_str = '{:>3}{:>9}{:17.5f}{:9.5f}{:>4}'.format(
-                            atom['type'], atom['type'], 0., 0., 'A')
-                        line_str += '{:16.5e}{:14.5e}\n'.format(
-                            atom['sigma'], atom['epsilon'])
-                        f_itp.write(line_str)
-                        break
+                    # Left-aligned (<12) to prevent string overflow bugs in GROMACS!
+                    line_str = '{:<12}{:<12}{:12.5f}{:9.5f}{:>4}'.format(
+                        atom['type'].strip(), atom['type'].strip(), 0., 0., 'A')
+                    line_str += '{:16.5e}{:14.5e}\n'.format(
+                        atom['sigma'], atom['epsilon'])
+                    f_itp.write(line_str)
+            else:
+                # GAFF/UFF standard path
+                # TODO: Make unique_atom_types and atom['type'] more consistent
+                for at in self.unique_atom_types:
+                    for i, atom in self.atoms.items():
+                        # Note: need strip() for converting e.g. 'c ' to 'c'
+                        if (atom['type'].strip() == at.strip()) or (atom['type'].strip() + '_unknown' == at.strip()):
+                            line_str = '{:>3}{:>9}{:17.5f}{:9.5f}{:>4}'.format(
+                                atom['type'], atom['type'], 0., 0., 'A')
+                            line_str += '{:16.5e}{:14.5e}\n'.format(
+                                atom['sigma'], atom['epsilon'])
+                            f_itp.write(line_str)
+                            break
 
             # Molecule type
             f_itp.write('\n[ moleculetype ]\n')
@@ -3036,13 +4087,21 @@ class MMForceFieldGenerator:
                 ET.SubElement(Dihedrals, "Proper", **attributes)
 
         # Improper dihedrals
+        # OpenMM PeriodicTorsionForce <Improper> convention: class3 is the central atom.
+        # Our improper key stores centre at index 0: (centre, p1, p2, p3).
+        # Reorder to (p1, p2, centre, p3) so that class3 = centre.
         for improper_id, improper_data in self.impropers.items():
-
+            centre_idx = improper_id[0]
+            p1_idx     = improper_id[1]
+            p2_idx     = improper_id[2]
+            p3_idx     = improper_id[3]
+            # Reorder: class1=p1, class2=p2, class3=centre, class4=p3
+            ordered = (p1_idx, p2_idx, centre_idx, p3_idx)
             attributes = {
-                "class1": str(improper_id[0] + 1) + f'_{mol_name}',
-                "class2": str(improper_id[1] + 1) + f'_{mol_name}',
-                "class3": str(improper_id[2] + 1) + f'_{mol_name}',
-                "class4": str(improper_id[3] + 1) + f'_{mol_name}',
+                "class1": str(ordered[0] + 1) + f'_{mol_name}',
+                "class2": str(ordered[1] + 1) + f'_{mol_name}',
+                "class3": str(ordered[2] + 1) + f'_{mol_name}',
+                "class4": str(ordered[3] + 1) + f'_{mol_name}',
                 "periodicity1": str(improper_data['periodicity']),
                 "phase1": str(improper_data['phase'] * np.pi / 180),
                 "k1": str(improper_data['barrier'])
@@ -3123,27 +4182,6 @@ class MMForceFieldGenerator:
             The name of the molecule.
         """
 
-        # PDB format from http://deposit.rcsb.org/adit/docs/pdb_atom_format.html
-
-        # COLUMNS        DATA TYPE       CONTENTS
-        # --------------------------------------------------------------------------------
-        #  1 -  6        Record name     "HETATM" or "ATOM  "
-        #  7 - 11        Integer         Atom serial number.
-        # 13 - 16        Atom            Atom name.
-        # 17             Character       Alternate location indicator.
-        # 18 - 20        Residue name    Residue name.
-        # 22             Character       Chain identifier.
-        # 23 - 26        Integer         Residue sequence number.
-        # 27             AChar           Code for insertion of residues.
-        # 31 - 38        Real(8.3)       Orthogonal coordinates for X in Angstroms.
-        # 39 - 46        Real(8.3)       Orthogonal coordinates for Y in Angstroms.
-        # 47 - 54        Real(8.3)       Orthogonal coordinates for Z in Angstroms.
-        # 55 - 60        Real(6.2)       Occupancy (Default = 1.0).
-        # 61 - 66        Real(6.2)       Temperature factor (Default = 0.0).
-        # 73 - 76        LString(4)      Segment identifier, left-justified.
-        # 77 - 78        LString(2)      Element symbol, right-justified.
-        # 79 - 80        LString(2)      Charge on the atom.
-
         pdb_filename = str(pdb_file)
         if mol_name is None:
             mol_name = Path(self.molecule_name).stem
@@ -3164,8 +4202,6 @@ class MMForceFieldGenerator:
                 occupancy = 1.00
                 temp_factor = 0.00
                 element_symbol = element[:2].rjust(2)
-
-                # Format string from https://cupnet.net/pdb-format/
 
                 line_str = "{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   ".format(
                     'HETATM', i, atom_name[:4], '', mol_name[:3], 'A', 1, '')
@@ -3201,11 +4237,9 @@ class MMForceFieldGenerator:
         :param mol_name:
             The name of the molecule.
         :param amber_ff:
-            The name of the Amber force field.
-        :param water_model:
-            The name of the water model.
+            Optional Amber force-field include name for the topology file.
         :param gro_precision:
-            The number of decimal places in gro file.
+            The number of decimal places in the GRO file.
         """
 
         if mol_name is None:
@@ -3221,16 +4255,27 @@ class MMForceFieldGenerator:
 
     def write_openmm_files(self, filename, mol_name=None):
         """
-        Writes all the needed files for a MD simulation with OpenMM.
+        Writes the XML and PDB files needed for an OpenMM simulation.
 
         :param filename:
-            The name of the molecule.
+            Base filename used for the generated files.
         :param mol_name:
-            The name of the molecule.
+            Molecule or residue name written to the output files.
         """
 
         if mol_name is None:
             mol_name = Path(self.molecule_name).stem
+
+        if self.force_field in ('opls',):
+            warnmsg = (
+                'MMForceFieldGenerator: OPLS-AA uses geometric-mean combining '
+                'rules (comb-rule 3) for LJ interactions. OpenMM only supports '
+                'Lorentz-Berthelot (arithmetic) combining rules natively. '
+                'To use OPLS-AA with OpenMM you must apply geometric combining '
+                'rules via a CustomNonbondedForce. '
+                'See: https://github.com/openmm/openmm/issues/1918'
+            )
+            self.ostream.print_warning(warnmsg)
 
         xml_file = Path(filename).with_suffix('.xml')
         pdb_file = Path(filename).with_suffix('.pdb')
@@ -3241,12 +4286,12 @@ class MMForceFieldGenerator:
     @staticmethod
     def copy_file(src, dest):
         """
-        Copies file (from src to dest).
+        Copies a text file if the destination differs from the source.
 
         :param src:
-            The source of copy.
+            Source path.
         :param dest:
-            The destination of copy.
+            Destination path.
         """
 
         if (not dest.is_file()) or (not src.samefile(dest)):
@@ -3256,13 +4301,16 @@ class MMForceFieldGenerator:
 
     def validate_force_field(self, i, verbose=True):
         """
-        Validates force field by RMSD of dihedral potentials.
+        Compares MM and QM dihedral scans for one target dihedral.
 
         :param i:
             The index of the target dihedral.
+        :param verbose:
+            Whether to print progress information.
 
         :return:
-            A dictionary containing the results of validation.
+            A dictionary with the dihedral indices, scan angles, and relative
+            MM and QM scan energies in kJ/mol.
         """
 
         dih = self.target_dihedrals[i]
@@ -3301,6 +4349,11 @@ class MMForceFieldGenerator:
             The scanned geometries for this dihedral.
         :param angles:
             The scanned angles for this dihedral.
+        :param verbose:
+            Whether to print progress information.
+
+        :return:
+            A list of MM energies in kJ/mol corresponding to ``angles``.
         """
 
         # select scan angles and geometries from QM data
@@ -3336,7 +4389,10 @@ class MMForceFieldGenerator:
         :param molecule:
             The molecule.
         :param constraints:
-            The constraints.
+            A list of geometry constraints passed to the optimizer.
+
+        :return:
+            The final MM energy in Hartree.
         """
 
         mm_drv = MMDriver(self.comm, self.ostream)
@@ -3358,8 +4414,10 @@ class MMForceFieldGenerator:
         """
         Prints validation summary.
 
-        :param validation_result:
+        :param fitted_dihedral_results:
             The dictionary containing the result of validation.
+        :param verbose:
+            Whether to print the pointwise MM/QM comparison before the summary.
         """
 
         if verbose:
@@ -3395,10 +4453,12 @@ class MMForceFieldGenerator:
 
     def visualize(self, validation_result, show_diff=False):
         """
-        Visualizes dihedral potential.
+        Plots QM and MM dihedral potentials.
 
         :param validation_result:
             The dictionary containing the result of validation.
+        :param show_diff:
+            Whether to plot the QM-MM difference curve.
         """
 
         try:
@@ -3468,10 +4528,13 @@ class MMForceFieldGenerator:
 
     def get_included_file(self, top_fname):
         """
-        Gets the name of the included itp file.
+        Gets the ITP file included by a topology file.
 
         :param top_fname:
             The topology file.
+
+        :return:
+            The included ITP file path.
         """
 
         itp_file = None
@@ -3523,20 +4586,8 @@ class MMForceFieldGenerator:
         Returns:
             MMForceFieldGenerator: The updated forcefield object with the loaded data.
         """
-        forcefield = MMForceFieldGenerator()
         ff_data = json.loads(json_string)
-
-        forcefield.atoms = MMForceFieldGenerator._str_to_tuple_key(
-            ff_data["atoms"])
-        forcefield.bonds = MMForceFieldGenerator._str_to_tuple_key(
-            ff_data["bonds"])
-        forcefield.angles = MMForceFieldGenerator._str_to_tuple_key(
-            ff_data["angles"])
-        forcefield.dihedrals = MMForceFieldGenerator._str_to_tuple_key(
-            ff_data["dihedrals"])
-        forcefield.impropers = MMForceFieldGenerator._str_to_tuple_key(
-            ff_data["impropers"])
-        return forcefield
+        return MMForceFieldGenerator._forcefield_from_json_data(ff_data)
 
     @staticmethod
     def load_forcefield_from_json_file(path: str):
@@ -3549,13 +4600,14 @@ class MMForceFieldGenerator:
         Returns:
             MMForceFieldGenerator: The updated forcefield object with the loaded data.
         """
-        with open(path, "r", encoding="utf-8") as file:
-            json_str = file.read()
-        forcefield = MMForceFieldGenerator.load_forcefield_from_json_string(
-            json_str)
-        return forcefield
+        json_path = Path(path)
+        json_string = json_path.read_text(encoding="utf-8")
+        return MMForceFieldGenerator.load_forcefield_from_json_string(
+            json_string)
 
     def print_bonds(self):
+        """Prints the bond parameters in a tabular format."""
+
         s = "Bonds: \n"
         s += f"{'Bond':>9} {'fc (kJ/mol nm^2)':>18} {'eq (nm)':>10} {'comment'}\n"
         for bond, params in self.bonds.items():
@@ -3564,6 +4616,8 @@ class MMForceFieldGenerator:
         self.ostream.flush()
 
     def print_angles(self):
+        """Prints the angle parameters in a tabular format."""
+
         s = "Angles: \n"
         s += f"{'Angle':>15} {'fc (kJ/mol rad^2)':>18} {'eq (rad)':>10} {'comment'}\n"
         for angle, params in self.angles.items():
@@ -3572,12 +4626,16 @@ class MMForceFieldGenerator:
         self.ostream.flush()
 
     def print_dihedrals(self):
+        """Prints the proper dihedral parameters in a tabular format."""
+
         s = "Proper dihedrals: \n"
         s += self.get_torsion_print_string(self.dihedrals)
         self.ostream.print_info(s)
         self.ostream.flush()
 
     def print_impropers(self):
+        """Prints the improper dihedral parameters in a tabular format."""
+
         s = "Improper dihedrals: \n"
         s += self.get_torsion_print_string(self.impropers)
         self.ostream.print_info(s)
@@ -3585,6 +4643,8 @@ class MMForceFieldGenerator:
 
     @staticmethod
     def get_torsion_print_string(torsions):
+        """Formats torsion parameters for the print helpers."""
+
         s = ""
         s += f"{'Torsion':>21} {'barrier (kJ/mol rad^2)':>22} {'phase (rad)':>11} {'periodicity':>12} {'comment'}\n"
         for torsion, params in torsions.items():
@@ -3617,8 +4677,7 @@ class MMForceFieldGenerator:
         ff_data = {
             "atoms": forcefield.atoms,
             "bonds": MMForceFieldGenerator._tuple_to_str_key(forcefield.bonds),
-            "angles": MMForceFieldGenerator._tuple_to_str_key(forcefield.angles
-                                                             ),
+            "angles": MMForceFieldGenerator._tuple_to_str_key(forcefield.angles),
             "dihedrals": MMForceFieldGenerator._tuple_to_str_key(
                 forcefield.dihedrals),
             "impropers": MMForceFieldGenerator._tuple_to_str_key(
@@ -3638,14 +4697,27 @@ class MMForceFieldGenerator:
         Returns:
             None
         """
-        json = MMForceFieldGenerator.get_forcefield_as_json(forcefield)
-        cwd = Path().cwd()
-        path = cwd / Path(filename)
-        folder = str(path.parent)
-        if not Path(folder).exists():
-            Path(folder).mkdir(parents=True, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as file:
-            file.write(json)
+        json_payload = MMForceFieldGenerator.get_forcefield_as_json(forcefield)
+        json_path = Path(filename)
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        json_path.write_text(json_payload, encoding="utf-8")
+
+    @staticmethod
+    def _forcefield_from_json_data(ff_data: dict):
+        """Builds a force field generator instance from decoded JSON data."""
+
+        forcefield = MMForceFieldGenerator()
+        forcefield.atoms = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["atoms"])
+        forcefield.bonds = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["bonds"])
+        forcefield.angles = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["angles"])
+        forcefield.dihedrals = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["dihedrals"])
+        forcefield.impropers = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["impropers"])
+        return forcefield
 
     @staticmethod
     def _str_to_tuple_key(dictionary: dict) -> dict:
@@ -3658,19 +4730,15 @@ class MMForceFieldGenerator:
         Returns:
             dict: The dictionary with keys converted to tuple.
         """
-        str_keys = list(dictionary.keys())
-        tup_keys = []
-        for str_key in str_keys:
-            tuple = ()
-            for item in str_key.split(","):
-                item = item.replace("(", "")
-                item = item.replace(")", "")
-                item = item.replace(" ", "")
-                tuple += (int(item),)
-            if len(tuple) == 1:
-                tuple = tuple[0]
-            tup_keys.append(tuple)
-        return {key: value for key, value in zip(tup_keys, dictionary.values())}
+        converted = {}
+
+        for str_key, value in dictionary.items():
+            tuple_key = tuple(
+                int(item.strip().strip("()")) for item in str_key.split(","))
+            converted_key = tuple_key[0] if len(tuple_key) == 1 else tuple_key
+            converted[converted_key] = value
+
+        return converted
 
     @staticmethod
     def _tuple_to_str_key(dictionary: dict) -> dict:
