@@ -37,6 +37,7 @@ from pathlib import Path
 import numpy as np
 import sys
 import time
+import copy
 
 from .veloxchemlib import mpi_master
 from .solvationbuilder import SolvationBuilder
@@ -133,8 +134,8 @@ class SolvationFepDriver:
         self.resname = None 
         
         # Ensemble and MD options
-        self.temperature = 298.15 * unit.kelvin
-        self.kT = (unit.AVOGADRO_CONSTANT_NA * unit.BOLTZMANN_CONSTANT_kB * self.temperature).in_units_of(unit.kilojoule_per_mole)
+        self.temperature = 298.15 
+        self.kT = (unit.AVOGADRO_CONSTANT_NA * unit.BOLTZMANN_CONSTANT_kB * (self.temperature * unit.kelvin)).in_units_of(unit.kilojoule_per_mole)
         self.pressure = 1 * unit.atmospheres
         self.timestep = 2.0 * unit.femtoseconds 
         self.num_em_steps = 0  # no limit
@@ -207,7 +208,7 @@ class SolvationFepDriver:
                             equilibrate=True)
         
         self.solvent_name = solvent
-        sol_builder.write_gromacs_files(ff_gen_solute, ff_gen_solvent)
+        sol_builder.write_openmm_files(ff_gen_solute, ff_gen_solvent)
         
         if self.save_trajectory_xtc or self.save_system_xml or self.save_energies_txt:
             self.output_folder.mkdir(parents=True, exist_ok=True)
@@ -230,7 +231,7 @@ class SolvationFepDriver:
 
         return self.compute_solvation_from_gromacs_files("system.gro", "system.top", solute_gro, solute_top)
         
-    def compute_solvation_from_openmm_files(self, solute_pdb, solute_xml, solvent='cspce', solvent_molecule=None, ff_gen_solvent=None, target_density=None, system_pdb=None, other_xml_files=None):
+    def compute_solvation_from_openmm_files(self, solute_pdb, solute_xml, solvent='cspce', solvent_molecule=None, ff_gen_solvent=None, target_density=None, system_pdb=None, other_xml_files=None, system_xml=None):
         """
         Run the solvation free energy calculation using OpenMM.
         :param solute_pdb:
@@ -255,8 +256,19 @@ class SolvationFepDriver:
         :return:
             A dictionary containing the free energy calculations and the uncertainty for each stage, and the final free energy.
         """
+        
+        self.solute_pdb = solute_pdb
+        self.solute_xml = solute_xml
+        
+        # To run with pre-built OMM system objects
+        if system_xml is not None and system_pdb is not None:
+            self.system_pdb = system_pdb
+            self.system_xml = system_xml
+            self.solute_pdb = solute_pdb
+            self.solute_xml = solute_xml
+            self.solvent_name = 'omm_system_xml'
 
-        if system_pdb is None:
+        elif system_pdb is None:
             self.ostream.print_info(f"No system_pdb provided, using SolvationBuilder to solvate the system with {solvent} solvent")
             self.ostream.flush()
             molecule = Molecule.read_pdb_file(solute_pdb)
@@ -288,11 +300,7 @@ class SolvationFepDriver:
             assert_msg_critical(other_xml_files is not None,
                 "SolvationFepDriver: other_xml_files must be provided if system_pdb is provided")
             self.other_xml_files = other_xml_files    
-
-        self.solute_pdb = solute_pdb
-        self.solute_xml = solute_xml
-        # Special name for the solvent
-        self.solvent_name = 'omm_files'
+            self.solvent_name = 'omm_files'
 
         if self.save_trajectory_xtc or self.save_system_xml or self.save_energies_txt:
             self.output_folder.mkdir(parents=True, exist_ok=True)
@@ -483,8 +491,16 @@ class SolvationFepDriver:
         """
         Create solvated system with alchemical scaling.
         """
+        # Reading from pre-built OpenMM system XML
+        if self.solvent_name == 'omm_system_xml':
+            pdb = app.PDBFile(self.system_pdb)
+            topology = pdb.topology
+            positions = pdb.positions
+            with open(self.system_xml, 'r') as f:
+                base_system = mm.XmlSerializer.deserialize(f.read())
+
         # Reading the system from files
-        if self.solvent_name == 'omm_files':
+        elif self.solvent_name == 'omm_files':
             pdb = app.PDBFile(self.system_pdb)
             initial_system_ff = app.ForceField(self.solute_xml, *self.other_xml_files)
             topology = pdb.topology
@@ -500,30 +516,29 @@ class SolvationFepDriver:
         # From molecule and ffgenerator
         else:
             if self.solvent_name != 'itself':
-                gro = app.GromacsGroFile('system.gro')
-                initial_system_ff = app.GromacsTopFile('system.top', 
-                                                        periodicBoxVectors=gro.getPeriodicBoxVectors())
-                topology = initial_system_ff.topology
-                positions = gro.positions
+                pdb = app.PDBFile('system.pdb')
+                initial_system_ff = app.ForceField('solute.xml', 'solvent_1.xml')
+                topology = pdb.topology
+                positions = pdb.positions
             else:
-                gro = app.GromacsGroFile('liquid.gro')
-                initial_system_ff = app.GromacsTopFile('liquid.top',
-                                                    periodicBoxVectors=gro.getPeriodicBoxVectors())
-                topology = initial_system_ff.topology
-                positions = gro.positions
+                pdb = app.PDBFile('liquid.pdb')
+                initial_system_ff = app.ForceField('liquid.xml')
+                topology = pdb.topology
+                positions = pdb.positions
         
         # createSystem from a top file does not require the topology as an argument
-        if self.solvent_name == 'omm_files':
-            sys_arguments = [topology, self.nonbondedMethod, self.cutoff, self.constraints]
-        else:
+        if self.solvent_name == 'gro_files':
             sys_arguments = [self.nonbondedMethod, self.cutoff, self.constraints]
+        else:
+            sys_arguments = [topology, self.nonbondedMethod, self.cutoff, self.constraints]
 
         solvated_systems = []
         for lambda_val in lambdas:
-            solvated_system = initial_system_ff.createSystem(*sys_arguments)
-
-            # Add barostat
-            solvated_system.addForce(mm.MonteCarloBarostat(self.pressure, self.temperature))
+            if self.solvent_name == 'omm_system_xml':
+                solvated_system = copy.deepcopy(base_system)
+            else:
+                solvated_system = initial_system_ff.createSystem(*sys_arguments)
+                solvated_system.addForce(mm.MonteCarloBarostat(self.pressure, self.temperature* unit.kelvin))
 
             # Define alchemical regions
             alchemical_region, chemical_region = self._get_alchemical_region(topology)
@@ -579,19 +594,19 @@ class SolvationFepDriver:
 
         # From molecule and ffgenerator
         else:
-            self.solute_ff.write_gromacs_files('solute_vacuum', 'MOL')
-            gro = app.GromacsGroFile('solute_vacuum.gro')
-            forcefield_solute = app.GromacsTopFile('solute_vacuum.top')
-            topology = forcefield_solute.topology
-            positions = gro.positions
+            self.solute_ff.write_openmm_files('solute_vacuum', 'MOL')
+            pdb = app.PDBFile('solute_vacuum.pdb')
+            forcefield_solute = app.ForceField('solute_vacuum.xml')
+            topology = pdb.topology
+            positions = pdb.positions
 
 
         vacuum_systems = []
         for lambda_val in lambdas:
-            if self.solvent_name == 'omm_files':
-                vacuum_system = forcefield_solute.createSystem(topology, nonbondedMethod=app.NoCutoff, constraints=self.constraints)
-            else:
+            if self.solvent_name == 'gro_files':
                 vacuum_system = forcefield_solute.createSystem(nonbondedMethod=app.NoCutoff, constraints=self.constraints)
+            else:
+                vacuum_system = forcefield_solute.createSystem(topology, nonbondedMethod=app.NoCutoff, constraints=self.constraints)
         
             gsc_force = self._get_gaussian_softcore_force(lambda_val)
 
@@ -635,7 +650,7 @@ class SolvationFepDriver:
         Run the simulation using OpenMM. Return simulated time in ns and real elapsed time in seconds.
         """
 
-        integrator = mm.LangevinIntegrator(self.temperature, 1.0 / unit.picoseconds, self.timestep)
+        integrator = mm.LangevinIntegrator(self.temperature * unit.kelvin, 1.0 / unit.picoseconds, self.timestep)
         simulation = app.Simulation(topology, system, integrator, platform=self._create_platform())
         simulation.context.setPositions(positions)
 

@@ -161,9 +161,23 @@ class ReactionSystemBuilder():
         self.water_model: str
         self.decompose_bonded = True
         self.decompose_nb: list | None = None
+
+        self.implicit_solvent_model: str | None = None
+        self.solute_dielectric: float = 1.0
+        self.solvent_dielectric: float = 78.39
+
+        # Conformational TS parameters.  Set by build_systems when
+        # 'conformer_active_torsion' is present in the configuration dict.
+        # conformer_active_torsion is handled outside the keywords loop
+        # because it is a tuple rather than a plain scalar.
+        self.conformer_active_torsion: tuple | None = None
+        self.conformer_phi_reactant: float = 0.0
+        self.conformer_phi_product: float = 0.0
+        self.conformer_k: float = 200.0
+
         self.keywords = {
-            "temperature": float,  #-> system dependent
-            "nb_cutoff": float,  #-> 
+            "temperature": float,
+            "nb_cutoff": float,
             # "bonded_integration": bool,
             "bonded_integration_bond_fac": float,
             "bonded_integration_angle_fac": float,
@@ -199,6 +213,12 @@ class ReactionSystemBuilder():
             "CNT_radius_nm": float,
             "decompose_nb": list,
             "decompose_bonded": bool,
+            "implicit_solvent_model": str,
+            "solute_dielectric": float,
+            "solvent_dielectric": float,
+            "conformer_phi_reactant": float,
+            "conformer_phi_product": float,
+            "conformer_k": float,
         }
 
     def build_systems(
@@ -229,6 +249,12 @@ class ReactionSystemBuilder():
             else:
                 self.ostream.print_info(
                     f"{keyword}: {getattr(self, keyword)} (default)")
+        # conformer_active_torsion is a tuple, handled separately
+        if 'conformer_active_torsion' in configuration:
+            self.conformer_active_torsion = tuple(
+                configuration['conformer_active_torsion'])
+            self.ostream.print_info(
+                f"conformer_active_torsion: {self.conformer_active_torsion}")
         self.ostream.flush()
         self.reactant = reactant
         self.product = product
@@ -289,6 +315,17 @@ class ReactionSystemBuilder():
         if self.pressure > 0:
             barostat = self._add_barostat(system)
 
+        if self.implicit_solvent_model is not None:
+            assert_msg_critical(
+                not self.solvent,
+                'EvbSystemBuilder: implicit_solvent_model and solvent (explicit) '
+                'cannot be used simultaneously.')
+            assert_msg_critical(
+                not self.CNT and not self.graphene,
+                'EvbSystemBuilder: implicit_solvent_model is not compatible '
+                'with CNT or graphene environments.')
+            self._add_implicit_solvent(system, topology, nb_force)
+
         E_field = None
         if np.any(abs(np.array(self.E_field)) > 0.001):
             E_field = self._add_E_field(system, self.E_field)
@@ -316,8 +353,6 @@ class ReactionSystemBuilder():
             topology)
 
         for t, template in enumerate(templates):
-            # if template.name == 'HOH':
-            #     continue
             for i, atom in enumerate(template.atoms):
                 forcefield.registerAtomType({
                     'name':
@@ -347,13 +382,11 @@ class ReactionSystemBuilder():
         )
 
         self.positions = system_mol.get_coordinates_in_angstrom()
-        # self._add_posres(system, posres_atoms, self.positions)
 
         reaction_atoms = {}
         if self.no_reactant:
             return system, topology, system_mol, reaction_atoms
 
-        total_mapping = {}
         residues = []
         for res_dict in self.pdb_active_res:
             # all atoms already exist in the topology, pdb: top, matching chain id with removed_chain
@@ -872,20 +905,6 @@ class ReactionSystemBuilder():
             return 4 * (_m % M * N + _n % N)
 
         index = 0
-        # mol_positions = system_mol.get_coordinates_in_angstrom()
-        # middle_x = (max(mol_positions[:, 0]) + min(mol_positions[:, 0])) / 2
-        # middle_y = (max(mol_positions[:, 1]) + min(mol_positions[:, 1])) / 2
-        # min_z = min(mol_positions[:, 2])
-        # min_y = min(mol_positions[:, 1])
-
-        # if self.graphene:
-        #     x_offset = middle_x - X / 2
-        #     y_offset = middle_y - Y / 2
-        #     z_offset = min_z - 5
-        # else:
-        #     x_offset = middle_x - X / 2
-        #     y_offset = min_y - 0.7 * (R + 1)
-        #     z_offset = min_z - 0.7 * (R + 1)
 
         for m in range(0, M):
             for n in range(0, N):
@@ -900,8 +919,6 @@ class ReactionSystemBuilder():
                         coord = np.array(
                             [coord[0], R * math.sin(phi), R * math.cos(phi)]
                         )  # A, X/2 factor is to center the CNT in the middle of the box. The X length is used to get the proper box size
-
-                    # coord += np.array([x_offset, y_offset, z_offset])
 
                     mm_element = mmapp.Element.getByAtomicNumber(atomic_number)
                     name = index
@@ -1345,6 +1362,75 @@ class ReactionSystemBuilder():
         system.addForce(barostat)
         return barostat
 
+    def _add_implicit_solvent(self, system, topology, nb_force):
+        """Add a GB implicit solvent force to the system.
+
+        Mirrors the logic in OpenMM's implicit solvent XML scripts: selects the
+        appropriate CustomGBForce subclass, obtains per-atom radii and scaling
+        factors from getStandardParameters (element-based Bondi radii), reads
+        charges from the existing NonbondedForce, and attaches the finalized
+        force to the system.
+
+        :param system: the OpenMM System to add the force to.
+        :param topology: the OpenMM Topology (all atoms must already be added).
+        :param nb_force: the NonbondedForce already present in the system.
+        """
+        assert_msg_critical('openmm' in sys.modules,
+                            'openmm is required for EvbSystemBuilder.')
+
+        from openmm.app.internal.customgbforces import (
+            GBSAGBnForce,
+            GBSAGBn2Force,
+            GBSAOBC1Force,
+            GBSAOBC2Force,
+            GBSAHCTForce,
+        )
+
+        model_map = {
+            'gbn': GBSAGBnForce,
+            'gbn2': GBSAGBn2Force,
+            'obc1': GBSAOBC1Force,
+            'obc2': GBSAOBC2Force,
+            'hct': GBSAHCTForce,
+        }
+
+        model_key = self.implicit_solvent_model.lower()
+        assert_msg_critical(
+            model_key in model_map,
+            f'EvbSystemBuilder: unknown implicit_solvent_model '
+            f'"{self.implicit_solvent_model}". '
+            f'Valid options are: {list(model_map.keys())}')
+
+        ForceClass = model_map[model_key]
+
+        gb_force = ForceClass(
+            solventDielectric=self.solvent_dielectric,
+            soluteDielectric=self.solute_dielectric,
+            SA='ACE',
+        )
+
+        # getStandardParameters returns [[radius, scalingFactor], ...] per atom,
+        # using element-based Bondi radii derived from the topology.
+        std_params = ForceClass.getStandardParameters(topology)
+        for i, gb_params in enumerate(std_params):
+            charge = nb_force.getParticleParameters(i)[0]
+            gb_force.addParticle([charge] + list(gb_params))
+
+        gb_force.finalize()
+        gb_force.setNonbondedMethod(mm.CustomNonbondedForce.NoCutoff)
+
+        # Required by OpenMM when GB is active: set reaction-field dielectric
+        # of the NonbondedForce to 1 so it does not double-count dielectric
+        # screening.
+        nb_force.setReactionFieldDielectric(1)
+
+        system.addForce(gb_force)
+        self.ostream.print_info(
+            f'Added implicit solvent ({self.implicit_solvent_model}) with '
+            f'solvent_dielectric={self.solvent_dielectric}, '
+            f'solute_dielectric={self.solute_dielectric}')
+        self.ostream.flush()
+
     def _interpolate_system(self, system, lambda_vec, nb_force, E_field_force):
         systems = {}
         rea_charge = [atom['charge'] for atom in self.reactant.atoms.values()]
@@ -1398,6 +1484,17 @@ class ReactionSystemBuilder():
                 f"Total product charge is {sum(pro_charge)} and is not sufficiently close to a whole number, skipping charge offset"
             )
 
+        # Locate the GB force once so we can keep its per-particle charges in
+        # sync with the interpolated NB charges before each deepcopy.
+        gb_force = None
+        if self.implicit_solvent_model is not None:
+            gb_candidates = [
+                f for f in system.getForces()
+                if isinstance(f, mm.CustomGBForce)
+            ]
+            if gb_candidates:
+                gb_force = gb_candidates[0]
+
         for lam in lambda_vec:
             total_charge = 0
             if not self.no_reactant:
@@ -1425,6 +1522,15 @@ class ReactionSystemBuilder():
 
                     nb_force.setParticleParameters(self.reaction_atoms[i].index,
                                                    charge, sigma, epsilon)
+
+                    # Mirror the interpolated charge into the GB force so each
+                    # deepcopy carries the correct lambda-dependent charge.
+                    if gb_force is not None:
+                        atom_index = self.reaction_atoms[i].index
+                        gb_params = list(
+                            gb_force.getParticleParameters(atom_index))
+                        gb_params[0] = charge
+                        gb_force.setParticleParameters(atom_index, gb_params)
 
             # Add the interpolated charge to the E_field for both the system and environment
             for i in range(system.getNumParticles()):
@@ -1459,7 +1565,7 @@ class ReactionSystemBuilder():
                 systems.update(self._add_nb_decompositions(pro_system, 'pro'))
             else:
                 self.ostream.print_info(
-                    f"Skipping nonbonded force decompositions")
+                    "Skipping nonbonded force decompositions")
             self.ostream.flush()
 
         if self.decompose_bonded:
@@ -1486,7 +1592,7 @@ class ReactionSystemBuilder():
         angle = self._create_harmonic_angle_forces(lam, model_broken=False)
 
         # angle, angle_integration = self._create_angle_forces(lam)
-        torsion = self._create_proper_torsion_forces(lam)
+        torsion_forces = self._create_proper_torsion_forces(lam, pes=pes)
         improper = self._create_improper_torsion_forces(lam)
 
         if not pes:
@@ -1533,7 +1639,8 @@ class ReactionSystemBuilder():
 
         system.addForce(static_bonded_harmonic)
         system.addForce(angle)
-        system.addForce(torsion)
+        for torsion_force in torsion_forces:
+            system.addForce(torsion_force)
         system.addForce(improper)
         system.addForce(bond_constraint)
         system.addForce(constant_force)
@@ -1605,7 +1712,7 @@ class ReactionSystemBuilder():
             solcoul.setParticleParameters(atom_id, 0, 1, 0)
             sollj.setParticleParameters(atom_id, 0, 1, 0)
 
-        #set the charges or epsilons of all solvent atoms to 0
+        # set the charges or epsilons of all solvent atoms to 0
         for atom_id in self.solvent_atom_ids:
             charge, sigma, epsilon = nbforce.getParticleParameters(atom_id)
             sollj.setParticleParameters(atom_id, 0, sigma, epsilon)
@@ -1626,7 +1733,7 @@ class ReactionSystemBuilder():
             f"decomp_{state_name}_solvent_LJ": lj_system
         })
 
-        #Remove all solvent solvent interactions in the other forces
+        # Remove all solvent solvent interactions in the other forces
 
         for to_decompose in self.decompose_nb:
 
@@ -1650,7 +1757,7 @@ class ReactionSystemBuilder():
                         lj_dec.addException(atom_id, solvent_atom, 0, sig, eps)
                         coul_dec.addException(atom_id, solvent_atom, qq, 1, 0)
 
-                #Everything is handeled by the exceptions, so the default parameters can be set to 0
+                # Everything is handeled by the exceptions, so the default parameters can be set to 0
                 lj_dec.setParticleParameters(atom_id, 0, 1, 0)
                 coul_dec.setParticleParameters(atom_id, 0, 1, 0)
 
@@ -1937,8 +2044,20 @@ class ReactionSystemBuilder():
             self._add_angle(harmonic_force, atom_ids, eq, fc)
         return harmonic_force
 
-    def _create_proper_torsion_forces(self, lam):
+    def _create_proper_torsion_forces(self, lam, pes=False):
+        """Build proper torsion forces for the reaction system at the given lambda.
 
+        For conformational TS integration systems (self.conformer_active_torsion
+        is set and pes=False), the Fourier terms on the active central bond are
+        omitted and a periodic restraint  k*(1 - cos(theta - theta0))  is added
+        instead, with theta0 shifting from phi_reactant (lam=0) to phi_product
+        (lam=1) along the shortest arc.
+
+        Returns:
+            list[mm.Force]: always a list — one PeriodicTorsionForce for the
+            normal case, plus a CustomTorsionForce appended for conformational
+            integration systems.
+        """
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
 
@@ -1947,9 +2066,24 @@ class ReactionSystemBuilder():
         if not self.no_force_groups:
             fourier_force.setForceGroup(EvbForceGroup.REA_TORSION.value)
 
+        # When modelling a conformational TS integration system, identify the
+        # central bond to skip so the restraint below takes its place.
+        active_torsion = self.conformer_active_torsion
+        if active_torsion is not None and not pes:
+            active_torsion_central = tuple(
+                sorted([active_torsion[1], active_torsion[2]]))
+        else:
+            active_torsion_central = None
+
         dihedral_keys = list(
             set(self.reactant.dihedrals) | set(self.product.dihedrals))
         for key in dihedral_keys:
+            # Skip Fourier terms on the active central bond for integration
+            # systems; the periodic restraint below replaces them.
+            if (active_torsion_central is not None and tuple(
+                    sorted([key[1], key[2]])) == active_torsion_central):
+                continue
+
             atom_ids = self._key_to_id(key, self.reaction_atoms)
             if atom_ids is None:
                 continue
@@ -1967,7 +2101,6 @@ class ReactionSystemBuilder():
                 self._add_torsion(fourier_force, dihedA, atom_ids, reascale)
                 self._add_torsion(fourier_force, dihedB, atom_ids, proscale)
             else:
-
                 # if the torsion on one side of the reaction completely disapears, then turn of the torsion much earlier / turn it on later
                 reascale, proscale = self._get_lambda_scaling(
                     lam, self.torsion_lambda_switch)
@@ -1979,7 +2112,42 @@ class ReactionSystemBuilder():
                     dihed = self.product.dihedrals[key]
                 if scale > 0:
                     self._add_torsion(fourier_force, dihed, atom_ids, scale)
-        return fourier_force
+
+        forces = [fourier_force]
+
+        # For conformational TS integration systems, append the periodic
+        # restraint whose minimum shifts from phi_reactant to phi_product.
+        if active_torsion is not None and not pes:
+            phi_rea_rad = self.conformer_phi_reactant * self.deg_to_rad
+            phi_pro_rad = self.conformer_phi_product * self.deg_to_rad
+            delta_phi_rad = phi_pro_rad - phi_rea_rad
+            if delta_phi_rad > math.pi:
+                delta_phi_rad -= 2 * math.pi
+            elif delta_phi_rad <= -math.pi:
+                delta_phi_rad += 2 * math.pi
+            theta0 = phi_rea_rad + lam * delta_phi_rad
+
+            restraint_force = mm.CustomTorsionForce(
+                "k_dih * (1 - cos(theta - theta0))")
+            restraint_force.setName("Conformer dihedral restraint")
+            restraint_force.addGlobalParameter("k_dih", self.conformer_k)
+            restraint_force.addPerTorsionParameter("theta0")
+            if not self.no_force_groups:
+                restraint_force.setForceGroup(EvbForceGroup.REA_TORSION.value)
+
+            active_atom_ids = self._key_to_id(active_torsion,
+                                              self.reaction_atoms)
+            if active_atom_ids is not None:
+                restraint_force.addTorsion(
+                    active_atom_ids[0],
+                    active_atom_ids[1],
+                    active_atom_ids[2],
+                    active_atom_ids[3],
+                    [theta0],
+                )
+            forces.append(restraint_force)
+
+        return forces
 
     # Create a linear switching function that turns the force on only past the lambda-switch
     def _get_lambda_scaling(self, lam, lambda_switch):

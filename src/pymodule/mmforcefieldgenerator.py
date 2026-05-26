@@ -4371,6 +4371,27 @@ class MMForceFieldGenerator:
             The name of the molecule.
         """
 
+        # PDB format from http://deposit.rcsb.org/adit/docs/pdb_atom_format.html
+
+        # COLUMNS        DATA TYPE       CONTENTS
+        # --------------------------------------------------------------------------------
+        #  1 -  6        Record name     "HETATM" or "ATOM  "
+        #  7 - 11        Integer         Atom serial number.
+        # 13 - 16        Atom            Atom name.
+        # 17             Character       Alternate location indicator.
+        # 18 - 20        Residue name    Residue name.
+        # 22             Character       Chain identifier.
+        # 23 - 26        Integer         Residue sequence number.
+        # 27             AChar           Code for insertion of residues.
+        # 31 - 38        Real(8.3)       Orthogonal coordinates for X in Angstroms.
+        # 39 - 46        Real(8.3)       Orthogonal coordinates for Y in Angstroms.
+        # 47 - 54        Real(8.3)       Orthogonal coordinates for Z in Angstroms.
+        # 55 - 60        Real(6.2)       Occupancy (Default = 1.0).
+        # 61 - 66        Real(6.2)       Temperature factor (Default = 0.0).
+        # 73 - 76        LString(4)      Segment identifier, left-justified.
+        # 77 - 78        LString(2)      Element symbol, right-justified.
+        # 79 - 80        LString(2)      Charge on the atom.
+
         pdb_filename = str(pdb_file)
         if mol_name is None:
             mol_name = Path(self.molecule_name).stem
@@ -4391,6 +4412,8 @@ class MMForceFieldGenerator:
                 occupancy = 1.00
                 temp_factor = 0.00
                 element_symbol = element[:2].rjust(2)
+
+                # Format string from https://cupnet.net/pdb-format/
 
                 line_str = "{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   ".format(
                     'HETATM', i, atom_name[:4], '', mol_name[:3], 'A', 1, '')

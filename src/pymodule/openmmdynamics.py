@@ -818,6 +818,9 @@ class OpenMMDynamics:
                 if not duplicate:
                     if partial_charges:
                         ff_gen.partial_charges = partial_charges[i]
+                    self.ostream.print_info(
+                        f'Generating force field for molecule {i+1}...')
+                    self.ostream.flush()
                     ff_gen.create_topology(mol, water_model=water_model)
                     ff_gen.generate_residue_xml(f'molecule_{i+1}.xml',
                                                 f'M{i+1:02d}')
@@ -1137,7 +1140,7 @@ class OpenMMDynamics:
 
         equiv_conformer_pairs = []
         if unique_conformers:
-            msg = f'Filtering for unique conformers'
+            msg = 'Filtering for unique conformers'
             self.ostream.print_info(msg)
             self.ostream.flush()
 

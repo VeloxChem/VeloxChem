@@ -49,7 +49,7 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
 from .errorhandler import assert_msg_critical
 
 
-class TpaDriver(NonlinearSolver):
+class TpaDriverBase(NonlinearSolver):
     """
     Implements the isotropic cubic response driver for two-photon absorption
     (TPA)
@@ -79,7 +79,7 @@ class TpaDriver(NonlinearSolver):
         super().__init__(comm, ostream)
 
         # cpp settings
-        self.frequencies = (0,)
+        self.frequencies = (0.0,)
         self.comp = None
         self.damping = 1000.0 / hartree_in_wavenumber()
 
@@ -200,6 +200,9 @@ class TpaDriver(NonlinearSolver):
                 if operator == 'dipole':
                     b_grad[ind] *= -1.0
 
+        # use python float
+        self.frequencies = [float(x) for x in self.frequencies]
+
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
         if self.rank == mpi_master():
@@ -270,8 +273,7 @@ class TpaDriver(NonlinearSolver):
         # A[3] and A[2] which formally are not part of the third-order gradient
         # but which are used for the cubic response function
 
-        tpa_dict = self.compute_tpa_components(Focks, self.frequencies, X,
-                                               d_a_mo, Nx, self.comp,
+        tpa_dict = self.compute_tpa_components(Focks, X, d_a_mo, Nx, self.comp,
                                                scf_results, molecule, ao_basis,
                                                profiler, eri_dict, dft_dict)
 
@@ -285,14 +287,12 @@ class TpaDriver(NonlinearSolver):
 
         return tpa_dict
 
-    def compute_tpa_components(self, Focks, w, X, d_a_mo, Nx, track,
+    def compute_tpa_components(self, Focks, X, d_a_mo, Nx, track,
                                scf_results, molecule, ao_basis, profiler,
                                eri_dict, dft_dict):
         """
         Computes all the relevent terms to third-order isotropic gradient
 
-        :param w:
-            A list of all the frequencies
         :param X:
             A dictonary of matricies containing all the dipole integrals
         :param d_a_mo:
@@ -333,7 +333,7 @@ class TpaDriver(NonlinearSolver):
 
         # computing all compounded first-order densities
         density_list1, density_list2, density_list3 = self.get_densities(
-            w, Nx, mo, nocc, norb)
+            self.frequencies, Nx, mo, nocc, norb)
 
         profiler.check_memory_usage('1st densities')
 
@@ -345,7 +345,7 @@ class TpaDriver(NonlinearSolver):
         })
 
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(w, density_list1, density_list2,
+        fock_dict = self.get_fock_dict(self.frequencies, density_list1, density_list2,
                                        density_list3, F0, mo, molecule,
                                        ao_basis, eri_dict, dft_dict,
                                        fock_profiler)
@@ -355,13 +355,13 @@ class TpaDriver(NonlinearSolver):
         profiler.check_memory_usage('1st Focks')
 
         fock_dict.update(Focks)
-        e4_dict = self.get_e4(w, Nx, fock_dict, nocc, norb)
+        e4_dict = self.get_e4(self.frequencies, Nx, fock_dict, nocc, norb)
 
         profiler.check_memory_usage('E[4]')
 
         # computing all the compounded second-order response vectors and
         # extracting some of the second-order Fock matrices from the subspace
-        (Nxy_dict, Focks_xy) = self.get_Nxy(w, d_a_mo, X, fock_dict, Nx, nocc,
+        (Nxy_dict, Focks_xy) = self.get_Nxy(self.frequencies, d_a_mo, X, fock_dict, Nx, nocc,
                                             norb, molecule, ao_basis,
                                             scf_results)
 
@@ -370,7 +370,7 @@ class TpaDriver(NonlinearSolver):
         # computing all second-order compounded densities based on the
         # second-order response vectors
         density_list_two1, density_list_two2 = self.get_densities_II(
-            w, Nx, Nxy_dict, mo, nocc, norb)
+            self.frequencies, Nx, Nxy_dict, mo, nocc, norb)
 
         profiler.check_memory_usage('2nd densities')
 
@@ -383,7 +383,7 @@ class TpaDriver(NonlinearSolver):
 
         # computing the remaning second-order Fock matrices from the
         # second-order densities
-        fock_dict_two = self.get_fock_dict_II(w, density_list_two1,
+        fock_dict_two = self.get_fock_dict_II(self.frequencies, density_list_two1,
                                               density_list_two2, mo, molecule,
                                               ao_basis, eri_dict, dft_dict,
                                               fock_profiler_two)
@@ -398,14 +398,14 @@ class TpaDriver(NonlinearSolver):
 
         # computing the compounded E[3] contractions for the isotropic
         # cubic response function
-        e3_dict = self.get_e3(w, Nx, Nxy_dict, fock_dict, fock_dict_two, nocc,
+        e3_dict = self.get_e3(self.frequencies, Nx, Nxy_dict, fock_dict, fock_dict_two, nocc,
                               norb)
 
         profiler.check_memory_usage('E[3]')
 
         # computing the X[3],A[3],X[2],A[2] contractions for the isotropic
         # cubic response function
-        other_dict = self.get_other_terms(w, track, X, Nx, Nxy_dict, d_a_mo,
+        other_dict = self.get_other_terms(self.frequencies, track, X, Nx, Nxy_dict, d_a_mo,
                                           nocc, norb)
 
         profiler.check_memory_usage('X[3],A[3],X[2],A[2]')
@@ -433,13 +433,24 @@ class TpaDriver(NonlinearSolver):
                     sum_val += val[(w, -w, w)]
                 gamma[(w, -w, w)] = sum_val
 
-            ret_dict.update(other_dict)
-
             ret_dict.update({
-                't4_dict': t4_dict,
-                't3_dict': t3_dict,
+                'tpa_terms': {},
                 'gamma': gamma,
                 'frequencies': list(self.frequencies),
+            })
+
+            ret_dict['tpa_terms'].update(other_dict)
+            ret_dict['tpa_terms'].update({
+                't4_dict': t4_dict,
+                't3_dict': t3_dict,
+            })
+
+            tpa_spectrum = self.get_spectrum(ret_dict, 'au')
+            assert_msg_critical(
+                '[GM]' in tpa_spectrum['y_label'],
+                'TpaDriverBase: In valid unit in TPA spectrum y_label')
+            ret_dict.update({
+                'cross_sections': list(tpa_spectrum['y_data'])
             })
 
             self._print_results(ret_dict)
@@ -459,7 +470,7 @@ class TpaDriver(NonlinearSolver):
         :param Nx:
             A dictonary with all the first-order response vectors in distributed form
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param nocc:
             Number of occupied orbitals
         :param norb:
@@ -484,7 +495,7 @@ class TpaDriver(NonlinearSolver):
         :param F0:
             The Fock matrix in MO basis
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param molecule:
             The molecule
         :param ao_basis:
@@ -572,7 +583,7 @@ class TpaDriver(NonlinearSolver):
         :param Nxy:
             A dict of the two index response vectors in distributed form
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param nocc:
             Number of occupied orbitals
         :param nocc:
@@ -595,7 +606,7 @@ class TpaDriver(NonlinearSolver):
         :param density_list:
             A list of tranformed compounded densities
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param molecule:
             The molecule
         :param ao_basis:
@@ -925,7 +936,7 @@ class TpaDriver(NonlinearSolver):
 
         assert_msg_critical(
             x_unit.lower() in ['au', 'ev', 'nm'],
-            'TpaDriver.get_spectrum: x_unit should be au, ev or nm')
+            'TpaDriverBase.get_spectrum: x_unit should be au, ev or nm')
 
         au2ev = hartree_in_ev()
         auxnm = 1.0 / hartree_in_inverse_nm()
@@ -996,19 +1007,19 @@ class TpaDriver(NonlinearSolver):
 
         assert_msg_critical(
             '[a.u.]' in spectrum['x_label'],
-            'TpaDriver._print_spectrum: In valid unit in x_label')
+            'TpaDriverBase._print_spectrum: In valid unit in x_label')
         assert_msg_critical(
             '[GM]' in spectrum['y_label'],
-            'TpaDriver._print_spectrum: In valid unit in y_label')
+            'TpaDriverBase._print_spectrum: In valid unit in y_label')
 
-        title = '{:<20s}{:<20s}{:>15s}'.format('Frequency[a.u.]',
-                                               'Frequency[eV]',
+        title = '{:<22s}{:<22s}{:>18s}'.format('Photon Energy[a.u.]',
+                                               'Photon Energy[eV]',
                                                'TPA cross-section[GM]')
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_header(('-' * len(title)).ljust(width))
 
         for w, cross_section in zip(spectrum['x_data'], spectrum['y_data']):
-            output = '{:<20.4f}{:<20.5f}{:>13.8f}'.format(
+            output = '{:<22.4f}{:<22.5f}{:>13.8f}'.format(
                 w, w * hartree_in_ev(), cross_section)
             self.ostream.print_header(output.ljust(width))
 

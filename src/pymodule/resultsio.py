@@ -70,10 +70,7 @@ def _write_value_to_hdf5(parent, key, value, value_label='HDF5 value'):
         return
 
     if isinstance(value, (bytes, np.bytes_)):
-        dset = parent.create_dataset(key,
-                                     data=np.bytes_(value.decode('utf-8')
-                                                    if isinstance(value, bytes)
-                                                    else value.decode('utf-8')))
+        dset = parent.create_dataset(key, data=np.bytes_(value.decode('utf-8')))
         dset.attrs['value_type'] = 'str'
         return
 
@@ -210,7 +207,9 @@ def _read_value_from_hdf5(h5obj, value_label='HDF5 value'):
 
     if value_type == 'str':
         data = h5obj[()]
-        if isinstance(data, bytes):
+        if isinstance(data, np.ndarray):
+            return data[0].decode('utf-8')
+        if isinstance(data, (bytes, np.bytes_)):
             return data.decode('utf-8')
         return data.astype(str) if isinstance(data, np.ndarray) else str(data)
 

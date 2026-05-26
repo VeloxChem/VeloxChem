@@ -44,6 +44,7 @@ from .molecule import Molecule
 from .outputstream import OutputStream
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .reactionsystembuilder import ReactionSystemBuilder
+from .reactionsystembuilder import ReactionSystemBuilder
 from .evbfepdriver import EvbFepDriver
 from .reaffbuilder import ReactionForceFieldBuilder
 from .evbdataprocessing import EvbDataProcessing

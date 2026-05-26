@@ -31,10 +31,8 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from importlib.metadata import version
-
-import sys
 import numpy as np
-import copy
+from pathlib import Path
 
 from .errorhandler import assert_msg_critical
 from .reactionsystembuilder import EvbForceGroup, ReactionSystemBuilder
@@ -87,7 +85,8 @@ class EvbReporter():
 
         self.simulations = {}
         for name, system in systems.items():
-            sim = mmapp.Simulation(topology, system, mm.LangevinIntegrator(1,1,1))
+            sim = mmapp.Simulation(topology, system,
+                                   mm.LangevinIntegrator(1, 1, 1))
             self.simulations.update({name: sim})
 
         if not append:
@@ -124,10 +123,13 @@ class EvbReporter():
             self.report_forcegroups = False
         else:
             self.report_forcegroups = True
-            no_ext = '.'.join(forcegroup_file.split('.')[:-1])
-            ext = forcegroup_file.split('.')[-1]
-            rea_fg = no_ext + '_rea.' + ext
-            pro_fg = no_ext + '_pro.' + ext
+            forcegroup_path = Path(forcegroup_file)
+            rea_fg = str(
+                forcegroup_path.with_name(forcegroup_path.stem + '_rea' +
+                                          forcegroup_path.suffix))
+            pro_fg = str(
+                forcegroup_path.with_name(forcegroup_path.stem + '_pro' +
+                                          forcegroup_path.suffix))
 
             self.FG_out = open(forcegroup_file, 'a' if append else 'w')
             self.rea_FG_out = open(rea_fg, 'a' if append else 'w')
@@ -185,9 +187,9 @@ class EvbReporter():
             dir = '/'.join(energy_file.split('/')[:-1])
             filename = dir + '/bonded_E1_decomp.csv'
             self.bonded_E1_decomp_out = open(filename, 'a' if append else 'w')
-            filename = dir + '/bonded_E2_decomp.csv'
+            filename = str(output_dir / 'bonded_E2_decomp.csv')
             self.bonded_E2_decomp_out = open(filename, 'a' if append else 'w')
-            filename = dir + '/bonded_params.csv'
+            filename = str(output_dir / 'bonded_params.csv')
             self.bonded_params_out = open(filename, 'a' if append else 'w')
             self.out_streams.append(self.bonded_E1_decomp_out)
             self.out_streams.append(self.bonded_E2_decomp_out)
@@ -268,7 +270,7 @@ class EvbReporter():
         if self.use_tuple:
             return (steps, True, self.report_velocities, self.report_forces,
                     True, True
-                    )  #steps, positions, velocities, forces, energy, pbc
+                    )  # steps, positions, velocities, forces, energy, pbc
         else:
             include = ['energy']
             if self.report_velocities:
@@ -522,7 +524,8 @@ class EvbReporter():
         if state is not None:
             try:
                 simulation.context.setState(state)
-            except:
+            except Exception:
+                print_exception_if_debug()
                 # Decomposition systems which have the barostat removed will throw an error on the above case
                 simulation.context.setPositions(state.getPositions())
 
