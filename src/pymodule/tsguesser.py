@@ -391,44 +391,69 @@ class TransitionStateGuesser():
                 V, E1, E2, conf_indices = self._get_best_mm_E_from_scan_dict(
                     scan_dict)
                 if self.peak_conformer_search:
-                    peak_index = np.argmax(V)
-                    peak_lambda = self.lambda_vector[peak_index]
+                    peak_iteration = 0
 
-                    min_index = max(
-                        0,
-                        peak_index - self.peak_conformer_search_range,
-                    )
-                    max_index = min(
-                        len(self.lambda_vector) - 1,
-                        peak_index + self.peak_conformer_search_range,
-                    )
+                    while True:
+                        peak_iteration += 1
+                        peak_index = int(np.argmax(V))
+                        peak_lambda = self.lambda_vector[peak_index]
 
-                    self.ostream.print_info(
-                        f"Found peak MM E: {V[peak_index]:.3f} at Lambda: {peak_lambda}."
-                    )
-                    self.ostream.print_info(
-                        f"Doing conformer search from Lambda: {self.lambda_vector[min_index]} to Lambda: {self.lambda_vector[max_index]}."
-                    )
-                    self.ostream.flush()
+                        min_index = max(
+                            0,
+                            peak_index - self.peak_conformer_search_range,
+                        )
+                        max_index = min(
+                            len(self.lambda_vector) - 1,
+                            peak_index + self.peak_conformer_search_range,
+                        )
 
-                    searched_conformers_indices.extend(
-                        range(min_index, max_index + 1))
-                    forward_init_pos = scan_dict[
-                        self.lambda_vector[min_index]][0]['pos']
-                    backward_init_pos = scan_dict[
-                        self.lambda_vector[max_index]][0]['pos']
+                        # Stop once both immediate neighbours of the peak have
+                        # been conformer-searched (peak is "sandwiched").
+                        # Termination is guaranteed: each iteration adds ≥1 new
+                        # index and the lambda vector is finite.
+                        left = peak_index - 1
+                        right = peak_index + 1
+                        left_ok = (left < 0
+                                   or left in searched_conformers_indices)
+                        right_ok = (right >= len(self.lambda_vector)
+                                    or right in searched_conformers_indices)
+                        if left_ok and right_ok:
+                            break
 
-                    scan_dict_peak_conf = self._run_mm_scan(
-                        self.lambda_vector[min_index:max_index + 1],
-                        rea_sim,
-                        pro_sim,
-                        conformer_search=True,
-                        forward_init_pos=forward_init_pos,
-                        backward_init_pos=backward_init_pos,
-                        skip_backward=True,
-                    )
-                    for l in scan_dict_peak_conf.keys():
-                        scan_dict[l] += scan_dict_peak_conf[l]
+                        self.ostream.print_info(
+                            f"Found peak MM E: {V[peak_index]:.3f} at Lambda: {peak_lambda}"
+                            f" (iteration {peak_iteration})."
+                        )
+                        self.ostream.print_info(
+                            f"Doing conformer search from Lambda: {self.lambda_vector[min_index]} to Lambda: {self.lambda_vector[max_index]}."
+                        )
+                        self.ostream.flush()
+
+                        searched_conformers_indices.extend(
+                            range(min_index, max_index + 1))
+                        searched_conformers_indices = sorted(
+                            list(set(searched_conformers_indices)))
+                        forward_init_pos = scan_dict[
+                            self.lambda_vector[min_index]][0]['pos']
+                        backward_init_pos = scan_dict[
+                            self.lambda_vector[max_index]][0]['pos']
+
+                        scan_dict_peak_conf = self._run_mm_scan(
+                            self.lambda_vector[min_index:max_index + 1],
+                            rea_sim,
+                            pro_sim,
+                            conformer_search=True,
+                            forward_init_pos=forward_init_pos,
+                            backward_init_pos=backward_init_pos,
+                            skip_backward=True,
+                        )
+                        for l in scan_dict_peak_conf.keys():
+                            scan_dict[l] += scan_dict_peak_conf[l]
+
+                        # Re-evaluate so the next iteration and the
+                        # discontinuity check both see up-to-date energies.
+                        V, E1, E2, conf_indices = (
+                            self._get_best_mm_E_from_scan_dict(scan_dict))
 
                 if self.discont_conformer_search:
                     discont_indices = self._check_discontinuities(E1, E2)
