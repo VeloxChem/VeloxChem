@@ -399,7 +399,7 @@ class TransitionStateGuesser():
                         peak_index - self.peak_conformer_search_range,
                     )
                     max_index = min(
-                        len(self.lambda_vector),
+                        len(self.lambda_vector) - 1,
                         peak_index + self.peak_conformer_search_range,
                     )
 
