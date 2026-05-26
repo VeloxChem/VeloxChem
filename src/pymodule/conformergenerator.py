@@ -52,7 +52,7 @@ try:
     import openmm
     from openmm import LangevinIntegrator, Platform
     from openmm.app import NoCutoff, Simulation, PDBFile, ForceField, GromacsTopFile
-    from openmm.unit import nanometer, md_unit_system, kelvin, picoseconds, picosecond, dalton
+    from openmm.unit import nanometer, md_unit_system, kelvin, picoseconds, picosecond,dalton
 except ImportError:
     pass
 
@@ -180,7 +180,8 @@ class ConformerGenerator:
                     b
                 }  # remove the other dihedral atom
                 connected_elements = [
-                    atom_info_dict[idx]["AtomicSymbol"] for idx in connected_set
+                    atom_info_dict[idx]["AtomicSymbol"]
+                    for idx in connected_set
                 ]
                 if tuple(connected_elements) == ("H", "H", "H"):
                     return True
@@ -226,8 +227,7 @@ class ConformerGenerator:
             self.ostream.flush()
 
         # convert to zero based index
-        rotatable_bonds_zero_based = [(i - 1, j - 1)
-                                      for (i, j) in rotatable_bonds]
+        rotatable_bonds_zero_based = [(i - 1, j - 1) for (i, j) in rotatable_bonds]
         rotatable_dihedrals_dict = {}
 
         # Due to size limit in mmforcefieldgenerator's cycle detection, we need
@@ -347,7 +347,8 @@ class ConformerGenerator:
                             'OpenMM is required for ConformerGenerator.')
 
         assert_msg_critical(
-            not (self.use_gromacs_files and implicit_solvent_model is not None),
+            not (self.use_gromacs_files
+                 and implicit_solvent_model is not None),
             'ConformerGenerator: Please set to use_gromacs_files to False ' +
             'when using implicit solvent model.')
 
@@ -431,7 +432,8 @@ class ConformerGenerator:
             # getForces=True,
         )
 
-        energy = state.getPotentialEnergy().value_in_unit_system(md_unit_system)
+        energy = state.getPotentialEnergy().value_in_unit_system(
+            md_unit_system)
         # convert to angstrom
         optimized_coords = state.getPositions(
             asNumpy=True).value_in_unit_system(md_unit_system) * 10
@@ -561,7 +563,8 @@ class ConformerGenerator:
                 old_dih_settings = dih_comb_arr_rank[i - 1][:, 4]
                 new_dih_settings = dih_comb_arr_rank[i][:, 4]
                 # compare the difference between the two sets and only update the dihedrals that are different
-                diff_dih_ind = np.where(old_dih_settings != new_dih_settings)[0]
+                diff_dih_ind = np.where(
+                    old_dih_settings != new_dih_settings)[0]
             else:
                 new_molecule = Molecule(molecule)
                 diff_dih_ind = np.arange(dih_comb_arr_rank[i].shape[0])
@@ -569,9 +572,8 @@ class ConformerGenerator:
             value_atom_index = dih_comb_arr_rank[i, :, 0:4] + 1
 
             for j in diff_dih_ind:
-                new_molecule.set_dihedral_in_degrees(value_atom_index[j],
-                                                     dih_comb_arr_rank[i, j, 4],
-                                                     verbose=False)
+                new_molecule.set_dihedral_in_degrees(
+                    value_atom_index[j], dih_comb_arr_rank[i, j, 4], verbose=False)
 
             conformations.append(Molecule(new_molecule))
 
@@ -660,7 +662,8 @@ class ConformerGenerator:
                 mol_copy = Molecule(molecule)
                 for iatom in range(mol_copy.number_of_atoms()):
                     mol_copy.set_atom_coordinates(
-                        iatom, conf_coords_angstrom[iatom] / bohr_in_angstrom())
+                        iatom,
+                        conf_coords_angstrom[iatom] / bohr_in_angstrom())
                 conformers_dict["molecules"].append(mol_copy)
                 conformers_dict["geometries"].append(
                     mol_copy.get_xyz_string(
@@ -729,7 +732,8 @@ class ConformerGenerator:
 
                 self.ostream.print_info(
                     f"{len(conformers_dict['energies'])} conformers with " +
-                    f"the lowest energies are saved in folder {str(save_path)}")
+                    f"the lowest energies are saved in folder {str(save_path)}"
+                )
             else:
                 self.ostream.print_info(
                     f"{len(conformers_dict['energies'])} conformers remain " +
