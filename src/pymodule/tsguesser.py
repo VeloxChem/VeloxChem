@@ -210,10 +210,6 @@ class TransitionStateGuesser():
             self.ostream.flush()
             self.ostream.mute()
 
-        if self._reaction_matcher_assist_min_depth is not None:
-            self.ffbuilder._reaction_matcher_assist_min_depth = int(
-                self._reaction_matcher_assist_min_depth)
-
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_forcefields(
             reactant=reactant,
             product=product,
@@ -305,12 +301,12 @@ class TransitionStateGuesser():
                     f"{tuple(self.active_torsion)}, "
                     f"phi_reactant = {phi_reactant:.1f}°, "
                     f"phi_product = {phi_product:.1f}°, "
-                    f"|Δφ| = {abs(delta):.1f}°."
-                )
+                    f"|Δφ| = {abs(delta):.1f}°.")
                 self.ostream.flush()
                 active_torsion = torsion_0idx
             else:
-                active_torsion, phi_reactant, phi_product = self._detect_active_dihedral()
+                active_torsion, phi_reactant, phi_product = self._detect_active_dihedral(
+                )
             self._conformer_active_torsion = active_torsion
             self._conformer_phi_reactant = float(phi_reactant)
             self._conformer_phi_product = float(phi_product)
@@ -538,8 +534,7 @@ class TransitionStateGuesser():
                      skip_backward=False):
         pos = copy.copy(forward_init_pos)
         results = {}
-        self._print_mm_header(lambda_vals=lambda_vals,
-                              conformer_search=conformer_search)
+        self._print_mm_header(conformer_search=conformer_search)
         for l in lambda_vals:
 
             result = self._get_mm_energy(
@@ -567,8 +562,7 @@ class TransitionStateGuesser():
                 "mm_scan_backward turned on. Scanning in reverse direction.")
             self.ostream.flush()
             lambda_vals_rev = list(reversed(lambda_vals))
-            self._print_mm_header(lambda_vals=lambda_vals,
-                                  conformer_search=conformer_search)
+            self._print_mm_header(conformer_search=conformer_search)
             pos = copy.copy(backward_init_pos)
             for l in lambda_vals_rev:
                 result = self._get_mm_energy(
@@ -833,8 +827,7 @@ class TransitionStateGuesser():
                 return math.nan
         return scf_results['scf_energy'] * hartree_in_kjpermol()
 
-    @staticmethod
-    def show_results(ts_results=None, filename=None, **mol_show_kwargs):
+    def show_results(self, ts_results=None, filename=None, **mol_show_kwargs):
         """Show the results of the transition state guesser.
         This function uses ipywidgets to create an interactive plot of the MM and SCF energies as a function of lambda.
 
@@ -862,26 +855,28 @@ class TransitionStateGuesser():
                     ostream,
                 )
             else:
-                raise ValueError(
-                    "No results provided. Provide either ts_results or filename."
-                )
+                if self.results is None or 'scan' not in self.results.keys():
+                    raise ValueError(
+                        "No results provided. Provide either ts_results or filename."
+                    )
+                ts_results = self.results
 
         scan = ts_results['scan']
         lambda_vec = [round(float(l), 3) for l in ts_results['lambda_vec']]
 
-        if scan[lambda_vec[0]][0].get('qm_energy', None) is not None:
+        if TransitionStateGuesser._has_qm_results(scan, lambda_vec):
             final_lambda = round(float(ts_results.get('max_qm_lambda', 0)), 3)
         else:
             final_lambda = round(float(ts_results['max_mm_lambda']), 3)
 
-        forming_bonds = set(ts_results.get('forming_bonds', None))
-        breaking_bonds = set(ts_results.get('breaking_bonds', None))
-        bonds = set(ts_results.get('static_bonds', None))
+        forming_bonds = set(ts_results.get('forming_bonds', set()))
+        breaking_bonds = set(ts_results.get('breaking_bonds', set()))
+        bonds = set(ts_results.get('static_bonds', set()))
 
         def _best_conformer_index(step):
             best_index = 0
             min_energy = None
-            if scan[0][0].get('qm_energy', None) is not None:
+            if TransitionStateGuesser._has_qm_results(scan, lambda_vec):
                 for i, conf in enumerate(scan[step]):
                     qm_E = conf.get('qm_energy', None)
                     if min_energy is None or (qm_E is not None
@@ -1039,7 +1034,7 @@ class TransitionStateGuesser():
         y = np.interp(x, lambda_vec, rel_mm_energies)
         fig, ax1 = plt.subplots(figsize=(6.5, 4))
 
-        if scan[0][0].get('qm_energy', None) is not None:
+        if TransitionStateGuesser._has_qm_results(scan, lambda_vec):
             qm_energies, _ = TransitionStateGuesser._get_best_qm_E_from_scan_dict(
                 scan)
             qm_min = np.min(qm_energies)
@@ -1234,6 +1229,11 @@ class TransitionStateGuesser():
         return qm_energies, conf_indices
 
     @staticmethod
+    def _has_qm_results(scan, lambda_vec):
+        """Return True if qm_energy values are present in the scan dict."""
+        return scan[lambda_vec[0]][0].get('qm_energy', None) is not None
+
+    @staticmethod
     def _set_molecule_positions(molecule, positions):
         positions_au = positions / bohr_in_angstrom()
         assert molecule.number_of_atoms() == len(positions_au)
@@ -1242,18 +1242,32 @@ class TransitionStateGuesser():
         return molecule
 
     def save_results(self, fname, results):
+        required_keys = {
+            'max_mm_xyz', 'max_mm_lambda', 'min_mm_conformer_index'
+        }
+        missing = required_keys - results.keys()
+        if missing:
+            raise ValueError("Cannot save results: the MM scan is incomplete. "
+                             f"Missing keys: {sorted(missing)}. "
+                             "Call scan_mm() before saving.")
         self.ostream.print_info(f"Saving results to {fname}")
         self.ostream.flush()
+
+        def _bonds_to_array(bonds):
+            # Always store as shape (N, 2) — even for empty sets — so that
+            # load_results can iterate rows uniformly regardless of set size.
+            if len(bonds) == 0:
+                return np.empty((0, 2), dtype='i')
+            return np.array(list(bonds), dtype='i')
+
         with h5py.File(fname, 'w') as hf:
             # breaking forming static bonds
-            breaking_bonds = np.array(list(results['breaking_bonds']),
-                                      dtype='i')
-            forming_bonds = np.array(list(results['forming_bonds']), dtype='i')
-            static_bonds = np.array(list(results['static_bonds']), dtype='i')
-
-            hf.create_dataset('breaking_bonds', data=breaking_bonds)
-            hf.create_dataset('forming_bonds', data=forming_bonds)
-            hf.create_dataset('static_bonds', data=static_bonds)
+            hf.create_dataset('breaking_bonds',
+                              data=_bonds_to_array(results['breaking_bonds']))
+            hf.create_dataset('forming_bonds',
+                              data=_bonds_to_array(results['forming_bonds']))
+            hf.create_dataset('static_bonds',
+                              data=_bonds_to_array(results['static_bonds']))
 
             # lambda vec
             lambda_vec = results.get('lambda_vec', None)
@@ -1372,7 +1386,7 @@ class TransitionStateGuesser():
             for l in scan_grp:
                 l_grp = scan_grp[l]
                 conf_scan = []
-                for i in l_grp:
+                for i in sorted(l_grp, key=lambda x: int(x)):
                     conf_grp = l_grp[i]
                     conf = {
                         'v': conf_grp['v'][()],
@@ -1388,53 +1402,63 @@ class TransitionStateGuesser():
 
         return results
 
-    def _print_mm_header(self, lambda_vals=None, conformer_search=False):
+    @staticmethod
+    def _param(label, value, lw=24, vw=20):
+        """Format one parameter line with fixed label and value widths.
+
+        Because print_header centers text, all lines must be the same total
+        length to appear left-aligned relative to each other.
+        Total width = lw + len(' : ') + vw = 47 chars (default).
+        """
+        return f"{label:<{lw}} : {str(value):>{vw}}"
+
+    def _print_mm_header(self, conformer_search=False):
         self.ostream.print_blank()
         if conformer_search:
-            if lambda_vals is None:
-                self.ostream.print_header(
-                    "Starting MM scan with conformer search")
-            else:
-                self.ostream.print_header(
-                    f"Starting MM scan with conformer search for lambda values {lambda_vals}"
-                )
+            self.ostream.print_header(
+                "Starting MM Scan  (with conformer search)")
         else:
-            self.ostream.print_header("Starting MM scan")
-        self.ostream.print_header(f"MD steps:              {self.mm_steps:>10}")
-        if conformer_search:
-            conf_snapshots = self.conformer_snapshots
-        else:
-            conf_snapshots = 1
+            self.ostream.print_header("Starting MM Scan")
+        self.ostream.print_blank()
+
+        conf_snapshots = self.conformer_snapshots if conformer_search else 1
+        self.ostream.print_header(self._param("MD steps", self.mm_steps))
+        self.ostream.print_header(self._param("conf. snapshots",
+                                              conf_snapshots))
         self.ostream.print_header(
-            f"conf. snapshots:       {conf_snapshots:>10}")
+            self._param("MD temperature", f"{self.mm_temperature} K"))
         self.ostream.print_header(
-            f"MD temperature:        {self.mm_temperature:>8} K")
+            self._param("MD step size", f"{self.mm_step_size} ps"))
+        self.ostream.print_header(self._param("folder name", self.folder_name))
         self.ostream.print_header(
-            f"MD step size:          {self.mm_step_size:>7} ps")
-        self.ostream.print_header(f"folder name: {self.folder_name:>20}")
-        self.ostream.print_header(
-            f"saving MD traj:        {str(self.save_mm_traj):>10}")
+            self._param("saving MD traj", self.save_mm_traj))
         if self.implicit_solvent_model is not None:
             self.ostream.print_header(
-                f"implicit solvent:      {self.implicit_solvent_model:>10}")
+                self._param("implicit solvent", self.implicit_solvent_model))
             self.ostream.print_header(
-                f"solvent dielectric:    {self.solvent_dielectric:>10.2f}")
+                self._param("solvent dielectric",
+                            f"{self.solvent_dielectric:.2f}"))
             self.ostream.print_header(
-                f"solute dielectric:     {self.solute_dielectric:>10.2f}")
+                self._param("solute dielectric",
+                            f"{self.solute_dielectric:.2f}"))
         else:
-            self.ostream.print_header(f"implicit solvent:           vacuum")
+            self.ostream.print_header(self._param("implicit solvent", "vacuum"))
+
         if self._conformer_active_torsion is not None:
             one_based = tuple(a + 1 for a in self._conformer_active_torsion)
+            self.ostream.print_blank()
+            self.ostream.print_header(self._param("conformational TS", "yes"))
             self.ostream.print_header(
-                f"conformational TS:               yes")
+                self._param("active torsion (1-idx)", str(one_based)))
             self.ostream.print_header(
-                f"active torsion (1-idx): {str(one_based):>14}")
+                self._param("phi reactant",
+                            f"{self._conformer_phi_reactant:.1f} deg"))
             self.ostream.print_header(
-                f"phi reactant:          {self._conformer_phi_reactant:>10.1f} deg")
+                self._param("phi product",
+                            f"{self._conformer_phi_product:.1f} deg"))
             self.ostream.print_header(
-                f"phi product:           {self._conformer_phi_product:>10.1f} deg")
-            self.ostream.print_header(
-                f"restraint k:           {self.conformer_k:>7.1f} kJ/mol")
+                self._param("restraint k", f"{self.conformer_k:.1f} kJ/mol"))
+
         self.ostream.print_blank()
         valstr = '{} | {} | {} | {} | {}'.format(
             'Lambda',
@@ -1458,17 +1482,21 @@ class TransitionStateGuesser():
         if self.mute_scf:
             self.ostream.print_info("Disable mute_scf to see detailed output.")
         self.ostream.print_blank()
-        self.ostream.print_header("Starting QM scan")
+        self.ostream.print_header("Starting QM Scan")
         self.ostream.print_blank()
-        self.ostream.print_header("QM parameters:")
-        self.ostream.print_header(f"Basis:       {self.qm_basis:>10}")
-        self.ostream.print_header(f"DFT xc fun:  {self.qm_xcfun:>10}")
-        self.ostream.print_header(f"Max conf.:   {self.max_qm_conformers:>10}")
+
+        self.ostream.print_header(self._param("basis set", self.qm_basis))
+        self.ostream.print_header(
+            self._param("DFT xc functional", self.qm_xcfun))
+        self.ostream.print_header(
+            self._param("max conformers", self.max_qm_conformers))
         if self.implicit_solvent_model is not None:
-            self.ostream.print_header(f"Solvation:          SMD")
-            self.ostream.print_header(f"SMD solvent: {self.smd_solvent:>10}")
+            self.ostream.print_header(self._param("solvation", "SMD"))
+            self.ostream.print_header(
+                self._param("SMD solvent", self.smd_solvent))
         else:
-            self.ostream.print_header(f"Solvation:       vacuum")
+            self.ostream.print_header(self._param("solvation", "vacuum"))
+
         self.ostream.print_blank()
         self.ostream.flush()
         valsltr = '{} | {} | {} | {}'.format(
@@ -1546,13 +1574,11 @@ class TransitionStateGuesser():
 
         assert best_phi_rea is not None
         assert best_phi_pro is not None
-        self.ostream.print_info(
-            f"Active torsion (1-indexed): "
-            f"{tuple(a + 1 for a in active_torsion)}, "
-            f"phi_reactant = {best_phi_rea:.1f}°, "
-            f"phi_product = {best_phi_pro:.1f}°, "
-            f"|Δφ| = {max_delta:.1f}°."
-        )
+        self.ostream.print_info(f"Active torsion (1-indexed): "
+                                f"{tuple(a + 1 for a in active_torsion)}, "
+                                f"phi_reactant = {best_phi_rea:.1f}°, "
+                                f"phi_product = {best_phi_pro:.1f}°, "
+                                f"|Δφ| = {max_delta:.1f}°.")
         self.ostream.flush()
         return active_torsion, best_phi_rea, best_phi_pro
 
