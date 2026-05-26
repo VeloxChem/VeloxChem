@@ -63,6 +63,7 @@ from rdkit import Chem
 from rdkit.Chem import Draw, AllChem
 
 
+
 log = logging.getLogger(__name__)
 
 
@@ -643,6 +644,19 @@ def _next_formula_iso_tag(output_folder: str, formula: str) -> str:
         return "iso0"
 
     return f"iso{max_idx + 1}"
+
+def _resolve_run_tag(
+    output_folder: str,
+    formula: str,
+    file_tag: str = "",
+    row_index: Optional[int] = None,
+    ) -> str:
+
+    if file_tag:
+        return str(file_tag)
+    if row_index is not None:
+        return f"row{int(row_index)}"
+    return _next_formula_iso_tag(output_folder, formula)
 
 def _mol_formula(mol_obj) -> str:
     """Hill-ordered molecular formula from a VeloxChem Molecule."""
@@ -1286,6 +1300,84 @@ def _mm_gibbs_correction(
     )
     return g_vib, g_trans_rot, g_full
 
+def _equiv_atom_groups(mol_obj) -> list[list[int]]:
+    """
+    Return 0-based equivalence groups from VeloxChem/GAFF atom typing.
+
+    Example output:
+        [[12, 17], [4, 6], [14, 19], ...]
+    """
+    #from veloxchem import atomtypeidentifier
+    try:
+        idtf = atomtypeidentifier()
+        idtf.ostream.mute()
+
+        # Generates the internal typing needed before identify_equivalences()
+        idtf.generate_gaff_atomtypes(mol_obj)
+        idtf.identify_equivalences()
+        
+        equiv = getattr(idtf, "equivalent_charges", "") or ""
+        if not equiv:
+            return []
+
+        groups: list[list[int]] = []
+        for chunk in str(equiv).split(","):
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+
+            parts = [x.strip() for x in chunk.split("=") if x.strip()]
+            if len(parts) < 2:
+                continue
+
+            try:
+                # VeloxChem uses 1-based atom numbering here -> convert to 0-based
+                group = sorted({int(x) - 1 for x in parts})
+            except ValueError:
+                continue
+
+            if len(group) > 1:
+                groups.append(group)
+
+        return groups
+
+    except Exception as exc:
+        log.warning("Equivalence detection failed; using all protic sites. Reason: %s", exc)
+        return []
+
+
+def _unique_sites_by_equivalence(site_indices: list[int], equiv_groups: list[list[int]]) -> list[int]:
+    """
+    Keep one representative per equivalence group, preserving ascending order.
+
+    Any site not present in an equivalence group is kept as-is.
+    """
+    sites = sorted(set(site_indices))
+    if not sites or not equiv_groups:
+        return sites
+
+    rep_map: dict[int, int] = {}
+
+    for group in equiv_groups:
+        members_in_sites = sorted(i for i in group if i in sites)
+        if not members_in_sites:
+            continue
+        rep = members_in_sites[0]
+        for idx in members_in_sites:
+            rep_map[idx] = rep
+
+    unique_sites: list[int] = []
+    seen_reps: set[int] = set()
+
+    for idx in sites:
+        rep = rep_map.get(idx, idx)
+        if rep in seen_reps:
+            continue
+        seen_reps.add(rep)
+        unique_sites.append(rep)
+
+    return unique_sites
+
 
 # ---------------------------------------------------------------------------
 # Main calculator class
@@ -1363,7 +1455,73 @@ class RedoxCalculator:
         self._solvation_registry: dict[str, dict[str, float]] = {}
 
         os.makedirs(self.output_folder, exist_ok=True)
+        
+    def _state_h5_path(self, mol_obj, label: str, file_tag: str = "") -> str:
+        """Return the exact HDF5 path for one state."""
+        charge = int(mol_obj.get_charge())
+        mult = _valid_multiplicity(mol_obj, charge)
+        formula = _mol_formula(mol_obj)
+        suffix = f"_{file_tag}" if file_tag else ""
+        file_name_base = f"{formula}_q{charge}_m{mult}_{label}{suffix}"
+        return os.path.join(self.output_folder, f"{file_name_base}.h5")
+    
+    def _get_or_compute_et_state(
+        self,
+        mol_obj,
+        label: str,
+        file_tag: str = "",
+    ) -> Optional[GibbsResult]:
+        """
+        Reuse an existing ET state (M / M+ / M-) if its HDF5 file exists.
+        Otherwise run conformer search and then compute it.
+        """
+        charge = int(mol_obj.get_charge())
+        mult = _valid_multiplicity(mol_obj, charge)
+        mol_obj.set_multiplicity(mult)
 
+        h5_path = self._state_h5_path(mol_obj, label, file_tag=file_tag)
+
+        if os.path.exists(h5_path):
+            try:
+                log.info("Reusing existing ET state from %s", h5_path)
+                return _load_gibbs_from_h5(h5_path)
+            except Exception as exc:
+                log.warning(
+                    "Could not load existing ET state %s (%s). Recomputing.",
+                    h5_path,
+                    exc,
+                )
+
+        seed = self._conformer_search(mol_obj)
+        return self.compute_gibbs(seed, label, file_tag=file_tag)
+
+    def _get_or_compute_state(self, mol_obj, label: str, file_tag: str = "") -> Optional[GibbsResult]:
+        """
+        Reuse a saved GibbsResult if it exists, otherwise compute it.
+
+        This is the state-level restart logic that lets the calculator resume
+        incomplete runs instead of recomputing every state.
+        """
+        charge = int(mol_obj.get_charge())
+        mult = _valid_multiplicity(mol_obj, charge)
+        mol_obj.set_multiplicity(mult)
+
+        h5_path = self._state_h5_path(mol_obj, label, file_tag=file_tag)
+
+        if os.path.exists(h5_path):
+            try:
+                log.info("Reusing existing state from %s", h5_path)
+                return _load_gibbs_from_h5(h5_path)
+            except Exception as exc:
+                log.warning(
+                    "Could not load existing state %s (%s). Recomputing.",
+                    h5_path,
+                    exc,
+                )
+
+        return self.compute_gibbs(mol_obj, label, file_tag=file_tag)
+
+    
     # ------------------------------------------------------------------
     # Named solvation interface
     # ------------------------------------------------------------------
@@ -1490,10 +1648,12 @@ class RedoxCalculator:
         n = len(dihedrals_combinations)
         
         if n < 10000:
+            conf = vlx.ConformerGenerator()
             conf.partial_charges = input_data.get_partial_charges(input_data.get_charge())
             conf.top_file_name = f"conf_{uuid.uuid4().hex[:8]}"
             conformers_dict = conf.generate(input_data)
             molecules = conformers_dict.get("molecules", [])
+            print('Fuck you')
         else:
             print("Too many conformer combinations; using OpenMM conformational sampling.")
             ff_gen = vlx.MMForceFieldGenerator()
@@ -1696,27 +1856,44 @@ class RedoxCalculator:
 
     def find_protic_sites(self, mol_obj) -> tuple[list[int], list[int]]:
         """
-        Identify acidic H atoms and basic heavy atoms (O, N, S, P).
-
-        Returns
-        -------
-        acidic_H : list[int]
-            Indices of H atoms bonded to a heteroatom within the bond cutoff.
-        basic_atoms : list[int]
-            Indices of heteroatoms that could be protonated.
+        Identify acidic H atoms and basic heavy atoms (O, N, S, P),
+        then prune symmetry-equivalent sites so only one representative
+        per equivalent set is scanned.
         """
         labels = mol_obj.get_labels()
         coords = mol_obj.get_coordinates_in_angstrom()
-        acidic_H, basic_atoms = [], []
+
+        acidic_H: list[int] = []
+        basic_atoms: list[int] = []
+
         for i, si in enumerate(labels):
             if si in BOND_CUTOFF:
                 basic_atoms.append(i)
                 cutoff = BOND_CUTOFF[si]
+
                 for j, sj in enumerate(labels):
                     if sj == "H":
                         if float(np.linalg.norm(coords[i] - coords[j])) < cutoff:
                             acidic_H.append(j)
-        return list(set(acidic_H)), list(set(basic_atoms))
+
+        acidic_H = sorted(set(acidic_H))
+        basic_atoms = sorted(set(basic_atoms))
+
+        equiv_groups = _equiv_atom_groups(mol_obj)
+
+        if equiv_groups:
+            old_n_h = len(acidic_H)
+            old_n_b = len(basic_atoms)
+
+            acidic_H = _unique_sites_by_equivalence(acidic_H, equiv_groups)
+            basic_atoms = _unique_sites_by_equivalence(basic_atoms, equiv_groups)
+
+            log.info(
+                "Equivalent-site pruning: acidic H %d -> %d, basic atoms %d -> %d",
+                old_n_h, len(acidic_H), old_n_b, len(basic_atoms),
+            )
+
+        return acidic_H, basic_atoms
 
     def protonate(self, mol_obj, atom_idx: int, new_charge: int):
         """
@@ -2131,69 +2308,67 @@ class RedoxCalculator:
     # Full thermodynamic profile
     # ------------------------------------------------------------------
 
-    def run(self, input_data) -> RedoxProfile:
+    def run(
+        self,
+        input_data,
+        file_tag: str = "",
+        row_index: Optional[int] = None,
+    ) -> RedoxProfile:
         """
         Compute the complete redox / pKa profile for a molecule.
 
-        Parameters
-        ----------
-        input_data : str or VeloxChem Molecule
-            A SMILES string or a pre-built VeloxChem Molecule.
-
-        Returns
-        -------
-        RedoxProfile
-            Dataclass with all GibbsResult objects (``profile.M``,
-            ``profile.M_ox``, ``profile.MH_plus``, ...) and derived
-            scalar quantities (``profile.E_red``, ``profile.pKa_M``, ...).
+        This version:
+        - uses a stable run tag (important for cluster reruns)
+        - reuses existing M / M+ / M- states if already present
+        - only computes missing ET states
+        - does the same for protonation/deprotonation site states
         """
         if isinstance(input_data, str):
-            mol_obj   = _mol_from_smiles(input_data)
+            mol_obj = _mol_from_smiles(input_data)
             mol_label = input_data
         else:
-            mol_obj   = input_data
+            mol_obj = input_data
             mol_label = (
                 f"{_mol_formula(mol_obj)} "
                 f"(q={mol_obj.get_charge()}, m={mol_obj.get_multiplicity()})"
             )
 
         init_charge = int(mol_obj.get_charge())
-        init_xyz    = _xyz_block(mol_obj)
-        profile     = RedoxProfile()
+        init_xyz = _xyz_block(mol_obj)
+        profile = RedoxProfile()
 
         run_formula = _mol_formula(mol_obj)
-        run_tag = _next_formula_iso_tag(self.output_folder, run_formula)
+        run_tag = _resolve_run_tag(
+            self.output_folder,
+            run_formula,
+            file_tag=file_tag,
+            row_index=row_index,
+        )
         log.info("Using file tag %s for formula %s", run_tag, run_formula)
 
         # ---- neutral, oxidised, reduced --------------------------------
         for attr, lbl, dq in [
-            ("M",     "M",  0),
-            ("M_ox",  "M+", 1),
-            ("M_red", "M-", -1),
+            ("M",    "M",  0),
+            ("M_ox", "M+", 1),
+            ("M_red","M-", -1),
         ]:
             m_tmp = vlx.Molecule.read_xyz_string(init_xyz)
             m_tmp.set_charge(init_charge + dq)
             m_tmp.set_multiplicity(_valid_multiplicity(m_tmp, init_charge + dq))
 
-            m_seed = self._conformer_search(m_tmp)
-            setattr(
-                profile, attr,
-                self.compute_gibbs(m_seed, lbl, file_tag=run_tag)
-            )
+            res = self._get_or_compute_et_state(m_tmp, lbl, file_tag=run_tag)
+            setattr(profile, attr, res)
 
         acidic_H, basic_atoms = self.find_protic_sites(mol_obj)
 
         # ---- protonation scan (basic sites) ----------------------------
         if basic_atoms:
-            log.info(
-                "Scanning %d basic site(s) for protonation.", len(basic_atoms)
-            )
+            log.info("Scanning %d basic site(s) for protonation.", len(basic_atoms))
             best_plus = best_rad = None
             min_gp = min_gr = float("inf")
 
             for idx in basic_atoms:
-                # MH+: protonated, charge +1
-                res_p = self.compute_gibbs(
+                res_p = self._get_or_compute_state(
                     self.protonate(mol_obj, idx, init_charge + 1),
                     f"MH+_site{idx}",
                     file_tag=run_tag,
@@ -2201,7 +2376,7 @@ class RedoxCalculator:
                 if res_p and res_p.g_total < min_gp:
                     min_gp, best_plus = res_p.g_total, res_p
 
-                res_r = self.compute_gibbs(
+                res_r = self._get_or_compute_state(
                     self.protonate(mol_obj, idx, init_charge),
                     f"MH_rad_site{idx}",
                     file_tag=run_tag,
@@ -2216,15 +2391,12 @@ class RedoxCalculator:
 
         # ---- deprotonation scan (acidic sites) -------------------------
         if acidic_H:
-            log.info(
-                "Scanning %d acidic site(s) for deprotonation.", len(acidic_H)
-            )
+            log.info("Scanning %d acidic site(s) for deprotonation.", len(acidic_H))
             best_dep = best_dep_rad = None
             min_gd = min_gdr = float("inf")
 
             for h_idx in acidic_H:
-                # M_dep-: deprotonated anion, charge -1
-                res_d = self.compute_gibbs(
+                res_d = self._get_or_compute_state(
                     self.deprotonate(mol_obj, h_idx, init_charge - 1),
                     f"M_deprot_site{h_idx}",
                     file_tag=run_tag,
@@ -2232,7 +2404,7 @@ class RedoxCalculator:
                 if res_d and res_d.g_total < min_gd:
                     min_gd, best_dep = res_d.g_total, res_d
 
-                res_dr = self.compute_gibbs(
+                res_dr = self._get_or_compute_state(
                     self.deprotonate(mol_obj, h_idx, init_charge),
                     f"M_deprot_rad_site{h_idx}",
                     file_tag=run_tag,
@@ -2246,18 +2418,93 @@ class RedoxCalculator:
                 profile.M_deprot_rad = best_dep_rad
 
         # ---- thermal correction normalisation --------------------------
-        # If one state in a pair has a MM thermal correction and the other
-        # doesn't (mm_corr_available=False), the computed potential or pKa
-        # would use asymmetric energies.  To ensure fair comparison, we
-        # subtract g_corr from any state whose partner lacks it, effectively
-        # putting both on the pure E_SP(solvent) level.
-        # The original GibbsResult objects are not modified -- we build a
-        # normalised g_total lookup used only for the thermochemistry below.
+        def _normalise_pair(
+            res_a: Optional[GibbsResult],
+            res_b: Optional[GibbsResult],
+        ) -> tuple:
+            if res_a is None or res_b is None:
+                return None, None
+            g_a = res_a.g_total
+            g_b = res_b.g_total
+            stripped = []
+            if res_a.mm_corr_available and not res_b.mm_corr_available:
+                g_a -= res_a.g_corr
+                stripped.append(res_a.label)
+            elif res_b.mm_corr_available and not res_a.mm_corr_available:
+                g_b -= res_b.g_corr
+                stripped.append(res_b.label)
+            if stripped:
+                log.warning(
+                    "Thermal normalisation: stripped g_corr from %s so that "
+                    "both states are at the E_SP(solvent) level for a "
+                    "consistent comparison. This pair is flagged SP-ONLY.",
+                    ", ".join(stripped),
+                )
+            return g_a, g_b
 
-        def _g(res: Optional[GibbsResult]) -> Optional[float]:
-            """Raw g_total for a result, or None."""
-            return res.g_total if res is not None else None
+        # ---- reduction potentials --------------------------------------
+        if profile.M:
+            if profile.M_ox:
+                g_ox, g_M = _normalise_pair(profile.M_ox, profile.M)
+                if g_ox is not None:
+                    profile.E_ox = self.reduction_potential(
+                        g_ox=g_ox,
+                        g_red=g_M,
+                    )
 
+            if profile.M_red:
+                g_M, g_red = _normalise_pair(profile.M, profile.M_red)
+                if g_M is not None:
+                    profile.E_red = self.reduction_potential(
+                        g_ox=g_M,
+                        g_red=g_red,
+                    )
+
+            if profile.MH_rad:
+                g_M, g_mhr = _normalise_pair(profile.M, profile.MH_rad)
+                if g_M is not None:
+                    profile.E_pcet_red = self.reduction_potential(
+                        g_ox=g_M,
+                        g_red=g_mhr,
+                        n=1,
+                        m=1,
+                    )
+
+            if profile.M_deprot_rad:
+                g_mdr, g_M = _normalise_pair(profile.M_deprot_rad, profile.M)
+                if g_mdr is not None:
+                    profile.E_pcet_ox = self.reduction_potential(
+                        g_ox=g_mdr,
+                        g_red=g_M,
+                        n=1,
+                        m=1,
+                    )
+
+        # ---- pKa values ------------------------------------------------
+        if profile.MH_plus and profile.M:
+            g_mhp, g_M = _normalise_pair(profile.MH_plus, profile.M)
+            if g_mhp is not None:
+                profile.pKa_MH_plus = self.pka(g_acid=g_mhp, g_base=g_M)
+
+        if profile.MH_rad and profile.M_red:
+            g_mhr, g_red = _normalise_pair(profile.MH_rad, profile.M_red)
+            if g_mhr is not None:
+                profile.pKa_MH_rad = self.pka(g_acid=g_mhr, g_base=g_red)
+
+        if profile.M and profile.M_deprot:
+            g_M, g_dep = _normalise_pair(profile.M, profile.M_deprot)
+            if g_M is not None:
+                profile.pKa_M = self.pka(g_acid=g_M, g_base=g_dep)
+
+        if profile.M_ox and profile.M_deprot_rad:
+            g_ox, g_mdr = _normalise_pair(profile.M_ox, profile.M_deprot_rad)
+            if g_ox is not None:
+                profile.pKa_M_plus = self.pka(g_acid=g_ox, g_base=g_mdr)
+
+        self._print_summary(profile, label=mol_label)
+        return profile
+
+        # ---- thermal correction normalisation --------------------------
         def _normalise_pair(
             res_a: Optional[GibbsResult],
             res_b: Optional[GibbsResult],
@@ -2266,7 +2513,7 @@ class RedoxCalculator:
             Return (g_a, g_b) normalised to the same thermal level.
 
             If one has a thermal correction and the other doesn't, strip the
-            correction from the one that has it.  Returns (None, None) if
+            correction from the one that has it. Returns (None, None) if
             either result is missing.
             """
             if res_a is None or res_b is None:
@@ -2284,7 +2531,7 @@ class RedoxCalculator:
                 log.warning(
                     "Thermal normalisation: stripped g_corr from %s so that "
                     "both states are at the E_SP(solvent) level for a "
-                    "consistent comparison.  This pair is flagged SP-ONLY.",
+                    "consistent comparison. This pair is flagged SP-ONLY.",
                     ", ".join(stripped),
                 )
             return g_a, g_b
@@ -2310,9 +2557,7 @@ class RedoxCalculator:
                         g_ox=g_M, g_red=g_mhr, n=1, m=1
                     )
             if profile.M_deprot_rad:
-                g_mdr, g_M = _normalise_pair(
-                    profile.M_deprot_rad, profile.M
-                )
+                g_mdr, g_M = _normalise_pair(profile.M_deprot_rad, profile.M)
                 if g_mdr is not None:
                     profile.E_pcet_ox = self.reduction_potential(
                         g_ox=g_mdr, g_red=g_M, n=1, m=1
@@ -2335,9 +2580,7 @@ class RedoxCalculator:
                 profile.pKa_M = self.pka(g_acid=g_M, g_base=g_dep)
 
         if profile.M_ox and profile.M_deprot_rad:
-            g_ox, g_mdr = _normalise_pair(
-                profile.M_ox, profile.M_deprot_rad
-            )
+            g_ox, g_mdr = _normalise_pair(profile.M_ox, profile.M_deprot_rad)
             if g_ox is not None:
                 profile.pKa_M_plus = self.pka(g_acid=g_ox, g_base=g_mdr)
 
@@ -2433,76 +2676,6 @@ class RedoxCalculator:
         print(sep + "\n")
 
 
-'''Redox calc only (no pKa) convenience subclass.'''
-
-class ETCalculator(RedoxCalculator):
-    """
-    Electron-transfer-only calculator.
-    Computes only M, M+, and M- and derives E_ox / E_red.
-    Skips all protonation/deprotonation scans.
-    """
-
-    def run(self, input_data) -> RedoxProfile:   # type: ignore[override]
-        if isinstance(input_data, str):
-            mol_obj = _mol_from_smiles(input_data)
-            mol_label = input_data
-        else:
-            mol_obj = input_data
-            mol_label = (
-                f"{_mol_formula(mol_obj)} "
-                f"(q={mol_obj.get_charge()}, m={mol_obj.get_multiplicity()})"
-            )
-
-        init_charge = int(mol_obj.get_charge())
-        init_xyz = _xyz_block(mol_obj)
-        profile = RedoxProfile()
-
-        run_formula = _mol_formula(mol_obj)
-        run_tag = _next_formula_iso_tag(self.output_folder, run_formula)
-        log.info("Using file tag %s for formula %s", run_tag, run_formula)
-
-        for attr, lbl, dq in [
-            ("M", "M", 0),
-            ("M_ox", "M+", 1),
-            ("M_red", "M-", -1),
-        ]:
-            m_tmp = vlx.Molecule.read_xyz_string(init_xyz)
-            m_tmp.set_charge(init_charge + dq)
-            m_tmp.set_multiplicity(_valid_multiplicity(m_tmp, init_charge + dq))
-
-            # Conformer search for M / M+ / M-
-            m_seed = self._conformer_search(m_tmp)
-
-            setattr(profile, attr, self.compute_gibbs(m_seed, lbl, file_tag=run_tag))
-
-        def _normalise_pair(
-            res_a: Optional[GibbsResult],
-            res_b: Optional[GibbsResult],
-        ) -> tuple:
-            if res_a is None or res_b is None:
-                return None, None
-            g_a = res_a.g_total
-            g_b = res_b.g_total
-            if res_a.mm_corr_available and not res_b.mm_corr_available:
-                g_a -= res_a.g_corr
-            elif res_b.mm_corr_available and not res_a.mm_corr_available:
-                g_b -= res_b.g_corr
-            return g_a, g_b
-
-        if profile.M and profile.M_ox:
-            g_ox, g_M = _normalise_pair(profile.M_ox, profile.M)
-            if g_ox is not None:
-                profile.E_ox = self.reduction_potential(g_ox=g_ox, g_red=g_M)
-
-        if profile.M and profile.M_red:
-            g_M, g_red = _normalise_pair(profile.M, profile.M_red)
-            if g_M is not None:
-                profile.E_red = self.reduction_potential(g_ox=g_M, g_red=g_red)
-
-        self._print_summary(profile, label=mol_label)
-        return profile
-
-
 # ---------------------------------------------------------------------------
 # pKa-only convenience subclass
 # ---------------------------------------------------------------------------
@@ -2540,14 +2713,14 @@ class pKaCalculator(RedoxCalculator):
         run_tag = _next_formula_iso_tag(self.output_folder, run_formula)
         log.info("Using file tag %s for formula %s", run_tag, run_formula)
 
-        profile.M = self.compute_gibbs(mol_obj, "M", file_tag=run_tag)
+        profile.M = self._get_or_compute_state(mol_obj, "M", file_tag=run_tag)
 
         acidic_H, basic_atoms = self.find_protic_sites(mol_obj)
 
         if basic_atoms and profile.M:
             best_plus, min_g = None, float("inf")
             for idx in basic_atoms:
-                res = self.compute_gibbs(
+                res = self._get_or_compute_state(
                     self.protonate(mol_obj, idx, init_charge + 1),
                     f"MH+_site{idx}",
                     file_tag=run_tag,
@@ -2564,7 +2737,7 @@ class pKaCalculator(RedoxCalculator):
         if acidic_H and profile.M:
             best_dep, min_g = None, float("inf")
             for h_idx in acidic_H:
-                res = self.compute_gibbs(
+                res = self._get_or_compute_state(
                     self.deprotonate(mol_obj, h_idx, init_charge - 1),
                     f"M_deprot_site{h_idx}",
                     file_tag=run_tag,
