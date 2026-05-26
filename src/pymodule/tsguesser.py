@@ -50,7 +50,7 @@ from .molecule import Molecule
 from .scfrestdriver import ScfRestrictedDriver
 from .molecularbasis import MolecularBasis
 from .reaffbuilder import ReactionForceFieldBuilder
-from .evbsystembuilder import EvbSystemBuilder
+from .reactionsystembuilder import ReactionSystemBuilder
 
 try:
     import openmm as mm
@@ -257,7 +257,7 @@ class TransitionStateGuesser():
         return self.results
 
     def build_systems(self, constraints=None):
-        sysbuilder = EvbSystemBuilder()
+        sysbuilder = ReactionSystemBuilder()
         if self.mute_ff_build:
             sysbuilder.ostream.mute()
             self.ostream.print_info(

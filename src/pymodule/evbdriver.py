@@ -43,7 +43,7 @@ from .veloxchemlib import mpi_master
 from .molecule import Molecule
 from .outputstream import OutputStream
 from .mmforcefieldgenerator import MMForceFieldGenerator
-from .evbsystembuilder import EvbSystemBuilder
+from .reactionsystembuilder import ReactionSystemBuilder
 from .evbfepdriver import EvbFepDriver
 from .reaffbuilder import ReactionForceFieldBuilder
 from .evbdataprocessing import EvbDataProcessing
@@ -246,7 +246,7 @@ class EvbDriver():
                 )
                 conf.pop("pressure")
             # build the system
-            system_builder = EvbSystemBuilder(ostream=self.ostream)
+            system_builder = ReactionSystemBuilder(ostream=self.ostream)
             system_builder.water_model = self.water_model
             self.ostream.print_blank()
             self.ostream.print_header(f"Building systems for {conf['name']}")
@@ -703,7 +703,8 @@ class EvbDriver():
                         group.create_dataset(
                             k,
                             data=np.array(list(v) if isinstance(v, set) else v))
-                    elif isinstance(v, (bool, int, float, str, bytes, np.generic)):
+                    elif isinstance(v,
+                                    (bool, int, float, str, bytes, np.generic)):
                         # np.generic covers numpy scalars (np.float64, np.int32, etc.)
                         group[k] = v
                     elif hasattr(v, '__dict__'):
@@ -902,7 +903,8 @@ class EvbDriver():
             }
         else:
             try:
-                solvent_prop_not_used = SolvationBuilder()._solvent_properties(name)
+                solvent_prop_not_used = SolvationBuilder()._solvent_properties(
+                    name)
                 conf = {
                     "name": name,
                     "solvent": name,

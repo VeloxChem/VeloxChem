@@ -59,7 +59,7 @@ except ImportError:
     pass
 
 
-class EvbSystemBuilder():
+class ReactionSystemBuilder():
 
     def __init__(self, comm=None, ostream=None):
         '''
@@ -2355,9 +2355,8 @@ class EvbSystemBuilder():
             if i != base_particle:
                 exclusions.add(i)
             if current_level > 0:
-                EvbSystemBuilder._add_exclusions_to_set(bonded12, exclusions,
-                                                        base_particle, i,
-                                                        current_level - 1)
+                ReactionSystemBuilder._add_exclusions_to_set(
+                    bonded12, exclusions, base_particle, i, current_level - 1)
 
     def _create_constraint_forces(self, lam):
 
