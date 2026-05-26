@@ -121,6 +121,12 @@ class TransitionStateGuesser():
         # is used, which is periodic and harmonic-like near the minimum.
         self.conformer_k: float = 200.0
 
+        # Optional explicit active torsion (1-indexed atom indices) for the
+        # conformational TS scan.  When set, auto-detection via
+        # _detect_active_dihedral is skipped and this dihedral is used instead.
+        # Must be a 4-element sequence [i, j, k, l] with 1-based atom indices.
+        self.active_torsion: tuple | None = None
+
         # Set by build_systems when a conformational TS is detected; used for
         # descriptive output during the scan.
         self._conformer_active_torsion: tuple | None = None
@@ -280,7 +286,31 @@ class TransitionStateGuesser():
                 "using a shifting dihedral restraint in the integration systems."
             )
             self.ostream.flush()
-            active_torsion, phi_reactant, phi_product = self._detect_active_dihedral()
+            if self.active_torsion is not None:
+                # Convert user-supplied 1-indexed tuple to 0-indexed
+                torsion_0idx = tuple(a - 1 for a in self.active_torsion)
+                one_based = list(self.active_torsion)
+                phi_reactant = self.reactant.molecule.get_dihedral_in_degrees(
+                    one_based)
+                phi_product = self.product.molecule.get_dihedral_in_degrees(
+                    one_based)
+                # Wrap product angle to shortest path from reactant
+                delta = phi_product - phi_reactant
+                if delta > 180.0:
+                    delta -= 360.0
+                elif delta <= -180.0:
+                    delta += 360.0
+                self.ostream.print_info(
+                    f"Using explicitly set active torsion (1-indexed): "
+                    f"{tuple(self.active_torsion)}, "
+                    f"phi_reactant = {phi_reactant:.1f}°, "
+                    f"phi_product = {phi_product:.1f}°, "
+                    f"|Δφ| = {abs(delta):.1f}°."
+                )
+                self.ostream.flush()
+                active_torsion = torsion_0idx
+            else:
+                active_torsion, phi_reactant, phi_product = self._detect_active_dihedral()
             self._conformer_active_torsion = active_torsion
             self._conformer_phi_reactant = float(phi_reactant)
             self._conformer_phi_product = float(phi_product)
@@ -1459,15 +1489,19 @@ class TransitionStateGuesser():
         self.ostream.flush()
 
     def _detect_active_dihedral(self):
-        """Identify the rotatable dihedral that differs most between reactant and product.
+        """Identify the dihedral that differs most between reactant and product.
 
         Called when no bonds are forming or breaking (conformational TS).
+        Iterates over every dihedral in the reactant force field, one
+        representative per unique central bond, and picks the one with the
+        largest absolute angle difference between the two geometries.
+
         Returns a tuple (active_torsion, phi_reactant, phi_product) where
         active_torsion is a 0-indexed (i, j, k, l) tuple and the angles are
         in degrees.
 
         Raises:
-            ValueError: if no rotatable dihedral with |Δφ| > 20° is found.
+            ValueError: if no dihedral with |Δφ| > 20° is found.
         """
         threshold = 20.0  # degrees
 
@@ -1476,22 +1510,16 @@ class TransitionStateGuesser():
         best_phi_rea = None
         best_phi_pro = None
 
-        for bond in self.reactant.rotatable_bonds:
-            # rotatable_bonds are 1-indexed; convert to 0-indexed for FF lookup
-            j0, k0 = bond[0] - 1, bond[1] - 1
-            central = tuple(sorted([j0, k0]))
-
-            # Pick the first dihedral entry whose central bond matches
-            representative = None
-            for key in self.reactant.dihedrals:
-                if tuple(sorted([key[1], key[2]])) == central:
-                    representative = key
-                    break
-            if representative is None:
+        # Deduplicate by central bond so each bond is measured exactly once.
+        seen_central = set()
+        for key in self.reactant.dihedrals:
+            central = tuple(sorted([key[1], key[2]]))
+            if central in seen_central:
                 continue
+            seen_central.add(central)
 
             # get_dihedral_in_degrees expects 1-based indices
-            one_based = [idx + 1 for idx in representative]
+            one_based = [idx + 1 for idx in key]
             phi_rea = self.reactant.molecule.get_dihedral_in_degrees(one_based)
             phi_pro = self.product.molecule.get_dihedral_in_degrees(one_based)
 
@@ -1504,13 +1532,13 @@ class TransitionStateGuesser():
 
             if abs(delta) > max_delta:
                 max_delta = abs(delta)
-                active_torsion = representative
+                active_torsion = key
                 best_phi_rea = phi_rea
                 best_phi_pro = phi_pro
 
         if active_torsion is None or max_delta < threshold:
             raise ValueError(
-                f"No rotatable dihedral with |Δφ| > {threshold:.0f}° found "
+                f"No dihedral with |Δφ| > {threshold:.0f}° found "
                 f"between reactant and product geometries "
                 f"(largest difference: {max_delta:.1f}°). "
                 "Verify that the two input geometries differ by a dihedral rotation."
