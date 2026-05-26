@@ -398,6 +398,17 @@ class TransitionStateGuesser():
                         peak_index = int(np.argmax(V))
                         peak_lambda = self.lambda_vector[peak_index]
 
+                        # Stop as soon as the peak itself has already been
+                        # conformer-searched. Checking neighbours is not
+                        # sufficient: the peak can fall in a gap between two
+                        # disjoint search windows whose edges are both marked.
+                        if (peak_index in searched_conformers_indices
+                                and (max(0, peak_index - 1)
+                                     in searched_conformers_indices) and
+                            (min(peak_index + 1, len(self.lambda_vector))
+                             in searched_conformers_indices)):
+                            break
+
                         min_index = max(
                             0,
                             peak_index - self.peak_conformer_search_range,
@@ -407,38 +418,34 @@ class TransitionStateGuesser():
                             peak_index + self.peak_conformer_search_range,
                         )
 
-                        # Stop once both immediate neighbours of the peak have
-                        # been conformer-searched (peak is "sandwiched").
-                        # Termination is guaranteed: each iteration adds ≥1 new
-                        # index and the lambda vector is finite.
-                        left = peak_index - 1
-                        right = peak_index + 1
-                        left_ok = (left < 0
-                                   or left in searched_conformers_indices)
-                        right_ok = (right >= len(self.lambda_vector)
-                                    or right in searched_conformers_indices)
-                        if left_ok and right_ok:
+                        # Only scan indices not yet covered by a prior
+                        # iteration to avoid redundant MD runs.
+                        new_indices = [
+                            i for i in range(min_index, max_index + 1)
+                            if i not in searched_conformers_indices
+                        ]
+                        if not new_indices:
+                            # Entire window already searched but peak not
+                            # recorded — guard against infinite loop.
                             break
+
+                        new_lambdas = [
+                            self.lambda_vector[i] for i in new_indices
+                        ]
 
                         self.ostream.print_info(
                             f"Found peak MM E: {V[peak_index]:.3f} at Lambda: {peak_lambda}"
                             f" (iteration {peak_iteration}).")
                         self.ostream.print_info(
-                            f"Doing conformer search from Lambda: {self.lambda_vector[min_index]} to Lambda: {self.lambda_vector[max_index]}."
+                            f"Doing conformer search from Lambda: {new_lambdas[0]} to Lambda: {new_lambdas[-1]}."
                         )
                         self.ostream.flush()
 
-                        searched_conformers_indices.extend(
-                            range(min_index, max_index + 1))
-                        searched_conformers_indices = sorted(
-                            list(set(searched_conformers_indices)))
-                        forward_init_pos = scan_dict[
-                            self.lambda_vector[min_index]][0]['pos']
-                        backward_init_pos = scan_dict[
-                            self.lambda_vector[max_index]][0]['pos']
+                        forward_init_pos = scan_dict[new_lambdas[0]][0]['pos']
+                        backward_init_pos = scan_dict[new_lambdas[-1]][0]['pos']
 
                         scan_dict_peak_conf = self._run_mm_scan(
-                            self.lambda_vector[min_index:max_index + 1],
+                            new_lambdas,
                             rea_sim,
                             pro_sim,
                             conformer_search=True,
@@ -448,6 +455,10 @@ class TransitionStateGuesser():
                         )
                         for l in scan_dict_peak_conf.keys():
                             scan_dict[l] += scan_dict_peak_conf[l]
+
+                        searched_conformers_indices.extend(new_indices)
+                        searched_conformers_indices = sorted(
+                            list(set(searched_conformers_indices)))
 
                         # Re-evaluate so the next iteration and the
                         # discontinuity check both see up-to-date energies.
@@ -1114,6 +1125,23 @@ class TransitionStateGuesser():
                     print_str = "  {:>9} {:>19}  ".format(conf_str, mm_e)
                 print(print_str)
 
+        # Collect all conformer MM energies for the stripe markers.
+        conf_x_mm, conf_y_mm = [], []
+        for lv in lambda_vec:
+            for conf in scan[lv]:
+                conf_x_mm.append(lv)
+                conf_y_mm.append(conf['v'] - mm_min)
+
+        # Collect all conformer QM energies for the stripe markers.
+        conf_x_qm, conf_y_qm = [], []
+        if rel_qm_energies is not None:
+            for lv in lambda_vec:
+                for conf in scan[lv]:
+                    qm_e = conf.get('qm_energy', None)
+                    if qm_e is not None and not math.isnan(qm_e):
+                        conf_x_qm.append(lv)
+                        conf_y_qm.append(qm_e - qm_min)
+
         ax1.plot(
             x,
             y,
@@ -1125,6 +1153,16 @@ class TransitionStateGuesser():
             label='MM energy',
         )
         ax1.scatter(
+            conf_x_mm,
+            conf_y_mm,
+            marker='_',
+            color='darkcyan',
+            alpha=0.4,
+            s=80 / math.log(total_steps, 10),
+            linewidths=1.0,
+            zorder=0.5,
+        )
+        ax1.scatter(
             lambda_vec,
             rel_mm_energies,
             color='black',
@@ -1134,9 +1172,10 @@ class TransitionStateGuesser():
             edgecolor="darkcyan",
             zorder=1,
         )
+        selected_mm_e = scan[step][conformer_id - 1]['v'] - mm_min
         ax1.scatter(
             lambda_vec[lam_index],
-            rel_mm_energies[lam_index],
+            selected_mm_e,
             marker='o',
             color='darkcyan',
             alpha=1.0,
@@ -1158,6 +1197,16 @@ class TransitionStateGuesser():
                 label='QM energy',
             )
             ax1.scatter(
+                conf_x_qm,
+                conf_y_qm,
+                marker='_',
+                color='darkorange',
+                alpha=0.4,
+                s=80 / math.log(total_steps, 10),
+                linewidths=1.0,
+                zorder=0.5,
+            )
+            ax1.scatter(
                 lambda_vec,
                 rel_qm_energies,
                 alpha=0.7,
@@ -1166,9 +1215,16 @@ class TransitionStateGuesser():
                 edgecolor="darkorange",
                 zorder=1,
             )
+            selected_qm_e_raw = scan[step][conformer_id - 1].get(
+                'qm_energy', None)
+            if selected_qm_e_raw is not None and not math.isnan(
+                    selected_qm_e_raw):
+                selected_qm_e = selected_qm_e_raw - qm_min
+            else:
+                selected_qm_e = rel_qm_energies[lam_index]
             ax1.scatter(
                 lambda_vec[lam_index],
-                rel_qm_energies[lam_index],
+                selected_qm_e,
                 marker='o',
                 color='darkorange',
                 alpha=1.0,
@@ -1465,8 +1521,6 @@ class TransitionStateGuesser():
             self.ostream.print_header(
                 self._param("solute dielectric",
                             f"{self.solute_dielectric:.2f}"))
-        else:
-            self.ostream.print_header(self._param("implicit solvent", "vacuum"))
 
         if self._conformer_active_torsion is not None:
             one_based = tuple(a + 1 for a in self._conformer_active_torsion)
