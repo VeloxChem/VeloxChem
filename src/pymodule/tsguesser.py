@@ -115,6 +115,18 @@ class TransitionStateGuesser():
         self.mm_conformer_equivalence_threshold = 1e-1  # kJ/mol
         self.mm_scan_backward = False
 
+        # Force constant (kJ/mol) for the periodic dihedral restraint used in
+        # the integration systems when a conformational TS is detected (no
+        # forming or breaking bonds).  The expression k*(1-cos(theta-theta0))
+        # is used, which is periodic and harmonic-like near the minimum.
+        self.conformer_k: float = 200.0
+
+        # Set by build_systems when a conformational TS is detected; used for
+        # descriptive output during the scan.
+        self._conformer_active_torsion: tuple | None = None
+        self._conformer_phi_reactant: float | None = None
+        self._conformer_phi_product: float | None = None
+
         # Implicit solvation during conformational sampling.
         # Set implicit_solvent_model to one of 'gbn', 'gbn2', 'obc1', 'obc2',
         # 'hct' to enable GB solvation; None runs in vacuum (default).
@@ -257,6 +269,29 @@ class TransitionStateGuesser():
                 'implicit_solvent_model'] = self.implicit_solvent_model
             configuration['solute_dielectric'] = self.solute_dielectric
             configuration['solvent_dielectric'] = self.solvent_dielectric
+
+        # Conformational TS: no bonds forming or breaking — replace the
+        # active dihedral in the integration systems with a periodic restraint
+        # whose minimum shifts from phi_reactant (λ=0) to phi_product (λ=1).
+        if len(self.forming_bonds) == 0 and len(self.breaking_bonds) == 0:
+            self.ostream.print_info(
+                "No forming or breaking bonds detected. "
+                "Treating as a conformational transition state: "
+                "using a shifting dihedral restraint in the integration systems."
+            )
+            self.ostream.flush()
+            active_torsion, phi_reactant, phi_product = self._detect_active_dihedral()
+            self._conformer_active_torsion = active_torsion
+            self._conformer_phi_reactant = float(phi_reactant)
+            self._conformer_phi_product = float(phi_product)
+            configuration['conformer_active_torsion'] = active_torsion
+            configuration['conformer_phi_reactant'] = float(phi_reactant)
+            configuration['conformer_phi_product'] = float(phi_product)
+            configuration['conformer_k'] = float(self.conformer_k)
+            self.ostream.print_info(
+                f"Conformer restraint force constant: {self.conformer_k:.1f} kJ/mol."
+            )
+            self.ostream.flush()
 
         self.systems, self.topology, _ = sysbuilder.build_systems(
             self.reactant,
@@ -1358,6 +1393,18 @@ class TransitionStateGuesser():
                 f"solute dielectric:     {self.solute_dielectric:>10.2f}")
         else:
             self.ostream.print_header(f"implicit solvent:           vacuum")
+        if self._conformer_active_torsion is not None:
+            one_based = tuple(a + 1 for a in self._conformer_active_torsion)
+            self.ostream.print_header(
+                f"conformational TS:               yes")
+            self.ostream.print_header(
+                f"active torsion (1-idx): {str(one_based):>14}")
+            self.ostream.print_header(
+                f"phi reactant:          {self._conformer_phi_reactant:>10.1f} deg")
+            self.ostream.print_header(
+                f"phi product:           {self._conformer_phi_product:>10.1f} deg")
+            self.ostream.print_header(
+                f"restraint k:           {self.conformer_k:>7.1f} kJ/mol")
         self.ostream.print_blank()
         valstr = '{} | {} | {} | {} | {}'.format(
             'Lambda',
@@ -1410,6 +1457,76 @@ class TransitionStateGuesser():
             l, conf_index + 1, dif, mm_E)
         self.ostream.print_header(valstr)
         self.ostream.flush()
+
+    def _detect_active_dihedral(self):
+        """Identify the rotatable dihedral that differs most between reactant and product.
+
+        Called when no bonds are forming or breaking (conformational TS).
+        Returns a tuple (active_torsion, phi_reactant, phi_product) where
+        active_torsion is a 0-indexed (i, j, k, l) tuple and the angles are
+        in degrees.
+
+        Raises:
+            ValueError: if no rotatable dihedral with |Δφ| > 20° is found.
+        """
+        threshold = 20.0  # degrees
+
+        max_delta = 0.0
+        active_torsion = None
+        best_phi_rea = None
+        best_phi_pro = None
+
+        for bond in self.reactant.rotatable_bonds:
+            # rotatable_bonds are 1-indexed; convert to 0-indexed for FF lookup
+            j0, k0 = bond[0] - 1, bond[1] - 1
+            central = tuple(sorted([j0, k0]))
+
+            # Pick the first dihedral entry whose central bond matches
+            representative = None
+            for key in self.reactant.dihedrals:
+                if tuple(sorted([key[1], key[2]])) == central:
+                    representative = key
+                    break
+            if representative is None:
+                continue
+
+            # get_dihedral_in_degrees expects 1-based indices
+            one_based = [idx + 1 for idx in representative]
+            phi_rea = self.reactant.molecule.get_dihedral_in_degrees(one_based)
+            phi_pro = self.product.molecule.get_dihedral_in_degrees(one_based)
+
+            # Shortest-path difference, wrapped to (-180, 180]
+            delta = phi_pro - phi_rea
+            if delta > 180.0:
+                delta -= 360.0
+            elif delta <= -180.0:
+                delta += 360.0
+
+            if abs(delta) > max_delta:
+                max_delta = abs(delta)
+                active_torsion = representative
+                best_phi_rea = phi_rea
+                best_phi_pro = phi_pro
+
+        if active_torsion is None or max_delta < threshold:
+            raise ValueError(
+                f"No rotatable dihedral with |Δφ| > {threshold:.0f}° found "
+                f"between reactant and product geometries "
+                f"(largest difference: {max_delta:.1f}°). "
+                "Verify that the two input geometries differ by a dihedral rotation."
+            )
+
+        assert best_phi_rea is not None
+        assert best_phi_pro is not None
+        self.ostream.print_info(
+            f"Active torsion (1-indexed): "
+            f"{tuple(a + 1 for a in active_torsion)}, "
+            f"phi_reactant = {best_phi_rea:.1f}°, "
+            f"phi_product = {best_phi_pro:.1f}°, "
+            f"|Δφ| = {max_delta:.1f}°."
+        )
+        self.ostream.flush()
+        return active_torsion, best_phi_rea, best_phi_pro
 
     # todo add option for reading geometry (bond distances, angles, etc.) from transition state instead of averaging them
     # todo add option for recalculating charges from ts_mol

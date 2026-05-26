@@ -164,6 +164,15 @@ class EvbSystemBuilder():
         self.solute_dielectric: float = 1.0
         self.solvent_dielectric: float = 78.39
 
+        # Conformational TS parameters.  Set by build_systems when
+        # 'conformer_active_torsion' is present in the configuration dict.
+        # conformer_active_torsion is handled outside the keywords loop
+        # because it is a tuple rather than a plain scalar.
+        self.conformer_active_torsion: tuple | None = None
+        self.conformer_phi_reactant: float = 0.0
+        self.conformer_phi_product: float = 0.0
+        self.conformer_k: float = 200.0
+
         self.keywords = {
             "temperature": float,  # -> system dependent
             "nb_cutoff": float,  # ->
@@ -205,6 +214,9 @@ class EvbSystemBuilder():
             "implicit_solvent_model": str,
             "solute_dielectric": float,
             "solvent_dielectric": float,
+            "conformer_phi_reactant": float,
+            "conformer_phi_product": float,
+            "conformer_k": float,
         }
 
     def build_systems(
@@ -235,6 +247,12 @@ class EvbSystemBuilder():
             else:
                 self.ostream.print_info(
                     f"{keyword}: {getattr(self, keyword)} (default)")
+        # conformer_active_torsion is a tuple, handled separately
+        if 'conformer_active_torsion' in configuration:
+            self.conformer_active_torsion = tuple(
+                configuration['conformer_active_torsion'])
+            self.ostream.print_info(
+                f"conformer_active_torsion: {self.conformer_active_torsion}")
         self.ostream.flush()
         self.reactant = reactant
         self.product = product
@@ -1324,7 +1342,8 @@ class EvbSystemBuilder():
                     # deepcopy carries the correct lambda-dependent charge.
                     if gb_force is not None:
                         atom_index = self.reaction_atoms[i].index
-                        gb_params = list(gb_force.getParticleParameters(atom_index))
+                        gb_params = list(
+                            gb_force.getParticleParameters(atom_index))
                         gb_params[0] = charge
                         gb_force.setParticleParameters(atom_index, gb_params)
 
@@ -1388,7 +1407,7 @@ class EvbSystemBuilder():
         angle = self._create_harmonic_angle_forces(lam, model_broken=False)
 
         # angle, angle_integration = self._create_angle_forces(lam)
-        torsion = self._create_proper_torsion_forces(lam)
+        torsion_forces = self._create_proper_torsion_forces(lam, pes=pes)
         improper = self._create_improper_torsion_forces(lam)
 
         if not pes:
@@ -1435,7 +1454,8 @@ class EvbSystemBuilder():
 
         system.addForce(static_bonded_harmonic)
         system.addForce(angle)
-        system.addForce(torsion)
+        for torsion_force in torsion_forces:
+            system.addForce(torsion_force)
         system.addForce(improper)
         system.addForce(bond_constraint)
         system.addForce(constant_force)
@@ -1835,8 +1855,20 @@ class EvbSystemBuilder():
             self._add_angle(harmonic_force, atom_ids, eq, fc)
         return harmonic_force
 
-    def _create_proper_torsion_forces(self, lam):
+    def _create_proper_torsion_forces(self, lam, pes=False):
+        """Build proper torsion forces for the reaction system at the given lambda.
 
+        For conformational TS integration systems (self.conformer_active_torsion
+        is set and pes=False), the Fourier terms on the active central bond are
+        omitted and a periodic restraint  k*(1 - cos(theta - theta0))  is added
+        instead, with theta0 shifting from phi_reactant (lam=0) to phi_product
+        (lam=1) along the shortest arc.
+
+        Returns:
+            list[mm.Force]: always a list — one PeriodicTorsionForce for the
+            normal case, plus a CustomTorsionForce appended for conformational
+            integration systems.
+        """
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
 
@@ -1845,9 +1877,24 @@ class EvbSystemBuilder():
         if not self.no_force_groups:
             fourier_force.setForceGroup(EvbForceGroup.REA_TORSION.value)
 
+        # When modelling a conformational TS integration system, identify the
+        # central bond to skip so the restraint below takes its place.
+        active_torsion = self.conformer_active_torsion
+        if active_torsion is not None and not pes:
+            active_torsion_central = tuple(
+                sorted([active_torsion[1], active_torsion[2]]))
+        else:
+            active_torsion_central = None
+
         dihedral_keys = list(
             set(self.reactant.dihedrals) | set(self.product.dihedrals))
         for key in dihedral_keys:
+            # Skip Fourier terms on the active central bond for integration
+            # systems; the periodic restraint below replaces them.
+            if (active_torsion_central is not None and tuple(
+                    sorted([key[1], key[2]])) == active_torsion_central):
+                continue
+
             atom_ids = self._key_to_id(key, self.reaction_atoms)
             if atom_ids is None:
                 continue
@@ -1865,7 +1912,6 @@ class EvbSystemBuilder():
                 self._add_torsion(fourier_force, dihedA, atom_ids, reascale)
                 self._add_torsion(fourier_force, dihedB, atom_ids, proscale)
             else:
-
                 # if the torsion on one side of the reaction completely disapears, then turn of the torsion much earlier / turn it on later
                 reascale, proscale = self._get_lambda_scaling(
                     lam, self.torsion_lambda_switch)
@@ -1877,7 +1923,42 @@ class EvbSystemBuilder():
                     dihed = self.product.dihedrals[key]
                 if scale > 0:
                     self._add_torsion(fourier_force, dihed, atom_ids, scale)
-        return fourier_force
+
+        forces = [fourier_force]
+
+        # For conformational TS integration systems, append the periodic
+        # restraint whose minimum shifts from phi_reactant to phi_product.
+        if active_torsion is not None and not pes:
+            phi_rea_rad = self.conformer_phi_reactant * self.deg_to_rad
+            phi_pro_rad = self.conformer_phi_product * self.deg_to_rad
+            delta_phi_rad = phi_pro_rad - phi_rea_rad
+            if delta_phi_rad > math.pi:
+                delta_phi_rad -= 2 * math.pi
+            elif delta_phi_rad <= -math.pi:
+                delta_phi_rad += 2 * math.pi
+            theta0 = phi_rea_rad + lam * delta_phi_rad
+
+            restraint_force = mm.CustomTorsionForce(
+                "k_dih * (1 - cos(theta - theta0))")
+            restraint_force.setName("Conformer dihedral restraint")
+            restraint_force.addGlobalParameter("k_dih", self.conformer_k)
+            restraint_force.addPerTorsionParameter("theta0")
+            if not self.no_force_groups:
+                restraint_force.setForceGroup(EvbForceGroup.REA_TORSION.value)
+
+            active_atom_ids = self._key_to_id(active_torsion,
+                                              self.reaction_atoms)
+            if active_atom_ids is not None:
+                restraint_force.addTorsion(
+                    active_atom_ids[0],
+                    active_atom_ids[1],
+                    active_atom_ids[2],
+                    active_atom_ids[3],
+                    [theta0],
+                )
+            forces.append(restraint_force)
+
+        return forces
 
     # Create a linear switching function that turns the force on only past the lambda-switch
     def _get_lambda_scaling(self, lam, lambda_switch):
