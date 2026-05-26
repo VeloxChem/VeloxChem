@@ -398,6 +398,13 @@ class TransitionStateGuesser():
                         peak_index = int(np.argmax(V))
                         peak_lambda = self.lambda_vector[peak_index]
 
+                        # Stop as soon as the peak itself has already been
+                        # conformer-searched. Checking neighbours is not
+                        # sufficient: the peak can fall in a gap between two
+                        # disjoint search windows whose edges are both marked.
+                        if peak_index in searched_conformers_indices:
+                            break
+
                         min_index = max(
                             0,
                             peak_index - self.peak_conformer_search_range,
@@ -407,39 +414,34 @@ class TransitionStateGuesser():
                             peak_index + self.peak_conformer_search_range,
                         )
 
-                        # Stop once both immediate neighbours of the peak have
-                        # been conformer-searched (peak is "sandwiched").
-                        # Termination is guaranteed: each iteration adds ≥1 new
-                        # index and the lambda vector is finite.
-                        left = peak_index - 1
-                        right = peak_index + 1
-                        left_ok = (left < 0
-                                   or left in searched_conformers_indices)
-                        right_ok = (right >= len(self.lambda_vector)
-                                    or right in searched_conformers_indices)
-                        if left_ok and right_ok:
+                        # Only scan indices not yet covered by a prior
+                        # iteration to avoid redundant MD runs.
+                        new_indices = [
+                            i for i in range(min_index, max_index + 1)
+                            if i not in searched_conformers_indices
+                        ]
+                        if not new_indices:
+                            # Entire window already searched but peak not
+                            # recorded — guard against infinite loop.
                             break
+
+                        new_lambdas = [self.lambda_vector[i]
+                                       for i in new_indices]
 
                         self.ostream.print_info(
                             f"Found peak MM E: {V[peak_index]:.3f} at Lambda: {peak_lambda}"
                             f" (iteration {peak_iteration})."
                         )
                         self.ostream.print_info(
-                            f"Doing conformer search from Lambda: {self.lambda_vector[min_index]} to Lambda: {self.lambda_vector[max_index]}."
+                            f"Doing conformer search from Lambda: {new_lambdas[0]} to Lambda: {new_lambdas[-1]}."
                         )
                         self.ostream.flush()
 
-                        searched_conformers_indices.extend(
-                            range(min_index, max_index + 1))
-                        searched_conformers_indices = sorted(
-                            list(set(searched_conformers_indices)))
-                        forward_init_pos = scan_dict[
-                            self.lambda_vector[min_index]][0]['pos']
-                        backward_init_pos = scan_dict[
-                            self.lambda_vector[max_index]][0]['pos']
+                        forward_init_pos = scan_dict[new_lambdas[0]][0]['pos']
+                        backward_init_pos = scan_dict[new_lambdas[-1]][0]['pos']
 
                         scan_dict_peak_conf = self._run_mm_scan(
-                            self.lambda_vector[min_index:max_index + 1],
+                            new_lambdas,
                             rea_sim,
                             pro_sim,
                             conformer_search=True,
@@ -449,6 +451,10 @@ class TransitionStateGuesser():
                         )
                         for l in scan_dict_peak_conf.keys():
                             scan_dict[l] += scan_dict_peak_conf[l]
+
+                        searched_conformers_indices.extend(new_indices)
+                        searched_conformers_indices = sorted(
+                            list(set(searched_conformers_indices)))
 
                         # Re-evaluate so the next iteration and the
                         # discontinuity check both see up-to-date energies.
