@@ -404,9 +404,10 @@ class TransitionStateGuesser():
                         # disjoint search windows whose edges are both marked.
                         if (peak_index in searched_conformers_indices
                                 and (max(0, peak_index - 1)
-                                     in searched_conformers_indices) and
-                            (min(peak_index + 1, len(self.lambda_vector))
-                             in searched_conformers_indices)):
+                                     in searched_conformers_indices)
+                                and (min(peak_index + 1,
+                                         len(self.lambda_vector) - 1)
+                                     in searched_conformers_indices)):
                             break
 
                         min_index = max(
