@@ -674,6 +674,8 @@ def gostshyp_sanity_check(obj):
         obj._pressure_in_input_units = obj.pressure
         obj.pressure = parse_pressure_units(obj.pressure,
                                                 obj.pressure_units)
+        
+        #print(obj._pressure_in_input_units)
 
 
 def solvation_model_sanity_check(obj):

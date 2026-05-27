@@ -101,6 +101,14 @@ from .veloxchemlib import parse_xc_func
 from .veloxchemlib import make_matrix
 from .veloxchemlib import make_matrices
 from .veloxchemlib import partition_atoms
+from .veloxchemlib import compute_tco_s_fock
+from .veloxchemlib import compute_tco_s_values
+from .veloxchemlib import compute_tco_p_fock
+from .veloxchemlib import compute_tco_p_values
+from .veloxchemlib import compute_tco_d_values
+from .veloxchemlib import compute_tco_f_values
+from .veloxchemlib import compute_tco_s_gradient
+from .veloxchemlib import compute_tco_p_gradient
 
 # C++ enums
 from .veloxchemlib import mat_t
@@ -227,6 +235,8 @@ from .orbitallocalization import OrbitalLocalizationDriver
 from .ensembleparser import EnsembleParser
 from .ensembledriver import EnsembleDriver
 from .spectrumaverager import SpectrumAverager
+from .tessellation import TessellationDriver
+from .gostshyp import GostshypDriver
 # for backward compatibility only
 from .cppsolver import ComplexResponseSolver as ComplexResponse
 from .tdacppsolver import ComplexResponseTdaSolver as ComplexResponseTDA

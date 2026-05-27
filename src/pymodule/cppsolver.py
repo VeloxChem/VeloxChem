@@ -152,7 +152,7 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
         pe_sanity_check(self, molecule=molecule)
         # check solvation setup
         solvation_model_sanity_check(self)
-
+        # check gostshyp setup
         gostshyp_sanity_check(self)
 
         # check print level (verbosity of output)
@@ -193,7 +193,7 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
         self._init_cpcm(molecule, basis)
 
         # GOSTSHYP information
-        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_tensors)
+        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_results)
 
         # right-hand side (gradient)
         if self.rank == mpi_master():
@@ -360,7 +360,7 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
 
                     self._e2n_half_size(bger, bung, molecule, basis,
                                         scf_results, eri_dict, dft_dict,
-                                        pe_dict, profiler)
+                                        pe_dict, gostshyp_dict, profiler)
 
         # generate initial guess from scratch
         else:
@@ -369,7 +369,8 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
             profiler.set_timing_key('Preparation')
 
             self._e2n_half_size(bger, bung, molecule, basis, scf_results,
-                                eri_dict, dft_dict, pe_dict, profiler)
+                                eri_dict, dft_dict, pe_dict, gostshyp_dict,
+                                profiler)
 
         profiler.check_memory_usage('Initial guess')
 
@@ -462,6 +463,12 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                 profiler.print_memory_tracing(self.ostream)
                 self._print_iteration(relative_residual_norm, xvs)
 
+                if self._gostshyp:
+                    valstr = '    *** GOSTSHYP information: A total number of '
+                    valstr += '{} grid points with negative amplitudes were excluded'.format(gostshyp_dict['neg_amps'])
+                    self.ostream.print_header(valstr)
+                    self.ostream.print_blank()
+
             profiler.stop_timer('ReducedSpace')
 
             # check convergence
@@ -517,7 +524,7 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
             # creating new sigma and rho linear transformations
             self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
                                 scf_results, eri_dict, dft_dict, pe_dict,
-                                profiler)
+                                gostshyp_dict, profiler)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trial_in_hours = iter_in_hours / n_new_trials
@@ -759,7 +766,7 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
 
     def _collapse_current_subspace(self, active_keys, solutions, residual_norms,
                                    molecule, basis, scf_results, eri_dict,
-                                   dft_dict, pe_dict, profiler):
+                                   dft_dict, pe_dict, gostshyp_dict, profiler):
         """
         Collapses the reduced space to a basis built from the largest
         unconverged solution vectors and rebuilds associated sigma data.
@@ -802,7 +809,8 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
 
         self._clear_subspace_data()
         self._e2n_half_size(new_bger, new_bung, molecule, basis, scf_results,
-                            eri_dict, dft_dict, pe_dict, profiler)
+                            eri_dict, dft_dict, pe_dict, gostshyp_dict, 
+                            profiler)
 
         self.collapsed_subspace = True
         self.collapsed_from_dim = prev_dim

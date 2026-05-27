@@ -284,6 +284,7 @@ class ScfGradientDriver(GradientDriver):
             'XC_grad': 0.0,
             'PE_grad': 0.0,
             'CPCM_grad': 0.0,
+            'GOSTSHYP_grad': 0.0,
             'D4_grad': 0.0,
             'Classical': 0.0,
         }
@@ -402,6 +403,48 @@ class ScfGradientDriver(GradientDriver):
                 molecule, basis, density_matrix)
 
             grad_timing['CPCM_grad'] += time.time() - t0
+
+    def _add_gostshyp_gradient(self, molecule, basis, density_matrix, grad_timing):
+        """
+        Adds the GOSTSHYP contribution to the gradient.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param density_matrix:
+            The total density matrix.
+        :param grad_timing:
+            The timing dictionary to update.
+        """
+
+        t0 = time.time()
+
+        if self.scf_driver._gostshyp:
+            from .gostshyp import GostshypDriver
+
+            self._gostshyp_drv = GostshypDriver(molecule = molecule,
+                                                basis = basis,
+                                                pressure = self.scf_driver.pressure,
+                                                pressure_units = self.scf_driver.pressure_units,
+                                                comm = self.comm,
+                                                ostream = self.ostream)
+
+            tessellation_settings = {
+                'num_leb_points': self.scf_driver.num_leb_points,
+                'tssf': self.scf_driver.tssf,
+                'discretization': self.scf_driver.discretization,
+                'switching_thresh': self.scf_driver.switching_thresh,
+                'filename': self.scf_driver.filename,
+                'r_ext': self.scf_driver.r_ext
+            }
+
+            gostshyp_grad = self._gostshyp_drv.gostshyp_grad_contrib(density_matrix, tessellation_settings)
+
+            self.gradient += gostshyp_grad
+
+        grad_timing['GOSTSHYP_grad'] += time.time() - t0
+
 
     def _add_nuclear_and_dispersion_gradient(self, molecule, basis,
                                              xcfun_label, grad_timing):
@@ -665,33 +708,7 @@ class ScfGradientDriver(GradientDriver):
 
         self._add_cpcm_gradient(molecule, basis, 2.0 * D, grad_timing)
 
-        # move to _add_gostshyp_gradient
-        t0 = time.time()
-
-        if self.scf_driver._gostshyp:
-            from .gostshyp import GostshypDriver
-
-            self._gostshyp_drv = GostshypDriver(molecule = molecule, 
-                                                basis = basis,
-                                                pressure = self.scf_driver.pressure, 
-                                                pressure_units = self.scf_driver.pressure_units, 
-                                                comm = self.comm, 
-                                                ostream = self.ostream)
-
-            tessellation_settings = {
-                'num_leb_points': self.scf_driver.num_leb_points,
-                'tssf': self.scf_driver.tssf,
-                'discretization': self.scf_driver.discretization,
-                'switching_thresh': self.scf_driver.switching_thresh,
-                'filename': self.scf_driver.filename,
-                'r_ext': self.scf_driver.r_ext
-            }
-
-            gostshyp_grad = self._gostshyp_drv.gostshyp_grad_contrib(2 * D, tessellation_settings)
-
-            self.gradient += gostshyp_grad
-
-        grad_timing['GOSTSHYP_grad'] += time.time() - t0
+        self._add_gostshyp_gradient(molecule, basis, 2.0 * D, grad_timing)
 
         # nuclear contribution to gradient
         # and D4 dispersion correction if requested
@@ -910,6 +927,8 @@ class ScfGradientDriver(GradientDriver):
 
         self._add_cpcm_gradient(molecule, basis, Da + Db, grad_timing)
 
+        self._add_gostshyp_gradient(molecule, basis, Da + Db, grad_timing)
+
         # nuclear contribution to gradient
         # and D4 dispersion correction if requested
         # (only added on master rank)
@@ -955,14 +974,10 @@ class ScfGradientDriver(GradientDriver):
         
         # reset pressure to input units
         # this is needed if the scf_driver is called multiple times
-        # since the pressure is recalculated from input units to atomic units 
+        # since the pressure is recalculated from input units to atomic units
         # when the compute() method is called
         if self.scf_driver._gostshyp:
-            self.scf_driver.pressure = self.scf_driver._pressure_in_input_units
-        
-        new_scf_results = self.scf_driver.compute(molecule, ao_basis)
-        assert_msg_critical(self.scf_driver.is_converged,
-                            'ScfGradientDriver: SCF did not converge')
+           self.scf_driver.pressure = self.scf_driver._pressure_in_input_units
 
         self.scf_driver.ostream.mute()
         new_scf_results_not_used = self.scf_driver.compute(molecule, basis)

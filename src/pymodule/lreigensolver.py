@@ -215,6 +215,9 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
         # CPCM_information
         self._init_cpcm(molecule, basis)
 
+        # GOSTSHYP information
+        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_results)
+
         if self.nonlinear:
             rsp_vector_labels = [
                 'LR_eigen_bger_half_size',
@@ -280,7 +283,7 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
                     self._e2n_half_size(bger, bung, molecule, basis,
                                         scf_results, eri_dict, dft_dict,
-                                        pe_dict, profiler)
+                                        pe_dict, gostshyp_dict, profiler)
 
         # generate initial guess from scratch
         else:
@@ -290,7 +293,8 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
             profiler.set_timing_key('Preparation')
 
             self._e2n_half_size(bger, bung, molecule, basis, scf_results,
-                                eri_dict, dft_dict, pe_dict, profiler)
+                                eri_dict, dft_dict, pe_dict, gostshyp_dict,
+                                profiler)
 
         profiler.check_memory_usage('Initial guess')
 
@@ -410,6 +414,12 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
                 self._print_iteration(relative_residual_norm, wn)
 
+                if self._gostshyp:
+                    valstr = '    *** GOSTSHYP information: A total number of '
+                    valstr += '{} grid points with negative amplitudes were excluded'.format(gostshyp_dict['neg_amps'])
+                    self.ostream.print_header(valstr)
+                    self.ostream.print_blank()
+
             profiler.stop_timer('ReducedSpace')
 
             # check convergence
@@ -466,7 +476,7 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
             self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
                                 scf_results, eri_dict, dft_dict, pe_dict,
-                                profiler)
+                                gostshyp_dict, profiler)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trial_in_hours = iter_in_hours / n_new_trials
@@ -978,7 +988,7 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
     def _collapse_current_subspace(self, c_ger, c_ung, molecule, basis,
                                    scf_results, eri_dict, dft_dict, pe_dict,
-                                   profiler):
+                                   gostshyp_dict, profiler):
         """
         Collapses the reduced space to retained Ritz vectors and rebuilds
         associated sigma data.
@@ -995,7 +1005,8 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
         self._clear_subspace_data()
         self._e2n_half_size(new_bger, new_bung, molecule, basis, scf_results,
-                            eri_dict, dft_dict, pe_dict, profiler)
+                            eri_dict, dft_dict, pe_dict, gostshyp_dict, 
+                            profiler)
 
         self.collapsed_subspace = True
         self.collapsed_from_dim = prev_dim
@@ -1169,6 +1180,9 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
+        # GOSTSHYP information
+        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_results)
+
         # generate initial guess from scratch
 
         igs = {}
@@ -1195,7 +1209,7 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
         bger, bung = self._setup_trials(igs, precond=None, renormalize=False)
 
         self._e2n_half_size(bger, bung, molecule, basis, scf_results, eri_dict,
-                            dft_dict, pe_dict)
+                            dft_dict, pe_dict, gostshyp_dict)
 
         if self.rank == mpi_master():
             E2 = np.zeros((2 * n_exc, 2 * n_exc))

@@ -1,4 +1,4 @@
-name: vlxenv
+name: vlxenv_gostshyp_2026
 channels:
   - conda-forge
 dependencies:

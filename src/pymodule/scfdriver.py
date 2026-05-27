@@ -71,7 +71,7 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
 from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            ri_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
+                           solvation_model_sanity_check, gostshyp_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import screened_eigh
 from .checkpoint import write_cpcm_charges, read_cpcm_charges
@@ -991,7 +991,7 @@ class ScfDriver:
         # set up gostshyp method by creating a surface tessellation
         if self._gostshyp:
             from .gostshyp import GostshypDriver
-            self._gostshyp_drv = GostshypDriver(molecule, ao_basis,
+            self._gostshyp_drv = GostshypDriver(molecule, basis,
                     self.pressure, self.pressure_units, self.comm, self.ostream)
 
             tessellation_settings = {
@@ -1778,15 +1778,17 @@ class ScfDriver:
 
             iter_start_time = tm.time()
 
-            fock_mat, vxc_mat, e_emb, V_emb = self._comp_2e_fock(
+            fock_mat, vxc_mat, e_emb, V_emb, e_pr, V_pr = self._comp_2e_fock(
                 den_mat, molecule, ao_basis, screener, e_grad, profiler)
+            
+            self._e_gost = e_pr
 
             profiler.start_timer('ErrVec')
 
-            e_el = self._comp_energy(fock_mat, vxc_mat, e_emb, kin_mat,
+            e_el = self._comp_energy(fock_mat, vxc_mat, e_emb, e_pr, kin_mat,
                                      npot_mat, ecp_mat, den_mat)
 
-            self._comp_full_fock(fock_mat, vxc_mat, V_emb, kin_mat, npot_mat,
+            self._comp_full_fock(fock_mat, vxc_mat, V_emb, V_pr, kin_mat, npot_mat,
                                  ecp_mat)
 
             profiler.stop_timer('ErrVec')
@@ -2066,6 +2068,8 @@ class ScfDriver:
                             'cpcm_custom_vdw_radii',
                     ]:
                         self._scf_results[key] = getattr(self, key)
+
+                # add gostshyp info
 
             else:
                 # non-master rank
@@ -2453,10 +2457,10 @@ class ScfDriver:
             The Fock matrix, AO Kohn-Sham (Vxc) matrix, etc.
         """
 
-        fock_mat, vxc_mat, e_emb, V_emb = self._comp_2e_fock_single_comm(
+        fock_mat, vxc_mat, e_emb, V_emb, e_pr, V_pr = self._comp_2e_fock_single_comm(
             den_mat, molecule, basis, screener, e_grad, profiler)
 
-        return fock_mat, vxc_mat, e_emb, V_emb
+        return fock_mat, vxc_mat, e_emb, V_emb, e_pr, V_pr
 
     def _prepare_for_ri_fock_build(self, fock_type):
         """
@@ -2812,9 +2816,9 @@ class ScfDriver:
         if self.timing and self._gostshyp and not self._first_step:
             profiler.add_timing_info('FockGOSTSHYP', tm.time() - gostshyp_t0)
 
-        return fock_mat, vxc_mat, vkx_mat, e_emb, V_emb, e_pr, V_pr
+        return fock_mat, vxc_mat, e_emb, V_emb, e_pr, V_pr
 
-    def _comp_energy(self, fock_mat, vxc_mat, e_emb, kin_mat, npot_mat, ecp_mat,
+    def _comp_energy(self, fock_mat, vxc_mat, e_emb, e_pr, kin_mat, npot_mat, ecp_mat,
                      den_mat):
         """
         Computes the sum of SCF energy components: electronic energy, kinetic
@@ -2826,6 +2830,8 @@ class ScfDriver:
             The Vxc matrix.
         :param e_emb:
             The embedding energy.
+        :param e_pr:
+            The pressure energy.
         :param kin_mat:
             The kinetic energy matrix.
         :param npot_mat:
@@ -2861,6 +2867,9 @@ class ScfDriver:
             if self._has_embedded_potential() and not self._first_step:
                 e_onee += e_emb
 
+            if self._gostshyp and not self._first_step:
+                e_onee += e_pr
+
             e_sum = e_twoe + e_onee
         else:
             e_sum = 0.0
@@ -2868,7 +2877,7 @@ class ScfDriver:
 
         return e_sum
 
-    def _comp_full_fock(self, fock_mat, vxc_mat, V_emb, kin_mat, npot_mat,
+    def _comp_full_fock(self, fock_mat, vxc_mat, V_emb, V_pr, kin_mat, npot_mat,
                         ecp_mat):
         """
         Computes full Fock/Kohn-Sham matrix by adding to 2e-part of
@@ -2881,6 +2890,8 @@ class ScfDriver:
             The Vxc matrix.
         :param V_emb:
             The embedding Fock matrix contributions.
+        :param V_pr:
+            The pressure Fock matrix contributions.
         :param kin_mat:
             The kinetic energy matrix.
         :param npot_mat:
@@ -2909,6 +2920,9 @@ class ScfDriver:
 
             if self._has_embedded_potential() and not self._first_step:
                 self._add_onee_contribution(fock_mat, V_emb)
+
+            if self._gostshyp and not self._first_step:
+                self._add_onee_contribution(fock_mat, V_pr)
 
     def _comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """
@@ -3596,6 +3610,9 @@ class ScfDriver:
         elif self._cpcm:
             e_el -= self.cpcm_drv.cpcm_epol
 
+        if self._gostshyp:
+            e_el -= self._e_gost
+
         valstr = f'Total Energy                       :{etot:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
 
@@ -3616,6 +3633,11 @@ class ScfDriver:
         elif self._cpcm:
             valstr = 'Electrostatic Solvation Energy     :'
             valstr += f'{self.cpcm_drv.cpcm_epol:20.10f} a.u.'
+            self.ostream.print_header(valstr.ljust(92))
+        
+        if self._gostshyp:
+            valstr = 'GOSTSHYP Pressure Energy           :'
+            valstr += f'{self._e_gost:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
 
         valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} a.u.'
