@@ -229,7 +229,6 @@ from .conformergenerator import ConformerGenerator
 from .tsguesser import TransitionStateGuesser
 from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
-from .smirnofftyper import SmirnoffTyper
 from .atombdedriver import AtomBdeDriver
 from .orbitallocalization import OrbitalLocalizationDriver
 from .ensembleparser import EnsembleParser
@@ -241,8 +240,6 @@ from .gostshyp import GostshypDriver
 from .cppsolver import ComplexResponseSolver as ComplexResponse
 from .tdacppsolver import ComplexResponseTdaSolver as ComplexResponseTDA
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
-from .molecule_toolkit import MoleculeToolkit
-from .openmmhessian import MMHessianDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical

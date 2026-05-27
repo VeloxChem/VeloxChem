@@ -23,7 +23,7 @@ jobs:
 
     defaults:
       run:
-        shell: bash -l {0}
+        shell: bash -leo pipefail {0}
 
     container:
       image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-2074132
