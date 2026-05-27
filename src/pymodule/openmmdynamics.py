@@ -54,7 +54,7 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .optimizationdriver import OptimizationDriver
 from .interpolationdriver import InterpolationDriver
 from .errorhandler import assert_msg_critical
-from .mofutils import svd_superimpose
+from .superimpose import svd_superimpose
 
 try:
     import openmm as mm

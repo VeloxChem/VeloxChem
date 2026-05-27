@@ -16,3 +16,7 @@ def pytest_configure(config):
         "markers",
         "timeconsuming: time-consuming tests that are not included in CI",
     )
+    config.addinivalue_line(
+        "markers",
+        "mofbuilder: tests for MOFBuilder functionality",
+    )

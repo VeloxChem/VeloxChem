@@ -1,0 +1,56 @@
+[ defaults ]
+; nbfunc        comb-rule       gen-pairs       fudgeLJ fudgeQQ
+1               2               yes             0.5          0.83333333  
+
+[ atomtypes ]
+; name    at.num    mass    charge ptype  sigma      epsilon
+Hf           Hf  154.49000  0.00000000  A     0.15840179      227.47546 ;Hf1 
+Br        Br         79.90000 0.00000   A     0           0	; bromine
+F         F          19.00000 0.00000   A     0           0	; fluorine
+;HO        HO          1.00800 0.00000   A     0           0	; hydroxyl group
+;HS        HS          1.00800 0.00000   A     0           0	; hydrogen bonded to sulphur (pol?)
+;HW        HW          1.00800 0.00000   A     0           0	; H in TIP3P water
+I         I          26.90000 0.00000   A     0           0	; iodine  (Applequist)
+Cl        Cl         35.45000 0.00000   A     0           0	; chlorine  (Applequist)
+Na        Na         22.99000 0.00000   A     0           0	; Na+, ions pol:J.PhysC,11,1541,(1978)
+MG        MG         24.30500 0.00000   A     0           0	; magnesium
+;O         O          16.00000 0.00000   A     0           0	; carbonyl group oxygen
+;OW        OW         16.00000 0.00000   A     0           0	; oxygen in TIP3P water
+;OH        OH         16.00000 0.00000   A     0           0	; oxygen in hydroxyl group
+;OS        OS         16.00000 0.00000   A     0           0	; ether and ester oxygen
+;O2        O2         16.00000 0.00000   A     0           0	; carboxyl and phosphate group oxygen
+;OP        OP         16.00000 0.00000   A     0           0      ;
+P         P          30.97000 0.00000   A     0           0	; phosphate,pol:JACS,112,8543,90,K.J.Miller
+S         S          32.06000 0.00000   A     0           0	; S in disulfide linkage,pol:JPC,102,2399,98
+SH        SH         32.06000 0.00000   A     0           0	; S in cystine
+CU        CU         63.55000 0.00000   A     0           0	; copper
+FE        FE         55.00000 0.00000   A     0           0	; iron
+K         K          39.10000 0.00000   A     0           0	; potassium
+Rb        Rb         85.47000 0.00000   A     0           0	; rubidium
+Cs        Cs         32.90000 0.00000   A     0           0	; cesium
+OW_spc    OW_spc     15.99940 0.00000   A     0           0      ; SPC Water OW
+HW_spc    HW_spc      1.00800 0.00000   A     0           0      ; SPC Water HW
+Li        Li          6.94000 0.00000   A     0           0      ; lithium, ions pol:J.PhysC,11,1541,(1978)
+Zn        Zn         65.40000 0.00000   A     0           0      ; Zn2+
+HW_tip4pewHW_tip4pew  1.00800 0.00000   A     0           0      ; tip4pEW HW
+OW_tip4pewOW_tip4pew 16.00000 0.00000   A     0           0      ; tip4pEW OW
+HW_tip4p  HW_tip4p    1.00800 0.00000   A     0           0      ; tip4p HW
+OW_tip4p  OW_tip4p   16.00000 0.00000   A     0           0      ; tip4p OW
+HW_tip5p  HW_tip5p    1.00800 0.00000   A     0           0      ; tip5p HW
+OW_tip5p  OW_tip5p   16.00000 0.00000   A     0           0      ; tip5p OW
+MW        MW          0.00000 0.00000   A     0           0      ; Virtual site for tip4p/5p water point charge
+MCH3      MCH3        0.00000 0.00000   A     0           0      ; Dummy mass in rigid tetrahedral CH3 group
+MNH3      MNH3        0.00000 0.00000   A     0           0      ; Dummy mass in rigid tetrahedral NH3 group
+EP        EP          0.00000 0.00000   A     0           0      ;
+
+
+
+
+
+
+
+[ system ]
+; Name
+
+[ molecules ]
+; Compound     #mols

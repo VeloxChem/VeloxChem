@@ -1,0 +1,13 @@
+[ atomtypes ]
+; name    at.num    mass    charge ptype  sigma      epsilon
+OS           OS  16.000000  0.00000000  A     0.31560978      0.3037584 ;OM2
+
+
+[ moleculetype ]
+; Name            nrexcl
+O          3
+
+[ atoms ]
+;   nr       type  resnr residue  atom   cgnr    charge       mass  typeB    chargeB      massB
+    1         OS      1    O     O1      1 -2.00000000  16.000000   ; qtot-2.000000
+
