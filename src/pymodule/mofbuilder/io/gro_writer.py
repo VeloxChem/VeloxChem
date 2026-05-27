@@ -34,7 +34,7 @@ from pathlib import Path
 import sys
 import numpy as np
 from typing import Optional, Any, Sequence
-from .basic import nn, nl
+from .basic import nn
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
 from mpi4py import MPI
@@ -45,7 +45,7 @@ class GroWriter:
     """
     Write atomic structure data to GROMACS .gro coordinate files.
 
-    Handles formatting, unit conversion, residue management, and MPI-based output stream selection. 
+    Handles formatting, unit conversion, residue management, and MPI-based output stream selection.
     Supports both orthorhombic and triclinic box specification.
 
     Attributes:
@@ -124,7 +124,7 @@ class GroWriter:
             Positions (x, y, z) are converted from angstroms to nanometers.
             Box lengths are also written in nanometers.
             Triclinic box format: [lx, ly, lz, xy, xz, yz].
-        
+
         Example:
             >>> writer = GroWriter()
             >>> writer.write("output.gro", lines=atom_list, box=[30.0, 30.0, 30.0])
@@ -179,7 +179,7 @@ class GroWriter:
                     last_name = values[3]
                     last_residue_number = values[4]
                     j = 0
-                atom_type = values[0]
+                # atom_type = values[0]
                 atom_label = values[1]
                 atom_number = i + 1
                 residue_name = values[3].split("_")[0][:3]
@@ -187,9 +187,9 @@ class GroWriter:
                 x = (float(values[5]) + translation[0]) / 10  # Angstroms to nm
                 y = (float(values[6]) + translation[1]) / 10
                 z = (float(values[7]) + translation[2]) / 10
-                spin = values[8]
-                charge = values[9]
-                note = values[10]
+                # spin = values[8]
+                # charge = values[9]
+                # note = values[10]
 
                 formatted_line = "%5d%-5s%5s%5s%8.3f%8.3f%8.3f" % (
                     residue_number,

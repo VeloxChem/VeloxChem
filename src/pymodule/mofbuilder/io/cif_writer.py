@@ -63,7 +63,7 @@ class CifWriter:
     """
 
     def __init__(
-        self, 
+        self,
         comm: Optional[Any] = None,
         ostream: Optional[OutputStream] = None,
         filepath: Optional[str] = None,

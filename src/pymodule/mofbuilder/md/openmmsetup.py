@@ -55,7 +55,7 @@ except ImportError:
     pass
 from mpi4py import MPI
 import sys
-from typing import Optional, List, Any, Union
+from typing import Optional, List, Any
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
 from ...errorhandler import assert_msg_critical

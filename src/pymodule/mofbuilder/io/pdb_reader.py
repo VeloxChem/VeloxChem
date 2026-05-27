@@ -41,8 +41,6 @@ from mpi4py import MPI
 import sys
 
 
-
-
 class PdbReader:
     """Class for reading and processing atomic coordinates from PDB files.
 
@@ -148,7 +146,7 @@ class PdbReader:
                     atom_number = int(line[6:11]) if line[6:11].strip() else 1
                     atom_type = line[12:16].strip()
                     residue_name = line[17:20].strip()
-                    chain_id = line[21].strip() if line[21].strip() else "A"
+                    # chain_id = line[21].strip() if line[21].strip() else "A"
                     residue_number = int(line[22:26]) if line[22:26].strip() else 1
                     value_x = float(line[30:38])
                     value_y = float(line[38:46])
@@ -156,7 +154,7 @@ class PdbReader:
                     occupancy = float(line[54:60]) if line[54:60].strip() else 0.0
                     b_factor = float(line[60:66]) if line[60:66].strip() else 0.0
                     atom_label = line[76:78].strip()
-                    charge = line[78:80].strip()
+                    # charge = line[78:80].strip()
                     note = nn(atom_type)
 
                     data.append([

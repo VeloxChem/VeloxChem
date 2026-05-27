@@ -53,7 +53,7 @@ from ...scfrestdriver import ScfRestrictedDriver
 from ...scfunrestdriver import ScfUnrestrictedDriver
 from ..io.basic import nn
 from ...outputstream import OutputStream
-from ...veloxchemlib import mpi_master, hartree_in_kcalpermol, hartree_in_kjpermol
+from ...veloxchemlib import mpi_master, hartree_in_kcalpermol
 from ...errorhandler import assert_msg_critical
 from mpi4py import MPI
 from networkx.algorithms.isomorphism import GraphMatcher
@@ -372,16 +372,16 @@ class LinkerForceFieldGenerator:
         """
         def correct_connectivity_for_hydrogens(mol: Molecule, conn: np.ndarray) -> np.ndarray:
             # find hydrogens with more than 1 connection and correct connectivity matrix to treat them as non-hydrogens for isomorphism
-            #the real connection should be the closest non-hydrogen atom
+            # the real connection should be the closest non-hydrogen atom
             labels = mol.get_labels()
-            element_ids = mol.get_element_ids()
+            # element_ids = mol.get_element_ids()
             for i in range(len(labels)):
                 if labels[i].startswith('H') and np.sum(conn[i]) > 1:
                     non_hydrogen_indices = [j for j in range(len(labels)) if not labels[j].startswith('H') and conn[i][j] == 1]
                     if len(non_hydrogen_indices) > 0:
-                        #sort connected non-hydrogen atoms by distance to the hydrogen, keep label
+                        # sort connected non-hydrogen atoms by distance to the hydrogen, keep label
                         sorted_non_hydrogen_indices = sorted(non_hydrogen_indices, key=lambda j: np.linalg.norm(np.array(mol.get_coordinates_in_angstrom()[i]) - np.array(mol.get_coordinates_in_angstrom()[j])))
-                        #check if the closest non-hydrogen have more than 3 connections, if so, find the closest non-hydrogen with less than 3 connections
+                        # check if the closest non-hydrogen have more than 3 connections, if so, find the closest non-hydrogen with less than 3 connections
                         closest_non_hydrogen_index = sorted_non_hydrogen_indices[0]
                         if np.sum(conn[closest_non_hydrogen_index]) > 3:
                             for idx in sorted_non_hydrogen_indices[1:]:
@@ -395,19 +395,19 @@ class LinkerForceFieldGenerator:
 
         def correct_connectivity_for_carbons(mol: Molecule, conn: np.ndarray) -> np.ndarray:
             # find carbons with 4 connections and correct connectivity matrix to treat them as non-carbons for isomorphism
-            #drop the farest connection for carbons with 4 connections
+            # drop the farest connection for carbons with 4 connections
             for i in range(len(conn)):
-                if np.sum(conn[i]) >3 and mol.get_labels()[i].startswith('C'):
+                if np.sum(conn[i]) > 3 and mol.get_labels()[i].startswith('C'):
                     non_carbon_indices = [j for j in range(len(conn)) if conn[i][j] == 1]
                     if len(non_carbon_indices) > 0:
                         farthest_non_carbon_index = max(non_carbon_indices, key=lambda j: np.linalg.norm(np.array(mol.get_coordinates_in_angstrom()[i]) - np.array(mol.get_coordinates_in_angstrom()[j])))
                         conn[i][farthest_non_carbon_index] = 0
                         conn[farthest_non_carbon_index][i] = 0
             return conn
-        
+
         def correct_connectivity_for_oxygens(mol: Molecule, conn: np.ndarray) -> np.ndarray:
             # find oxygens with 2 connections and correct connectivity matrix to treat them as non-oxygens for isomorphism
-            #drop the farest connection for oxygens with 2 connections
+            # drop the farest connection for oxygens with 2 connections
             labels = mol.get_labels()
             for i in range(len(conn)):
                 if labels[i].startswith('O') and np.sum(conn[i]) == 2:
@@ -418,17 +418,16 @@ class LinkerForceFieldGenerator:
                         conn[farthest_non_oxygen_index][i] = 0
             return conn
 
-
         def correct_connectivity(mol: Molecule, conn: np.ndarray) -> np.ndarray:
             conn = correct_connectivity_for_hydrogens(mol, conn)
             conn = correct_connectivity_for_oxygens(mol, conn)
             return conn
-        
+
         src_mol_connectivity = correct_connectivity(src_mol, src_mol.get_connectivity_matrix())
         if dest_molecule_connectivity_matrix is not None:
             dest_mol_connectivity = correct_connectivity(dest_mol, dest_molecule_connectivity_matrix)
         else:
-            dest_mol_connectivity = correct_connectivity(dest_mol, dest_mol.get_connectivity_matrix() )
+            dest_mol_connectivity = correct_connectivity(dest_mol, dest_mol.get_connectivity_matrix())
         bond_num_src = np.sum(src_mol_connectivity) // 2
         bond_num_dest = np.sum(dest_mol_connectivity) // 2
         if (len(src_mol.get_labels()) != len(dest_mol.get_labels())) or bond_num_src != bond_num_dest:
@@ -440,8 +439,6 @@ class LinkerForceFieldGenerator:
         src_mol.show(atom_indices=True)
         dest_mol.show(atom_indices=True)
 
-
-        
         def get_graph_from_molecule(mol: Molecule, conn: np.ndarray) -> nx.Graph:
             labels = mol.get_labels()
             element_ids = mol.get_element_ids()
@@ -836,7 +833,7 @@ class ForceFieldMapper:
         if 'dihedrals_im' in sections:
             dest_sections['dihedrals_im'] = self._format_dihedrals(sections['dihedrals_im'], src_dest_map)
         if self._debug:
-            self.ostream.print_info(f"Forcefield sections mapped from source to destination molecule.")
+            self.ostream.print_info("Forcefield sections mapped from source to destination molecule.")
             self.ostream.print_info(f"Sections in mapped itp file: {list(dest_sections.keys())}")
             self.ostream.print_info(f"mapping {src_dest_map}")
             self.ostream.print_info(f"destination atom labels {dest_atomlabels}")
@@ -859,7 +856,7 @@ class ForceFieldMapper:
             output_itpfile = Path(output_itpfile).with_suffix('.itp')
         self.ostream.print_info(f"Writing mapped forcefield to itp file: {output_itpfile}")
         self.ostream.flush()
-        #create parent directory if not exist
+        # create parent directory if not exist
         Path(output_itpfile).parent.mkdir(parents=True, exist_ok=True)
         with open(output_itpfile, 'w') as fp:
             for section_name, lines in mapped_sections.items():

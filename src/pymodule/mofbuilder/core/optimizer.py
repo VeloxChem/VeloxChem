@@ -34,10 +34,8 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import networkx as nx
 from mpi4py import MPI
 import h5py
-import re
 
 try:
     from scipy.optimize import minimize
@@ -47,13 +45,11 @@ except ImportError:
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
 from ...errorhandler import assert_msg_critical
-from ...molecule import Molecule
 
-from ..io.basic import nn, nl, pname, is_list_A_in_B
+from ..io.basic import pname, is_list_A_in_B
 from ..utils.geometry import (unit_cell_to_cartesian_matrix,
                               fractional_to_cartesian, cartesian_to_fractional,
-                              locate_min_idx, reorthogonalize_matrix,
-                              find_optimal_pairings, find_edge_pairings)
+                              reorthogonalize_matrix, find_edge_pairings)
 from .other import fetch_X_atoms_ind_array
 from .superimpose import superimpose_rotation_only
 
@@ -74,7 +70,7 @@ class NetOptimizer:
         self.ostream = ostream or OutputStream(sys.stdout if self.rank ==
                                                mpi_master() else None)
 
-        #NEED to be set before use
+        # NEED to be set before use
         self.G = None
         self.V_data = None
         self.V_X_data = None
@@ -86,7 +82,7 @@ class NetOptimizer:
         self.sorted_edges = None
         self.cell_info = None
 
-        #will be generated
+        # will be generated
         self.sorted_edges_of_sortednodeidx = None
         self.pname_set_dict = None
         self.pname_set = None
@@ -107,9 +103,9 @@ class NetOptimizer:
 
         # Optimization parameters
         self.opt_drv = OptimizationDriver(comm=self.comm, ostream=self.ostream)
-        self.opt_drv.pname_set_dict = None  #to be set later
+        self.opt_drv.pname_set_dict = None  # to be set later
 
-        #other parameters
+        # other parameters
         self._debug = False
         self.opt_drv._debug = self._debug
 
@@ -204,14 +200,14 @@ class NetOptimizer:
         node_atom = self.V_data[:, 0:2]
         ec_atom = self.EC_data[:, 0:2] if self.EC_data is not None else None
 
-        linker_frag_length = self.linker_frag_length
-        constant_length = self.constant_length
+        # linker_frag_length = self.linker_frag_length
+        # constant_length = self.constant_length
         x_com_length = np.mean(
             [np.linalg.norm(i) for i in self.node_x_ccoords])
         # firstly, check if all V nodes have highest connectivity
         # secondly, sort all DV nodes by connectivity
         sorted_nodes = self.sorted_nodes
-        sorted_edges = self.sorted_edges
+        # sorted_edges = self.sorted_edges
 
         self.nodes_atom = {}
         for n in sorted_nodes:
@@ -237,7 +233,7 @@ class NetOptimizer:
 
         node_pos_dict, node_X_pos_dict = self._apply_rot_trans2dict(
             G, node_pos_dict, node_X_pos_dict)
-        ###3D free rotation
+        # 3D free rotation
         saved_optimized_rotations = None
 
         ini_rot = (np.eye(3, 3).reshape(1, 3, 3).repeat(len(pname_set),
@@ -254,7 +250,7 @@ class NetOptimizer:
                     self.ostream.print_info(
                         f"Loaded saved optimized rotations shape: {saved_optimized_rotations.shape}"
                     )
-            if not self.skip_rotation_optimization:  #load but not skip
+            if not self.skip_rotation_optimization:  # load but not skip
                 self.ostream.print_info(
                     "use the loaded optimized_rotations from the previous optimization as initial guess"
                 )
@@ -496,7 +492,7 @@ class NetOptimizer:
                         target_vec = xx_vector[1] - xx_vector[0]
                     rot = correct_rot_direction(rot, source_vec, target_vec)
             else:
-                #get a random rotation matrix
+                # get a random rotation matrix
                 rot = np.eye(3)
 
             # use the rotation matrix to rotate the linker x coords
@@ -517,7 +513,7 @@ class NetOptimizer:
                 placed_edge, 0, "X")
         for i, v in scaled_rotated_node_positions.items():
             k = sorted_nodes[i]
-            pos = v[:, 1:]  #cause first column is index added by addidx
+            pos = v[:, 1:]  # cause first column is index added by addidx
             sG.nodes[k]["c_points"] = np.hstack((nodes_atom[k], pos))
             sG.nodes[k]["f_points"] = np.hstack(
                 (nodes_atom[k], cartesian_to_fractional(pos,
@@ -547,7 +543,7 @@ class NetOptimizer:
         if len(set(lengths)) != 1:
             self.ostream.print_warning(
                 "Warning: more than one type of edge length")
-            if np.std(lengths) < 1:  #1 Angstrom
+            if np.std(lengths) < 1:  # 1 Angstrom
                 self.ostream.print_info("the edge lengths are close")
             else:
                 self.ostream.print_info("the edge lengths are not close")
@@ -634,7 +630,7 @@ class NetOptimizer:
         """Apply per-pname rotation and translation to node and X positions in place."""
         sorted_nodes = self.sorted_nodes
         pname_set_dict = self.pname_set_dict
-        opt_rots = self.opt_rots
+        # opt_rots = self.opt_rots
         for p_name in pname_set_dict:
             rot, trans = pname_set_dict[p_name]["rot_trans"]
             for k in pname_set_dict[p_name]["ind_ofsortednodes"]:
@@ -859,7 +855,7 @@ class OptimizationDriver:
         assert_msg_critical("scipy" in sys.modules,
                             "SciPy is required for MofBuilder.")
 
-        self.ostream.print_info(f"Rotations optimization information:")
+        self.ostream.print_info("Rotations optimization information:")
         self.ostream.print_info(f"opt_method:, {self.opt_method}")
         self.ostream.print_info(f"maxfun:, {self.maxfun}")
         self.ostream.print_info(f"maxiter:, {self.maxiter}")
@@ -868,7 +864,7 @@ class OptimizationDriver:
         self.ostream.print_info(f"Number of nodes to optimize:, {num_nodes}")
         self.ostream.print_info("\n")
         self.ostream.print_separator()
-        self.ostream.print_info(f"Rotation Optimization (stage 1)")
+        self.ostream.print_info("Rotation Optimization (stage 1)")
         self.ostream.flush()
 
         # get a better initial guess, use random rotation matrix combination
@@ -909,7 +905,7 @@ class OptimizationDriver:
         assert_msg_critical("scipy" in sys.modules,
                             "SciPy is required for MofBuilder.")
         self.ostream.print_info('-' * 20)
-        self.ostream.print_info(f"Rotation Optimization (stage 2)")
+        self.ostream.print_info("Rotation Optimization (stage 2)")
         self.ostream.print_separator()
         self.ostream.flush()
 
@@ -944,7 +940,7 @@ class OptimizationDriver:
         """Sum of squared differences between old fractional coords and new coords in new cell (optionally fixed shape)."""
         a_old, b_old, c_old, alpha_old, beta_old, gamma_old = old_cell_params
         a_new, b_new, c_new, _, _, _ = params
-        #constrain the angles to be the same as old cell
+        # constrain the angles to be the same as old cell
         if self.fixed_cell_shape:
             b_new = a_new * ratio_ba
             c_new = a_new * ratio_ca

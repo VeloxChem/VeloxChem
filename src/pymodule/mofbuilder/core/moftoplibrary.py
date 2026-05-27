@@ -32,10 +32,8 @@
 
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-import numpy as np
-import networkx as nx
 from mpi4py import MPI
 
 from ...outputstream import OutputStream

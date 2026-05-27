@@ -53,7 +53,7 @@ class XyzWriter:
         filepath (Optional[str]): Default path to write the XYZ file if not provided per call.
         _debug (bool): If True, debug information is printed.
         file_dir (Optional[Path]): Directory of the current file to write (only set when writing).
-    
+
     Methods:
         write(filepath, header, lines):
             Write the atom coordinates to an XYZ file.
@@ -110,7 +110,7 @@ class XyzWriter:
                 x, y, z, spin, charge, note.
 
                 Only atom_label, x, y, z are directly written to the XYZ file.
-        
+
         Raises:
             AssertionError: If filepath is not specified or invalid.
 

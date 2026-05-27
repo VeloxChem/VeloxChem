@@ -37,27 +37,16 @@ import networkx as nx
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
 from ...errorhandler import assert_msg_critical
-from ...environment import get_data_path
 from mpi4py import MPI
 import sys
-import re
 
-from ..utils.geometry import (
-    unit_cell_to_cartesian_matrix,
-    fractional_to_cartesian,
-    find_edge_pairings,
-)
+from ..utils.geometry import fractional_to_cartesian
 
-from pathlib import Path
-
-from ..io.basic import pname, is_list_A_in_B, nn
-from ..io.pdb_reader import PdbReader
+from ..io.basic import pname, nn
 from ..io.pdb_writer import PdbWriter
 from ..io.gro_writer import GroWriter
 from ..io.xyz_writer import XyzWriter
 from ..io.cif_writer import CifWriter
-from ..utils.geometry import cartesian_to_fractional, fractional_to_cartesian
-from .superimpose import superimpose_rotation_only
 
 
 class MofWriter:
@@ -196,7 +185,7 @@ class MofWriter:
             return edge_data
 
         cG = self._remove_xoo_from_node(G, self.xoo_dict)
-        count = 0
+        # count = 0
         term_count = 0
         nodes_data = []
         terms_data = []
@@ -341,10 +330,10 @@ class MofWriter:
             return True
 
         cG = self._remove_xoo_from_node(G, self.xoo_dict)
-        count = 0
-        term_count = 0
+        # count = 0
+        # term_count = 0
         nodes_data = []
-        terms_data = []
+        # terms_data = []
         edges_data = []
         for n in cG.nodes():
             if pname(n) != "EDGE":

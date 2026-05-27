@@ -32,7 +32,7 @@
 
 import numpy as np
 import re
-from typing import List, Sequence, Any, Tuple, Union
+from typing import List, Sequence, Any, Tuple
 
 
 def nn(s: str) -> str:

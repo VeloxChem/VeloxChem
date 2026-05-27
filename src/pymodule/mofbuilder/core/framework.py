@@ -33,7 +33,6 @@
 from typing import Any, List, Optional, Sequence
 
 import numpy as np
-import networkx as nx
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
 from ...errorhandler import assert_msg_critical
@@ -41,7 +40,6 @@ from mpi4py import MPI
 import sys
 from .other import safe_copy
 from ..utils.environment import get_data_path
-from ..utils.fetch import fetch_pdbfile
 from pathlib import Path
 from .linker import FrameLinker
 from .write import MofWriter
@@ -163,23 +161,23 @@ class Framework:
 
         self.mofwriter = MofWriter(comm=self.comm, ostream=self.ostream)
 
-        #MD preparation
-        self.framework_data = None  #merged data for the whole framework, generated in write()
-        self.framework_fcoords_data = None  #merged fractional coordinates for the whole framework, generated in write()
+        # MD preparation
+        self.framework_data = None  # merged data for the whole framework, generated in write()
+        self.framework_fcoords_data = None  # merged fractional coordinates for the whole framework, generated in write()
 
         self.solvationbuilder = SolvationBuilder(comm=self.comm,
                                                  ostream=self.ostream)
-        self.solvents = []  #list of solvent names or xyz files
-        self.solvents_molecules = []  #list of solvent molecules
-        self.solvents_proportions = []  #list of solvent proportions
-        self.solvents_quantities = []  #list of solvent quantities
-        #will be set
+        self.solvents = []  # list of solvent names or xyz files
+        self.solvents_molecules = []  # list of solvent molecules
+        self.solvents_proportions = []  # list of solvent proportions
+        self.solvents_quantities = []  # list of solvent quantities
+        # will be set
         self.solvated_gro_file = None
-        #MD simulation
+        # MD simulation
 
-        #others for output and saving
-        self.target_directory = None  #will be set to default path if None
-        self.data_path = None  #will be set to default path if None
+        # others for output and saving
+        self.target_directory = None  # will be set to default path if None
+        self.data_path = None  # will be set to default path if None
 
         self.save_files = False
         self.linker_ff_name = "Linker"
@@ -187,15 +185,15 @@ class Framework:
         self.linker_multiplicity = None
         self.linker_reconnect_drv = 'xtb'
         self.linker_reconnect_opt = True
-        self.reconnected_linker_molecule = None  #will be set after linker force field generation
-        self.provided_linker_itpfile = None  #if provided, will map directly
-        self.filename = None  #will be set in write()
-        self.resp_charges = True  #whether to use resp charges for linker force field generation
+        self.reconnected_linker_molecule = None  # will be set after linker force field generation
+        self.provided_linker_itpfile = None  # if provided, will map directly
+        self.filename = None  # will be set in write()
+        self.resp_charges = True  # whether to use resp charges for linker force field generation
 
-        #debug
+        # debug
         self._debug = False
 
-        #will be set by MofBuilder.build()
+        # will be set by MofBuilder.build()
         self.mof_family = None
         self.node_metal = None
         self.dummy_atom_node = None
@@ -303,25 +301,25 @@ class Framework:
             fr_new_linker.create(molecule=self.new_linker_molecule)
             new_linker_center_data = fr_new_linker.linker_center_data
             new_linker_center_X_data = fr_new_linker.linker_center_X_data
-            if fr_new_linker.linker_connectivity > 2:
-                new_linker_com = np.mean(
-                    fr_new_linker.linker_outer_X_data[:, 5:8].astype(float),
-                    axis=0)
-                new_linker_outer_data = np.hstack(
-                    (fr_new_linker.linker_outer_data[:, 0:5],
-                     fr_new_linker.linker_outer_data[:, 5:8].astype(float) -
-                     new_linker_com, fr_new_linker.linker_outer_data[:, 8:]))
-                new_linker_outer_X_data = np.hstack(
-                    (fr_new_linker.linker_outer_X_data[:, 0:5],
-                     fr_new_linker.linker_outer_X_data[:, 5:8].astype(float) -
-                     new_linker_com, fr_new_linker.linker_outer_X_data[:, 8:]))
-                new_linker_frag_length = np.linalg.norm(
-                    new_linker_outer_X_data[0, 5:8].astype(float) -
-                    new_linker_outer_X_data[1, 5:8].astype(float))
-            else:
-                new_linker_frag_length = np.linalg.norm(
-                    new_linker_center_X_data[0, 5:8].astype(float) -
-                    new_linker_center_X_data[1, 5:8].astype(float))
+            # if fr_new_linker.linker_connectivity > 2:
+            #     new_linker_com = np.mean(
+            #         fr_new_linker.linker_outer_X_data[:, 5:8].astype(float),
+            #         axis=0)
+            #     new_linker_outer_data = np.hstack(
+            #         (fr_new_linker.linker_outer_data[:, 0:5],
+            #          fr_new_linker.linker_outer_data[:, 5:8].astype(float) -
+            #          new_linker_com, fr_new_linker.linker_outer_data[:, 8:]))
+            #     new_linker_outer_X_data = np.hstack(
+            #         (fr_new_linker.linker_outer_X_data[:, 0:5],
+            #          fr_new_linker.linker_outer_X_data[:, 5:8].astype(float) -
+            #          new_linker_com, fr_new_linker.linker_outer_X_data[:, 8:]))
+            #     new_linker_frag_length = np.linalg.norm(
+            #         new_linker_outer_X_data[0, 5:8].astype(float) -
+            #         new_linker_outer_X_data[1, 5:8].astype(float))
+            # else:
+            #     new_linker_frag_length = np.linalg.norm(
+            #         new_linker_center_X_data[0, 5:8].astype(float) -
+            #         new_linker_center_X_data[1, 5:8].astype(float))
 
             self.defectgenerator.new_linker_data = new_linker_center_data
             self.defectgenerator.new_linker_X_data = new_linker_center_X_data
@@ -330,7 +328,7 @@ class Framework:
                                                  self.graph.copy())
         # create a new Framework object to hold the replaced graph
         new_framework = Framework(comm=self.comm, ostream=self.ostream)
-        #inherit the properties from the current framework all attributes except graph
+        # inherit the properties from the current framework all attributes except graph
         for attr, value in self.__dict__.items():
             if attr not in ['graph', 'defectgenerator', 'framework_data']:
                 setattr(new_framework, attr, safe_copy(value))
@@ -353,20 +351,20 @@ class Framework:
         self.defectgenerator.eG_index_name_dict = self.graph_index_name_dict
         self.defectgenerator.sc_unit_cell = self.sc_unit_cell
         self.defectgenerator.sc_unit_cell_inv = self.sc_unit_cell_inv
-        self.defectgenerator.clean_unsaturated_linkers = self.clean_unsaturated_linkers  #boolean
-        self.defectgenerator.update_node_termination = self.update_node_termination  #boolean
+        self.defectgenerator.clean_unsaturated_linkers = self.clean_unsaturated_linkers  # boolean
+        self.defectgenerator.update_node_termination = self.update_node_termination  # boolean
         self.defectgenerator.matched_vnode_xind = self.matched_vnode_xind
         self.defectgenerator.xoo_dict = self.xoo_dict
         self.defectgenerator.use_termination = self.termination
         self.defectgenerator.unsaturated_linkers = self.unsaturated_linkers
         self.defectgenerator.unsaturated_nodes = self.unsaturated_nodes
 
-        #remove
+        # remove
         rmG = self.defectgenerator.remove_items_or_terminate(
             remove_indices, self.graph.copy())
-        #create a new Framework object to hold the removed graph
+        # create a new Framework object to hold the removed graph
         new_framework = Framework(comm=self.comm, ostream=self.ostream)
-        #inherit the properties from the current framework all attributes except graph
+        # inherit the properties from the current framework all attributes except graph
         for attr, value in self.__dict__.items():
             if attr not in ['graph', 'defectgenerator', 'framework_data']:
                 setattr(new_framework, attr, safe_copy(value))
@@ -409,7 +407,7 @@ class Framework:
 
             com = mean_list(self.graph.nodes[i]['fcoords'])
 
-            #every point should be less than 1
+            # every point should be less than 1
             def primitive_cell_check(point):
                 for i in point:
                     if i >= 1:
@@ -436,10 +434,10 @@ class Framework:
                 False, "OpenMM-ML is required for MofBuilder.")
         from pathlib import Path
 
-        #write a pdb file #with a random name
+        # write a pdb file #with a random name
         self.write(format='pdb')
         pdb = PDBFile(f"{self.filename}.pdb")
-        #delete the temporary pdb file after loading
+        # delete the temporary pdb file after loading
         Path(f"{self.filename}.pdb").unlink()
         potential = MLPotential(self.mlp_type, modelPath=self.mlp_model_path)
         system = potential.createSystem(pdb.topology)
@@ -480,8 +478,8 @@ class Framework:
             self.ostream.flush()
             boundary_overlap_list = self._boundary_overlap_indices()
             if len(boundary_overlap_list) > 0:
-                #remove these linkers/nodes that overlap with boundary, but remove_defects() will
-                #created a new Framework object, only update the graph to mofwriter
+                # remove these linkers/nodes that overlap with boundary, but remove_defects() will
+                # created a new Framework object, only update the graph to mofwriter
                 new_framework = self.remove_defects(
                     remove_indices=boundary_overlap_list)
                 self.get_merged_data(extra_graph=new_framework.graph)
@@ -491,7 +489,7 @@ class Framework:
                 "Performing MLP energy minimization before writing output files..."
             )
             self.ostream.flush()
-            #update ccoords and fcoords in mofwriter
+            # update ccoords and fcoords in mofwriter
             em_ccoords, em_fcoords = self._mlp_omm_minimize(mlp_maxIterations)
             em_merged_data = np.hstack((self.framework_data[:, 0:5],
                                         em_ccoords, self.framework_data[:,
@@ -508,7 +506,7 @@ class Framework:
         self.filename = str(
             Path(filename).parent / Path(filename).stem
         ) if filename is not None else f"{self.mof_family}_mofbuilder_output"
-        self.mofwriter.filename = self.filename  #whole path including directory
+        self.mofwriter.filename = self.filename  # whole path including directory
         self.ostream.print_info(f"Writing output files to {self.filename}.*")
         self.ostream.flush()
         if "xyz" in format:
@@ -538,8 +536,8 @@ class Framework:
             self.solvationbuilder.solvents_files = [self.solvents_file]
             solvents_proportions = [1]
         self.solvationbuilder.solute_data = self.framework_data
-        #mof box as preferred region
-        self.solvationbuilder.preferred_region_box = np.array([[0, self.supercell_info[0]+10], [0, self.supercell_info[1]+10], [0, self.supercell_info[2]+10]]) 
+        # mof box as preferred region
+        self.solvationbuilder.preferred_region_box = np.array([[0, self.supercell_info[0]+10], [0, self.supercell_info[1]+10], [0, self.supercell_info[2]+10]])
         self.solvationbuilder.solvents_proportions = solvents_proportions if solvents_proportions else self.solvents_proportions
         self.solvationbuilder.solvents_quantities = solvents_quantities if solvents_quantities else self.solvents_quantities
         self.solvationbuilder.target_directory = self.target_directory
@@ -549,7 +547,7 @@ class Framework:
         self.framework_data, self.solvents_data = self.solvationbuilder._update_datalines(
         )
 
-        #update residue info
+        # update residue info
         def update_residues_info(solvents_dict, residue_info):
             for k, v in solvents_dict.items():
                 residue_info[k] = v['accepted_quantity']
@@ -561,7 +559,7 @@ class Framework:
         self.solvation_system_data = np.vstack(
             (self.framework_data, self.solvents_data))
 
-        #write solvated system to gro file
+        # write solvated system to gro file
         file_name = f"{self.mof_family}_in_solvent"
         self.solvationbuilder.write_output(output_file=file_name,
                                            format=["gro"])
@@ -610,7 +608,7 @@ class Framework:
         self.reconnected_linker_molecule = self.linker_ff_gen.dest_linker_molecule
 
     def md_prepare(self):
-        #write gro file for the framework
+        # write gro file for the framework
         self.generate_linker_forcefield()
         self._print_dummy_atom_reference()
         self.gmx_ff = GromacsForcefieldMerger(comm=self.comm,
@@ -632,16 +630,16 @@ class Framework:
         self.gmx_ff.mof_name = self.mof_family
         self.gmx_ff.generate_MOF_gromacsfile()
         if self.solvated_gro_file is None:
-            self.ostream.print_warning(f"MOF system is not solvated!")
+            self.ostream.print_warning("MOF system is not solvated!")
             self.ostream.flush()
             if self.filename is None:
                 self.filename = str(
                     Path(self.target_directory) /
                     f"{self.mof_family}_mofbuilder_output")
             system_pbc = False
-            #write gro file for the framework only
+            # write gro file for the framework only
             self.ostream.print_info(
-                f"Writing gro file for the framework only.")
+                "Writing gro file for the framework only.")
             self.ostream.flush()
             self.ostream.print_info(
                 f"MD input gro file will be {self.filename}.gro")
@@ -655,7 +653,7 @@ class Framework:
             f"MD input gro file: {grofile}, top file: {self.gmx_ff.top_path}")
         self.ostream.flush()
 
-        #setup MD driver
+        # setup MD driver
         self.md_driver = OpenmmSetup(gro_file=grofile,
                                      top_file=self.gmx_ff.top_path,
                                      comm=self.comm,

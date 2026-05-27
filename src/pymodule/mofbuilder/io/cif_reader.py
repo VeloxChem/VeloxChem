@@ -41,6 +41,7 @@ from ...errorhandler import assert_msg_critical
 from mpi4py import MPI
 import sys
 
+
 class CifReader:
     """
     Class for reading CIF files, extracting symmetry and atomic site information,

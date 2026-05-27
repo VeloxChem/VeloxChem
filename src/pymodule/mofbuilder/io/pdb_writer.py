@@ -148,7 +148,7 @@ class PdbWriter:
                     last_name = values[3]
                     last_residue_number = values[4]
                     j = 0
-                atom_type = values[0]
+                # atom_type = values[0]
                 atom_label = values[1] + str(j + 1)
                 atom_number = i + 1
                 residue_name = values[3].split('_')[0]
@@ -156,8 +156,8 @@ class PdbWriter:
                 x = values[5]
                 y = values[6]
                 z = values[7]
-                spin = values[8]
-                charge = values[9]
+                # spin = values[8]
+                # charge = values[9]
                 note = values[10].split('_')[0]
                 j += 1
                 # Format the values using the specified format string

@@ -30,7 +30,6 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from operator import index
 import re
 import sys
 from pathlib import Path
@@ -41,8 +40,7 @@ from ...scfrestdriver import ScfRestrictedDriver
 from ...molecularbasis import MolecularBasis
 from ...optimizationdriver import OptimizationDriver
 from ...mmforcefieldgenerator import MMForceFieldGenerator
-from ...veloxchemlib import mpi_master, hartree_in_kcalpermol, hartree_in_kjpermol
-from ...errorhandler import assert_msg_critical
+from ...veloxchemlib import mpi_master
 from mpi4py import MPI
 
 
@@ -152,6 +150,7 @@ class GromacsForcefieldMerger:
         target_itp_path.mkdir(parents=True, exist_ok=True)
         amber_itp_path = Path(data_path, "amber14sb_OL21.ff")
         dest_amber_itp_path = Path(target_itp_path, "amber14sb_OL21.ff")
+
         def copy_folder(src: Path, dest: Path) -> None:
             if not dest.is_dir():
                 dest.mkdir(parents=True, exist_ok=True)
@@ -169,8 +168,7 @@ class GromacsForcefieldMerger:
                 "parameters or atom types in the generated GROMACS files."
             )
             self.ostream.flush()
-        
-        
+
         node_itp_name = f"{self.node_metal_type}_dummy" if self.dummy_atom_node else f"{self.node_metal_type}"
         if self._debug:
             self.ostream.print_info(f"looking for {node_itp_name}.itp for node")
@@ -343,7 +341,7 @@ class GromacsForcefieldMerger:
             inputfile (str): Path to the template .top file.
 
         Returns:
-            Tuple[List[List[str]], List[str]]: 
+            Tuple[List[List[str]], List[str]]:
                 - middlelines: a list where each element is a section (list of lines) from the .top file
                 - sectorname: list of the name/header line of each section
         """
@@ -409,7 +407,7 @@ class GromacsForcefieldMerger:
         top_itp_lines.append("; Include forcefield parameters\n")
         itps = [i for i in Path(itp_path).rglob("*.itp") if i.is_file() and i.suffix == ".itp" and str(Path(i).name) not in ["posre.itp"]]
         for i in itps[::-1]:
-            if i.name not in ["posre.itp", "ffnonbonded.itp","ffbonded.itp","gbsa.itp"]:  
+            if i.name not in ["posre.itp", "ffnonbonded.itp","ffbonded.itp","gbsa.itp"]:
                 if self._debug:
                     self.ostream.print_info(f"found file: {i} in path {itp_path}")
                     self.ostream.flush()

@@ -32,7 +32,7 @@
 
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import numpy as np
 import networkx as nx
@@ -187,7 +187,7 @@ class FrameNode:
 
     def _fetch_template(self, metal):
         if not self.dummy_node:
-            #just metal atom
+            # just metal atom
             self.ostream.print_info("No dummy atoms to add.")
             self.ostream.flush()
             return np.array([[0.0, 0.0, 0.0]])
@@ -272,8 +272,8 @@ class FrameNode:
             f"Found {len(metal_nodes)} metal nodes, {len(oxygen_nodes)} oxygen nodes, {len(hydrogen_nodes)} hydrogen nodes."
         )
         self.ostream.flush()
-        
-        #firstly clean all bonds to metal
+
+        # firstly clean all bonds to metal
         for mn in metal_nodes:
             neighbor_nodes = list(sG.adj[mn])
             for n in neighbor_nodes:
@@ -313,7 +313,7 @@ class FrameNode:
                         sG.add_edge(mn, d_name)
                         count += 1
         else:
-            #clean all metal bonds if no dummy atoms
+            # clean all metal bonds if no dummy atoms
             for mn in metal_nodes:
                 neighbor_nodes = list(sG.adj[mn])
                 for n in neighbor_nodes:
@@ -334,10 +334,10 @@ class FrameNode:
 
     def _lines_of_atoms(self, subgraph, subgraph_nodes):
         if not self.dummy_node:
-            #just metal atom
+            # just metal atom
             def not_metal_nodes(nodes):
-                l = [nn(node) for node in nodes]
-                return l.count(self.node_metal_type) == 0
+                labels = [nn(node) for node in nodes]
+                return labels.count(self.node_metal_type) == 0
 
             rows = [[
                 n, subgraph.nodes[n]["type"], *subgraph.nodes[n]["ccoords"]
@@ -379,7 +379,7 @@ class FrameNode:
         for subnodes in self.subpart_nodes:
             subgraph = sG.subgraph(subnodes)
             sorted_nodes = sorted(subnodes)
-            #extend Dummy or metal node firstly
+            # extend Dummy or metal node firstly
             if self.node_metal_type in [nn(sn) for sn in subnodes]:
                 all_atom_lines_head.extend(
                     self._lines_of_atoms(subgraph, sorted_nodes))
@@ -408,8 +408,8 @@ class FrameNode:
         self.bonds = all_atom_bonds
 
     def _generate_dummy_node_split_dict(self):
-        #head: without dummy atoms
-        #tail: with dummy atoms and metal atoms
+        # head: without dummy atoms
+        # tail: with dummy atoms and metal atoms
         nodes_dict = {
             'O': [],
             'HO': [],
@@ -422,25 +422,25 @@ class FrameNode:
         def is_OOX(list):
             if len(list) != 3:
                 return False
-            #two oxygens and one X connected atoms
+            # two oxygens and one X connected atoms
             return list.count("O") == 2 and list.count("X") == 1
 
         def is_O(list):
             if len(list) != 1:
                 return False
-            #two oxygens connected atoms
+            # two oxygens connected atoms
             return list.count("O") == 1
 
         def is_HO(list):
             if len(list) != 2:
                 return False
-            #one oxygen and one hydrogen connected atoms
+            # one oxygen and one hydrogen connected atoms
             return list.count("O") == 1 and list.count("H") == 1
 
         def is_HHO(list):
             if len(list) != 3:
                 return False
-            #one oxygen and two hydrogen connected atoms
+            # one oxygen and two hydrogen connected atoms
             return list.count("O") == 1 and list.count("H") == 2
 
         def is_METAL(list):
@@ -449,24 +449,24 @@ class FrameNode:
 
         head, tail = [], []
         for sub in self.sG_subparts:
-            l = [nn(i) for i in sub]
-            l.sort()
-            if "X" not in l:
+            labels = [nn(i) for i in sub]
+            labels.sort()
+            if "X" not in labels:
                 head.append(sorted(sub))
-                if is_O(l):
-                    nodes_dict['O'].append(l)
-                elif is_HO(l):
-                    nodes_dict['HO'].append(l)
-                elif is_HHO(l):
-                    nodes_dict['HHO'].append(l)
-                elif is_METAL(l):
-                    nodes_dict['METAL'].append(l)
+                if is_O(labels):
+                    nodes_dict['O'].append(labels)
+                elif is_HO(labels):
+                    nodes_dict['HO'].append(labels)
+                elif is_HHO(labels):
+                    nodes_dict['HHO'].append(labels)
+                elif is_METAL(labels):
+                    nodes_dict['METAL'].append(labels)
                 else:
-                    nodes_dict['others'].append(l)
+                    nodes_dict['others'].append(labels)
             else:
                 tail.append(sorted(sub))
-                if is_OOX(l):
-                    nodes_dict['OOX'].append(l)
+                if is_OOX(labels):
+                    nodes_dict['OOX'].append(labels)
 
         self.subpart_nodes = head + tail
 
@@ -554,7 +554,7 @@ class FrameNode:
             self.lines)
 
         if self.save_files:
-            #read the new pdb file to get self.node_data
+            # read the new pdb file to get self.node_data
             self.pdbreader.filepath = self.new_pdbfilename
             self.ostream.print_info(
                 f"Node processing completed. New pdb file at {self.new_pdbfilename}."

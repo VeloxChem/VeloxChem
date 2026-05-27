@@ -34,18 +34,13 @@ import sys
 from pathlib import Path
 from typing import Any, Optional
 
-import numpy as np
-import networkx as nx
 from mpi4py import MPI
 
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
 from ...errorhandler import assert_msg_critical
-from ...molecule import Molecule
 
-from ..io.basic import nn
 from ..io.pdb_reader import PdbReader
-from ..io.pdb_writer import PdbWriter
 
 
 class FrameTermination:

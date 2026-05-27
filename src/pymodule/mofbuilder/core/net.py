@@ -30,14 +30,13 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 import numpy as np
 import networkx as nx
 from ..io.cif_reader import CifReader
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
-from ...errorhandler import assert_msg_critical
 from mpi4py import MPI
 import sys
 
@@ -97,7 +96,7 @@ class FrameNet:
         self.cif_file = None
         self.edge_length_range = []
 
-        #will be set by create_net
+        # will be set by create_net
         self.vvnode333 = None
         self.ecnode333 = None
         self.eenode333 = None
@@ -111,7 +110,7 @@ class FrameNet:
         self.sorted_edges = None
         self.linker_connectivity = None
 
-        #debug
+        # debug
         self._debug = False
 
     def _make_supercell_3x3x3(self, array_xyz):
@@ -283,7 +282,7 @@ class FrameNet:
         self.G = G.copy()
         self.max_degree = max_degree
 
-        #check if the self.max_degree is correct
+        # check if the self.max_degree is correct
         if self._debug:
             self.ostream.print_info(
                 f"Max degree of the net: {self.max_degree}")
@@ -437,7 +436,7 @@ class FrameNet:
         self.unit_cell = self._extract_unit_cell(self.cell_info)
         self.unit_cell_inv = np.linalg.inv(self.unit_cell)
 
-        if self.cifreader.EC_con is None:  #ditopic linker MOF
+        if self.cifreader.EC_con is None:  # ditopic linker MOF
             self.linker_connectivity = 2
             self._find_pair_v_e(distance_range=self.edge_length_range)
             self._add_ccoords(self.G, self.unit_cell)
@@ -473,7 +472,7 @@ class FrameNet:
 
         if int(self.max_degree) != int(self.cifreader.V_con):
             self.ostream.print_warning(
-                f"Max degree of the net: {self.max_degree}, {self.max_degree==self.cifreader.V_con} to the net connectivity {self.cifreader.V_con}"
+                f"Max degree of the net: {self.max_degree}, {self.max_degree == self.cifreader.V_con} to the net connectivity {self.cifreader.V_con}"
             )
         else:
             self.ostream.print_info(

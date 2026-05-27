@@ -31,32 +31,17 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
-from pathlib import Path
 
 import numpy as np
 import networkx as nx
 from mpi4py import MPI
-import h5py
-import re
-
-try:
-    from scipy.optimize import linear_sum_assignment
-except ImportError:
-    pass
 
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
-from ...errorhandler import assert_msg_critical
-from ...molecule import Molecule
 
-from ..io.basic import nn, nl, pname, is_list_A_in_B, lname, arr_dimension
-from ..utils.geometry import (unit_cell_to_cartesian_matrix,
-                              fractional_to_cartesian, cartesian_to_fractional,
-                              locate_min_idx, reorthogonalize_matrix,
-                              find_optimal_pairings, find_edge_pairings,
-                              Carte_points_generator)
+from ..io.basic import nn, nl, pname, lname, arr_dimension
+from ..utils.geometry import locate_min_idx, Carte_points_generator
 from .other import fetch_X_atoms_ind_array, find_pair_x_edge_fc, order_edge_array
-from .superimpose import superimpose_rotation_only
 
 
 class SupercellBuilder:
@@ -381,7 +366,7 @@ class SupercellBuilder:
                 n for n in superG.nodes() if superG.nodes[n]["note"] == "CV"
             ]
             if set(cvnodes) == set(
-                [i[0] for i in super_multiedge_bundlings_edges]):
+                    [i[0] for i in super_multiedge_bundlings_edges]):
                 return superG
             else:
                 self.ostream.print_info(
@@ -522,11 +507,11 @@ class EdgeGraphBuilder:
             self.eG, unsaturated_linker, self.matched_vnode_xind, self.xoo_dict = self._addxoo2edge_multitopic(
                 self.eG, self.sc_unit_cell)
 
-        #cleave the range of supercell buffer
+        # cleave the range of supercell buffer
         self._make_supercell_range_cleaved_eG(self.eG, self.supercell,
                                               self.custom_fbox)
         self.eG_index_name_dict = eG_index_name_dict
-        #will generate the cleaved_eG, cleaved_edges, cleaved_nodes
+        # will generate the cleaved_eG, cleaved_edges, cleaved_nodes
         self.unsaturated_linkers = unsaturated_linker
 
         self.unsaturated_nodes = self._find_unsaturated_node(
@@ -555,8 +540,8 @@ class EdgeGraphBuilder:
         - Virtual edges in superG are preserved in the resulting eG.
         """
         eG = nx.Graph()
-        edge_count = 1  #2n
-        node_count = 0  #2n+1
+        edge_count = 1  # 2n
+        node_count = 0  # 2n+1
         eG_index_name_dict = {}
 
         # First pass: add NODE entries for V nodes and EDGE nodes for CV centers
@@ -739,7 +724,7 @@ class EdgeGraphBuilder:
         # extract only the X atoms in the neighbor edges but not the cv nodes: [len(ec_arr) :]
         nei_indices, nei_fcpoints = fetch_X_atoms_ind_array(merged_arr, 0, "X")
 
-        #skip atom type column
+        # skip atom type column
         row_ind, col_ind = find_pair_x_edge_fc(
             ec_fpoints[:, 2:5].astype(float),
             nei_fcpoints[:, 2:5].astype(float), sc_unit_cell)
@@ -947,8 +932,8 @@ class EdgeGraphBuilder:
                 # nothing to match for this edge
                 continue
             elif len(Xs_edge_indices) == 1:
-                #only one dot in edge
-                #duplicate this dot
+                # only one dot in edge
+                # duplicate this dot
                 Xs_edge_fpoints = np.vstack([Xs_edge_fpoints] * 2)
                 Xs_edge_indices = np.hstack([Xs_edge_indices] * 2)
 
