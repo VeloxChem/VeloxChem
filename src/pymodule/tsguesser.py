@@ -897,9 +897,9 @@ class TransitionStateGuesser():
                 ts_results = self.results
 
         scan = ts_results['scan']
-        lambda_vec = [round(float(l), 3) for l in ts_results['lambda_vec']]
 
-        if TransitionStateGuesser._has_qm_results(scan, lambda_vec):
+        if TransitionStateGuesser._has_qm_results(scan,
+                                                  ts_results['lambda_vec']):
             final_lambda = round(float(ts_results.get('max_qm_lambda', 0)), 3)
         else:
             final_lambda = round(float(ts_results['max_mm_lambda']), 3)
@@ -911,7 +911,8 @@ class TransitionStateGuesser():
         def _best_conformer_index(step):
             best_index = 0
             min_energy = None
-            if TransitionStateGuesser._has_qm_results(scan, lambda_vec):
+            if TransitionStateGuesser._has_qm_results(scan,
+                                                      ts_results['lambda_vec']):
                 for i, conf in enumerate(scan[step]):
                     qm_E = conf.get('qm_energy', None)
                     if min_energy is None or (qm_E is not None
@@ -927,8 +928,11 @@ class TransitionStateGuesser():
 
         initial_best = _best_conformer_index(final_lambda)
 
+        rounded_lambda_vec = [
+            round(float(l), 3) for l in ts_results['lambda_vec']
+        ]
         step_selector = ipywidgets.SelectionSlider(
-            options=lambda_vec,
+            options=rounded_lambda_vec,
             description='Lambda',
             value=final_lambda,
         )
@@ -946,7 +950,7 @@ class TransitionStateGuesser():
             TransitionStateGuesser._show_conformer_iteration(
                 step,
                 min(conformer_id, n_conf),
-                lambda_vec,
+                rounded_lambda_vec,
                 scan,
                 bonds=bonds,
                 forming_bonds=forming_bonds,
