@@ -454,10 +454,15 @@ class ReactionSystemBuilder():
         mol.write_xyz_file('residue.xyz')
         connectivity_matrix = mol.get_connectivity_matrix()
         residue_bonds = []
-        for i, id in enumerate(residue_ids):
-            if np.all(connectivity_matrix[i]) == 0:
-                if int(residue_elements[i]) == 1:
-                    # unconnected hydrogen, connect to closest heavy atom
+        for connectivity_range in [1.3, 1.29, 1.28, 1.27, 1.26, 1.25]:
+            connectivity_matrix = mol.get_connectivity_matrix(
+                factor=connectivity_range)
+            residue_bonds = set()
+            residue_bonds_save = set()
+            for i, id in enumerate(residue_ids):
+                if np.all(connectivity_matrix[i] == 0):
+                    # if int(residue_elements[i]) == 1:
+                    # unconnected atom, connect to closest heavy atom
                     heavy_indices = [
                         j for j, elem in enumerate(residue_elements)
                         if int(elem) != 1
@@ -468,41 +473,58 @@ class ReactionSystemBuilder():
                         mol.get_coordinates_in_angstrom()[heavy_indices] -
                         mol.get_coordinates_in_angstrom()[i],
                         axis=1)
+
+                    if i in heavy_indices:
+                        distances[heavy_indices.index(i)] = 100
+
                     closest_heavy = heavy_indices[np.argmin(distances)]
+                    connectivity_matrix[i, closest_heavy] = 1
+                    connectivity_matrix[closest_heavy, i] = 1
 
-            for j, jd in enumerate(residue_ids):
-                if i >= j:
-                    continue
-                if connectivity_matrix[i, j] == 1:
-                    residue_bonds.append((id, jd))
+                for j, jd in enumerate(residue_ids):
+                    # if i >= j:
+                    #     continue
+                    if connectivity_matrix[i, j] == 1:
+                        residue_bonds.add(tuple(sorted((id, jd))))
+                        residue_bonds_save.add(tuple(sorted((i, j))))
 
-        vlx_graph = nx.Graph()
-        vlx_graph.add_nodes_from(vlx_ids)
-        vlx_graph.add_edges_from(vlx_bonds)
-        for i, elem in zip(vlx_ids, vlx_elements):
-            vlx_graph.nodes[i]['elem'] = elem
+            vlx_graph = nx.Graph()
+            vlx_graph.add_nodes_from(vlx_ids)
+            vlx_graph.add_edges_from(vlx_bonds)
+            for i, elem in zip(vlx_ids, vlx_elements):
+                vlx_graph.nodes[i]['elem'] = elem
 
-        res_graph = nx.Graph()
-        res_graph.add_nodes_from(residue_ids)
-        res_graph.add_edges_from(residue_bonds)
+            res_graph = nx.Graph()
+            res_graph.add_nodes_from(residue_ids)
+            res_graph.add_edges_from(residue_bonds)
 
-        for i, elem in zip(residue_ids, residue_elements):
-            res_graph.nodes[i]['elem'] = elem
+            for i, elem in zip(residue_ids, residue_elements):
+                res_graph.nodes[i]['elem'] = elem
 
-        self.ostream.print_info(
-            f"Created vlx graph with {len(vlx_ids)} nodes and {len(vlx_bonds)} edges"
-        )
-        self.ostream.print_info(
-            f"Created residue graph with {len(residue_ids)} nodes and {len(residue_bonds)} edges"
-        )
-        self.ostream.flush()
-        GM = GraphMatcher(vlx_graph, res_graph,
-                          categorical_node_match('elem', ''))
-        if not GM.subgraph_is_isomorphic():
-            raise ValueError(
-                f"Could not find subgraph isomorphism between the residue and the reactant molecule"
+            self.ostream.print_info(
+                f"Created vlx graph with {len(vlx_ids)} nodes and {len(vlx_bonds)} edges"
             )
-        return GM.subgraph_isomorphisms_iter()
+            self.ostream.print_info(
+                f"Created residue graph with {len(residue_ids)} nodes and {len(residue_bonds)} edges"
+            )
+            self.ostream.flush()
+            GM = GraphMatcher(vlx_graph, res_graph,
+                              categorical_node_match('elem', ''))
+            mol.write_xyz_file('residue.xyz')
+            np.savetxt('residue_bonds.txt', np.array(list(residue_bonds_save)))
+
+            self.reactant.molecule.write_xyz_file('reactant.xyz')
+            np.savetxt('reactant_bonds.txt', np.array(list(vlx_bonds)))
+
+            if GM.subgraph_is_isomorphic():
+                return GM.subgraph_isomorphisms_iter()
+
+        raise ValueError(
+            "The detected residue structure must be subgraph isomorphic to the reactant molecule, but it is not. "
+            "You can inspect the automatically detected bonds and geometry with the following code: \n"
+            "vlx.Molecule.read_xyz_file('reactant.xyz').show(bonds=np.loadtxt('reactant_bonds.txt'))\n"
+            "vlx.Molecule.read_xyz_file('residue.xyz').show(bonds=np.loadtxt('residue_bonds.txt'))"
+        )
 
     def _delete_pdb_forces(self, system, del_indices):
         # set the right force groups, give descriptive names to the pdb forces, and delete all contributions that solely have the given indices

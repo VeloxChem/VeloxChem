@@ -205,8 +205,8 @@ class ReactionForceFieldBuilder():
 
         self.ostream.flush()
 
-        if self.optimize_ff and len(forming_bonds) > 0 or len(
-                breaking_bonds) > 0:
+        if self.optimize_ff and (len(forming_bonds) > 0 or len(
+                breaking_bonds) > 0):
             # TODO this optimisation can likely be taken care of by the openmmdynamics class
             reactant_ff.molecule = self._optimize_molecule(
                 reactant_ff.molecule.get_element_ids(),

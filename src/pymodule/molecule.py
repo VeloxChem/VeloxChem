@@ -1547,7 +1547,7 @@ def _Molecule_show(self,
                     if bond in dashed_bonds or (bond[1],
                                                 bond[0]) in dashed_bonds:
                         continue
-                edit_mol.AddBond(bond[0], bond[1], Chem.BondType.SINGLE)
+                edit_mol.AddBond(int(bond[0]), int(bond[1]), Chem.BondType.SINGLE)
 
             sdf = Chem.MolToMolBlock(edit_mol.GetMol())
             viewer.addModel(sdf, 'sdf')

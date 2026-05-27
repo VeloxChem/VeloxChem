@@ -184,12 +184,14 @@ class EvbReporter():
             # self.measure_params = sorted(self.measure_params)
             self.measure_params = sorted(self.measure_params,
                                          key=lambda x: (len(x), x))
-            dir = '/'.join(energy_file.split('/')[:-1])
-            filename = dir + '/bonded_E1_decomp.csv'
+            dir = Path(energy_file).parent
+
+            # dir = '/'.join(energy_file.split('/')[:-1])
+            filename = dir / 'bonded_E1_decomp.csv'
+            filename = dir / 'bonded_E2_decomp.csv'
+            filename = dir / 'bonded_params.csv'
             self.bonded_E1_decomp_out = open(filename, 'a' if append else 'w')
-            filename = str(output_dir / 'bonded_E2_decomp.csv')
             self.bonded_E2_decomp_out = open(filename, 'a' if append else 'w')
-            filename = str(output_dir / 'bonded_params.csv')
             self.bonded_params_out = open(filename, 'a' if append else 'w')
             self.out_streams.append(self.bonded_E1_decomp_out)
             self.out_streams.append(self.bonded_E2_decomp_out)
