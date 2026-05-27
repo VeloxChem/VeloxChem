@@ -836,8 +836,8 @@ class TransitionStateGuesser():
                     self.scf_drv,
                     'solvation_model') and self.scf_drv.solvation_model is None:
                 self.ostream.print_warning(
-                    'Implicit solvation turned on, but explicitly provided SCF'
-                    'driver has no solvation model activated. Continuing without QM solvation.'
+                    'Implicit solvation turned on, but explicitly provided SCF '
+                    'driver has no solvation model activated. Continuing without QM solvation. '
                     'Provide an SCF driver with a solvation model activated to enable QM solvation.'
                 )
 
