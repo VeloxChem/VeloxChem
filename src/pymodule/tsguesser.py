@@ -111,7 +111,7 @@ class TransitionStateGuesser():
         self.force_conformer_search = False
         self.discont_conformer_search = False
         self.peak_conformer_search = False
-        self.peak_conformer_search_range = 1
+        self.peak_conformer_search_range = 2
         self.mm_conformer_equivalence_threshold = 1e-1  # kJ/mol
         self.mm_scan_backward = False
 
@@ -1163,8 +1163,8 @@ class TransitionStateGuesser():
             marker='_',
             color='darkcyan',
             alpha=0.4,
-            s=80 / math.log(total_steps, 10),
-            linewidths=1.0,
+            s=30 / math.log(min(2, total_steps), 10),
+            linewidths=2.0,
             zorder=0.5,
         )
         ax1.scatter(
@@ -1172,7 +1172,7 @@ class TransitionStateGuesser():
             rel_mm_energies,
             color='black',
             alpha=0.7,
-            s=120 / math.log(total_steps, 10),
+            s=50 / math.log(min(2, total_steps), 10),
             facecolors="none",
             edgecolor="darkcyan",
             zorder=1,
@@ -1184,7 +1184,7 @@ class TransitionStateGuesser():
             marker='o',
             color='darkcyan',
             alpha=1.0,
-            s=120 / math.log(total_steps, 10),
+            s=50 / math.log(min(2, total_steps), 10),
             zorder=2,
         )
         ax1.set_xlabel(r'$\lambda$')
@@ -1207,15 +1207,15 @@ class TransitionStateGuesser():
                 marker='_',
                 color='darkorange',
                 alpha=0.4,
-                s=80 / math.log(total_steps, 10),
-                linewidths=1.0,
+                s=30 / math.log(min(2, total_steps), 10),
+                linewidths=2.0,
                 zorder=0.5,
             )
             ax1.scatter(
                 lambda_vec,
                 rel_qm_energies,
                 alpha=0.7,
-                s=120 / math.log(total_steps, 10),
+                s=50 / math.log(min(2, total_steps), 10),
                 facecolors="none",
                 edgecolor="darkorange",
                 zorder=1,
@@ -1233,7 +1233,7 @@ class TransitionStateGuesser():
                 marker='o',
                 color='darkorange',
                 alpha=1.0,
-                s=120 / math.log(total_steps, 10),
+                s=120 / math.log(min(2, total_steps), 10),
                 zorder=2,
             )
             ax1.set_ylabel('Relative QM energy [kJ/mol]')
@@ -1577,8 +1577,6 @@ class TransitionStateGuesser():
             self.ostream.print_header(self._param("solvation", "SMD"))
             self.ostream.print_header(
                 self._param("SMD solvent", self.smd_solvent))
-        else:
-            self.ostream.print_header(self._param("solvation", "vacuum"))
 
         self.ostream.print_blank()
         self.ostream.flush()
