@@ -155,7 +155,8 @@ class OpenmmSetup:
             output_prefix (str, optional): Prefix for output and log files.
             whole_traj_file (Optional[str], optional): If provided, append structure to this PDB.
         """
-        print("Starting energy minimization...")
+        self.ostream.print_info("Starting energy minimization...")
+        self.ostream.flush()
         if self.simulation is None:
             integrator = LangevinIntegrator(
                 self.temperature, 1 / picosecond, self.timestep
@@ -178,7 +179,8 @@ class OpenmmSetup:
         PDBFile.writeFile(
             self.simulation.topology, self.positions, open(em_file, "w")
         )
-        print("Energy minimization done.")
+        self.ostream.print_info("Energy minimization done.")
+        self.ostream.flush()
 
         # Append to whole trajectory if requested
         if whole_traj_file:
@@ -237,12 +239,14 @@ class OpenmmSetup:
             )
         )
 
-        print(f"Running {mode.upper()} for {time_ps} ps ...")
+        self.ostream.print_info(f"Running {mode.upper()} for {time_ps} ps ...")
+        self.ostream.flush()
         self.simulation.step(nsteps)
         self.positions = self.simulation.context.getState(
             getPositions=True
         ).getPositions()
-        print(f"{mode.upper()} done.")
+        self.ostream.print_info(f"{mode.upper()} done.")
+        self.ostream.flush()
 
     def run_nvt(
         self,
@@ -346,4 +350,5 @@ class OpenmmSetup:
                     whole_traj_file=whole_traj_file,
                 )
             else:
-                print(f"Unknown step: {step}")
+                self.ostream.print_warning(f"Unknown step: {step}")
+                self.ostream.flush()

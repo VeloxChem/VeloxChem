@@ -613,7 +613,8 @@ class Framework:
         #write gro file for the framework
         self.generate_linker_forcefield()
         self._print_dummy_atom_reference()
-        self.gmx_ff = GromacsForcefieldMerger()
+        self.gmx_ff = GromacsForcefieldMerger(comm=self.comm,
+                                              ostream=self.ostream)
         self.gmx_ff._debug = self._debug
         self.gmx_ff.solvents_dict = self.solvents_dict
         self.gmx_ff.database_dir = self.data_path if self.data_path is not None else get_data_path(

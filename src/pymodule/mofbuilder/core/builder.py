@@ -141,6 +141,8 @@ class MetalOrganicFrameworkBuilder:
                                                mpi_master() else None)
         #need to be set before building the framework
         self.framework = Framework(
+            comm=self.comm,
+            ostream=self.ostream,
         )  #will be returned as the built framework object
 
         self.mof_family = mof_family  #need to be set by user
