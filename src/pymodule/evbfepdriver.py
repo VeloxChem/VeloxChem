@@ -35,8 +35,6 @@ from pathlib import Path
 import numpy as np
 import time
 import sys
-import os
-import glob
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
@@ -814,12 +812,11 @@ class EvbFepDriver():
 
             output_file = "combined_crash.pdb"
             pdb_pattern = "state_step_*.pdb"
-            pdb_files = sorted(
-                glob.glob(os.path.join(self.run_folder, pdb_pattern)))
-            with open(self.data_folder / output_file, 'w') as outfile:
+            pdb_files = sorted(self.run_folder.glob(pdb_pattern))
+            with (self.data_folder / output_file).open("w") as outfile:
                 for model_number, pdb_file in enumerate(pdb_files, start=1):
                     outfile.write(f"MODEL     {model_number}\n")
-                    with open(pdb_file, 'r') as infile:
+                    with pdb_file.open("r") as infile:
                         for line in infile:
                             if line.startswith(
                                 ('ATOM', 'HETATM', 'TER',
@@ -828,7 +825,7 @@ class EvbFepDriver():
                                              ):  # Skip headers/footers
                                 outfile.write(line)
                     outfile.write("ENDMDL\n")
-                    os.remove(pdb_file)
+                    pdb_file.unlink()
 
         header = "step, kinetic, potential, volume,"
         header += EvbForceGroup.get_header()

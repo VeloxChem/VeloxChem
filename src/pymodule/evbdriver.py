@@ -312,13 +312,14 @@ class EvbDriver():
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbDriver.')
 
-        with open(str(Path(data_folder) / "options.json"), "r") as file:
+        options_path = Path(data_folder) / "options.json"
+        with options_path.open("r") as file:
             options = json.load(file)
             temperature = options["temperature"]
             Lambda = options["Lambda"]
         if self.Lambda != Lambda and self.Lambda is not None:
             self.ostream.print_warning(
-                f"Lambda vector in {data_folder}/options.json does not match the current Lambda vector. Overwriting current Lambda vector with the one from the file."
+                f"Lambda vector in {options_path} does not match the current Lambda vector. Overwriting current Lambda vector with the one from the file."
             )
 
         self.Lambda = Lambda
@@ -724,9 +725,11 @@ class EvbDriver():
 
     def create_viamd_environment_files(self):
         for conf in self.system_confs:
+            molecule_file_path = Path("topology.pdb")
+            trajectory_file_path = Path("trajectory.xtc")
             base = ("[Files]\n"
-                    "MoleculeFile=./topology.pdb\n"
-                    "TrajectoryFile=./trajectory.xtc\n"
+                    f"MoleculeFile={molecule_file_path}\n"
+                    f"TrajectoryFile={trajectory_file_path}\n"
                     "CoarseGrained=0\n"
                     "\n"
                     "[RenderSettings]\n"
@@ -820,7 +823,8 @@ class EvbDriver():
 
             string += script + "\n"
 
-            with open(f"{conf['data_folder']}/workspace.via", "w") as file:
+            workspace_path = Path(conf["data_folder"]) / "workspace.via"
+            with workspace_path.open("w") as file:
                 file.write(string)
 
     def default_system_configurations(self, name: str) -> dict:
