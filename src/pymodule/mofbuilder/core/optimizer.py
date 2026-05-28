@@ -737,7 +737,6 @@ class OptimizationDriver:
         self.opt_method = 'L-BFGS-B'
         self.maxfun = 15000
         self.maxiter = 15000
-        self.display = True
         self.eps = 1e-8
 
         self.fixed_cell_shape = True
@@ -858,7 +857,6 @@ class OptimizationDriver:
         self.ostream.print_info(f"opt_method:, {self.opt_method}")
         self.ostream.print_info(f"maxfun:, {self.maxfun}")
         self.ostream.print_info(f"maxiter:, {self.maxiter}")
-        self.ostream.print_info(f"display:, {self.display}")
         self.ostream.print_info(f"eps:, {self.eps}")
         self.ostream.print_info(f"Number of nodes to optimize:, {num_nodes}")
         self.ostream.print_info("\n")
@@ -878,7 +876,6 @@ class OptimizationDriver:
             options={
                 "maxfun": self.maxfun,
                 "maxiter": self.maxiter,
-                "disp": self.display,
                 "eps": self.eps,
                 "maxls": 50,
             },
@@ -920,7 +917,6 @@ class OptimizationDriver:
             options={
                 "maxfun": self.maxfun,
                 "maxiter": self.maxiter,
-                "disp": self.display,
                 "eps": self.eps,
             },
         )
