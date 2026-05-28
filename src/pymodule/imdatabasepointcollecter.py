@@ -2660,7 +2660,7 @@ class IMDatabasePointCollecter:
             if self.skipping_value < 0:
                 self.skipping_value = 0
         
-        if self.step % 50 == 0 and self.step > self.start_collect:
+        if self.step % 500 == 0 and self.step > self.start_collect:
             self.add_a_point = True
         self.point_checker += 1 
 
@@ -3068,13 +3068,14 @@ class IMDatabasePointCollecter:
                                    
                     print('Main CONSTRAINTS', main_constraint_list)
                     opt_results = None
+                    opt_gradient = None
                     if isinstance(drivers[0], ScfRestrictedDriver) or isinstance(drivers[0], ScfUnrestrictedDriver):
 
                             energies, scf_results, rsp_results = self._compute_energy(drivers[0], molecule, current_basis)
                     
-                            opt_results = self._run_optimization(drivers[0], molecule, constraints=main_constraint_list, index_offset=1, compute_args=(current_basis, scf_results))
+                            opt_results, opt_gradient = self._run_optimization(drivers[0], molecule, constraints=main_constraint_list, index_offset=1, compute_args=(current_basis, scf_results))
                     elif isinstance(drivers[0], XtbDriver):
-                         opt_results = self._run_optimization(drivers[0], molecule, constraints=main_constraint_list, index_offset=1)
+                         opt_results, opt_gradient = self._run_optimization(drivers[0], molecule, constraints=main_constraint_list, index_offset=1)
                     
                     optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
                     optimized_molecule.set_charge(molecule.get_charge())
@@ -3093,6 +3094,9 @@ class IMDatabasePointCollecter:
                     delta_e = abs(opt_results['opt_energies'][-1] - self.impes_drivers[state_to_optim].get_energy()
                     ) * hartree_in_kcalpermol()
 
+                    current_gradient_difference = (opt_gradient - self.impes_drivers[state_to_optim].impes_coordinate.gradient) * hartree_in_kcalpermol() / bohr_in_angstrom()
+                    current_rmsd_gradient    = np.sqrt((current_gradient_difference**2).mean())
+
                     print("\n" + "=" * 80)
                     print(f"IM-PES diagnostics for state {state_to_optim}")
                     print("=" * 80)
@@ -3105,8 +3109,12 @@ class IMDatabasePointCollecter:
                     print(f"  ΔE = {delta_e: .10f} kcal/mol")
 
                     print("=" * 80 + "\n")
-                    needs_locality_fallback = (bool(fallback_constraints) and abs(delta_e) > abs(state_specific_energies[state_to_optim][0] - state_specific_energies[state_to_optim][1]) * hartree_in_kcalpermol() * 0.5)
-                    print('Here is the first element', sorted_items_org[0] == sorted_items[0], sorted_items_org[0], sorted_items[0])
+
+                    print("Gradient difference RMSD: ", current_rmsd_gradient, "kcal/mol/angstrom", current_state_difference[state_to_optim][1] * 0.5, "kcal/mol/angstrom")
+                    needs_locality_fallback = (bool(fallback_constraints) and abs(delta_e) < abs(state_specific_energies[state_to_optim][0] - state_specific_energies[state_to_optim][1]) * hartree_in_kcalpermol() * 0.5 and
+                                                                    bool(fallback_constraints) and current_rmsd_gradient < current_state_difference[state_to_optim][1] * 0.5)
+                                        
+                    print('Here is the first element', sorted_items_org[0][0] == sorted_items[0][0], sorted_items_org[0], sorted_items[0])
                     if needs_locality_fallback:
                         converged = False
                         correct_order = (bool(sorted_items_org[0][0] == sorted_items[0][0])and abs(delta_e) > abs(state_specific_energies[state_to_optim][0]- state_specific_energies[state_to_optim][1]) * hartree_in_kcalpermol() * 0.3)
@@ -3114,7 +3122,7 @@ class IMDatabasePointCollecter:
                             converged = True
                         increasing_DOFs = 0
                         while not converged:
-                            increasing_DOFs +=5
+                            increasing_DOFs +=3
                             if increasing_DOFs >= len(fallback_constraints):
                                 break
                                 
@@ -3152,7 +3160,7 @@ class IMDatabasePointCollecter:
                                 current_basis = MolecularBasis.read(molecule, current_basis.get_main_basis_label())
                                 energies, scf_results, rsp_results = self._compute_energy(drivers[0], molecule, current_basis)
                                 print('org mol in optimized loop', molecule.get_xyz_string())
-                                opt_results = self._run_optimization(
+                                opt_results, opt_gradient = self._run_optimization(
                                     drivers[0],
                                     molecule,
                                     constraints=constraint_mask,
@@ -3160,7 +3168,7 @@ class IMDatabasePointCollecter:
                                     compute_args=(current_basis, scf_results),
                                 )
                             elif isinstance(drivers[0], XtbDriver):
-                                opt_results = self._run_optimization(
+                                opt_results, opt_gradient = self._run_optimization(
                                     drivers[0],
                                     molecule,
                                     constraints=constraint_mask,
@@ -3183,6 +3191,9 @@ class IMDatabasePointCollecter:
                             sorted_items = sorted(zip(used_labels, weights), key=lambda x: x[1], reverse=True)
                             delta_e = abs(opt_results['opt_energies'][-1] - self.impes_drivers[state_to_optim].get_energy()) * hartree_in_kcalpermol()
 
+                            current_gradient_difference = (opt_gradient - self.impes_drivers[state_to_optim].impes_coordinate.gradient) * hartree_in_kcalpermol() / bohr_in_angstrom()
+                            current_rmsd_gradient    = np.sqrt((current_gradient_difference**2).mean())
+
                             print("\n" + "=" * 80)
                             print(f"IM-PES diagnostics for state {state_to_optim}")
                             print("=" * 80)
@@ -3195,6 +3206,9 @@ class IMDatabasePointCollecter:
                             print(f"  ΔE = {delta_e: .10f} kcal/mol")
 
                             print("=" * 80 + "\n")
+
+                            print("Gradient difference RMSD: ", current_rmsd_gradient, "kcal/mol/angstrom", current_state_difference[state_to_optim][1] * 0.5, "kcal/mol/angstrom")
+
                             prev_fall_const_size = len(fallback_constraints)
                             for key, coord_type_entries in self.root_z_matrix[state_to_optim].items():
                                 for coord in coord_type_entries:
@@ -3205,10 +3219,11 @@ class IMDatabasePointCollecter:
                                 if len(fallback_constraints) != prev_fall_const_size:
                                     break
 
-                            needs_locality_fallback = (bool(fallback_constraints) and abs(delta_e) > abs(state_specific_energies[state_to_optim][0] - state_specific_energies[state_to_optim][1]) * hartree_in_kcalpermol() * 0.5)
+                            needs_locality_fallback = (bool(fallback_constraints) and abs(delta_e) < abs(state_specific_energies[state_to_optim][0] - state_specific_energies[state_to_optim][1]) * hartree_in_kcalpermol() * 0.5 and
+                                                                    bool(fallback_constraints) and current_rmsd_gradient < current_state_difference[state_to_optim][1] * 0.5)
 
                             if needs_locality_fallback:
-                                correct_order = (bool(sorted_items_org[0][0] == sorted_items[0][0])and abs(delta_e) > abs(state_specific_energies[state_to_optim][0]- state_specific_energies[state_to_optim][1]) * hartree_in_kcalpermol() * 0.3)
+                                correct_order = (bool(sorted_items_org[0][0] == sorted_items[0][0])and abs(delta_e) < abs(state_specific_energies[state_to_optim][0]- state_specific_energies[state_to_optim][1]) * hartree_in_kcalpermol() * 0.3)
                                 if correct_order:
                                     converged = True
                                     main_constraint_list = guarded_constraints.copy()
@@ -3430,72 +3445,6 @@ class IMDatabasePointCollecter:
 
         return float(eta), residual_norm, float(b_norm)
 
-    def _normalize_weight_dict(self, weights):
-        """
-        This function is used to normalize the incoming weight dictionary
-        used for the identificaiton of the necessary constraint optimizaiton
-        """
-        vals = {int(k): max(float(v), 0.0) for k, v in weights.items()}
-        total = sum(vals.values())
-
-        if total <= 1.0e-15:
-            n = max(len(vals), 1)
-            return {k: 1.0/n for k in vals}
-        return {k: v / total for k, v in vals.items()}
-
-    def _weight_distribution_report(self, ref_weights, cur_weights):
-        # define the current weight contribuionts
-        labels = sorted(set(ref_weights) | set(cur_weights))
-        p = np.array([ref_weights[k] for k in labels])
-        q = np.array([cur_weights[k] for k in labels])
-        
-        # normalization
-        p /= max(p.sum(), 1.0e-12)
-        q /= max(q.sum(), 1.0e-12)
-        
-        hell_coeff = float(np.sqrt(0.5 * np.sum((np.sqrt(p) - np.sqrt(q))**2)))
-        
-        m = 0.5 * (p + q)
-        mask_p = p > 0.0
-        mask_q = q > 0.0
-
-        js = 0.5 * np.sum(p[mask_p] * np.log(p[mask_p] / m[mask_p]))
-        js += 0.5 * np.sum(q[mask_q] * np.log(q[mask_q] / m[mask_q]))
-
-        order = np.argsort(-p)
-        keep = []
-        mass = 0.0
-        for idx in order:
-            keep.append(idx)
-            mass += p[idx]
-            if mass >= 0.8:
-                break
-        
-        retained = float(np.sum(q[keep]))
-        neff_ref = float(1.0 / max(np.sum(p * p), 1.0e-12))
-        neff_trial = float(1.0 / max(np.sum(q * q), 1.0e-12))
-
-        return {
-            "hell_coef": hell_coeff,
-            "js": float(js),
-            "retained_ref_top_mass": retained,
-            "max_abs_delta": float(np.max(np.abs(p - q))) if p.size else 0.0,
-            "neff_ratio": neff_trial / max(neff_ref, 1.0e-12)
-        }
-
-    def _weight_distribution_is_local(self, report):
-
-        return (
-            report["hellinger"] <= 0.20 and
-            report["js"] <= 0.05 and
-            report["retained_ref_top_mass"] >= 0.70 and
-            report["max_abs_delta"] <= 0.35 and
-            0.35 <= report["neff_ratio"] <= 3.0
-        )
-    
-    # def _normalized_coord_delta(self, driver, z_matrix, q_a, q_b, q_sigma_ref):
-
-    #     coords, kinds = 
 
     def _build_opt_constraint_list(self, constraints, index_offset=1):
 
@@ -3530,7 +3479,7 @@ class IMDatabasePointCollecter:
         else:
             opt_results = opt_drv.compute(molecule, *compute_args)
 
-        return opt_results
+        return opt_results, opt_drv.grad_drv.gradient
     
     def _write_string_dataset(self, h5f, name, value):
         if value is None:

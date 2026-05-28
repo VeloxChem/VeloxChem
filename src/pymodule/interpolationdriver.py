@@ -786,11 +786,11 @@ class InterpolationDriver():
         chain = np.ones_like(dist_org)
         if not self.use_cosine_dihedral:
             d_prop = self._principal_torsion_delta(dist_org[dihedral_start:dihedral_end])
-            dist_check[dihedral_start:dihedral_end] = np.sin(d_prop)
+            dist_check[dihedral_start:dihedral_end] = 2.0 * np.sin(0.5 * d_prop)
             d_imp = self._principal_torsion_delta(
                 dist_org[dihedral_end:]
             )
-            chain[dihedral_start:dihedral_end] = np.cos(d_prop)
+            chain[dihedral_start:dihedral_end] = np.cos(0.5 * d_prop)
             imp_slice = slice(dihedral_end, len(dist_org))
             dist_check[imp_slice] = 2.0 * np.tan(0.5 * d_imp)
             chain[imp_slice] = 1.0 / np.maximum(np.cos(0.5 * d_imp)**2, 1.0e-12)
@@ -1587,7 +1587,7 @@ z
         # ------------------------------------------------------------------
         selection_rule = "coverage"   # 'relative' | 'coverage' | 'topk'
         relative_threshold = 0.10
-        coverage_mass = 0.80
+        coverage_mass = 1.0
         topk = None
 
         # final global score = source + response + support - helpful
@@ -1626,7 +1626,7 @@ z
             max_component_size = min(20, max(5, int(np.ceil(np.sqrt(N)))))
 
         if N == 0:
-            return [], [], []
+            return [], [], [], [] 
 
         constraints_to_exclude = []
         per_dp_results = []
@@ -1717,28 +1717,25 @@ z
             })
 
         if not per_dp_results:
-            return [], [], []
+            return [], [], [], []
 
         # ------------------------------------------------------------------
         # Normalize datapoint weights and keep important datapoints only
         # ------------------------------------------------------------------
-        dp_weights = np.array([r["dp_weight"] for r in per_dp_results], dtype=float)
-        if dp_weights.sum() < eps:
-            dp_weights[:] = 1.0
-        dp_weights /= dp_weights.sum()
+        dp_weights = np.array(
+            [r["dp_weight"] for r in per_dp_results],
+            dtype=float,
+        )
 
-        order = np.argsort(-dp_weights)
-        cum = np.cumsum(dp_weights[order])
+        dp_weights = np.maximum(dp_weights, 0.0)
+        weight_sum = float(dp_weights.sum())
 
-        keep_mask = cum <= coverage_mass
-        if keep_mask.size > 0:
-            keep_mask[0] = True
+        if weight_sum < eps:
+            dp_weights[:] = 1.0 / max(len(dp_weights), 1)
+        else:
+            dp_weights /= weight_sum
 
-        keep_indices = order[np.where(keep_mask)[0]]
-
-        if keep_mask.size > 0 and cum[keep_mask][-1] < coverage_mass and len(keep_indices) < len(order):
-            next_idx = order[len(keep_indices)]
-            keep_indices = np.append(keep_indices, next_idx)
+        keep_indices = np.arange(len(per_dp_results), dtype=int)
 
         # ------------------------------------------------------------------
         # Aggregate global response/source/pair information
@@ -1963,7 +1960,7 @@ z
         ranked_blocks = sorted(ranked_blocks, key=lambda x: x["acq_score"], reverse=True)
 
         if not ranked_blocks:
-            return [], [], []
+            return [], [], [], []
 
         best_block = ranked_blocks[0]
 
@@ -2430,8 +2427,8 @@ z
             if kind == "dihedral":
                 d = self._principal_torsion_delta(q_current[idx] - q_ref[idx])
                 dq_raw[idx] = d
-                dq_eff[idx] = np.sin(d)
-                chain[idx] = np.cos(d)
+                dq_eff[idx] = 2.0 *np.sin(0.5 * d)
+                chain[idx] = np.cos(0.5 * d)
 
             elif kind == "improper":
                 d = self._principal_torsion_delta(q_current[idx] - q_ref[idx])
