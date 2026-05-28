@@ -1560,12 +1560,14 @@ def _Molecule_show(self,
         for bond in dashed_bonds:
             p1 = coords[bond[0]]
             p2 = coords[bond[1]]
-            if bond in forming_bonds:
+            if forming_bonds is not None and bond in forming_bonds:
                 colour = "#00a287"
                 radius = forming_width
-            else:
+            elif breaking_bonds is not None and bond in breaking_bonds:
                 colour = "#ffa200"
                 radius = breaking_width
+            else:
+                continue
             if radius >= 0.17:
                 dashed = False
             else:
