@@ -438,8 +438,8 @@ class LinkerForceFieldGenerator:
                 f"{len(src_mol.get_labels())} atoms and {bond_num_src} bonds in source molecule vs "
                 f"{len(dest_mol.get_labels())} atoms and {bond_num_dest} bonds in destination molecule."
             )
-        src_mol.show(atom_indices=True)
-        dest_mol.show(atom_indices=True)
+        # src_mol.show(atom_indices=True)
+        # dest_mol.show(atom_indices=True)
 
         def get_graph_from_molecule(mol: Molecule, conn: np.ndarray) -> nx.Graph:
             labels = mol.get_labels()
