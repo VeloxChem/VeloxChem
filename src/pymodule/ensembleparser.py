@@ -401,6 +401,10 @@ class EnsembleParser:
         total_frames = len(mda_universe.trajectory)
         self.ostream.print_blank()
 
+        def seek_trajectory_frame(iframe):
+            """Move the trajectory cursor to a frame and return its timestep."""
+            return mda_universe.trajectory[iframe]
+
         if last_snapshot_only:
             frame_indices = np.array([total_frames - 1], dtype=int)
         else:
@@ -411,11 +415,9 @@ class EnsembleParser:
                     "time-resilved trajectories (e.g. .ztc), not .pdb input."
                 )
             if use_time_window:
-                mda_universe.trajectory[0]
-                traj_start = float(mda_universe.trajectory.ts.time)
+                traj_start = float(seek_trajectory_frame(0).time)
 
-                mda_universe.trajectory[total_frames - 1]
-                traj_end = float(mda_universe.trajectory.ts.time)
+                traj_end = float(seek_trajectory_frame(total_frames - 1).time)
 
                 if start is None:
                     start = traj_start
@@ -427,8 +429,7 @@ class EnsembleParser:
 
                 window_frames = []
                 for iframe in range(total_frames):
-                    mda_universe.trajectory[iframe]
-                    t = float(mda_universe.trajectory.ts.time)
+                    t = float(seek_trajectory_frame(iframe).time)
                     if float(start) <= t <= float(end):
                         window_frames.append(iframe)
 
@@ -485,8 +486,7 @@ class EnsembleParser:
         # skip transformations.
         has_box = False
         try:
-            mda_universe.trajectory[0]
-            dims = getattr(mda_universe.trajectory.ts, "dimensions", None)
+            dims = getattr(seek_trajectory_frame(0), "dimensions", None)
             if dims is not None:
                 dims = np.asarray(dims, dtype=float)
                 if dims.size > 3 and np.all(dims[:3] > 0):
@@ -507,7 +507,7 @@ class EnsembleParser:
 
         snapshots = []
         for iframe in frame_indices:
-            mda_universe.trajectory[iframe]
+            seek_trajectory_frame(iframe)
 
             qm_coords = np.asarray(qm_atoms.positions, dtype=float).copy()
             qm_elements = np.asarray(
