@@ -463,8 +463,8 @@ class XPSDriver:
         n_ov_a = nalpha * nvir_a
         n_ov_b = nbeta * nvir_b
         if tda:
-            X_0_a = rsp_results['eigenvectors'][:n_ov_a, state_idx].reshape(nalpha, nvir_a)
-            X_0_b = rsp_results['eigenvectors'][n_ov_a:, state_idx].reshape(nbeta, nvir_b)
+            X_a = rsp_results['eigenvectors'][:n_ov_a, state_idx].reshape(nalpha, nvir_a)
+            X_b = rsp_results['eigenvectors'][n_ov_a:, state_idx].reshape(nbeta, nvir_b)
         else:
             assert_msg_critical(
                 False,
@@ -489,14 +489,14 @@ class XPSDriver:
                 O_exc_ia[:, i] = V_delta_a[:, a].copy()
 
                 s_ia = np.linalg.det(O_exc_ia.conj().T @ S @ O_Ra)
-                amp_ia = X_0_a[i,a] * s_ia
+                amp_ia = X_a[i,a] * s_ia
                 A_a += amp_ia
         for i in range(nbeta):
             for a in range(nvir_b):
                 O_exc_ia = O_delta_b.copy()
                 O_exc_ia[:, i] = V_delta_b[:, a].copy()
                 s_ia = np.linalg.det(O_exc_ia.conj().T @ S @ O_Rb)
-                amp_ia = X_0_b[i,a] * s_ia
+                amp_ia = X_b[i,a] * s_ia
                 A_b += amp_ia
                 
         amplitude = A_a * s0_b + A_b * s0_a
@@ -716,7 +716,7 @@ class XPSDriver:
                     n_shakeup = self.nstates - first_shakeup_idx
 
                     for n in range(first_shakeup_idx, first_shakeup_idx + n_shakeup):
-                        energy = rsp_results['eigenvalues'][n]
+                        energy = rsp_results['eigenvalues'][n] * hartree_in_ev()
 
                         # TODO?: only consider shake-up states with significant oscillator strength
                         #if excitation['oscillator_strength'] > 1e-3:
