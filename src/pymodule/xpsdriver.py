@@ -38,6 +38,8 @@ import sys
 from .veloxchemlib import hartree_in_ev, mpi_master
 from .outputstream import OutputStream
 from .scfunrestdriver import ScfUnrestrictedDriver
+from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
+from .tdaeigensolverunrest import TdaUnrestrictedEigenSolver
 from .errorhandler import assert_msg_critical
 from .spectrumplot import plot_xps_spectrum
 from .sanitychecks import scf_results_sanity_check
@@ -58,6 +60,7 @@ class XPSDriver:
 
     Instance variables
         - energy_ranges: Dictionary of core orbital energy ranges for different elements (in Hartree).
+        - shake_ups: Whether to compute shake-up satellites (bool).
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -102,6 +105,12 @@ class XPSDriver:
 
         # Default to DFT ranges for backward compatibility
         self.energy_ranges = self.energy_ranges_dft
+
+        self.shake_ups = False
+        # Temporarily only enabled w/ TDA, but might be preferred for stability in RPA as well
+        self.tamm_dancoff = True
+        # Number of TOTAL states to compute per core ionization (if shake_ups is True)
+        self.nstates = 5
 
     def update_settings(self, xps_dict, method_dict=None):
         """
@@ -375,7 +384,7 @@ class XPSDriver:
 
         return assignments
     
-    def _compute_mainline_intensity(self, scf_results, scf_ion_results, core_idx, nalpha):
+    def _compute_mainline_intensity(self, scf_results, scf_ion_results, O_Rb, nalpha):
         """
         Computes the intensity of the mainline peak in the sudden approximation.
 
@@ -399,7 +408,7 @@ class XPSDriver:
 
         C_alpha_occ_unrel = scf_results['C_alpha'][:, :nalpha]
         # Ionized (sudden-approx.) GS determinant (beta-spin) for mainline intensity calculation
-        C_beta_occ_unrel = self._get_unrelaxed_fchgs_det(scf_results, core_idx, nbeta)
+        C_beta_occ_unrel = O_Rb #self._get_unrelaxed_fchgs_det(scf_results, core_idx, nbeta)
 
         C_beta_occ_rel = scf_ion_results['C_beta'][:, :nbeta]
         C_alpha_occ_rel = scf_ion_results['C_alpha'][:, :nalpha]
@@ -427,6 +436,72 @@ class XPSDriver:
             for alpha and beta spins in the unrelaxed determinant.
         """
         return np.hstack((scf_results['C_beta'][:, :core_idx], scf_results['C_beta'][:, core_idx+1:1+nbeta]))
+    
+    def _compute_shakeup_intensity(self, gs_scf_results, ion_scf_results, rsp_results, state_idx, O_Rb, nalpha, tda=False):
+        """
+        Computes the intensity of shake-up satellites in the sudden approximation.
+
+        :param gs_scf_results:
+            The ground state SCF results dictionary.
+        :param ion_ scf_results:
+            The ion SCF results dictionary.
+        :param rsp_results:
+            The response results dictionary.
+        :param tda:
+            Whether to use the TDA approximation.
+
+        :return:
+            The shake-up intensity (float).
+        """
+        S = gs_scf_results['S']
+        norb = gs_scf_results['C_alpha'].shape[1]
+        #nalpha = ion_scf_results['C_alpha'].shape[1]
+        nbeta = nalpha - 1
+        nvir_a = norb - nalpha
+        nvir_b = norb - nbeta
+
+        n_ov_a = nalpha * nvir_a
+        n_ov_b = nbeta * nvir_b
+        if tda:
+            X_0_a = rsp_results['eigenvectors'][:n_ov_a, state_idx].reshape(nalpha, nvir_a)
+            X_0_b = rsp_results['eigenvectors'][n_ov_a:, state_idx].reshape(nbeta, nvir_b)
+        else:
+            assert_msg_critical(
+                False,
+                'Only enabled in the TDA approximation currently.')
+
+        O_delta_a = ion_scf_results['C_alpha'][:, :nalpha]
+        V_delta_a = ion_scf_results['C_alpha'][:, nalpha:]
+        O_delta_b = ion_scf_results['C_beta'][:, :nbeta]
+        V_delta_b = ion_scf_results['C_beta'][:, nbeta:]
+        O_Ra = gs_scf_results['C_alpha'][:, :nalpha]
+        #O_Rb = self._get_unrelaxed_fchgs_det(gs_scf_results, core_idx, nbeta)
+
+        s0_a = np.linalg.det(O_delta_a.conj().T @ S @ O_Ra)
+        s0_b = np.linalg.det(O_delta_b.conj().T @ S @ O_Rb)
+
+        # ampliteude
+        A_a, A_b = 0, 0
+
+        for i in range(nalpha):
+            for a in range(nvir_a):
+                O_exc_ia = O_delta_a.copy()
+                O_exc_ia[:, i] = V_delta_a[:, a].copy()
+
+                s_ia = np.linalg.det(O_exc_ia.conj().T @ S @ O_Ra)
+                amp_ia = X_0_a[i,a] * s_ia
+                A_a += amp_ia
+        for i in range(nbeta):
+            for a in range(nvir_b):
+                O_exc_ia = O_delta_b.copy()
+                O_exc_ia[:, i] = V_delta_b[:, a].copy()
+                s_ia = np.linalg.det(O_exc_ia.conj().T @ S @ O_Rb)
+                amp_ia = X_0_b[i,a] * s_ia
+                A_b += amp_ia
+                
+        amplitude = A_a * s0_b + A_b * s0_a
+        intensity = amplitude**2
+        return intensity
 
     def compute(self, molecule, basis, scf_driver, element=None, elements=None):
         """
@@ -603,13 +678,52 @@ class XPSDriver:
                 fch_energy = scf_ion.get_scf_energy()
 
                 # Calculate mainline intensity
-                mainline_intensity = self._compute_mainline_intensity(scf_results, scf_ion_results, mo_index, nalpha)
+                O_Rb = self._get_unrelaxed_fchgs_det(scf_results, mo_index, nalpha-1)
+                mainline_intensity = self._compute_mainline_intensity(scf_results, scf_ion_results, O_Rb, nalpha)
 
                 # Calculate core ionization energy (in eV)
                 # why do we return in eV?
                 ie = (fch_energy - gs_energy) * hartree_in_ev()
 
                 ionization_energies.append((mo_index, atom_index, ie, contribution, mainline_intensity))
+                
+                if self.shake_ups:
+                    if self.rank == mpi_master():
+                        self.ostream.print_blank()
+                        # TODO: should not print the number of shake-up states since these include emission
+                        self.ostream.print_info(
+                            f'Computing {self.nstates} [not only shake-up satellite] states for {elem} orbital {mo_index} '
+                            f'(Atom {atom_index+1})...')
+                        self.ostream.print_blank()
+                        self.ostream.flush()
+                    if self.tamm_dancoff:
+                        rsp_drv = TdaUnrestrictedEigenSolver(self.comm, self.ostream)
+                    else:
+                        assert_msg_critical(False, 'Only enabled in the TDA approximation currently.')
+                        rsp_drv = LinearResponseUnrestrictedEigenSolver(self.comm, self.ostream)
+                    rsp_drv.update_settings({'nstates': self.nstates})
+                    rsp_drv.nstates = self.nstates
+                    rsp_results = rsp_drv.compute(molecular_ion, basis, scf_ion_results)
+
+                    positive = rsp_results['eigenvalues'] > 0.0
+                    assert_msg_critical(
+                        positive[-1],
+                        'Need to compute more excited states to reach the shake-up states.'
+                    )
+
+                    #first_shakeup_idx = np.where(positive)[0][np.argmin(rsp_results['eigenvalues'][positive])]
+                    first_shakeup_idx = np.where(positive)[0][0]  # if eigenvalues are sorted
+                    n_shakeup = self.nstates - first_shakeup_idx
+
+                    for n in range(first_shakeup_idx, first_shakeup_idx + n_shakeup):
+                        energy = rsp_results['eigenvalues'][n]
+
+                        # TODO?: only consider shake-up states with significant oscillator strength
+                        #if excitation['oscillator_strength'] > 1e-3:
+                        shakeup_intensity = self._compute_shakeup_intensity(scf_results, scf_ion_results, rsp_results, n, O_Rb, nalpha, tda=self.tamm_dancoff)
+                        # Approximate shake-up IE as mainline IE + excitation energy
+                        shakeup_energy = ie + energy  
+                        ionization_energies.append((mo_index, atom_index, shakeup_energy, contribution, shakeup_intensity))
 
                 if self.rank == mpi_master():
                     self.ostream.print_info(
@@ -647,7 +761,7 @@ class XPSDriver:
             self.ostream.print_info(f'Element: {element}')
             self.ostream.print_info('-' * 80)
             self.ostream.print_info(
-                f'{"Atom":<8} {"MO Index":<12} {"IE (eV)":<15} {"Localization":<15}')
+                f'{"Atom":<8} {"Intensity":<12} {"MO Index":<12} {"IE (eV)":<15} {"Localization":<15}')
             self.ostream.print_info('-' * 80)
 
             # Sort by atom index for better readability
@@ -655,7 +769,7 @@ class XPSDriver:
 
             for mo_idx, atom_idx, ie, contribution, mainline_intensity in sorted_data:
                 self.ostream.print_info(
-                    f'{atom_idx+1:<8} {mo_idx:<12} {ie:>12.2f}   {contribution:>13.1%}')
+                    f' {atom_idx+1:<8} {mainline_intensity:<11.2e}  {mo_idx:<12} {ie:>12.2f}   {contribution:>13.1%}')
 
             self.ostream.print_blank()
 
