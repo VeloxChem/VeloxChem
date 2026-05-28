@@ -437,7 +437,7 @@ def plot_xps_spectrum(xps_results,
 
     :param xps_results:
         The dictionary containing XPS results from XPSDriver.compute().
-        Format: {element: [(mo_idx, atom_idx, ionization_energy, contribution), ...]}
+        Format: {element: [(mo_idx, atom_idx, ionization_energy, contribution, mainline_intensity), ...]}
     :param element:
         Element symbol to plot (e.g., 'C', 'O', 'N', 'F', 'S').
         If None and xps_results contains only one element, that element is plotted.
@@ -516,10 +516,11 @@ def plot_xps_spectrum(xps_results,
     if len(ionization_data[0]) == 2:
         energies = np.array([ie for _, ie in ionization_data])
         atom_indices = None
+        intensities = np.ones(len(energies))
     else:
-        energies = np.array([ie for _, _, ie, _ in ionization_data])
-        atom_indices = np.array([atom_idx for _, atom_idx, _, _ in ionization_data])
-    intensities = np.ones(len(energies))
+        energies = np.array([ie for _, _, ie, _, _ in ionization_data])
+        atom_indices = np.array([atom_idx for _, atom_idx, _, _, _ in ionization_data])
+        intensities = np.array([mainline_intensity for _, _, _, _, mainline_intensity in ionization_data])
 
     # Create or use provided axis
     if ax is None:

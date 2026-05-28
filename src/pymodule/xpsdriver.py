@@ -90,6 +90,8 @@ class XPSDriver:
         }
 
         # Based on typical DFT (B3LYP/PBE) calculations
+        # TODO: make this a function of the functional? 
+        # or at least have separate ranges for GGA vs hybrid?
         self.energy_ranges_dft = {
             'C': (-10.5, -9.2),
             'N': (-14.6, -13.8),
@@ -372,6 +374,59 @@ class XPSDriver:
             assignments.append((mo_idx, atom_idx, contribution))
 
         return assignments
+    
+    def _compute_mainline_intensity(self, scf_results, scf_ion_results, core_idx, nalpha):
+        """
+        Computes the intensity of the mainline peak in the sudden approximation.
+
+        :param molecule:
+            The molecule object.
+        :param basis:
+            The molecular basis set.
+        :param scf_ion_results:
+            The ion SCF results dictionary.
+        :param core_idx:
+            The index of the core orbital for which to compute the intensity.
+        :param nalpha:
+            The number of alpha-spin occupied molecular orbitals.
+
+        :return:
+            Mainline intensity (float) (0-1).
+        """
+        S = scf_results['S']
+        # For the ionized system
+        nbeta = nalpha - 1 
+
+        C_alpha_occ_unrel = scf_results['C_alpha'][:, :nalpha]
+        # Ionized (sudden-approx.) GS determinant (beta-spin) for mainline intensity calculation
+        C_beta_occ_unrel = self._get_unrelaxed_fchgs_det(scf_results, core_idx, nbeta)
+
+        C_beta_occ_rel = scf_ion_results['C_beta'][:, :nbeta]
+        C_alpha_occ_rel = scf_ion_results['C_alpha'][:, :nalpha]
+
+        amp_beta = np.linalg.det(C_beta_occ_rel.T @ S @ C_beta_occ_unrel)
+        amp_alpha = np.linalg.det(C_alpha_occ_rel.T @ S @ C_alpha_occ_unrel)
+        #amp_beta = np.linalg.det(np.linalg.matmul(np.linalg.matmul(C_occ_beta_rel.T, S), C_occ_beta_unrel))
+        #amp_alpha = np.linalg.det(np.linalg.matmul(np.linalg.matmul(C_occ_alpha_rel.T, S), C_occ_alpha_unrel))
+        
+        return (amp_alpha * amp_beta)**2
+
+    def _get_unrelaxed_fchgs_det(self, scf_results, core_idx, nbeta):
+        """
+        Constructs the unrelaxed ground state (beta-spin) determinant for the ionized system.
+
+        :param scf_results:
+            The GS SCF results dictionary.
+        :param core_idx:
+            The index of the core orbital for which to construct the determinant.
+        :param nbeta:
+            The number of beta-spin occupied molecular orbitals.
+
+        :return:
+            Tuple of (O_Ra, O_Rb) where each is a matrix of occupied MO coefficients
+            for alpha and beta spins in the unrelaxed determinant.
+        """
+        return np.hstack((scf_results['C_beta'][:, :core_idx], scf_results['C_beta'][:, core_idx+1:1+nbeta]))
 
     def compute(self, molecule, basis, scf_driver, element=None, elements=None):
         """
@@ -536,17 +591,25 @@ class XPSDriver:
                 # Maximum number of iterations (not included in scf_results)
                 scf_ion.max_iter = scf_driver.max_iter
 
+                # propose using density-damping as default for FCH calculations
+                scf_ion.density_damping = True
+
                 # Apply maximum overlap method to maintain core hole
                 scf_ion.maximum_overlap(molecular_ion, basis, orbs, occa, occb)
 
                 # Compute FCH state
-                fch_results_not_used = scf_ion.compute(molecular_ion, basis)
+                #fch_results_not_used = scf_ion.compute(molecular_ion, basis)
+                scf_ion_results = scf_ion.compute(molecular_ion, basis)
                 fch_energy = scf_ion.get_scf_energy()
 
+                # Calculate mainline intensity
+                mainline_intensity = self._compute_mainline_intensity(scf_results, scf_ion_results, mo_index, nalpha)
+
                 # Calculate core ionization energy (in eV)
+                # why do we return in eV?
                 ie = (fch_energy - gs_energy) * hartree_in_ev()
 
-                ionization_energies.append((mo_index, atom_index, ie, contribution))
+                ionization_energies.append((mo_index, atom_index, ie, contribution, mainline_intensity))
 
                 if self.rank == mpi_master():
                     self.ostream.print_info(
@@ -590,7 +653,7 @@ class XPSDriver:
             # Sort by atom index for better readability
             sorted_data = sorted(ionization_data, key=lambda x: x[1])
 
-            for mo_idx, atom_idx, ie, contribution in sorted_data:
+            for mo_idx, atom_idx, ie, contribution, mainline_intensity in sorted_data:
                 self.ostream.print_info(
                     f'{atom_idx+1:<8} {mo_idx:<12} {ie:>12.2f}   {contribution:>13.1%}')
 
