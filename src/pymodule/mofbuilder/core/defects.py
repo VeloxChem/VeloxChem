@@ -459,7 +459,7 @@ class TerminationDefectGenerator:
         for entry in matched_vnode_xind:
             try:
                 n, xind, _ = entry  # entry expected as [node, xind, edge] (edge ignored here)
-            except Exception:
+            except (TypeError, ValueError):
                 # malformed entry: skip
                 continue
             matched_vnode_xind_dict.setdefault(n, []).append(xind)
@@ -501,7 +501,7 @@ class TerminationDefectGenerator:
 
             try:
                 fpoints_len = len(fpoints)
-            except Exception:
+            except TypeError:
                 fpoints_len = 0
 
             for xind in exposed_x_indices:
@@ -525,7 +525,7 @@ class TerminationDefectGenerator:
                     try:
                         oo_fpoints_in_vnode = np.vstack(
                             [fpoints[i] for i in oo_ind_in_vnode])
-                    except Exception:
+                    except (IndexError, TypeError, ValueError):
                         continue
                     oo_cpoints = np.hstack((
                         oo_fpoints_in_vnode[:, 0:2],

@@ -1020,7 +1020,7 @@ class EdgeGraphBuilder:
                 vnode_fpoints = eG.nodes[nearest_vnode]["f_points"]
                 try:
                     xoo_fpoints_in_vnode = vnode_fpoints[xoo_inds]
-                except Exception:
+                except TypeError:
                     # Fallback: build by list comprehension if direct indexing fails
                     xoo_fpoints_in_vnode = np.vstack(
                         [vnode_fpoints[idx] for idx in xoo_inds])
