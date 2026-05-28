@@ -31,14 +31,16 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import re
+import sys
 from typing import Any, List, Tuple, Union
 
 import numpy as np
-import sys
+
 try:
     from scipy.optimize import linear_sum_assignment
 except ImportError:
     pass
+
 from ...errorhandler import assert_msg_critical
 from ..utils.geometry import fractional_to_cartesian
 

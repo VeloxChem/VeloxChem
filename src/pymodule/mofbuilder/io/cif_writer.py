@@ -30,14 +30,16 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from pathlib import Path
+import datetime
 import sys
+from pathlib import Path
 from typing import Optional, List, Any, Sequence
+
+from mpi4py import MPI
+
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
-from mpi4py import MPI
 from ...errorhandler import assert_msg_critical
-import datetime
 
 
 class CifWriter:

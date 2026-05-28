@@ -31,10 +31,12 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+from typing import Optional, Any, Dict
+
 from mpi4py import MPI
+
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
-from typing import Optional, Any, Dict
 from ..io.xyz_writer import XyzWriter
 
 

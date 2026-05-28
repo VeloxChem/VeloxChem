@@ -30,17 +30,18 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import sys
+from pathlib import Path
 from typing import Any, List, Optional, Sequence
 
 import numpy as np
+from mpi4py import MPI
+
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
 from ...errorhandler import assert_msg_critical
-from mpi4py import MPI
-import sys
 from .other import safe_copy
 from ..utils.environment import get_data_path
-from pathlib import Path
 from .linker import FrameLinker
 from .write import MofWriter
 from ..io.pdb_reader import PdbReader
@@ -434,7 +435,6 @@ class Framework:
         except ImportError:
             assert_msg_critical(
                 False, "OpenMM-ML is required for MofBuilder.")
-        from pathlib import Path
 
         # write a pdb file #with a random name
         self.write(format='pdb')

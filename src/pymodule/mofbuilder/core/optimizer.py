@@ -33,9 +33,9 @@
 import sys
 from pathlib import Path
 
+import h5py
 import numpy as np
 from mpi4py import MPI
-import h5py
 
 try:
     from scipy.optimize import minimize
@@ -45,7 +45,6 @@ except ImportError:
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
 from ...errorhandler import assert_msg_critical
-
 from ..io.basic import pname, is_list_A_in_B
 from ..utils.geometry import (unit_cell_to_cartesian_matrix,
                               fractional_to_cartesian, cartesian_to_fractional,

@@ -30,22 +30,25 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import numpy as np
+import math
+import sys
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import numpy as np
+from mpi4py import MPI
+
 try:
     from scipy.spatial.transform import Rotation as R
     from scipy.spatial import cKDTree
 except ImportError:
     pass
+
 from ...molecule import Molecule
 from ..core.other import safe_dict_copy
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
 from ...errorhandler import assert_msg_critical
-from mpi4py import MPI
-import sys
-import math
-from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 class SolvationBuilder:

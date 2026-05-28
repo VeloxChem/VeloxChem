@@ -30,8 +30,9 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import numpy as np
 from typing import Tuple, Dict, List, Any
+
+import numpy as np
 
 
 def unit_cell_to_cartesian_matrix(

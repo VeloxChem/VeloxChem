@@ -39,7 +39,6 @@ from mpi4py import MPI
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
 from ...errorhandler import assert_msg_critical
-
 from ..io.pdb_reader import PdbReader
 
 

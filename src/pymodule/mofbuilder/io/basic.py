@@ -30,9 +30,10 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import numpy as np
 import re
 from typing import List, Sequence, Any, Tuple
+
+import numpy as np
 
 
 def nn(s: str) -> str:

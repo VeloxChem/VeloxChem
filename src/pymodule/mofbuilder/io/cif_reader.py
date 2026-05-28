@@ -31,15 +31,17 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import re
-import numpy as np
+import sys
 from pathlib import Path
+
+import numpy as np
+from mpi4py import MPI
+
 from .basic import convert_fraction_to_decimal, remove_bracket, remove_quotes, remove_tail_number, extract_quote_lines
 from .basic import find_keyword, extract_xyz_lines
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
 from ...errorhandler import assert_msg_critical
-from mpi4py import MPI
-import sys
 
 
 class CifReader:

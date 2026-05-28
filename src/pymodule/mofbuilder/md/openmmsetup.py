@@ -30,6 +30,11 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import sys
+from typing import Optional, List, Any
+
+from mpi4py import MPI
+
 try:
     from openmm.app import (
         GromacsGroFile,
@@ -53,9 +58,7 @@ try:
     )
 except ImportError:
     pass
-from mpi4py import MPI
-import sys
-from typing import Optional, List, Any
+
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
 from ...errorhandler import assert_msg_critical

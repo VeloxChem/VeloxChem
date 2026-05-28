@@ -30,10 +30,9 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import numpy as np
-import sys
-import networkx as nx
 import re
+import sys
+from pathlib import Path
 from typing import (
     Any,
     Dict,
@@ -43,7 +42,12 @@ from typing import (
     Tuple,
     Union,
 )
-from pathlib import Path
+
+import networkx as nx
+import numpy as np
+from mpi4py import MPI
+from networkx.algorithms.isomorphism import GraphMatcher
+
 from ...molecule import Molecule
 from ...mmforcefieldgenerator import MMForceFieldGenerator
 from ...xtbdriver import XtbDriver
@@ -55,8 +59,6 @@ from ..io.basic import nn
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master, hartree_in_kcalpermol
 from ...errorhandler import assert_msg_critical
-from mpi4py import MPI
-from networkx.algorithms.isomorphism import GraphMatcher
 
 
 class LinkerForceFieldGenerator:

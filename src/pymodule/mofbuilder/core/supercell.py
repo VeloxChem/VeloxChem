@@ -32,13 +32,12 @@
 
 import sys
 
-import numpy as np
 import networkx as nx
+import numpy as np
 from mpi4py import MPI
 
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
-
 from ..io.basic import nn, nl, pname, lname, arr_dimension
 from ..utils.geometry import locate_min_idx, Carte_points_generator
 from .other import fetch_X_atoms_ind_array, find_pair_x_edge_fc, order_edge_array

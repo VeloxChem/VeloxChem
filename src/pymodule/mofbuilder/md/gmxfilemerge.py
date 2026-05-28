@@ -34,6 +34,9 @@ import re
 import sys
 from pathlib import Path
 from typing import Optional, Any, List, Dict, Tuple, Sequence
+
+from mpi4py import MPI
+
 from ...outputstream import OutputStream
 from ...molecule import Molecule
 from ...scfrestdriver import ScfRestrictedDriver
@@ -41,7 +44,6 @@ from ...molecularbasis import MolecularBasis
 from ...optimizationdriver import OptimizationDriver
 from ...mmforcefieldgenerator import MMForceFieldGenerator
 from ...veloxchemlib import mpi_master
-from mpi4py import MPI
 
 
 class GromacsForcefieldMerger:

@@ -30,19 +30,19 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import sys
+from pathlib import Path
 from typing import Any, Optional
 
 import numpy as np
+from mpi4py import MPI
+
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
 from ...errorhandler import assert_msg_critical
 from ...molecule import Molecule
-from mpi4py import MPI
-import sys
-
 from ..utils.environment import get_data_path
 from ..utils.fetch import fetch_pdbfile
-from pathlib import Path
 from .net import FrameNet
 from .node import FrameNode
 from .linker import FrameLinker

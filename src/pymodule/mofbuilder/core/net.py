@@ -30,15 +30,16 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import sys
 from typing import Any, Optional
 
-import numpy as np
 import networkx as nx
+import numpy as np
+from mpi4py import MPI
+
 from ..io.cif_reader import CifReader
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
-from mpi4py import MPI
-import sys
 
 
 class FrameNet:

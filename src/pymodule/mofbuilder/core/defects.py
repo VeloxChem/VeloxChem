@@ -33,13 +33,12 @@
 import sys
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-import numpy as np
 import networkx as nx
+import numpy as np
 from mpi4py import MPI
 
 from ...outputstream import OutputStream
 from ...veloxchemlib import mpi_master
-
 from ..io.basic import nn, pname, is_list_A_in_B
 from ..utils.geometry import fractional_to_cartesian, cartesian_to_fractional
 from .superimpose import superimpose
