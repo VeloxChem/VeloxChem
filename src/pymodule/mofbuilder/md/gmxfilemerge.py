@@ -145,7 +145,7 @@ class GromacsForcefieldMerger:
         """
         if data_path is None:
             data_path = self.database_dir
-        target_itp_path = Path(self.target_dir, 'MD_run/itps')
+        target_itp_path = Path(self.target_dir, "MD_run", "itps")
         self._backup_and_rename(str(target_itp_path))
         target_itp_path.mkdir(parents=True, exist_ok=True)
         amber_itp_path = Path(data_path, "amber14sb_OL21.ff")
@@ -390,7 +390,7 @@ class GromacsForcefieldMerger:
         all_secs = self._extract_atomstypes(itp_path)
         unique_atomtypes = self._get_unique_atomtypes(all_secs)
         middlelines, sectorname = self._parsetop(
-            str(Path(data_path or self.database_dir, "nodes_itps/template.top"))
+            str(Path(data_path or self.database_dir, "nodes_itps", "template.top"))
         )
         top_res_lines = []
         res_info = res_info or {}
@@ -411,7 +411,8 @@ class GromacsForcefieldMerger:
                 if self._debug:
                     self.ostream.print_info(f"found file: {i} in path {itp_path}")
                     self.ostream.flush()
-                line = '#include "itps/' + str(i.relative_to(itp_path)) + '"\n'
+                include_path = Path("itps", i.relative_to(itp_path)).as_posix()
+                line = f'#include "{include_path}"\n'
                 top_itp_lines.append(line)
                 if self._debug:
                     self.ostream.print_info(f"line{line}")
@@ -460,7 +461,7 @@ class GromacsForcefieldMerger:
     def generate_MOF_gromacsfile(self) -> None:
         """Generate ITP, topology, and MDP files for a MOF system."""
         database_path = self.database_dir
-        itps_path = Path(self.target_dir, 'MD_run/itps')
+        itps_path = Path(self.target_dir, "MD_run", "itps")
         res_info = self.residues_info
         model_name = self.mof_name
 
