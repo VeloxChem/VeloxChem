@@ -291,7 +291,6 @@ class EvbDriver():
 
         self.system_confs = configurations
 
-        self.create_viamd_environment_files()
         self.ostream.flush()
 
     def load_initialisation(self,
@@ -722,110 +721,6 @@ class EvbDriver():
                             )
 
             save_group(data, file)
-
-    def create_viamd_environment_files(self):
-        for conf in self.system_confs:
-            molecule_file_path = Path("topology.pdb")
-            trajectory_file_path = Path("trajectory.xtc")
-            base = ("[Files]\n"
-                    f"MoleculeFile={molecule_file_path}\n"
-                    f"TrajectoryFile={trajectory_file_path}\n"
-                    "CoarseGrained=0\n"
-                    "\n"
-                    "[RenderSettings]\n"
-                    "SsaoEnabled=0\n"
-                    "DofEnabled=0\n"
-                    "\n"
-                    "[Representation]\n"
-                    "Name=Reaction\n"
-                    'Filter=resname("REA")\n'
-                    "Enabled=1\n"
-                    "Type=2\n"
-                    "ColorMapping=1\n"
-                    "Saturation=1.000000\n"
-                    "Param=1.000000,1.000000,1.000000,1.000000\n"
-                    "DynamicEval=0\n")
-
-            script = ("[Script]\n"
-                      'Text="""\n')
-            rea_script = 'rea = resname("REA");'
-            sol_script = ""
-            if conf.get("solvent", None) is not None:
-
-                sol_script = (
-                    'sol = resname("SOL");\n'
-                    'close_sol = (within(5, rea) and resname("SOL"));\n')
-            pdb_script = ""
-            if conf.get('pdb', None) is not None:
-                resids = [
-                    res['residue'] for res in conf.get("pdb_active_res", [])
-                ]
-
-                if len(resids) > 0:
-                    s = "".join([f" or resid({id})" for id in resids])
-                    rea_script = rea_script[:-1] + s + ";"
-                pdb_script = "pocket = residue(protein and within(3,rea)) and not element('H');\n"
-            script += rea_script + "\n"
-            script += sol_script + "\n"
-            script += pdb_script + "\n"
-
-            script += '"""'
-
-            solvent_rep = ("[Representation]\n"
-                           "Name=Solvent\n"
-                           "Filter=close_sol\n"
-                           "Enabled=1\n"
-                           "Type=1\n"
-                           "ColorMapping=1\n"
-                           "Saturation=1.000000\n"
-                           "Param=0.354000,1.000000,1.000000,1.000000\n"
-                           "DynamicEval=1\n")
-
-            protein_rep = ("[Representation]\n"
-                           "Name=Protein\n"
-                           "Filter=protein\n"
-                           "Enabled=1\n"
-                           "Type=4\n"
-                           "ColorMapping=8\n"
-                           "StaticColor=1.000000,1.000000,1.000000,1.000000\n"
-                           "Saturation=1.000000\n"
-                           "Param=1.000000,1.000000,1.000000,1.000000\n"
-                           "DynamicEval=0\n"
-                           "\n"
-                           "[Representation]\n"
-                           "Name=pocket\n"
-                           "Filter=pocket\n"
-                           "Enabled=1\n"
-                           "Type=0\n"
-                           "ColorMapping=1\n"
-                           "StaticColor=1.000000,1.000000,1.000000,1.000000\n"
-                           "Saturation=0.570000\n"
-                           "Param=1.000000,1.000000,1.000000,1.000000\n"
-                           "DynamicEval=0\n")
-
-            carbon_rep = ("[Representation]\n"
-                          "Name=Carbon\n"
-                          'Filter=resname("CCC")\n'
-                          "Enabled=1\n"
-                          "Type=2\n"
-                          "ColorMapping=1\n"
-                          "Saturation=1.000000\n"
-                          "Param=1.000000,1.000000,1.000000,1.000000\n"
-                          "DynamicEval=0\n")
-
-            string = base + "\n"
-            if conf.get("solvent", None) is not None:
-                string += solvent_rep + "\n"
-            if conf.get('pdb', None) is not None:
-                string += protein_rep + "\n"
-            if conf.get('CNT', False) or conf.get('graphene', False):
-                string += carbon_rep + "\n"
-
-            string += script + "\n"
-
-            workspace_path = Path(conf["data_folder"]) / "workspace.via"
-            with workspace_path.open("w") as file:
-                file.write(string)
 
     def default_system_configurations(self, name: str) -> dict:
         """Return a dictionary with a default configuration. Options not given in the dictionary will be set to default values in the build_systems function.
