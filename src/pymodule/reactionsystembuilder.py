@@ -343,10 +343,18 @@ class ReactionSystemBuilder():
         return self.systems, self.topology, self.positions
 
     def _system_from_pdb(self):
-        pdb_file = mmapp.PDBFile(self.pdb)
-        topology = pdb_file.getTopology()
-        system_mol = Molecule.read_pdb_file(self.pdb)
-        posres_atoms = [atom for atom in topology.atoms()]
+        if self.pdb[-4:] == '.cif':
+            pdb_file = mmapp.PDBxFile(self.pdb)
+            topology = pdb_file.topology
+            positions = pdb_file.positions
+            temp_pdb = mmapp.PDBFile.writeFile(topology, positions, 'temp.pdb')
+            system_mol = Molecule.read_pdb_file('temp.pdb')
+            os.unlink('temp.pdb')
+        else:
+            pdb_file = mmapp.PDBFile(self.pdb)
+            topology = pdb_file.getTopology()
+            system_mol = Molecule.read_pdb_file(self.pdb)
+        # posres_atoms = [atom for atom in topology.atoms()]
 
         forcefield = mmapp.ForceField('amber14-all.xml', 'amber14/tip3pfb.xml')
         templates, residues = forcefield.generateTemplatesForUnmatchedResidues(
@@ -518,6 +526,11 @@ class ReactionSystemBuilder():
 
             if GM.subgraph_is_isomorphic():
                 return GM.subgraph_isomorphisms_iter()
+            if connectivity_range > 1.25:
+                self.ostream.print_info(
+                    f"Could not find subgraph isomorphismfrom residue to reactant, reducing connectivity range to {connectivity_range-0.01:.2f} and trying again"
+                )
+                self.ostream.flush()
 
         raise ValueError(
             "The detected residue structure must be subgraph isomorphic to the reactant molecule, but it is not. "

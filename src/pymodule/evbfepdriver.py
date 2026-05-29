@@ -819,7 +819,6 @@ class EvbFepDriver():
                     energy = energy.value_in_unit(mmunit.kilojoule_per_mole)
                     energies[j, k + 4] = energy
             except Exception:
-                print_exception_if_debug()
                 self.ostream.print_warning(
                     "Encountered error while saving forcegroups, continuing without forcegroups"
                 )

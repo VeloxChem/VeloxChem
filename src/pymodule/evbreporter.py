@@ -527,7 +527,6 @@ class EvbReporter():
             try:
                 simulation.context.setState(state)
             except Exception:
-                print_exception_if_debug()
                 # Decomposition systems which have the barostat removed will throw an error on the above case
                 simulation.context.setPositions(state.getPositions())
 
