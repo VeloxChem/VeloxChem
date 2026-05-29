@@ -209,6 +209,9 @@ class TransitionStateGuesser():
             self.ostream.flush()
             self.ostream.mute()
 
+        if self._reaction_matcher_assist_min_depth is not None:
+            self.ffbuilder._reaction_matcher_assist_min_depth = int(self._reaction_matcher_assist_min_depth)
+
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_forcefields(
             reactant=reactant,
             product=product,

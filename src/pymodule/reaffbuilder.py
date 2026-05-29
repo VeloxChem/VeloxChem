@@ -530,6 +530,8 @@ class ReactionForceFieldBuilder():
         # Turn the reactand and product into graphs
 
         rm = ReactionMatcher(ostream=self.ostream)
+        if self._reaction_matcher_assist_min_depth is not None:
+            rm._assist_min_depth = int(self._reaction_matcher_assist_min_depth)
         total_mapping, breaking_bonds, forming_bonds = rm.get_mapping(
             reactant,
             product,
