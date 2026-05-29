@@ -206,7 +206,7 @@ class ReactionForceFieldBuilder():
             product_ff.bonds[bond]['comment'] += ', formed in reaction'
 
         self.ostream.flush()
-        
+
         if self.optimize_ff and (len(forming_bonds) > 0 or len(breaking_bonds) > 0):
             # TODO this optimisation can likely be taken care of by the openmmdynamics class
             reactant_ff.molecule = self._optimize_molecule(
