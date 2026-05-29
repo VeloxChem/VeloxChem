@@ -206,7 +206,8 @@ class ReactionForceFieldBuilder():
             product_ff.bonds[bond]['comment'] += ', formed in reaction'
 
         self.ostream.flush()
-        if self.optimize_ff:
+        
+        if self.optimize_ff and (len(forming_bonds) > 0 or len(breaking_bonds) > 0):
             # TODO this optimisation can likely be taken care of by the openmmdynamics class
             reactant_ff.molecule = self._optimize_molecule(
                 reactant_ff.molecule.get_element_ids(),
@@ -222,6 +223,10 @@ class ReactionForceFieldBuilder():
             )
             # if len(reactant_ffs) > 1:
             # if len(product_ffs) > 1:
+        elif self.optimize_ff:
+            self.ostream.print_info(
+                "Skipping optimization of the force fields because no bonds are breaking or forming."
+            )
 
         return reactant_ff, product_ff, forming_bonds, breaking_bonds, reactant_ffs, product_ffs, product_mapping
 
@@ -525,8 +530,6 @@ class ReactionForceFieldBuilder():
         # Turn the reactand and product into graphs
 
         rm = ReactionMatcher(ostream=self.ostream)
-        if self._reaction_matcher_assist_min_depth is not None:
-            rm._assist_min_depth = int(self._reaction_matcher_assist_min_depth)
         total_mapping, breaking_bonds, forming_bonds = rm.get_mapping(
             reactant,
             product,
