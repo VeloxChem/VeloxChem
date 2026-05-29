@@ -33,7 +33,6 @@
 from mpi4py import MPI
 import sys
 import numpy as np
-import os
 import math
 import copy
 import h5py
@@ -233,7 +232,7 @@ class TransitionStateGuesser():
         self.mol_multiplicity = self.molecule.get_multiplicity()
 
         if self.save_intermediates:
-            os.makedirs(self.folder_name, exist_ok=True)
+            Path(self.folder_name).mkdir(parents=True, exist_ok=True)
             self.ostream.print_info(
                 f"Saving reactant and product forcefield as json to {self.folder_name}"
             )
@@ -331,8 +330,9 @@ class TransitionStateGuesser():
             self.ostream.flush()
             sysbuilder.ostream.unmute()
         if self.save_intermediates:
-            systems_dir = str(Path(self.folder_name) / "systems")
-            os.makedirs(systems_dir, exist_ok=True)
+            systems_dir_path = Path(self.folder_name) / "systems"
+            systems_dir_path.mkdir(parents=True, exist_ok=True)
+            systems_dir = str(systems_dir_path)
             self.ostream.print_info(f"Saving systems as xml to {systems_dir}")
             self.ostream.flush()
             sysbuilder.save_systems_as_xml(self.systems, systems_dir)
@@ -340,7 +340,7 @@ class TransitionStateGuesser():
 
     def scan_mm(self):
 
-        self.folder = Path().cwd() / self.folder_name
+        self.folder = Path.cwd() / self.folder_name
 
         # pdbs are saved in angstrom
 
@@ -689,7 +689,7 @@ class TransitionStateGuesser():
             temperature=self.mm_temperature,
         )
         if not self.save_intermediates:
-            os.remove(pdb_name)
+            Path(pdb_name).unlink()
 
         result = []
         for e_int, temp_mol in zip(conformers_dict['energies'],

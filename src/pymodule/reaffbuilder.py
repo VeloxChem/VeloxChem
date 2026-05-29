@@ -33,7 +33,7 @@
 from mpi4py import MPI
 import numpy as np
 import sys
-import os
+from pathlib import Path
 from .veloxchemlib import mpi_master
 from .sanitychecks import molecule_sanity_check
 from .molecule import Molecule
@@ -720,6 +720,7 @@ class ReactionForceFieldBuilder():
 
         pdb = mmapp.PDBFile(f'{name}.pdb')
         ff = mmapp.ForceField(f'{name}.xml')
+        sys_xml_path = Path(f'{name}_sys.xml')
 
         modeller = mmapp.Modeller(pdb.topology, pdb.positions)
 
@@ -739,7 +740,7 @@ class ReactionForceFieldBuilder():
                     mmsys = self._add_reaction_bonds(forcefield, mmsys,
                                                      changing_bonds, note)
 
-                with open(f'{name}_sys.xml', 'w') as f:
+                with sys_xml_path.open('w') as f:
                     f.write(mm.XmlSerializer.serialize(mmsys))
 
                 opm_dyn = OpenMMDynamics()
@@ -789,9 +790,9 @@ class ReactionForceFieldBuilder():
         self.optimize_dist_restraint_offset = 0.5  # Reset for next use
         new_molecule.set_charge(forcefield.molecule.get_charge())
         new_molecule.set_multiplicity(forcefield.molecule.get_multiplicity())
-        os.unlink(f'{name}.xml')
-        os.unlink(f'{name}.pdb')
-        os.unlink(f'{name}_sys.xml')
+        Path(f'{name}.xml').unlink()
+        Path(f'{name}.pdb').unlink()
+        sys_xml_path.unlink()
         return new_molecule
 
     def _add_reaction_bonds(self, forcefield, mmsys, changing_bonds, note):
