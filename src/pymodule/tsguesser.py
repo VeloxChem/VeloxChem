@@ -285,6 +285,16 @@ class TransitionStateGuesser():
             )
             self.ostream.flush()
             if self.active_torsion is not None:
+                assert_msg_critical(
+                    len(self.active_torsion) == 4,
+                    'TransitionStateGuesser: active_torsion must contain '
+                    'exactly four 1-based atom indices')
+                reactant_natoms = self.reactant.molecule.number_of_atoms()
+                assert_msg_critical(
+                    all(1 <= a <= reactant_natoms for a in self.active_torsion),
+                    'TransitionStateGuesser: active_torsion indices must be '
+                    f'between 1 and {reactant_natoms}')
+
                 # Convert user-supplied 1-indexed tuple to 0-indexed
                 torsion_0idx = tuple(a - 1 for a in self.active_torsion)
                 one_based = list(self.active_torsion)
