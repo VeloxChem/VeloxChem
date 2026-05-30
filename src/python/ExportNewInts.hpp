@@ -30,41 +30,17 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <pybind11/pybind11.h>
+#ifndef ExportNewInts_hpp
+#define ExportNewInts_hpp
 
-#include "ExportDft.hpp"
-#include "ExportGeneral.hpp"
-#include "ExportMath.hpp"
-#include "ExportMoldata.hpp"
-#include "ExportNewInts.hpp"
-#include "ExportOneElecInts.hpp"
-#include "ExportOrbdata.hpp"
-#include "ExportVisualization.hpp"
-#include "ExportT2CIntegrals.hpp"
-#include "ExportT3CIntegrals.hpp"
-#include "ExportT4CIntegrals.hpp"
+#include "ExportHelpers.hpp"
 
-PYBIND11_MODULE(veloxchemlib, m)
-{
-    vlx_general::export_general(m);
+namespace vlx_newints {  // vlx_newints namespace
 
-    vlx_math::export_math(m);
+/// @brief Exports classes/functions in src/newints to Python module.
+/// @param m The Python module.
+auto export_newints(py::module &m) -> void;
 
-    vlx_moldata::export_moldata(m);
+}  // namespace vlx_newints
 
-    vlx_orbdata::export_orbdata(m);
-
-    vlx_newints::export_newints(m);
-
-    vlx_dft::export_dft(m);
-
-    vlx_oneeints::export_oneeints(m);
-
-    vlx_visualization::export_visualization(m);
-
-    vlx_t2cintegrals::export_t2cintegrals(m);
-    
-    vlx_t3cintegrals::export_t3cintegrals(m);
-
-    vlx_t4cintegrals::export_t4cintegrals(m);
-}
+#endif /* ExportNewInts_hpp */
