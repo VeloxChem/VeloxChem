@@ -5,6 +5,7 @@ include Makefile.setup
 # Set TARGET and linker flags for VeloxChem shared library
 
 VLX_BAS := ../basis
+VLX_MOF := pymodule/mofbuilder
 VLX_TARGET := veloxchemlib.so
 VLX_MODULE := $(wildcard pymodule/*.py)
 VLX_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -75,6 +76,7 @@ debug: $(VLX_LIBS)
 	mkdir -p ../build/python/veloxchem
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
+	$(CP) -r $(VLX_MOF) $(CURDIR)/../build/python/veloxchem/mofbuilder
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
 	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py
@@ -89,6 +91,7 @@ release: $(VLX_LIBS)
 	mkdir -p ../build/python/veloxchem
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
+	$(CP) -r $(VLX_MOF) $(CURDIR)/../build/python/veloxchem/mofbuilder
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
 	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py
