@@ -933,8 +933,8 @@ class OpenMMDynamics:
             opt_coordinates.append(xyz)
 
         # Sort the conformations by (increasing) energy
-        index_ẹnergy = [(i, minimized_energies[i]) for i in range(len(minimized_energies))]
-        sorted_index_energy = sorted(index_ẹnergy, key=lambda x: x[1])
+        index_energy = [(i, minimized_energies[i]) for i in range(len(minimized_energies))]
+        sorted_index_energy = sorted(index_energy, key=lambda x: x[1])
         sorted_indices = [i[0] for i in sorted_index_energy]
 
         minimized_energies = [minimized_energies[i] for i in sorted_indices]
@@ -1072,8 +1072,8 @@ class OpenMMDynamics:
             self.ostream.flush()
 
             # reorder coordinates and energies by increasing energy
-            index_ẹnergy = [(i, energies[i]) for i in range(len(energies))]
-            sorted_index_energy = sorted(index_ẹnergy, key=lambda x: x[1])  # sorted by increasing energy
+            index_energy = [(i, energies[i]) for i in range(len(energies))]
+            sorted_index_energy = sorted(index_energy, key=lambda x: x[1])  # sorted by increasing energy
             sorted_indices = [i[0] for i in sorted_index_energy]
 
             minimized_energy = [energies[i] for i in sorted_indices]
