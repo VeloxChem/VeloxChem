@@ -154,7 +154,6 @@ class InterpolationDriver():
         self.use_inverse_bond_length = True
         self.use_eq_bond_length = False
         self.use_cosine_dihedral = False
-        self.use_tc_weights = False
         self.use_mass_weight = False
 
         # Optional runtime profiling for interpolation bottleneck analysis.
@@ -164,15 +163,20 @@ class InterpolationDriver():
         self.runtime_profile_totals = {}
         self.runtime_profile_last = {}
         self.runtime_profile_calls = 0
+        
 
+        ####### General target customized schemes #######
+        self.use_tc_weights = False
+        self.tc_weight_mode = "multiplicative" # additive_rhee
+        # original scheme YM 2024-06-17: multiplicative weight function scheme with fixed confidence radius and no coordinate-specific scaling
+
+        # multiplicative weight function scheme
         self.tc_imp_gate_lambda = 0.7
-
         # Coordinate tolerances defining the sphere of influence.
         self.tc_imp_bond_sigma_angstrom = 0.04
-        self.tc_imp_angle_sigma_degrees = 5.0
+        self.tc_imp_angle_sigma_degrees = 6.0
         self.tc_imp_dihedral_sigma_degrees = 12.0
-        self.tc_imp_improper_sigma_degrees = 5.0
-
+        self.tc_imp_improper_sigma_degrees = 6.0
         # Numerical guards.
         self.tc_imp_gate_exp_clip = 50.0
         self.tc_imp_min_sigma = 1.0e-12
@@ -202,6 +206,7 @@ class InterpolationDriver():
                     'use_eq_bond_length': ('bool', 'whether to use eq bond lengths in the Z-matrix'),
                     'use_cosine_dihedral':('bool', 'wether to use cosine and sin for the diehdral in the Z-matrix'),
                     'use_tc_weights':('bool', 'weither to use target coustomized weights'),
+                    'tc_weight_mode':('str', 'the mode for the target customized weights (multiplicative/additive)'),
                     'use_mass_weight':('bool', 'weither to use mass weighting in coordinates'),
                 'labels': ('seq_fixed_str', 'the list of QM data point labels'),
             }
@@ -236,6 +241,36 @@ class InterpolationDriver():
 
         if self.interpolation_type == 'shepard' and self.exponent_q is None:
             self.exponent_q = self.exponent_p / 2.0
+
+        valid_tc_modes = {"multiplicative", "additive_rhee"}
+
+        if self.tc_weight_mode not in valid_tc_modes:
+            raise ValueError(
+                "Unknown tc_weight_mode: "
+                f"{self.tc_weight_mode}. "
+                "Allowed values are 'multiplicative' and 'additive_rhee'."
+            )
+
+        if (
+            self.use_tc_weights
+            and self.tc_weight_mode == "additive_rhee"
+            and self.weightfunction_type != "cartesian"
+        ):
+            raise NotImplementedError(
+                "The additive Rhee target-customized formalism is currently "
+                "implemented only for Cartesian base weighting coordinates."
+            )
+
+        if (
+            self.use_tc_weights
+            and self.tc_weight_mode == "additive_rhee"
+            and self.use_cosine_dihedral
+        ):
+            raise NotImplementedError(
+                "The additive Rhee target-customized formalism currently "
+                "requires raw dihedral-angle rows. "
+                "use_cosine_dihedral=True is not supported."
+            )
 
     def enable_runtime_profiling(self, enabled=True, reset=True, print_summary=False):
         """
@@ -856,6 +891,130 @@ class InterpolationDriver():
                 yield section, coord, idx
 
             
+    # def _imp_coordinate_sigma(self, section, idx, q_ref):
+    #     """
+    #     Returns the sigma value in the same coordinate representation as the
+    #     internal coordinate row idx.
+
+    #     For inverse bonds, q = 1/r, so a physical bond tolerance sigma_r is
+    #     converted into q-space via sigma_q = sigma_r / r_ref^2.
+    #     """
+
+    #     sigma_bond_bohr = (
+    #         float(self.tc_imp_bond_sigma_angstrom) / bohr_in_angstrom()
+    #     )
+
+    #     if section == "bonds":
+    #         if self.use_inverse_bond_length:
+    #             # q_ref is 1/r in bohr^-1.
+    #             r_ref = 1.0 / max(abs(float(q_ref[idx])), self.tc_imp_min_sigma)
+    #             sigma = sigma_bond_bohr / max(r_ref * r_ref, self.tc_imp_min_sigma)
+    #         else:
+    #             sigma = sigma_bond_bohr
+
+    #     elif section == "angles":
+    #         sigma = np.deg2rad(float(self.tc_imp_angle_sigma_degrees))
+
+    #     elif section == "dihedrals":
+    #         sigma = np.sin(np.deg2rad(float(self.tc_imp_dihedral_sigma_degrees)))
+
+    #     elif section == "impropers":
+    #         sigma = np.sin(np.deg2rad(float(self.tc_imp_improper_sigma_degrees)))
+
+
+    #     else:
+    #         raise ValueError(f"Unknown important-coordinate section: {section}")
+
+    #     return max(float(abs(sigma)), self.tc_imp_min_sigma)
+
+    # def _important_coordinate_gate_metric(self, data_point, active_dofs):
+    #     """
+    #     Computes the dimensionless important-coordinate distance A_imp and
+    #     its Cartesian derivative.
+
+    #     A_imp = sum_k beta_k z_k^2 / sum_k beta_k
+
+    #     The derivative is with respect to the active Cartesian coordinates
+    #     used by the Cartesian weight gradient.
+
+    #     Returns
+    #     -------
+    #     A_imp : float
+    #         Dimensionless mean squared important-coordinate displacement.
+
+    #     grad_A_imp : ndarray, shape (n_active_dofs,)
+    #         dA_imp/dX for active Cartesian degrees of freedom.
+    #     """
+
+    #     q_cur = np.asarray(
+    #         self.impes_coordinate.internal_coordinates_values,
+    #         dtype=np.float64,
+    #     )
+    #     q_ref = np.asarray(
+    #         data_point.internal_coordinates_values,
+    #         dtype=np.float64,
+    #     )
+
+    #     B = np.asarray(self.impes_coordinate.b_matrix, dtype=np.float64)
+
+    #     inv_sqrt_masses = getattr(self.impes_coordinate, "inv_sqrt_masses", None)
+    #     if inv_sqrt_masses is not None:
+    #         inv_sqrt_active = np.asarray(inv_sqrt_masses, dtype=np.float64)[active_dofs]
+    #     else:
+    #         inv_sqrt_active = None
+
+    #     A_num = 0.0
+    #     beta_sum = 0.0
+    #     grad_A_num = np.zeros(active_dofs.size, dtype=np.float64)
+
+    #     for section, coord, idx in self._iter_imp_internal_coordinate_rows(data_point):
+    #         beta = 1.0
+
+    #         dq_raw = float(q_cur[idx] - q_ref[idx])
+    #         sigma = self._imp_coordinate_sigma(section, idx, q_ref)
+
+    #         # B row is mass-weighted if inv_sqrt_masses was set on the datapoint.
+    #         # Convert it back to derivative with respect to physical Cartesian
+    #         # coordinates, matching the existing target-customized code path.
+    #         b_row = B[idx, active_dofs].copy()
+    #         if inv_sqrt_active is not None:
+    #             b_row = b_row / inv_sqrt_active
+
+    #         if section == "dihedrals":
+    #             # Periodic, smooth metric.
+    #             d = self._principal_torsion_delta(dq_raw)
+    #             z = np.sin(d) / sigma
+    #             dz_dx = np.cos(d) * b_row / sigma
+
+    #         elif section == "impropers":
+    #             d = self._principal_torsion_delta(dq_raw)
+    #             z = np.sin(d) / sigma
+    #             dz_dx = np.cos(d) * b_row / sigma
+
+
+    #         elif section == "angles":
+    #             z = dq_raw / sigma
+    #             dz_dx = b_row / sigma
+
+    #         elif section == "bonds":
+    #             z = dq_raw / sigma
+    #             dz_dx = b_row / sigma
+
+    #         else:
+    #             continue
+
+    #         A_num += beta * z * z
+    #         grad_A_num += beta * 2.0 * z * dz_dx
+    #         beta_sum += beta
+
+    #     if beta_sum <= 0.0:
+    #         return 0.0, np.zeros(active_dofs.size, dtype=np.float64)
+
+    #     A_imp = A_num / beta_sum
+    #     grad_A_imp = grad_A_num / beta_sum
+
+    #     return float(A_imp), grad_A_imp
+
     def _imp_coordinate_sigma(self, section, idx, q_ref):
         """
         Returns the sigma value in the same coordinate representation as the
@@ -881,11 +1040,10 @@ class InterpolationDriver():
             sigma = np.deg2rad(float(self.tc_imp_angle_sigma_degrees))
 
         elif section == "dihedrals":
-            sigma = np.sin(np.deg2rad(float(self.tc_imp_dihedral_sigma_degrees)))
+            sigma = 2.0 * np.sin(np.deg2rad(0.5 * float(self.tc_imp_dihedral_sigma_degrees)))
 
         elif section == "impropers":
-            sigma = np.sin(np.deg2rad(float(self.tc_imp_improper_sigma_degrees)))
-
+            sigma = 2.0 * np.tan(0.5 * np.deg2rad(float(self.tc_imp_improper_sigma_degrees)))
 
         else:
             raise ValueError(f"Unknown important-coordinate section: {section}")
@@ -948,13 +1106,18 @@ class InterpolationDriver():
             if section == "dihedrals":
                 # Periodic, smooth metric.
                 d = self._principal_torsion_delta(dq_raw)
-                z = np.sin(d) / sigma
-                dz_dx = np.cos(d) * b_row / sigma
+                z = 2.0 * np.sin(0.5 * d) / sigma
+                dz_dx = np.cos(0.5 * d) * b_row / sigma
 
             elif section == "impropers":
                 d = self._principal_torsion_delta(dq_raw)
-                z = np.sin(d) / sigma
-                dz_dx = np.cos(d) * b_row / sigma
+
+                eta = 2.0 * np.tan(0.5 * d)
+                cos_half = np.cos(0.5 * d)
+                chain_eta = 1.0 / np.maximum(cos_half * cos_half, 1.0e-12)
+
+                z = eta / sigma
+                dz_dx = chain_eta * b_row / sigma
 
 
             elif section == "angles":
@@ -1037,8 +1200,178 @@ class InterpolationDriver():
 
             return denominator_mod, grad_w_mod.reshape(raw_weight_gradient_base.shape)
 
+    def _target_customized_additive_distance_term(self, data_point, active_dofs):
+        """
+        Computes the additive target-customized weighting-coordinate term
+        following the Kim/Rhee formalism.
 
+        The modified squared distance is
 
+            D_total = D_cart + D_tc
+
+        with
+
+            D_tc = sum_k delta_k^2.
+
+        Returns
+        -------
+        D_tc : float
+            Additive dimensionless customized-coordinate contribution.
+
+        grad_D_tc : ndarray, shape (n_active_dofs,)
+            Cartesian derivative d(D_tc)/dX.
+
+        Notes
+        -----
+        This method is intentionally separate from the multiplicative
+        target-customized gate implementation. In the Rhee weighting
+        formalism, both proper and improper dihedrals use the sine-based
+        periodic distance coordinate.
+        """
+
+        q_cur = np.asarray(
+            self.impes_coordinate.internal_coordinates_values,
+            dtype=np.float64,
+        )
+
+        q_ref = np.asarray(
+            data_point.internal_coordinates_values,
+            dtype=np.float64,
+        )
+
+        B = np.asarray(
+            self.impes_coordinate.b_matrix,
+            dtype=np.float64,
+        )
+
+        inv_sqrt_masses = getattr(
+            self.impes_coordinate,
+            "inv_sqrt_masses",
+            None,
+        )
+
+        if inv_sqrt_masses is not None:
+            inv_sqrt_active = np.asarray(
+                inv_sqrt_masses,
+                dtype=np.float64,
+            )[active_dofs]
+        else:
+            inv_sqrt_active = None
+
+        D_tc = 0.0
+        grad_D_tc = np.zeros(active_dofs.size, dtype=np.float64)
+
+        for section, coord, idx in self._iter_imp_internal_coordinate_rows(
+            data_point
+        ):
+            dq_raw = float(q_cur[idx] - q_ref[idx])
+
+            b_row = B[idx, active_dofs].copy()
+
+            # Convert dq/dQ back to dq/dX if the B-matrix is expressed
+            # with respect to mass-weighted Cartesian coordinates.
+            if inv_sqrt_active is not None:
+                b_row = b_row / inv_sqrt_active
+
+            if section == "bonds":
+                sigma = self._rhee_coordinate_sigma(section, idx, q_ref)
+
+                delta = dq_raw / sigma
+                ddelta_dx = b_row / sigma
+
+            elif section == "angles":
+                sigma = self._rhee_coordinate_sigma(section, idx, q_ref)
+
+                delta = dq_raw / sigma
+                ddelta_dx = b_row / sigma
+
+            elif section in ("dihedrals", "impropers"):
+                sigma = self._rhee_coordinate_sigma(section, idx, q_ref)
+
+                d = self._principal_torsion_delta(dq_raw)
+
+                # Identical to:
+                # sin(d / 2) / sin(tau / 2),
+                # because sigma = 2 sin(tau / 2).
+                delta = 2.0 * np.sin(0.5 * d) / sigma
+
+                ddelta_dx = (
+                    np.cos(0.5 * d) * b_row / sigma
+                )
+
+            else:
+                continue
+
+            D_tc += delta * delta
+            grad_D_tc += 2.0 * delta * ddelta_dx
+
+        return float(D_tc), grad_D_tc
+
+    def _rhee_coordinate_sigma(self, section, idx, q_ref):
+        """
+        Returns the scaling parameter for the additive Kim/Rhee
+        target-customized weighting-coordinate formalism.
+
+        For bonds:
+            The current framework may store inverse bond coordinates q = 1/r.
+            In that case, a physical bond tolerance is approximately mapped
+            into inverse-distance coordinate space.
+
+        For angles:
+            sigma is in radians.
+
+        For proper and improper dihedrals:
+            sigma = 2 sin(tau / 2), so that
+
+                delta = 2 sin(Delta / 2) / sigma
+                    = sin(Delta / 2) / sin(tau / 2).
+
+            This is the weighting-coordinate convention of Kim and Rhee.
+        """
+
+        sigma_bond_bohr = (
+            float(self.tc_imp_bond_sigma_angstrom) / bohr_in_angstrom()
+        )
+
+        if section == "bonds":
+            if self.use_inverse_bond_length:
+                r_ref = 1.0 / max(
+                    abs(float(q_ref[idx])),
+                    self.tc_imp_min_sigma,
+                )
+
+                sigma = sigma_bond_bohr / max(
+                    r_ref * r_ref,
+                    self.tc_imp_min_sigma,
+                )
+            else:
+                sigma = sigma_bond_bohr
+
+        elif section == "angles":
+            sigma = np.deg2rad(
+                float(self.tc_imp_angle_sigma_degrees)
+            )
+
+        elif section == "dihedrals":
+            sigma = 2.0 * np.sin(
+                0.5 * np.deg2rad(
+                    float(self.tc_imp_dihedral_sigma_degrees)
+                )
+            )
+
+        elif section == "impropers":
+            sigma = 2.0 * np.sin(
+                0.5 * np.deg2rad(
+                    float(self.tc_imp_improper_sigma_degrees)
+                )
+            )
+
+        else:
+            raise ValueError(
+                f"Unknown important-coordinate section: {section}"
+            )
+
+        return max(float(abs(sigma)), self.tc_imp_min_sigma)
 
     def trust_radius_weight_gradient(self, confidence_radius, distance):
         
@@ -1146,12 +1479,12 @@ class InterpolationDriver():
         
         return trust_radius_weight_gradient
 
-    def trust_radius_tc_weight_gradient_gradient(self, confidence_radius, distance, distance_vector, imp_int_coords_distance, imp_int_coords_dist_derivative):
+    def trust_radius_tc_weight_gradient_gradient(self, confidence_radius, distance, distance_vector, imp_int_coords_distance, imp_int_coords_dist_derivative, scale2=1.0,):
             
             # 1. Define base variables
             R = confidence_radius
             D = distance**2 + imp_int_coords_distance
-            v = imp_int_coords_dist_derivative + 2.0 * distance_vector.reshape(-1)
+            v = imp_int_coords_dist_derivative + 2.0 * scale2 * distance_vector.reshape(-1)
             
             p = float(self.exponent_p)
             q = float(self.exponent_q)
@@ -1180,29 +1513,94 @@ class InterpolationDriver():
 
             return trust_radius_weight_gradient_gradient.reshape(distance_vector.shape[0], 3)
 
-    def YM_target_customized_shepard_weight_gradient(self, distance_vector, distance, confidence_radius, imp_int_coords_distance, imp_int_coordinate_derivative):
-        
-        R = confidence_radius
-        D = distance**2 + imp_int_coords_distance
-        v = 2.0 * distance_vector.reshape(-1) + imp_int_coordinate_derivative
-        
+    def additive_rhee_shepard_weight_gradient(
+        self,
+        distance_vector,
+        distance,
+        scale2,
+        confidence_radius,
+        D_tc,
+        grad_D_tc,
+    ):
+        """
+        Computes the raw two-part Shepard weight denominator and its
+        Cartesian derivative for the additive Kim/Rhee target-customized
+        weighting-distance formalism.
+
+        Definitions
+        -----------
+        D_cart  = d_cart^2
+        D_total = D_cart + D_tc
+        u       = D_total / R^2
+
+        raw weight:
+            w = 1 / (u^p + u^q)
+
+        Parameters
+        ----------
+        distance_vector : ndarray, shape (n_active_atoms, 3)
+            Cartesian aligned displacement vector.
+
+        distance : float
+            Cartesian distance satisfying
+                distance^2 = scale2 * ||distance_vector||^2.
+
+        scale2 : float
+            Cartesian distance scaling factor.
+
+        confidence_radius : float
+            Datapoint confidence radius R.
+
+        D_tc : float
+            Additive customized-coordinate distance contribution.
+
+        grad_D_tc : ndarray, shape (n_active_dofs,)
+            Cartesian derivative of D_tc.
+        """
+
+        R = float(confidence_radius)
         p = float(self.exponent_p)
         q = float(self.exponent_q)
-        
-        u = D / (R**2)
-        
-        # Early Exit
-        if np.isscalar(u) and u > 1e6:
-            return np.inf, np.zeros((distance_vector.shape[0], 3), dtype=np.float64)
-            
-        denom_base = u**p + u**q
-        denom_base = np.clip(denom_base, a_min=1e-300, a_max=None)
-        
-        numerator = p * u**(p - 1.0) + q * u**(q - 1.0)
-        
-        weight_gradient = -1.0 * (numerator / (R**2 * denom_base**2)) * v
-   
-        return denom_base, weight_gradient.reshape(distance_vector.shape[0], 3)
+
+        D_cart = float(distance * distance)
+        D_total = D_cart + float(D_tc)
+
+        grad_D_cart = (
+            2.0 * float(scale2) * distance_vector.reshape(-1)
+        )
+
+        grad_D_total = (
+            grad_D_cart
+            + np.asarray(grad_D_tc, dtype=np.float64).reshape(-1)
+        )
+
+        u = D_total / (R * R)
+
+        if np.isscalar(u) and u > 1.0e6:
+            return (
+                np.inf,
+                np.zeros_like(distance_vector, dtype=np.float64),
+            )
+
+        denominator = u**p + u**q
+        denominator = np.clip(
+            denominator,
+            a_min=1.0e-300,
+            a_max=None,
+        )
+
+        numerator = (
+            p * u**(p - 1.0)
+            + q * u**(q - 1.0)
+        )
+
+        prefactor = -numerator / (
+            (R * R) * denominator**2
+        )
+
+        weight_gradient = prefactor * grad_D_total
+
+        return denominator, weight_gradient.reshape(distance_vector.shape)
     
 
     def VL_target_customized_shepard_weight_gradient(self, distance_vector, distance, confidence_radius, dq, dq_dx):
@@ -1270,14 +1668,19 @@ class InterpolationDriver():
         dstart = int(bounds["dihedral_start"])
         dend = int(bounds["dihedral_end"])
 
-        for idx in range(len(dq_raw)):
-            if dstart <= idx < dend:  # proper dihedrals only
-                d = self._principal_torsion_delta(dq_raw[idx])
-                dq_eff[idx] = np.sin(d)
-                chain[idx] = np.cos(d)
-            else:  # bonds, angles, impropers -> linear
-                dq_eff[idx] = dq_raw[idx]
-                chain[idx] = 1.0
+        if not self.use_cosine_dihedral:
+            for idx in range(len(dq_raw)):
+                if dstart <= idx < dend:  # proper dihedrals only
+                    d = self._principal_torsion_delta(dq_raw[idx])
+                    dq_eff[idx] = np.sin(d)
+                    chain[idx] = np.cos(d)
+                elif idx >= dend:  # impropers
+                    d = self._principal_torsion_delta(dq_raw[idx])
+                    dq_eff[idx] = self._improper_dihedral_displacement(d)
+                    chain[idx] = self._improper_dihedral_chain(d)
+                else:  # bonds and angles
+                    dq_eff[idx] = dq_raw[idx]
+                    chain[idx] = 1.0
 
         grad_Dint = np.zeros(active_dofs.shape[0], dtype=np.float64)
         if self.impes_coordinate.inv_sqrt_masses is not None:
@@ -1445,7 +1848,7 @@ class InterpolationDriver():
         # distance_vector_sub *= scale**2
 
         n_dof = distance_vector_sub.size
-        scale2 = 1.0 / n_dof**(2.0 * 0.25)
+        scale2 = 1.0 #/ n_dof**(2.0 * 0.25)
         distance = np.sqrt(scale2 * np.dot(distance_vector_sub.ravel(),distance_vector_sub.ravel()))
         
         dihedral_dist = 0.0
@@ -1455,6 +1858,8 @@ class InterpolationDriver():
       
         dw_dalhpa_i = 0
         dw_dX_dalpha_i = 0
+        D_tc = None
+        grad_D_tc = None
 
         if self.interpolation_type == 'shepard':
             
@@ -1464,7 +1869,26 @@ class InterpolationDriver():
                 scale2,
                 data_point.confidence_radius,
             )
-            if self.use_tc_weights:
+            if not self.use_tc_weights:
+                denominator_imp_coord, weight_gradient_sub_imp_coord = (
+                    self.shepard_weight_gradient(
+                        distance_vector_sub,
+                        distance,
+                        scale2,
+                        data_point.confidence_radius,
+                    )
+                )
+
+            elif self.tc_weight_mode == "multiplicative":
+                denominator_base, weight_gradient_sub_base = (
+                    self.shepard_weight_gradient(
+                        distance_vector_sub,
+                        distance,
+                        scale2,
+                        data_point.confidence_radius,
+                    )
+                )
+
                 A_imp, grad_A_imp = self._important_coordinate_gate_metric(
                     data_point,
                     active_dofs,
@@ -1478,19 +1902,72 @@ class InterpolationDriver():
                         grad_A_imp,
                     )
                 )
-            else:
-                denominator_imp_coord = denominator_base
-                weight_gradient_sub_imp_coord = weight_gradient_sub_base
 
+            elif self.tc_weight_mode == "additive_rhee":
+                D_tc, grad_D_tc = self._target_customized_additive_distance_term(
+                    data_point,
+                    active_dofs,
+                )
+
+                denominator_imp_coord, weight_gradient_sub_imp_coord = (
+                    self.additive_rhee_shepard_weight_gradient(
+                        distance_vector=distance_vector_sub,
+                        distance=distance,
+                        scale2=scale2,
+                        confidence_radius=data_point.confidence_radius,
+                        D_tc=D_tc,
+                        grad_D_tc=grad_D_tc,
+                    )
+                )
+
+            else:
+                raise ValueError(
+                    f"Unsupported tc_weight_mode: {self.tc_weight_mode}"
+                )
+            # if self.use_tc_weights:
+            #     A_imp, grad_A_imp = self._important_coordinate_gate_metric(
+            #         data_point,
+            #         active_dofs,
+            #     )
+
+            #     denominator_imp_coord, weight_gradient_sub_imp_coord = (
+            #         self._apply_imp_coordinate_penalty_gate(
+            #             denominator_base,
+            #             weight_gradient_sub_base,
+            #             A_imp,
+            #             grad_A_imp,
+            #         )
+            #     )
+            # else:
+            #     denominator_imp_coord = denominator_base
+            #     weight_gradient_sub_imp_coord = weight_gradient_sub_base
+            
             if self.calc_optim_trust_radius:
-                if self.use_tc_weights:
+
+                if not self.use_tc_weights:
+                    dw_dalhpa_i = self.trust_radius_weight_gradient(
+                        data_point.confidence_radius,
+                        distance,
+                    )
+
+                    dw_dX_dalpha_i = self.trust_radius_weight_gradient_gradient(
+                        data_point.confidence_radius,
+                        distance,
+                        distance_vector_sub,
+                        scale2,
+                    )
+
+                elif self.tc_weight_mode == "multiplicative":
                     A_imp, grad_A_imp = self._important_coordinate_gate_metric(
                         data_point,
                         active_dofs,
                     )
 
                     lam = float(self.tc_imp_gate_lambda)
-                    gate = np.exp(-min(lam * A_imp, self.tc_imp_gate_exp_clip))
+                    gate = np.exp(
+                        -min(lam * A_imp, self.tc_imp_gate_exp_clip)
+                    )
+
                     grad_gate = -lam * gate * grad_A_imp
 
                     dw_base_dR = self.trust_radius_weight_gradient(
@@ -1511,24 +1988,91 @@ class InterpolationDriver():
                         gate * dgradw_base_dR.reshape(-1)
                         + grad_gate * dw_base_dR
                     ).reshape(distance_vector_sub.shape)
-                else:
-                    dw_dalhpa_i = self.trust_radius_weight_gradient(
+
+                elif self.tc_weight_mode == "additive_rhee":
+                    if D_tc is None or grad_D_tc is None:
+                        D_tc, grad_D_tc = self._target_customized_additive_distance_term(
+                            data_point,
+                            active_dofs,
+                        )
+
+                    dw_dalhpa_i = self.trust_radius_tc_weight_gradient(
                         data_point.confidence_radius,
                         distance,
+                        D_tc,
                     )
 
-                    dw_dX_dalpha_i = self.trust_radius_weight_gradient_gradient(
-                        data_point.confidence_radius,
-                        distance,
-                        distance_vector_sub,
-                        scale2,
+                    dw_dX_dalpha_i = (
+                        self.trust_radius_tc_weight_gradient_gradient(
+                            confidence_radius=data_point.confidence_radius,
+                            distance=distance,
+                            distance_vector=distance_vector_sub,
+                            imp_int_coords_distance=D_tc,
+                            imp_int_coords_dist_derivative=grad_D_tc,
+                            scale2=scale2,
+                        )
+                    )
+
+                else:
+                    raise ValueError(
+                        f"Unsupported tc_weight_mode: {self.tc_weight_mode}"
                     )
 
                 if store_alpha_gradients:
                     self.dw_dalpha_list.append(dw_dalhpa_i)
+
                     dw_dX_dalpha_i_full = np.zeros_like(reference_coordinates)
-                    dw_dX_dalpha_i_full[self.symmetry_information[3]] = dw_dX_dalpha_i
+                    dw_dX_dalpha_i_full[active_atoms] = dw_dX_dalpha_i
+
                     self.dw_dX_dalpha_list.append(dw_dX_dalpha_i_full)
+
+            # if self.calc_optim_trust_radius:
+            #     if self.use_tc_weights:
+            #         A_imp, grad_A_imp = self._important_coordinate_gate_metric(
+            #             data_point,
+            #             active_dofs,
+            #         )
+
+            #         lam = float(self.tc_imp_gate_lambda)
+            #         gate = np.exp(-min(lam * A_imp, self.tc_imp_gate_exp_clip))
+            #         grad_gate = -lam * gate * grad_A_imp
+
+            #         dw_base_dR = self.trust_radius_weight_gradient(
+            #             data_point.confidence_radius,
+            #             distance,
+            #         )
+
+            #         dgradw_base_dR = self.trust_radius_weight_gradient_gradient(
+            #             data_point.confidence_radius,
+            #             distance,
+            #             distance_vector_sub,
+            #             scale2,
+            #         )
+
+            #         dw_dalhpa_i = gate * dw_base_dR
+
+            #         dw_dX_dalpha_i = (
+            #             gate * dgradw_base_dR.reshape(-1)
+            #             + grad_gate * dw_base_dR
+            #         ).reshape(distance_vector_sub.shape)
+            #     else:
+            #         dw_dalhpa_i = self.trust_radius_weight_gradient(
+            #             data_point.confidence_radius,
+            #             distance,
+            #         )
+
+            #         dw_dX_dalpha_i = self.trust_radius_weight_gradient_gradient(
+            #             data_point.confidence_radius,
+            #             distance,
+            #             distance_vector_sub,
+            #             scale2,
+            #         )
+
+            #     if store_alpha_gradients:
+            #         self.dw_dalpha_list.append(dw_dalhpa_i)
+            #         dw_dX_dalpha_i_full = np.zeros_like(reference_coordinates)
+            #         dw_dX_dalpha_i_full[self.symmetry_information[3]] = dw_dX_dalpha_i
+            #         self.dw_dX_dalpha_list.append(dw_dX_dalpha_i_full)
                     
         else:
             errtxt = "Unrecognized interpolation type: "

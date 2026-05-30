@@ -106,6 +106,7 @@ except ImportError:
     pass
 
 
+# todo remove cluster/rotor information from the master
 @contextmanager
 def scoped_omp_num_threads(nthreads):
     if nthreads is None:
@@ -205,7 +206,7 @@ class IMDatabasePointCollecter:
         # control messages and interpolation payload broadcasts.
         self.comm = comm
         try:
-            self._mpi_ctrl_comm = self.comm.Dup()
+            self._mpi_ctrl_comm = self.comm.Dup() # mpi delete not necessary here / Dup is not used within Veloxchem
         except Exception:
             self._mpi_ctrl_comm = self.comm
 
@@ -391,9 +392,6 @@ class IMDatabasePointCollecter:
         # Cache of the most recent QM molecule passed through interpolation.
         self._latest_qm_molecule = None
         self._latest_qm_positions_nm = None
-
-        self.qm_omp_threads = None
-        
 
     def _create_platform(self):
         """
@@ -2138,7 +2136,7 @@ class IMDatabasePointCollecter:
                 ET.SubElement(RBForce, "Torsion", **attributes)
 
         # ImproperForce section
-        ImproperForce = ET.SubElement(ForceField, "PeriodicTorsionForce")
+        ImproperForce = ET.SubElement(ForceField, "PeriodicTorsionForce") # check the ordering of the improper
         for improper_id, improper_data in impropers.items():
             if (improper_id[0] in bonded_atoms and
                 improper_id[1] in bonded_atoms and
@@ -3065,17 +3063,40 @@ class IMDatabasePointCollecter:
                             constraints.append(dih)
                     main_constraint_list.extend(constraints)
 
+                    b_matrix = self.impes_drivers[state_to_optim].impes_coordinate.b_matrix
+                    masks = []
+                    for coord_idx, coord in enumerate(self.root_z_matrix[state_to_optim]['bonds'] + self.root_z_matrix[state_to_optim]['angles'] + self.root_z_matrix[state_to_optim]['dihedrals'] + self.root_z_matrix[state_to_optim]['impropers']):
+                            if coord in main_constraint_list:
+                                masks.append(coord_idx)
+
+                    Bc = b_matrix[masks, :]
+                    info = self.analyze_constraint_jacobian(Bc)
+                    
+                    new_masks = []
+                    constraint_mask = []
+                    for sigma_idx, sigma in enumerate(info["sigma"]):
+                        if sigma > 0.4:
+                            new_masks.append(masks[sigma_idx])
+                    Bc = b_matrix[new_masks, :]
+                    for idx, coord in enumerate(new_masks, start=1):
+                        
+                        eta, _, _ = self.candidate_independence_eta(Bc[:idx, :], Bc[idx, :])
+                        if eta > 0.3:
+                            constraint_mask.append(main_constraint_list[idx])
+                        if idx == len(new_masks) - 1:
+                            break
                                    
                     print('Main CONSTRAINTS', main_constraint_list)
+                    print('Filtered CONSTRAINTS', constraint_mask)
                     opt_results = None
                     opt_gradient = None
                     if isinstance(drivers[0], ScfRestrictedDriver) or isinstance(drivers[0], ScfUnrestrictedDriver):
 
                             energies, scf_results, rsp_results = self._compute_energy(drivers[0], molecule, current_basis)
                     
-                            opt_results, opt_gradient = self._run_optimization(drivers[0], molecule, constraints=main_constraint_list, index_offset=1, compute_args=(current_basis, scf_results))
+                            opt_results, opt_gradient = self._run_optimization(drivers[0], molecule, constraints=constraint_mask, index_offset=1, compute_args=(current_basis, scf_results))
                     elif isinstance(drivers[0], XtbDriver):
-                         opt_results, opt_gradient = self._run_optimization(drivers[0], molecule, constraints=main_constraint_list, index_offset=1)
+                         opt_results, opt_gradient = self._run_optimization(drivers[0], molecule, constraints=constraint_mask, index_offset=1)
                     
                     optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
                     optimized_molecule.set_charge(molecule.get_charge())
@@ -4068,11 +4089,11 @@ class IMDatabasePointCollecter:
     
             def _fmt_float(value):
                 if value is None:
-                    return "nan"
+                    return math.nan
                 try:
                     v = float(value)
                 except Exception:
-                    return "nan"
+                    return math.nan # check the nan
                 if not np.isfinite(v):
                     return "nan"
                 return f"{v:.6e}"
@@ -4482,28 +4503,22 @@ class IMDatabasePointCollecter:
 
         # XTB
         if isinstance(qm_driver, XtbDriver):
-            with scoped_omp_num_threads(self.qm_omp_threads['energy']):
-                qm_driver.ostream.mute()
-                try:
-                    qm_driver.compute(molecule)
-                    qm_energy = qm_driver.get_energy()
-                finally:
-                    qm_driver.ostream.unmute()
+            qm_driver.ostream.mute()
+            qm_driver.compute(molecule)
+            qm_energy = qm_driver.get_energy()
+            qm_driver.ostream.unmute()
             if qm_energy is None:
                 raise RuntimeError('XTB energy is None on this rank after MPI synchronization.')
             qm_energy = np.array([qm_energy])
 
         # restricted SCF
         elif isinstance(qm_driver, ScfRestrictedDriver) or isinstance(qm_driver, ScfUnrestrictedDriver):
-            with scoped_omp_num_threads(self.qm_omp_threads['energy']):
-                qm_driver.ostream.mute()
-                try:
-                    scf_results = qm_driver.compute(molecule, basis)
-                    qm_energy = np.array([qm_driver.scf_energy])
-                finally:
-                    qm_driver.ostream.unmute()
-                    qm_driver.filename = None
-                    qm_driver.checkpoint_file = None
+            qm_driver.ostream.mute()
+            scf_results = qm_driver.compute(molecule, basis)
+            qm_energy = np.array([qm_driver.scf_energy])
+            qm_driver.ostream.unmute()
+            qm_driver.filename = None
+            qm_driver.checkpoint_file = None
 
             print('qm_energy in SCF driver', qm_energy)
         
@@ -4529,24 +4544,18 @@ class IMDatabasePointCollecter:
         qm_gradient = None
 
         if isinstance(grad_driver, XtbGradientDriver):
-            with scoped_omp_num_threads(self.qm_omp_threads['gradient']):
-                grad_driver.ostream.mute()
-                try:
-                    grad_driver.compute(molecule)
-                    qm_gradient = grad_driver.gradient
-                    qm_gradient = np.array([qm_gradient])
-                finally:
-                    grad_driver.ostream.unmute()
+            grad_driver.ostream.mute()
+            grad_driver.compute(molecule)
+            qm_gradient = grad_driver.gradient
+            qm_gradient = np.array([qm_gradient])
+            grad_driver.ostream.unmute()
 
         elif isinstance(grad_driver, ScfGradientDriver):
-            with scoped_omp_num_threads(self.qm_omp_threads['gradient']):
-                grad_driver.ostream.mute()
-                try:
-                    grad_driver.compute(molecule, basis, scf_results)
-                    qm_gradient = grad_driver.gradient
-                    qm_gradient = np.array([qm_gradient])
-                finally:
-                    grad_driver.ostream.unmute()
+            grad_driver.ostream.mute()
+            grad_driver.compute(molecule, basis, scf_results)
+            qm_gradient = grad_driver.gradient
+            qm_gradient = np.array([qm_gradient])
+            grad_driver.ostream.unmute()
 
 
         if qm_gradient is None:
@@ -4572,27 +4581,21 @@ class IMDatabasePointCollecter:
         qm_hessians = None
 
         if isinstance(hess_driver, XtbHessianDriver):
-            with scoped_omp_num_threads(self.qm_omp_threads['hessian']):
-                hess_driver.ostream.mute()
-                try:
-                    hess_driver.compute(molecule)
-                    qm_hessian = hess_driver.hessian
-                finally:
-                    hess_driver.ostream.unmute()
+            hess_driver.ostream.mute()
+            hess_driver.compute(molecule)
+            qm_hessian = hess_driver.hessian
+            hess_driver.ostream.unmute()
 
             if qm_hessian is None:
                 raise RuntimeError('XTB Hessian is None on this rank after MPI synchronization.')
             qm_hessians = np.array([qm_hessian])
 
         elif isinstance(hess_driver, ScfHessianDriver):
-            with scoped_omp_num_threads(self.qm_omp_threads['hessian']):
-                hess_driver.ostream.mute()
-                try:
-                    hess_driver.compute(molecule, basis)
-                    qm_hessian = hess_driver.hessian
-                    qm_hessians = np.array([qm_hessian])
-                finally:
-                    hess_driver.ostream.unmute()
+            hess_driver.ostream.mute()
+            hess_driver.compute(molecule, basis)
+            qm_hessian = hess_driver.hessian
+            qm_hessians = np.array([qm_hessian])
+            hess_driver.ostream.unmute()
 
         if qm_hessians is None:
             error_txt = "Could not compute the QM Hessian. "
@@ -4764,8 +4767,6 @@ class IMDatabasePointCollecter:
                     ds[old_size:new_size, :, :] = grad_data
 
             # store information about the checked data with reference calculations
-
-            
     
     def read_simulation_summary(self, fname, roots_to_follow):
         """

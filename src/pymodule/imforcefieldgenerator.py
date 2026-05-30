@@ -74,43 +74,6 @@ from .veloxchemlib import mpi_master, hartree_in_kcalpermol, bohr_in_angstrom
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
 
-
-@contextmanager
-def scoped_omp_num_threads(nthreads):
-    if nthreads is None:
-        yield
-        return
-
-    nthreads = int(nthreads)
-    if nthreads < 1:
-        raise ValueError("OpenMP thread count must be >= 1")
-
-    old_env = environ.get("OMP_NUM_THREADS")
-    old_runtime = None
-    set_runtime_threads = None
-
-    # try:
-    #     from .veloxchemlib import get_number_of_threads, set_number_of_threads
-    #     old_runtime = int(get_number_of_threads())
-    #     set_runtime_threads = set_number_of_threads
-    # except Exception:
-    #     pass
-
-    environ["OMP_NUM_THREADS"] = str(nthreads)
-    if set_runtime_threads is not None:
-        set_runtime_threads(nthreads)
-    print("Setting_trhead", nthreads)
-    try:
-        yield
-    finally:
-        if old_env is None:
-            environ.pop("OMP_NUM_THREADS", None)
-        else:
-            environ["OMP_NUM_THREADS"] = old_env
-
-        if set_runtime_threads is not None and old_runtime is not None:
-            set_runtime_threads(old_runtime)
-
 class IMForceFieldGenerator:
     """
     Class to set up and control the construction of the Interpolation Dynamics (IM) database.
@@ -294,6 +257,7 @@ class IMForceFieldGenerator:
         self.use_eq_bond_length = False
         self.use_cosine_dihedral = False
         self.use_tc_weights = True
+        self.tc_weight_mode = "multiplicative" # "additive_rhee"
         self.use_mass_weight = False
         
         self.eq_bond_length = None
@@ -382,13 +346,6 @@ class IMForceFieldGenerator:
 
         self.profile_runtime_timing = False
         self.profile_interpolation_timing = False
-
-        self.qm_omp_threads = {
-                                "energy": None,
-                                "gradient": None,
-                                "hessian": None,
-                            }
-    
 
     def define_z_matrix_dict(self, molecule, add_coordinates=None):
         g_molecule = geometric.molecule.Molecule()
@@ -616,6 +573,7 @@ class IMForceFieldGenerator:
                                         'use_eq_bond_length':self.use_eq_bond_length,
                                         'use_cosine_dihedral':self.use_cosine_dihedral,
                                         'use_tc_weights':self.use_tc_weights,
+                                        'tc_weight_mode':self.tc_weight_mode,
                                         'use_mass_weight':self.use_mass_weight,
                                     })
        
@@ -952,6 +910,7 @@ class IMForceFieldGenerator:
                                 'use_eq_bond_length':self.use_eq_bond_length,
                                 'use_cosine_dihedral':self.use_cosine_dihedral,
                                 'use_tc_weights':self.use_tc_weights,
+                                'tc_weight_mode':self.tc_weight_mode,
                                 'use_mass_weight':self.use_mass_weight,
                             }
             self.sampling_states_interpolation_settings[self.roots_to_follow[0]] = self.states_interpolation_settings[self.roots_to_follow[0]].copy()
@@ -1199,10 +1158,7 @@ class IMForceFieldGenerator:
             # set optimization features in the construction run
             im_database_driver.identfy_relevant_int_coordinates = (self.identfy_relevant_int_coordinates, self.use_minimized_structures[1])
             im_database_driver.use_opt_confidence_radius = self.use_opt_confidence_radius
-
-            im_database_driver.qm_omp_threads = self.qm_omp_threads
-            
-            
+                     
             im_database_driver.system_from_molecule(dynamics_molecule, self.roots_z_matrix, forcefield_generator, solvent=self.solvent, qm_atoms='all')  
             if self.bias_force_reaction_prop is not None:
                 im_database_driver.bias_force_reaction_idx = self.bias_force_reaction_idx
@@ -2327,28 +2283,24 @@ class IMForceFieldGenerator:
 
         # XTB
         if isinstance(qm_driver, XtbDriver):
-            with scoped_omp_num_threads(self.qm_omp_threads['energy']):
-                qm_driver.ostream.mute()
-                try:
-                    qm_driver.compute(molecule)
-                    qm_energy = qm_driver.get_energy()
-                finally:
-                    qm_driver.ostream.unmute()
+            qm_driver.ostream.mute()
+            qm_driver.compute(molecule)
+            qm_energy = qm_driver.get_energy()
+            qm_driver.ostream.unmute()
             if qm_energy is None:
                 raise RuntimeError('XTB energy is None on this rank after MPI synchronization.')
             qm_energy = np.array([qm_energy])
 
         # restricted SCF
         elif isinstance(qm_driver, ScfRestrictedDriver) or isinstance(qm_driver, ScfUnrestrictedDriver):
-            with scoped_omp_num_threads(self.qm_omp_threads['energy']):
-                qm_driver.ostream.mute()
-                try:
-                    scf_results = qm_driver.compute(molecule, basis)
-                    qm_energy = np.array([qm_driver.scf_energy])
-                finally:
-                    qm_driver.ostream.unmute()
-                    qm_driver.filename = None
-                    qm_driver.checkpoint_file = None
+            qm_driver.ostream.mute()
+            
+            scf_results = qm_driver.compute(molecule, basis)
+            qm_energy = np.array([qm_driver.scf_energy])
+            
+            qm_driver.ostream.unmute()
+            qm_driver.filename = None
+            qm_driver.checkpoint_file = None
 
             print('qm_energy in SCF driver', qm_energy)
 
@@ -2373,24 +2325,21 @@ class IMForceFieldGenerator:
         qm_gradient = None
 
         if isinstance(grad_driver, XtbGradientDriver):
-            with scoped_omp_num_threads(self.qm_omp_threads['gradient']):
+
                 grad_driver.ostream.mute()
-                try:
-                    grad_driver.compute(molecule)
-                    qm_gradient = grad_driver.gradient
-                    qm_gradient = np.array([qm_gradient])
-                finally:
-                    grad_driver.ostream.unmute()
+                grad_driver.compute(molecule)
+                qm_gradient = grad_driver.gradient
+                qm_gradient = np.array([qm_gradient])
+                grad_driver.ostream.unmute()
 
         elif isinstance(grad_driver, ScfGradientDriver):
-            with scoped_omp_num_threads(self.qm_omp_threads['gradient']):
-                grad_driver.ostream.mute()
-                try:
-                    grad_driver.compute(molecule, basis, scf_results)
-                    qm_gradient = grad_driver.gradient
-                    qm_gradient = np.array([qm_gradient])
-                finally:
-                    grad_driver.ostream.unmute()
+            grad_driver.ostream.mute()
+
+            grad_driver.compute(molecule, basis, scf_results)
+            qm_gradient = grad_driver.gradient
+            qm_gradient = np.array([qm_gradient])
+
+            grad_driver.ostream.unmute()
 
         if qm_gradient is None:
             error_txt = "Could not compute the QM gradient. "
@@ -2415,27 +2364,21 @@ class IMForceFieldGenerator:
         qm_hessians = None
 
         if isinstance(hess_driver, XtbHessianDriver):
-            with scoped_omp_num_threads(self.qm_omp_threads['hessian']):
-                hess_driver.ostream.mute()
-                try:
-                    hess_driver.compute(molecule)
-                    qm_hessian = hess_driver.hessian
-                finally:
-                    hess_driver.ostream.unmute()
+            hess_driver.ostream.mute()
+            hess_driver.compute(molecule)
+            qm_hessian = hess_driver.hessian
+            hess_driver.ostream.unmute()
 
             if qm_hessian is None:
                 raise RuntimeError('XTB Hessian is None on this rank after MPI synchronization.')
             qm_hessians = np.array([qm_hessian])
 
         elif isinstance(hess_driver, ScfHessianDriver):
-            with scoped_omp_num_threads(self.qm_omp_threads['hessian']):
-                hess_driver.ostream.mute()
-                try:
-                    hess_driver.compute(molecule, basis)
-                    qm_hessian = hess_driver.hessian
-                    qm_hessians = np.array([qm_hessian])
-                finally:
-                    hess_driver.ostream.unmute()
+            hess_driver.ostream.mute()
+            hess_driver.compute(molecule, basis)
+            qm_hessian = hess_driver.hessian
+            qm_hessians = np.array([qm_hessian])
+            hess_driver.ostream.unmute()
 
         if qm_hessians is None:
             error_txt = "Could not compute the QM Hessian. "
