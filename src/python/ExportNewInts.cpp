@@ -39,6 +39,7 @@
 #include <cstddef>
 #include <vector>
 
+#include "DenseMatrix.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularBasisOutline.hpp"
 #include "Molecule.hpp"
@@ -62,18 +63,25 @@ export_newints(py::module &m) -> void
         .value("antisymmetric", newints::SymmetryType::antisymmetric)
         .value("general", newints::SymmetryType::general);
 
+    // newints::Kind enum
+    py::enum_<newints::Kind>(sub, "Kind")
+        .value("full", newints::Kind::full)
+        .value("lower_triangular", newints::Kind::lower_triangular);
+
     // newints::Block struct
     PyClass<newints::Block>(sub, "Block")
         .def(py::init<>())
-        .def(py::init([](const std::size_t nrows, const std::size_t ncols, const std::vector<double> &data) {
-                 return newints::Block{nrows, ncols, data};
+        .def(py::init([](const std::size_t nrows, const std::size_t ncols, const std::vector<double> &data, const newints::Kind kind) {
+                 return newints::Block{nrows, ncols, data, kind};
              }),
              "nrows"_a,
              "ncols"_a,
-             "data"_a)
+             "data"_a,
+             "kind"_a = newints::Kind::full)
         .def_readwrite("nrows", &newints::Block::nrows, "Number of rows (2 l_a + 1).")
         .def_readwrite("ncols", &newints::Block::ncols, "Number of columns (2 l_b + 1).")
-        .def_readwrite("data", &newints::Block::data, "Row-major block values.")
+        .def_readwrite("data", &newints::Block::data, "Block values (row-major; packed lower triangle if lower_triangular).")
+        .def_readwrite("kind", &newints::Block::kind, "Storage layout of the block (full or lower_triangular).")
         .def("__eq__", [](const newints::Block &self, const newints::Block &other) { return self == other; });
 
     // newints::SparseMatrix class
@@ -102,6 +110,10 @@ export_newints(py::module &m) -> void
         .def("zero", &newints::SparseMatrix::zero, "Sets all block values to zero.")
         .def("number_of_blocks", &newints::SparseMatrix::number_of_blocks, "Gets number of stored blocks.")
         .def("keys", &newints::SparseMatrix::keys, "Gets keys of all stored blocks in ascending order.")
+        .def("to_dense",
+             &newints::SparseMatrix::to_dense,
+             "Converts to a full dense matrix in VeloxChem atomic-orbital ordering.",
+             "basis"_a)
         .def("__eq__", [](const newints::SparseMatrix &self, const newints::SparseMatrix &other) { return self == other; });
 
     // newints::MolecularBasisOutline class

@@ -38,6 +38,9 @@
 #include <utility>
 #include <vector>
 
+class CMolecularBasis;
+class CDenseMatrix;
+
 namespace newints {
 
 /// @brief Enumerates the symmetry of a sparse matrix.
@@ -46,6 +49,13 @@ enum class SymmetryType
     symmetric,      ///< matrix equals its transpose
     antisymmetric,  ///< matrix equals the negative of its transpose
     general         ///< no symmetry
+};
+
+/// @brief Enumerates the storage layout of a block.
+enum class Kind
+{
+    full,             ///< all nrows * ncols values stored row-major
+    lower_triangular  ///< square block; lower triangle (r >= c) packed as n(n+1)/2 values
 };
 
 /// @brief A single dense block of a sparse matrix, i.e. the integrals of one
@@ -61,12 +71,17 @@ struct Block
     /// @brief The number of columns, i.e. 2 l_b + 1 spherical components of the ket shell.
     std::size_t ncols;
 
-    /// @brief The block values stored row-major, with nrows * ncols elements.
+    /// @brief The block values, row-major. For Kind::full there are nrows * ncols
+    /// values; for Kind::lower_triangular the block is square and only its lower
+    /// triangle (r >= c) is stored as n(n+1)/2 packed values.
     std::vector<double> data;
+
+    /// @brief The storage layout of the block.
+    Kind kind = Kind::full;
 
     /// @brief The equality operator.
     /// @param other The block to compare with.
-    /// @return True if both blocks have identical dimensions and values.
+    /// @return True if both blocks have identical dimensions, layout and values.
     auto operator==(const Block &other) const -> bool;
 };
 
@@ -119,14 +134,20 @@ class SparseMatrix
     auto set_symmetry(const SymmetryType symmetry) -> void;
 
     /// @brief Adds (inserts or overwrites) a block at the given key.
+    ///
+    /// For a general matrix the full block is stored as given. For a symmetric
+    /// or antisymmetric matrix only the upper block triangle (i <= j) is kept:
+    /// a block given with i > j is canonicalized to (j, i) by transposing it
+    /// (negating it as well when antisymmetric), and a diagonal block (i == j)
+    /// is stored packed lower-triangular (Kind::lower_triangular).
     /// @param key The (bra, ket) pair of contracted GTO indices.
-    /// @param block The block of shell-pair integrals.
+    /// @param block The full block of shell-pair integrals.
     auto add(const Key &key, const Block &block) -> void;
 
     /// @brief Adds (inserts or overwrites) a block at the given indices.
     /// @param i The bra contracted GTO index.
     /// @param j The ket contracted GTO index.
-    /// @param block The block of shell-pair integrals.
+    /// @param block The full block of shell-pair integrals.
     auto add(const int i, const int j, const Block &block) -> void;
 
     /// @brief Sets all block values to zero, keeping the block structure.
@@ -158,6 +179,15 @@ class SparseMatrix
     /// @brief Gets the keys of all stored blocks in ascending order.
     /// @return The vector of keys.
     auto keys() const -> std::vector<Key>;
+
+    /// @brief Converts to a full dense matrix in VeloxChem atomic-orbital
+    /// ordering (angular-momentum major: l -> m -> atom -> contraction). For
+    /// symmetric / antisymmetric matrices the stored triangle (and packed
+    /// diagonal blocks) are expanded into the full matrix.
+    /// @param basis The molecular basis defining the indexing and ordering;
+    /// must be the basis whose outline produced the stored keys.
+    /// @return The dense matrix.
+    auto to_dense(const CMolecularBasis &basis) const -> CDenseMatrix;
 
    private:
     /// @brief The symmetry of the matrix.
