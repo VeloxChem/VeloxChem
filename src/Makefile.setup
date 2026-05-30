@@ -39,7 +39,7 @@ CXX_DEB_FLG += $(OPENMP_INC)
 # LibXC interface
 
 LIBXC_INC := -I /opt/libxc/include
-LIBXC_LD  := -L /opt/libxc/lib -lxc
+LIBXC_LD  := -L /opt/libxc/lib -lxc -Wl,-rpath,/opt/libxc/lib
 
 CXX_REL_FLG += $(LIBXC_INC)
 CXX_DEB_FLG += $(LIBXC_INC)

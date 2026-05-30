@@ -68,7 +68,7 @@ VLX_LIBS_OPTS = $(foreach d,$(VLX_LIBS_DIR),$(addprefix $d/,*.optrpt))
 VLX_LIBS_LIST = $(foreach d,$(VLX_LIBS_DIR),$(addprefix -L$d -l,$d))
 
 # Debug
-debug: $(VLX_LIBS)
+debug: $(VLX_LIBS_DIR)
 	@echo ====== Linking debug version of $(VLX_TARGET)...
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) \
 	$(VLX_LIBS_OBJS) $(LIB_LIST)
@@ -83,7 +83,7 @@ debug: $(VLX_LIBS)
 	@echo "__commit__ = \"$(VLX_COMMIT)\"" >> $(CURDIR)/../build/python/veloxchem/__init__.py
 
 # Release
-release: $(VLX_LIBS)
+release: $(VLX_LIBS_DIR)
 	@echo ====== Linking release version of $(VLX_TARGET)...
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) \
 	$(VLX_LIBS_OBJS) $(LIB_LIST)
@@ -106,7 +106,6 @@ clean:
 	$(RM) $(VLX_LIBS_OPTS)
 
 # Set internal libraries generation rule
-.PHONY: $(VLX_LIBS) $(VLX_LIBS_DIR)
-$(VLX_LIBS): $(VLX_LIBS_DIR)
+.PHONY: $(VLX_LIBS_DIR)
 $(VLX_LIBS_DIR):
 	$(MAKE) --directory=$@ $(MAKECMDGOALS)

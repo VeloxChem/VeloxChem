@@ -29,15 +29,10 @@ vpath %.hpp $(VLX_INCLUDES)
 # Add MKL includes
 CXXFLAGS += $(MATH_INC)
 
-# Default rule for linking library
+# Default rule: compile all objects (no archive; objects are linked by ../Makefile)
 debug: $(LOCAL_OBJ)
-	@echo ====== Linking $(LOCAL_LIB)...
-	$(AR) $(ARFLAGS) $(LOCAL_LIB) $^
 
-# Default rule for linking library
 release: $(LOCAL_OBJ)
-	@echo ====== Linking $(LOCAL_LIB)...
-	$(AR) $(ARFLAGS) $(LOCAL_LIB) $^
 
 # Default rule for cleaning library directory
 clean:
