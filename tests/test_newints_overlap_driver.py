@@ -1,6 +1,7 @@
 import numpy as np
 
 from veloxchem.veloxchemlib import newints
+from veloxchem.veloxchemlib import OverlapDriver as RefOverlapDriver
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 
@@ -59,12 +60,40 @@ class TestNewIntsOverlapDriver:
         assert smat.block((2, 5)).kind == newints.Kind.full              # p(O)-s(H1)
         assert (smat.block((2, 5)).nrows, smat.block((2, 5)).ncols) == (3, 1)
 
-    def test_compute_values_are_zero_stub(self):
+    def test_diagonal_kernel_matches_reference_same_atom(self):
 
-        # kernels are stubs -> all integral values are zero for now
+        # the same-atom (diagonal) kernel is implemented; the two-center kernel
+        # is still a stub, so only same-atom blocks match the reference driver.
+        mol, bas = self.water_sto3g()
+        snew = newints.OverlapDriver().compute(mol, bas, 1.0e-12).to_dense(bas).to_numpy()
+        sref = RefOverlapDriver().compute(mol, bas).to_numpy()
+
+        assert snew.shape == (7, 7)
+        # normalized diagonal, fully determined by the same-atom kernel
+        assert np.allclose(np.diag(snew), 1.0)
+        assert np.allclose(np.diag(snew), np.diag(sref))
+        # O 1s-2s (same atom, l == l') matches the reference
+        assert np.isclose(snew[0, 1], sref[0, 1])
+        assert np.isclose(snew[1, 0], sref[1, 0])
+        # different-atom block (O-H, AO 0-2) still stubbed to zero
+        assert snew[0, 2] == 0.0
+        assert sref[0, 2] != 0.0
+
+    def test_screener_filters_offdiagonal_blocks(self):
+
+        # the screener applies only to different-atom pairs; a huge threshold
+        # screens all of them out, leaving only the same-atom blocks
+        mol, bas = self.water_sto3g()
+        smat = newints.OverlapDriver().compute(mol, bas, 1.0e10)
+
+        same_atom = [(0, 0), (0, 1), (1, 1), (2, 2),  # O
+                     (5, 5),                           # H1
+                     (6, 6)]                           # H2
+        assert smat.keys() == sorted(same_atom)
+
+    def test_small_threshold_keeps_all_blocks(self):
+
+        # a tiny threshold screens nothing -> full block structure (13 blocks)
         mol, bas = self.water_sto3g()
         smat = newints.OverlapDriver().compute(mol, bas, 1.0e-12)
-
-        dense = smat.to_dense(bas).to_numpy()
-        assert dense.shape == (7, 7)
-        assert np.allclose(dense, 0.0)
+        assert smat.number_of_blocks() == 13
