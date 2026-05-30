@@ -135,6 +135,10 @@ class CBasisFunction
     /// @brief The angular momentum of basis function.
     int _angular_momentum;
 
+    /// @brief Sorts primitive exponents in decreasing order, applying the same
+    /// permutation to the normalization factors so each exponent keeps its factor.
+    auto _sort() -> void;
+
     /// @brief Rescales normalization factors to match normalization of spherical
     /// (l,0) component of basis function.
     auto _rescale() -> void;

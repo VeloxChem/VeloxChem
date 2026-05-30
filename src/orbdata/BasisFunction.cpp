@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 #include <ranges>
 
 #include "CustomViews.hpp"
@@ -160,6 +161,8 @@ CBasisFunction::add(const double exponent, const double norm) -> void
 auto
 CBasisFunction::normalize() -> void
 {
+    _sort();
+
     // TODO: Implemented for l > 6
     if (_angular_momentum > 6) return;
 
@@ -198,6 +201,33 @@ auto
 CBasisFunction::number_of_primitive_functions() const -> size_t
 {
     return _exponents.size();
+}
+
+auto
+CBasisFunction::_sort() -> void
+{
+    const auto n = _exponents.size();
+
+    if (n < 2) return;
+
+    std::vector<size_t> perm(n);
+
+    std::iota(perm.begin(), perm.end(), size_t{0});
+
+    // stable so equal exponents keep their original relative order
+    std::stable_sort(perm.begin(), perm.end(), [&](const size_t a, const size_t b) { return _exponents[a] > _exponents[b]; });
+
+    std::vector<double> sexps(n), snorms(n);
+
+    for (size_t i = 0; i < n; i++)
+    {
+        sexps[i]  = _exponents[perm[i]];
+        snorms[i] = _norms[perm[i]];
+    }
+
+    _exponents = std::move(sexps);
+
+    _norms = std::move(snorms);
 }
 
 auto
