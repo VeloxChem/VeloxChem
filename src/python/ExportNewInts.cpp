@@ -40,6 +40,7 @@
 #include <vector>
 
 #include "MolecularBasis.hpp"
+#include "MolecularBasisOutline.hpp"
 #include "Molecule.hpp"
 #include "OverlapDriver.hpp"
 #include "SparseMatrix.hpp"
@@ -102,6 +103,27 @@ export_newints(py::module &m) -> void
         .def("number_of_blocks", &newints::SparseMatrix::number_of_blocks, "Gets number of stored blocks.")
         .def("keys", &newints::SparseMatrix::keys, "Gets keys of all stored blocks in ascending order.")
         .def("__eq__", [](const newints::SparseMatrix &self, const newints::SparseMatrix &other) { return self == other; });
+
+    // newints::MolecularBasisOutline class
+    PyClass<newints::MolecularBasisOutline>(sub, "MolecularBasisOutline")
+        .def(py::init<>())
+        .def(py::init<const CMolecularBasis &>(), "basis"_a)
+        .def("number_of_atoms", &newints::MolecularBasisOutline::number_of_atoms, "Gets the number of atoms.")
+        .def("number_of_basis_functions",
+             &newints::MolecularBasisOutline::number_of_basis_functions,
+             "Gets the number of contracted basis functions (shells).")
+        .def("number_of_atomic_orbitals",
+             &newints::MolecularBasisOutline::number_of_atomic_orbitals,
+             "Gets the total angular-expanded dimension (number of atomic orbitals).")
+        .def("basis_function_indices",
+             &newints::MolecularBasisOutline::basis_function_indices,
+             "Gets the contracted-GTO (shell) indices on a given atom.",
+             "atom"_a)
+        .def("indices", &newints::MolecularBasisOutline::indices, "Gets the contracted-GTO index of each shell (atom-major).")
+        .def("angular_momenta", &newints::MolecularBasisOutline::angular_momenta, "Gets the angular momentum of each shell (atom-major).")
+        .def("atom_indices", &newints::MolecularBasisOutline::atom_indices, "Gets the owning atom of each shell (atom-major).")
+        .def("__eq__",
+             [](const newints::MolecularBasisOutline &self, const newints::MolecularBasisOutline &other) { return self == other; });
 
     // newints::OverlapDriver class
     PyClass<newints::OverlapDriver>(sub, "OverlapDriver")
