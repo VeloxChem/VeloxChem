@@ -110,7 +110,7 @@ class OpenMMDynamics:
         - scaling_factor: The scaling factor for the QM stabilizer.
         - linking_atom_distance: The distance between the QM and MM regions in angstroms.
     """
-    
+
     def __init__(self, comm=None, ostream=None):
         """
         Initializes the class with default simulation parameters.
@@ -144,13 +144,13 @@ class OpenMMDynamics:
         # Instance variables
         # Simulation parameters
         self.ensemble = 'NVE'
-        self.temperature = 298.15 
-        self.friction = 1.0 
+        self.temperature = 298.15
+        self.friction = 1.0
         self.timestep = 2.0
         self.nsteps = 1000
         self.parent_ff = 'amber03.xml'
         self.water_ff = 'spce.xml'
-        self.box_size = 2.0 
+        self.box_size = 2.0
         self.padding = 1.0
         self.cutoff = 1.0
         self.integrator = None
@@ -172,7 +172,7 @@ class OpenMMDynamics:
 
         # filtering
         self.rmsd_threshold = 1.5
-        self.energy_threshold = 1.5 # kj/mol
+        self.energy_threshold = 1.5  # kj/mol
 
         # QM Region parameters
         self.qm_driver = None
@@ -188,22 +188,22 @@ class OpenMMDynamics:
         self.scaling_factor = 0.01
 
         # Default value for the C-H linker distance
-        self.linking_atom_distance = 1.0705 
-        
+        self.linking_atom_distance = 1.0705
+
     # Loading methods
     # TODO: Integrate the guess with the read_pdb_file in Molecule.
     def load_system_PDB(self, filename):
         """
         Loads a system from a PDB file, extracting unique residues and their details.
 
-        :param filename: 
+        :param filename:
             Path to the PDB file. Example: 'system.pdb'.
         """
-        
+
         pdb_path = Path(filename)
         if not pdb_path.is_file():
             raise FileNotFoundError(f"{filename} does not exist.")
-        
+
         pdbstr = pdb_path.read_text()
         residues = {}
 
@@ -239,10 +239,10 @@ class OpenMMDynamics:
                         'labels': [],
                         'coordinates': []
                     }
-                
+
                 residues[residue_identifier]['labels'].append(atom_label)
                 residues[residue_identifier]['coordinates'].append(coordinates)
-            
+
             # If a line starts with TER, skip it
             if line.startswith('TER'):
                 continue
@@ -253,7 +253,6 @@ class OpenMMDynamics:
             # If a line starts with END, break the loop
             if line.startswith('END'):
                 break
-            
 
         # Overwrite the PDB file with the guessed atom labels in columns 77-78
         # if the labels are missing
@@ -288,7 +287,7 @@ class OpenMMDynamics:
                             # Convert indices to 1-based index for PDB format and ensure proper column alignment
                             i_index = i + 1
                             j_index = j + 1
-                            # Align to the right 
+                            # Align to the right
                             con_string = "{:6s}{:>5d}{:>5d}".format('CONECT', i_index, j_index)
                             f.write(con_string + '\n')
 
@@ -302,7 +301,6 @@ class OpenMMDynamics:
             mol = Molecule(data['labels'], coordinates_array, "angstrom")
             molecules.append(mol)
             unq_residues.append((residue, number))
-
 
         # Initialize a set to track the first occurrence of each residue name
         seen_residue_names = set()
@@ -321,14 +319,14 @@ class OpenMMDynamics:
         info_msg = f"Unique Residues: {self.unique_residues}, saved as molecules."
         self.ostream.print_info(info_msg)
         self.ostream.flush()
-    
+
     def load_system_from_files(self, system_xml, system_pdb):
         """
         Loads a preexisting system from an XML file and a PDB file.
 
-        :param system_xml: 
+        :param system_xml:
             XML file containing the system parameters.
-        :param system_pdb: 
+        :param system_pdb:
             PDB file containing the system coordinates.
         """
         self.pdb = app.PDBFile(system_pdb)
@@ -362,25 +360,25 @@ class OpenMMDynamics:
             msg = f"CustomExternalForce found at index {self.qm_force_index}."
             self.ostream.print_info(msg)
             self.ostream.flush()
-            
+
     # Method to generate OpenMM system from VeloxChem objects
-    def create_system_from_molecule(self, 
-                             molecule, 
-                             ff_gen, 
-                             solvent='gas', 
-                             qm_atoms=None, 
-                             filename='residue', 
-                             residue_name='MOL'):
+    def create_system_from_molecule(self,
+                                    molecule,
+                                    ff_gen,
+                                    solvent='gas',
+                                    qm_atoms=None,
+                                    filename='residue',
+                                    residue_name='MOL'):
         """
         Creates an OpenMM system from a VeloxChem molecule and a forcefield generator.
-        
+
         :param molecule:
             VeloxChem molecule object.
         :param ff_gen:
             VeloxChem forcefield generator object.
         :param solvent:
             Available options:'gas', 'cspce', 'ctip3p', 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone',
-            'chloroform', 'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf', 
+            'chloroform', 'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf',
             'acetonitrile', 'other' or 'itself'.
         :param qm_atoms:
             Options: None, 'all', or list of atom indices for QM region.
@@ -405,11 +403,11 @@ class OpenMMDynamics:
                 self.ostream.print_info(msg)
                 self.ostream.flush()
                 qm_atoms = list(range(len(self.labels)))
-                self._create_QM_residue(ff_gen, 
-                                        qm_atoms, 
+                self._create_QM_residue(ff_gen,
+                                        qm_atoms,
                                         filename)
 
-            elif isinstance (qm_atoms, list):
+            elif isinstance(qm_atoms, list):
                 if qm_atoms == list(range(len(self.labels))):
                     msg = 'Full molecule as QM region'
                     self.ostream.print_info(msg)
@@ -421,8 +419,8 @@ class OpenMMDynamics:
                 self.ostream.print_info(msg)
                 self.ostream.flush()
                 self._create_QM_subregion(ff_gen,
-                                          qm_atoms, 
-                                          molecule, 
+                                          qm_atoms,
+                                          molecule,
                                           filename)
 
             ff_gen.write_pdb('qm_region.pdb', 'QMR')
@@ -432,7 +430,7 @@ class OpenMMDynamics:
 
         if solvent == 'gas':
             phase = 'gas'
-            self.pdb = app.PDBFile(f'{filename}.pdb')     
+            self.pdb = app.PDBFile(f'{filename}.pdb')
             # Common forcefield loading, modified according to phase specifics
             forcefield_files = [f'{filename}.xml']
 
@@ -441,14 +439,14 @@ class OpenMMDynamics:
             phase = 'periodic'
             sol_builder = SolvationBuilder()
             sol_builder.steps = 10000
-            sol_builder.solvate(solute=molecule, 
+            sol_builder.solvate(solute=molecule,
                                 solvent=solvent,
                                 padding=self.padding,
                                 equilibrate=True,
                                 )
-            
+
             sol_builder.write_openmm_files(solute_ff=ff_gen)
-            
+
             if solvent == 'spce':
                 self.water_ff = 'spce.xml'
                 forcefield_files = [f'{filename}.xml', self.parent_ff, self.water_ff]
@@ -466,7 +464,7 @@ class OpenMMDynamics:
             # Load the PDB from the SolvationBuilder
             self.pdb = app.PDBFile('system.pdb')
 
-        # Create the ForceField object        
+        # Create the ForceField object
         forcefield = app.ForceField(*forcefield_files)
 
         # Create the System object
@@ -474,17 +472,17 @@ class OpenMMDynamics:
             self.system = forcefield.createSystem(self.pdb.topology, nonbondedMethod=app.NoCutoff, constraints=app.HBonds)
 
         else:
-            self.system = forcefield.createSystem(self.pdb.topology, 
-                                                  nonbondedMethod=app.PME, 
-                                                  nonbondedCutoff=self.cutoff * unit.nanometer, 
+            self.system = forcefield.createSystem(self.pdb.topology,
+                                                  nonbondedMethod=app.PME,
+                                                  nonbondedCutoff=self.cutoff * unit.nanometer,
                                                   constraints=app.HBonds)
-        
+
         # Modify the system to include QM and QM/MM forces.
         if qm_atoms:
-            self.set_qm_mm_system(phase, 
+            self.set_qm_mm_system(phase,
                                   ff_gen)
             # self.qm_stabilizer(ff_gen)
-        
+
         # Write the system to a xml file (for debugging purposes)
         with open(f'{filename}_system.xml', 'w') as f:
             f.write(mm.XmlSerializer.serialize(self.system))
@@ -494,32 +492,32 @@ class OpenMMDynamics:
 
         # Write the system to a pdb file (for debugging purposes)
         if phase == 'gas':
-            app.PDBFile.writeFile(self.pdb.topology, 
-                                  self.positions, 
+            app.PDBFile.writeFile(self.pdb.topology,
+                                  self.positions,
                                   open(f'{filename}_system.pdb', 'w'))
             msg = f'System coordinates written to {filename}_system.pdb'
             self.ostream.print_info(msg)
             self.ostream.flush()
 
         elif phase == 'periodic':
-            app.PDBFile.writeFile(self.pdb.topology, 
-                                  self.pdb.positions, 
+            app.PDBFile.writeFile(self.pdb.topology,
+                                  self.pdb.positions,
                                   open(f'{filename}_system.pdb', 'w'))
             msg = f'System coordinates written to {filename}_system.pdb'
             self.ostream.print_info(msg)
             self.ostream.flush()
-        
+
         self.phase = phase
 
     # Methods to build a custom system from a PDB file and custom XML files
-    def create_md_system_from_files(self, 
-                            pdb_file, 
-                            xml_file,
-                            filename='custom',
-                            write_files = True):
+    def create_md_system_from_files(self,
+                                    pdb_file,
+                                    xml_file,
+                                    filename='custom',
+                                    write_files=True):
         """
         Creates a system from a PDB file containing multiple residues and custom XML files.
-        
+
         :param system_pdb:
             PDB file containing the system or a list of PDB files.
         :param xml_file:
@@ -527,7 +525,7 @@ class OpenMMDynamics:
         :param filename:
             Base filename for output and intermediate files. Default is 'custom_system'.
         """
-        
+
         # Load the PDB file and format it correctly
         # This method already prints the unique residues info!
         self.load_system_PDB(pdb_file)
@@ -566,12 +564,12 @@ class OpenMMDynamics:
         system_arguments = {
             'nonbondedMethod': nonbondedMethod,
             'constraints': constraints
-        }   
-        
+        }
+
         if nonbondedCutoff is not None:
             system_arguments['nonbondedCutoff'] = nonbondedCutoff
 
-        self.system = forcefield.createSystem(self.pdb.topology, 
+        self.system = forcefield.createSystem(self.pdb.topology,
                                               **system_arguments)
 
         if write_files:
@@ -583,36 +581,36 @@ class OpenMMDynamics:
                 self.ostream.flush()
 
             with open(f'{filename}_system.pdb', 'w') as pdb_file:
-                app.PDBFile.writeFile(self.pdb.topology, 
-                                    self.pdb.positions, 
-                                    pdb_file)
+                app.PDBFile.writeFile(self.pdb.topology,
+                                      self.pdb.positions,
+                                      pdb_file)
                 msg = f'System coordinates written to {filename}_system.pdb'
                 self.ostream.print_info(msg)
                 self.ostream.flush()
 
         self.phase = 'gas'
 
-    def create_qmmm_system_from_files(self, 
-                            pdb_file, 
-                            xml_file, 
-                            qm_residue, 
-                            ff_gen_qm=None, 
-                            qm_atoms='all', 
-                            filename='custom'):
+    def create_qmmm_system_from_files(self,
+                                      pdb_file,
+                                      xml_file,
+                                      qm_residue,
+                                      ff_gen_qm=None,
+                                      qm_atoms='all',
+                                      filename='custom'):
         """
         Builds a QM/MM system from a PDB file containing multiple residues and custom XML files.
-        
-        :param pdb_file: 
+
+        :param pdb_file:
             PDB file containing the system.
-        :param xml_file: 
+        :param xml_file:
             XML file containing the forcefield parameters. Can be a list of XML files.
-        :param qm_residue: 
+        :param qm_residue:
             Tuple containing the name and number of the QM residue. (e.g. ('MOL', 1))
-        :param ff_gen_qm: 
+        :param ff_gen_qm:
             Optional custom forcefield generator for the QM region. If None, a new one will be created.
         :param qm_atoms:
             Options: 'all' or a list of atom indices for QM region.
-        :param filename: 
+        :param filename:
             Base filename for output and intermediate files.
         """
 
@@ -639,23 +637,23 @@ class OpenMMDynamics:
             self.ostream.print_info(msg)
             qm_atoms = list(range(qm_molecule.number_of_atoms()))
             self._create_QM_residue(ff_gen_qm,
-                        qm_atoms, 
-                        filename=filename, 
-                        residue_name=qm_residue_name)
+                                    qm_atoms,
+                                    filename=filename,
+                                    residue_name=qm_residue_name)
         elif isinstance(qm_atoms, list):
-            if qm_atoms == list(range(qm_molecule.number_of_atoms())): 
+            if qm_atoms == list(range(qm_molecule.number_of_atoms())):
                 msg = 'Full molecule as QM region'
                 self.ostream.print_info(msg)
                 self._create_QM_residue(ff_gen_qm,
-                        qm_atoms, 
-                        filename=filename, 
-                        residue_name=qm_residue_name)
+                                        qm_atoms,
+                                        filename=filename,
+                                        residue_name=qm_residue_name)
             msg = 'QM/MM partition inside the molecule'
             self.ostream.print_info(msg)
             qm_atoms = qm_atoms
             self._create_QM_subregion(ff_gen_qm,
-                                      qm_atoms, 
-                                      qm_molecule, 
+                                      qm_atoms,
+                                      qm_molecule,
                                       filename,
                                       residue_name=qm_residue_name)
         else:
@@ -697,7 +695,7 @@ class OpenMMDynamics:
         system_arguments = {
             'nonbondedMethod': nonbondedMethod,
             'constraints': constraints
-        }   
+        }
 
         if nonbondedCutoff is not None:
             system_arguments['nonbondedCutoff'] = nonbondedCutoff
@@ -705,7 +703,7 @@ class OpenMMDynamics:
         self.system = forcefield.createSystem(self.pdb.topology, **system_arguments)
 
         # Set QM atoms based on the QM residue
-        #self.qm_atoms = [atom.index for atom in self.pdb.topology.atoms() if (atom.residue.name == qm_residue_name and atom.residue.id == str(qm_residue_number))]
+        # self.qm_atoms = [atom.index for atom in self.pdb.topology.atoms() if (atom.residue.name == qm_residue_name and atom.residue.id == str(qm_residue_number))]
         self.qm_atoms = qm_atoms
 
         # Setting QM/MM system
@@ -732,21 +730,20 @@ class OpenMMDynamics:
 
     # Simulation methods
     def conformational_sampling_multiple(self,
-                                molecules = None,
-                                pdb_files=None,
-                                xml_files=None,
-                                partial_charges = None,
-                                position_restraint = None,
-                                temperature=700, 
-                                timestep=2.0, 
-                                nsteps=500000,
-                                snapshots=100,
-                                lowest_conformations=10,
-                                save_pdb = False,
-                                k = 1000,
-                                r0 = 0.5,
-                                water_model = 'tip3p'
-                                ):
+                                         molecules=None,
+                                         pdb_files=None,
+                                         xml_files=None,
+                                         partial_charges=None,
+                                         position_restraint=None,
+                                         temperature=700,
+                                         timestep=2.0,
+                                         nsteps=500000,
+                                         snapshots=100,
+                                         lowest_conformations=10,
+                                         save_pdb=False,
+                                         k=1000,
+                                         r0=0.5,
+                                         water_model='tip3p'):
         """
         Runs high-temperature conformational sampling for multiple residues in the system.
 
@@ -780,7 +777,7 @@ class OpenMMDynamics:
             The water model to be used if water molecules are present.
 
         :return:
-            conformers_dict: Dictionary with lists of potential energies of the conformations, the minimized molecule objects, 
+            conformers_dict: Dictionary with lists of potential energies of the conformations, the minimized molecule objects,
             and their corresponding coordinates in XYZ format.
         """
         if molecules:
@@ -794,14 +791,14 @@ class OpenMMDynamics:
                 ff_gen = MMForceFieldGenerator()
                 ff_gen.ostream.mute()
                 duplicate = False
-                
+
                 if mol.is_water_molecule():
                     water_msg = True
 
                 for j in range(i):
                     if (mol.get_labels() == molecules[j].get_labels() and
-                        mol.get_connectivity_matrix().shape == molecules[j].get_connectivity_matrix().shape and
-                        (mol.get_connectivity_matrix() == molecules[j].get_connectivity_matrix()).all()):
+                            mol.get_connectivity_matrix().shape == molecules[j].get_connectivity_matrix().shape and
+                            (mol.get_connectivity_matrix() == molecules[j].get_connectivity_matrix()).all()):
                         ff_gen.create_topology(mol, resp=False, water_model=water_model)
                         self.atom_dict[f'{i}'] = ff_gen.atoms
                         duplicate = True
@@ -815,79 +812,79 @@ class OpenMMDynamics:
                     ff_gen.create_topology(mol, water_model=water_model)
                     ff_gen.generate_residue_xml(f'molecule_{i+1}.xml', f'M{i+1:02d}')
                     xml_files.append(f'molecule_{i+1}.xml')
-                
+
                 self.atom_dict[f'{i}'] = ff_gen.atoms
-            
-            if water_msg:    
+
+            if water_msg:
                 self.ostream.print_info(f'Water molecule detected. Using {water_model} water model.')
                 self.ostream.flush()
-            
+
             pdb_file = 'system.pdb'
             use_chain = False
-            self._create_system_from_multiple_molecules(molecules, pdb_file, write_pdb = True)
+            self._create_system_from_multiple_molecules(molecules, pdb_file, write_pdb=True)
             self.create_md_system_from_files(pdb_file, xml_files, write_files=False)
             self.topology = self.pdb.topology
             self.positions = self.pdb.positions
-              
+
         elif pdb_files:
             # creating a system from merged xml files
             assert_msg_critical(
                 xml_files is not None,
-                "No XML files provided. Please provide either a list of VeloxChem Molecule objects or the XML files.")   
-            
+                "No XML files provided. Please provide either a list of VeloxChem Molecule objects or the XML files.")
+
             self.ostream.print_info("Merging pdb files...")
             self.ostream.flush()
-            
+
             # to ensure that coordinates are adjusted if identical files are provided
             molecules = [Molecule.read_pdb_file(pdb) for pdb in pdb_files]
-            self._create_system_from_multiple_molecules(molecules, write_pdb = False)
-            
+            self._create_system_from_multiple_molecules(molecules, write_pdb=False)
+
             pdbs = [app.PDBFile(pdb) for pdb in pdb_files]
-            coords = self.all_coords # list of the new coordinates
+            coords = self.all_coords  # list of the new coordinates
             atom_counter = [len(mol.get_labels()) for mol in molecules]
 
             modeller = None
             for pdb, (start,end) in zip(pdbs, zip([0,*accumulate(atom_counter[:-1])], accumulate(atom_counter))):
                 positions = coords[start:end] * unit.angstrom
                 if modeller is None:
-                    modeller = app.Modeller(pdb.topology, positions)  
+                    modeller = app.Modeller(pdb.topology, positions)
                 else:
                     modeller.add(pdb.topology, positions)
-            
+
             pdb_file = 'merged_system.pdb'
             use_chain = True
 
             app.PDBFile.writeFile(modeller.topology, modeller.positions, pdb_file)
-            
+
             # create system
             self.topology = modeller.topology
             self.positions = modeller.positions
             forcefield = app.ForceField(*xml_files)
             self.ostream.print_info(f'Added XML Files: {xml_files}')
             self.ostream.flush()
-            
+
             system_arguments = {
                 'nonbondedMethod': app.NoCutoff,
                 'constraints': app.HBonds
-            }   
-            
+            }
+
             self.system = forcefield.createSystem(modeller.topology, **system_arguments)
 
         # prepare system for simulation
-        real_system = self.system # used for recalculation
+        real_system = self.system  # used for recalculation
         self.ensemble = 'NVT'
         self.temperature = temperature * unit.kelvin
         self.timestep = timestep * unit.femtosecond
         self.nsteps = nsteps
 
         self.integrator = self._create_integrator()
-        
+
         if pdb_files:
             self.labels = [atom.element.symbol for atom in self.topology.atoms()]
 
         # add customcentroidbondforce to the system
         self._get_centroid_bond_force(k, r0, use_chain, position_restraint)
-    
+
         self.simulation = app.Simulation(self.topology, self.system, self.integrator, platform=self._create_platform())
         self.simulation.context.setPositions(self.positions)
         self.simulation.context.setVelocitiesToTemperature(self.temperature)
@@ -900,7 +897,7 @@ class OpenMMDynamics:
         opt_coordinates = []
         pdb_coords = []
 
-        # Run MD 
+        # Run MD
         self.ostream.print_info(f"Running high-temperature MD for {self.nsteps * self.timestep.value_in_unit(unit.nanoseconds):.2f} ns...")
         self.ostream.flush()
         for i in range(snapshots):
@@ -911,17 +908,17 @@ class OpenMMDynamics:
             self.ostream.print_info(f"Energy for conformer {i+1}/{snapshots}: {state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole):.4f} kJ/mol")
             self.ostream.flush()
             conformations.append(positions)
-        
+
         # Recalculate energies
         self.ostream.print_info("Recalculating energies for the conformations...")
         self.ostream.flush()
         simulation = app.Simulation(self.topology, real_system, self._create_integrator(), platform=self._create_platform())
-        
-        for idx, conformation in enumerate(conformations):    
+
+        for idx, conformation in enumerate(conformations):
             simulation.context.setPositions(conformation)
             simulation.minimizeEnergy()
             state = simulation.context.getState(getEnergy=True, getPositions=True)
-            
+
             minimized_energy = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
             minimized_energies.append(minimized_energy)
             minimized_coordinates = state.getPositions()
@@ -931,13 +928,13 @@ class OpenMMDynamics:
 
             xyz = f"{len(self.labels)}\n\n"
             for label, coord in zip(self.labels, minimized_coordinates):
-                xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"  
+                xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"
 
             opt_coordinates.append(xyz)
 
         # Sort the conformations by (increasing) energy
         index_ẹnergy = [(i, minimized_energies[i]) for i in range(len(minimized_energies))]
-        sorted_index_energy = sorted(index_ẹnergy, key=lambda x: x[1]) 
+        sorted_index_energy = sorted(index_ẹnergy, key=lambda x: x[1])
         sorted_indices = [i[0] for i in sorted_index_energy]
 
         minimized_energies = [minimized_energies[i] for i in sorted_indices]
@@ -948,7 +945,7 @@ class OpenMMDynamics:
             self.ostream.flush()
             minimized_energies = minimized_energies[:lowest_conformations]
             opt_coordinates = opt_coordinates[:lowest_conformations]
-        
+
         self.ostream.print_info('Conformational sampling completed!')
         self.ostream.flush()
 
@@ -958,23 +955,22 @@ class OpenMMDynamics:
             self.ostream.flush()
             app.PDBFile.writeFile(self.topology, pdb_coords[sorted_indices[0]], filename)
 
-
         # Save final molecules, coordinates and corresponding energies to a dictionary
         conformers_dict = {
-                'energies': minimized_energies,
-                'molecules': [Molecule.from_xyz_string(coords) for coords in opt_coordinates],
-                'geometries': opt_coordinates
+            'energies': minimized_energies,
+            'molecules': [Molecule.from_xyz_string(coords) for coords in opt_coordinates],
+            'geometries': opt_coordinates
         }
 
         self.conformer_dict = conformers_dict
 
         return conformers_dict
 
-    def conformational_sampling(self, 
-                                ensemble='NVT', 
-                                temperature=700, 
-                                timestep=2.0, 
-                                nsteps=10000, 
+    def conformational_sampling(self,
+                                ensemble='NVT',
+                                temperature=700,
+                                timestep=2.0,
+                                nsteps=10000,
                                 snapshots=10,
                                 unique_conformers=True,
                                 qm_driver=None,
@@ -1006,9 +1002,9 @@ class OpenMMDynamics:
             If True, the energy of the conformations will be minimized. Default is True.
 
         :return:
-            conformers_dict: Dictionary with lists of potential energies of the conformations, the minimized molecule objects, 
+            conformers_dict: Dictionary with lists of potential energies of the conformations, the minimized molecule objects,
             and their corresponding coordinates in XYZ format.
-            
+
         """
 
         if self.system is None:
@@ -1045,22 +1041,22 @@ class OpenMMDynamics:
         # Run MD
         for i in range(snapshots):
             self.simulation.step(save_freq)
-        
+
             minimized_system = app.Simulation(topology, self.system, self._create_integrator(), platform=self._create_platform())
             minimized_system.context.setPositions(self.simulation.context.getState(getPositions=True).getPositions())
-            
+
             minimized_system.minimizeEnergy()
             minimized_state = minimized_system.context.getState(getPositions=True, getEnergy=True)
-            
+
             minimized_coordinates = minimized_state.getPositions()
             minimized_energy = minimized_state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
             energies.append(minimized_energy)
-            
+
             self.ostream.print_info(f'Minimized energy: {minimized_energy}')
             self.ostream.flush()
             xyz = f"{len(self.labels)}\n\n"
             for label, coord in zip(self.labels, minimized_coordinates):
-                xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"  
+                xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"
             self.ostream.print_info(f'Saved coordinates for step {save_freq * (i + 1)}')
             self.ostream.flush()
             opt_coordinates.append(xyz)
@@ -1069,30 +1065,28 @@ class OpenMMDynamics:
         self.ostream.print_info(f'Number of conformations: {len(opt_coordinates)}')
         self.ostream.flush()
 
-        equiv_conformer_pairs= []
+        equiv_conformer_pairs = []
         if unique_conformers:
             msg = 'Filtering for unique conformers'
             self.ostream.print_info(msg)
             self.ostream.flush()
-            
+
             # reorder coordinates and energies by increasing energy
             index_ẹnergy = [(i, energies[i]) for i in range(len(energies))]
-            sorted_index_energy = sorted(index_ẹnergy, key=lambda x: x[1]) # sorted by increasing energy
+            sorted_index_energy = sorted(index_ẹnergy, key=lambda x: x[1])  # sorted by increasing energy
             sorted_indices = [i[0] for i in sorted_index_energy]
-
 
             minimized_energy = [energies[i] for i in sorted_indices]
             opt_coordinates = [opt_coordinates[i] for i in sorted_indices]
 
-
             # Filter out the conformations with RMSD < 0.1 and keep the lowest energy one.
             for i, coord in enumerate(opt_coordinates):
-                mol= Molecule.read_xyz_string(coord)
+                mol = Molecule.read_xyz_string(coord)
                 xyz_i = mol.get_coordinates_in_angstrom()
                 ene_i = minimized_energy[i]
 
                 for j in range(i + 1, len(opt_coordinates)):
-                    mol_j= Molecule.read_xyz_string(opt_coordinates[j])
+                    mol_j = Molecule.read_xyz_string(opt_coordinates[j])
                     xyz_j = mol_j.get_coordinates_in_angstrom()
                     ene_j = minimized_energy[j]
                     if abs(ene_i - ene_j) < self.energy_threshold:
@@ -1114,13 +1108,10 @@ class OpenMMDynamics:
                 for i, g in enumerate(opt_coordinates)
                 if i not in duplicate_conformers
             ]
-            
+
             opt_coordinates = filtered_geometries
             energies = filtered_energies
 
-
-        
-        
             # print table of results
             msg = f'\nNumber of unique conformers: {len(opt_coordinates)}'
             self.ostream.print_info(msg)
@@ -1162,35 +1153,35 @@ class OpenMMDynamics:
 
         # Save final molecules, coordinates and corresponding energies to a dictionary
         conformers_dict = {
-                'energies': energies,
-                'molecules': [Molecule.from_xyz_string(coords) for coords in opt_coordinates],
-                'geometries': opt_coordinates
+            'energies': energies,
+            'molecules': [Molecule.from_xyz_string(coords) for coords in opt_coordinates],
+            'geometries': opt_coordinates
         }
 
         self.conformer_dict = conformers_dict
 
         return conformers_dict
-    
+
     def calculate_boltzmann_distribution(self, energies=None, T=300, unit='kj/mol'):
-        """ 
+        """
         Calculate the Boltzmann distribution of conformers based on their energies.
-        
-        :param energies: 
+
+        :param energies:
             list of energies. If None, it will use the energies from the conformers_dict from the conformational sampling.
-        :param T: 
+        :param T:
             temperature in Kelvin
-        :param unit: 
+        :param unit:
             unit of energy, options are 'kj/mol', 'kcal/mol', 'hartree'
 
-        :return: 
+        :return:
             list of probabilities for each conformer
-        
+
         """
-        if unit=='kj/mol':
+        if unit == 'kj/mol':
             R = 0.008314462618
-        elif unit=='kcal/mol':
+        elif unit == 'kcal/mol':
             R = 1.98720425864083e-3
-        elif unit=='hartree':
+        elif unit == 'hartree':
             R = 3.166811563671e-6
         else:
             raise ValueError('Invalid unit')
@@ -1208,9 +1199,9 @@ class OpenMMDynamics:
         partition_function = sum(boltzmann_factors)
         # calculate the probabilities
         probabilities = [factor/partition_function for factor in boltzmann_factors]
-        
+
         return probabilities
-    
+
     def show_conformers(self, number=5, atom_indices=False, atom_labels=False, boltzmann_distribution=True):
         weights = None
         if boltzmann_distribution:
@@ -1221,23 +1212,23 @@ class OpenMMDynamics:
             print(f"Only {number} conformers available, showing all.")
         for i in range(number):
             if weights is not None:
-                msg = f'\nConformation {i+1}: Energy: {self.conformer_dict["energies"][i]:.3f} kJ/mol, Weight: {weights[i]:.4f}'   
+                msg = f'\nConformation {i+1}: Energy: {self.conformer_dict["energies"][i]:.3f} kJ/mol, Weight: {weights[i]:.4f}'
             else:
                 msg = f'\nConformation {i+1}: Energy: {self.conformer_dict["energies"][i]:.3f} kJ/mol'
             self.ostream.print_info(msg)
             self.ostream.flush()
             self.conformer_dict["molecules"][i].show(
                 atom_indices=atom_indices, atom_labels=atom_labels)
-                
-    def run_md(self, 
+
+    def run_md(self,
                restart_file=None,
                ensemble='NVE',
-               temperature=298.15, 
-               pressure=1.0, 
+               temperature=298.15,
+               pressure=1.0,
                friction=1.0,
-               timestep=2.0, 
-               nsteps=1000, 
-               snapshots=100, 
+               timestep=2.0,
+               nsteps=1000,
+               snapshots=100,
                traj_file='trajectory.pdb',
                state_file='output.xml',
                save_last_frame=True,
@@ -1281,7 +1272,6 @@ class OpenMMDynamics:
         self.temperatures = []
         self.total_energies = []
 
-
         # Create or update the integrator
         if self.integrator is None:
             new_integrator = self._create_integrator()
@@ -1289,20 +1279,20 @@ class OpenMMDynamics:
             new_integrator = self.integrator
 
         self.topology = self.pdb.topology
-        
+
         self.positions = self.pdb.positions
-        
+
         self.simulation = app.Simulation(self.topology, self.system, new_integrator, platform=self._create_platform())
 
         self.simulation.context.setPositions(self.positions)
-        
+
         # Load the state if a restart file is provided
         if restart_file is not None:
             self.simulation.loadState(restart_file)
             msg = f'Restarting simulation from {restart_file}'
             self.ostream.print_info(msg)
             self.ostream.flush()
-        
+
         else:
             self.simulation.context.setPositions(self.positions)
 
@@ -1315,7 +1305,7 @@ class OpenMMDynamics:
 
         # Set up reporting
         save_freq = max(nsteps // snapshots, 1)
-        self.simulation.reporters.clear()  
+        self.simulation.reporters.clear()
         self.simulation.reporters.append(app.PDBReporter(traj_file, save_freq))
 
         # Print header
@@ -1330,7 +1320,6 @@ class OpenMMDynamics:
         print('Timestep:', timestep, 'fs')
         print('Total simulation time in ns:', nsteps * timestep / 1e6)
         print('=' * 50)
-
 
         start_time = time()
         for step in range(nsteps):
@@ -1354,7 +1343,7 @@ class OpenMMDynamics:
                 if hasattr(self.integrator, 'computeSystemTemperature'):
                     temp = self.integrator.computeSystemTemperature().value_in_unit(unit.kelvin)
                 else:
-                    temp = (2*state.getKineticEnergy()/(dof * unit.MOLAR_GAS_CONSTANT_R)).value_in_unit(unit.kelvin) 
+                    temp = (2*state.getKineticEnergy()/(dof * unit.MOLAR_GAS_CONSTANT_R)).value_in_unit(unit.kelvin)
 
                 self.temperatures.append(temp)
                 print('Temperature:', temp, 'K')
@@ -1364,7 +1353,6 @@ class OpenMMDynamics:
                 self.total_energies.append(total)
                 print('Total Energy:', total, 'kJ/mol')
                 print('-' * 60)
-
 
         end_time = time()
         elapsed_time = end_time - start_time
@@ -1401,18 +1389,18 @@ class OpenMMDynamics:
         self.ostream.print_info(f'Simulation output saved as {output_file}')
         self.ostream.flush()
 
-    def run_qmmm(self, 
+    def run_qmmm(self,
                  qm_driver,
                  grad_driver,
-                 basis = None,
-                 restart_file = None, 
-                 ensemble='NVE', 
-                 temperature=298.15, 
-                 pressure=1.0, 
+                 basis=None,
+                 restart_file=None,
+                 ensemble='NVE',
+                 temperature=298.15,
+                 pressure=1.0,
                  friction=1.0,
                  timestep=0.5,
-                 nsteps=1000, 
-                 snapshots=100, 
+                 nsteps=1000,
+                 snapshots=100,
                  traj_file='trajectory.pdb',
                  state_file='output.xml',
                  output_file='output'):
@@ -1448,7 +1436,7 @@ class OpenMMDynamics:
         """
         if self.system is None:
             raise RuntimeError('System has not been created!')
-        
+
         if basis is not None:
             self.basis = basis
 
@@ -1462,7 +1450,7 @@ class OpenMMDynamics:
         self.grad_driver = grad_driver
         self.qm_driver.ostream.mute()
 
-        # Driver flag 
+        # Driver flag
         if isinstance(self.qm_driver, XtbDriver):
             self.driver_flag = 'XTb Driver'
         elif isinstance(self.qm_driver, ScfRestrictedDriver):
@@ -1475,7 +1463,6 @@ class OpenMMDynamics:
             self.driver_flag = 'IM Driver'
             _ = self.qm_driver.read_qm_data_points()
 
-        
         else:
             raise ValueError('Invalid QM driver. Please use a valid VeloxChem driver.')
 
@@ -1487,7 +1474,7 @@ class OpenMMDynamics:
         self.temperatures = []
         self.total_energies = []
         self.dynamic_molecules = []
-        
+
         save_freq = nsteps // snapshots if snapshots else nsteps
 
         # Create or update the integrator
@@ -1499,13 +1486,13 @@ class OpenMMDynamics:
         self.topology = self.pdb.topology
 
         self.positions = self.pdb.positions
-        
+
         self.simulation = app.Simulation(self.topology, self.system, new_integrator, platform=self._create_platform())
 
         # Load the state if a restart file is provided
         if restart_file is not None:
             self.simulation.loadState(restart_file)
-        
+
         else:
             self.simulation.context.setPositions(self.positions)
 
@@ -1517,11 +1504,11 @@ class OpenMMDynamics:
 
         # There is no minimization step for QM/MM simulations
         # It causes instabilities in the MM region!
-        
+
         # Set up reporting
         self.simulation.reporters.clear()
         self.simulation.reporters.append(app.PDBReporter(traj_file, save_freq))
-        
+
         # Print header
         print('QM/MM Simulation Parameters')
         print('=' * 60)
@@ -1552,7 +1539,7 @@ class OpenMMDynamics:
             qm_mm = self.simulation.context.getState(getEnergy=True, groups={1,2}).getPotentialEnergy()
             self.qm_mm_interaction_energies.append(qm_mm.value_in_unit(unit.kilojoules_per_mole))
 
-            # MM region 
+            # MM region
             mm = self.simulation.context.getState(getEnergy=True, groups={3,4,5,6,7}).getPotentialEnergy()
             self.mm_potentials.append(mm.value_in_unit(unit.kilojoules_per_mole))
 
@@ -1561,7 +1548,7 @@ class OpenMMDynamics:
             self.total_potentials.append(pot.value_in_unit(unit.kilojoules_per_mole))
 
             # Kinetic energyex
-            
+
             kinetic = self.simulation.context.getState(getEnergy=True).getKineticEnergy()
             self.kinetic_energies.append(kinetic.value_in_unit(unit.kilojoules_per_mole))
 
@@ -1577,10 +1564,9 @@ class OpenMMDynamics:
             total = pot + kinetic
             self.total_energies.append(total.value_in_unit(unit.kilojoules_per_mole))
 
-
             # Information output
             if step % save_freq == 0:
-                
+
                 print(f"Step: {step} / {nsteps} Time: {round((step * timestep) / 1000, 2)} ps")
                 print('Potential Energy QM region:', qm, 'kJ/mol')
                 print('Potential Energy MM region:', mm)
@@ -1589,7 +1575,7 @@ class OpenMMDynamics:
                 print('Kinetic Energy:', kinetic)
                 print('Temperature:', temp, 'K')
                 print('Total Energy:', total)
-                print('-' * 60)   
+                print('-' * 60)
 
             self.simulation.step(1)
 
@@ -1673,9 +1659,9 @@ class OpenMMDynamics:
         plt.tight_layout()
         plt.savefig(filename)
         plt.show()
-        
-    def visualize_trajectory(self, 
-                             trajectory_file='trajectory.pdb', 
+
+    def visualize_trajectory(self,
+                             trajectory_file='trajectory.pdb',
                              interval=1):
         """
         Visualizes the trajectory of the simulation using py3Dmol.
@@ -1688,7 +1674,7 @@ class OpenMMDynamics:
 
         except ImportError:
             raise ImportError("py3Dmol is not installed. Please install it using `pip install py3Dmol`.")
-        
+
         viewer = py3Dmol.view(width=800, height=600)
 
         viewer.addModelsAsFrames(open(trajectory_file, 'r').read(),'pdb', {'keepH': True})
@@ -1697,9 +1683,9 @@ class OpenMMDynamics:
         viewer.zoomTo()
 
         viewer.show()
-    
+
     # Other methods:
-    
+
     def qm_minimization(self, molecule, basis, scf_drv, constraints=None):
         """
         Minimizes the energy using a QM driver.
@@ -1730,7 +1716,7 @@ class OpenMMDynamics:
         min_coords = results['opt_geometries'][-1]
 
         return min_energy, min_coords
-    
+
     def add_bias_force(self, atoms, force_constant, target):
         """
         Method to add a biasing force to the system.
@@ -1764,7 +1750,7 @@ class OpenMMDynamics:
             self.system.addForce(force)
         elif len(atoms) == 4:
             target_rad = target * np.pi / 180
-            msg = f'Adding torsion force between atoms {atoms[0]}, {atoms[1]}, {atoms[2]}, and {atoms[3]} with force constant {force_constant}.'        
+            msg = f'Adding torsion force between atoms {atoms[0]}, {atoms[1]}, {atoms[2]}, and {atoms[3]} with force constant {force_constant}.'
             self.ostream.print_info(msg)
             self.ostream.flush()
             force = mm.CustomTorsionForce('0.5*k*(theta-theta0)^2')
@@ -1823,7 +1809,7 @@ class OpenMMDynamics:
                 out.write(f'Average QM/MM Interaction Energy (kJ/mol): {np.mean(self.qm_mm_interaction_energies):.4f} ± {np.std(self.qm_mm_interaction_energies):.4f}\n')
                 out.write(f'Average MM Potential Energy (kJ/mol): {np.mean(self.mm_potentials):.4f} ± {np.std(self.mm_potentials):.4f}\n')
             out.write(f'Average Total Energy (kJ/mol): {np.mean(self.total_energies):.4f} ± {np.std(self.total_energies):.4f}\n')
-            out.write('=' * 60 + '\n')      
+            out.write('=' * 60 + '\n')
 
     def _format_PDB_file(self, filename):
         """
@@ -1838,7 +1824,7 @@ class OpenMMDynamics:
         pdb_path = Path(filename)
         if not pdb_path.is_file():
             raise FileNotFoundError(f"{filename} does not exist.")
-        
+
         pdbstr = pdb_path.read_text()
 
         # Formatting issues flags
@@ -1871,7 +1857,7 @@ class OpenMMDynamics:
                         f.write(new_line)
                     else:
                         f.write(line + '\n')
-            
+
             print('Warning: Atom labels were guessed based on atom names (first character).')
             print(f'Please verify the atom labels in the {filename} PDB file.')
 
@@ -1888,10 +1874,10 @@ class OpenMMDynamics:
                             # Convert indices to 1-based index for PDB format and ensure proper column alignment
                             i_index = i + 1
                             j_index = j + 1
-                            # Align to the right 
+                            # Align to the right
                             con_string = "{:6s}{:>5d}{:>5d}".format('CONECT', i_index, j_index)
                             f.write(con_string + '\n')
-       
+
             print('The CONECT records were not found in the PDB file.')
             print('The connectivity matrix was used to determine the bonds.')
 
@@ -1934,12 +1920,12 @@ class OpenMMDynamics:
             raise ValueError("Unsupported ensemble type. Please choose 'NVE', 'NVT', or 'NPT'.")
 
         return integrator
-    
+
     # Methods to create a QM region/subregion in the system
-    def _create_QM_residue(self, 
+    def _create_QM_residue(self,
                            ff_gen,
-                           qm_atoms, 
-                           filename='qm_region', 
+                           qm_atoms,
+                           filename='qm_region',
                            residue_name='QMR'):
         """
         This method creates an xml file for a QM region.
@@ -1960,18 +1946,18 @@ class OpenMMDynamics:
 
         # Create the root element of the XML file
         ForceField = ET.Element("ForceField")
-        
+
         # AtomTypes section
         AtomTypes = ET.SubElement(ForceField, "AtomTypes")
 
         for i, atom in atoms.items():
-            element = ''.join([i for i in atom['name'] if not i.isdigit()])  
+            element = ''.join([i for i in atom['name'] if not i.isdigit()])
             attributes = {
                 # Name is the atom type_molname
                 "name": atom['name'] + '_' + residue_name,
                 "class": str(i + 1),
                 "element": element,
-                "mass": str(atom['mass']) 
+                "mass": str(atom['mass'])
             }
             ET.SubElement(AtomTypes, "Type", **attributes)
 
@@ -1994,11 +1980,11 @@ class OpenMMDynamics:
             }
             ET.SubElement(NonbondedForce, "Atom", **attributes)
 
-        # Generate the tree and write to file
-        tree = ET.ElementTree(ForceField)
+        # Generate the XML and write to file
+        # tree = ET.ElementTree(ForceField)
         rough_string = ET.tostring(ForceField, 'utf-8')
         reparsed = minidom.parseString(rough_string)
-        indented_string = reparsed.toprettyxml(indent="    ")  
+        indented_string = reparsed.toprettyxml(indent="    ")
 
         with open(filename + '.xml', 'w') as output_file:
             output_file.write(indented_string)
@@ -2071,13 +2057,13 @@ class OpenMMDynamics:
         AtomTypes = ET.SubElement(ForceField, "AtomTypes")
 
         for i, atom in atoms.items():
-            element = ''.join([i for i in atom['name'] if not i.isdigit()])  
+            element = ''.join([i for i in atom['name'] if not i.isdigit()])
             attributes = {
                 # Name is the atom type_molname
                 "name": atom['name'] + '_' + residue_name,
                 "class": str(i + 1),
                 "element": element,
-                "mass": str(atom['mass']) 
+                "mass": str(atom['mass'])
             }
             ET.SubElement(AtomTypes, "Type", **attributes)
 
@@ -2113,8 +2099,8 @@ class OpenMMDynamics:
         # BondForce section
         BondForce = ET.SubElement(ForceField, "HarmonicBondForce")
         for bond_id, bond_data in bonds.items():
-            if (bond_id[0] in bonded_atoms and 
-                bond_id[1] in bonded_atoms):
+            if (bond_id[0] in bonded_atoms and
+                    bond_id[1] in bonded_atoms):
                 attributes = {
                     "class1": str(bond_id[0] + 1),
                     "class2": str(bond_id[1] + 1),
@@ -2126,9 +2112,9 @@ class OpenMMDynamics:
         # AngleForce section
         AngleForce = ET.SubElement(ForceField, "HarmonicAngleForce")
         for angle_id, angle_data in angles.items():
-            if (angle_id[0] in bonded_atoms and 
-                angle_id[1] in bonded_atoms and 
-                angle_id[2] in bonded_atoms):
+            if (angle_id[0] in bonded_atoms and
+                    angle_id[1] in bonded_atoms and
+                    angle_id[2] in bonded_atoms):
                 attributes = {
                     "class1": str(angle_id[0] + 1),
                     "class2": str(angle_id[1] + 1),
@@ -2142,9 +2128,9 @@ class OpenMMDynamics:
         DihedralForce = ET.SubElement(ForceField, "PeriodicTorsionForce")
         for dihedral_id, dihedral_data in dihedrals.items():
             if (dihedral_id[0] in bonded_atoms and
-                dihedral_id[1] in bonded_atoms and
-                dihedral_id[2] in bonded_atoms and
-                dihedral_id[3] in bonded_atoms):
+                    dihedral_id[1] in bonded_atoms and
+                    dihedral_id[2] in bonded_atoms and
+                    dihedral_id[3] in bonded_atoms):
                 # Skip RB dihedrals
                 if dihedral_data['type'] == 'RB':
                     continue
@@ -2163,9 +2149,9 @@ class OpenMMDynamics:
         RBForce = ET.SubElement(ForceField, "RBTorsionForce")
         for dihedral_id, dihedral_data in dihedrals.items():
             if (dihedral_id[0] in bonded_atoms and
-                dihedral_id[1] in bonded_atoms and
-                dihedral_id[2] in bonded_atoms and
-                dihedral_id[3] in bonded_atoms):
+                    dihedral_id[1] in bonded_atoms and
+                    dihedral_id[2] in bonded_atoms and
+                    dihedral_id[3] in bonded_atoms):
                 # Skip Fourier dihedrals
                 if dihedral_data['type'] == 'Fourier':
                     continue
@@ -2187,9 +2173,9 @@ class OpenMMDynamics:
         ImproperForce = ET.SubElement(ForceField, "PeriodicTorsionForce")
         for improper_id, improper_data in impropers.items():
             if (improper_id[0] in bonded_atoms and
-                improper_id[1] in bonded_atoms and
-                improper_id[2] in bonded_atoms and
-                improper_id[3] in bonded_atoms):
+                    improper_id[1] in bonded_atoms and
+                    improper_id[2] in bonded_atoms and
+                    improper_id[3] in bonded_atoms):
                 attributes = {
                     "class1": str(improper_id[1] + 1),
                     "class2": str(improper_id[0] + 1),
@@ -2201,11 +2187,11 @@ class OpenMMDynamics:
                 }
                 ET.SubElement(ImproperForce, "Torsion", **attributes)
 
-        # Generate the tree and write to file
-        tree = ET.ElementTree(ForceField)
+        # Generate the XML and write to file
+        # tree = ET.ElementTree(ForceField)
         rough_string = ET.tostring(ForceField, 'utf-8')
         reparsed = minidom.parseString(rough_string)
-        indented_string = reparsed.toprettyxml(indent="    ")  
+        indented_string = reparsed.toprettyxml(indent="    ")
 
         with open(filename + '.xml', 'w') as output_file:
             output_file.write(indented_string)
@@ -2231,13 +2217,13 @@ class OpenMMDynamics:
 
         # Set the QM/MM Interaction Groups
         total_atoms = self.system.getNumParticles()
-        
+
         # The MM subregion is counted as regular MM atoms
         qm_group = list(self.qm_atoms)
         msg = f'QM region: {qm_group[0]} ... {qm_group[-1]}'
         self.ostream.print_info(msg)
         mm_group = list(set(range(total_atoms)) - set(qm_group))
-       
+
         if mm_group != []:
             msg = f'MM region: {mm_group[0]} ... {mm_group[-1]}'
             self.ostream.print_info(msg)
@@ -2260,13 +2246,13 @@ class OpenMMDynamics:
 
         # If a MM region is present define the interactions
         if mm_group:
-            
+
             nonbonded_force = None
             for force in self.system.getForces():
                 if isinstance(force, NonbondedForce):
                     nonbonded_force = force
                     break
-    
+
             if nonbonded_force is None:
                 raise ValueError("NonbondedForce not found in the system")
 
@@ -2278,12 +2264,11 @@ class OpenMMDynamics:
             vdw.addPerParticleParameter("sigma")
             vdw.addPerParticleParameter("epsilon")
 
-
             if phase == 'periodic':
                 # OpenMM uses Reaction Field method for CustomNB with PBC.
                 rfDielectric = nonbonded_force.getReactionFieldDielectric()
                 krf = (1 / (self.cutoff**3)) * (rfDielectric - 1) / (2*rfDielectric + 1)
-                crf = (1 /  self.cutoff) * (3*rfDielectric) / (2*rfDielectric + 1)
+                crf = (1 / self.cutoff) * (3 * rfDielectric) / (2 * rfDielectric + 1)
                 coulomb_rf = f"(138.935456*charge1*charge2)*(1/r + {krf}*r*r - {crf});"
                 coulomb = mm.CustomNonbondedForce(coulomb_rf)
                 coulomb.setNonbondedMethod(mm.CustomNonbondedForce.CutoffPeriodic)
@@ -2293,23 +2278,23 @@ class OpenMMDynamics:
             else:
                 coulomb = mm.CustomNonbondedForce("138.935456*charge1*charge2/r;")
                 coulomb.setNonbondedMethod(mm.CustomNonbondedForce.NoCutoff)
-            
+
             coulomb.addPerParticleParameter("charge")
-            
+
             # Apply the same exclusions to the custom forces as in the NonbondedForce
             # This is needed to avoid errors (all forces must have identical exclusions)
             for i in range(nonbonded_force.getNumExceptions()):
                 p1, p2, chargeProd, sigma, epsilon = nonbonded_force.getExceptionParameters(i)
                 vdw.addExclusion(p1, p2)
                 coulomb.addExclusion(p1, p2)
-            
+
             self.system.addForce(vdw)
             self.system.addForce(coulomb)
 
             # Add particles to the custom forces
             # QM region
             for i in qm_group:
-                vdw.addParticle([ff_gen.atoms[i]['sigma']* unit.nanometer, 
+                vdw.addParticle([ff_gen.atoms[i]['sigma'] * unit.nanometer,
                                  ff_gen.atoms[i]['epsilon']] * unit.kilojoules_per_mole)
                 coulomb.addParticle([ff_gen.atoms[i]['charge']] * unit.elementary_charge)
 
@@ -2349,34 +2334,33 @@ class OpenMMDynamics:
                     force.setForceGroup(7)
                 elif isinstance(force, mm.CMMotionRemover):
                     force.setForceGroup(8)
-                
+
         # Determine the force index for the QM region
         # it is an instance of openmm.openmm.CustomExternalForce
         for i, force in enumerate(self.system.getForces()):
             if isinstance(force, mm.CustomExternalForce):
                 self.qm_force_index = i
                 break
-    
+
     def qm_stabilizer(self, ff_gen_qm):
-        
+
         """
         Implements a MM potential to stabilize the QM region.
         The forces are 1% of the regular MM forces.
 
-        :param qm_atoms: 
+        :param qm_atoms:
             List of atom indices to be included in the QM region.
-        :param ff_gen_qm: 
+        :param ff_gen_qm:
             MMForceFieldGenerator object from VeloxChem.
         """
-
 
         # Harmonic bond contribution. Parameters are read from ff_gen_qm
         bonds = ff_gen_qm.bonds
         bond_force = mm.HarmonicBondForce()
         for bond, params in bonds.items():
             bond_force.addBond(*bond,
-                            params['equilibrium'] * unit.nanometer,
-                            params['force_constant'] * unit.kilojoule_per_mole / unit.nanometer**2 * self.scaling_factor)
+                               params['equilibrium'] * unit.nanometer,
+                               params['force_constant'] * unit.kilojoule_per_mole / unit.nanometer**2 * self.scaling_factor)
         self.system.addForce(bond_force)
 
         # Harmonic angle contribution. Parameters are read from ff_gen_qm
@@ -2384,8 +2368,8 @@ class OpenMMDynamics:
         angle_force = mm.HarmonicAngleForce()
         for angle, params in angles.items():
             angle_force.addAngle(*angle,
-                                params['equilibrium'] * np.pi / 180 * unit.radian,
-                                params['force_constant'] * unit.kilojoule_per_mole / unit.radian**2 * self.scaling_factor)
+                                 params['equilibrium'] * np.pi / 180 * unit.radian,
+                                 params['force_constant'] * unit.kilojoule_per_mole / unit.radian**2 * self.scaling_factor)
         self.system.addForce(angle_force)
 
         # Periodic torsion contribution. Parameters are read from ff_gen_qm
@@ -2414,9 +2398,9 @@ class OpenMMDynamics:
         improper_force = mm.PeriodicTorsionForce()
         for improper, params in impropers.items():
             improper_force.addTorsion(*improper,
-                                    params['periodicity'],
-                                    params['phase'] * np.pi / 180 * unit.radian,
-                                    params['barrier'] * unit.kilojoule_per_mole * self.scaling_factor)
+                                      params['periodicity'],
+                                      params['phase'] * np.pi / 180 * unit.radian,
+                                      params['barrier'] * unit.kilojoule_per_mole * self.scaling_factor)
         self.system.addForce(improper_force)
 
     def update_gradient_and_energy(self, new_positions):
@@ -2429,7 +2413,7 @@ class OpenMMDynamics:
             The gradient and potential energy of the QM region.
         """
 
-        positions_ang = (new_positions) * 10 
+        positions_ang = (new_positions) * 10
         # Check if there is a QM/MM partition in the system
         if self.mm_subregion is not None:
             # Create a molecule with a link atom (H)
@@ -2448,7 +2432,6 @@ class OpenMMDynamics:
                 else:
                     qm_atom_labels.append(atom_labels[i])
 
-            
             # Change the positions of the linking atoms to 1.0 angstrom
             for atom1, atom2 in self.broken_bonds:
 
@@ -2495,7 +2478,7 @@ class OpenMMDynamics:
         gradient, _ = self.update_gradient_and_energy(new_positions)
 
         return gradient
-    
+
     def update_potential_energy(self, new_positions):
         """
         Updates and returns the potential energy of the QM region.
@@ -2529,13 +2512,13 @@ class OpenMMDynamics:
         custom_force = self.system.getForce(self.qm_force_index)
 
         # Construct a set from the list of tuples self.broken_bonds
-        #broken_bond_atoms = set([atom for bond in self.broken_bonds for atom in bond])
+        # broken_bond_atoms = set([atom for bond in self.broken_bonds for atom in bond])
 
         for i, atom_idx in enumerate(self.qm_atoms):
             custom_force.setParticleParameters(i, atom_idx, force[i])
-            
+
         custom_force.updateParametersInContext(context)
-    
+
     def get_qm_potential_energy(self):
         """
         Returns the potential energy of the QM region.
@@ -2549,15 +2532,15 @@ class OpenMMDynamics:
             potential_energy = self.qm_driver.get_energy() * hartree_in_kjpermol()
 
         return potential_energy
-    
+
     def _get_centroid(self,coords):
         centroid = np.mean(coords, axis=0)
         rg_sq = np.mean(np.sum((coords - centroid) ** 2, axis=1))
-        
+
         return max(np.sqrt(rg_sq), 1.5)
 
     def _create_system_from_multiple_molecules(
-        self, molecules, pdb_file='system.pdb', spacing_factor=1.5, max_attempts=1000, write_pdb = True
+        self, molecules, pdb_file='system.pdb', spacing_factor=1.5, max_attempts=1000, write_pdb=True
     ):
         placed_coords = []
         placed_rgs = []
@@ -2569,7 +2552,7 @@ class OpenMMDynamics:
             labels = mol.get_labels()
             centroid = np.mean(coords, axis=0)
             coords_centered = coords - centroid
-            
+
             rg = self._get_centroid(coords)
 
             if mol_index == 0:
@@ -2608,11 +2591,11 @@ class OpenMMDynamics:
             placed_rgs.append(rg)
             all_labels.extend(labels)
             atom_mol_ids.extend([mol_index] * len(labels))
-        
+
         self.labels = all_labels
         all_coords = np.vstack(placed_coords)
         self.all_coords = all_coords
-        
+
         if write_pdb:
             chain_id_list = list(string.ascii_uppercase + string.ascii_lowercase + string.digits)
             atom_names = [atom_info['name'] for mol in self.atom_dict.values() for atom_info in mol.values()]
@@ -2620,9 +2603,9 @@ class OpenMMDynamics:
             min_coords = np.min(all_coords, axis=0)
             max_coords = np.max(all_coords, axis=0)
             extent = max_coords - min_coords
-            
+
             # Add the padding to the extent
-            self.padding = 20 # (Å)
+            self.padding = 20  # (Å)
             box_size = np.max(extent) + 2 * self.padding
 
             with open(pdb_file, 'w') as f:
@@ -2653,7 +2636,7 @@ class OpenMMDynamics:
 
                 f.write("END\n")
 
-    def _get_centroid_bond_force(self, k, r0, use_chain = False, position_restraint = None):
+    def _get_centroid_bond_force(self, k, r0, use_chain=False, position_restraint=None):
         """
         Creates a CustomCentroidBondForce to restrain the molecules to eachother during conformational sampling
         of more than one molecule.
@@ -2669,7 +2652,7 @@ class OpenMMDynamics:
         restraint.setUsesPeriodicBoundaryConditions(True)
         restraint.addGlobalParameter('r0', r0 * unit.nanometer)
         restraint.addGlobalParameter('k',k)
-        
+
         groups = [[atom.index for atom in residue.atoms()] for residue in residues]
 
         group_indices = []
@@ -2682,11 +2665,11 @@ class OpenMMDynamics:
             restraint.addBond([g1, g2], [])
 
         self.system.addForce(restraint)
-        
+
         if position_restraint:
             assert isinstance(position_restraint, (list, tuple)), (
-            f"'position_restraint' must be a list or tuple of 1-based molecule indices, "
-            f"got {type(position_restraint).__name__}."
+                f"'position_restraint' must be a list or tuple of 1-based molecule indices, "
+                f"got {type(position_restraint).__name__}."
             )
             self.ostream.print_info(f"Setting position restraint on molecule(s): {', '.join(map(str, position_restraint))}")
             self.ostream.flush()
@@ -2701,4 +2684,3 @@ class OpenMMDynamics:
             for mol_idx in position_restraint:
                 for atom_idx in groups[mol_idx - 1]:
                     pos_restraint.addParticle(atom_idx, self.positions[atom_idx])
-
