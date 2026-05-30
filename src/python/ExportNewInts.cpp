@@ -39,6 +39,9 @@
 #include <cstddef>
 #include <vector>
 
+#include "MolecularBasis.hpp"
+#include "Molecule.hpp"
+#include "OverlapDriver.hpp"
 #include "SparseMatrix.hpp"
 
 namespace py = pybind11;
@@ -99,6 +102,16 @@ export_newints(py::module &m) -> void
         .def("number_of_blocks", &newints::SparseMatrix::number_of_blocks, "Gets number of stored blocks.")
         .def("keys", &newints::SparseMatrix::keys, "Gets keys of all stored blocks in ascending order.")
         .def("__eq__", [](const newints::SparseMatrix &self, const newints::SparseMatrix &other) { return self == other; });
+
+    // newints::OverlapDriver class
+    PyClass<newints::OverlapDriver>(sub, "OverlapDriver")
+        .def(py::init<>())
+        .def("compute",
+             &newints::OverlapDriver::compute,
+             "Computes two-center overlap matrix for given molecule and basis.",
+             "molecule"_a,
+             "basis"_a,
+             "threshold"_a);
 }
 
 }  // namespace vlx_newints
