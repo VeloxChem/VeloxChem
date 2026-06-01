@@ -45,6 +45,56 @@
 #include "Molecule.hpp"
 #include "Point.hpp"
 
+#include "OverlapABRecSS.hpp"
+#include "OverlapABRecSP.hpp"
+#include "OverlapABRecSD.hpp"
+#include "OverlapABRecSF.hpp"
+#include "OverlapABRecSG.hpp"
+#include "OverlapABRecSH.hpp"
+#include "OverlapABRecSI.hpp"
+#include "OverlapABRecPS.hpp"
+#include "OverlapABRecPP.hpp"
+#include "OverlapABRecPD.hpp"
+#include "OverlapABRecPF.hpp"
+#include "OverlapABRecPG.hpp"
+#include "OverlapABRecPH.hpp"
+#include "OverlapABRecPI.hpp"
+#include "OverlapABRecDS.hpp"
+#include "OverlapABRecDP.hpp"
+#include "OverlapABRecDD.hpp"
+#include "OverlapABRecDF.hpp"
+#include "OverlapABRecDG.hpp"
+#include "OverlapABRecDH.hpp"
+#include "OverlapABRecDI.hpp"
+#include "OverlapABRecFS.hpp"
+#include "OverlapABRecFP.hpp"
+#include "OverlapABRecFD.hpp"
+#include "OverlapABRecFF.hpp"
+#include "OverlapABRecFG.hpp"
+#include "OverlapABRecFH.hpp"
+#include "OverlapABRecFI.hpp"
+#include "OverlapABRecGS.hpp"
+#include "OverlapABRecGP.hpp"
+#include "OverlapABRecGD.hpp"
+#include "OverlapABRecGF.hpp"
+#include "OverlapABRecGG.hpp"
+#include "OverlapABRecGH.hpp"
+#include "OverlapABRecGI.hpp"
+#include "OverlapABRecHS.hpp"
+#include "OverlapABRecHP.hpp"
+#include "OverlapABRecHD.hpp"
+#include "OverlapABRecHF.hpp"
+#include "OverlapABRecHG.hpp"
+#include "OverlapABRecHH.hpp"
+#include "OverlapABRecHI.hpp"
+#include "OverlapABRecIS.hpp"
+#include "OverlapABRecIP.hpp"
+#include "OverlapABRecID.hpp"
+#include "OverlapABRecIF.hpp"
+#include "OverlapABRecIG.hpp"
+#include "OverlapABRecIH.hpp"
+#include "OverlapABRecII.hpp"
+
 namespace newints {
 
 namespace {
@@ -144,20 +194,44 @@ overlap_kernel_diagonal(const CBasisFunction &bra, const CBasisFunction &ket) ->
     return Block{n, n, data};
 }
 
-/// @brief STUB: two-center overlap block for two shells on different atoms.
-/// Returns a zero block of the correct dimensions until the kernel is implemented.
+/// @brief Two-center overlap block for two shells on different atoms.
+///
+/// Dispatches on the (l_a, l_b) pair to the matching Tabula-generated spherical
+/// kernel in namespace ovlab. The grid spans S..I (l = 0..6); pairs outside that
+/// range fall back to a zero block of the correct dimensions.
 auto
 overlap_kernel(const CBasisFunction &bra,
                const CBasisFunction &ket,
                const TPoint<double> &bra_center,
                const TPoint<double> &ket_center) -> Block
 {
-    const std::size_t nrows = 2 * bra.get_angular_momentum() + 1;
+    using kernel_fn = Block (*)(const CBasisFunction &, const CBasisFunction &, const TPoint<double> &, const TPoint<double> &);
 
-    const std::size_t ncols = 2 * ket.get_angular_momentum() + 1;
+    // [l_a][l_b] -> spherical (l_a | l_b) kernel, l = 0 (S) .. 6 (I)
+    static const kernel_fn table[7][7] = {
+        {ovlab::overlap_s_s, ovlab::overlap_s_p, ovlab::overlap_s_d, ovlab::overlap_s_f, ovlab::overlap_s_g, ovlab::overlap_s_h, ovlab::overlap_s_i},
+        {ovlab::overlap_p_s, ovlab::overlap_p_p, ovlab::overlap_p_d, ovlab::overlap_p_f, ovlab::overlap_p_g, ovlab::overlap_p_h, ovlab::overlap_p_i},
+        {ovlab::overlap_d_s, ovlab::overlap_d_p, ovlab::overlap_d_d, ovlab::overlap_d_f, ovlab::overlap_d_g, ovlab::overlap_d_h, ovlab::overlap_d_i},
+        {ovlab::overlap_f_s, ovlab::overlap_f_p, ovlab::overlap_f_d, ovlab::overlap_f_f, ovlab::overlap_f_g, ovlab::overlap_f_h, ovlab::overlap_f_i},
+        {ovlab::overlap_g_s, ovlab::overlap_g_p, ovlab::overlap_g_d, ovlab::overlap_g_f, ovlab::overlap_g_g, ovlab::overlap_g_h, ovlab::overlap_g_i},
+        {ovlab::overlap_h_s, ovlab::overlap_h_p, ovlab::overlap_h_d, ovlab::overlap_h_f, ovlab::overlap_h_g, ovlab::overlap_h_h, ovlab::overlap_h_i},
+        {ovlab::overlap_i_s, ovlab::overlap_i_p, ovlab::overlap_i_d, ovlab::overlap_i_f, ovlab::overlap_i_g, ovlab::overlap_i_h, ovlab::overlap_i_i},
+    };
 
-    // TODO: evaluate two-center overlap integrals for this shell pair.
-    return Block{nrows, ncols, std::vector<double>(nrows * ncols, 0.0)};
+    const auto la = bra.get_angular_momentum();
+
+    const auto lb = ket.get_angular_momentum();
+
+    if (la < 0 || la > 6 || lb < 0 || lb > 6)
+    {
+        const std::size_t nrows = 2 * la + 1;
+
+        const std::size_t ncols = 2 * lb + 1;
+
+        return Block{nrows, ncols, std::vector<double>(nrows * ncols, 0.0)};
+    }
+
+    return table[la][lb](bra, ket, bra_center, ket_center);
 }
 
 }  // namespace

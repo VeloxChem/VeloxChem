@@ -60,24 +60,34 @@ class TestNewIntsOverlapDriver:
         assert smat.block((2, 5)).kind == newints.Kind.full              # p(O)-s(H1)
         assert (smat.block((2, 5)).nrows, smat.block((2, 5)).ncols) == (3, 1)
 
-    def test_diagonal_kernel_matches_reference_same_atom(self):
+    def test_matches_reference_driver(self):
 
-        # the same-atom (diagonal) kernel is implemented; the two-center kernel
-        # is still a stub, so only same-atom blocks match the reference driver.
+        # both kernels (same-atom diagonal + two-center dispatch) are wired in,
+        # so the full dense matrix must match the legacy driver to machine precision.
         mol, bas = self.water_sto3g()
         snew = newints.OverlapDriver().compute(mol, bas, 1.0e-12).to_dense(bas).to_numpy()
         sref = RefOverlapDriver().compute(mol, bas).to_numpy()
 
         assert snew.shape == (7, 7)
-        # normalized diagonal, fully determined by the same-atom kernel
-        assert np.allclose(np.diag(snew), 1.0)
-        assert np.allclose(np.diag(snew), np.diag(sref))
-        # O 1s-2s (same atom, l == l') matches the reference
-        assert np.isclose(snew[0, 1], sref[0, 1])
-        assert np.isclose(snew[1, 0], sref[1, 0])
-        # different-atom block (O-H, AO 0-2) still stubbed to zero
-        assert snew[0, 2] == 0.0
-        assert sref[0, 2] != 0.0
+        assert np.allclose(np.diag(snew), 1.0)  # normalized basis
+        assert np.allclose(snew, sref)
+        # the two-center O-H block is now computed, not zero
+        assert snew[0, 2] != 0.0
+
+    def test_matches_reference_high_angular_momentum(self):
+
+        # exercise the d/f/g/h off-diagonal kernels via the (l_a, l_b) dispatch
+        xyz = """2
+
+        N    0.000000    0.000000    0.000000
+        N    0.000000    0.000000    1.100000
+        """
+        mol = Molecule.read_xyz_string(xyz)
+        bas = MolecularBasis.read(mol, "cc-pvqz", ostream=None)
+        snew = newints.OverlapDriver().compute(mol, bas, 1.0e-14).to_dense(bas).to_numpy()
+        sref = RefOverlapDriver().compute(mol, bas).to_numpy()
+
+        assert np.allclose(snew, sref, atol=1.0e-10)
 
     def test_screener_filters_offdiagonal_blocks(self):
 
