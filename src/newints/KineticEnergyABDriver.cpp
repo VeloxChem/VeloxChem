@@ -143,8 +143,15 @@ kinetic_screener(const CBasisFunction &bra,
 
     cfac *= static_cast<double>(1 << lsum);
 
-    // angular polynomial envelope (R_AB^2 + 1/p_min)^{(l_a+l_b)/2}
-    const auto ang = std::pow(r2 + 1.0 / pmin, 0.5 * static_cast<double>(lsum));
+    // angular polynomial envelope (R_AB^2 + 1/p_min)^{(l_a+l_b)/2}. The exponent
+    // is half-integer, but std::pow with a fractional power takes libm's slow
+    // generic path (it dominated the profile). Compute it as an integer power plus
+    // a single sqrt when l_a+l_b is odd -- identical value, a few multiplies.
+    const auto base = r2 + 1.0 / pmin;
+
+    auto ang = ipow(base, lsum / 2);
+
+    if (lsum & 1) ang *= std::sqrt(base);
 
     const auto estimate = cfac * mu * std::exp(-mu * r2) * ang;
 
