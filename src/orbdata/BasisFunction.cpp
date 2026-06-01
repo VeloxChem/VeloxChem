@@ -192,12 +192,6 @@ CBasisFunction::get_normalization_factors() const -> std::vector<double>
 }
 
 auto
-CBasisFunction::get_angular_momentum() const -> int
-{
-    return _angular_momentum;
-}
-
-auto
 CBasisFunction::number_of_primitive_functions() const -> size_t
 {
     return _exponents.size();

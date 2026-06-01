@@ -130,7 +130,9 @@ class CBasisFunction
 
     /// @brief Gets angular momentum of basis function.
     /// @return The angular momentum of basis function.
-    auto get_angular_momentum() const -> int;
+    /// @note Inline so it inlines across translation units (called per shell pair
+    /// in hot integral loops).
+    auto get_angular_momentum() const -> int { return _angular_momentum; }
 
     /// @brief Gets number of primitive Gaussian functions in basis function.
     /// @return The number of primitive Gaussian functions in basis function.

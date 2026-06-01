@@ -235,7 +235,16 @@ overlap_kernel(const CBasisFunction &bra,
 
     const auto lb = ket.get_angular_momentum();
 
-    if (la < 0 || la > 6 || lb < 0 || lb > 6) return;
+    if (la < 0 || la > 6 || lb < 0 || lb > 6)
+    {
+        // unsupported angular momentum: write an explicit zero block (the arena is
+        // not pre-zeroed)
+        const auto n = (2 * la + 1) * (2 * lb + 1);
+
+        for (int x = 0; x < n; x++) out[x] = 0.0;
+
+        return;
+    }
 
     s_kernels[la][lb](bra, ket, bra_center, ket_center, out);
 }
@@ -271,23 +280,25 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
         atom_indices[a] = outline.basis_function_indices(a);
     }
 
-    // flatten the triangular atom-pair loop (bra atom a <= ket atom b) into a work list
-    std::vector<std::pair<int, int>> atom_pairs;
+    // row offsets of the triangular atom-pair index (bra atom a <= ket atom b):
+    // row_off[a] = number of pairs in rows before a. This O(N) table replaces the
+    // O(N^2) materialized atom-pair list; the flat index t maps to (a, b) by a
+    // binary search in the loop below.
+    std::vector<std::size_t> row_off(static_cast<std::size_t>(natoms) + 1);
 
-    atom_pairs.reserve(static_cast<std::size_t>(natoms) * (natoms + 1) / 2);
+    row_off[0] = 0;
 
-    for (int a = 0; a < natoms; a++)
-    {
-        for (int b = a; b < natoms; b++) atom_pairs.push_back({a, b});
-    }
+    for (int a = 0; a < natoms; a++) row_off[a + 1] = row_off[a] + static_cast<std::size_t>(natoms - a);
 
     // each thread writes block payloads directly into its own data arena (the
     // kernels take a raw double* output), recording a SparseMatrix::RawBlock per
     // block. No per-block allocation and no shared-container mutation in the
-    // parallel region; the arenas are merged in bulk afterwards.
+    // parallel region; the arenas are merged in bulk afterwards. The data arena
+    // uses a non-zeroing allocator: off-diagonal kernels write every entry, and the
+    // (few) diagonal blocks are zeroed explicitly, so resize() need not memset.
     struct ThreadArena
     {
-        std::vector<double> data;
+        std::vector<double, DefaultInitAllocator<double>> data;
         std::vector<SparseMatrix::RawBlock> meta;
     };
 
@@ -301,16 +312,19 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
         arena.meta.reserve(1u << 10);
     }
 
-    const auto npairs = static_cast<int>(atom_pairs.size());
+    const auto npairs = static_cast<int>(row_off[natoms]);
 
     // dynamic scheduling balances the load: a heavy-heavy atom pair does far more
     // work than a light-light one
 #pragma omp parallel for schedule(dynamic)
     for (int t = 0; t < npairs; t++)
     {
-        const auto a = atom_pairs[t].first;
+        // map the flat triangular index t -> (a, b) with a <= b
+        const auto row = std::upper_bound(row_off.begin(), row_off.end(), static_cast<std::size_t>(t));
 
-        const auto b = atom_pairs[t].second;
+        const int a = static_cast<int>(row - row_off.begin()) - 1;
+
+        const int b = a + static_cast<int>(static_cast<std::size_t>(t) - row_off[a]);
 
         auto &arena = arenas[static_cast<std::size_t>(omp_get_thread_num())];
 
@@ -336,8 +350,13 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
 
                     if (p == q)
                     {
-                        // diagonal block (i == j): store packed lower-triangular
-                        arena.data.resize(off + n * (n + 1) / 2);  // resize zero-fills
+                        // diagonal block (i == j): packed lower-triangular, only the
+                        // (m, m) entries non-zero -> zero the slot, then write them
+                        const auto np = n * (n + 1) / 2;
+
+                        arena.data.resize(off + np);
+
+                        std::fill(arena.data.begin() + off, arena.data.begin() + off + np, 0.0);
 
                         for (std::size_t m = 0; m < n; m++) arena.data[off + m * (m + 1) / 2 + m] = sab;
 
@@ -346,7 +365,9 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
                     else
                     {
                         // same-atom off-diagonal (i < j): full n x n block, diagonal in m
-                        arena.data.resize(off + n * n);  // resize zero-fills
+                        arena.data.resize(off + n * n);
+
+                        std::fill(arena.data.begin() + off, arena.data.begin() + off + n * n, 0.0);
 
                         for (std::size_t m = 0; m < n; m++) arena.data[off + m * n + m] = sab;
 
@@ -374,7 +395,7 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
 
                     const auto off = arena.data.size();
 
-                    arena.data.resize(off + nr * nc);  // resize zero-fills (also the l > 6 fallback)
+                    arena.data.resize(off + nr * nc);  // uninitialized; the kernel writes every entry
 
                     // pointer taken after resize, so a reallocation cannot dangle mid-kernel
                     overlap_kernel(bra_shells[p], ket_shells[q], coords[a], coords[b], arena.data.data() + off);
