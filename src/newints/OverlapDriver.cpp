@@ -32,9 +32,12 @@
 
 #include "OverlapDriver.hpp"
 
+#include <omp.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <tuple>
 #include <vector>
 
 #include "AtomBasis.hpp"
@@ -252,46 +255,76 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
 
     const auto natoms = static_cast<int>(outline.number_of_atoms());
 
-    // triangular loop over atom pairs with bra atom a <= ket atom b
+    // flatten the triangular atom-pair loop (bra atom a <= ket atom b) into a work list
+    std::vector<std::pair<int, int>> atom_pairs;
+
+    atom_pairs.reserve(static_cast<std::size_t>(natoms) * (natoms + 1) / 2);
+
     for (int a = 0; a < natoms; a++)
     {
+        for (int b = a; b < natoms; b++) atom_pairs.push_back({a, b});
+    }
+
+    // each thread accumulates its (key, block) results into a private buffer; no map
+    // mutation happens inside the parallel region (std::map::insert is not thread-safe)
+    using Entry = std::tuple<int, int, Block>;
+
+    std::vector<std::vector<Entry>> buffers(static_cast<std::size_t>(omp_get_max_threads()));
+
+    const auto npairs = static_cast<int>(atom_pairs.size());
+
+    // dynamic scheduling balances the load: a heavy-heavy atom pair does far more
+    // work than a light-light one
+#pragma omp parallel for schedule(dynamic)
+    for (int t = 0; t < npairs; t++)
+    {
+        const auto a = atom_pairs[t].first;
+
+        const auto b = atom_pairs[t].second;
+
+        auto &buffer = buffers[static_cast<std::size_t>(omp_get_thread_num())];
+
         const auto bra_shells = atom_bases[basis_indices[a]].basis_functions();
 
         const auto bra_idx = outline.basis_function_indices(a);
 
-        for (int b = a; b < natoms; b++)
+        if (a == b)
         {
-            if (a == b)
+            // same atom: only l == l' shell pairs contribute; triangular over shells
+            for (std::size_t p = 0; p < bra_shells.size(); p++)
             {
-                // same atom: only l == l' shell pairs contribute; triangular over shells
-                for (std::size_t p = 0; p < bra_shells.size(); p++)
+                for (std::size_t q = p; q < bra_shells.size(); q++)
                 {
-                    for (std::size_t q = p; q < bra_shells.size(); q++)
-                    {
-                        if (bra_shells[p].get_angular_momentum() != bra_shells[q].get_angular_momentum()) continue;
+                    if (bra_shells[p].get_angular_momentum() != bra_shells[q].get_angular_momentum()) continue;
 
-                        matrix.add(bra_idx[p], bra_idx[q], overlap_kernel_diagonal(bra_shells[p], bra_shells[q]));
-                    }
-                }
-            }
-            else
-            {
-                // different atoms: all (l, l') shell pairs, screened
-                const auto ket_shells = atom_bases[basis_indices[b]].basis_functions();
-
-                const auto ket_idx = outline.basis_function_indices(b);
-
-                for (std::size_t p = 0; p < bra_shells.size(); p++)
-                {
-                    for (std::size_t q = 0; q < ket_shells.size(); q++)
-                    {
-                        if (!overlap_screener(bra_shells[p], ket_shells[q], coords[a], coords[b], threshold)) continue;
-
-                        matrix.add(bra_idx[p], ket_idx[q], overlap_kernel(bra_shells[p], ket_shells[q], coords[a], coords[b]));
-                    }
+                    buffer.emplace_back(bra_idx[p], bra_idx[q], overlap_kernel_diagonal(bra_shells[p], bra_shells[q]));
                 }
             }
         }
+        else
+        {
+            // different atoms: all (l, l') shell pairs, screened
+            const auto ket_shells = atom_bases[basis_indices[b]].basis_functions();
+
+            const auto ket_idx = outline.basis_function_indices(b);
+
+            for (std::size_t p = 0; p < bra_shells.size(); p++)
+            {
+                for (std::size_t q = 0; q < ket_shells.size(); q++)
+                {
+                    if (!overlap_screener(bra_shells[p], ket_shells[q], coords[a], coords[b], threshold)) continue;
+
+                    buffer.emplace_back(bra_idx[p], ket_idx[q], overlap_kernel(bra_shells[p], ket_shells[q], coords[a], coords[b]));
+                }
+            }
+        }
+    }
+
+    // serial merge of the per-thread buffers into the matrix (keys are disjoint across
+    // atom pairs, so insertion order does not affect the result)
+    for (auto &buffer : buffers)
+    {
+        for (const auto &[i, j, block] : buffer) matrix.add(i, j, block);
     }
 
     return matrix;
