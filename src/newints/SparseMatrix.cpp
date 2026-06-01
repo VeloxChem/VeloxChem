@@ -236,13 +236,17 @@ SparseMatrix::reserve_data(const std::size_t values) -> void
 }
 
 auto
-SparseMatrix::add_raw(const int i, const int j, const std::size_t nrows, const std::size_t ncols, const Kind kind, const double *src) -> void
+SparseMatrix::append_arena(const std::vector<double> &data, const std::vector<RawBlock> &metas) -> void
 {
-    const auto n = payload_size(nrows, ncols, kind);
+    const auto base = _data.size();
 
-    _meta.push_back(BlockMeta{i, j, static_cast<std::uint32_t>(nrows), static_cast<std::uint32_t>(ncols), _data.size(), kind});
+    // one bulk copy of the whole arena (no per-block insert overhead)
+    _data.insert(_data.end(), data.begin(), data.end());
 
-    _data.insert(_data.end(), src, src + n);
+    for (const auto &m : metas)
+    {
+        _meta.push_back(BlockMeta{m.i, m.j, static_cast<std::uint32_t>(m.nrows), static_cast<std::uint32_t>(m.ncols), base + m.offset, m.kind});
+    }
 
     _sorted = false;
 }

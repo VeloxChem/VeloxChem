@@ -162,18 +162,24 @@ class SparseMatrix
     /// @param values The expected total number of stored doubles.
     auto reserve_data(const std::size_t values) -> void;
 
-    /// @brief Appends a pre-canonicalized block by copying its payload from a raw
-    /// pointer into the data arena. The caller is responsible for canonicalization
-    /// (for sym/antisym: i <= j, and a diagonal block already packed lower-
-    /// triangular). Used by drivers that build blocks in their own arenas and
-    /// merge them in bulk, avoiding a per-block Block allocation.
-    /// @param i The (canonical) bra contracted GTO index.
-    /// @param j The (canonical) ket contracted GTO index.
-    /// @param nrows The number of rows.
-    /// @param ncols The number of columns.
-    /// @param kind The storage layout (full, or lower_triangular for a packed diagonal).
-    /// @param src Pointer to the payload (payload_size(nrows, ncols, kind) values).
-    auto add_raw(const int i, const int j, const std::size_t nrows, const std::size_t ncols, const Kind kind, const double *src) -> void;
+    /// @brief Descriptor of one pre-canonicalized block within a caller-built data
+    /// arena: its (canonical) key, dimensions, layout, and the offset of its
+    /// payload (payload_size(nrows, ncols, kind) values) within that arena.
+    struct RawBlock
+    {
+        int i, j;
+        std::size_t nrows, ncols, offset;
+        Kind kind;
+    };
+
+    /// @brief Bulk-appends a caller-built data arena and its block descriptors,
+    /// copying the whole arena in one memcpy and rebasing each descriptor's offset.
+    /// The caller is responsible for canonicalization (for sym/antisym: i <= j, and
+    /// a diagonal block already packed lower-triangular). Lets drivers build blocks
+    /// in per-thread arenas and merge them without per-block calls or copies.
+    /// @param data The contiguous payloads of all blocks in `metas`.
+    /// @param metas The block descriptors, with offsets into `data`.
+    auto append_arena(const std::vector<double> &data, const std::vector<RawBlock> &metas) -> void;
 
     /// @brief Sets all block values to zero, keeping the block structure.
     auto zero() -> void;

@@ -282,19 +282,13 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
     }
 
     // each thread writes block payloads directly into its own data arena (the
-    // kernels take a raw double* output), recording a RawBlock per block. No
-    // per-block allocation and no shared-container mutation in the parallel region.
-    struct RawBlock
-    {
-        int i, j;
-        std::size_t nrows, ncols, offset;
-        Kind kind;
-    };
-
+    // kernels take a raw double* output), recording a SparseMatrix::RawBlock per
+    // block. No per-block allocation and no shared-container mutation in the
+    // parallel region; the arenas are merged in bulk afterwards.
     struct ThreadArena
     {
         std::vector<double> data;
-        std::vector<RawBlock> meta;
+        std::vector<SparseMatrix::RawBlock> meta;
     };
 
     std::vector<ThreadArena> arenas(static_cast<std::size_t>(omp_get_max_threads()));
@@ -347,7 +341,7 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
 
                         for (std::size_t m = 0; m < n; m++) arena.data[off + m * (m + 1) / 2 + m] = sab;
 
-                        arena.meta.push_back(RawBlock{bra_idx[p], bra_idx[q], n, n, off, Kind::lower_triangular});
+                        arena.meta.push_back(SparseMatrix::RawBlock{bra_idx[p], bra_idx[q], n, n, off, Kind::lower_triangular});
                     }
                     else
                     {
@@ -356,7 +350,7 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
 
                         for (std::size_t m = 0; m < n; m++) arena.data[off + m * n + m] = sab;
 
-                        arena.meta.push_back(RawBlock{bra_idx[p], bra_idx[q], n, n, off, Kind::full});
+                        arena.meta.push_back(SparseMatrix::RawBlock{bra_idx[p], bra_idx[q], n, n, off, Kind::full});
                     }
                 }
             }
@@ -385,7 +379,7 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
                     // pointer taken after resize, so a reallocation cannot dangle mid-kernel
                     overlap_kernel(bra_shells[p], ket_shells[q], coords[a], coords[b], arena.data.data() + off);
 
-                    arena.meta.push_back(RawBlock{bra_idx[p], ket_idx[q], nr, nc, off, Kind::full});
+                    arena.meta.push_back(SparseMatrix::RawBlock{bra_idx[p], ket_idx[q], nr, nc, off, Kind::full});
                 }
             }
         }
@@ -408,10 +402,7 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
 
     matrix.reserve_data(total_data);
 
-    for (const auto &arena : arenas)
-    {
-        for (const auto &rb : arena.meta) matrix.add_raw(rb.i, rb.j, rb.nrows, rb.ncols, rb.kind, arena.data.data() + rb.offset);
-    }
+    for (const auto &arena : arenas) matrix.append_arena(arena.data, arena.meta);
 
     return matrix;
 }
