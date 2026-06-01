@@ -34,7 +34,8 @@
 #define newints_SparseMatrix_hpp
 
 #include <cstddef>
-#include <map>
+#include <cstdint>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -150,20 +151,10 @@ class SparseMatrix
     /// @param block The full block of shell-pair integrals.
     auto add(const int i, const int j, const Block &block) -> void;
 
-    /// @brief Adds (inserts or overwrites) a block at the given key, moving it.
-    ///
-    /// Same canonicalization as the copying overload, but for the stored-as-given
-    /// cases (general, and i < j for sym/antisym) the block is moved instead of
-    /// copied, avoiding a heap allocation of its data vector.
-    /// @param key The (bra, ket) pair of contracted GTO indices.
-    /// @param block The full block of shell-pair integrals (consumed).
-    auto add(const Key &key, Block &&block) -> void;
-
-    /// @brief Adds (inserts or overwrites) a block at the given indices, moving it.
-    /// @param i The bra contracted GTO index.
-    /// @param j The ket contracted GTO index.
-    /// @param block The full block of shell-pair integrals (consumed).
-    auto add(const int i, const int j, Block &&block) -> void;
+    /// @brief Reserves capacity for the given number of blocks, avoiding rehashes
+    /// when the final block count is known up front (e.g. before a bulk merge).
+    /// @param count The expected number of blocks.
+    auto reserve(const std::size_t count) -> void;
 
     /// @brief Sets all block values to zero, keeping the block structure.
     auto zero() -> void;
@@ -177,15 +168,13 @@ class SparseMatrix
     /// @return True if a block exists at the key.
     auto contains(const Key &key) const -> bool;
 
-    /// @brief Gets a mutable pointer to the block at the given key.
+    /// @brief Gets a read-only snapshot of the block at the given key.
+    ///
+    /// The block data is stored in a contiguous arena, so this returns a copy
+    /// (not a reference into storage); mutating it does not affect the matrix.
     /// @param key The (bra, ket) pair of contracted GTO indices.
-    /// @return The pointer to the block, or nullptr if absent.
-    auto block(const Key &key) -> Block *;
-
-    /// @brief Gets a constant pointer to the block at the given key.
-    /// @param key The (bra, ket) pair of contracted GTO indices.
-    /// @return The constant pointer to the block, or nullptr if absent.
-    auto block(const Key &key) const -> const Block *;
+    /// @return The block, or std::nullopt if absent.
+    auto block(const Key &key) const -> std::optional<Block>;
 
     /// @brief Gets the number of stored blocks.
     /// @return The number of stored blocks.
@@ -205,11 +194,32 @@ class SparseMatrix
     auto to_dense(const CMolecularBasis &basis) const -> CDenseMatrix;
 
    private:
+    /// @brief Descriptor of one stored block: its canonical (bra, ket) key, its
+    /// dimensions and layout, and the offset of its payload in the data arena.
+    struct BlockMeta
+    {
+        int i, j;
+        std::uint32_t nrows, ncols;
+        std::size_t offset;
+        Kind kind;
+    };
+
+    /// @brief Ensures _meta is sorted by key with duplicates collapsed (last add
+    /// wins). Lazy: add() merely appends, and queries trigger one sort/dedup.
+    auto ensure_sorted() const -> void;
+
     /// @brief The symmetry of the matrix.
     SymmetryType _symmetry;
 
-    /// @brief The stored blocks keyed by (bra, ket) contracted GTO indices.
-    std::map<Key, Block> _blocks;
+    /// @brief Per-block descriptors; sorted by key once a query needs ordering.
+    mutable std::vector<BlockMeta> _meta;
+
+    /// @brief Whether _meta is currently sorted and deduplicated.
+    mutable bool _sorted;
+
+    /// @brief Contiguous arena holding every block's payload back-to-back. One
+    /// allocation instead of a heap vector per block.
+    std::vector<double> _data;
 };
 
 }  // namespace newints

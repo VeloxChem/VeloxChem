@@ -81,13 +81,15 @@ class TestSparseMatrix:
         assert m.number_of_blocks() == 1
         assert m.block((0, 0)).data == [0.0, 0.0, 0.0, 0.0]
 
-    def test_block_reference_mutation_persists(self):
+    def test_block_is_readonly_snapshot(self):
 
+        # block() returns a copy out of the contiguous arena, so mutating the
+        # returned Block does not write back into the matrix
         m = newints.SparseMatrix()
         m.add(0, 0, newints.Block(1, 1, [1.0]))
         blk = m.block((0, 0))
         blk.data = [9.0]
-        assert m.block((0, 0)).data == [9.0]
+        assert m.block((0, 0)).data == [1.0]
 
     def test_equality(self):
 

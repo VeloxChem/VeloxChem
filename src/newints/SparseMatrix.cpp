@@ -33,6 +33,7 @@
 #include "SparseMatrix.hpp"
 
 #include <algorithm>
+#include <map>
 #include <vector>
 
 #include "AtomBasis.hpp"
@@ -84,6 +85,15 @@ pack_lower(const Block &block) -> Block
     return result;
 }
 
+/// @brief Number of stored payload values for a block of the given dimensions
+/// and layout (n(n+1)/2 packed for a lower-triangular diagonal block, else
+/// nrows * ncols).
+auto
+payload_size(const std::size_t nrows, const std::size_t ncols, const Kind kind) -> std::size_t
+{
+    return (kind == Kind::lower_triangular) ? nrows * (nrows + 1) / 2 : nrows * ncols;
+}
+
 }  // namespace
 
 auto
@@ -96,7 +106,11 @@ SparseMatrix::SparseMatrix()
 
     : _symmetry(SymmetryType::general)
 
-    , _blocks{}
+    , _meta{}
+
+    , _sorted(true)
+
+    , _data{}
 {
 }
 
@@ -104,14 +118,69 @@ SparseMatrix::SparseMatrix(const SymmetryType symmetry)
 
     : _symmetry(symmetry)
 
-    , _blocks{}
+    , _meta{}
+
+    , _sorted(true)
+
+    , _data{}
 {
+}
+
+auto
+SparseMatrix::ensure_sorted() const -> void
+{
+    if (_sorted) return;
+
+    std::ranges::stable_sort(_meta, [](const BlockMeta &a, const BlockMeta &b) { return (a.i != b.i) ? (a.i < b.i) : (a.j < b.j); });
+
+    // collapse duplicate keys, keeping the most recently added (stable_sort kept
+    // insertion order within an equal-key run, so the last occurrence wins)
+    std::vector<BlockMeta> unique;
+
+    unique.reserve(_meta.size());
+
+    for (const auto &m : _meta)
+    {
+        if (!unique.empty() && unique.back().i == m.i && unique.back().j == m.j)
+        {
+            unique.back() = m;
+        }
+        else
+        {
+            unique.push_back(m);
+        }
+    }
+
+    _meta.swap(unique);
+
+    _sorted = true;
 }
 
 auto
 SparseMatrix::operator==(const SparseMatrix &other) const -> bool
 {
-    return (_symmetry == other._symmetry) && (_blocks == other._blocks);
+    if (_symmetry != other._symmetry) return false;
+
+    ensure_sorted();
+
+    other.ensure_sorted();
+
+    if (_meta.size() != other._meta.size()) return false;
+
+    for (std::size_t k = 0; k < _meta.size(); k++)
+    {
+        const auto &a = _meta[k];
+
+        const auto &b = other._meta[k];
+
+        if (a.i != b.i || a.j != b.j || a.nrows != b.nrows || a.ncols != b.ncols || a.kind != b.kind) return false;
+
+        const auto n = payload_size(a.nrows, a.ncols, a.kind);
+
+        if (!std::equal(_data.begin() + a.offset, _data.begin() + a.offset + n, other._data.begin() + b.offset)) return false;
+    }
+
+    return true;
 }
 
 auto
@@ -125,21 +194,26 @@ SparseMatrix::add(const Key &key, const Block &block) -> void
 {
     const auto [i, j] = key;
 
-    if (_symmetry == SymmetryType::general)
+    // canonicalize to the stored block, then append its payload to the arena
+    auto append = [this](const int bi, const int bj, const Block &b) {
+        _meta.push_back(BlockMeta{bi, bj, static_cast<std::uint32_t>(b.nrows), static_cast<std::uint32_t>(b.ncols), _data.size(), b.kind});
+
+        _data.insert(_data.end(), b.data.begin(), b.data.end());
+
+        _sorted = false;
+    };
+
+    if (_symmetry == SymmetryType::general || i < j)
     {
-        _blocks[key] = block;
-    }
-    else if (i < j)
-    {
-        _blocks[key] = block;
+        append(i, j, block);
     }
     else if (i > j)
     {
-        _blocks[{j, i}] = transpose_block(block, _symmetry == SymmetryType::antisymmetric);
+        append(j, i, transpose_block(block, _symmetry == SymmetryType::antisymmetric));
     }
     else  // i == j: diagonal block stored packed lower-triangular
     {
-        _blocks[key] = pack_lower(block);
+        append(i, j, pack_lower(block));
     }
 }
 
@@ -150,38 +224,15 @@ SparseMatrix::add(const int i, const int j, const Block &block) -> void
 }
 
 auto
-SparseMatrix::add(const Key &key, Block &&block) -> void
+SparseMatrix::reserve(const std::size_t count) -> void
 {
-    const auto [i, j] = key;
-
-    if (_symmetry == SymmetryType::general)
-    {
-        _blocks[key] = std::move(block);
-    }
-    else if (i < j)
-    {
-        _blocks[key] = std::move(block);
-    }
-    else if (i > j)
-    {
-        _blocks[{j, i}] = transpose_block(block, _symmetry == SymmetryType::antisymmetric);
-    }
-    else  // i == j: diagonal block stored packed lower-triangular
-    {
-        _blocks[key] = pack_lower(block);
-    }
-}
-
-auto
-SparseMatrix::add(const int i, const int j, Block &&block) -> void
-{
-    add(Key{i, j}, std::move(block));
+    _meta.reserve(count);
 }
 
 auto
 SparseMatrix::zero() -> void
 {
-    std::ranges::for_each(_blocks, [](auto &entry) { std::ranges::fill(entry.second.data, 0.0); });
+    std::ranges::fill(_data, 0.0);
 }
 
 auto
@@ -193,39 +244,43 @@ SparseMatrix::symmetry() const -> SymmetryType
 auto
 SparseMatrix::contains(const Key &key) const -> bool
 {
-    return _blocks.contains(key);
+    ensure_sorted();
+
+    return std::ranges::binary_search(_meta, key, {}, [](const BlockMeta &m) { return Key{m.i, m.j}; });
 }
 
 auto
-SparseMatrix::block(const Key &key) -> Block *
+SparseMatrix::block(const Key &key) const -> std::optional<Block>
 {
-    auto it = _blocks.find(key);
+    ensure_sorted();
 
-    return (it != _blocks.end()) ? &it->second : nullptr;
-}
+    const auto it = std::ranges::lower_bound(_meta, key, {}, [](const BlockMeta &m) { return Key{m.i, m.j}; });
 
-auto
-SparseMatrix::block(const Key &key) const -> const Block *
-{
-    auto it = _blocks.find(key);
+    if (it == _meta.end() || it->i != key.first || it->j != key.second) return std::nullopt;
 
-    return (it != _blocks.end()) ? &it->second : nullptr;
+    const auto n = payload_size(it->nrows, it->ncols, it->kind);
+
+    return Block{it->nrows, it->ncols, std::vector<double>(_data.begin() + it->offset, _data.begin() + it->offset + n), it->kind};
 }
 
 auto
 SparseMatrix::number_of_blocks() const -> std::size_t
 {
-    return _blocks.size();
+    ensure_sorted();
+
+    return _meta.size();
 }
 
 auto
 SparseMatrix::keys() const -> std::vector<Key>
 {
+    ensure_sorted();
+
     std::vector<Key> ckeys;
 
-    ckeys.reserve(_blocks.size());
+    ckeys.reserve(_meta.size());
 
-    std::ranges::for_each(_blocks, [&](const auto &entry) { ckeys.push_back(entry.first); });
+    for (const auto &m : _meta) ckeys.push_back(Key{m.i, m.j});
 
     return ckeys;
 }
@@ -298,13 +353,17 @@ SparseMatrix::to_dense(const CMolecularBasis &basis) const -> CDenseMatrix
 
     const auto sign = (_symmetry == SymmetryType::antisymmetric) ? -1.0 : 1.0;
 
-    for (const auto &[key, block] : _blocks)
+    ensure_sorted();
+
+    for (const auto &m : _meta)
     {
-        const auto &rcomps = ao_map.at(key.first);
+        const auto &rcomps = ao_map.at(m.i);
 
-        const auto &ccomps = ao_map.at(key.second);
+        const auto &ccomps = ao_map.at(m.j);
 
-        if (block.kind == Kind::lower_triangular)
+        const auto *vals = _data.data() + m.offset;
+
+        if (m.kind == Kind::lower_triangular)
         {
             // diagonal block (i == j): unpack the lower triangle, mirror with the symmetry sign
             const auto n = static_cast<int>(rcomps.size());
@@ -313,7 +372,7 @@ SparseMatrix::to_dense(const CMolecularBasis &basis) const -> CDenseMatrix
             {
                 for (int c = 0; c <= r; c++)
                 {
-                    const auto v = block.data[r * (r + 1) / 2 + c];
+                    const auto v = vals[r * (r + 1) / 2 + c];
 
                     dmat.row(rcomps[r])[ccomps[c]] = v;
 
@@ -331,7 +390,7 @@ SparseMatrix::to_dense(const CMolecularBasis &basis) const -> CDenseMatrix
             {
                 for (int c = 0; c < nc; c++)
                 {
-                    const auto v = block.data[r * nc + c];
+                    const auto v = vals[r * nc + c];
 
                     dmat.row(rcomps[r])[ccomps[c]] = v;
 

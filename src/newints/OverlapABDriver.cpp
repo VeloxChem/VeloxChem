@@ -323,6 +323,12 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
 
     // serial merge of the per-thread buffers into the matrix (keys are disjoint across
     // atom pairs, so insertion order does not affect the result)
+    std::size_t total = 0;
+
+    for (const auto &buffer : buffers) total += buffer.size();
+
+    matrix.reserve(total);
+
     for (auto &buffer : buffers)
     {
         for (auto &[i, j, block] : buffer) matrix.add(i, j, std::move(block));

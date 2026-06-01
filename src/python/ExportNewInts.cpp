@@ -103,10 +103,9 @@ export_newints(py::module &m) -> void
              "block"_a)
         .def("contains", &newints::SparseMatrix::contains, "Checks if a block exists at given key.", "key"_a)
         .def("block",
-             py::overload_cast<const newints::SparseMatrix::Key &>(&newints::SparseMatrix::block),
-             "Gets the block at given key, or None if absent.",
-             "key"_a,
-             py::return_value_policy::reference_internal)
+             &newints::SparseMatrix::block,
+             "Gets a read-only snapshot of the block at given key, or None if absent.",
+             "key"_a)
         .def("zero", &newints::SparseMatrix::zero, "Sets all block values to zero.")
         .def("number_of_blocks", &newints::SparseMatrix::number_of_blocks, "Gets number of stored blocks.")
         .def("keys", &newints::SparseMatrix::keys, "Gets keys of all stored blocks in ascending order.")
