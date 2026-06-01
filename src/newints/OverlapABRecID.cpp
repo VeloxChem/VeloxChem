@@ -34,7 +34,7 @@
 
 #include <array>
 #include <cmath>
-#include <vector>
+#include <cstddef>
 
 #include "MathConst.hpp"
 #include "RealSolidHarmonicAB.hpp"
@@ -45,8 +45,9 @@ auto overlap_i_d(
     const CBasisFunction &bra,
     const CBasisFunction &ket,
     const TPoint<double> &bra_center,
-    const TPoint<double> &ket_center
-) -> newints::Block
+    const TPoint<double> &ket_center,
+    double *buffer
+) -> void
 {
     // ---- Phase 1: geometry ----
     const auto a_xyz = bra_center.coordinates();
@@ -89,10 +90,10 @@ auto overlap_i_d(
     //   V[0] ↔ α^2 · β^6 · p^{-8} · (s|s)
     //   V[1] ↔ α · β^5 · p^{-7} · (s|s)
     //   V[2] ↔ β^4 · p^{-6} · (s|s)
-    const auto exps_a  = bra.get_exponents();
-    const auto coefs_a = bra.get_normalization_factors();
-    const auto exps_b  = ket.get_exponents();
-    const auto coefs_b = ket.get_normalization_factors();
+    const auto &exps_a  = bra.exponents();
+    const auto &coefs_a = bra.normalization_factors();
+    const auto &exps_b  = ket.exponents();
+    const auto &coefs_b = ket.normalization_factors();
 
     const auto pi = mathconst::pi_value();
 
@@ -162,8 +163,7 @@ auto overlap_i_d(
     const auto Y6_p4 = harm::Y_ll_6_m_p4(AB_x, AB_y, AB_z);
     const auto Y6_p5 = harm::Y_ll_6_m_p5(AB_x, AB_y, AB_z);
     const auto Y6_p6 = harm::Y_ll_6_m_p6(AB_x, AB_y, AB_z);
-    newints::Block out{13, 5, std::vector<double>(65, 0.0)};
-    auto *d = out.data.data();
+    auto *d = buffer;
     d[32] = Y6_p0 * Y2_p0 * V[0] + ((-21.0 / 11.0) * Y6_p0 + (-45.0 / 11.0) * Y4_p0 * R2) * V[1] + 11.25 * Y4_p0 * V[2];
     d[33] = Y6_p0 * Y2_p1 * V[0] + ((-3.0 / 22.0) * sqrt7 * Y6_p1 + (6.0 / 11.0) * sqrt30 * Y4_p1 * R2) * V[1] - 1.5 * sqrt30 * Y4_p1 * V[2];
     d[34] = Y6_p0 * Y2_p2 * V[0] + ((3.0 / 11.0) * sqrt70 * Y6_p2 + (-3.0 / 11.0) * sqrt15 * Y4_p2 * R2) * V[1] + 0.75 * sqrt15 * Y4_p2 * V[2];
@@ -229,8 +229,6 @@ auto overlap_i_d(
     d[4] = Y6_n6 * Y2_p2 * V[0] + ((3.0 / 22.0) * sqrt22 * Y6_n4 + (-9.0 / 22.0) * sqrt110 * Y4_n4 * R2) * V[1] + 1.125 * sqrt110 * Y4_n4 * V[2];
     d[1] = Y6_n6 * Y2_n1 * V[0] - 1.5 * Y6_p5 * V[1];
     d[0] = Y6_n6 * Y2_n2 * V[0] + ((3.0 / 22.0) * sqrt22 * Y6_p4 + (-9.0 / 22.0) * sqrt110 * Y4_p4 * R2) * V[1] + 1.125 * sqrt110 * Y4_p4 * V[2];
-
-    return out;
 }
 
 }  // namespace ovlab

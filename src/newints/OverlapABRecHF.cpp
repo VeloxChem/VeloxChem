@@ -34,7 +34,7 @@
 
 #include <array>
 #include <cmath>
-#include <vector>
+#include <cstddef>
 
 #include "MathConst.hpp"
 #include "RealSolidHarmonicAB.hpp"
@@ -45,8 +45,9 @@ auto overlap_h_f(
     const CBasisFunction &bra,
     const CBasisFunction &ket,
     const TPoint<double> &bra_center,
-    const TPoint<double> &ket_center
-) -> newints::Block
+    const TPoint<double> &ket_center,
+    double *buffer
+) -> void
 {
     // ---- Phase 1: geometry ----
     const auto a_xyz = bra_center.coordinates();
@@ -87,10 +88,10 @@ auto overlap_h_f(
     //   V[1] ↔ α^2 · β^4 · p^{-7} · (s|s)
     //   V[2] ↔ α · β^3 · p^{-6} · (s|s)
     //   V[3] ↔ β^2 · p^{-5} · (s|s)
-    const auto exps_a  = bra.get_exponents();
-    const auto coefs_a = bra.get_normalization_factors();
-    const auto exps_b  = ket.get_exponents();
-    const auto coefs_b = ket.get_normalization_factors();
+    const auto &exps_a  = bra.exponents();
+    const auto &coefs_a = bra.normalization_factors();
+    const auto &exps_b  = ket.exponents();
+    const auto &coefs_b = ket.normalization_factors();
 
     const auto pi = mathconst::pi_value();
 
@@ -180,8 +181,7 @@ auto overlap_h_f(
     const auto Y6_p5 = harm::Y_ll_6_m_p5(AB_x, AB_y, AB_z);
     const auto Y6_p6 = harm::Y_ll_6_m_p6(AB_x, AB_y, AB_z);
     const auto R4 = R2 * R2;
-    newints::Block out{11, 7, std::vector<double>(77, 0.0)};
-    auto *d = out.data.data();
+    auto *d = buffer;
     d[38] = -Y5_p0 * Y3_p0 * V[0] + ((35.0 / 22.0) * Y6_p0 + (180.0 / 77.0) * Y4_p0 * R2 + (25.0 / 7.0) * Y2_p0 * R4) * V[1] + ((-45.0 / 7.0) * Y4_p0 + (-225.0 / 14.0) * Y2_p0 * R2) * V[2] + 18.75 * Y2_p0 * V[3];
     d[39] = -Y5_p0 * Y3_p1 * V[0] + ((5.0 / 22.0) * sqrt14 * Y6_p1 + (3.0 / 77.0) * sqrt15 * Y4_p1 * R2 + (-25.0 / 14.0) * sqrt2 * Y2_p1 * R4) * V[1] + ((-3.0 / 28.0) * sqrt15 * Y4_p1 + (225.0 / 28.0) * sqrt2 * Y2_p1 * R2) * V[2] - 9.375 * sqrt2 * Y2_p1 * V[3];
     d[40] = -Y5_p0 * Y3_p2 * V[0] + ((-5.0 / 22.0) * sqrt14 * Y6_p2 + (-120.0 / 77.0) * sqrt3 * Y4_p2 * R2 + (5.0 / 14.0) * sqrt5 * Y2_p2 * R4) * V[1] + ((30.0 / 7.0) * sqrt3 * Y4_p2 + (-45.0 / 28.0) * sqrt5 * Y2_p2 * R2) * V[2] + 1.875 * sqrt5 * Y2_p2 * V[3];
@@ -259,8 +259,6 @@ auto overlap_h_f(
     d[2] = -Y5_n5 * Y3_n1 * V[0] + ((15.0 / 22.0) * sqrt3 * Y6_p4 + (15.0 / 44.0) * sqrt22 * Y6_p6 + (-6.0 / 11.0) * sqrt15 * Y4_p4 * R2) * V[1] + 1.5 * sqrt15 * Y4_p4 * V[2];
     d[1] = -Y5_n5 * Y3_n2 * V[0] + ((-15.0 / 22.0) * Y6_p3 + (15.0 / 11.0) * sqrt3 * Y4_p3 * R2) * V[1] - 3.75 * sqrt3 * Y4_p3 * V[2];
     d[0] = -Y5_n5 * Y3_n3 * V[0] + ((5.0 / 44.0) * sqrt6 * Y6_p2 + (-45.0 / 77.0) * sqrt7 * Y4_p2 * R2 + (5.0 / 14.0) * sqrt105 * Y2_p2 * R4) * V[1] + ((45.0 / 28.0) * sqrt7 * Y4_p2 + (-45.0 / 28.0) * sqrt105 * Y2_p2 * R2) * V[2] + 1.875 * sqrt105 * Y2_p2 * V[3];
-
-    return out;
 }
 
 }  // namespace ovlab

@@ -34,7 +34,7 @@
 
 #include <array>
 #include <cmath>
-#include <vector>
+#include <cstddef>
 
 #include "MathConst.hpp"
 #include "RealSolidHarmonicAB.hpp"
@@ -45,8 +45,9 @@ auto overlap_p_h(
     const CBasisFunction &bra,
     const CBasisFunction &ket,
     const TPoint<double> &bra_center,
-    const TPoint<double> &ket_center
-) -> newints::Block
+    const TPoint<double> &ket_center,
+    double *buffer
+) -> void
 {
     // ---- Phase 1: geometry ----
     const auto a_xyz = bra_center.coordinates();
@@ -77,10 +78,10 @@ auto overlap_p_h(
     // ---- Phase 2: V evaluation + primitive contraction ----
     //   V[0] ↔ α^5 · β · p^{-6} · (s|s)
     //   V[1] ↔ α^4 · p^{-5} · (s|s)
-    const auto exps_a  = bra.get_exponents();
-    const auto coefs_a = bra.get_normalization_factors();
-    const auto exps_b  = ket.get_exponents();
-    const auto coefs_b = ket.get_normalization_factors();
+    const auto &exps_a  = bra.exponents();
+    const auto &coefs_a = bra.normalization_factors();
+    const auto &exps_b  = ket.exponents();
+    const auto &coefs_b = ket.normalization_factors();
 
     const auto pi = mathconst::pi_value();
 
@@ -141,8 +142,7 @@ auto overlap_p_h(
     const auto Y5_p3 = harm::Y_ll_5_m_p3(AB_x, AB_y, AB_z);
     const auto Y5_p4 = harm::Y_ll_5_m_p4(AB_x, AB_y, AB_z);
     const auto Y5_p5 = harm::Y_ll_5_m_p5(AB_x, AB_y, AB_z);
-    newints::Block out{3, 11, std::vector<double>(33, 0.0)};
-    auto *d = out.data.data();
+    auto *d = buffer;
     d[16] = -Y1_p0 * Y5_p0 * V[0] + 2.5 * Y4_p0 * V[1];
     d[17] = -Y1_p0 * Y5_p1 * V[0] + sqrt6 * Y4_p1 * V[1];
     d[18] = -Y1_p0 * Y5_p2 * V[0] + 0.5 * sqrt21 * Y4_p2 * V[1];
@@ -176,8 +176,6 @@ auto overlap_p_h(
     d[2] = -Y1_n1 * Y5_n3 * V[0] + (0.5 * sqrt14 * Y4_p2 + 0.25 * sqrt2 * Y4_p4) * V[1];
     d[1] = -Y1_n1 * Y5_n4 * V[0] + 1.5 * sqrt2 * Y4_p3 * V[1];
     d[0] = -Y1_n1 * Y5_n5 * V[0] + 0.75 * sqrt10 * Y4_p4 * V[1];
-
-    return out;
 }
 
 }  // namespace ovlab

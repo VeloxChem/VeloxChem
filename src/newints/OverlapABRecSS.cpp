@@ -33,7 +33,7 @@
 #include "OverlapABRecSS.hpp"
 
 #include <cmath>
-#include <vector>
+#include <cstddef>
 
 #include "MathConst.hpp"
 
@@ -43,8 +43,9 @@ auto overlap_s_s(
     const CBasisFunction &bra,
     const CBasisFunction &ket,
     const TPoint<double> &bra_center,
-    const TPoint<double> &ket_center
-) -> newints::Block
+    const TPoint<double> &ket_center,
+    double *buffer
+) -> void
 {
     // ---- Phase 1: geometry ----
     const auto a_xyz = bra_center.coordinates();
@@ -55,10 +56,10 @@ auto overlap_s_s(
     const auto R2    = AB_x * AB_x + AB_y * AB_y + AB_z * AB_z;
 
     // ---- Phase 2: primitive-pair contraction (no M·V; base case only) ----
-    const auto exps_a  = bra.get_exponents();
-    const auto coefs_a = bra.get_normalization_factors();
-    const auto exps_b  = ket.get_exponents();
-    const auto coefs_b = ket.get_normalization_factors();
+    const auto &exps_a  = bra.exponents();
+    const auto &coefs_a = bra.normalization_factors();
+    const auto &exps_b  = ket.exponents();
+    const auto &coefs_b = ket.normalization_factors();
 
     const auto pi = mathconst::pi_value();
 
@@ -79,7 +80,7 @@ auto overlap_s_s(
         }
     }
 
-    return newints::Block{1, 1, std::vector<double>{sab}};
+    buffer[0] = sab;
 }
 
 }  // namespace ovlab

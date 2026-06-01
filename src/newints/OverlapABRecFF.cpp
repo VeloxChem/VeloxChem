@@ -34,7 +34,7 @@
 
 #include <array>
 #include <cmath>
-#include <vector>
+#include <cstddef>
 
 #include "MathConst.hpp"
 #include "RealSolidHarmonicAB.hpp"
@@ -45,8 +45,9 @@ auto overlap_f_f(
     const CBasisFunction &bra,
     const CBasisFunction &ket,
     const TPoint<double> &bra_center,
-    const TPoint<double> &ket_center
-) -> newints::Block
+    const TPoint<double> &ket_center,
+    double *buffer
+) -> void
 {
     // ---- Phase 1: geometry ----
     const auto a_xyz = bra_center.coordinates();
@@ -78,10 +79,10 @@ auto overlap_f_f(
     //   V[1] ↔ α^2 · β^2 · p^{-5} · (s|s)
     //   V[2] ↔ α · β · p^{-4} · (s|s)
     //   V[3] ↔ p^{-3} · (s|s)
-    const auto exps_a  = bra.get_exponents();
-    const auto coefs_a = bra.get_normalization_factors();
-    const auto exps_b  = ket.get_exponents();
-    const auto coefs_b = ket.get_normalization_factors();
+    const auto &exps_a  = bra.exponents();
+    const auto &coefs_a = bra.normalization_factors();
+    const auto &exps_b  = ket.exponents();
+    const auto &coefs_b = ket.normalization_factors();
 
     const auto pi = mathconst::pi_value();
 
@@ -143,8 +144,7 @@ auto overlap_f_f(
     const auto Y4_p3 = harm::Y_ll_4_m_p3(AB_x, AB_y, AB_z);
     const auto Y4_p4 = harm::Y_ll_4_m_p4(AB_x, AB_y, AB_z);
     const auto R4 = R2 * R2;
-    newints::Block out{7, 7, std::vector<double>(49, 0.0)};
-    auto *d = out.data.data();
+    auto *d = buffer;
     d[24] = -Y3_p0 * Y3_p0 * V[0] + ((9.0 / 7.0) * Y4_p0 + (12.0 / 7.0) * Y2_p0 * R2 + 1.5 * R4) * V[1] + (-3.0 * Y2_p0 - 3.75 * R2) * V[2] + 1.875 * V[3];
     d[25] = d[31] = -Y3_p0 * Y3_p1 * V[0] + ((3.0 / 14.0) * sqrt15 * Y4_p1 + (3.0 / 7.0) * sqrt2 * Y2_p1 * R2) * V[1] - 0.75 * sqrt2 * Y2_p1 * V[2];
     d[26] = d[38] = -Y3_p0 * Y3_p2 * V[0] + ((-3.0 / 14.0) * sqrt3 * Y4_p2 + (-6.0 / 7.0) * sqrt5 * Y2_p2 * R2) * V[1] + 1.5 * sqrt5 * Y2_p2 * V[2];
@@ -173,8 +173,6 @@ auto overlap_f_f(
     d[8] = -Y3_n2 * Y3_n2 * V[0] + (-1.5 * Y4_p0 + (-3.0 / 14.0) * sqrt35 * Y4_p4 + 1.5 * R4) * V[1] - 3.75 * R2 * V[2] + 1.875 * V[3];
     d[7] = d[1] = -Y3_n2 * Y3_n3 * V[0] + ((-3.0 / 14.0) * sqrt15 * Y4_p1 + (15.0 / 14.0) * sqrt2 * Y2_p1 * R2) * V[1] - 1.875 * sqrt2 * Y2_p1 * V[2];
     d[0] = -Y3_n3 * Y3_n3 * V[0] + ((9.0 / 14.0) * Y4_p0 + (-15.0 / 7.0) * Y2_p0 * R2 + 1.5 * R4) * V[1] + (3.75 * Y2_p0 - 3.75 * R2) * V[2] + 1.875 * V[3];
-
-    return out;
 }
 
 }  // namespace ovlab

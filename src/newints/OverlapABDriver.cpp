@@ -145,17 +145,17 @@ overlap_screener(const CBasisFunction &bra,
     return estimate >= threshold;
 }
 
-/// @brief Same-center overlap block for two shells of equal angular momentum l.
+/// @brief Same-center overlap value for two shells of equal angular momentum l.
 ///
 /// On a common center the overlap is diagonal in (l, m) and independent of m
 /// (eq. 8 of concentric_spherical_overlap.pdf). In VeloxChem's unnormalized
 /// solid-harmonic convention (the (l,0) normalization absorbed into the
 /// contraction coefficients) the per-primitive-pair value is
-/// (pi/p)^{3/2} (2l-1)!! / (2^l p^l), p = alpha + beta, so the contracted
-/// block value is S_ab = sum_ij c_i c_j (pi/p)^{3/2} (2l-1)!! / (2^l p^l) on
-/// every diagonal (m, m) entry and zero off the diagonal.
+/// (pi/p)^{3/2} (2l-1)!! / (2^l p^l), p = alpha + beta, so the contracted value
+/// is S_ab = sum_ij c_i c_j (pi/p)^{3/2} (2l-1)!! / (2^l p^l), placed on every
+/// diagonal (m, m) entry by the caller.
 auto
-overlap_kernel_diagonal(const CBasisFunction &bra, const CBasisFunction &ket) -> Block
+overlap_diagonal_value(const CBasisFunction &bra, const CBasisFunction &ket) -> double
 {
     const auto l = bra.get_angular_momentum();  // == ket angular momentum (caller guarantees l_a == l_b)
 
@@ -188,54 +188,42 @@ overlap_kernel_diagonal(const CBasisFunction &bra, const CBasisFunction &ket) ->
         }
     }
 
-    // block is diagonal in m: only (m, m) entries are non-zero, all equal to S_ab
-    const auto n = static_cast<std::size_t>(2 * l + 1);
-
-    std::vector<double> data(n * n, 0.0);
-
-    for (std::size_t m = 0; m < n; m++) data[m * n + m] = sab;
-
-    return Block{n, n, data};
+    return sab;
 }
 
-/// @brief Two-center overlap block for two shells on different atoms.
-///
-/// Dispatches on the (l_a, l_b) pair to the matching Tabula-generated spherical
-/// kernel in namespace ovlab. The grid spans S..I (l = 0..6); pairs outside that
-/// range fall back to a zero block of the correct dimensions.
+/// @brief Function-pointer type of a Tabula-generated spherical overlap kernel:
+/// it writes the (2 l_a + 1) x (2 l_b + 1) row-major block into the buffer.
+using kernel_fn = void (*)(const CBasisFunction &, const CBasisFunction &, const TPoint<double> &, const TPoint<double> &, double *);
+
+/// @brief [l_a][l_b] dispatch table to the spherical (l_a | l_b) kernel, l = 0 (S) .. 6 (I).
+constexpr kernel_fn s_kernels[7][7] = {
+    {ovlab::overlap_s_s, ovlab::overlap_s_p, ovlab::overlap_s_d, ovlab::overlap_s_f, ovlab::overlap_s_g, ovlab::overlap_s_h, ovlab::overlap_s_i},
+    {ovlab::overlap_p_s, ovlab::overlap_p_p, ovlab::overlap_p_d, ovlab::overlap_p_f, ovlab::overlap_p_g, ovlab::overlap_p_h, ovlab::overlap_p_i},
+    {ovlab::overlap_d_s, ovlab::overlap_d_p, ovlab::overlap_d_d, ovlab::overlap_d_f, ovlab::overlap_d_g, ovlab::overlap_d_h, ovlab::overlap_d_i},
+    {ovlab::overlap_f_s, ovlab::overlap_f_p, ovlab::overlap_f_d, ovlab::overlap_f_f, ovlab::overlap_f_g, ovlab::overlap_f_h, ovlab::overlap_f_i},
+    {ovlab::overlap_g_s, ovlab::overlap_g_p, ovlab::overlap_g_d, ovlab::overlap_g_f, ovlab::overlap_g_g, ovlab::overlap_g_h, ovlab::overlap_g_i},
+    {ovlab::overlap_h_s, ovlab::overlap_h_p, ovlab::overlap_h_d, ovlab::overlap_h_f, ovlab::overlap_h_g, ovlab::overlap_h_h, ovlab::overlap_h_i},
+    {ovlab::overlap_i_s, ovlab::overlap_i_p, ovlab::overlap_i_d, ovlab::overlap_i_f, ovlab::overlap_i_g, ovlab::overlap_i_h, ovlab::overlap_i_i},
+};
+
+/// @brief Two-center overlap block for two shells on different atoms, written
+/// row-major into out (which must hold (2 l_a + 1) * (2 l_b + 1) doubles).
+/// Dispatches on (l_a, l_b) to the matching ovlab kernel; pairs outside the
+/// S..I grid (l > 6) leave out as supplied by the caller (a zero block).
 auto
 overlap_kernel(const CBasisFunction &bra,
                const CBasisFunction &ket,
                const TPoint<double> &bra_center,
-               const TPoint<double> &ket_center) -> Block
+               const TPoint<double> &ket_center,
+               double                *out) -> void
 {
-    using kernel_fn = Block (*)(const CBasisFunction &, const CBasisFunction &, const TPoint<double> &, const TPoint<double> &);
-
-    // [l_a][l_b] -> spherical (l_a | l_b) kernel, l = 0 (S) .. 6 (I)
-    static const kernel_fn table[7][7] = {
-        {ovlab::overlap_s_s, ovlab::overlap_s_p, ovlab::overlap_s_d, ovlab::overlap_s_f, ovlab::overlap_s_g, ovlab::overlap_s_h, ovlab::overlap_s_i},
-        {ovlab::overlap_p_s, ovlab::overlap_p_p, ovlab::overlap_p_d, ovlab::overlap_p_f, ovlab::overlap_p_g, ovlab::overlap_p_h, ovlab::overlap_p_i},
-        {ovlab::overlap_d_s, ovlab::overlap_d_p, ovlab::overlap_d_d, ovlab::overlap_d_f, ovlab::overlap_d_g, ovlab::overlap_d_h, ovlab::overlap_d_i},
-        {ovlab::overlap_f_s, ovlab::overlap_f_p, ovlab::overlap_f_d, ovlab::overlap_f_f, ovlab::overlap_f_g, ovlab::overlap_f_h, ovlab::overlap_f_i},
-        {ovlab::overlap_g_s, ovlab::overlap_g_p, ovlab::overlap_g_d, ovlab::overlap_g_f, ovlab::overlap_g_g, ovlab::overlap_g_h, ovlab::overlap_g_i},
-        {ovlab::overlap_h_s, ovlab::overlap_h_p, ovlab::overlap_h_d, ovlab::overlap_h_f, ovlab::overlap_h_g, ovlab::overlap_h_h, ovlab::overlap_h_i},
-        {ovlab::overlap_i_s, ovlab::overlap_i_p, ovlab::overlap_i_d, ovlab::overlap_i_f, ovlab::overlap_i_g, ovlab::overlap_i_h, ovlab::overlap_i_i},
-    };
-
     const auto la = bra.get_angular_momentum();
 
     const auto lb = ket.get_angular_momentum();
 
-    if (la < 0 || la > 6 || lb < 0 || lb > 6)
-    {
-        const std::size_t nrows = 2 * la + 1;
+    if (la < 0 || la > 6 || lb < 0 || lb > 6) return;
 
-        const std::size_t ncols = 2 * lb + 1;
-
-        return Block{nrows, ncols, std::vector<double>(nrows * ncols, 0.0)};
-    }
-
-    return table[la][lb](bra, ket, bra_center, ket_center);
+    s_kernels[la][lb](bra, ket, bra_center, ket_center, out);
 }
 
 }  // namespace
@@ -266,11 +254,23 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
         for (int b = a; b < natoms; b++) atom_pairs.push_back({a, b});
     }
 
-    // each thread accumulates its (key, block) results into a private buffer; no map
-    // mutation happens inside the parallel region (std::map::insert is not thread-safe)
-    using Entry = std::tuple<int, int, Block>;
+    // each thread writes block payloads directly into its own data arena (the
+    // kernels take a raw double* output), recording a RawBlock per block. No
+    // per-block allocation and no shared-container mutation in the parallel region.
+    struct RawBlock
+    {
+        int i, j;
+        std::size_t nrows, ncols, offset;
+        Kind kind;
+    };
 
-    std::vector<std::vector<Entry>> buffers(static_cast<std::size_t>(omp_get_max_threads()));
+    struct ThreadArena
+    {
+        std::vector<double> data;
+        std::vector<RawBlock> meta;
+    };
+
+    std::vector<ThreadArena> arenas(static_cast<std::size_t>(omp_get_max_threads()));
 
     const auto npairs = static_cast<int>(atom_pairs.size());
 
@@ -283,7 +283,7 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
 
         const auto b = atom_pairs[t].second;
 
-        auto &buffer = buffers[static_cast<std::size_t>(omp_get_thread_num())];
+        auto &arena = arenas[static_cast<std::size_t>(omp_get_thread_num())];
 
         const auto bra_shells = atom_bases[basis_indices[a]].basis_functions();
 
@@ -291,14 +291,38 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
 
         if (a == b)
         {
-            // same atom: only l == l' shell pairs contribute; triangular over shells
+            // same atom: only l == l' shell pairs contribute; triangular over shells.
+            // The block is diagonal in m with value S_ab on every (m, m) entry.
             for (std::size_t p = 0; p < bra_shells.size(); p++)
             {
                 for (std::size_t q = p; q < bra_shells.size(); q++)
                 {
                     if (bra_shells[p].get_angular_momentum() != bra_shells[q].get_angular_momentum()) continue;
 
-                    buffer.emplace_back(bra_idx[p], bra_idx[q], overlap_kernel_diagonal(bra_shells[p], bra_shells[q]));
+                    const auto sab = overlap_diagonal_value(bra_shells[p], bra_shells[q]);
+
+                    const auto n = static_cast<std::size_t>(2 * bra_shells[p].get_angular_momentum() + 1);
+
+                    const auto off = arena.data.size();
+
+                    if (p == q)
+                    {
+                        // diagonal block (i == j): store packed lower-triangular
+                        arena.data.resize(off + n * (n + 1) / 2);  // resize zero-fills
+
+                        for (std::size_t m = 0; m < n; m++) arena.data[off + m * (m + 1) / 2 + m] = sab;
+
+                        arena.meta.push_back(RawBlock{bra_idx[p], bra_idx[q], n, n, off, Kind::lower_triangular});
+                    }
+                    else
+                    {
+                        // same-atom off-diagonal (i < j): full n x n block, diagonal in m
+                        arena.data.resize(off + n * n);  // resize zero-fills
+
+                        for (std::size_t m = 0; m < n; m++) arena.data[off + m * n + m] = sab;
+
+                        arena.meta.push_back(RawBlock{bra_idx[p], bra_idx[q], n, n, off, Kind::full});
+                    }
                 }
             }
         }
@@ -315,23 +339,34 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
                 {
                     if (!overlap_screener(bra_shells[p], ket_shells[q], coords[a], coords[b], threshold)) continue;
 
-                    buffer.emplace_back(bra_idx[p], ket_idx[q], overlap_kernel(bra_shells[p], ket_shells[q], coords[a], coords[b]));
+                    const auto nr = static_cast<std::size_t>(2 * bra_shells[p].get_angular_momentum() + 1);
+
+                    const auto nc = static_cast<std::size_t>(2 * ket_shells[q].get_angular_momentum() + 1);
+
+                    const auto off = arena.data.size();
+
+                    arena.data.resize(off + nr * nc);  // resize zero-fills (also the l > 6 fallback)
+
+                    // pointer taken after resize, so a reallocation cannot dangle mid-kernel
+                    overlap_kernel(bra_shells[p], ket_shells[q], coords[a], coords[b], arena.data.data() + off);
+
+                    arena.meta.push_back(RawBlock{bra_idx[p], ket_idx[q], nr, nc, off, Kind::full});
                 }
             }
         }
     }
 
-    // serial merge of the per-thread buffers into the matrix (keys are disjoint across
-    // atom pairs, so insertion order does not affect the result)
+    // serial bulk merge: append each thread's blocks (keys are disjoint across atom
+    // pairs, so insertion order does not affect the result)
     std::size_t total = 0;
 
-    for (const auto &buffer : buffers) total += buffer.size();
+    for (const auto &arena : arenas) total += arena.meta.size();
 
     matrix.reserve(total);
 
-    for (auto &buffer : buffers)
+    for (const auto &arena : arenas)
     {
-        for (auto &[i, j, block] : buffer) matrix.add(i, j, std::move(block));
+        for (const auto &rb : arena.meta) matrix.add_raw(rb.i, rb.j, rb.nrows, rb.ncols, rb.kind, arena.data.data() + rb.offset);
     }
 
     return matrix;

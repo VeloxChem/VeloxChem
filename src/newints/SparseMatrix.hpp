@@ -156,6 +156,19 @@ class SparseMatrix
     /// @param count The expected number of blocks.
     auto reserve(const std::size_t count) -> void;
 
+    /// @brief Appends a pre-canonicalized block by copying its payload from a raw
+    /// pointer into the data arena. The caller is responsible for canonicalization
+    /// (for sym/antisym: i <= j, and a diagonal block already packed lower-
+    /// triangular). Used by drivers that build blocks in their own arenas and
+    /// merge them in bulk, avoiding a per-block Block allocation.
+    /// @param i The (canonical) bra contracted GTO index.
+    /// @param j The (canonical) ket contracted GTO index.
+    /// @param nrows The number of rows.
+    /// @param ncols The number of columns.
+    /// @param kind The storage layout (full, or lower_triangular for a packed diagonal).
+    /// @param src Pointer to the payload (payload_size(nrows, ncols, kind) values).
+    auto add_raw(const int i, const int j, const std::size_t nrows, const std::size_t ncols, const Kind kind, const double *src) -> void;
+
     /// @brief Sets all block values to zero, keeping the block structure.
     auto zero() -> void;
 

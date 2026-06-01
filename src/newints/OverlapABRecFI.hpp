@@ -35,7 +35,6 @@
 
 #include "BasisFunction.hpp"
 #include "Point.hpp"
-#include "SparseMatrix.hpp"
 
 namespace ovlab {
 
@@ -47,13 +46,16 @@ namespace ovlab {
 /// @param ket The contracted GTO on centre B (angular momentum 6).
 /// @param bra_center Position of centre A.
 /// @param ket_center Position of centre B.
-/// @return Row-major (2 l_a + 1) × (2 l_b + 1) block of spherical overlap integrals.
+/// @param buffer Caller-owned, row-major (2 l_a + 1) × (2 l_b + 1) output
+///        buffer. The kernel writes every cell, so the caller need not
+///        pre-zero it.
 auto overlap_f_i(
     const CBasisFunction &bra,
     const CBasisFunction &ket,
     const TPoint<double> &bra_center,
-    const TPoint<double> &ket_center
-) -> newints::Block;
+    const TPoint<double> &ket_center,
+    double *buffer
+) -> void;
 
 }  // namespace ovlab
 

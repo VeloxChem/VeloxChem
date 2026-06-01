@@ -230,6 +230,18 @@ SparseMatrix::reserve(const std::size_t count) -> void
 }
 
 auto
+SparseMatrix::add_raw(const int i, const int j, const std::size_t nrows, const std::size_t ncols, const Kind kind, const double *src) -> void
+{
+    const auto n = payload_size(nrows, ncols, kind);
+
+    _meta.push_back(BlockMeta{i, j, static_cast<std::uint32_t>(nrows), static_cast<std::uint32_t>(ncols), _data.size(), kind});
+
+    _data.insert(_data.end(), src, src + n);
+
+    _sorted = false;
+}
+
+auto
 SparseMatrix::zero() -> void
 {
     std::ranges::fill(_data, 0.0);
