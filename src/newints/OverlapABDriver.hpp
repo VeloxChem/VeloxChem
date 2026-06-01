@@ -30,8 +30,8 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef newints_OverlapDriver_hpp
-#define newints_OverlapDriver_hpp
+#ifndef newints_OverlapABDriver_hpp
+#define newints_OverlapABDriver_hpp
 
 #include "SparseMatrix.hpp"
 
@@ -57,4 +57,4 @@ class OverlapDriver
 
 }  // namespace newints
 
-#endif /* newints_OverlapDriver_hpp */
+#endif /* newints_OverlapABDriver_hpp */

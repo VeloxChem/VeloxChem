@@ -30,7 +30,7 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "OverlapDriver.hpp"
+#include "OverlapABDriver.hpp"
 
 #include <omp.h>
 
@@ -38,6 +38,7 @@
 #include <cmath>
 #include <cstddef>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "AtomBasis.hpp"
@@ -113,9 +114,9 @@ overlap_screener(const CBasisFunction &bra,
                  const double          threshold) -> bool
 {
     // smallest exponents (exponents are stored in decreasing order -> last element)
-    const auto alpha = bra.get_exponents().back();
+    const auto alpha = bra.exponents().back();
 
-    const auto beta = ket.get_exponents().back();
+    const auto beta = ket.exponents().back();
 
     const auto gamma = alpha + beta;
 
@@ -158,13 +159,13 @@ overlap_kernel_diagonal(const CBasisFunction &bra, const CBasisFunction &ket) ->
 {
     const auto l = bra.get_angular_momentum();  // == ket angular momentum (caller guarantees l_a == l_b)
 
-    const auto exps_a = bra.get_exponents();
+    const auto &exps_a = bra.exponents();
 
-    const auto coefs_a = bra.get_normalization_factors();
+    const auto &coefs_a = bra.normalization_factors();
 
-    const auto exps_b = ket.get_exponents();
+    const auto &exps_b = ket.exponents();
 
-    const auto coefs_b = ket.get_normalization_factors();
+    const auto &coefs_b = ket.normalization_factors();
 
     // (2l - 1)!! with (-1)!! = 1
     auto dfact = 1.0;
@@ -324,7 +325,7 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
     // atom pairs, so insertion order does not affect the result)
     for (auto &buffer : buffers)
     {
-        for (const auto &[i, j, block] : buffer) matrix.add(i, j, block);
+        for (auto &[i, j, block] : buffer) matrix.add(i, j, std::move(block));
     }
 
     return matrix;

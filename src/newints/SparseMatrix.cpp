@@ -150,6 +150,35 @@ SparseMatrix::add(const int i, const int j, const Block &block) -> void
 }
 
 auto
+SparseMatrix::add(const Key &key, Block &&block) -> void
+{
+    const auto [i, j] = key;
+
+    if (_symmetry == SymmetryType::general)
+    {
+        _blocks[key] = std::move(block);
+    }
+    else if (i < j)
+    {
+        _blocks[key] = std::move(block);
+    }
+    else if (i > j)
+    {
+        _blocks[{j, i}] = transpose_block(block, _symmetry == SymmetryType::antisymmetric);
+    }
+    else  // i == j: diagonal block stored packed lower-triangular
+    {
+        _blocks[key] = pack_lower(block);
+    }
+}
+
+auto
+SparseMatrix::add(const int i, const int j, Block &&block) -> void
+{
+    add(Key{i, j}, std::move(block));
+}
+
+auto
 SparseMatrix::zero() -> void
 {
     std::ranges::for_each(_blocks, [](auto &entry) { std::ranges::fill(entry.second.data, 0.0); });

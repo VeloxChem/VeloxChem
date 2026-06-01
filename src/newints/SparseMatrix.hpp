@@ -150,6 +150,21 @@ class SparseMatrix
     /// @param block The full block of shell-pair integrals.
     auto add(const int i, const int j, const Block &block) -> void;
 
+    /// @brief Adds (inserts or overwrites) a block at the given key, moving it.
+    ///
+    /// Same canonicalization as the copying overload, but for the stored-as-given
+    /// cases (general, and i < j for sym/antisym) the block is moved instead of
+    /// copied, avoiding a heap allocation of its data vector.
+    /// @param key The (bra, ket) pair of contracted GTO indices.
+    /// @param block The full block of shell-pair integrals (consumed).
+    auto add(const Key &key, Block &&block) -> void;
+
+    /// @brief Adds (inserts or overwrites) a block at the given indices, moving it.
+    /// @param i The bra contracted GTO index.
+    /// @param j The ket contracted GTO index.
+    /// @param block The full block of shell-pair integrals (consumed).
+    auto add(const int i, const int j, Block &&block) -> void;
+
     /// @brief Sets all block values to zero, keeping the block structure.
     auto zero() -> void;
 
