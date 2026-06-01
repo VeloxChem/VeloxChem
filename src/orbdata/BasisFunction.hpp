@@ -117,14 +117,16 @@ class CBasisFunction
     auto get_normalization_factors() const -> std::vector<double>;
 
     /// @brief Gets a const reference to the exponents of primitive Gaussian
-    /// functions (non-copying accessor for hot integral kernels).
+    /// functions (non-copying accessor for hot integral kernels; inline so it
+    /// inlines across translation units).
     /// @return The const reference to the vector of exponents.
-    auto exponents() const -> const std::vector<double> &;
+    auto exponents() const -> const std::vector<double> & { return _exponents; }
 
     /// @brief Gets a const reference to the normalization factors of primitive
-    /// Gaussian functions (non-copying accessor for hot integral kernels).
+    /// Gaussian functions (non-copying accessor for hot integral kernels; inline
+    /// so it inlines across translation units).
     /// @return The const reference to the vector of normalization factors.
-    auto normalization_factors() const -> const std::vector<double> &;
+    auto normalization_factors() const -> const std::vector<double> & { return _norms; }
 
     /// @brief Gets angular momentum of basis function.
     /// @return The angular momentum of basis function.

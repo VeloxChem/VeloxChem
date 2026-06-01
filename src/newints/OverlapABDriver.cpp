@@ -103,6 +103,18 @@ namespace newints {
 
 namespace {
 
+/// @brief Integer power base^exp by repeated multiplication (cheaper than
+/// std::pow for the small exponents that occur here, l = 0..6 and l_a + l_b).
+inline auto
+ipow(const double base, const int exp) -> double
+{
+    auto result = 1.0;
+
+    for (int k = 0; k < exp; k++) result *= base;
+
+    return result;
+}
+
 /// @brief STUB: screening test for an off-diagonal (two-center) shell pair.
 /// Returns true if the shell-pair block must be computed. Its form will be
 /// defined in a later step; for now nothing is screened out.
@@ -140,7 +152,7 @@ overlap_screener(const CBasisFunction &bra,
     // coarse overlap estimate using the smallest-exponent Gaussian pair
     const auto pg = mathconst::pi_value() / gamma;
 
-    const auto estimate = pg * std::sqrt(pg) * std::max(1.0, std::pow(rab, lsum)) * std::exp(-alpha * beta / gamma * r2);
+    const auto estimate = pg * std::sqrt(pg) * std::max(1.0, ipow(rab, lsum)) * std::exp(-alpha * beta / gamma * r2);
 
     return estimate >= threshold;
 }
@@ -184,7 +196,9 @@ overlap_diagonal_value(const CBasisFunction &bra, const CBasisFunction &ket) -> 
         {
             const auto p = exps_a[i] + exps_b[j];
 
-            sab += coefs_a[i] * coefs_b[j] * std::pow(pi / p, 1.5) * dfact / (two_l * std::pow(static_cast<double>(p), l));
+            const auto pq = pi / p;  // (pi/p)^{3/2} = (pi/p) * sqrt(pi/p)
+
+            sab += coefs_a[i] * coefs_b[j] * pq * std::sqrt(pq) * dfact / (two_l * ipow(p, l));
         }
     }
 
@@ -271,6 +285,14 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
     };
 
     std::vector<ThreadArena> arenas(static_cast<std::size_t>(omp_get_max_threads()));
+
+    // light warmup of each thread's arena to skip the first few reallocations
+    for (auto &arena : arenas)
+    {
+        arena.data.reserve(1u << 14);
+
+        arena.meta.reserve(1u << 10);
+    }
 
     const auto npairs = static_cast<int>(atom_pairs.size());
 
@@ -360,9 +382,18 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
     // pairs, so insertion order does not affect the result)
     std::size_t total = 0;
 
-    for (const auto &arena : arenas) total += arena.meta.size();
+    std::size_t total_data = 0;
+
+    for (const auto &arena : arenas)
+    {
+        total += arena.meta.size();
+
+        total_data += arena.data.size();
+    }
 
     matrix.reserve(total);
+
+    matrix.reserve_data(total_data);
 
     for (const auto &arena : arenas)
     {

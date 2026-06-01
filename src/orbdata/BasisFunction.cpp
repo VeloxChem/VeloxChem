@@ -192,18 +192,6 @@ CBasisFunction::get_normalization_factors() const -> std::vector<double>
 }
 
 auto
-CBasisFunction::exponents() const -> const std::vector<double> &
-{
-    return _exponents;
-}
-
-auto
-CBasisFunction::normalization_factors() const -> const std::vector<double> &
-{
-    return _norms;
-}
-
-auto
 CBasisFunction::get_angular_momentum() const -> int
 {
     return _angular_momentum;

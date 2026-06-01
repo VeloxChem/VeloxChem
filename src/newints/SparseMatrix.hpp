@@ -156,6 +156,12 @@ class SparseMatrix
     /// @param count The expected number of blocks.
     auto reserve(const std::size_t count) -> void;
 
+    /// @brief Reserves capacity in the data arena for the given number of values,
+    /// avoiding reallocations when the total payload size is known (e.g. before a
+    /// bulk merge).
+    /// @param values The expected total number of stored doubles.
+    auto reserve_data(const std::size_t values) -> void;
+
     /// @brief Appends a pre-canonicalized block by copying its payload from a raw
     /// pointer into the data arena. The caller is responsible for canonicalization
     /// (for sym/antisym: i <= j, and a diagonal block already packed lower-

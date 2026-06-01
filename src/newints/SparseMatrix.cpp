@@ -230,6 +230,12 @@ SparseMatrix::reserve(const std::size_t count) -> void
 }
 
 auto
+SparseMatrix::reserve_data(const std::size_t values) -> void
+{
+    _data.reserve(values);
+}
+
+auto
 SparseMatrix::add_raw(const int i, const int j, const std::size_t nrows, const std::size_t ncols, const Kind kind, const double *src) -> void
 {
     const auto n = payload_size(nrows, ncols, kind);
