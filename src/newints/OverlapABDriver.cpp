@@ -258,6 +258,19 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
 
     const auto natoms = static_cast<int>(outline.number_of_atoms());
 
+    // cache each atom's shells and contracted-GTO indices once, so the atom-pair
+    // loop reads them by reference instead of reallocating these vectors on every
+    // iteration (an atom appears in many pairs)
+    std::vector<std::vector<CBasisFunction>> atom_shells(natoms);
+
+    std::vector<std::vector<int>> atom_indices(natoms);
+
+    for (int a = 0; a < natoms; a++)
+    {
+        atom_shells[a]  = atom_bases[basis_indices[a]].basis_functions();
+        atom_indices[a] = outline.basis_function_indices(a);
+    }
+
     // flatten the triangular atom-pair loop (bra atom a <= ket atom b) into a work list
     std::vector<std::pair<int, int>> atom_pairs;
 
@@ -307,9 +320,9 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
 
         auto &arena = arenas[static_cast<std::size_t>(omp_get_thread_num())];
 
-        const auto bra_shells = atom_bases[basis_indices[a]].basis_functions();
+        const auto &bra_shells = atom_shells[a];
 
-        const auto bra_idx = outline.basis_function_indices(a);
+        const auto &bra_idx = atom_indices[a];
 
         if (a == b)
         {
@@ -351,9 +364,9 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
         else
         {
             // different atoms: all (l, l') shell pairs, screened
-            const auto ket_shells = atom_bases[basis_indices[b]].basis_functions();
+            const auto &ket_shells = atom_shells[b];
 
-            const auto ket_idx = outline.basis_function_indices(b);
+            const auto &ket_idx = atom_indices[b];
 
             for (std::size_t p = 0; p < bra_shells.size(); p++)
             {
