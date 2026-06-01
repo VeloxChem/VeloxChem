@@ -42,6 +42,7 @@
 #include "DenseMatrix.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularBasisOutline.hpp"
+#include "KineticEnergyABDriver.hpp"
 #include "Molecule.hpp"
 #include "OverlapABDriver.hpp"
 #include "SparseMatrix.hpp"
@@ -142,6 +143,16 @@ export_newints(py::module &m) -> void
         .def("compute",
              &newints::OverlapDriver::compute,
              "Computes two-center overlap matrix for given molecule and basis.",
+             "molecule"_a,
+             "basis"_a,
+             "threshold"_a);
+
+    // newints::KineticEnergyDriver class
+    PyClass<newints::KineticEnergyDriver>(sub, "KineticEnergyDriver")
+        .def(py::init<>())
+        .def("compute",
+             &newints::KineticEnergyDriver::compute,
+             "Computes two-center kinetic-energy matrix for given molecule and basis.",
              "molecule"_a,
              "basis"_a,
              "threshold"_a);
