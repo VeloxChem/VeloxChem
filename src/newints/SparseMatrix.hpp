@@ -35,6 +35,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <new>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -43,6 +45,52 @@ class CMolecularBasis;
 class CDenseMatrix;
 
 namespace newints {
+
+/// @brief Allocator that default-initializes (does NOT value-initialize) elements,
+/// so resizing leaves new entries uninitialized instead of zeroing them. Used for
+/// the storage that a parallel merge fills in full afterward, avoiding a redundant
+/// serial memset of the whole arena.
+template <typename T>
+class DefaultInitAllocator
+{
+   public:
+    using value_type = T;
+
+    DefaultInitAllocator() noexcept = default;
+
+    template <typename U>
+    DefaultInitAllocator(const DefaultInitAllocator<U> &) noexcept
+    {
+    }
+
+    auto allocate(const std::size_t n) -> T * { return std::allocator<T>{}.allocate(n); }
+
+    auto deallocate(T *const p, const std::size_t n) noexcept -> void { std::allocator<T>{}.deallocate(p, n); }
+
+    template <typename U>
+    auto construct(U *const p) noexcept -> void
+    {
+        ::new (static_cast<void *>(p)) U;  // default-initialization: no zeroing
+    }
+
+    template <typename U, typename A>
+    auto construct(U *const p, A &&arg) -> void
+    {
+        ::new (static_cast<void *>(p)) U(std::forward<A>(arg));
+    }
+};
+
+template <typename T, typename U>
+auto operator==(const DefaultInitAllocator<T> &, const DefaultInitAllocator<U> &) noexcept -> bool
+{
+    return true;
+}
+
+template <typename T, typename U>
+auto operator!=(const DefaultInitAllocator<T> &, const DefaultInitAllocator<U> &) noexcept -> bool
+{
+    return false;
+}
 
 /// @brief Enumerates the symmetry of a sparse matrix.
 enum class SymmetryType
@@ -172,14 +220,26 @@ class SparseMatrix
         Kind kind;
     };
 
-    /// @brief Bulk-appends a caller-built data arena and its block descriptors,
-    /// copying the whole arena in one memcpy and rebasing each descriptor's offset.
-    /// The caller is responsible for canonicalization (for sym/antisym: i <= j, and
-    /// a diagonal block already packed lower-triangular). Lets drivers build blocks
-    /// in per-thread arenas and merge them without per-block calls or copies.
-    /// @param data The contiguous payloads of all blocks in `metas`.
-    /// @param metas The block descriptors, with offsets into `data`.
-    auto append_arena(const std::vector<double> &data, const std::vector<RawBlock> &metas) -> void;
+    /// @brief Allocates storage for a known number of blocks and total payload
+    /// doubles, leaving both uninitialized (the caller fills every entry via a
+    /// parallel merge). Pairs with data() and set_block().
+    /// @param nblocks The total number of blocks.
+    /// @param ndata The total number of payload doubles across all blocks.
+    auto prepare(const std::size_t nblocks, const std::size_t ndata) -> void;
+
+    /// @brief Writable pointer to the contiguous data arena (size ndata from the
+    /// last prepare()); the caller writes each block's payload at its global offset.
+    /// @return The data arena pointer.
+    auto data() -> double * { return _data.data(); }
+
+    /// @brief Sets the descriptor of block k (0 <= k < nblocks from prepare()) from
+    /// a pre-canonicalized RawBlock whose offset is the GLOBAL offset into data().
+    /// Disjoint k may be written concurrently. @param k The block index.
+    /// @param rb The block descriptor (global offset).
+    auto set_block(const std::size_t k, const RawBlock &rb) -> void
+    {
+        _meta[k] = BlockMeta{rb.i, rb.j, static_cast<std::uint32_t>(rb.nrows), static_cast<std::uint32_t>(rb.ncols), rb.offset, rb.kind};
+    }
 
     /// @brief Sets all block values to zero, keeping the block structure.
     auto zero() -> void;
@@ -237,14 +297,16 @@ class SparseMatrix
     SymmetryType _symmetry;
 
     /// @brief Per-block descriptors; sorted by key once a query needs ordering.
-    mutable std::vector<BlockMeta> _meta;
+    /// Non-zeroing allocator: prepare() resizes it and the parallel merge fills it.
+    mutable std::vector<BlockMeta, DefaultInitAllocator<BlockMeta>> _meta;
 
     /// @brief Whether _meta is currently sorted and deduplicated.
     mutable bool _sorted;
 
     /// @brief Contiguous arena holding every block's payload back-to-back. One
-    /// allocation instead of a heap vector per block.
-    std::vector<double> _data;
+    /// allocation instead of a heap vector per block; non-zeroing allocator so the
+    /// parallel merge (which writes every entry) is not preceded by a memset.
+    std::vector<double, DefaultInitAllocator<double>> _data;
 };
 
 }  // namespace newints

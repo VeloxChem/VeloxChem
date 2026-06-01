@@ -37,7 +37,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
-#include <tuple>
+#include <cstring>
 #include <utility>
 #include <vector>
 
@@ -385,24 +385,42 @@ OverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, 
         }
     }
 
-    // serial bulk merge: append each thread's blocks (keys are disjoint across atom
-    // pairs, so insertion order does not affect the result)
-    std::size_t total = 0;
+    // per-thread base offsets into the merged storage (serial, O(nthreads));
+    // the heavy payload/descriptor copy is parallelized below
+    const std::size_t nt = arenas.size();
 
-    std::size_t total_data = 0;
+    std::vector<std::size_t> data_base(nt + 1, 0);
 
-    for (const auto &arena : arenas)
+    std::vector<std::size_t> meta_base(nt + 1, 0);
+
+    for (std::size_t t = 0; t < nt; t++)
     {
-        total += arena.meta.size();
+        data_base[t + 1] = data_base[t] + arenas[t].data.size();
 
-        total_data += arena.data.size();
+        meta_base[t + 1] = meta_base[t] + arenas[t].meta.size();
     }
 
-    matrix.reserve(total);
+    matrix.prepare(meta_base[nt], data_base[nt]);
 
-    matrix.reserve_data(total_data);
+    double *const dst = matrix.data();
 
-    for (const auto &arena : arenas) matrix.append_arena(arena.data, arena.meta);
+    // parallel merge: each thread copies its arena into a disjoint slice of the
+    // matrix data and fills its disjoint range of block descriptors (no serial
+    // bottleneck beyond the prefix sums above)
+#pragma omp parallel for schedule(static)
+    for (int t = 0; t < static_cast<int>(nt); t++)
+    {
+        const auto &arena = arenas[static_cast<std::size_t>(t)];
+
+        if (!arena.data.empty()) std::memcpy(dst + data_base[t], arena.data.data(), arena.data.size() * sizeof(double));
+
+        auto m = meta_base[t];
+
+        for (const auto &rb : arena.meta)
+        {
+            matrix.set_block(m++, SparseMatrix::RawBlock{rb.i, rb.j, rb.nrows, rb.ncols, data_base[t] + rb.offset, rb.kind});
+        }
+    }
 
     return matrix;
 }

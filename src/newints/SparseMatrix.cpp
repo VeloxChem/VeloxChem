@@ -135,7 +135,7 @@ SparseMatrix::ensure_sorted() const -> void
 
     // collapse duplicate keys, keeping the most recently added (stable_sort kept
     // insertion order within an equal-key run, so the last occurrence wins)
-    std::vector<BlockMeta> unique;
+    decltype(_meta) unique;
 
     unique.reserve(_meta.size());
 
@@ -236,17 +236,12 @@ SparseMatrix::reserve_data(const std::size_t values) -> void
 }
 
 auto
-SparseMatrix::append_arena(const std::vector<double> &data, const std::vector<RawBlock> &metas) -> void
+SparseMatrix::prepare(const std::size_t nblocks, const std::size_t ndata) -> void
 {
-    const auto base = _data.size();
+    // both allocators are non-zeroing; the caller fills every entry via the merge
+    _meta.resize(nblocks);
 
-    // one bulk copy of the whole arena (no per-block insert overhead)
-    _data.insert(_data.end(), data.begin(), data.end());
-
-    for (const auto &m : metas)
-    {
-        _meta.push_back(BlockMeta{m.i, m.j, static_cast<std::uint32_t>(m.nrows), static_cast<std::uint32_t>(m.ncols), base + m.offset, m.kind});
-    }
+    _data.resize(ndata);
 
     _sorted = false;
 }
