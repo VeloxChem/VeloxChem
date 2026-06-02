@@ -84,11 +84,11 @@ class XPSDriver:
         # Core orbital energy ranges (in Hartree) for different elements and methods
         # Based on typical Hartree-Fock calculations
         self.energy_ranges_hf = {
-            'C': (-11.5, -11.0),
-            'N': (-15.7, -15.6),
-            'O': (-20.7, -20.5),
-            'F': (-26.4, -26.3),
-            'S': (-92.0, -91.0),
+            'C': (-11.8, -10.8),
+            'N': (-15.9, -15.2),
+            'O': (-21.2, -20.2),
+            'F': (-26.9, -26.1),
+            'S': (-92.0, -89.0),
         }
 
         # Based on typical DFT (B3LYP/PBE) calculations
