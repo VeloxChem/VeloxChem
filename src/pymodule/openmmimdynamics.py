@@ -36,11 +36,8 @@ from time import time
 from xml.dom import minidom
 import xml.etree.ElementTree as ET
 import numpy as np
-import json
-import h5py
 import sys
 from sys import stdout
-import math
 import random
 from copy import deepcopy
 
@@ -139,8 +136,8 @@ class OpenMMIMDynamics:
 
 
         # MPI information (based on control communicator)
-        self.rank = self._mpi_ctrl_comm.Get_rank()
-        self.nodes = self._mpi_ctrl_comm.Get_size()
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
 
         # output stream
         self.ostream = ostream
@@ -377,168 +374,24 @@ class OpenMMIMDynamics:
         self.qm_symmetry_datapoint_dict[root] = {}
         self.sorted_state_spec_im_labels[root] = []
 
-        old_label = None
-
         for label in im_labels:
             qm_data_point = InterpolationDatapoint(self.roots_z_matrix[root])
             qm_data_point.update_settings(self.interpolation_settings[root])
             qm_data_point.read_hdf5(self.interpolation_settings[root]['imforcefield_file'], label)
             qm_data_point.inv_sqrt_masses = inv_sqrt_masses
-            
-            if qm_data_point.bank_role == "core" or "cluster" not in qm_data_point.point_label and "symmetry" not in qm_data_point.point_label:
+
+            self.qm_data_point_dict[root].append(qm_data_point)
+            self.sorted_state_spec_im_labels[root].append(label)
 
 
-                self.qm_data_point_dict[root].append(qm_data_point)
-                self.sorted_state_spec_im_labels[root].append(label)
-
-                old_label = qm_data_point.point_label
-                self.qm_symmetry_datapoint_dict[root][old_label] = [qm_data_point]
-            elif qm_data_point.bank_role == "symmetry":
-
-                self.qm_symmetry_datapoint_dict[root][old_label].append(qm_data_point)
-
-        driver_object.qm_symmetry_data_points = self.qm_symmetry_datapoint_dict[root]
         driver_object.qm_data_points = self.qm_data_point_dict[root]
         driver_object.labels = self.sorted_state_spec_im_labels[root]
-        
-        print(len(self.qm_data_point_dict[root]), driver_object.impes_coordinate.eq_bond_lengths, self.qm_data_point_dict[root][0].eq_bond_lengths)
+
         if len(self.qm_data_point_dict[root]) > 0:
             driver_object.impes_coordinate.eq_bond_lengths = self.qm_data_point_dict[root][0].eq_bond_lengths
 
         driver_object.mark_runtime_data_cache_dirty()
-        driver_object.prepare_runtime_data_cache(force=True)
 
-    def _load_rotor_cluster_bank_for_root(self, root):
-        out = {}
-        imff_file = self.interpolation_settings[root]["imforcefield_file"]
-        families = self._list_rotor_cluster_families_from_registry(root)
-
-        for family in families:
-            cluster_info, angle_library, point_index = self._read_cluster_registry_for_family(
-                imff_file, root, family
-            )
-            fam = {
-                "cluster_info": cluster_info,
-                "cluster_angle_library": angle_library,
-                "point_index": point_index,
-                "core": None,
-                "clusters": {
-                    cid: {
-                        "cluster_type": cluster.cluster_type,
-                        "rotor_ids": tuple(cluster.rotor_ids),
-                        "expected_states": {state.state_id: None for state in angle_library.state_banks[cid]},
-                    }
-                    for cid, cluster in cluster_info.clusters.items()
-                },
-            }
-
-            core_dp = InterpolationDatapoint(self.roots_z_matrix[root])
-            core_dp.update_settings(self.interpolation_settings[root])
-            core_dp.read_hdf5(imff_file, point_index["core_label"])
-            fam["core"] = core_dp
-
-            for cid, state_map in point_index["cluster_state_labels"].items():
-                for sid, label in state_map.items():
-                    dp = InterpolationDatapoint(self.roots_z_matrix[root])
-                    dp.update_settings(self.interpolation_settings[root])
-                    dp.read_hdf5(imff_file, label)
-                    fam["clusters"][cid]["expected_states"][sid] = dp
-
-            for cid, cbank in fam["clusters"].items():
-                expected = cbank["expected_states"]
-                if 0 in expected and expected[0] is None:
-                    expected[0] = fam["core"]
-
-            out[family] = fam
-        return out
-    
-    def _list_rotor_cluster_families_from_registry(self, root):
-        imff_file = self.interpolation_settings[root]["imforcefield_file"]
-        prefix = f"rotor_cluster_registry/root_{root}"
-        with h5py.File(imff_file, "r") as h5f:
-            if prefix not in h5f:
-                return []
-            return sorted(name.replace("family_", "", 1) for name in h5f[prefix].keys())
-
-
-    def _read_cluster_registry_for_family(self, imff_file, root, family_label):
-        def _read_scalar_string(ds):
-            val = ds[()]
-            return val.decode("utf-8") if isinstance(val, bytes) else str(val)
-
-        with h5py.File(imff_file, "r") as h5f:
-            prefix = f"rotor_cluster_registry/root_{root}/family_{family_label}"
-            info_json = _read_scalar_string(h5f[prefix + "/cluster_info_json"])
-            library_json = _read_scalar_string(h5f[prefix + "/cluster_angle_library_json"])
-            index_json = _read_scalar_string(h5f[prefix + "/point_index_json"])
-
-        info_payload = json.loads(info_json)
-        library_payload = json.loads(library_json)
-        index_payload = json.loads(index_json)
-        
-        rotor_to_cluster_map = {
-            int(rid): int(cid) for rid, cid in info_payload["rotor_to_cluster"].items()
-        }
-        cluster_info = RotorClusterInformation(
-            dihedral_start=int(info_payload["dihedral_start"]),
-            dihedral_end=int(info_payload["dihedral_end"]),
-            rotor_to_cluster=rotor_to_cluster_map,
-        )
-        for rotor_id, rotor_data in info_payload["rotors"].items():
-            cluster_info.rotors[int(rotor_id)] = RotorDefinition(
-                rotor_id=int(rotor_id),
-                center=tuple(rotor_data["center"]),
-                torsion_rows=tuple(rotor_data["torsion_rows"]),
-                torsion_coords=tuple(tuple(x) for x in rotor_data["torsion_coords"]),
-                symmetry_order=int(rotor_data["symmetry_order"]),
-                atom_group=tuple(rotor_data["atom_group"]),
-            )
-        for cid, cdata in info_payload["clusters"].items():
-            cluster_info.clusters[int(cid)] = RotorClusterDefinition(
-                cluster_id=int(cid),
-                rotor_ids=tuple(cdata["rotor_ids"]),
-                cluster_type=cdata["cluster_type"],
-                torsion_rows=tuple(cdata["torsion_rows"]),
-            )
-
-        angle_library = RotorClusterAngleLibrary()
-        for cid, state_list in library_payload.items():
-            bank = []
-            for state in state_list:
-                aa = {}
-                for key, val in state["angle_assignment"].items():
-                    aa[tuple(int(x) for x in key.split(","))] = float(val)
-                bank.append(
-                    RotorClusterStateDefinition(
-                        cluster_id=int(cid),
-                        state_id=int(state["state_id"]),
-                        cluster_type=state["cluster_type"],
-                        rotor_ids=tuple(state["rotor_ids"]),
-                        angle_assignment=aa,
-                        dihedrals_to_rotate=(
-                            None
-                            if state["dihedrals_to_rotate"] is None
-                            else tuple(tuple(int(x) for x in row) for row in state["dihedrals_to_rotate"])
-                        ),
-                        phase_signature=(
-                            None if state["phase_signature"] is None
-                            else np.asarray(state["phase_signature"], dtype=np.float64)
-                        ),
-                        is_anchor=bool(state.get("is_anchor", False)),
-                        label_suffix=str(state.get("label_suffix", "")),
-                    )
-                )
-            angle_library.state_banks[int(cid)] = tuple(bank)
-
-        point_index = {
-            "family_label": index_payload["family_label"],
-            "core_label": index_payload["core_label"],
-            "cluster_state_labels": {
-                int(cid): {int(sid): lbl for sid, lbl in smap.items()}
-                for cid, smap in index_payload["cluster_state_labels"].items()
-            },
-        }
-        return cluster_info, angle_library, point_index
 
     def run_immm(self, 
                  roots_to_follow=[0],
@@ -605,7 +458,6 @@ class OpenMMIMDynamics:
         self.qm_data_point_dict = {root: [] for root in self.roots_to_follow}
         self.sorted_state_spec_im_labels = {root: [] for root in self.roots_to_follow}
         self.root_spec_molecules = {root: [] for root in self.roots_to_follow}
-        self.qm_rotor_cluster_banks = {root: {} for root in self.roots_to_follow}
         self.im_drivers = {root: None for root in self.roots_to_follow}
         self.interpolation_settings = interpolation_settings_dict
         masses = self.molecule.get_masses().copy()
@@ -628,14 +480,7 @@ class OpenMMIMDynamics:
            
             self.im_drivers[root] = driver_object
             self._reload_interpolation_root_from_hdf5(root, inv_sqrt_masses)
-            self.qm_rotor_cluster_banks[root] = self._load_rotor_cluster_bank_for_root(root)
-            driver_object.qm_rotor_cluster_banks = self.qm_rotor_cluster_banks[root]
-            if driver_object.qm_rotor_cluster_banks:
-                first_family = next(iter(driver_object.qm_rotor_cluster_banks.values()))
-                driver_object.rotor_cluster_information = first_family.get("cluster_info")
-            else:
-                driver_object.rotor_cluster_information = None
-            print('In set up', driver_object.rotor_cluster_information)
+
             # Set the object as an attribute of the instance
             setattr(self, attribute_name, driver_object)
             # Append the object to the list
@@ -2060,7 +1905,7 @@ class OpenMMIMDynamics:
             if root >= 2 and len(self.symmetry_information['es']) == 0 and self.drivers['es']:
                 non_core_atoms = [element for group in regrouped['es'] for element in group]
                 core_atoms = [element for element in symmetry_groups[0] if element not in non_core_atoms]
-                print(rot_groups['es'], rotatable_bonds_zero_based)
+
                 angles_to_set, _, _, self.symmetry_dihedral_lists, dih_list = self._adjust_symmetry_dihedrals(molecule, rot_groups['es'], rotatable_bonds_zero_based,  self.roots_z_matrix[root])
                 dihedrals_to_set = {key: [] for key in angles_to_set.keys()}
                 indices_list = []
@@ -2103,26 +1948,6 @@ class OpenMMIMDynamics:
 
         return z_matrix
         
-    def perform_symmetry_assignment(self, atom_map, sym_group, reference_group, datapoint_group):
-        """ Performs the atom mapping. """
-        from scipy.optimize import linear_sum_assignment
-        new_map = np.array(atom_map.copy())
-        mapping_dict = {}
-        # cost = self.get_dihedral_cost(atom_map, sym_group, non_group_atoms)
-        cost = np.linalg.norm(datapoint_group[:, np.newaxis, :] - reference_group[np.newaxis, :, :], axis=2)
-        row, col = linear_sum_assignment(cost)
-        assigned = False
-        if not np.equal(row, col).all():
-            assigned = True
-            
-            # atom_maps = self.linear_assignment_solver(cost)
-
-            reordred_arr = np.array(sym_group)[col]
-            new_map[sym_group] = new_map[reordred_arr]
-
-            mapping_dict = {org: new for org, new in zip(np.array(sym_group), reordred_arr)}
-        
-        return mapping_dict
 
     def _adjust_symmetry_dihedrals(self, molecule, symmetry_groups, rot_bonds, z_matrix):
         

@@ -94,20 +94,6 @@ class IMTrustRadiusOptimizer:
         else:
             self.cluster_banks = {}
 
-        # self._pool = ProcessPoolExecutor(
-        #     max_workers=(n_workers or os.cpu_count() or 2),
-        #     initializer=_init_worker,
-        #     initargs=(
-        #         z_matrix, impes_dict, sym_dict, self.cluster_banks,
-        #         dps, self.idx, exponent_p_q, self.beta, self.e_x,
-        #         self.structures, self.qm_e, self.qm_g_flat,
-        #     )
-        # _init_worker(
-        #     z_matrix, impes_dict, sym_dict, self.cluster_banks,
-        #     dps, self.idx, exponent_p_q, self.beta, self.e_x,
-        #     self.structures, self.qm_e, self.qm_g_flat,
-        # )
-
         self._init_worker_state(exponent_p_q)
 
         self._cache_key = None
@@ -121,9 +107,6 @@ class IMTrustRadiusOptimizer:
 
         This replaces the global _W dictionary in serial mode.
         """
-
-        # os.environ["OMP_NUM_THREADS"] = "1"
-        # os.environ["MKL_NUM_THREADS"] = "1"
 
         driver = InterpolationDriver(self.z_matrix)
         driver.update_settings(self.impes_dict)
@@ -150,17 +133,6 @@ class IMTrustRadiusOptimizer:
             "qm_e": np.asarray(self.qm_e, dtype=np.float64),
             "qm_g_flat": np.asarray(self.qm_g_flat, dtype=np.float64),
         }
-
-        # _W["driver"] = driver
-        # _W["idx"]    = np.asarray(idx, dtype=int)
-        # _W["nsub"]   = len(idx)
-        # _W["beta"]   = float(beta)
-        # _W["e_x"]    = float(e_x)
-        # _W["conv"]   = float(hartree_in_kcalpermol())
-        # _W["structures"] = tuple(structures)
-        # _W["qm_e"] = np.asarray(qm_e, dtype=np.float64)
-        # _W["qm_g_flat"] = np.asarray(qm_g_flat, dtype=np.float64)
-
 
     def _eval_structure(self, payload):
         """Compute loss and grad contrib for one structure index."""
@@ -323,127 +295,6 @@ class IMTrustRadiusOptimizer:
 
         dG_dα_sub = term1 + term2 - term3
         
-        # Vectorized getters (M, MxD, etc.)
-        # P       = np.asarray(drv.potentials, dtype=np.float64)                # (M,)
-        # G       = np.asarray(drv.gradients, dtype=np.float64).reshape(len(P), -1)  # (M,D)
-        # w_dα    = np.asarray(drv.dw_dalpha_list, dtype=np.float64)                  # (M,)
-        # w_x_alpha     = np.asarray(drv.dw_dX_dalpha_list, dtype=np.float64).reshape(len(P), -1) # (M,D)
-        # S = float(getattr(drv, "raw_sum_of_weights", drv.sum_of_weights))
-        # S_x = np.asarray(drv.sum_of_weights_grad, dtype=np.float64).reshape(-1)
-
-        # used_weight_fallback = bool(
-        #     getattr(
-        #         drv,
-        #         "used_weight_fallback",
-        #         (not np.isfinite(S)) or (S <= 1.0e-12),
-        #     )
-        # )
-
-        # weight_eps = float(getattr(drv, "weight_eps", 1.0e-12))
-        # # Residuals in kcal/mol
-        # dE_res  = (E_interp - E_qm) * conv                                          # ()
-
-        # # ----- loss (your anisotropic force term) -----
-        # g_sub   = (G_interp[idx] - G_qm_flat[idx]) * conv / bohr_in_angstrom()   # (nsub,) in kcal/mol/Angstrom
-
-        # h_sub   = (G_qm_flat[idx]) * conv / bohr_in_angstrom()   # (nsub,) in kcal/mol/Angstrom
-        # nh      = np.linalg.norm(h_sub)
-        # L_iso   = (g_sub @ g_sub) / nsub
-
-        # if nh > 1e-8:
-        #     u    = h_sub / nh
-        #     tau  = 1e-8
-        #     gate = (nh*nh) / (nh*nh + tau*tau)
-        #     gpar = (u @ g_sub) * u
-        #     gper = g_sub - gpar
-        #     L_e   = dE_res**2
-        #     L_per = (gper @ gper) / nsub
-        #     L_par = (u @ g_sub)**2
-        #     L_F   = gate * (beta * L_per + (1.0 - beta) * L_par) + (1.0 - gate) * L_iso
-        # else:
-        #     L_e = dE_res**2
-        #     L_F = L_iso
-
-        # loss_s = 1.0 * e_x * L_e + 0.5 * (1.0 - e_x) * L_F
-        
-        # # ----- gradient wrt alphas (vector length M) -----
-        # # dE/dα
-        # # dE_dα = (w_dα * (P - E_interp)) * (conv / S)                                 # (M,)
-
-        # # # dG/dα only on relevant coordinates (matrix M x nsub), all in kcal/mol
-        # # G_sub = G[:, idx]
-        # # G_interp_sub = G_interp[idx]
-        # # w_x_alpha_sub = w_x_alpha[:, idx]
-        # # S_x_sub = S_x[idx]
-        # # term1 = (w_x_alpha_sub * (P - E_interp)[:, None]) * (conv/bohr_in_angstrom() / S)                  # (M,nsub)
-        # # term2 = (w_dα[:, None] * (G_sub - G_interp_sub[None, :])) * (conv/bohr_in_angstrom() / S)          # (M,nsub)
-        # # term3 = ((w_dα * (P - E_interp)) / (S**2))[:, None] * (conv/bohr_in_angstrom() * S_x_sub[None, :]) # (M,nsub)
-        # # dG_dα_sub = term1 + term2 - term3                                                # (M,nsub)
-
-        # # dE/dα and dG/dα
-        # #
-        # # The formulas below are valid only for the standard Shepard branch:
-        # #
-        # #     W_i = w_i / S
-        # #
-        # # If InterpolationDriver used the fallback branch:
-        # #
-        # #     W_i = 1 / n_pts
-        # #     grad_W_i = 0
-        # #
-        # # then dividing by raw S is mathematically invalid.
-        # # During trust-radius optimization, fallback should be treated as an invalid
-        # # alpha vector because it means the current alphas provide no Shepard support
-        # # for this reference structure.
-
-        # G_sub = G[:, idx]
-        # G_interp_sub = G_interp[idx]
-        # w_x_alpha_sub = w_x_alpha[:, idx]
-        # S_x_sub = S_x[idx]
-
-        # if used_weight_fallback or (not np.isfinite(S)) or (S <= weight_eps):
-        #     # Strong recommendation for trust-radius optimization:
-        #     # reject this alpha vector by returning a large penalty.
-        #     #
-        #     # The negative gradient pushes alpha upward because optimizers step roughly
-        #     # along -gradient. Thus a negative dL/dalpha favors increasing alpha.
-        #     penalty = 1.0e20
-        #     grad_penalty = -1.0e4 * np.ones(self.M, dtype=np.float64)
-
-        #     return float(penalty), grad_penalty, float(penalty), float(penalty)
-
-        # else:
-        #     invS = 1.0 / S
-        #     invS2 = invS * invS
-
-        #     # dE/dalpha_j = dw_j/dalpha_j * (P_j - E) / S
-        #     dE_dα = (w_dα * (P - E_interp)) * (conv * invS)
-
-        #     # dG/dalpha_j in the selected Cartesian subspace.
-        #     #
-        #     # This matches the derivative of:
-        #     #
-        #     # G = sum_i W_i G_i + sum_i P_i grad_X W_i
-        #     #
-        #     # under the standard normalized-weight branch.
-        #     term1 = (
-        #         w_x_alpha_sub * (P - E_interp)[:, None]
-        #     ) * (conv / bohr_in_angstrom() * invS)
-
-        #     term2 = (
-        #         w_dα[:, None] * (G_sub - G_interp_sub[None, :])
-        #     ) * (conv / bohr_in_angstrom() * invS)
-
-        #     term3 = (
-        #         (w_dα * (P - E_interp))[:, None]
-        #         * (conv / bohr_in_angstrom())
-        #         * S_x_sub[None, :]
-        #         * invS2
-        #     )
-
-        #     dG_dα_sub = term1 + term2 - term3
-
-        # dL/dg in subspace
         if nh > 1e-8:
             dL_dg_sub = (2.0 * gate) * ((beta/nsub)*(gper) + (1.0 - beta)*(gpar)) + (2.0 * (1.0 - gate) / nsub) * g_sub
         else:
@@ -498,12 +349,7 @@ class IMTrustRadiusOptimizer:
             'loss_energy': mean_energy,
             'loss_force': mean_force,
         }
-        if self.verbose:
-            print(
-                'loss function',
-                mean_loss,
-                f"(energy={mean_energy:.6f}, force={mean_force:.6f})"
-            )
+    
 
         return mean_loss
 

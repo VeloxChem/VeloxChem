@@ -30,16 +30,19 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from mpi4py import MPI
 from contextlib import redirect_stderr
 from io import StringIO
 import numpy as np
 import h5py
 from time import time
+from sys import stdout
 
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes)
+from .outputstream import OutputStream
+from .veloxchemlib import mpi_master
 
-from .mmforcefieldgenerator import MMForceFieldGenerator
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -77,21 +80,24 @@ class InterpolationDatapoint:
           cosine of radians (dihedral angles).
     """
 
-    def __init__(self, z_matrix=None, atom_labels=None):
+    def __init__(self, z_matrix=None, atom_labels=None, comm=None, ostream=None):
         """
         Initializes the InterpolationDatapoint object.
 
         :param z_matrix: a list of tuples with atom indices (starting at 0)
         that define bonds, bond angles, and dihedral angles.
         """
-        # if comm is None:
-        #     comm = MPI.COMM_WORLD
+        if comm is None:
+            comm = MPI.COMM_WORLD
 
-        # if ostream is None:
-        #     ostream = OutputStream(sys.stdout)
+        if ostream is None:
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(stdout)
+            else:
+                ostream = OutputStream(None)
 
-        # self.comm = None
-        # self.ostream = ostream
+        self.comm = None
+        self.ostream = ostream
 
         self.point_label = None
 
@@ -453,22 +459,6 @@ class InterpolationDatapoint:
         
         # Critical assertion, check that the remaining positive values are equal to dimension (3N-6)
         number_of_positive_values = np.count_nonzero(s_inv)
-        
-        # If more elements are zero than allowed, restore the largest ones
-        if number_of_positive_values > dimension:
-            print('InterpolationDatapoint: The number of positive singular values is not equal to the dimension of the Hessian., restoring the last biggest elements')
-            # Get indices of elements originally set to zero
-            zero_indices = np.where(s_inv == 0.0)[0]
-            
-            # Sort these indices based on their corresponding values in 's' (descending order)
-            sorted_zero_indices = zero_indices[np.argsort(s[zero_indices])[::-1]]
-            
-            # Calculate how many elements need to be restored
-            num_to_restore = abs(number_of_positive_values - dimension)
-            
-            # Restore the largest elements among those set to zero
-            for idx in sorted_zero_indices[:num_to_restore]:
-                s_inv[idx] = 1 / s[idx]
 
         g_minus_matrix = np.dot(U, np.dot(np.diag(s_inv), Vt))
 
@@ -504,22 +494,6 @@ class InterpolationDatapoint:
         s_inv = np.array([1 / s_i if s_i > tol else 0.0 for s_i in s])
 
         number_of_positive_values = np.count_nonzero(s_inv)
-
-        # If more elements are zero than allowed, restore the largest ones
-        if number_of_positive_values > dimension:
-            print('InterpolationDatapoint: The number of positive singular values is not equal to the dimension of the Hessian., restoring the last biggest elements')
-            # Get indices of elements originally set to zero
-            zero_indices = np.where(s_inv == 0.0)[0]
-            
-            # Sort these indices based on their corresponding values in 's' (descending order)
-            sorted_zero_indices = zero_indices[np.argsort(s[zero_indices])[::-1]]
-            
-            # Calculate how many elements need to be restored
-            num_to_restore = abs(number_of_positive_values - dimension)
-            
-            # Restore the largest elements among those set to zero
-            for idx in sorted_zero_indices[:num_to_restore]:
-                s_inv[idx] = 1 / s[idx]
 
         g_minus_matrix = np.dot(U, np.dot(np.diag(s_inv), Vt))
 
@@ -731,7 +705,6 @@ class InterpolationDatapoint:
                     eps_inner=0.005,
                     eps_outer=0.01)
                 int_coords[bond_rows] = q_values
-                # print(int_coords, base_values)
 
         if self.use_cosine_dihedral:
             dihedral_rows = row_cache['dihedral_rows']

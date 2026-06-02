@@ -34,7 +34,7 @@ from mpi4py import MPI
 import numpy as np
 from time import time
 from typing import List, Tuple, Dict, Any, Optional
-import sys
+from sys import stdout
 
 from .profiler import Profiler
 import h5py
@@ -44,7 +44,7 @@ from io import StringIO
 from .interpolationdatapoint import InterpolationDatapoint
 
 from .outputstream import OutputStream
-from .veloxchemlib import mpi_master, bohr_in_angstrom
+from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
 
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input)
@@ -83,25 +83,21 @@ class InterpolationDriver():
         """
         Initializes the IMPES driver.
         """
-
+                
         if comm is None:
             comm = MPI.COMM_WORLD
 
         if ostream is None:
             if comm.Get_rank() == mpi_master():
-                ostream = OutputStream(sys.stdout)
+                ostream = OutputStream(stdout)
             else:
                 ostream = OutputStream(None)
 
-        # MPI information
         self.comm = comm
+        self.ostream = ostream
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
-        ostream = OutputStream(sys.stdout)
-        self.ostream = ostream
-
-        # Create InterpolationDatapoint, z-matrix required!
-        self.impes_coordinate = InterpolationDatapoint(z_matrix)#, self.comm,self.ostream)
+        self.impes_coordinate = InterpolationDatapoint(z_matrix, ostream=self.ostream)
 
         # simple or Shepard interpolation
         self.interpolation_type = 'shepard'
@@ -155,14 +151,6 @@ class InterpolationDriver():
         self.use_eq_bond_length = False
         self.use_cosine_dihedral = False
         self.use_mass_weight = False
-
-        # Optional runtime profiling for interpolation bottleneck analysis.
-        self.runtime_profile_enabled = False
-        self.runtime_profile_print = False
-        self.runtime_profile_profiler = None
-        self.runtime_profile_totals = {}
-        self.runtime_profile_last = {}
-        self.runtime_profile_calls = 0
         
 
         ####### General target customized schemes #######
@@ -181,6 +169,14 @@ class InterpolationDriver():
         self.tc_imp_gate_exp_clip = 50.0
         self.tc_imp_min_sigma = 1.0e-12
 
+        # Hessian-coupled multiplicative TC weighting.
+        self.tc_hessian_energy_scale_kcal = 1.0
+        self.tc_hessian_mix = 0.8
+        self.tc_hessian_psd_mode = "positive"  # "abs" or "positive"
+        self.tc_hessian_eig_floor = 0.0
+        self.tc_hessian_eig_cap = 10.0
+        self.tc_hessian_normalize_by_count = True
+
         # Optional runtime cache for symmetry-expanded task evaluation.
         # enables reuse of flattened symmetry tasks across compute() calls
         self.runtime_data_cache_enabled = True
@@ -194,9 +190,9 @@ class InterpolationDriver():
         self._input_keywords = {
             'im_settings': {
                 'interpolation_type':
-                    ('str', 'type of interpolation (simple/Shepard)'),
+                    ('str', 'type of interpolation (Shepard)'),
                 'weightfunction_type':
-                    ('str', 'type of interpolation (cartesian/internal/cartesian-hessian)'),
+                    ('str', 'type of interpolation (cartesian/internal)'),
                 'exponent_p': ('int', 'the main exponent'),
                 'exponent_q': ('int', 'the additional exponent (Shepard IM)'),
                 'confidence_radius': ('float', 'the confidence radius'),
@@ -242,7 +238,7 @@ class InterpolationDriver():
         if self.interpolation_type == 'shepard' and self.exponent_q is None:
             self.exponent_q = self.exponent_p / 2.0
 
-        valid_tc_modes = {"multiplicative", "additive_rhee"}
+        valid_tc_modes = {"multiplicative", "multiplicative_hessian", "additive_rhee"}
 
         if self.tc_weight_mode not in valid_tc_modes:
             raise ValueError(
@@ -271,56 +267,6 @@ class InterpolationDriver():
                 "requires raw dihedral-angle rows. "
                 "use_cosine_dihedral=True is not supported."
             )
-
-    def enable_runtime_profiling(self, enabled=True, reset=True, print_summary=False):
-        """
-        Enables/disables lightweight runtime profiling for compute() calls.
-
-        :param enabled:
-            If True, timing data are collected.
-        :param reset:
-            If True, clear previous timing accumulators.
-        :param print_summary:
-            If True, print a short summary from compute().
-        """
-
-        self.runtime_profile_enabled = bool(enabled)
-        self.runtime_profile_print = bool(print_summary)
-
-        if not self.runtime_profile_enabled:
-            self.runtime_profile_profiler = None
-            return
-
-        if self.runtime_profile_profiler is None or reset:
-            self.runtime_profile_profiler = Profiler({'timing': True})
-            self.runtime_profile_profiler.set_timing_key('InterpolationDriver.compute')
-            self.runtime_profile_totals = {}
-            self.runtime_profile_last = {}
-            self.runtime_profile_calls = 0
-
-    def _add_runtime_timing(self, label, dt):
-        """
-        Adds timing information to interpolation runtime profile.
-        """
-
-        if not self.runtime_profile_enabled or self.runtime_profile_profiler is None:
-            return
-
-        self.runtime_profile_profiler.add_timing_info(label, dt)
-        self.runtime_profile_totals[label] = self.runtime_profile_totals.get(label, 0.0) + dt
-        self.runtime_profile_last[label] = self.runtime_profile_last.get(label, 0.0) + dt
-
-    def get_runtime_profile_summary(self):
-        """
-        Returns interpolation runtime profiling data.
-        """
-
-        return {
-            'enabled': self.runtime_profile_enabled,
-            'calls': self.runtime_profile_calls,
-            'totals': dict(self.runtime_profile_totals),
-            'last': dict(self.runtime_profile_last),
-        }
 
 
     def mark_runtime_data_cache_dirty(self):
@@ -474,16 +420,8 @@ class InterpolationDriver():
             :param coordinates:
                 a numpy array of Cartesian coordinates.
         """
-        if self.runtime_profile_enabled:
-            timing_info = {}
-            self.impes_coordinate.reset_coordinates_impes_driver(
-                coordinates,
-                timing_info=timing_info)
-            for key, dt in timing_info.items():
-                self._add_runtime_timing(
-                    f'compute.define_impes_coordinate.{key}', dt)
-        else:
-            self.impes_coordinate.reset_coordinates_impes_driver(coordinates)
+       
+        self.impes_coordinate.reset_coordinates_impes_driver(coordinates)
 
        
     def compute(self, molecule):
@@ -500,53 +438,28 @@ class InterpolationDriver():
                 if this parameter is None, all datapoints from fname will be
                 used.
         """
-        compute_t0 = time()
-        if self.runtime_profile_enabled:
-            self.runtime_profile_last = {}
 
-        prep_t0 = time()
         self.bond_rmsd = []
         self.angle_rmsd = []
         self.dihedral_rmsd = []
         
         self.molecule = molecule 
 
-        self._add_runtime_timing('compute.prepare_state', time() - prep_t0)
-
-        define_t0 = time()
         self.define_impes_coordinate(molecule.get_coordinates_in_bohr())
-        self._add_runtime_timing('compute.define_impes_coordinate', time() - define_t0)
 
-        load_t0 = time()
+
         if self.qm_data_points is None:
             self.qm_data_points = self.read_qm_data_points()
-        self._add_runtime_timing('compute.load_qm_data_points', time() - load_t0)
 
-        if self.runtime_data_cache_enabled and self._runtime_data_cache_dirty:
-            cache_t0 = time()
-            self._add_runtime_timing('compute.prepare_runtime_cache', time() - cache_t0)
 
         if self.interpolation_type == 'shepard':
-            interp_t0 = time()
             self.shepard_interpolation()
-            self._add_runtime_timing('compute.shepard_interpolation', time() - interp_t0)
         else:
             errtxt = "Unrecognized interpolation type: "
             errtxt += self.interpolation_type
             raise ValueError(errtxt)
 
-        self._add_runtime_timing('compute.total', time() - compute_t0)
-        if self.runtime_profile_enabled:
-            self.runtime_profile_calls += 1
-
-        if self.runtime_profile_enabled and self.runtime_profile_print:
-            total = self.runtime_profile_last.get('compute.total', 0.0)
-            shep = self.runtime_profile_last.get('compute.shepard_interpolation', 0.0)
-            if total > 0.0:
-                print(
-                    f"[InterpolationDriver] compute.total={total:.6f}s "
-                    f"(shepard={shep:.6f}s, {100.0 * shep / total:.1f}% )"
-                )
+        
 
     def shepard_interpolation(self):
         """Performs a simple interpolation.
@@ -556,7 +469,6 @@ class InterpolationDriver():
             to be used for interpolation (which have been calculated
             quantum mechanically).
         """
-        shepard_t0 = time()
     
         natms = self.impes_coordinate.cartesian_coordinates.shape[0]
 
@@ -583,8 +495,6 @@ class InterpolationDriver():
         self.time_step_reducer = False
         
         # self.calc_optim_trust_radius = True
-        
-        distance_scan_t0 = time()
 
         if self.weightfunction_type == 'cartesian':
             for data_point in self.qm_data_points[:]:
@@ -608,34 +518,24 @@ class InterpolationDriver():
             errtxt = "Unrecognized weight function type: "
             errtxt += self.weightfunction_type
             raise ValueError(errtxt)
-
-        self._add_runtime_timing('shepard.distance_scan', time() - distance_scan_t0)
         
-        filter_t0 = time()
         close_distances = None
         close_distances = [
             (self.qm_data_points[index], distance, dihedral_dist, denom, wg, distance_vec, index) 
             for distance, dihedral_dist, index, denom, wg, distance_vec in distances_and_gradients]
-        self._add_runtime_timing('shepard.filter_close_points', time() - filter_t0)
-
-        eval_loop_t0 = time()
-        compute_potential_acc = 0.0
 
         for seq, (qm_data_point, distance, dihedral_dist, denominator_cart, weight_grad_cart, _, label_idx) in enumerate(close_distances):
 
             weight_cart = 1.0 / (denominator_cart)
 
             # if outer_results is None:
-            potential_t0 = time()
             potential, gradient_mw, r_i = self.compute_potential(
                 qm_data_point,
                 self.impes_coordinate.internal_coordinates_values,
             )
-            compute_potential_acc += time() - potential_t0
 
             gradient = gradient_mw
             if self.use_mass_weight:
-
                 gradient = sqrt_masses * gradient_mw.reshape(-1)
                 gradient = gradient.reshape(gradient_mw.shape)
             gradients.append(gradient)
@@ -650,10 +550,6 @@ class InterpolationDriver():
             weight_gradients_cart.append(weight_grad_cart)
             weight_fallback_metrics.append(float(abs(distance)) if np.isfinite(distance) else np.inf)
 
-        self._add_runtime_timing('shepard.point_eval_loop', time() - eval_loop_t0)
-        self._add_runtime_timing('shepard.compute_potential', compute_potential_acc)
-           
-        assembly_t0 = time()
         # --- initialise accumulators -------------------------------------------------
         self.impes_coordinate.energy    = 0.0
         self.impes_coordinate.gradient  = np.zeros((natms, 3))
@@ -739,13 +635,6 @@ class InterpolationDriver():
         self.normalized_weights_array = W_i.copy()
         self.used_weight_fallback = bool(used_weight_fallback)
         self.weight_eps = eps
-        # print('S', S_norm, W_i, np.sum(W_i))
-        if used_weight_fallback:
-            print("[InterpolationDriver] Shepard fallback branch used")
-            print("  raw weights:", w_i)
-            print("  raw sum S:", S_raw)
-            print("  normalized weights:", W_i)
-            print("  sum normalized weights:", W_i.sum())
                 
         # --- 3.  accumulate energy and gradient --------------------------------------
         potentials   = np.array(potentials, dtype=np.float64)        # Uᵢ
@@ -758,10 +647,9 @@ class InterpolationDriver():
         # --- 4.  book-keeping (optional) ---------------------------------------------
         for lbl, Wi in zip(used_labels, W_i):
             self.weights[lbl] = Wi
-        # print(self.weights)
+
         self.averaged_int_dist   = np.tensordot(W_i, averaged_int_dists, axes=1)
-        self._add_runtime_timing('shepard.assembly', time() - assembly_t0)
-        self._add_runtime_timing('shepard.total', time() - shepard_t0)
+
 
 
     def read_qm_data_points(self):
@@ -799,13 +687,9 @@ class InterpolationDriver():
            :param data_point:
                 InterpolationDatapoint object.
         """
-        def principal_angle(delta):
-            return (delta + np.pi) % (2.0 * np.pi) - np.pi
-
 
         pes = 0.0
         natm = data_point.cartesian_coordinates.shape[0]
-        # print(len(self.qm_symmetry_data_points))
         
         bounds = self._get_internal_coordinate_partitions()
         bond_end = int(bounds['bond_end'])
@@ -851,24 +735,6 @@ class InterpolationDriver():
         return pes, pes_prime, (grad + dist_hessian_eff)
 
     def _iter_imp_internal_coordinate_rows(self, data_point):
-        """
-        Yields important internal-coordinate entries for a datapoint.
-
-        Returns
-        -------
-        section : str
-            One of 'bonds', 'angles', 'dihedrals', 'impropers'.
-        coord : tuple[int, ...]
-            Atom tuple defining the coordinate.
-        idx : int
-            Row index in self.impes_coordinate.z_matrix.
-
-        Notes
-        -----
-        This implementation assumes use_cosine_dihedral=False for proper
-        dihedral gates. That matches the current default and avoids ambiguity
-        caused by duplicated cosine/sine rows.
-        """
 
         imp = getattr(data_point, "imp_int_coordinates", None)
         if not isinstance(imp, dict):
@@ -1050,34 +916,107 @@ class InterpolationDriver():
 
         return max(float(abs(sigma)), self.tc_imp_min_sigma)
 
-    def _important_coordinate_gate_metric(self, data_point, active_dofs):
-        """
-        Computes the dimensionless important-coordinate distance A_imp and
-        its Cartesian derivative.
+    # def _important_coordinate_gate_metric(self, data_point, active_dofs):
+    #     """
+    #     Computes the dimensionless important-coordinate distance A_imp and
+    #     its Cartesian derivative.
 
-        A_imp = sum_k beta_k z_k^2 / sum_k beta_k
+    #     A_imp = sum_k beta_k z_k^2 / sum_k beta_k
 
-        The derivative is with respect to the active Cartesian coordinates
-        used by the Cartesian weight gradient.
+    #     The derivative is with respect to the active Cartesian coordinates
+    #     used by the Cartesian weight gradient.
 
-        Returns
-        -------
-        A_imp : float
-            Dimensionless mean squared important-coordinate displacement.
+    #     Returns
+    #     -------
+    #     A_imp : float
+    #         Dimensionless mean squared important-coordinate displacement.
 
-        grad_A_imp : ndarray, shape (n_active_dofs,)
-            dA_imp/dX for active Cartesian degrees of freedom.
-        """
+    #     grad_A_imp : ndarray, shape (n_active_dofs,)
+    #         dA_imp/dX for active Cartesian degrees of freedom.
+    #     """
 
-        q_cur = np.asarray(
-            self.impes_coordinate.internal_coordinates_values,
-            dtype=np.float64,
-        )
-        q_ref = np.asarray(
-            data_point.internal_coordinates_values,
-            dtype=np.float64,
-        )
+    #     q_cur = np.asarray(
+    #         self.impes_coordinate.internal_coordinates_values,
+    #         dtype=np.float64,
+    #     )
+    #     q_ref = np.asarray(
+    #         data_point.internal_coordinates_values,
+    #         dtype=np.float64,
+    #     )
 
+    #     B = np.asarray(self.impes_coordinate.b_matrix, dtype=np.float64)
+
+    #     inv_sqrt_masses = getattr(self.impes_coordinate, "inv_sqrt_masses", None)
+    #     if inv_sqrt_masses is not None:
+    #         inv_sqrt_active = np.asarray(inv_sqrt_masses, dtype=np.float64)[active_dofs]
+    #     else:
+    #         inv_sqrt_active = None
+
+    #     A_num = 0.0
+    #     beta_sum = 0.0
+    #     grad_A_num = np.zeros(active_dofs.size, dtype=np.float64)
+
+    #     for section, coord, idx in self._iter_imp_internal_coordinate_rows(data_point):
+    #         beta = 1.0
+
+    #         dq_raw = float(q_cur[idx] - q_ref[idx])
+    #         sigma = self._imp_coordinate_sigma(section, idx, q_ref)
+
+    #         # B row is mass-weighted if inv_sqrt_masses was set on the datapoint.
+    #         # Convert it back to derivative with respect to physical Cartesian
+    #         # coordinates, matching the existing target-customized code path.
+    #         b_row = B[idx, active_dofs].copy()
+    #         if inv_sqrt_active is not None:
+    #             b_row = b_row / inv_sqrt_active
+
+    #         if section == "dihedrals":
+    #             # Periodic, smooth metric.
+    #             d = self._principal_torsion_delta(dq_raw)
+    #             z = 2.0 * np.sin(0.5 * d) / sigma
+    #             dz_dx = np.cos(0.5 * d) * b_row / sigma
+
+    #         elif section == "impropers":
+    #             d = self._principal_torsion_delta(dq_raw)
+
+    #             eta = 2.0 * np.tan(0.5 * d)
+    #             cos_half = np.cos(0.5 * d)
+    #             chain_eta = 1.0 / np.maximum(cos_half * cos_half, 1.0e-12)
+
+    #             z = eta / sigma
+    #             dz_dx = chain_eta * b_row / sigma
+
+
+    #         elif section == "angles":
+    #             z = dq_raw / sigma
+    #             dz_dx = b_row / sigma
+
+    #         elif section == "bonds":
+    #             z = dq_raw / sigma
+    #             dz_dx = b_row / sigma
+
+    #         else:
+    #             continue
+
+    #         A_num += beta * z * z
+    #         grad_A_num += beta * 2.0 * z * dz_dx
+    #         beta_sum += beta
+
+    #     if beta_sum <= 0.0:
+    #         return 0.0, np.zeros(active_dofs.size, dtype=np.float64)
+
+    #     A_imp = A_num / beta_sum
+    #     grad_A_imp = grad_A_num / beta_sum
+
+    #     return float(A_imp), grad_A_imp
+
+    def _important_coordinate_gate_metric(
+        self,
+        data_point,
+        active_dofs,
+        hessian_weighted=False,
+    ):
+        q_cur = np.asarray(self.impes_coordinate.internal_coordinates_values, dtype=np.float64)
+        q_ref = np.asarray(data_point.internal_coordinates_values, dtype=np.float64)
         B = np.asarray(self.impes_coordinate.b_matrix, dtype=np.float64)
 
         inv_sqrt_masses = getattr(self.impes_coordinate, "inv_sqrt_masses", None)
@@ -1086,62 +1025,119 @@ class InterpolationDriver():
         else:
             inv_sqrt_active = None
 
-        A_num = 0.0
-        beta_sum = 0.0
-        grad_A_num = np.zeros(active_dofs.size, dtype=np.float64)
+        selected_idx = []
+        sigmas = []
+        z_values = []
+        dzdx_rows = []
 
         for section, coord, idx in self._iter_imp_internal_coordinate_rows(data_point):
-            beta = 1.0
-
             dq_raw = float(q_cur[idx] - q_ref[idx])
             sigma = self._imp_coordinate_sigma(section, idx, q_ref)
 
-            # B row is mass-weighted if inv_sqrt_masses was set on the datapoint.
-            # Convert it back to derivative with respect to physical Cartesian
-            # coordinates, matching the existing target-customized code path.
             b_row = B[idx, active_dofs].copy()
             if inv_sqrt_active is not None:
                 b_row = b_row / inv_sqrt_active
 
             if section == "dihedrals":
-                # Periodic, smooth metric.
                 d = self._principal_torsion_delta(dq_raw)
                 z = 2.0 * np.sin(0.5 * d) / sigma
                 dz_dx = np.cos(0.5 * d) * b_row / sigma
 
             elif section == "impropers":
                 d = self._principal_torsion_delta(dq_raw)
-
                 eta = 2.0 * np.tan(0.5 * d)
                 cos_half = np.cos(0.5 * d)
                 chain_eta = 1.0 / np.maximum(cos_half * cos_half, 1.0e-12)
-
                 z = eta / sigma
                 dz_dx = chain_eta * b_row / sigma
 
-
-            elif section == "angles":
-                z = dq_raw / sigma
-                dz_dx = b_row / sigma
-
-            elif section == "bonds":
+            elif section in ("angles", "bonds"):
                 z = dq_raw / sigma
                 dz_dx = b_row / sigma
 
             else:
                 continue
 
-            A_num += beta * z * z
-            grad_A_num += beta * 2.0 * z * dz_dx
-            beta_sum += beta
+            selected_idx.append(int(idx))
+            sigmas.append(float(sigma))
+            z_values.append(float(z))
+            dzdx_rows.append(np.asarray(dz_dx, dtype=np.float64).reshape(-1))
 
-        if beta_sum <= 0.0:
+        nsel = len(z_values)
+        if nsel == 0:
             return 0.0, np.zeros(active_dofs.size, dtype=np.float64)
 
-        A_imp = A_num / beta_sum
-        grad_A_imp = grad_A_num / beta_sum
+        z = np.asarray(z_values, dtype=np.float64)
+        J = np.vstack(dzdx_rows)  # shape: nsel x n_active_dofs
 
-        return float(A_imp), grad_A_imp
+        A_iso = float(np.dot(z, z) / nsel)
+        grad_iso = (2.0 / nsel) * (J.T @ z)
+
+        if not hessian_weighted:
+            return A_iso, grad_iso
+
+        H = getattr(data_point, "internal_hessian", None)
+        if H is None:
+            return A_iso, grad_iso
+
+        H = np.asarray(H, dtype=np.float64)
+        if H.ndim != 2 or H.shape[0] != H.shape[1] or H.shape[0] <= max(selected_idx):
+            return A_iso, grad_iso
+
+        H_sel = H[np.ix_(selected_idx, selected_idx)]
+        H_sel = 0.5 * (H_sel + H_sel.T)
+
+        sigma_vec = np.asarray(sigmas, dtype=np.float64)
+        K_energy = sigma_vec[:, None] * H_sel * sigma_vec[None, :]
+
+        e_ref = (
+            float(getattr(self, "tc_hessian_energy_scale_kcal", 1.0))
+            / hartree_in_kcalpermol()
+        )
+        e_ref = max(e_ref, 1.0e-12)
+
+        K_dimless = K_energy / e_ref
+        K_dimless = 0.5 * (K_dimless + K_dimless.T)
+
+        eigval, eigvec = np.linalg.eigh(K_dimless)
+
+        mode = str(getattr(self, "tc_hessian_psd_mode", "abs")).lower()
+        if mode == "positive":
+            lam = np.maximum(eigval, 0.0)
+        elif mode == "abs":
+            lam = np.abs(eigval)
+        else:
+            raise ValueError(
+                f"Unknown tc_hessian_psd_mode={self.tc_hessian_psd_mode}. "
+                "Allowed values are 'abs' and 'positive'."
+            )
+
+        floor = float(getattr(self, "tc_hessian_eig_floor", 0.0))
+        cap = float(getattr(self, "tc_hessian_eig_cap", 10.0))
+
+        if floor > 0.0:
+            lam = np.maximum(lam, floor)
+        if cap > 0.0:
+            lam = np.minimum(lam, cap)
+
+        K_psd = (eigvec * lam) @ eigvec.T
+        K_psd = 0.5 * (K_psd + K_psd.T)
+
+        scale = float(nsel) if bool(getattr(self, "tc_hessian_normalize_by_count", True)) else 1.0
+
+        A_hess = float(0.5 * z @ (K_psd @ z) / scale)
+        grad_hess = (J.T @ (K_psd @ z)) / scale
+
+        mix = float(getattr(self, "tc_hessian_mix", 0.5))
+        mix = min(max(mix, 0.0), 1.0)
+
+        A_imp = (1.0 - mix) * A_iso + mix * A_hess
+        grad_A_imp = (1.0 - mix) * grad_iso + mix * grad_hess
+
+        if A_imp < 0.0 and abs(A_imp) < 1.0e-12:
+            A_imp = 0.0
+
+        return float(A_imp), np.asarray(grad_A_imp, dtype=np.float64)
     
     def _apply_imp_coordinate_penalty_gate(
             self,
@@ -1150,37 +1146,23 @@ class InterpolationDriver():
             A_imp,
             grad_A_imp,
         ):
-            """
-            Applies the important-coordinate penalty gate to a raw Shepard weight.
-
-            Base:
-                w = 1 / denominator_base
-
-            Gate:
-                G = exp(-lambda * A_imp)
-
-            Modified raw weight:
-                w_mod = w * G
-
-            Gradient:
-                grad(w_mod) = G grad(w) + w grad(G)
-                            = G grad(w) - lambda w G grad(A_imp)
-
-            Returns
-            -------
-            denominator_mod : float
-                1 / w_mod, so the surrounding code can still use
-                raw_weight = 1 / denominator.
-
-            raw_weight_gradient_mod : ndarray
-                Gradient of w_mod with respect to active Cartesian coordinates.
-            """
 
             if not np.isfinite(denominator_base) or denominator_base <= 0.0:
                 return np.inf, np.zeros_like(raw_weight_gradient_base)
 
             lam = float(self.tc_imp_gate_lambda)
-            exponent = min(lam * float(A_imp), float(self.tc_imp_gate_exp_clip))
+            # exponent = min(lam * float(A_imp), float(self.tc_imp_gate_exp_clip))
+
+            # gate = np.exp(-exponent)
+            raw_exponent = lam * float(A_imp)
+            clip = float(self.tc_imp_gate_exp_clip)
+
+            if raw_exponent >= clip:
+                exponent = clip
+                lambda_eff = 0.0
+            else:
+                exponent = raw_exponent
+                lambda_eff = lam
 
             gate = np.exp(-exponent)
             w_base = 1.0 / denominator_base
@@ -1188,7 +1170,8 @@ class InterpolationDriver():
             grad_base_flat = np.asarray(raw_weight_gradient_base, dtype=np.float64).reshape(-1)
             grad_A_flat = np.asarray(grad_A_imp, dtype=np.float64).reshape(-1)
 
-            grad_gate = -lam * gate * grad_A_flat
+            # grad_gate = -lam * gate * grad_A_flat
+            grad_gate = -lambda_eff * gate * grad_A_flat
 
             w_mod = w_base * gate
             grad_w_mod = gate * grad_base_flat + w_base * grad_gate
@@ -1879,7 +1862,7 @@ class InterpolationDriver():
                     )
                 )
 
-            elif self.tc_weight_mode == "multiplicative":
+            elif self.tc_weight_mode in ("multiplicative", "multiplicative_hessian"):
                 denominator_base, weight_gradient_sub_base = (
                     self.shepard_weight_gradient(
                         distance_vector_sub,
@@ -1892,6 +1875,7 @@ class InterpolationDriver():
                 A_imp, grad_A_imp = self._important_coordinate_gate_metric(
                     data_point,
                     active_dofs,
+                    hessian_weighted=(self.tc_weight_mode == "multiplicative_hessian"),
                 )
 
                 denominator_imp_coord, weight_gradient_sub_imp_coord = (
@@ -1957,10 +1941,11 @@ class InterpolationDriver():
                         scale2,
                     )
 
-                elif self.tc_weight_mode == "multiplicative":
+                elif self.tc_weight_mode in ("multiplicative", "multiplicative_hessian"):
                     A_imp, grad_A_imp = self._important_coordinate_gate_metric(
                         data_point,
                         active_dofs,
+                        hessian_weighted=(self.tc_weight_mode == "multiplicative_hessian"),
                     )
 
                     lam = float(self.tc_imp_gate_lambda)
@@ -2078,8 +2063,7 @@ class InterpolationDriver():
             errtxt = "Unrecognized interpolation type: "
             errtxt += self.interpolation_type
             raise ValueError(errtxt)
-                
-        # print(weight_gradient_sub, weight_gradient_sub_imp_coord, denominator_imp_coord, denominator)
+
         weight_gradient = np.zeros_like(reference_coordinates)   # (natms,3)
         weight_gradient[self.symmetry_information[3]] = weight_gradient_sub_imp_coord
 
@@ -2094,6 +2078,23 @@ class InterpolationDriver():
         p = scores / s
         return 1.0 / (np.sum(p * p) + eps)
     
+    def _internal_coordinate_error_scales(
+        self,
+        q_ref,
+        coords_flat,
+        kinds_flat,
+        eps=1.0e-12,
+    ):
+        scales = np.ones(len(coords_flat), dtype=np.float64)
+
+        for idx, kind in enumerate(kinds_flat):
+            section = self._section_from_kind(kind)
+            if section is None:
+                continue
+
+            scales[idx] = self._imp_coordinate_sigma(section, idx, q_ref)
+
+        return np.maximum(np.asarray(scales, dtype=np.float64), eps)
 
     def determine_important_internal_coordinates(
         self,
@@ -2129,11 +2130,6 @@ z
         # ------------------------------------------------------------------
         # Hyperparameters
         # ------------------------------------------------------------------
-        selection_rule = "coverage"   # 'relative' | 'coverage' | 'topk'
-        relative_threshold = 0.10
-        coverage_mass = 1.0
-        topk = None
-
         # final global score = source + response + support - helpful
         w_source = 0.60
         w_response = 0.30
@@ -2144,13 +2140,12 @@ z
         support_top_frac = 0.20
 
         # block construction / ranking
-        max_anchor_candidates = 8
         pair_weight = 0.35
         support_weight = 0.25
 
         component_score_z = 2.0
         component_pair_z = 1.5
-        component_coverage_mass = 0.90
+        component_coverage_mass = 0.60
         component_size_penalty = 0.01
         max_component_size = None
 
@@ -2159,8 +2154,8 @@ z
         singleton_dominance = 1.35
         singleton_source_frac = 0.85
         singleton_response_frac = 0.85
-        secondary_score_frac = 0.25
-        min_secondary_pair_frac = 0.15
+        secondary_score_frac = 0.60
+        min_secondary_pair_frac = 0.35
 
         eps = 1e-12
 
@@ -2203,7 +2198,6 @@ z
                 q_current=q_current,
                 q_ref=q_dp,
                 z_matrix=z_matrix,
-                symmetry_information=self.symmetry_information,
             )
 
             pred_qm_G_int = self.transform_gradient_to_internal_coordinates(
@@ -2211,6 +2205,9 @@ z
             )
 
             diag_result = self.compute_internal_gradient_diagnostics_runtime_model(
+                dq_raw=dq_raw,
+                dq_eff=dq_eff,
+                chain=chain,
                 datapoint=datapoint,
                 molecule=molecule,
                 z_matrix=z_matrix,
@@ -2226,8 +2223,12 @@ z
             rho = np.asarray(diag_result["rho"], dtype=float)
 
             # local ranking used only for support counting
+            local_source_for_support = self._normalize_nonnegative(source_blame_score)
+            local_response_for_support = self._normalize_nonnegative(response_score)
+
             local_coord_score = self._normalize_nonnegative(
-                0.65 * source_blame_score + 0.35 * response_score
+                0.65 * local_source_for_support
+                + 0.35 * local_response_for_support
             )
 
             norm_displacement = self._normalized_internal_displacement(
@@ -2324,43 +2325,6 @@ z
         global_coord_score = self._normalize_nonnegative(raw_global_score)
 
         # ------------------------------------------------------------------
-        # Select anchor coordinates according to the chosen rule
-        # ------------------------------------------------------------------
-        sorted_idx = np.argsort(-global_coord_score)
-        sorted_weights = global_coord_score[sorted_idx]
-
-        selected_pos = []
-        if selection_rule == "relative":
-            if sorted_weights.size > 0:
-                wmax = sorted_weights.max()
-                keep = sorted_weights >= (relative_threshold * wmax)
-                selected_pos = list(np.where(keep)[0])
-
-        elif selection_rule == "coverage":
-            cumw = np.cumsum(sorted_weights)
-            keep = cumw <= coverage_mass
-            if keep.size > 0:
-                keep[0] = True
-            selected_pos = list(np.where(keep)[0])
-
-            while (
-                selected_pos
-                and np.sum(sorted_weights[selected_pos]) < coverage_mass
-                and selected_pos[-1] + 1 < len(sorted_weights)
-            ):
-                selected_pos.append(selected_pos[-1] + 1)
-
-        elif selection_rule == "topk":
-            k = topk if (topk is not None) else max(1, int(0.25 * N))
-            selected_pos = list(range(min(k, N)))
-
-        else:
-            raise ValueError(f"Unknown selection_rule: {selection_rule}")
-
-        candidate_anchor_indices = [int(sorted_idx[pos]) for pos in selected_pos]
-        candidate_anchor_indices = candidate_anchor_indices[:max_anchor_candidates]
-
-        # ------------------------------------------------------------------
         # Build and rank coupled repair blocks
         # ------------------------------------------------------------------
         N_coords = N
@@ -2409,7 +2373,7 @@ z
 
             # Steering score chooses the anchor inside the component.
             steering_score = {
-                i: float(0.5 * global_source_blame[i] + 0.5 * global_response[i])
+                i: float(0.8 * global_source_blame[i] + 0.2 * global_response[i])
                 for i in component
             }
 
@@ -2535,54 +2499,103 @@ z
             global_displacement=global_displacement,
         )
 
-        # ------------------------------------------------------------------
-        # Debug printout
-        # ------------------------------------------------------------------
-        print("\n=== Global coordinate scores (error-source focused) ===")
-        print(
-            f"{'rank':>4} {'idx':>4} {'type':>10} {'coord':>18} "
-            f"{'score':>12} {'source':>12} {'response':>12} "
-            f"{'support':>12} {'rho':>12} {'helpful':>12}"
+        self.print_best_repair_block(
+            best_block=best_block,
+            coords_flat=coords_flat,
+            kinds_flat=kinds_flat,
+            global_coord_score=global_coord_score,
+            global_source_blame=global_source_blame,
+            global_response=global_response,
+            global_support=global_support,
+            global_rho=global_rho,
+            global_helpful=global_helpful,
+            global_displacement=global_displacement,
+            primary_constraint=primary_constraint,
+            candidate_constraints=candidate_constraints,
+            fallback_constraints=fallback_constraints,
         )
-        print("-" * 122)
-        for rank, idx in enumerate(np.argsort(-global_coord_score)[:12]):
-            coord = tuple(int(x) for x in coords_flat[idx])
-            print(
-                f"{rank:4d} {idx:4d} {kinds_flat[idx]:>10} {self.format_coord(coord):>18} "
-                f"{global_coord_score[idx]:12.6e} "
-                f"{global_source_blame[idx]:12.6e} "
-                f"{global_response[idx]:12.6e} "
-                f"{global_support[idx]:12.6e} "
-                f"{global_rho[idx]:12.6e} "
-                f"{global_helpful[idx]:12.6e}"
-            )
-
-        print("\n=== Ranked candidate repair blocks ===")
-        print(
-            f"{'rank':>4} {'anchor':>18} {'type':>10} {'|block|':>8} "
-            f"{'coord':>12} {'pair':>12} {'support':>12} {'acq':>12}"
-        )
-        print("-" * 102)
-        for rank, blk in enumerate(ranked_blocks[:10]):
-            print(
-                f"{rank:4d} "
-                f"{self.format_coord(blk['anchor_coord']):>18} "
-                f"{blk['anchor_type']:>10} "
-                f"{len(blk['block_indices']):8d} "
-                f"{blk['coord_mass']:12.6e} "
-                f"{blk['pair_mass']:12.6e} "
-                f"{blk['support_mass']:12.6e} "
-                f"{blk['acq_score']:12.6e}"
-            )
-            print(f"      block coords: {blk['block_coords']}")
-            print(f"      block types : {blk['block_types']}")
-
-        print("\nPrimary constraint:", primary_constraint)
-        print("Candidate constraints:", candidate_constraints)
 
         return primary_constraint, candidate_constraints, best_block["block_coords"], fallback_constraints
 
     # Helper methods
+    def print_best_repair_block(
+        self,
+        best_block,
+        coords_flat,
+        kinds_flat,
+        global_coord_score,
+        global_source_blame,
+        global_response,
+        global_support,
+        global_rho,
+        global_helpful,
+        global_displacement,
+        primary_constraint,
+        candidate_constraints,
+        fallback_constraints,
+    ):
+        title = 'Selected Internal-Coordinate Repair Block'
+
+        self.ostream.print_blank()
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * len(title))
+        self.ostream.print_blank()
+
+        self.ostream.print_header(f"{'Anchor':<24}{self.format_coord(best_block['anchor_coord'])}")
+        self.ostream.print_header(f"{'Anchor type':<24}{best_block['anchor_type']}")
+        self.ostream.print_header(f"{'Block size':<24}{len(best_block['block_indices'])}")
+        self.ostream.print_header(f"{'Coordinate mass':<24}{best_block['coord_mass']:.6e}")
+        self.ostream.print_header(f"{'Pair mass':<24}{best_block['pair_mass']:.6e}")
+        self.ostream.print_header(f"{'Support mass':<24}{best_block['support_mass']:.6e}")
+        self.ostream.print_header(f"{'Acquisition score':<24}{best_block['acq_score']:.6e}")
+        self.ostream.print_blank()
+
+        header = (
+            f"{'Rank':>4} "
+            f"{'Idx':>5} "
+            f"{'Type':>10} "
+            f"{'Coord':>18} "
+            f"{'Score':>12} "
+            f"{'Source':>12} "
+            f"{'Response':>12} "
+            f"{'Support':>12} "
+            f"{'Disp':>12} "
+            f"{'Rho':>12} "
+            f"{'Helpful':>12}"
+        )
+
+        self.ostream.print_header(header)
+        self.ostream.print_header('-' * len(header))
+
+        for rank, idx in enumerate(best_block['block_indices']):
+            idx = int(idx)
+            coord = tuple(int(x) for x in coords_flat[idx])
+            coord_type = self.coord_type(coord, kinds_flat[idx])
+
+            self.ostream.print_header(
+                f"{rank:4d} "
+                f"{idx:5d} "
+                f"{coord_type:>10} "
+                f"{self.format_coord(coord):>18} "
+                f"{global_coord_score[idx]:12.6e} "
+                f"{global_source_blame[idx]:12.6e} "
+                f"{global_response[idx]:12.6e} "
+                f"{global_support[idx]:12.6e} "
+                f"{global_displacement[idx]:12.6e} "
+                f"{global_rho[idx]:12.6e} "
+                f"{global_helpful[idx]:12.6e}"
+            )
+
+        self.ostream.print_blank()
+        self.ostream.print_header(f"{'Primary constraint':<24}{primary_constraint}")
+        self.ostream.print_header(f"{'Candidate constraints':<24}{candidate_constraints}")
+
+        if fallback_constraints:
+            self.ostream.print_header('Fallback locality constraints')
+            self.ostream.print_block(str(fallback_constraints))
+
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def _robust_positive_threshold(
         self,
@@ -2945,18 +2958,8 @@ z
         q_current: np.ndarray,
         q_ref: np.ndarray,
         z_matrix: Dict[str, List[Tuple[int, ...]]],
-        symmetry_information,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Proper dihedrals:
-            dq_eff = sin(delta), chain = cos(delta)
 
-        Impropers:
-            dq_eff = 2*tan(delta/2), chain = sec^2(delta/2)
-
-        Bonds/angles:
-            dq_eff = raw delta, chain = 1
-        """
         q_current = np.asarray(q_current, dtype=float)
         q_ref = np.asarray(q_ref, dtype=float)
 
@@ -2988,49 +2991,6 @@ z
 
         return dq_raw, dq_eff, chain
 
-
-
-    def _compute_partial_taylor_contributions(
-        self,
-        dq_eff: np.ndarray,
-        chain: np.ndarray,
-        H: np.ndarray,
-        g0: np.ndarray,
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Per-coordinate split of Taylor energy and gradient contributions.
-
-        Energy is decomposed in the transformed displacement dq_eff.
-        Gradient follows the chain-weighted form used by the local model.
-        """
-        dq_eff = np.asarray(dq_eff, dtype=float)
-        chain = np.asarray(chain, dtype=float)
-        H = np.asarray(H, dtype=float)
-        g0 = np.asarray(g0, dtype=float)
-
-        N = len(dq_eff)
-        partial_energies = np.zeros(N, dtype=float)
-        partial_gradient = np.zeros(N, dtype=float)
-
-        for i in range(N):
-            partial_energies[i] += dq_eff[i] * g0[i]
-            partial_gradient[i] += chain[i] * g0[i]
-
-        for i in range(N):
-            partial_energies[i] += 0.5 * dq_eff[i] * H[i, i] * dq_eff[i]
-            partial_gradient[i] += chain[i] * H[i, i] * dq_eff[i]
-
-            for j in range(i + 1, N):
-                cross = dq_eff[i] * H[i, j] * dq_eff[j]
-                cross_prime_ij = chain[i] * H[i, j] * dq_eff[j]
-                cross_prime_ji = chain[j] * H[j, i] * dq_eff[i]
-
-                partial_energies[i] += 0.5 * cross
-                partial_energies[j] += 0.5 * cross
-                partial_gradient[i] += cross_prime_ij
-                partial_gradient[j] += cross_prime_ji
-
-        return partial_energies, partial_gradient
 
     def _predict_internal_gradient_runtime(self, datapoint, molecule, org_int_coords):
         """
@@ -3064,6 +3024,9 @@ z
     def compute_internal_gradient_diagnostics_runtime_model(
         self,
         *,
+        dq_raw,
+        dq_eff,
+        chain,
         datapoint,
         molecule,
         z_matrix,
@@ -3087,19 +3050,23 @@ z
         if q_current.size != N or q_ref.size != N or g_qm.size != N:
             raise ValueError("runtime diagnostics: size mismatch")
 
-        dq_raw, dq_eff, chain = self._compute_internal_differences(
-            q_current=q_current,
+        coord_scales = self._internal_coordinate_error_scales(
             q_ref=q_ref,
-            z_matrix=z_matrix,
-            symmetry_information=self.symmetry_information,
+            coords_flat=coords_flat,
+            kinds_flat=kinds_flat,
+            eps=eps,
         )
 
-        # Current model prediction (exact runtime path).
-        g_model = self._predict_internal_gradient_runtime(datapoint, molecule, q_current)
+        g_model = self._predict_internal_gradient_runtime(
+            datapoint,
+            molecule,
+            q_current,
+        )
+
         delta_g_err = g_qm - g_model
         abs_err = np.abs(delta_g_err)
+        scaled_abs_err = coord_scales * abs_err
 
-        # Select which sources to test (optional speed cap).
         source_indices = np.arange(N, dtype=np.int64)
         if isinstance(max_sources, int) and 0 < max_sources < N:
             source_indices = np.argsort(-np.abs(dq_eff))[:max_sources]
@@ -3109,34 +3076,35 @@ z
         for j in source_indices:
             q_wo_j = q_current.copy()
 
-            # Remove displacement of source j in the same coordinate chart.
             if kinds_flat[j] in ("dihedral", "improper"):
                 d = self._principal_torsion_delta(q_current[j] - q_ref[j])
                 q_wo_j[j] = q_current[j] - d
             else:
                 q_wo_j[j] = q_ref[j]
 
-            g_model_wo_j = self._predict_internal_gradient_runtime(datapoint, molecule, q_wo_j)
-            err_wo_j = np.abs(g_qm - g_model_wo_j)
+            g_model_wo_j = self._predict_internal_gradient_runtime(
+                datapoint,
+                molecule,
+                q_wo_j,
+            )
 
-            # Positive => source j worsens row-i error.
-            blame_matrix[:, j] = abs_err - err_wo_j
+            err_wo_j = np.abs(g_qm - g_model_wo_j)
+            scaled_err_wo_j = coord_scales * err_wo_j
+
+            blame_matrix[:, j] = scaled_abs_err - scaled_err_wo_j
 
         harmful_matrix = np.maximum(blame_matrix, 0.0)
         helpful_matrix = np.maximum(-blame_matrix, 0.0)
 
-        response_score = self._normalize_nonnegative(abs_err)
-
-        err_weights = abs_err / (abs_err.sum() + eps)
-        source_blame_score = self._normalize_nonnegative(harmful_matrix.T @ err_weights)
-        helpful_source_score = self._normalize_nonnegative(helpful_matrix.T @ err_weights)
+        # Raw, magnitude-preserving channels.
+        response_score = scaled_abs_err.copy()
+        source_blame_score = np.sum(harmful_matrix, axis=0)
+        helpful_source_score = np.sum(helpful_matrix, axis=0)
 
         pair_score = harmful_matrix + harmful_matrix.T
         np.fill_diagonal(pair_score, 0.0)
-        if np.max(pair_score) > eps:
-            pair_score /= (np.max(pair_score) + eps)
 
-        rho = abs_err / (np.abs(g_model) + eps)
+        rho = scaled_abs_err / (coord_scales * np.abs(g_model) + eps)
 
         rows = []
         for idx, (coord, kind) in enumerate(zip(coords_flat, kinds_flat)):
@@ -3201,260 +3169,6 @@ z
             "by_abs_pE": by_abs_pE,
             "by_source_blame": by_source_blame,
         }
-
-    def compute_internal_gradient_diagnostics(
-        self,
-        z_matrix,
-        dq_raw,
-        H,
-        g0,
-        g_qm,
-        eps: float = 1e-12,
-    ):
-        """
-        Compute local Taylor diagnostics in internal coordinates.
-
-        Core model:
-            g_model = chain * (g0 + H @ dq_eff)
-
-        Proper dihedrals:
-            dq_eff = sin(dq_raw), chain = cos(dq_raw)
-
-        Impropers:
-            dq_eff = dq_raw, chain = 1
-
-        Important new object:
-            source_contrib[i,j] = chain[i] * H[i,j] * dq_eff[j]
-
-        This is the modeled contribution from source coordinate j into response row i.
-
-        Error-source score:
-            err_i = g_qm[i] - g_model[i]
-            blame_ij = |err_i| - |err_i + source_contrib[i,j]|
-
-        If blame_ij > 0, removing source j would reduce the error in row i.
-        """
-        dq_raw = np.asarray(dq_raw, dtype=float).reshape(-1)
-        H = np.asarray(H, dtype=float)
-        g0 = np.asarray(g0, dtype=float).reshape(-1)
-        g_qm = np.asarray(g_qm, dtype=float).reshape(-1)
-
-        coords_flat, kinds_flat = self._flatten_internal_coordinates(z_matrix)
-        N = len(coords_flat)
-
-        if dq_raw.shape[0] != N:
-            raise ValueError("dq_raw has wrong length")
-        if g0.shape[0] != N:
-            raise ValueError("g0 has wrong length")
-        if g_qm.shape[0] != N:
-            raise ValueError("g_qm has wrong length")
-        if H.shape != (N, N):
-            raise ValueError("H has wrong shape")
-
-        dq_raw = np.array(dq_raw, dtype=float).reshape(-1)
-        dq_eff = np.zeros(N, dtype=float)
-        chain = np.ones(N, dtype=float)
-
-        for idx, (_, kind) in enumerate(zip(coords_flat, kinds_flat)):
-            if kind == "dihedral":
-                d = self._principal_torsion_delta(dq_raw[idx])
-                dq_raw[idx] = d
-                dq_eff[idx] = np.sin(d)
-                chain[idx] = np.cos(d)
-
-            elif kind == "improper":
-                d = self._principal_torsion_delta(dq_raw[idx])
-                dq_raw[idx] = d
-                dq_eff[idx] = self._improper_dihedral_displacement(d)
-                chain[idx] = self._improper_dihedral_chain(d)
-
-            else:
-                dq_eff[idx] = dq_raw[idx]
-                chain[idx] = 1.0
-
-
-        Hdq_raw = H @ dq_eff
-        Hdq = chain * Hdq_raw
-
-        diag_resp_raw = np.diag(H) * dq_eff
-        diag_resp = chain * diag_resp_raw
-        offdiag_resp = Hdq - diag_resp
-
-        g_model = chain * (g0 + Hdq_raw)
-        delta_g_err = g_qm - g_model
-        rho = np.abs(delta_g_err) / (np.abs(Hdq) + eps)
-
-        partial_energies, partial_gradient = self._compute_partial_taylor_contributions(
-            dq_eff=dq_eff,
-            chain=chain,
-            H=H,
-            g0=g0,
-        )
-
-
-        # ------------------------------------------------------------------
-        # New source-blame analysis
-        # ------------------------------------------------------------------
-        source_contrib = (chain[:, None] * H) * dq_eff[None, :]
-
-        # removing source j changes row-i error from err_i to err_i + contrib_ij
-        blame_matrix = np.abs(delta_g_err)[:, None] - np.abs(delta_g_err[:, None] + source_contrib)
-
-        harmful_matrix = np.maximum(blame_matrix, 0.0)
-        helpful_matrix = np.maximum(-blame_matrix, 0.0)
-
-        response_score = self._normalize_nonnegative(np.abs(delta_g_err))
-
-        err_weights = np.abs(delta_g_err)
-        err_weights = err_weights / (err_weights.sum() + eps)
-
-        source_blame_score = harmful_matrix.T @ err_weights
-        helpful_source_score = helpful_matrix.T @ err_weights
-
-        source_blame_score = self._normalize_nonnegative(source_blame_score)
-        helpful_source_score = self._normalize_nonnegative(helpful_source_score)
-
-        pair_score = harmful_matrix + harmful_matrix.T
-        np.fill_diagonal(pair_score, 0.0)
-
-        if np.max(pair_score) > eps:
-            pair_score = pair_score / (np.max(pair_score) + eps)
-
-        rows = []
-        for idx, (coord, kind) in enumerate(zip(coords_flat, kinds_flat)):
-            rows.append({
-                "idx": idx,
-                "coord": tuple(coord),
-                "type": self.coord_type(tuple(coord), kind),
-                "dq_raw": dq_raw[idx],
-                "dq_eff": dq_eff[idx],
-                "abs_dq": abs(dq_eff[idx]),
-                "chain": chain[idx],
-                "g0": g0[idx],
-                "diag_resp": diag_resp[idx],
-                "abs_diag_resp": abs(diag_resp[idx]),
-                "offdiag_resp": offdiag_resp[idx],
-                "abs_offdiag_resp": abs(offdiag_resp[idx]),
-                "Hdq": Hdq[idx],
-                "abs_Hdq": abs(Hdq[idx]),
-                "g_model": g_model[idx],
-                "g_qm": g_qm[idx],
-                "delta_g_err": delta_g_err[idx],
-                "abs_delta_g_err": abs(delta_g_err[idx]),
-                "rho": rho[idx],
-                "pE_total": partial_energies[idx],
-                "abs_pE_total": abs(partial_energies[idx]),
-                "source_blame_score": source_blame_score[idx],
-                "helpful_source_score": helpful_source_score[idx],
-                "response_score": response_score[idx],
-            })
-
-        by_abs_dq = sorted(rows, key=lambda r: r["abs_dq"], reverse=True)
-        by_abs_Hdq = sorted(rows, key=lambda r: r["abs_Hdq"], reverse=True)
-        by_abs_err = sorted(rows, key=lambda r: r["abs_delta_g_err"], reverse=True)
-        by_rho = sorted(rows, key=lambda r: r["rho"], reverse=True)
-        by_abs_pE = sorted(rows, key=lambda r: r["abs_pE_total"], reverse=True)
-        by_source_blame = sorted(rows, key=lambda r: r["source_blame_score"], reverse=True)
-
-        return {
-            "rows": rows,
-            "dq_eff": dq_eff,
-            "chain": chain,
-            "Hdq": Hdq,
-            "diag_resp": diag_resp,
-            "offdiag_resp": offdiag_resp,
-            "g_model": g_model,
-            "delta_g_err": delta_g_err,
-            "rho": rho,
-            "pE_total": partial_energies,
-            "source_contrib": source_contrib,
-            "blame_matrix": blame_matrix,
-            "harmful_matrix": harmful_matrix,
-            "helpful_matrix": helpful_matrix,
-            "response_score": response_score,
-            "source_blame_score": source_blame_score,
-            "helpful_source_score": helpful_source_score,
-            "pair_score": pair_score,
-            "by_abs_dq": by_abs_dq,
-            "by_abs_Hdq": by_abs_Hdq,
-            "by_abs_err": by_abs_err,
-            "by_rho": by_rho,
-            "by_abs_pE": by_abs_pE,
-            "by_source_blame": by_source_blame,
-        }
-
-
-    def _build_candidate_block(
-        self,
-        anchor_idx: int,
-        global_coord_score: np.ndarray,
-        global_pair: np.ndarray,
-        z_matrix: List[Tuple[int, ...]],
-        coord_kinds: List[str],
-        constraints_to_exclude: List[Tuple[int, ...]],
-        max_partners: int = 4,
-        min_partner_pair_frac: float = 0.15,
-        min_partner_coord_frac: float = 0.20,
-    ) -> List[int]:
-        """
-        Build a coupled block around an anchor using blame-derived pair coupling
-        plus global coordinate relevance.
-
-        No dihedral bonus is used here.
-        """
-        N = len(z_matrix)
-        anchor_score = float(global_coord_score[anchor_idx])
-
-        pair_row = np.asarray(global_pair[anchor_idx], dtype=float).copy()
-        partner_order = np.argsort(-pair_row)
-
-        block = [int(anchor_idx)]
-
-        best_pair = 0.0
-        for j in partner_order:
-            if j == anchor_idx:
-                continue
-            best_pair = float(pair_row[j])
-            break
-
-        if best_pair <= 0.0:
-            return block
-
-        anchor_atoms = set(z_matrix[anchor_idx])
-
-        candidates = []
-        for j in range(N):
-            if j == anchor_idx:
-                continue
-
-            coord_j = tuple(int(x) for x in z_matrix[j])
-
-            if coord_j in constraints_to_exclude:
-                continue
-
-            pair_ok = pair_row[j] >= min_partner_pair_frac * best_pair
-            coord_ok = global_coord_score[j] >= min_partner_coord_frac * anchor_score
-
-            if not (pair_ok and coord_ok):
-                continue
-
-            atoms_j = set(coord_j)
-            overlap = len(anchor_atoms.intersection(atoms_j)) / max(1, len(anchor_atoms.union(atoms_j)))
-
-            local_value = 0.65 * float(pair_row[j]) + 0.30 * float(global_coord_score[j]) + 0.05 * float(overlap)
-            candidates.append((int(j), local_value))
-
-        candidates = sorted(candidates, key=lambda x: x[1], reverse=True)
-
-        for j, _ in candidates[:max_partners]:
-            block.append(int(j))
-
-        partners = [i for i in block if i != anchor_idx]
-        partners = sorted(partners, key=lambda i: global_coord_score[i], reverse=True)
-        block = [int(anchor_idx)] + partners
-
-        return block
-
 
     def _select_constraints_from_block(
         self,
@@ -3635,83 +3349,6 @@ z
         ranked = sorted(ranked, key=lambda x: x[1], reverse=True)
         return [tuple(int(x) for x in coords_flat[i]) for i, _ in ranked[:]]
 
-
-
-    def print_ranked_table(
-        self,
-        rows: List[Dict[str, Any]],
-        title: str,
-        n: int = 10,
-    ) -> None:
-        """
-        Pretty-print a ranked summary table.
-        """
-        print(f"\n{title}")
-        print("-" * len(title))
-        header = (
-            f"{'rank':>4} {'idx':>4} {'type':>10} {'coord':>18} "
-            f"{'|dq|':>12} {'|diag|':>12} {'|offdiag|':>12} "
-            f"{'|Hdq|':>12} {'|err|':>12} {'rho':>12} {'src_blame':>12}"
-        )
-        print(header)
-        print("-" * len(header))
-
-        for rank, r in enumerate(rows[:n]):
-            print(
-                f"{rank:4d} "
-                f"{r['idx']:4d} "
-                f"{r['type']:>10} "
-                f"{self.format_coord(r['coord']):>18} "
-                f"{r['abs_dq']:12.6e} "
-                f"{r['abs_diag_resp']:12.6e} "
-                f"{r['abs_offdiag_resp']:12.6e} "
-                f"{r['abs_Hdq']:12.6e} "
-                f"{r['abs_delta_g_err']:12.6e} "
-                f"{r['rho']:12.6e} "
-                f"{r['source_blame_score']:12.6e}"
-            )
-
-
-    def print_type_summary(self, rows: List[Dict[str, Any]]) -> None:
-        """
-        Aggregate diagnostics by coordinate type.
-        """
-        buckets: Dict[str, Dict[str, float]] = {}
-        for r in rows:
-            t = r["type"]
-            if t not in buckets:
-                buckets[t] = {
-                    "count": 0,
-                    "sum_abs_dq": 0.0,
-                    "sum_abs_Hdq": 0.0,
-                    "sum_abs_err": 0.0,
-                    "sum_abs_pE": 0.0,
-                    "sum_src_blame": 0.0,
-                }
-            buckets[t]["count"] += 1
-            buckets[t]["sum_abs_dq"] += r["abs_dq"]
-            buckets[t]["sum_abs_Hdq"] += r["abs_Hdq"]
-            buckets[t]["sum_abs_err"] += r["abs_delta_g_err"]
-            buckets[t]["sum_abs_pE"] += r["abs_pE_total"]
-            buckets[t]["sum_src_blame"] += r["source_blame_score"]
-
-        print("\nSummary by coordinate type")
-        print("--------------------------")
-        print(
-            f"{'type':>10} {'count':>7} {'sum|dq|':>14} "
-            f"{'sum|Hdq|':>14} {'sum|err|':>14} {'sum|pE|':>14} {'sum src':>14}"
-        )
-        print("-" * 94)
-        for t, vals in buckets.items():
-            print(
-                f"{t:>10} "
-                f"{vals['count']:7d} "
-                f"{vals['sum_abs_dq']:14.6e} "
-                f"{vals['sum_abs_Hdq']:14.6e} "
-                f"{vals['sum_abs_err']:14.6e} "
-                f"{vals['sum_abs_pE']:14.6e} "
-                f"{vals['sum_src_blame']:14.6e}"
-            )
    
     def transform_gradient_to_internal_coordinates(self, molecule, gradient, b_matrix, tol=1e-6):
         grad = np.asarray(gradient, dtype=np.float64).reshape(-1)
@@ -3747,67 +3384,5 @@ z
         """ Returns the gradient obtained by interpolation.
         """
         return self.impes_coordinate.gradient
-    
 
-    # def perform_symmetry_assignment(self, atom_map, sym_group, reference_group, datapoint_group):
-    #     """ Performs the atom mapping. """
-
-    #     new_map = atom_map.copy()
-    #     mapping_dict = {}
-    #     # cost = self.get_dihedral_cost(atom_map, sym_group, non_group_atoms)
-    #     cost = np.linalg.norm(datapoint_group[:, np.newaxis, :] - reference_group[np.newaxis, :, :], axis=2)
-    #     row, col = linear_sum_assignment(cost)
-    #     assigned = False
-    #     print('row col', row, col)
-    #     if not np.equal(row, col).all():
-    #         assigned = True
-            
-    #         # atom_maps = self.linear_assignment_solver(cost)
-    #         reordred_arr = np.array(sym_group)[col]
-    #         new_map[sym_group] = new_map[reordred_arr]
-
-    #         for org, new in zip(np.array(sym_group), reordred_arr):
-    #             print('org, neww', org, new)
-    #         mapping_dict = {org: new for org, new in zip(np.array(sym_group), reordred_arr)}
-        
-    #     return [new_map], mapping_dict, assigned
-
-    def compute_internal_coordinates_values(self, coordinates):
-        """
-        Creates an array with the values of the internal coordinates
-        and saves it in self.
-        """
-
-        cartesian_coordinates = coordinates
-
-        n_atoms = cartesian_coordinates.shape[0]
-        coords = cartesian_coordinates.reshape((n_atoms * 3))
-
-        int_coords = []
-
-        internal_coordinates = []
-        for z in self.z_matrix:
-            
-            if len(z) == 2:
-                q = geometric.internal.Distance(*z)
-            elif len(z) == 3:
-                q = geometric.internal.Angle(*z)
-            elif len(z) == 4:
-                q = geometric.internal.Dihedral(*z)
-            else:
-                assert_msg_critical(False, 'InterpolationDatapoint: Invalid entry size in Z-matrix.')
-            internal_coordinates.append(q)
-
-
-        for element, q in enumerate(internal_coordinates):
-            if (isinstance(q, geometric.internal.Distance)):
-                int_coords.append(1.0 / q.value(coords))
-            elif len(self.z_matrix[element]) == 4:
-                int_coords.append(np.sin(q.value(coords)))
-            else:
-                int_coords.append(q.value(coords))
-
-        X = np.array(int_coords)
-
-        return X
     
