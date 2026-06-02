@@ -841,13 +841,16 @@ def _main_body():
     # XPS
 
     if task_type == 'xps':
+        assert_msg_critical(
+            not use_xtb,
+            'XPS task is not supported with xTB; please use an SCF/DFT method.')
+
         xps_dict = (dict(task.input_dict['xps'])
                     if 'xps' in task.input_dict else {})
         xps_dict['filename'] = task.input_dict['filename']
 
         xps_drv = XPSDriver(task.mpi_comm, task.ostream)
         xps_drv.update_settings(xps_dict, method_dict)
-
         element = xps_dict['element'] if 'element' in xps_dict else None
         elements = xps_dict['elements'] if 'elements' in xps_dict else None
 
