@@ -44,6 +44,7 @@
 
 #include "BoysFunction.hpp"
 #include "DenseMatrix.hpp"
+#include "ElectronRepulsionABDriver.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularBasisOutline.hpp"
 #include "KineticEnergyABDriver.hpp"
@@ -190,6 +191,16 @@ export_newints(py::module &m) -> void
         .def("compute",
              &newints::KineticEnergyDriver::compute,
              "Computes two-center kinetic-energy matrix for given molecule and basis.",
+             "molecule"_a,
+             "basis"_a,
+             "threshold"_a);
+
+    // newints::ElectronRepulsionDriver class
+    PyClass<newints::ElectronRepulsionDriver>(sub, "ElectronRepulsionDriver")
+        .def(py::init<>())
+        .def("compute",
+             &newints::ElectronRepulsionDriver::compute,
+             "Computes two-center Coulomb (RI-metric) electron-repulsion matrix for given molecule and basis.",
              "molecule"_a,
              "basis"_a,
              "threshold"_a);
