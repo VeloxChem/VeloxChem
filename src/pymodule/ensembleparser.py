@@ -331,6 +331,8 @@ class EnsembleParser:
                 Frame number.
             - qm_coords (numpy.ndarray):
                 QM region Cartesian coordinates, shape (N_qm, 3), in Angstrom.
+            - qm_atom_names (numpy.ndarray):
+                Atom names for each QM atom, shape (N_qm,).
             - qm_elements (numpy.ndarray):
                 Element symbols for each QM atom, shape (N_qm,).
             - qm_charge (int):
@@ -510,6 +512,7 @@ class EnsembleParser:
             seek_trajectory_frame(iframe)
 
             qm_coords = np.asarray(qm_atoms.positions, dtype=float).copy()
+            qm_atom_names = np.asarray(qm_atoms.names, dtype=object).copy()
             qm_elements = np.asarray(
                 [atom_guesser.guess_atom_element(n) for n in qm_atoms.names], dtype=object
             )
@@ -637,6 +640,7 @@ class EnsembleParser:
                 "frame": int(mda_universe.trajectory.frame),
 
                 "qm_coords": qm_coords,
+                "qm_atom_names": qm_atom_names,
                 "qm_elements": qm_elements,
                 "qm_charge": qm_charge,
                 "qm_multiplicity": qm_multiplicity,
