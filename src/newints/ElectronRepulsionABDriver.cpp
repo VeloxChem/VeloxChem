@@ -43,6 +43,7 @@
 
 #include "AtomBasis.hpp"
 #include "BasisFunction.hpp"
+#include "CoulombDiagonal.hpp"
 #include "MathConst.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularBasisOutline.hpp"
@@ -81,78 +82,6 @@
 namespace newints {
 
 namespace {
-
-/// @brief Integer power base^exp by repeated multiplication (cheaper than
-/// std::pow for the small exponents that occur here, l = 0..6).
-inline auto
-ipow(const double base, const int exp) -> double
-{
-    auto result = 1.0;
-
-    for (int k = 0; k < exp; k++) result *= base;
-
-    return result;
-}
-
-/// @brief Same-center two-center Coulomb value for two shells of equal angular
-/// momentum l.
-///
-/// On a common center (R_AB = 0) the Coulomb block is diagonal in (l, m) and
-/// independent of m, like the overlap and kinetic-energy blocks. For concentric
-/// solid-harmonic Gaussians the momentum-space Coulomb integral gives, in
-/// VeloxChem's unnormalized (Racah, int Y^2 dOmega = 4 pi / (2l+1)) convention,
-/// the per-primitive-pair value
-///   2 pi^{5/2} (2l-1)!! / ((2l+1) 2^l) * 1 / (alpha beta p^l sqrt(p)),  p = alpha + beta,
-/// placed on every diagonal (m, m) entry by the caller. (Reduces to
-/// 2 pi^{5/2} / (alpha beta sqrt(p)) for l = 0, matching the (s|s) seed.)
-auto
-coulomb_diagonal_value(const CBasisFunction &bra, const CBasisFunction &ket) -> double
-{
-    const auto l = bra.get_angular_momentum();  // == ket angular momentum (caller guarantees l_a == l_b)
-
-    const auto &exps_a = bra.exponents();
-
-    const auto &coefs_a = bra.normalization_factors();
-
-    const auto &exps_b = ket.exponents();
-
-    const auto &coefs_b = ket.normalization_factors();
-
-    // (2l - 1)!! with (-1)!! = 1
-    auto dfact = 1.0;
-
-    for (int k = 2 * l - 1; k > 0; k -= 2) dfact *= static_cast<double>(k);
-
-    const auto two_l = static_cast<double>(1 << l);
-
-    const auto pi = mathconst::pi_value();
-
-    const auto two_pi52 = 2.0 * pi * pi * std::sqrt(pi);
-
-    // 2 pi^{5/2} (2l-1)!! / ((2l+1) 2^l)
-    const auto prefac = two_pi52 * dfact / (static_cast<double>(2 * l + 1) * two_l);
-
-    auto vab = 0.0;
-
-    for (std::size_t i = 0; i < exps_a.size(); i++)
-    {
-        for (std::size_t j = 0; j < exps_b.size(); j++)
-        {
-            const auto alpha = exps_a[i];
-
-            const auto beta = exps_b[j];
-
-            const auto p = alpha + beta;
-
-            // 1 / (alpha beta p^l sqrt(p))
-            const auto denom = alpha * beta * ipow(p, l) * std::sqrt(p);
-
-            vab += coefs_a[i] * coefs_b[j] * prefac / denom;
-        }
-    }
-
-    return vab;
-}
 
 /// @brief Function-pointer type of a Tabula-generated spherical two-center Coulomb
 /// kernel: it writes the (2 l_a + 1) x (2 l_b + 1) row-major block into the buffer.
@@ -374,7 +303,7 @@ ElectronRepulsionDriver::compute(const CMolecule &molecule, const CMolecularBasi
                 {
                     if (bra_shells[p].get_angular_momentum() != bra_shells[q].get_angular_momentum()) continue;
 
-                    const auto vab = coulomb_diagonal_value(bra_shells[p], bra_shells[q]);
+                    const auto vab = coulomb_concentric_value(bra_shells[p], bra_shells[q]);
 
                     const auto n = static_cast<std::size_t>(2 * bra_shells[p].get_angular_momentum() + 1);
 
