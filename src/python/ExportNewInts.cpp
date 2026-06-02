@@ -36,9 +36,13 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <array>
 #include <cstddef>
+#include <stdexcept>
+#include <utility>
 #include <vector>
 
+#include "BoysFunction.hpp"
 #include "DenseMatrix.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularBasisOutline.hpp"
@@ -51,6 +55,39 @@ namespace py = pybind11;
 using namespace py::literals;
 
 namespace vlx_newints {  // vlx_newints namespace
+
+namespace {  // dispatch helpers for the compile-time templated Boys function
+
+template <std::size_t N>
+auto
+boys_values(const double x) -> std::vector<double>
+{
+    std::array<double, N> vals{};
+    newints::boys_function(x, vals);
+    return std::vector<double>(vals.begin(), vals.end());
+}
+
+template <std::size_t... Ns>
+auto
+boys_dispatch(const double x, const std::size_t nvals, std::index_sequence<Ns...>) -> std::vector<double>
+{
+    std::vector<double> result;
+    bool               matched = false;
+    ((nvals == Ns + 1 ? (result = boys_values<Ns + 1>(x), matched = true) : false), ...);
+    if (!matched)
+    {
+        throw std::invalid_argument("boys_function: number of values must be in 1..33.");
+    }
+    return result;
+}
+
+auto
+compute_boys(const double x, const std::size_t nvals) -> std::vector<double>
+{
+    return boys_dispatch(x, nvals, std::make_index_sequence<33>{});
+}
+
+}  // namespace
 
 auto
 export_newints(py::module &m) -> void
@@ -156,6 +193,13 @@ export_newints(py::module &m) -> void
              "molecule"_a,
              "basis"_a,
              "threshold"_a);
+
+    // newints::boys_function (three-region minimax Boys evaluator)
+    sub.def("boys_function",
+            &compute_boys,
+            "Evaluates Boys functions F_0(x), ..., F_{nvals-1}(x) at a single argument x.",
+            "x"_a,
+            "nvals"_a);
 }
 
 }  // namespace vlx_newints
