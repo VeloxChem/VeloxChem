@@ -40,6 +40,7 @@ from .outputstream import OutputStream
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from .tdaeigensolverunrest import TdaUnrestrictedEigenSolver
+from .orbitallocalization import OrbitalLocalizationDriver
 from .errorhandler import assert_msg_critical
 from .spectrumplot import plot_xps_spectrum
 from .sanitychecks import scf_results_sanity_check
@@ -110,6 +111,10 @@ class XPSDriver:
         # Temporarily only enabled w/ TDA, but might be preferred for stability in RPA as well
         self.tamm_dancoff = True
         # Number of TOTAL states to compute per core ionization (if shake_ups is True)
+        # TODO: change so that nstates refers only to shake-ups and exclude emission
+        # nstates = nocc_beta + n_shakeups
+        # TODO: add the emission energies as separate result entries since these are computed anyway
+        # i.e., the ones that we skip in the XPS
         self.nstates = 5
 
     def update_settings(self, xps_dict, method_dict=None):
@@ -437,7 +442,7 @@ class XPSDriver:
         """
         return np.hstack((scf_results['C_beta'][:, :core_idx], scf_results['C_beta'][:, core_idx+1:1+nbeta]))
     
-    def _compute_shakeup_intensity(self, gs_scf_results, ion_scf_results, rsp_results, state_idx, O_Rb, nalpha, tda=False):
+    def _compute_shakeup_intensity(self, gs_scf_results, ion_scf_results, rsp_results, state_idx, unrel_occ_b, nalpha, tda=False):
         """
         Computes the intensity of shake-up satellites in the sudden approximation.
 
@@ -447,6 +452,12 @@ class XPSDriver:
             The ion SCF results dictionary.
         :param rsp_results:
             The response results dictionary.
+        :param state_idx:
+            The index of the excited state for which to compute the intensity.
+        :param unrel_occ_b:
+            The unrelaxed (sudden-approx.) beta-spin occupied molecular orbital coefficients.
+        :param nalpha:
+            The number of alpha-spin occupied molecular orbitals.
         :param tda:
             Whether to use the TDA approximation.
 
@@ -470,32 +481,35 @@ class XPSDriver:
                 False,
                 'Only enabled in the TDA approximation currently.')
 
-        O_delta_a = ion_scf_results['C_alpha'][:, :nalpha]
-        V_delta_a = ion_scf_results['C_alpha'][:, nalpha:]
-        O_delta_b = ion_scf_results['C_beta'][:, :nbeta]
-        V_delta_b = ion_scf_results['C_beta'][:, nbeta:]
-        O_Ra = gs_scf_results['C_alpha'][:, :nalpha]
+        # Get the occupied- and virtual MOs of the ionized system, alpha and beta
+        rel_occ_a = ion_scf_results['C_alpha'][:, :nalpha]
+        rel_vir_a = ion_scf_results['C_alpha'][:, nalpha:]
+        rel_occ_b = ion_scf_results['C_beta'][:, :nbeta]
+        rel_vir_b = ion_scf_results['C_beta'][:, nbeta:]
+
+        # Get the 
+        unrel_occ_a = gs_scf_results['C_alpha'][:, :nalpha]
         #O_Rb = self._get_unrelaxed_fchgs_det(gs_scf_results, core_idx, nbeta)
 
-        s0_a = np.linalg.det(O_delta_a.conj().T @ S @ O_Ra)
-        s0_b = np.linalg.det(O_delta_b.conj().T @ S @ O_Rb)
+        s0_a = np.linalg.det(rel_occ_a.conj().T @ S @ unrel_occ_a)
+        s0_b = np.linalg.det(rel_occ_b.conj().T @ S @ unrel_occ_b)
 
         # ampliteude
         A_a, A_b = 0, 0
 
         for i in range(nalpha):
             for a in range(nvir_a):
-                O_exc_ia = O_delta_a.copy()
-                O_exc_ia[:, i] = V_delta_a[:, a].copy()
+                exc_ia = rel_occ_a.copy()
+                exc_ia[:, i] = rel_vir_a[:, a].copy()
 
-                s_ia = np.linalg.det(O_exc_ia.conj().T @ S @ O_Ra)
+                s_ia = np.linalg.det(exc_ia.conj().T @ S @ unrel_occ_a)
                 amp_ia = X_a[i,a] * s_ia
                 A_a += amp_ia
         for i in range(nbeta):
             for a in range(nvir_b):
-                O_exc_ia = O_delta_b.copy()
-                O_exc_ia[:, i] = V_delta_b[:, a].copy()
-                s_ia = np.linalg.det(O_exc_ia.conj().T @ S @ O_Rb)
+                exc_ia = rel_occ_b.copy()
+                exc_ia[:, i] = rel_vir_b[:, a].copy()
+                s_ia = np.linalg.det(exc_ia.conj().T @ S @ unrel_occ_b)
                 amp_ia = X_b[i,a] * s_ia
                 A_b += amp_ia
                 
@@ -623,13 +637,24 @@ class XPSDriver:
                         # TODO: Localize orbitals. If multiple edges, core orbitals must be
                         # localized separately for each edge.
                         n_deloc = len(delocalized)
+
                         warning = f' The molecule contains {n_deloc} delocalized core orbitals.'
                         self.ostream.print_blank()
                         self.ostream.print_warning(warning)
-                        warning = ' For correct XPS spectra, localize these orbitals first: '
+                        #warning = ' For correct XPS spectra, localize these orbitals first: '
+                        info = ' For correct XPS spectra, the following orbitals are localized: '
                         for mo_idx in delocalized:
-                            warning += f' MO {mo_idx} '
-                        self.ostream.print_warning(warning)
+                            info += f' MO {mo_idx} '
+                        self.ostream.print_info(info)
+
+                        orb_drv = OrbitalLocalizationDriver(self.ostream)
+                        # assumes the orbitals are in order
+                        loc_orbs = orb_drv.compute(molecule, basis, scf_results, (min(delocalized)+1, max(delocalized)+1))['loc_orbs']
+                        scf_driver._molecular_orbitals = loc_orbs
+                        orbs = loc_orbs
+                        #scf_results['C_alpha'][:, delocalized] = loc_orbs.alpha_to_numpy()[:, delocalized]
+                        #scf_results['C_beta'][:, delocalized] = loc_orbs.beta_to_numpy()[:, delocalized]
+
                 self.ostream.print_blank()
                 self.ostream.flush()
             else:
@@ -696,13 +721,18 @@ class XPSDriver:
                             f'(Atom {atom_index+1})...')
                         self.ostream.print_blank()
                         self.ostream.flush()
+
                     if self.tamm_dancoff:
                         rsp_drv = TdaUnrestrictedEigenSolver(self.comm, self.ostream)
                     else:
                         assert_msg_critical(False, 'Only enabled in the TDA approximation currently.')
                         rsp_drv = LinearResponseUnrestrictedEigenSolver(self.comm, self.ostream)
+
                     rsp_drv.update_settings({'nstates': self.nstates})
-                    rsp_drv.nstates = self.nstates
+
+                    # add nbeta = nalpha-1 to cover the emission states
+                    nbeta = nalpha - 1
+                    rsp_drv.nstates = self.nstates + nbeta
                     rsp_results = rsp_drv.compute(molecular_ion, basis, scf_ion_results)
 
                     positive = rsp_results['eigenvalues'] > 0.0
@@ -711,11 +741,7 @@ class XPSDriver:
                         'Need to compute more excited states to reach the shake-up states.'
                     )
 
-                    #first_shakeup_idx = np.where(positive)[0][np.argmin(rsp_results['eigenvalues'][positive])]
-                    first_shakeup_idx = np.where(positive)[0][0]  # if eigenvalues are sorted
-                    n_shakeup = self.nstates - first_shakeup_idx
-
-                    for n in range(first_shakeup_idx, first_shakeup_idx + n_shakeup):
+                    for n in range(nbeta, nbeta + self.nstates):
                         energy = rsp_results['eigenvalues'][n] * hartree_in_ev()
 
                         # TODO?: only consider shake-up states with significant oscillator strength
