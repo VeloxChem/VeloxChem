@@ -94,100 +94,6 @@ ipow(const double base, const int exp) -> double
     return result;
 }
 
-/// @brief Screening test for an off-diagonal (two-center) Coulomb shell pair.
-/// Returns true if the block must be computed.
-///
-/// Implements the per-pair pre-screener of per_pair_predicate.pdf (eq. 9): skip
-/// the pair if
-///   2 pi^{5/2} / (a_min b_min sqrt(a_min + b_min))
-///     * min(1, sqrt(pi) / (2 sqrt(rho_min) R_AB)) * C(l_a, l_b) < tau,
-/// where the first factor is the short-range (s|s) value, the min(...) is the
-/// Boys-function envelope F0(rho R^2) <= min(1, 1/2 sqrt(pi/T)), and
-///   C(l_a,l_b) = sqrt((2 l_a + 1)!! (2 l_b + 1)!!)
-///                * (1 + a_min R^2)^{l_a/2} (1 + b_min R^2)^{l_b/2}.
-/// a_min, b_min are the smallest exponents of each shell (stored in decreasing
-/// order, so the smallest is the last one); rho_min = a_min b_min / (a_min + b_min).
-/// This is a Level-1 scaling pre-screen using only exponents (no contraction
-/// coefficients); it never underestimates the magnitude.
-auto
-coulomb_screener(const CBasisFunction &bra,
-                 const CBasisFunction &ket,
-                 const TPoint<double> &bra_center,
-                 const TPoint<double> &ket_center,
-                 const double          threshold) -> bool
-{
-    // smallest exponents (exponents are stored in decreasing order -> last element)
-    const auto alpha = bra.exponents().back();
-
-    const auto beta = ket.exponents().back();
-
-    const auto pmin = alpha + beta;
-
-    const auto rho = alpha * beta / pmin;
-
-    // squared bra-ket separation R_AB^2
-    const auto ra = bra_center.coordinates();
-
-    const auto rb = ket_center.coordinates();
-
-    const auto dx = ra[0] - rb[0];
-
-    const auto dy = ra[1] - rb[1];
-
-    const auto dz = ra[2] - rb[2];
-
-    const auto r2 = dx * dx + dy * dy + dz * dz;
-
-    const auto la = bra.get_angular_momentum();
-
-    const auto lb = ket.get_angular_momentum();
-
-    const auto pi = mathconst::pi_value();
-
-    // short-range (s|s) value 2 pi^{5/2} / (a_min b_min sqrt(p_min))
-    const auto two_pi52 = 2.0 * pi * pi * std::sqrt(pi);
-
-    const auto short_range = two_pi52 / (alpha * beta * std::sqrt(pmin));
-
-    // Boys-function envelope F0(rho R^2) <= min(1, 1/2 sqrt(pi / (rho R^2)))
-    auto boys_env = 1.0;
-
-    const auto t = rho * r2;
-
-    if (t > 0.0)
-    {
-        const auto bound = 0.5 * std::sqrt(pi / t);
-
-        if (bound < boys_env) boys_env = bound;
-    }
-
-    // combinatorial prefactor sqrt((2 l_a + 1)!! (2 l_b + 1)!!)
-    auto dfact = 1.0;
-
-    for (int k = 2 * la + 1; k > 0; k -= 2) dfact *= static_cast<double>(k);
-
-    for (int k = 2 * lb + 1; k > 0; k -= 2) dfact *= static_cast<double>(k);
-
-    const auto gamma = std::sqrt(dfact);
-
-    // angular envelope (1 + a_min R^2)^{l_a/2} (1 + b_min R^2)^{l_b/2}. The
-    // exponents are half-integer, so (as in the kinetic screener) compute them as
-    // integer powers plus a single sqrt rather than via std::pow's slow path.
-    const auto base_a = 1.0 + alpha * r2;
-
-    const auto base_b = 1.0 + beta * r2;
-
-    auto ang = ipow(base_a, la / 2) * ipow(base_b, lb / 2);
-
-    if (la & 1) ang *= std::sqrt(base_a);
-
-    if (lb & 1) ang *= std::sqrt(base_b);
-
-    const auto estimate = short_range * boys_env * gamma * ang;
-
-    return estimate >= threshold;
-}
-
 /// @brief Same-center two-center Coulomb value for two shells of equal angular
 /// momentum l.
 ///
@@ -322,7 +228,7 @@ coulomb_kernel(const CBasisFunction &bra,
 }  // namespace
 
 auto
-ElectronRepulsionDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, const double threshold) const -> SparseMatrix
+ElectronRepulsionDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis, [[maybe_unused]] const double threshold) const -> SparseMatrix
 {
     // the two-center Coulomb matrix is symmetric
     SparseMatrix matrix(SymmetryType::symmetric);
@@ -338,7 +244,7 @@ ElectronRepulsionDriver::compute(const CMolecule &molecule, const CMolecularBasi
     const auto natoms = static_cast<int>(outline.number_of_atoms());
 
     // cache each atom's shells and contracted-GTO indices once, so the atom-pair
-    // loop reads them by reference instead of reallocating these vectors on every
+    // loops read them by reference instead of reallocating these vectors on every
     // iteration (an atom appears in many pairs)
     std::vector<std::vector<CBasisFunction>> atom_shells(natoms);
 
@@ -353,50 +259,106 @@ ElectronRepulsionDriver::compute(const CMolecule &molecule, const CMolecularBasi
     // row offsets of the triangular atom-pair index (bra atom a <= ket atom b):
     // row_off[a] = number of pairs in rows before a. This O(N) table replaces the
     // O(N^2) materialized atom-pair list; the flat index t maps to (a, b) by a
-    // binary search in the loop below.
+    // binary search in the loops below.
     std::vector<std::size_t> row_off(static_cast<std::size_t>(natoms) + 1);
 
     row_off[0] = 0;
 
     for (int a = 0; a < natoms; a++) row_off[a + 1] = row_off[a] + static_cast<std::size_t>(natoms - a);
 
-    // each thread writes block payloads directly into its own data arena (the
-    // kernels take a raw double* output), recording a SparseMatrix::RawBlock per
-    // block. No per-block allocation and no shared-container mutation in the
-    // parallel region; the arenas are merged in bulk afterwards. The data arena
-    // uses a non-zeroing allocator: off-diagonal kernels write every entry, and the
-    // (few) diagonal blocks are zeroed explicitly, so resize() need not memset.
-    struct ThreadArena
-    {
-        std::vector<double, DefaultInitAllocator<double>> data;
-        std::vector<SparseMatrix::RawBlock> meta;
-    };
-
-    std::vector<ThreadArena> arenas(static_cast<std::size_t>(omp_get_max_threads()));
-
-    // light warmup of each thread's arena to skip the first few reallocations
-    for (auto &arena : arenas)
-    {
-        arena.data.reserve(1u << 14);
-
-        arena.meta.reserve(1u << 10);
-    }
-
     const auto npairs = static_cast<int>(row_off[natoms]);
 
-    // dynamic scheduling balances the load: a heavy-heavy atom pair does far more
-    // work than a light-light one
+    // The 1/r12 Coulomb metric is effectively non-decaying (long-range 1/R_AB), so a
+    // per-pair pre-screener removes almost nothing and is not worth its cost; we
+    // compute every block. Because nothing is screened, the full block structure is
+    // known up front, so each block is written DIRECTLY into the final matrix at a
+    // precomputed offset -- no per-thread arenas and no bulk merge copy (that copy of
+    // the entire near-dense payload dominated the profile on the auxiliary bases).
+    // The `threshold` argument is accepted for API parity with the other two-center
+    // drivers but is ignored.
+
+    // map a flat atom-pair index t -> (a, b) with a <= b
+    const auto pair_atoms = [&](const int t) -> std::pair<int, int> {
+        const auto row = std::upper_bound(row_off.begin(), row_off.end(), static_cast<std::size_t>(t));
+        const int  a   = static_cast<int>(row - row_off.begin()) - 1;
+        const int  b   = a + static_cast<int>(static_cast<std::size_t>(t) - row_off[a]);
+        return {a, b};
+    };
+
+    // ---- Pass 1 (sizing): per atom pair, the payload size in doubles and the block
+    // count, from shell dimensions alone -- no kernels. ----
+    std::vector<std::size_t> pair_data_base(static_cast<std::size_t>(npairs) + 1, 0);
+
+    std::vector<std::size_t> pair_block_base(static_cast<std::size_t>(npairs) + 1, 0);
+
+#pragma omp parallel for schedule(static)
+    for (int t = 0; t < npairs; t++)
+    {
+        const auto [a, b] = pair_atoms(t);
+
+        const auto &bra_shells = atom_shells[a];
+
+        std::size_t bytes = 0, blocks = 0;
+
+        if (a == b)
+        {
+            // same atom: only l == l' shell pairs, triangular over shells
+            for (std::size_t p = 0; p < bra_shells.size(); p++)
+            {
+                const auto n = static_cast<std::size_t>(2 * bra_shells[p].get_angular_momentum() + 1);
+
+                for (std::size_t q = p; q < bra_shells.size(); q++)
+                {
+                    if (bra_shells[p].get_angular_momentum() != bra_shells[q].get_angular_momentum()) continue;
+
+                    bytes += (p == q) ? n * (n + 1) / 2 : n * n;  // packed-LT diagonal / full
+                    blocks += 1;
+                }
+            }
+        }
+        else
+        {
+            // different atoms: all shell pairs, full blocks
+            const auto &ket_shells = atom_shells[b];
+
+            for (std::size_t p = 0; p < bra_shells.size(); p++)
+            {
+                const auto nr = static_cast<std::size_t>(2 * bra_shells[p].get_angular_momentum() + 1);
+
+                for (std::size_t q = 0; q < ket_shells.size(); q++)
+                {
+                    bytes += nr * static_cast<std::size_t>(2 * ket_shells[q].get_angular_momentum() + 1);
+                    blocks += 1;
+                }
+            }
+        }
+
+        pair_data_base[t + 1]  = bytes;
+        pair_block_base[t + 1] = blocks;
+    }
+
+    // prefix sums -> base offset (into matrix.data()) and base block index per pair
+    for (int t = 0; t < npairs; t++)
+    {
+        pair_data_base[t + 1] += pair_data_base[t];
+
+        pair_block_base[t + 1] += pair_block_base[t];
+    }
+
+    matrix.prepare(pair_block_base[npairs], pair_data_base[npairs]);
+
+    double *const dst = matrix.data();
+
+    // ---- Pass 2 (fill): re-walk the identical block order, writing each block
+    // directly into matrix.data() at its precomputed offset. Block payloads and
+    // descriptor slots are disjoint per pair, so this is race-free. ----
 #pragma omp parallel for schedule(dynamic)
     for (int t = 0; t < npairs; t++)
     {
-        // map the flat triangular index t -> (a, b) with a <= b
-        const auto row = std::upper_bound(row_off.begin(), row_off.end(), static_cast<std::size_t>(t));
+        const auto [a, b] = pair_atoms(t);
 
-        const int a = static_cast<int>(row - row_off.begin()) - 1;
-
-        const int b = a + static_cast<int>(static_cast<std::size_t>(t) - row_off[a]);
-
-        auto &arena = arenas[static_cast<std::size_t>(omp_get_thread_num())];
+        auto off  = pair_data_base[t];   // running payload offset for this pair
+        auto bidx = pair_block_base[t];  // running block index for this pair
 
         const auto &bra_shells = atom_shells[a];
 
@@ -416,100 +378,57 @@ ElectronRepulsionDriver::compute(const CMolecule &molecule, const CMolecularBasi
 
                     const auto n = static_cast<std::size_t>(2 * bra_shells[p].get_angular_momentum() + 1);
 
-                    const auto off = arena.data.size();
-
                     if (p == q)
                     {
                         // diagonal block (i == j): packed lower-triangular, only the
                         // (m, m) entries non-zero -> zero the slot, then write them
                         const auto np = n * (n + 1) / 2;
 
-                        arena.data.resize(off + np);
+                        std::fill(dst + off, dst + off + np, 0.0);
 
-                        std::fill(arena.data.begin() + off, arena.data.begin() + off + np, 0.0);
+                        for (std::size_t m = 0; m < n; m++) dst[off + m * (m + 1) / 2 + m] = vab;
 
-                        for (std::size_t m = 0; m < n; m++) arena.data[off + m * (m + 1) / 2 + m] = vab;
+                        matrix.set_block(bidx++, SparseMatrix::RawBlock{bra_idx[p], bra_idx[q], n, n, off, Kind::lower_triangular});
 
-                        arena.meta.push_back(SparseMatrix::RawBlock{bra_idx[p], bra_idx[q], n, n, off, Kind::lower_triangular});
+                        off += np;
                     }
                     else
                     {
                         // same-atom off-diagonal (i < j): full n x n block, diagonal in m
-                        arena.data.resize(off + n * n);
+                        std::fill(dst + off, dst + off + n * n, 0.0);
 
-                        std::fill(arena.data.begin() + off, arena.data.begin() + off + n * n, 0.0);
+                        for (std::size_t m = 0; m < n; m++) dst[off + m * n + m] = vab;
 
-                        for (std::size_t m = 0; m < n; m++) arena.data[off + m * n + m] = vab;
+                        matrix.set_block(bidx++, SparseMatrix::RawBlock{bra_idx[p], bra_idx[q], n, n, off, Kind::full});
 
-                        arena.meta.push_back(SparseMatrix::RawBlock{bra_idx[p], bra_idx[q], n, n, off, Kind::full});
+                        off += n * n;
                     }
                 }
             }
         }
         else
         {
-            // different atoms: all (l, l') shell pairs, screened
+            // different atoms: all (l, l') shell pairs, full blocks
             const auto &ket_shells = atom_shells[b];
 
             const auto &ket_idx = atom_indices[b];
 
             for (std::size_t p = 0; p < bra_shells.size(); p++)
             {
+                const auto nr = static_cast<std::size_t>(2 * bra_shells[p].get_angular_momentum() + 1);
+
                 for (std::size_t q = 0; q < ket_shells.size(); q++)
                 {
-                    if (!coulomb_screener(bra_shells[p], ket_shells[q], coords[a], coords[b], threshold)) continue;
-
-                    const auto nr = static_cast<std::size_t>(2 * bra_shells[p].get_angular_momentum() + 1);
-
                     const auto nc = static_cast<std::size_t>(2 * ket_shells[q].get_angular_momentum() + 1);
 
-                    const auto off = arena.data.size();
+                    // kernel writes every entry directly into the final storage
+                    coulomb_kernel(bra_shells[p], ket_shells[q], coords[a], coords[b], dst + off);
 
-                    arena.data.resize(off + nr * nc);  // uninitialized; the kernel writes every entry
+                    matrix.set_block(bidx++, SparseMatrix::RawBlock{bra_idx[p], ket_idx[q], nr, nc, off, Kind::full});
 
-                    // pointer taken after resize, so a reallocation cannot dangle mid-kernel
-                    coulomb_kernel(bra_shells[p], ket_shells[q], coords[a], coords[b], arena.data.data() + off);
-
-                    arena.meta.push_back(SparseMatrix::RawBlock{bra_idx[p], ket_idx[q], nr, nc, off, Kind::full});
+                    off += nr * nc;
                 }
             }
-        }
-    }
-
-    // per-thread base offsets into the merged storage (serial, O(nthreads));
-    // the heavy payload/descriptor copy is parallelized below
-    const std::size_t nt = arenas.size();
-
-    std::vector<std::size_t> data_base(nt + 1, 0);
-
-    std::vector<std::size_t> meta_base(nt + 1, 0);
-
-    for (std::size_t t = 0; t < nt; t++)
-    {
-        data_base[t + 1] = data_base[t] + arenas[t].data.size();
-
-        meta_base[t + 1] = meta_base[t] + arenas[t].meta.size();
-    }
-
-    matrix.prepare(meta_base[nt], data_base[nt]);
-
-    double *const dst = matrix.data();
-
-    // parallel merge: each thread copies its arena into a disjoint slice of the
-    // matrix data and fills its disjoint range of block descriptors (no serial
-    // bottleneck beyond the prefix sums above)
-#pragma omp parallel for schedule(static)
-    for (int t = 0; t < static_cast<int>(nt); t++)
-    {
-        const auto &arena = arenas[static_cast<std::size_t>(t)];
-
-        if (!arena.data.empty()) std::memcpy(dst + data_base[t], arena.data.data(), arena.data.size() * sizeof(double));
-
-        auto m = meta_base[t];
-
-        for (const auto &rb : arena.meta)
-        {
-            matrix.set_block(m++, SparseMatrix::RawBlock{rb.i, rb.j, rb.nrows, rb.ncols, data_base[t] + rb.offset, rb.kind});
         }
     }
 

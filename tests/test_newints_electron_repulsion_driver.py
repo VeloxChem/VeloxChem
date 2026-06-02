@@ -114,21 +114,28 @@ class TestNewIntsElectronRepulsionDriver:
         assert bas.max_angular_momentum() == 6
         assert np.allclose(tnew, tref, atol=1.0e-9)
 
-    def test_screener_filters_offdiagonal_blocks(self):
+    def test_block_structure_threshold_independent(self):
 
-        # the screener applies only to different-atom pairs; a huge threshold
-        # screens all of them out, leaving only the same-atom blocks
+        # the 1/R Coulomb metric is not screened: the full block structure (all 13
+        # blocks for water/STO-3G) is present regardless of the threshold argument,
+        # which is accepted for API parity but ignored.
         mol, bas = self.water_sto3g()
-        smat = newints.ElectronRepulsionDriver().compute(mol, bas, 1.0e10)
 
-        same_atom = [(0, 0), (0, 1), (1, 1), (2, 2),  # O
-                     (5, 5),                           # H1
-                     (6, 6)]                           # H2
-        assert smat.keys() == sorted(same_atom)
+        full_keys = [
+            (0, 0), (0, 1), (1, 1), (2, 2),   # O-O, same atom, l == l'
+            (0, 5), (1, 5), (2, 5),            # O-H1
+            (0, 6), (1, 6), (2, 6),            # O-H2
+            (5, 5), (5, 6), (6, 6),            # H1/H2
+        ]
+        for threshold in (1.0e10, 1.0e-2, 1.0e-12, 0.0):
+            smat = newints.ElectronRepulsionDriver().compute(mol, bas, threshold)
+            assert smat.number_of_blocks() == 13
+            assert smat.keys() == sorted(full_keys)
 
-    def test_small_threshold_keeps_all_blocks(self):
+    def test_values_threshold_independent(self):
 
-        # a tiny threshold screens nothing -> full block structure (13 blocks)
+        # not only the structure but the values are identical for any threshold
         mol, bas = self.water_sto3g()
-        smat = newints.ElectronRepulsionDriver().compute(mol, bas, 1.0e-12)
-        assert smat.number_of_blocks() == 13
+        a = newints.ElectronRepulsionDriver().compute(mol, bas, 1.0e10).to_dense(bas).to_numpy()
+        b = newints.ElectronRepulsionDriver().compute(mol, bas, 1.0e-14).to_dense(bas).to_numpy()
+        assert np.array_equal(a, b)
