@@ -524,6 +524,9 @@ class EnsembleDriver:
 
         # Common CHARMM -> AMBER mappings
         res_alias = {
+            # Water naming variants
+            "TIP3": "WAT",
+            "TIP3P": "WAT",
             # Histidine tautomers / charge states
             "HSD": "HID",
             "HSE": "HIE",
@@ -578,6 +581,14 @@ class EnsembleDriver:
 
         candidates: list[str] = []
 
+        # CHARMM/GROMACS TIP3 water atom names vs TIP3P database atom names
+        if atom_name == "OH2":
+            candidates.append("OW")
+        elif atom_name == "H1":
+            candidates.extend(["HW1", "HW"])
+        elif atom_name == "H2":
+            candidates.extend(["HW2", "HW"])
+
         # Backbone amide proton: CHARMM often uses HN, AMBER often uses H (varies by residue in db)
         if atom_name == "HN":
             candidates.append("H")
@@ -608,6 +619,29 @@ class EnsembleDriver:
                 return cand
 
         return None
+    
+    @staticmethod
+    def _normalize_resname_for_pe_db(db: dict, resname: str) -> str:
+        """
+        This bridges common water residue naming differences, i.e. TIP3/TIP3P
+        in CHARMM/GROMACS topologies vs WAT in SEP PE table.
+        """
+
+        resname = str(resname)
+
+        if resname in db:
+            return resname
+        
+        res_alias = {
+            "TIP3": "WAT",
+            "TIP3P": "WAT",
+        }
+
+        mapped = res_alias.get(resname, resname)
+        if mapped in db:
+            return mapped
+        
+        return resname
 
     @staticmethod
     def _resolve_atom_name_for_pe_db(atom_name: str, available_atoms) -> str | None:
@@ -641,6 +675,14 @@ class EnsembleDriver:
             return atom_name
 
         candidates: list[str] = []
+
+        # CHARMM/GROMACS TIP3 water atom names vs SEP water atom names
+        if atom_name == "OH2":
+            candidates.append("OW")
+        elif atom_name == "H1":
+            candidates.extend(["HW1", "HW"])
+        elif atom_name == "H2":
+            candidates.extend(["HW2", "HW"])
 
         # Backbone amide proton name
         if atom_name == "HN":
@@ -1003,18 +1045,19 @@ class EnsembleDriver:
 
                 fh.write("@charges\n")
                 for resn in pe_resname_set:
-                    if resn not in pe_db:
+                    db_resn = self._normalize_resname_for_pe_db(pe_db, resn)
+                    if db_resn not in pe_db:
                         raise KeyError(f"No PE parameters for residue name '{resn}'")
                     pattern_atoms = self._first_residue_atom_pattern(
                         pe_atom_names, pe_resindices, pe_resnames, resn
                     )
                     for atom in pattern_atoms:
-                        resolved_atom = self._resolve_atom_name_for_pe_db(atom, pe_db[resn].keys())
+                        resolved_atom = self._resolve_atom_name_for_pe_db(atom, pe_db[db_resn].keys())
                         if resolved_atom is None:
                             raise KeyError(
-                                f"No PE params for {resn}/{atom}. Available: {sorted(pe_db[resn].keys())}"
+                                f"No PE params for {resn}/{atom}. Available: {sorted(pe_db[db_resn].keys())}"
                             )
-                        p = pe_db[resn][resolved_atom]
+                        p = pe_db[db_resn][resolved_atom]
                         fh.write(f"{p['element']:<2} {p['charge']:12.8f}  {resn}_pe\n")
                 for resn in npe_resname_set:
                     pattern_atoms = self._first_residue_atom_pattern(
@@ -1027,16 +1070,17 @@ class EnsembleDriver:
 
                 fh.write("@polarizabilities\n")
                 for resn in pe_resname_set:
+                    db_resn = self._normalize_resname_for_pe_db(pe_db, resn)
                     pattern_atoms = self._first_residue_atom_pattern(
                         pe_atom_names, pe_resindices, pe_resnames, resn
                     )
                     for atom in pattern_atoms:
-                        resolved_atom = self._resolve_atom_name_for_pe_db(atom, pe_db[resn].keys())
+                        resolved_atom = self._resolve_atom_name_for_pe_db(atom, pe_db[db_resn].keys())
                         if resolved_atom is None:
                             raise KeyError(
-                                f"No PE params for {resn}/{atom}. Available: {sorted(pe_db[resn].keys())}"
+                                f"No PE params for {resn}/{atom}. Available: {sorted(pe_db[db_resn].keys())}"
                             )
-                        p = pe_db[resn][resolved_atom]
+                        p = pe_db[db_resn][resolved_atom]
                         pol = p["polar"]
                         fh.write(
                             f"{p['element']:<2} {pol[0]:12.8f} {pol[1]:12.8f} {pol[2]:12.8f} "
