@@ -149,7 +149,6 @@ class InterpolationDriver():
         self.labels = None
         self.use_inverse_bond_length = True
         self.use_eq_bond_length = False
-        self.use_cosine_dihedral = False
         self.use_mass_weight = False
         
 
@@ -169,19 +168,6 @@ class InterpolationDriver():
         self.tc_imp_gate_exp_clip = 50.0
         self.tc_imp_min_sigma = 1.0e-12
 
-        # Hessian-coupled multiplicative TC weighting.
-        self.tc_hessian_energy_scale_kcal = 1.0
-        self.tc_hessian_mix = 0.8
-        self.tc_hessian_psd_mode = "positive"  # "abs" or "positive"
-        self.tc_hessian_eig_floor = 0.0
-        self.tc_hessian_eig_cap = 10.0
-        self.tc_hessian_normalize_by_count = True
-
-        # Optional runtime cache for symmetry-expanded task evaluation.
-        # enables reuse of flattened symmetry tasks across compute() calls
-        self.runtime_data_cache_enabled = True
-        # invalidation flag for rebuilt symmetry task cache payload
-        self._runtime_data_cache_dirty = True
         # core-label keyed cache of (datapoint, mask0, mask) symmetry tasks
         self._symmetry_task_cache = {}
 
@@ -200,14 +186,12 @@ class InterpolationDriver():
                     ('str', 'the name of the chk file with QM data'),
                     'use_inverse_bond_length': ('bool', 'whether to use inverse bond lengths in the Z-matrix'),
                     'use_eq_bond_length': ('bool', 'whether to use eq bond lengths in the Z-matrix'),
-                    'use_cosine_dihedral':('bool', 'wether to use cosine and sin for the diehdral in the Z-matrix'),
                     'use_tc_weights':('bool', 'weither to use target coustomized weights'),
                     'tc_weight_mode':('str', 'the mode for the target customized weights (multiplicative/additive)'),
                     'use_mass_weight':('bool', 'weither to use mass weighting in coordinates'),
                 'labels': ('seq_fixed_str', 'the list of QM data point labels'),
             }
         }
-
 
     def update_settings(self, impes_dict=None):
         """
@@ -238,7 +222,7 @@ class InterpolationDriver():
         if self.interpolation_type == 'shepard' and self.exponent_q is None:
             self.exponent_q = self.exponent_p / 2.0
 
-        valid_tc_modes = {"multiplicative", "multiplicative_hessian", "additive_rhee"}
+        valid_tc_modes = {"multiplicative", "additive_rhee"}
 
         if self.tc_weight_mode not in valid_tc_modes:
             raise ValueError(
@@ -260,12 +244,10 @@ class InterpolationDriver():
         if (
             self.use_tc_weights
             and self.tc_weight_mode == "additive_rhee"
-            and self.use_cosine_dihedral
         ):
             raise NotImplementedError(
                 "The additive Rhee target-customized formalism currently "
                 "requires raw dihedral-angle rows. "
-                "use_cosine_dihedral=True is not supported."
             )
 
 
@@ -362,13 +344,10 @@ class InterpolationDriver():
         else:
             remove_from_label += "_r"
             z_matrix_label += '_r'
-        
-        if self.impes_coordinate.use_cosine_dihedral:
-            remove_from_label += "_cosine"
-            z_matrix_label += '_cosine'
-        else:
-            remove_from_label += "_dihedral"
-            z_matrix_label += '_dihedral'
+
+
+        remove_from_label += "_dihedral"
+        z_matrix_label += '_dihedral'
         
         remove_from_label += "_energy"
 
@@ -703,16 +682,16 @@ class InterpolationDriver():
         dist_org = (org_int_coords.copy() - data_point.internal_coordinates_values)
         dist_check = (org_int_coords.copy() - data_point.internal_coordinates_values)
         chain = np.ones_like(dist_org)
-        if not self.use_cosine_dihedral:
-            d_prop = self._principal_torsion_delta(dist_org[dihedral_start:dihedral_end])
-            dist_check[dihedral_start:dihedral_end] = 2.0 * np.sin(0.5 * d_prop)
-            d_imp = self._principal_torsion_delta(
-                dist_org[dihedral_end:]
-            )
-            chain[dihedral_start:dihedral_end] = np.cos(0.5 * d_prop)
-            imp_slice = slice(dihedral_end, len(dist_org))
-            dist_check[imp_slice] = 2.0 * np.tan(0.5 * d_imp)
-            chain[imp_slice] = 1.0 / np.maximum(np.cos(0.5 * d_imp)**2, 1.0e-12)
+
+        d_prop = self._principal_torsion_delta(dist_org[dihedral_start:dihedral_end])
+        dist_check[dihedral_start:dihedral_end] = 2.0 * np.sin(0.5 * d_prop)
+        d_imp = self._principal_torsion_delta(
+            dist_org[dihedral_end:]
+        )
+        chain[dihedral_start:dihedral_end] = np.cos(0.5 * d_prop)
+        imp_slice = slice(dihedral_end, len(dist_org))
+        dist_check[imp_slice] = 2.0 * np.tan(0.5 * d_imp)
+        chain[imp_slice] = 1.0 / np.maximum(np.cos(0.5 * d_imp)**2, 1.0e-12)
 
         self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:bond_end])**2))))
         self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[bond_end:angle_end]**2))))
@@ -725,11 +704,8 @@ class InterpolationDriver():
         )
 
         dist_hessian_eff = np.matmul(dist_check.T, hessian)
-        if not self.use_cosine_dihedral:
-
-            grad *= chain
-            dist_hessian_eff *= chain
-
+        grad *= chain
+        dist_hessian_eff *= chain
 
         pes_prime = np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian_eff)).reshape(natm, 3)
         return pes, pes_prime, (grad + dist_hessian_eff)
@@ -755,131 +731,6 @@ class InterpolationDriver():
                     continue
 
                 yield section, coord, idx
-
-            
-    # def _imp_coordinate_sigma(self, section, idx, q_ref):
-    #     """
-    #     Returns the sigma value in the same coordinate representation as the
-    #     internal coordinate row idx.
-
-    #     For inverse bonds, q = 1/r, so a physical bond tolerance sigma_r is
-    #     converted into q-space via sigma_q = sigma_r / r_ref^2.
-    #     """
-
-    #     sigma_bond_bohr = (
-    #         float(self.tc_imp_bond_sigma_angstrom) / bohr_in_angstrom()
-    #     )
-
-    #     if section == "bonds":
-    #         if self.use_inverse_bond_length:
-    #             # q_ref is 1/r in bohr^-1.
-    #             r_ref = 1.0 / max(abs(float(q_ref[idx])), self.tc_imp_min_sigma)
-    #             sigma = sigma_bond_bohr / max(r_ref * r_ref, self.tc_imp_min_sigma)
-    #         else:
-    #             sigma = sigma_bond_bohr
-
-    #     elif section == "angles":
-    #         sigma = np.deg2rad(float(self.tc_imp_angle_sigma_degrees))
-
-    #     elif section == "dihedrals":
-    #         sigma = np.sin(np.deg2rad(float(self.tc_imp_dihedral_sigma_degrees)))
-
-    #     elif section == "impropers":
-    #         sigma = np.sin(np.deg2rad(float(self.tc_imp_improper_sigma_degrees)))
-
-
-    #     else:
-    #         raise ValueError(f"Unknown important-coordinate section: {section}")
-
-    #     return max(float(abs(sigma)), self.tc_imp_min_sigma)
-
-    # def _important_coordinate_gate_metric(self, data_point, active_dofs):
-    #     """
-    #     Computes the dimensionless important-coordinate distance A_imp and
-    #     its Cartesian derivative.
-
-    #     A_imp = sum_k beta_k z_k^2 / sum_k beta_k
-
-    #     The derivative is with respect to the active Cartesian coordinates
-    #     used by the Cartesian weight gradient.
-
-    #     Returns
-    #     -------
-    #     A_imp : float
-    #         Dimensionless mean squared important-coordinate displacement.
-
-    #     grad_A_imp : ndarray, shape (n_active_dofs,)
-    #         dA_imp/dX for active Cartesian degrees of freedom.
-    #     """
-
-    #     q_cur = np.asarray(
-    #         self.impes_coordinate.internal_coordinates_values,
-    #         dtype=np.float64,
-    #     )
-    #     q_ref = np.asarray(
-    #         data_point.internal_coordinates_values,
-    #         dtype=np.float64,
-    #     )
-
-    #     B = np.asarray(self.impes_coordinate.b_matrix, dtype=np.float64)
-
-    #     inv_sqrt_masses = getattr(self.impes_coordinate, "inv_sqrt_masses", None)
-    #     if inv_sqrt_masses is not None:
-    #         inv_sqrt_active = np.asarray(inv_sqrt_masses, dtype=np.float64)[active_dofs]
-    #     else:
-    #         inv_sqrt_active = None
-
-    #     A_num = 0.0
-    #     beta_sum = 0.0
-    #     grad_A_num = np.zeros(active_dofs.size, dtype=np.float64)
-
-    #     for section, coord, idx in self._iter_imp_internal_coordinate_rows(data_point):
-    #         beta = 1.0
-
-    #         dq_raw = float(q_cur[idx] - q_ref[idx])
-    #         sigma = self._imp_coordinate_sigma(section, idx, q_ref)
-
-    #         # B row is mass-weighted if inv_sqrt_masses was set on the datapoint.
-    #         # Convert it back to derivative with respect to physical Cartesian
-    #         # coordinates, matching the existing target-customized code path.
-    #         b_row = B[idx, active_dofs].copy()
-    #         if inv_sqrt_active is not None:
-    #             b_row = b_row / inv_sqrt_active
-
-    #         if section == "dihedrals":
-    #             # Periodic, smooth metric.
-    #             d = self._principal_torsion_delta(dq_raw)
-    #             z = np.sin(d) / sigma
-    #             dz_dx = np.cos(d) * b_row / sigma
-
-    #         elif section == "impropers":
-    #             d = self._principal_torsion_delta(dq_raw)
-    #             z = np.sin(d) / sigma
-    #             dz_dx = np.cos(d) * b_row / sigma
-
-
-    #         elif section == "angles":
-    #             z = dq_raw / sigma
-    #             dz_dx = b_row / sigma
-
-    #         elif section == "bonds":
-    #             z = dq_raw / sigma
-    #             dz_dx = b_row / sigma
-
-    #         else:
-    #             continue
-
-    #         A_num += beta * z * z
-    #         grad_A_num += beta * 2.0 * z * dz_dx
-    #         beta_sum += beta
-
-    #     if beta_sum <= 0.0:
-    #         return 0.0, np.zeros(active_dofs.size, dtype=np.float64)
-
-    #     A_imp = A_num / beta_sum
-    #     grad_A_imp = grad_A_num / beta_sum
-
-    #     return float(A_imp), grad_A_imp
 
     def _imp_coordinate_sigma(self, section, idx, q_ref):
         """
@@ -916,104 +767,10 @@ class InterpolationDriver():
 
         return max(float(abs(sigma)), self.tc_imp_min_sigma)
 
-    # def _important_coordinate_gate_metric(self, data_point, active_dofs):
-    #     """
-    #     Computes the dimensionless important-coordinate distance A_imp and
-    #     its Cartesian derivative.
-
-    #     A_imp = sum_k beta_k z_k^2 / sum_k beta_k
-
-    #     The derivative is with respect to the active Cartesian coordinates
-    #     used by the Cartesian weight gradient.
-
-    #     Returns
-    #     -------
-    #     A_imp : float
-    #         Dimensionless mean squared important-coordinate displacement.
-
-    #     grad_A_imp : ndarray, shape (n_active_dofs,)
-    #         dA_imp/dX for active Cartesian degrees of freedom.
-    #     """
-
-    #     q_cur = np.asarray(
-    #         self.impes_coordinate.internal_coordinates_values,
-    #         dtype=np.float64,
-    #     )
-    #     q_ref = np.asarray(
-    #         data_point.internal_coordinates_values,
-    #         dtype=np.float64,
-    #     )
-
-    #     B = np.asarray(self.impes_coordinate.b_matrix, dtype=np.float64)
-
-    #     inv_sqrt_masses = getattr(self.impes_coordinate, "inv_sqrt_masses", None)
-    #     if inv_sqrt_masses is not None:
-    #         inv_sqrt_active = np.asarray(inv_sqrt_masses, dtype=np.float64)[active_dofs]
-    #     else:
-    #         inv_sqrt_active = None
-
-    #     A_num = 0.0
-    #     beta_sum = 0.0
-    #     grad_A_num = np.zeros(active_dofs.size, dtype=np.float64)
-
-    #     for section, coord, idx in self._iter_imp_internal_coordinate_rows(data_point):
-    #         beta = 1.0
-
-    #         dq_raw = float(q_cur[idx] - q_ref[idx])
-    #         sigma = self._imp_coordinate_sigma(section, idx, q_ref)
-
-    #         # B row is mass-weighted if inv_sqrt_masses was set on the datapoint.
-    #         # Convert it back to derivative with respect to physical Cartesian
-    #         # coordinates, matching the existing target-customized code path.
-    #         b_row = B[idx, active_dofs].copy()
-    #         if inv_sqrt_active is not None:
-    #             b_row = b_row / inv_sqrt_active
-
-    #         if section == "dihedrals":
-    #             # Periodic, smooth metric.
-    #             d = self._principal_torsion_delta(dq_raw)
-    #             z = 2.0 * np.sin(0.5 * d) / sigma
-    #             dz_dx = np.cos(0.5 * d) * b_row / sigma
-
-    #         elif section == "impropers":
-    #             d = self._principal_torsion_delta(dq_raw)
-
-    #             eta = 2.0 * np.tan(0.5 * d)
-    #             cos_half = np.cos(0.5 * d)
-    #             chain_eta = 1.0 / np.maximum(cos_half * cos_half, 1.0e-12)
-
-    #             z = eta / sigma
-    #             dz_dx = chain_eta * b_row / sigma
-
-
-    #         elif section == "angles":
-    #             z = dq_raw / sigma
-    #             dz_dx = b_row / sigma
-
-    #         elif section == "bonds":
-    #             z = dq_raw / sigma
-    #             dz_dx = b_row / sigma
-
-    #         else:
-    #             continue
-
-    #         A_num += beta * z * z
-    #         grad_A_num += beta * 2.0 * z * dz_dx
-    #         beta_sum += beta
-
-    #     if beta_sum <= 0.0:
-    #         return 0.0, np.zeros(active_dofs.size, dtype=np.float64)
-
-    #     A_imp = A_num / beta_sum
-    #     grad_A_imp = grad_A_num / beta_sum
-
-    #     return float(A_imp), grad_A_imp
-
     def _important_coordinate_gate_metric(
         self,
         data_point,
         active_dofs,
-        hessian_weighted=False,
     ):
         q_cur = np.asarray(self.impes_coordinate.internal_coordinates_values, dtype=np.float64)
         q_ref = np.asarray(data_point.internal_coordinates_values, dtype=np.float64)
@@ -1073,71 +830,7 @@ class InterpolationDriver():
         A_iso = float(np.dot(z, z) / nsel)
         grad_iso = (2.0 / nsel) * (J.T @ z)
 
-        if not hessian_weighted:
-            return A_iso, grad_iso
-
-        H = getattr(data_point, "internal_hessian", None)
-        if H is None:
-            return A_iso, grad_iso
-
-        H = np.asarray(H, dtype=np.float64)
-        if H.ndim != 2 or H.shape[0] != H.shape[1] or H.shape[0] <= max(selected_idx):
-            return A_iso, grad_iso
-
-        H_sel = H[np.ix_(selected_idx, selected_idx)]
-        H_sel = 0.5 * (H_sel + H_sel.T)
-
-        sigma_vec = np.asarray(sigmas, dtype=np.float64)
-        K_energy = sigma_vec[:, None] * H_sel * sigma_vec[None, :]
-
-        e_ref = (
-            float(getattr(self, "tc_hessian_energy_scale_kcal", 1.0))
-            / hartree_in_kcalpermol()
-        )
-        e_ref = max(e_ref, 1.0e-12)
-
-        K_dimless = K_energy / e_ref
-        K_dimless = 0.5 * (K_dimless + K_dimless.T)
-
-        eigval, eigvec = np.linalg.eigh(K_dimless)
-
-        mode = str(getattr(self, "tc_hessian_psd_mode", "abs")).lower()
-        if mode == "positive":
-            lam = np.maximum(eigval, 0.0)
-        elif mode == "abs":
-            lam = np.abs(eigval)
-        else:
-            raise ValueError(
-                f"Unknown tc_hessian_psd_mode={self.tc_hessian_psd_mode}. "
-                "Allowed values are 'abs' and 'positive'."
-            )
-
-        floor = float(getattr(self, "tc_hessian_eig_floor", 0.0))
-        cap = float(getattr(self, "tc_hessian_eig_cap", 10.0))
-
-        if floor > 0.0:
-            lam = np.maximum(lam, floor)
-        if cap > 0.0:
-            lam = np.minimum(lam, cap)
-
-        K_psd = (eigvec * lam) @ eigvec.T
-        K_psd = 0.5 * (K_psd + K_psd.T)
-
-        scale = float(nsel) if bool(getattr(self, "tc_hessian_normalize_by_count", True)) else 1.0
-
-        A_hess = float(0.5 * z @ (K_psd @ z) / scale)
-        grad_hess = (J.T @ (K_psd @ z)) / scale
-
-        mix = float(getattr(self, "tc_hessian_mix", 0.5))
-        mix = min(max(mix, 0.0), 1.0)
-
-        A_imp = (1.0 - mix) * A_iso + mix * A_hess
-        grad_A_imp = (1.0 - mix) * grad_iso + mix * grad_hess
-
-        if A_imp < 0.0 and abs(A_imp) < 1.0e-12:
-            A_imp = 0.0
-
-        return float(A_imp), np.asarray(grad_A_imp, dtype=np.float64)
+        return A_iso, grad_iso
     
     def _apply_imp_coordinate_penalty_gate(
             self,
@@ -1151,9 +844,7 @@ class InterpolationDriver():
                 return np.inf, np.zeros_like(raw_weight_gradient_base)
 
             lam = float(self.tc_imp_gate_lambda)
-            # exponent = min(lam * float(A_imp), float(self.tc_imp_gate_exp_clip))
 
-            # gate = np.exp(-exponent)
             raw_exponent = lam * float(A_imp)
             clip = float(self.tc_imp_gate_exp_clip)
 
@@ -1170,7 +861,6 @@ class InterpolationDriver():
             grad_base_flat = np.asarray(raw_weight_gradient_base, dtype=np.float64).reshape(-1)
             grad_A_flat = np.asarray(grad_A_imp, dtype=np.float64).reshape(-1)
 
-            # grad_gate = -lam * gate * grad_A_flat
             grad_gate = -lambda_eff * gate * grad_A_flat
 
             w_mod = w_base * gate
@@ -1203,13 +893,6 @@ class InterpolationDriver():
 
         grad_D_tc : ndarray, shape (n_active_dofs,)
             Cartesian derivative d(D_tc)/dX.
-
-        Notes
-        -----
-        This method is intentionally separate from the multiplicative
-        target-customized gate implementation. In the Rhee weighting
-        formalism, both proper and improper dihedrals use the sine-based
-        periodic distance coordinate.
         """
 
         q_cur = np.asarray(
@@ -1273,15 +956,11 @@ class InterpolationDriver():
 
                 d = self._principal_torsion_delta(dq_raw)
 
-                # Identical to:
-                # sin(d / 2) / sin(tau / 2),
-                # because sigma = 2 sin(tau / 2).
                 delta = 2.0 * np.sin(0.5 * d) / sigma
 
                 ddelta_dx = (
                     np.cos(0.5 * d) * b_row / sigma
                 )
-
             else:
                 continue
 
@@ -1651,19 +1330,18 @@ class InterpolationDriver():
         dstart = int(bounds["dihedral_start"])
         dend = int(bounds["dihedral_end"])
 
-        if not self.use_cosine_dihedral:
-            for idx in range(len(dq_raw)):
-                if dstart <= idx < dend:  # proper dihedrals only
-                    d = self._principal_torsion_delta(dq_raw[idx])
-                    dq_eff[idx] = np.sin(d)
-                    chain[idx] = np.cos(d)
-                elif idx >= dend:  # impropers
-                    d = self._principal_torsion_delta(dq_raw[idx])
-                    dq_eff[idx] = self._improper_dihedral_displacement(d)
-                    chain[idx] = self._improper_dihedral_chain(d)
-                else:  # bonds and angles
-                    dq_eff[idx] = dq_raw[idx]
-                    chain[idx] = 1.0
+        for idx in range(len(dq_raw)):
+            if dstart <= idx < dend:  # proper dihedrals only
+                d = self._principal_torsion_delta(dq_raw[idx])
+                dq_eff[idx] = np.sin(d)
+                chain[idx] = np.cos(d)
+            elif idx >= dend:  # impropers
+                d = self._principal_torsion_delta(dq_raw[idx])
+                dq_eff[idx] = self._improper_dihedral_displacement(d)
+                chain[idx] = self._improper_dihedral_chain(d)
+            else:  # bonds and angles
+                dq_eff[idx] = dq_raw[idx]
+                chain[idx] = 1.0
 
         grad_Dint = np.zeros(active_dofs.shape[0], dtype=np.float64)
         if self.impes_coordinate.inv_sqrt_masses is not None:
@@ -1862,7 +1540,7 @@ class InterpolationDriver():
                     )
                 )
 
-            elif self.tc_weight_mode in ("multiplicative", "multiplicative_hessian"):
+            elif self.tc_weight_mode == "multiplicative":
                 denominator_base, weight_gradient_sub_base = (
                     self.shepard_weight_gradient(
                         distance_vector_sub,
@@ -1875,7 +1553,6 @@ class InterpolationDriver():
                 A_imp, grad_A_imp = self._important_coordinate_gate_metric(
                     data_point,
                     active_dofs,
-                    hessian_weighted=(self.tc_weight_mode == "multiplicative_hessian"),
                 )
 
                 denominator_imp_coord, weight_gradient_sub_imp_coord = (
@@ -1941,11 +1618,10 @@ class InterpolationDriver():
                         scale2,
                     )
 
-                elif self.tc_weight_mode in ("multiplicative", "multiplicative_hessian"):
+                elif self.tc_weight_mode == "multiplicative":
                     A_imp, grad_A_imp = self._important_coordinate_gate_metric(
                         data_point,
                         active_dofs,
-                        hessian_weighted=(self.tc_weight_mode == "multiplicative_hessian"),
                     )
 
                     lam = float(self.tc_imp_gate_lambda)
@@ -2104,44 +1780,22 @@ class InterpolationDriver():
         datapoints,
     ):
         """
-        Error-source-focused selection scheme.
-
-        Philosophy
-        ----------
-        This version explicitly separates three questions:
-
         1) Where does the local model fail?
         -> response score from |g_qm - g_model|
 
         2) Which displaced coordinates drive that failure?
         -> source blame score from a leave-one-source-out test
-
-        3) Which coordinates should be constrained together?
-        -> build local coupled blocks from a blame-derived pair graph
-
-        Proper dihedrals:
-            wrapped and represented with dq_eff = sin(dq_raw), chain = cos(dq_raw)
-
-        Impropers:
-            wrapped to principal interval if needed, but kept linear:
-            dq_eff = dq_raw, chain = 1
-z
         """
-        # ------------------------------------------------------------------
-        # Hyperparameters
-        # ------------------------------------------------------------------
-        # final global score = source + response + support - helpful
+
         w_source = 0.60
         w_response = 0.30
         w_support = 0.10
         helpful_penalty = 0.15
-
-        # local support
         support_top_frac = 0.20
 
         # block construction / ranking
         pair_weight = 0.35
-        support_weight = 0.25
+        support_weight = 0.0
 
         component_score_z = 2.0
         component_pair_z = 1.5
@@ -2170,10 +1824,8 @@ z
         constraints_to_exclude = []
         per_dp_results = []
 
-        # ------------------------------------------------------------------
         # Exclude near-linear angles from direct constraint selection
-        # (but they still remain in diagnostics)
-        # ------------------------------------------------------------------
+
         for element in z_matrix.get("angles", []):
             current_angle = molecule.get_angle_in_degrees(
                 (element[0] + 1, element[1] + 1, element[2] + 1)
@@ -2305,6 +1957,7 @@ z
             global_pair += wk * r["pair_score"]
             global_displacement += wk * r["norm_displacement"]
 
+        # Magnitude-preserving channels have already been aggregated.
         global_response = self._normalize_nonnegative(global_response)
         global_source_blame = self._normalize_nonnegative(global_source_blame)
         global_helpful = self._normalize_nonnegative(global_helpful)
@@ -2315,18 +1968,22 @@ z
         if np.max(global_pair) > eps:
             global_pair = global_pair / (np.max(global_pair) + eps)
 
-        raw_global_score = (
+        # Diagnostic/locality score only.
+        regularized_coord_score = (
             w_source * global_source_blame
             + w_response * global_response
             + w_support * global_support
             - helpful_penalty * global_helpful
         )
-        raw_global_score = np.maximum(raw_global_score, 0.0)
-        global_coord_score = self._normalize_nonnegative(raw_global_score)
+        regularized_coord_score = self._normalize_nonnegative(
+            np.maximum(regularized_coord_score, 0.0)
+        )
 
-        # ------------------------------------------------------------------
-        # Build and rank coupled repair blocks
-        # ------------------------------------------------------------------
+        # Constraint-selection score.
+        global_coord_score = self._normalize_nonnegative(
+            0.50 * global_source_blame
+            + 0.50 * global_response
+)
         N_coords = N
 
         d_eff = self._effective_dimension(global_coord_score)
@@ -2352,35 +2009,29 @@ z
             pair_z=component_pair_z,
         )
 
-        # Fallback: if the graph builder finds nothing, use the best coordinate.
         if not components:
             best_idx = int(np.argmax(global_coord_score))
             components = [[best_idx]]
 
         for component in components:
-            # Defensive filtering.
+
             component = [
                 int(i) for i in component
                 if tuple(int(x) for x in coords_flat[i]) not in constraints_to_exclude
             ]
-
             component = [
                 int(i) for i in component
             ]
-
             if not component:
                 continue
 
-            # Steering score chooses the anchor inside the component.
             steering_score = {
                 i: float(0.8 * global_source_blame[i] + 0.2 * global_response[i])
                 for i in component
             }
-
             anchor_idx = max(component, key=lambda i: steering_score[i])
             anchor_coord = tuple(int(x) for x in coords_flat[anchor_idx])
 
-            # Sort component coordinates by a mixture of individual score and coupling to anchor.
             pair_to_anchor = np.asarray(global_pair[anchor_idx], dtype=float)
 
             component_sorted = sorted(
@@ -2395,7 +2046,7 @@ z
             component_sorted = [anchor_idx] + [
                 int(i) for i in component_sorted if int(i) != int(anchor_idx)
             ]
-            # Trim oversized components by score coverage.
+
             total_component_score = float(np.sum(global_coord_score[component_sorted]))
             total_component_score = float(np.sum(global_coord_score[component_sorted]))
             block_indices = [int(anchor_idx)]
@@ -2427,8 +2078,6 @@ z
             coord_mass = float(np.sum(global_coord_score[block_indices]))
             support_mass = float(np.mean(global_support[block_indices])) if block_indices else 0.0
 
-            # Use pair density, not raw pair sum.
-            # Raw pair sum grows approximately as |block|^2 and would bias toward large components.
             pair_sum = 0.0
             n_pairs = 0
 
@@ -2479,6 +2128,7 @@ z
             global_response_score=global_response,
             global_pair=global_pair,
             z_matrix=coords_flat,
+            global_displacement=global_displacement,
             max_constraints=max_constraints_to_return,
             singleton_dominance=singleton_dominance,
             singleton_source_frac=singleton_source_frac,
@@ -2494,7 +2144,7 @@ z
             coords_flat=coords_flat,
             kinds_flat=kinds_flat,
             constraints_to_exclude=constraints_to_exclude,
-            global_coord_score=global_coord_score,
+            global_coord_score=regularized_coord_score,
             global_pair=global_pair,
             global_displacement=global_displacement,
         )
@@ -3178,12 +2828,15 @@ z
         global_response_score: np.ndarray,
         global_pair: np.ndarray,
         z_matrix: List[Tuple[int, ...]],
+        global_displacement=None,
         max_constraints: int = 3,
         singleton_dominance: float = 1.35,
         singleton_source_frac: float = 0.85,
         singleton_response_frac: float = 0.85,
-        secondary_score_frac: float = 0.25,
-        min_secondary_pair_frac: float = 0.15,
+        secondary_score_frac: float = 0.60,
+        min_secondary_pair_frac: float = 0.35,
+        min_secondary_displacement: float = 0.5,
+        min_secondary_relative_displacement: float = 0.10,
     ):
         """
         Choose final constraints from the winning block.
@@ -3249,6 +2902,20 @@ z
             if best_pair > eps:
                 pair_ok = float(pair_row[i]) >= min_secondary_pair_frac * best_pair
                 if not pair_ok and block_scores[i] < 0.60 * max(block_scores[primary_idx], eps):
+                    continue
+            if global_displacement is not None:
+                primary_disp = float(global_displacement[primary_idx])
+                disp_i = float(global_displacement[i])
+
+                required_disp = min_secondary_displacement
+
+                if primary_disp > eps:
+                    required_disp = max(
+                        required_disp,
+                        min_secondary_relative_displacement * primary_disp,
+                    )
+
+                if disp_i < required_disp:
                     continue
 
             coord_i = tuple(int(x) for x in z_matrix[i])

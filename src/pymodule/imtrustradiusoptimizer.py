@@ -34,9 +34,7 @@
 from mpi4py import MPI
 import numpy as np
 import scipy
-import h5py
-import re
-import os, copy, math
+import copy
 import warnings
 
 from contextlib import redirect_stderr
@@ -60,7 +58,7 @@ except ImportError:
 
 
 class IMTrustRadiusOptimizer:
-    def __init__(self, z_matrix, impes_dict, sym_dict, dps, structure_list, qm_e, qm_g, exponent_p_q, e_x, beta=0.8, verbose=False, cluster_banks=None):
+    def __init__(self, z_matrix, impes_dict, sym_dict, dps, structure_list, qm_e, qm_g, exponent_p_q, e_x, beta=0.8, verbose=False):
 
         p, q = exponent_p_q
 
@@ -89,10 +87,6 @@ class IMTrustRadiusOptimizer:
         self.S              = len(structure_list)
         self.idx            = np.asarray([o*3 + i for o in sym_dict[3] for i in range(3)], dtype=int)
         self.verbose        = bool(verbose)
-        if isinstance(cluster_banks, dict) and len(cluster_banks) > 0:
-            self.cluster_banks = copy.deepcopy(cluster_banks)
-        else:
-            self.cluster_banks = {}
 
         self._init_worker_state(exponent_p_q)
 
@@ -102,11 +96,6 @@ class IMTrustRadiusOptimizer:
         self._closed = False
 
     def _init_worker_state(self, exponent_p_q):
-        """
-        Build driver and static constants for this optimizer instance.
-
-        This replaces the global _W dictionary in serial mode.
-        """
 
         driver = InterpolationDriver(self.z_matrix)
         driver.update_settings(self.impes_dict)
@@ -120,7 +109,7 @@ class IMTrustRadiusOptimizer:
         driver.calc_optim_trust_radius = True
 
         # Keep this if datapoints are mutated during evaluation
-        driver.qm_data_points = [copy.deepcopy(dp) for dp in self.dps]
+        driver.qm_data_points = self.dps
 
         self._worker_state = {
             "driver": driver,
@@ -320,10 +309,6 @@ class IMTrustRadiusOptimizer:
         if not np.all(np.isfinite(alphas_arr)):
             raise ValueError("AlphaOptimizer.fun received non-finite alpha values")
 
-        # payloads = [(i, alphas_arr) for i in range(self.S)]
-
-        # chunksize = max(1, math.ceil(self.S / (4 * self._pool._max_workers)))
-        # futs = self._pool.map(_eval_structure, payloads, chunksize=chunksize)
         futs = (self._eval_structure((i, alphas_arr)) for i in range(self.S))
  
 
@@ -392,19 +377,14 @@ class IMTrustRadiusOptimizer:
 
 
     def pack_reduced_alphas(self, alpha_full, trainable_idx):
-        """
-        Extract reduced variables u = alpha[T].
-        """
+
         alpha = self._validate_full_alpha(alpha_full)
         idx = self._validate_trainable_idx(trainable_idx)
         return alpha[idx].copy()
 
 
     def expand_reduced_alphas(self, x_var, trainable_idx, alpha_full_fixed):
-        """
-        Build full alpha from reduced variables:
-        alpha_i(u) = u_k if i == T_k else alpha_fixed_i
-        """
+
         idx = self._validate_trainable_idx(trainable_idx)
         alpha_fixed = self._validate_full_alpha(alpha_full_fixed)
 
@@ -422,10 +402,7 @@ class IMTrustRadiusOptimizer:
 
 
     def project_full_gradient_to_reduced(self, grad_full, trainable_idx):
-        """
-        Chain-rule projection:
-        g_u = P_T^T g_alpha = g_alpha[T]
-        """
+
         g = np.asarray(grad_full, dtype=np.float64).reshape(-1)
         if g.size != self.M:
             raise ValueError(
@@ -436,19 +413,13 @@ class IMTrustRadiusOptimizer:
 
 
     def fun_reduced(self, x_var, trainable_idx, alpha_full_fixed):
-        """
-        Reduced objective:
-        J(u) = L(alpha(u))
-        """
+
         alpha_full = self.expand_reduced_alphas(x_var, trainable_idx, alpha_full_fixed)
         return self.fun(alpha_full)
 
 
     def jac_reduced(self, x_var, trainable_idx, alpha_full_fixed):
-        """
-        Reduced gradient:
-        ∇_u J(u) = P_T^T ∇_alpha L(alpha(u))
-        """
+
         alpha_full = self.expand_reduced_alphas(x_var, trainable_idx, alpha_full_fixed)
         g_full = self.jac(alpha_full)
         return self.project_full_gradient_to_reduced(g_full, trainable_idx)
@@ -460,12 +431,6 @@ class IMTrustRadiusOptimizer:
 
 
     def get_metrics(self, alphas=None, evaluate_if_missing=True):
-        """
-        Returns last cached objective components.
-
-        If ``alphas`` is provided and cache does not match, optionally evaluates
-        the objective once to populate the cache.
-        """
 
         if alphas is None:
             return dict(self._cache_metrics) if self._cache_metrics is not None else None

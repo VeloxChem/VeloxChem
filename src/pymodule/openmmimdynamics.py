@@ -188,7 +188,7 @@ class OpenMMIMDynamics:
         self.roots_to_follow = None
         self.qm_symmetry_datapoint_dict = None
         self.qm_data_point_dict = None
-        self.qm_rotor_cluster_banks = None
+
         self.sorted_state_spec_im_labels = None
         self.root_spec_molecules = None
         self.interpolation_settings = None
@@ -1863,8 +1863,6 @@ class OpenMMIMDynamics:
             # Work in zero-based indexing (same convention as z-matrix dihedrals)
             # and remove all symmetry-related rotatable bonds from the scan list.
             rotatable_bonds_zero_based = [tuple(sorted((i - 1, j - 1))) for (i, j) in rotatable_bonds]
-
-            self.roots_z_matrix[root] = _promote_nonrotatable_ring_torsions_to_impropers(self.roots_z_matrix[root], ff_gen, rotatable_bonds_zero_based)
 
             dihedral_start = len(self.roots_z_matrix[root]['bonds']) + len(self.roots_z_matrix[root]['angles'])
             dihedral_end = dihedral_start + len(self.roots_z_matrix[root]['dihedrals'])

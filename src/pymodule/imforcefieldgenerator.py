@@ -266,7 +266,6 @@ class IMForceFieldGenerator:
         self.imforcefieldfiles = None
         self.use_inverse_bond_length = True
         self.use_eq_bond_length = False
-        self.use_cosine_dihedral = False
         self.use_tc_weights = True
         self.tc_weight_mode = "multiplicative" # "additive_rhee"
         self.use_mass_weight = False
@@ -355,6 +354,8 @@ class IMForceFieldGenerator:
 
         self.imp_int_coordinates = []
 
+        self._system_is_set_up = False
+
     def define_z_matrix_dict(self, molecule, add_coordinates=None):
         g_molecule = geometric.molecule.Molecule()
         g_molecule.elem = molecule.get_labels()
@@ -387,7 +388,7 @@ class IMForceFieldGenerator:
 
         return zmat
 
-    def set_up_the_system(self, molecule, extract_z_matrix=None):
+    def set_up_the_system(self, molecule, imforcefieldfiles=None):
 
         """
         Assign the neccessary variables with respected values. 
@@ -555,12 +556,52 @@ class IMForceFieldGenerator:
         self.symmetry_information = {'gs': (), 'es': ()}
         
         self.molecule = molecule
+
+        root_extract_z_matrix = None
+        if imforcefieldfiles is not None:
+            root_extract_z_matrix = {}
+            self.sampling_imforcefieldfiles = {}
+            self.imforcefieldfiles = {}
+            for i, root in enumerate(self.roots_to_follow):
+                if root not in imforcefieldfiles:
+                    self.imforcefieldfiles[self.roots_to_follow[i]] = f'im_database_{root}.h5'
+                    root_extract_z_matrix[self.roots_to_follow[i]] = False
+                else:
+                    root_extract_z_matrix[self.roots_to_follow[i]] = True
+                    self.imforcefieldfiles[self.roots_to_follow[i]] = imforcefieldfiles[root]
+
+                self.sampling_imforcefieldfiles[self.roots_to_follow[i]] = f'im_database_sampling_{root}.h5'
+        else:
+            self.imforcefieldfiles = {}
+            self.sampling_imforcefieldfiles = {}
+            standard_files: list[str] = [f'im_database_{root}.h5' for root in self.roots_to_follow]
+            standard_smapling_files = [f'im_database_sampling_{root}.h5' for root in self.roots_to_follow]
+            root_extract_z_matrix = {}
+            for root_idx, standard_file in enumerate(standard_files):
+                
+                if os.path.exists(standard_file):
+                    if self.roots_to_follow[root_idx] not in root_extract_z_matrix:
+                        root_extract_z_matrix[self.roots_to_follow[root_idx]] = True 
+                else:
+                    root_extract_z_matrix[self.roots_to_follow[root_idx]] = False     
+                self.imforcefieldfiles[self.roots_to_follow[root_idx]] = standard_file
+                self.sampling_imforcefieldfiles[self.roots_to_follow[root_idx]] = standard_smapling_files[root_idx]
+        
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.ostream.mute()
+        ff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
+        ff_gen.create_topology(molecule)
+
+        # The AtomMapper class is based on Turtlemap program which is used to
+        # determine equivalent atoms within a molecular structure
+        symmetry_groups = (list(range(len(molecule.get_labels()))), [], [])
+        rotatable_bonds = deepcopy(ff_gen.rotatable_bonds)
+        # Work in zero-based indexing (same convention as z-matrix dihedrals)
+        # and remove all symmetry-related rotatable bonds from the scan list.
+        rotatable_bonds_zero_based = [tuple(sorted((i - 1, j - 1))) for (i, j) in rotatable_bonds]
         
         for root in self.roots_to_follow:
-            if extract_z_matrix is None:
-                extract_z_matrix = {}
-                extract_z_matrix[root] = False
-            if root not in self.roots_z_matrix and not extract_z_matrix[root]:
+            if root not in self.roots_z_matrix and not root_extract_z_matrix[root]:
                 # if no database is provided construct the primitive internal coordinates using geometric
                 self.roots_z_matrix[root] = self.define_z_matrix_dict(molecule)
                 if self.reaction_structures is not None:
@@ -572,6 +613,9 @@ class IMForceFieldGenerator:
                     if self.use_eq_bond_length:
                         self.eq_bond_length_irc_bonds = merge_info['added_coordinates']['bonds']
                     self.roots_z_matrix[self.roots_to_follow[0]] = merge_info["global_z_matrix"]  
+                
+                impropers = list(ff_gen.impropers.keys())
+                self.roots_z_matrix[root] = _promote_nonrotatable_ring_torsions_to_impropers(self.roots_z_matrix[root], ff_gen, rotatable_bonds_zero_based, impropers=impropers)
             elif root not in self.roots_z_matrix:
                 # generate the z-matrix based for the interpolation database provided
                 int_driver = InterpolationDriver()
@@ -583,7 +627,6 @@ class IMForceFieldGenerator:
                                         'imforcefield_file':self.imforcefieldfiles[root],
                                         'use_inverse_bond_length':self.use_inverse_bond_length,
                                         'use_eq_bond_length':self.use_eq_bond_length,
-                                        'use_cosine_dihedral':self.use_cosine_dihedral,
                                         'use_tc_weights':self.use_tc_weights,
                                         'tc_weight_mode':self.tc_weight_mode,
                                         'use_mass_weight':self.use_mass_weight,
@@ -591,25 +634,7 @@ class IMForceFieldGenerator:
        
                 _, z_matrix = int_driver.read_labels()
                 self.roots_z_matrix[root] = z_matrix
-
-            # The AtomMapper class is based on Turtlemap program which is used to
-            # determine equivalent atoms within a molecular structure
-            symmetry_groups = (list(range(len(molecule.get_labels()))), [], [])
             
-            ff_gen = MMForceFieldGenerator()
-            ff_gen.ostream.mute()
-            ff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
-            ff_gen.create_topology(molecule)
-
-            rotatable_bonds = deepcopy(ff_gen.rotatable_bonds)
-
-            impropers = list(ff_gen.impropers.keys())
-            
-            # Work in zero-based indexing (same convention as z-matrix dihedrals)
-            # and remove all symmetry-related rotatable bonds from the scan list.
-            rotatable_bonds_zero_based = [tuple(sorted((i - 1, j - 1))) for (i, j) in rotatable_bonds]
-
-            self.roots_z_matrix[root] = _promote_nonrotatable_ring_torsions_to_impropers(self.roots_z_matrix[root], ff_gen, rotatable_bonds_zero_based, impropers=impropers)
 
             dihedral_start = len(self.roots_z_matrix[root]['bonds']) + len(self.roots_z_matrix[root]['angles'])
             dihedral_end = dihedral_start + len(self.roots_z_matrix[root]['dihedrals'])
@@ -661,96 +686,6 @@ class IMForceFieldGenerator:
                                     reaction_root=self.roots_to_follow[0],
                                     reaction_key=None,
                                     )
-            
-        # if self.add_conformal_structures and 0 in self.roots_to_follow:
-
-        #     conformers_plus_ts = {0 : {}}
-        
-        #     # conformal_structures, dihedral_candidates = self._generate_conformers_mpi_synchronized(molecule)
-        #     conformer_gen = ConformerGenerator()
-        #     conformer_gen.resp_charges = False
-            
-        #     conformer_results = conformer_gen.generate(molecule)
-        #     dihedral_candidates = list(getattr(conformer_gen, "dihedral_candidates", []) or [])
-
-        #     conformal_structures = {'molecules': list(conformer_results.get("molecules", []) or [])}
-        
-
-        #     # before adding the conformers generate structures along the dihedral path
-        #     # for making the energy path avaliable in the database
-        #     # if rank == root:
-        #     if len(dihedral_candidates) > 0 and len(conformal_structures['molecules']) > 0:
-        #         seed_molecule = conformal_structures['molecules'][0]
-        #         rot_bond_set = {
-        #             tuple(sorted((int(a), int(b))))
-        #             for a, b in rotatable_bonds
-        #         }
-        #         def _circ_err_deg(actual, target):
-        #             return abs(((actual - target + 180.0) % 360.0) - 180.0)
-        #         for dih_zero, angle_grid in dihedral_candidates:
-        #             dih_key = tuple(int(x) + 1 for x in dih_zero)
-        #             if tuple(sorted((dih_key[1], dih_key[2]))) not in rot_bond_set:
-        #                 print('skipping dihedral', dih_zero)
-        #                 continue
-        #             scan_angles = sorted({float(a) % 360.0 for a in angle_grid})
-        #             conformers_plus_ts[0][dih_key] = []
-        #             def _w360(a):
-        #                 return float(a) % 360.0
-        #             def _k(a):
-        #                 return round(_w360(a), 6)
-        #             def _signed_deg(a):
-        #                 a = _w360(a)
-        #                 return a - 360.0 if a > 180.0 else a
-        #             # if the same angle is generated multiple times, keep the strongest tag
-        #             tag_priority = {'constraint': 0, 'transition': 1, 'normal': 2}
-        #             angle_to_tag = {}
-        #             def _add_angle(angle, tag):
-        #                 key = _k(angle)
-        #                 old = angle_to_tag.get(key)
-        #                 if old is None or tag_priority[tag] > tag_priority[old]:
-        #                     angle_to_tag[key] = tag
-        #             # minima from conformer candidates
-        #             for a in scan_angles:
-        #                 _add_angle(a, 'normal')
-        #             # for each minima pair on the circle:
-        #             # - TS midpoint (50%)
-        #             # - minima↔TS midpoint (25%)
-        #             # - TS↔next-minima midpoint (75%)
-        #             if len(scan_angles) > 1:
-        #                 for idx, cur in enumerate(scan_angles):
-        #                     nxt = scan_angles[(idx + 1) % len(scan_angles)]
-        #                     step = (nxt - cur) % 360.0
-        #                     if step < 1.0e-8:
-        #                         continue
-        #                     _add_angle(cur + 0.50 * step, 'transition')
-        #                     _add_angle(cur + 0.25 * step, 'constraint')
-        #                     _add_angle(cur + 0.75 * step, 'constraint')
-        #             schedule = [(ang, angle_to_tag[ang]) for ang in sorted(angle_to_tag.keys())]
-        #             print(
-        #                 f"scan schedule for {dih_key}: "
-        #                 f"{[(round(_signed_deg(a), 1), t) for a, t in schedule]}"
-        #             )
-        #             for target_deg, mode in schedule:
-        #                 mol_i = Molecule.from_xyz_string(seed_molecule.get_xyz_string())
-        #                 mol_i.set_charge(molecule.get_charge())
-        #                 mol_i.set_multiplicity(molecule.get_multiplicity())
-        #                 mol_i.set_dihedral_in_degrees(dih_key, target_deg, verbose=False)
-        #                 actual = float(mol_i.get_dihedral_in_degrees(dih_key)) % 360.0
-        #                 if _circ_err_deg(actual, target_deg) > 2.0:
-        #                     raise RuntimeError(
-        #                         f"Failed to set dihedral {dih_key} to {target_deg:.2f} deg "
-        #                         f"(actual {actual:.2f} deg)."
-        #                     )
-        #                 if abs(abs(mol_i.get_dihedral_in_degrees(dih_key)) - 180) < 5 or abs(mol_i.get_dihedral_in_degrees(dih_key)) < 3:
-        #                     mol_i.set_dihedral_in_degrees(dih_key,mol_i.get_dihedral_in_degrees(dih_key) + 10, verbose=False)
-
-        #                 conformers_plus_ts[0][dih_key].append((mol_i, mode))
-        #     else:
-        #         if len(conformal_structures['molecules']) == 0:
-        #             raise RuntimeError('ConformerGenerator returned no conformers.')
-        #         conformers_plus_ts[0][None] = [(conformal_structures['molecules'][0], 'normal')]
-
-        #     self.seed_structures = conformers_plus_ts
 
         if self.add_conformal_structures and 0 in self.roots_to_follow:
 
@@ -806,6 +741,8 @@ class IMForceFieldGenerator:
                 conformers_plus_ts[0][None] = [(mol_i, 'normal')]
 
             self.seed_structures = conformers_plus_ts
+        
+        self._system_is_set_up = True
 
 
     
@@ -850,8 +787,8 @@ class IMForceFieldGenerator:
             ref_dp.update_settings(ref_settings)
             ref_dp.read_hdf5(ref_file, label)
 
-            coords_ang = ref_dp.cartesian_coordinates * bohr_in_angstrom()
-            mol = Molecule(mol_labels, coords_ang, 'angstrom')
+            coords = ref_dp.cartesian_coordinates
+            mol = Molecule(mol_labels, coords, 'bohr')
             mol.set_charge(self.molecule.get_charge())
             mol.set_multiplicity(self.molecule.get_multiplicity())
 
@@ -925,33 +862,9 @@ class IMForceFieldGenerator:
 
         # First set up the system for which the database needs to be constructed
         states_basis = {'gs':self.gs_basis_set_label, 'es':self.es_basis_set_label}
-        root_extract_z_matrix = None
-        if self.imforcefieldfiles is not None:
-            root_extract_z_matrix = {}
-            self.sampling_imforcefieldfiles = {}
-            for i, root in enumerate(self.roots_to_follow):
-                if root not in self.imforcefieldfiles or not os.path.exists(self.imforcefieldfiles[root]):
-                    self.imforcefieldfiles[self.roots_to_follow[i]] = f'im_database_{root}.h5'
-                    root_extract_z_matrix[self.roots_to_follow[i]] = False
-                else:
-                    root_extract_z_matrix[self.roots_to_follow[i]] = True
-
-                self.sampling_imforcefieldfiles[self.roots_to_follow[i]] = f'im_database_sampling_{root}.h5'
-        else:
-            self.imforcefieldfiles = {}
-            self.sampling_imforcefieldfiles = {}
-            standard_files = [f'im_database_{root}.h5' for root in self.roots_to_follow]
-            standard_smapling_files = [f'im_database_sampling_{root}.h5' for root in self.roots_to_follow]
-            root_extract_z_matrix = {}
-            for root_idx, standard_file in enumerate(standard_files):
-                
-                if os.path.exists(standard_file):
-                    if self.roots_to_follow[root_idx] not in root_extract_z_matrix:
-                        root_extract_z_matrix[self.roots_to_follow[root_idx]] = True 
-                else:
-                    root_extract_z_matrix[self.roots_to_follow[root_idx]] = False     
-                self.imforcefieldfiles[self.roots_to_follow[root_idx]] = standard_file
-                self.sampling_imforcefieldfiles[self.roots_to_follow[root_idx]] = standard_smapling_files[root_idx]
+        if not self._system_is_set_up:
+            self.ostream.print_warning('System is not set up. Automatic set up ')
+            self.set_up_the_system(molecule)
 
         self.ostream.print_blank()
         self.ostream.print_header('IM Database Construction')
@@ -974,8 +887,6 @@ class IMForceFieldGenerator:
             self.ostream.print_blank()
             self.ostream.flush()
 
-            self.set_up_the_system(molecule, extract_z_matrix=root_extract_z_matrix)
-
             imforcefieldfile = self.imforcefieldfiles[self.roots_to_follow[0]]
             self.states_interpolation_settings[self.roots_to_follow[0]] = { 'interpolation_type':self.interpolation_type,
                                 'weightfunction_type':self.weightfunction_type, 
@@ -985,7 +896,6 @@ class IMForceFieldGenerator:
                                 'imforcefield_file':imforcefieldfile,
                                 'use_inverse_bond_length':self.use_inverse_bond_length,
                                 'use_eq_bond_length':self.use_eq_bond_length,
-                                'use_cosine_dihedral':self.use_cosine_dihedral,
                                 'use_tc_weights':self.use_tc_weights,
                                 'tc_weight_mode':self.tc_weight_mode,
                                 'use_mass_weight':self.use_mass_weight,
@@ -1011,98 +921,7 @@ class IMForceFieldGenerator:
             molecules_to_add_info = []             
 
             if not os.path.exists(self.imforcefieldfiles[self.roots_to_follow[0]]):
-                    files_to_add_conf.append(self.roots_to_follow[0])
-
-
-            # if self.seed_structures is not None and not os.path.exists(imforcefieldfile):
-    
-            #     molecules_to_add_info = []
-            #     for counter, entry in enumerate(self.seed_structures.items()):
-       
-            #         key, molecules_info = entry
-                    
-            #         for i, mol_entries in enumerate(molecules_info.items()):
-            #             current_molecule_to_add_info = []
-            #             dih_key, mol_info = mol_entries
-
-            #             for seed_entry in mol_info:
-            #                 if len(seed_entry) == 2:
-            #                     mol, mode = seed_entry
-            #                     seed_constraints = []
-            #                 else:
-            #                     mol, mode, seed_constraints = seed_entry[0], seed_entry[1], list(seed_entry[2] or [])
-          
-            #                 if self.use_minimized_structures[0]:
-            #                     transition = False
-            #                     constraints_global = []
-            #                     if len(self.use_minimized_structures[1]) > 0:
-            #                         constraints_global.extend(self.use_minimized_structures[1])  # extend, not append
-
-            #                     if mode == "transition":
-            #                         transition = True
-            #                         constraints_global = []
-
-            #                     if mode == "constraint" and dih_key is not None:
-            #                         if dih_key not in constraints_global:
-            #                             constraints_global.append(dih_key)
-   
-            #                     optimized_molecule = None
-            #                     opt_results = None
-            #                     scf_results = None
-            #                     if self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver) or self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfUnrestrictedDriver):
-                                
-            #                         current_basis = MolecularBasis.read(mol, states_basis['gs'])
-            #                         _, scf_results, _ = self._compute_energy(self.drivers['gs'][0], mol, current_basis)
-                                    
-            #                         opt_results = self._run_optimization(
-            #                             self.drivers['gs'][0],
-            #                             mol,
-            #                             constraints=constraints_global,
-            #                             transition=transition,
-            #                             index_offset=0,
-            #                             compute_args=(current_basis, scf_results),
-            #                         )
-            #                         optimized_molecule = opt_results['final_molecule']
-            #                         current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
-            #                         current_molecule_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow, constraints_global,transition))
-            #                         self.ostream.print_blank()
-            #                         self.ostream.print_header('Optimized Molecule')
-            #                         self.ostream.print_header('------------------')
-            #                         self.ostream.print_block(optimized_molecule.get_xyz_string())
-            #                         self.ostream.print_blank()
-            #                         self.ostream.flush()
-                                
-            #                     elif  self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
-                                    
-            #                         opt_results = self._run_optimization(
-            #                             self.drivers['gs'][0],
-            #                             mol,
-            #                             constraints=constraints_global,
-            #                             transition=transition,
-            #                             index_offset=0,
-            #                         )
-            #                         optimized_molecule = opt_results['final_molecule']
-            #                         current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
-            #                         current_molecule_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow, constraints_global,transition))
-            #                         self.ostream.print_blank()
-            #                         self.ostream.print_header('Optimized Molecule')
-            #                         self.ostream.print_header('------------------')
-            #                         self.ostream.print_block(optimized_molecule.get_xyz_string())
-            #                         self.ostream.print_blank()
-            #                         self.ostream.flush()
-
-            #                 else:
-            #                     if self.roots_to_follow[0] == 0:
-            #                         current_basis = MolecularBasis.read(mol, states_basis['gs'])
-            #                         current_molecule_to_add_info.append((mol, current_basis, self.roots_to_follow, []))
-            #                     else:
-            #                         current_basis = MolecularBasis.read(mol, states_basis['es'])
-            #                         current_molecule_to_add_info.append((mol, current_basis, self.roots_to_follow, []))
-            #             if len(molecules_to_add_info) == 0:
-
-            #                 molecules_to_add_info.append(current_molecule_to_add_info[0])
-
-            #             self.add_point(current_molecule_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
+                files_to_add_conf.append(self.roots_to_follow[0])
 
             if self.seed_structures is not None and not os.path.exists(imforcefieldfile):
     
@@ -1426,7 +1245,7 @@ class IMForceFieldGenerator:
             self.ostream.print_blank()
             self.ostream.print_header('Successfully constructed the interpolation database.')
             self.ostream.print_header('------------------')
-            self.ostream.print_block(self.states_data_point_density)
+            self.ostream.print_block(str(self.states_data_point_density))
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -1896,6 +1715,7 @@ class IMForceFieldGenerator:
         """
 
         im_driver = InterpolationDriver() # -> implemented Class in VeloxChem that is capable to perform interpolation calculations for a given molecule and provided z_matrix and database
+        im_settings['imforcefield_file'] = datafile
         im_driver.update_settings(im_settings)
         # im_driver.imforcefield_file = datafile
         labels, z_matrix = im_driver.read_labels()

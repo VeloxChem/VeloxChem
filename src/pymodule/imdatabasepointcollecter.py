@@ -295,8 +295,6 @@ class IMDatabasePointCollecter:
         self.im_labels = None
         self.add_a_point = False
         self.check_a_point = False
-        # if enabled, generates and stores explicit rotor-cluster state banks
-        self.cluster_run = None
         self.skipping_value = 0
         self.basis_set_label = None
         self.molecule = None
@@ -315,10 +313,6 @@ class IMDatabasePointCollecter:
         self.sampling_interpolation_settings = None
         self.sampling_qm_datapoints_dict = None
         # sampling-mode mirror of the symmetry-expanded datapoint registry
-        self.sampling_qm_symmetry_datapoint_dict = None
-
-        # symmetry considerations
-        # per-root-state active rotor cluster information used for setup diagnostics
 
         # output_file variables that will be written into self.general_variable_output
         self.gradients = None
@@ -885,9 +879,6 @@ class IMDatabasePointCollecter:
             self.basis_set_label = basis_set_label
     
         # Dertermines if non-adiabatic couplings should be calculate
-
-        if 'cluster_run' in dynamics_settings:
-            self.cluster_run = dynamics_settings['cluster_run']
         # TODO: these need to be different dictionary entries
         if 'start_collect' in dynamics_settings:
             self.start_collect = dynamics_settings['start_collect']
@@ -1139,7 +1130,6 @@ class IMDatabasePointCollecter:
     def _initialize_sampling_impes_drivers(self, inv_sqrt_masses):
         self.sampling_impes_drivers = {root: None for root in self.roots_to_follow}
         self.sampling_qm_data_point_dict = {root: [] for root in self.roots_to_follow}
-        self.sampling_qm_symmetry_datapoint_dict = {root: {} for root in self.roots_to_follow}
 
         for root in self.roots_to_follow:
             drv = InterpolationDriver(self.root_z_matrix[root])
@@ -1176,7 +1166,6 @@ class IMDatabasePointCollecter:
         self.qm_energies_dict[root] = []
         self.sorted_state_spec_im_labels[root] = []
 
-        old_label = None
 
         for label in sorted_im_labels[:]:
             qm_data_point = InterpolationDatapoint(self.root_z_matrix[root])
@@ -1330,8 +1319,6 @@ class IMDatabasePointCollecter:
         self.qm_energies_dict = {root: [] for root in self.roots_to_follow}
         self.impes_drivers = {root: None for root in self.roots_to_follow}
         self.sampled_molecules = {root: {'molecules': [], 'im_energies': [], 'qm_energies': [], 'qm_gradients': [], 'distances': []} for root in self.roots_to_follow}
-        self.qm_rotor_cluster_banks = {root: {} for root in self.roots_to_follow}
-        self.qm_sampling_rotor_cluster_banks = {root: {} for root in self.roots_to_follow}
 
 
         if self.reference_struc_energies_file is not None:
@@ -2250,13 +2237,12 @@ class IMDatabasePointCollecter:
                                     params['barrier'] * unit.kilojoule_per_mole * self.scaling_factor)
         self.system.addForce(improper_force)
     
-    def update_gradient_and_energy(self, new_positions, collective_mode=None):
+    def update_gradient_and_energy(self, new_positions):
 
         new_molecule = self._build_qm_molecule_from_positions(new_positions)
         self._latest_qm_molecule = new_molecule
         self._latest_qm_positions_nm = np.asarray(new_positions, dtype=np.float64).copy()
-        # if collective_mode is None:
-        #     collective_mode = bool(self._mpi_is_active() and self.mpi_root_worker_mode)
+
         self._compute_all_roots_for_molecule(new_molecule)
         self._postprocess_root_state_selection()
 
@@ -2371,7 +2357,6 @@ class IMDatabasePointCollecter:
         """
         gradient, _ = self.update_gradient_and_energy(
             new_positions,
-            # collective_mode=collective_mode
             )
 
         return gradient
@@ -2427,7 +2412,8 @@ class IMDatabasePointCollecter:
             mean_bond_rmsd = float(np.mean(bond_rmsd_values)) if bond_rmsd_values.size else 0.0
             mean_angle_rmsd = float(np.mean(angle_rmsd_values)) if angle_rmsd_values.size else 0.0
             mean_dihedral_rmsd = float(np.mean(dihedral_rmsd_values)) if dihedral_rmsd_values.size else 0.0
-            if mean_bond_rmsd > 0.01 or mean_angle_rmsd > 0.01 or mean_dihedral_rmsd > 1.0:
+
+            if mean_bond_rmsd > 0.02 or mean_angle_rmsd > 0.1 or mean_dihedral_rmsd > 1.5:
                 K = 5  # Number of closest previous matches to cache
                 threshold = 5e-2 #self.distance_thrsh - 0.05
                 new_coords = new_molecule.get_coordinates_in_bohr()
@@ -2479,8 +2465,6 @@ class IMDatabasePointCollecter:
             if self.skipping_value < 0:
                 self.skipping_value = 0
         
-        if self.step % 500 == 0 and self.step > self.start_collect:
-            self.add_a_point = True
         self.point_checker += 1 
 
         if self.add_a_point == True:
@@ -2506,7 +2490,7 @@ class IMDatabasePointCollecter:
             self.velocities = [context.getState(getVelocities=True).getVelocities()]
             
             qm_positions = self._extract_qm_positions_nm(context)
-            gradient_2 = self.update_gradient(qm_positions, collective_mode=False)
+            gradient_2 = self.update_gradient(qm_positions)
             new_molecule = self._get_latest_qm_molecule(qm_positions)
             
             force = -np.array(gradient_2) * conversion_factor
@@ -2568,13 +2552,8 @@ class IMDatabasePointCollecter:
         sampling_qm, sampling_grad, _ = self.sampling_driver['gs']
 
         xtb_energy, _, _ = self._compute_energy(sampling_qm, molecule, basis=None)
-        # xtb_energy, _, _ = self._compute_energy_mpi_safe(sampling_qm, molecule, basis=None)
-        xtb_grad = self._compute_gradient(sampling_grad, molecule, basis=None, scf_results=None, rsp_results=None)
-        # xtb_grad = self._compute_gradient_mpi_safe(sampling_grad, molecule, basis=None, scf_results=None, rsp_results=None)
 
         e_thr = float(self.sampling_settings["e_thrsh_kcal_per_atom"])
-        g_thr = float(self.sampling_settings["g_rmsd_thrsh_kcal_ang_per_atom"])
-        c_thr = float(self.sampling_settings["force_orient_cos"])
 
         all_ok = True
         details = {}
@@ -2582,41 +2561,29 @@ class IMDatabasePointCollecter:
         for root in self.roots_to_follow:
             self.sampling_impes_drivers[root].compute(molecule)
             e_im = self.sampling_impes_drivers[root].impes_coordinate.energy
-            g_im = self.sampling_impes_drivers[root].impes_coordinate.gradient
 
             e_diff = abs(float(xtb_energy[0]) - float(e_im)) / natms * hartree_in_kcalpermol()
-            g_diff = (xtb_grad[0] - g_im) * hartree_in_kcalpermol() * bohr_in_angstrom()
-            g_rmsd = float(np.sqrt((g_diff ** 2).mean()))
 
-            gq = xtb_grad[0].ravel()
-            gi = g_im.ravel()
-            denom = np.linalg.norm(gq) * np.linalg.norm(gi)
-            cos_theta = 1.0 if denom < 1.0e-15 else float(np.dot(gq, gi) / denom)
-            details[root] = {"e_diff_kcal_per_atom": e_diff, "g_rmsd": g_rmsd, "cos": cos_theta}
+            details[root] = {"e_diff_kcal_per_atom": e_diff}
             if not (e_diff <= e_thr):
                 all_ok = False
 
         if all_ok:
-            self.previous_energy_list.append(details[root].get('e_diff_kcal_per_atom'))
-            curr_state_diff = details[root].get('e_diff_kcal_per_atom')
-            if curr_state_diff == 0:
-                curr_state_diff = 1e-8
-            if len(self.previous_energy_list) > 3:
-                # Compute gradient (rate of change of energy difference)
-                grad1 = self.previous_energy_list[-2] - self.previous_energy_list[-3]
-                grad2 = self.previous_energy_list[-1] - self.previous_energy_list[-2]
-                # Base skipping value calculation
-                
-                base_skip = min(round(abs(self.energy_threshold / (curr_state_diff)**2)), 20) - 1
-                # Adjust skipping value based on gradient
-                if grad2 > grad1:  # Energy difference is increasing
-                    self.skipping_value = max(1, base_skip - 1)  # Reduce skipping for more frequent checks
-                else:  # Energy difference is decreasing
-                    self.skipping_value = base_skip + 10  # Increase skipping to check less often
-            else:
-                self.skipping_value = min(round(abs(self.energy_threshold / (curr_state_diff)**2)), 20)
+            # Use the worst root as the decision value.
+            max_e_diff = max(
+                float(root_details["e_diff_kcal_per_atom"])
+                for root_details in details.values()
+            )
+
+            # 0 means perfect agreement, 1 means exactly at threshold.
+            rel = max(0.0, min(max_e_diff / e_thr, 1.0))
+
+            # Quadratic falloff: conservative near threshold, generous near zero.
+            skip = 20 - (20 - 1) * rel**2
+            self.skipping_value = skip
 
             return {"skip_full_qm": True, "details": details}
+        
         return {"skip_full_qm": False, "details": details}
 
     def point_correlation_check(self, molecule):
@@ -2630,14 +2597,14 @@ class IMDatabasePointCollecter:
                 in the IM dynamics.
         """
 
-        self.ostream.print_header("Performing point correlation check for current conformation.")
-        self.ostream.flush()
         if self.sampling_enabled:
             screen = self._sampling_screen_check(molecule)
             if screen["skip_full_qm"]:
                 self.add_a_point = False
                 return
         
+        self.ostream.print_header("Performing point correlation check for current conformation with QM.")
+        self.ostream.flush()
         current_state_difference = {}
         state_specific_energies = {}
         state_specific_gradients = {}
@@ -2881,30 +2848,43 @@ class IMDatabasePointCollecter:
                         touches_fault = bool(selected_atoms.intersection(dih))
                         if touches_fault and dih not in main_constraint_list:
                             constraints.append(dih)
+                    
                     main_constraint_list.extend(constraints)
-                    if len(main_constraint_list) > 2:
-                        b_matrix = self.impes_drivers[state_to_optim].impes_coordinate.b_matrix
-                        masks = []
-                        for coord_idx, coord in enumerate(self.root_z_matrix[state_to_optim]['bonds'] + self.root_z_matrix[state_to_optim]['angles'] + self.root_z_matrix[state_to_optim]['dihedrals'] + self.root_z_matrix[state_to_optim]['impropers']):
-                                if coord in main_constraint_list:
-                                    masks.append(coord_idx)
+                    full_z = (
+                        self.root_z_matrix[state_to_optim]["bonds"]
+                        + self.root_z_matrix[state_to_optim]["angles"]
+                        + self.root_z_matrix[state_to_optim]["dihedrals"]
+                        + self.root_z_matrix[state_to_optim]["impropers"]
+                    )
 
-                        Bc = b_matrix[masks, :]
-                        info = self.analyze_constraint_jacobian(Bc)
-                        
-                        new_masks = []
+                    coord_to_idx = {
+                        tuple(int(x) for x in coord): idx
+                        for idx, coord in enumerate(full_z)
+                    }
+
+                    b_matrix = self.impes_drivers[state_to_optim].impes_coordinate.b_matrix
+
+                    if len(main_constraint_list) > 2:
+
                         constraint_mask = []
-                        for sigma_idx, sigma in enumerate(info["sigma"]):
-                            if sigma > 0.4:
-                                new_masks.append(masks[sigma_idx])
-                        Bc = b_matrix[new_masks, :]
-                        for idx, coord in enumerate(new_masks, start=1):
-                            
-                            eta, _, _ = self.candidate_independence_eta(Bc[:idx, :], Bc[idx, :])
+                        active_rows = []
+                        for pos, coord in enumerate(main_constraint_list):
+                            coord = tuple(int(x) for x in coord)
+                            if coord not in coord_to_idx:
+                                continue
+                            row = b_matrix[coord_to_idx[coord], :]
+                            if np.linalg.norm(row) <= 1.0e-12:
+                                continue
+                            # Always keep the primary constraint.
+                            if pos == 0:
+                                constraint_mask.append(coord)
+                                active_rows.append(row)
+                                continue
+                            B_active = np.asarray(active_rows, dtype=np.float64)
+                            eta, _, _ = self.candidate_independence_eta(B_active, row)
                             if eta > 0.3:
-                                constraint_mask.append(main_constraint_list[idx])
-                            if idx == len(new_masks) - 1:
-                                break
+                                constraint_mask.append(coord)
+                                active_rows.append(row)
                     
                     else:
                         constraint_mask = main_constraint_list.copy()
@@ -2956,7 +2936,6 @@ class IMDatabasePointCollecter:
 
                     self.ostream.print_block("Gradient difference RMSD: ")
                     self.ostream.print_block(f"  {current_rmsd_gradient} kcal/mol/angstrom")
-                    self.ostream.print_block(f"  {current_state_difference[state_to_optim][1] * 0.5} kcal/mol/angstrom")
                     self.ostream.flush()    
                     needs_locality_fallback = (bool(fallback_constraints) and abs(delta_e) < abs(state_specific_energies[state_to_optim][0] - state_specific_energies[state_to_optim][1]) * hartree_in_kcalpermol() * 0.5 and
                                                                     bool(fallback_constraints) and current_rmsd_gradient < current_state_difference[state_to_optim][1] * 0.5)
@@ -2983,33 +2962,31 @@ class IMDatabasePointCollecter:
                             for coord_idx, coord in enumerate(self.root_z_matrix[state_to_optim]['bonds'] + self.root_z_matrix[state_to_optim]['angles'] + self.root_z_matrix[state_to_optim]['dihedrals'] + self.root_z_matrix[state_to_optim]['impropers']):
                                     if coord in guarded_constraints:
                                         masks.append(coord_idx)
-     
-                            Bc = b_matrix[masks, :]
-                            info = self.analyze_constraint_jacobian(Bc)
                             
-                            new_masks = []
                             constraint_mask = []
-                            for sigma_idx, sigma in enumerate(info["sigma"]):
-                                if sigma > 0.4:
-                                    new_masks.append(masks[sigma_idx])
-
-                            Bc = b_matrix[new_masks, :]
-
-                            for idx, coord in enumerate(new_masks, start=1):
-                                
-                                eta, _, _ = self.candidate_independence_eta(Bc[:idx, :], Bc[idx, :])
-
+                            active_rows = []
+                            for pos, coord in enumerate(guarded_constraints):
+                                coord = tuple(int(x) for x in coord)
+                                if coord not in coord_to_idx:
+                                    continue
+                                row = b_matrix[coord_to_idx[coord], :]
+                                if np.linalg.norm(row) <= 1.0e-12:
+                                    continue
+                                # Always keep the primary constraint.
+                                if pos == 0:
+                                    constraint_mask.append(coord)
+                                    active_rows.append(row)
+                                    continue
+                                B_active = np.asarray(active_rows, dtype=np.float64)
+                                eta, _, _ = self.candidate_independence_eta(B_active, row)
                                 if eta > 0.3:
-                                    constraint_mask.append(guarded_constraints[idx])
-                                if idx == len(new_masks) - 1:
-                                    break
+                                    constraint_mask.append(coord)
+                                    active_rows.append(row)
+
 
                             if isinstance(drivers[0], ScfRestrictedDriver) or isinstance(drivers[0], ScfUnrestrictedDriver):
                                 current_basis = MolecularBasis.read(molecule, current_basis.get_main_basis_label())
                                 energies, scf_results, rsp_results = self._compute_energy(drivers[0], molecule, current_basis)
-                                self.ostream.print_blank()
-                                self.ostream.print_block('org mol in optimized loop', molecule.get_xyz_string())
-                                self.ostream.flush()
                                 opt_results, opt_gradient = self._run_optimization(
                                     drivers[0],
                                     molecule,
@@ -3150,96 +3127,6 @@ class IMDatabasePointCollecter:
 
         return Bn, row_norms, active_mask
 
-    def analyze_constraint_jacobian(
-        self,
-        Bc,
-        svd_tol=1e-8,
-        normalize=True,
-    ):
-        """
-        Analyze rank and conditioning of a constraint Jacobian.
-
-        Parameters
-        ----------
-        Bc : np.ndarray, shape (m, 3N)
-            Constraint Jacobian rows.
-        svd_tol : float
-            Singular-value threshold for numerical rank.
-        normalize : bool
-            If True, row-normalize before analysis.
-
-        Returns
-        -------
-        info : dict
-        """
-        Bc = np.asarray(Bc, dtype=np.float64)
-
-        if Bc.shape[0] == 0:
-            return {
-                "n_constraints": 0,
-                "rank": 0,
-                "sigma": np.array([]),
-                "sigma_min": 0.0,
-                "sigma_max": 0.0,
-                "condition": np.inf,
-                "row_norms": np.array([]),
-                "active_rows": np.array([], dtype=bool),
-                "is_full_rank": True,
-            }
-
-        if normalize:
-            Btest, row_norms, active_rows = self.normalize_constraint_rows(Bc)
-        else:
-            Btest = Bc.copy()
-            row_norms = np.linalg.norm(Bc, axis=1)
-            active_rows = row_norms > 0.0
-
-        # Remove zero rows for SVD analysis.
-        Bsvd = Btest[active_rows]
-
-        if Bsvd.shape[0] == 0:
-            return {
-                "n_constraints": Bc.shape[0],
-                "rank": 0,
-                "sigma": np.array([]),
-                "sigma_min": 0.0,
-                "sigma_max": 0.0,
-                "condition": np.inf,
-                "row_norms": row_norms,
-                "active_rows": active_rows,
-                "is_full_rank": False,
-            }
-
-        sigma = np.linalg.svd(Bsvd, compute_uv=False, full_matrices=False)
-
-        if sigma.size == 0:
-            rank = 0
-            sigma_min = 0.0
-            sigma_max = 0.0
-            condition = np.inf
-        else:
-            sigma_max = float(np.max(sigma))
-            rank = int(np.sum(sigma > svd_tol * sigma_max))
-
-            if rank == 0:
-                sigma_min = 0.0
-                condition = np.inf
-            else:
-                sigma_min = float(np.min(sigma[:rank]))
-                smallest_all = float(np.min(sigma))
-                condition = float(sigma_max / max(smallest_all, 1e-300))
-
-        return {
-            "n_constraints": int(Bc.shape[0]),
-            "rank": rank,
-            "sigma": sigma,
-            "sigma_min": float(np.min(sigma)) if sigma.size else 0.0,
-            "sigma_max": sigma_max,
-            "condition": condition,
-            "row_norms": row_norms,
-            "active_rows": active_rows,
-            "is_full_rank": rank == int(Bc.shape[0]),
-        }
 
     def candidate_independence_eta(
         self,
@@ -3427,10 +3314,8 @@ class IMDatabasePointCollecter:
                             category_label += "_eq"
                         else:
                             category_label += "_r"
-                        if impes_coordinate.use_cosine_dihedral:
-                            category_label += "_cosine"
-                        else:
-                            category_label += "_dihedral"
+
+                        category_label += "_dihedral"
                         
 
                         self.qm_data_point_dict[mol_basis[4][number]].append(impes_coordinate)
@@ -3520,7 +3405,6 @@ class IMDatabasePointCollecter:
         dp.hessian = mw_hess.reshape(h[0].shape)
         dp.confidence_radius = template_point.confidence_radius
 
-        # Carry rotor-cluster metadata into sampling datapoints.
         dp.point_label = label
 
         dp.transform_gradient_and_hessian()
@@ -3537,8 +3421,6 @@ class IMDatabasePointCollecter:
         im_labels, _ = driver_object.read_labels()
 
         self.sampling_qm_data_point_dict[root] = []
-        self.sampling_qm_symmetry_datapoint_dict[root] = {}
-
 
         for label in im_labels:
             dp = InterpolationDatapoint(self.root_z_matrix[root])
@@ -3579,33 +3461,33 @@ class IMDatabasePointCollecter:
         return opt_constraint_list
 
     
-    def determine_beysian_trust_radius(self, molecules, qm_energies, current_datapoints, interpolation_setting, sym_datapoints, sym_dict, z_matrix):
+    # def determine_beysian_trust_radius(self, molecules, qm_energies, current_datapoints, interpolation_setting, sym_datapoints, sym_dict, z_matrix):
     
-        trust_radii = []
-        for dp in current_datapoints:   
-            sum_sq_error = 0.0
-            combined_datapoints = [dp]
+    #     trust_radii = []
+    #     for dp in current_datapoints:   
+    #         sum_sq_error = 0.0
+    #         combined_datapoints = [dp]
 
-            for i, mol in enumerate(molecules):
-                _, distance, _ = self.calculate_distance_to_ref(mol.get_coordinates_in_bohr(), dp.cartesian_coordinates)
+    #         for i, mol in enumerate(molecules):
+    #             _, distance, _ = self.calculate_distance_to_ref(mol.get_coordinates_in_bohr(), dp.cartesian_coordinates)
 
-                interpolation_driver = InterpolationDriver(z_matrix)
-                interpolation_driver.update_settings(interpolation_setting)
-                interpolation_driver.symmetry_information = sym_dict
-                interpolation_driver.qm_symmetry_data_points = sym_datapoints
-                interpolation_driver.print = False
-                interpolation_driver.qm_data_points = combined_datapoints
+    #             interpolation_driver = InterpolationDriver(z_matrix)
+    #             interpolation_driver.update_settings(interpolation_setting)
+    #             interpolation_driver.symmetry_information = sym_dict
+    #             interpolation_driver.qm_symmetry_data_points = sym_datapoints
+    #             interpolation_driver.print = False
+    #             interpolation_driver.qm_data_points = combined_datapoints
                 
-                interpolation_driver.compute(mol)
-                new_im_energy = interpolation_driver.get_energy()
-                diff = (new_im_energy - qm_energies[i]) * hartree_in_kcalpermol()
-                sum_sq_error += (diff)**2 / (0.1**2 * distance**6)
+    #             interpolation_driver.compute(mol)
+    #             new_im_energy = interpolation_driver.get_energy()
+    #             diff = (new_im_energy - qm_energies[i]) * hartree_in_kcalpermol()
+    #             sum_sq_error += (diff)**2 / (0.1**2 * distance**6)
 
-            bey_trust_radius = (1/sum_sq_error)**(1/6)
+    #         bey_trust_radius = (1/sum_sq_error)**(1/6)
 
-            trust_radii.append(bey_trust_radius)
+    #         trust_radii.append(bey_trust_radius)
             
-        return trust_radii
+    #     return trust_radii
 
 
     def _build_dp_ref_distance_matrix(self, datapoints, molecules, symmetry_info):
@@ -3655,14 +3537,18 @@ class IMDatabasePointCollecter:
         return D_db, D_ref, D_dpref
     
     def _clone_datapoints_with_alphas(self, datapoints, alphas):
-        cloned = [copy.deepcopy(dp) for dp in datapoints]
         alpha_vec = np.asarray(alphas, dtype=np.float64).reshape(-1)
-        if len(cloned) != alpha_vec.size:
+        if len(datapoints) != alpha_vec.size:
             raise ValueError(
-                f"Alpha/datapoint size mismatch: n_dp={len(cloned)} vs n_alpha={alpha_vec.size}"
+                f"Alpha/datapoint size mismatch: n_dp={len(datapoints)} vs n_alpha={alpha_vec.size}"
             )
-        for i, dp in enumerate(cloned):
-            dp.confidence_radius = float(alpha_vec[i])
+
+        cloned = []
+        for dp, alpha in zip(datapoints, alpha_vec):
+            dp_clone = copy.copy(dp)
+            dp_clone.confidence_radius = float(alpha)
+            cloned.append(dp_clone)
+
         return cloned
     
     def _build_interp_driver_for_trust_radius_eval(
@@ -3677,7 +3563,6 @@ class IMDatabasePointCollecter:
         drv = InterpolationDriver(z_matrix)
         drv.update_settings(interpolation_setting)
         drv.symmetry_information = sym_dict
-        drv.print = False
         drv.calc_optim_trust_radius = False
         drv.exponent_p = exponent_p_q[0]
         drv.exponent_q = exponent_p_q[1]
@@ -3844,7 +3729,7 @@ class IMDatabasePointCollecter:
 
     def determine_trust_radius_gradient(self, molecules, qm_energies, qm_gradients, im_energies, datapoints, interpolation_setting, sym_dict, z_matrix, exponent_p_q):
         
-        def optimize_trust_radius(alpha_full_start, trainable_idx, geom_list, E_ref_list, G_ref_list, E_im_list, dps, impes_dict, sym_dict, exponent_p_q, cluster_banks, basin_id=None):
+        def optimize_trust_radius(alpha_full_start, trainable_idx, geom_list, E_ref_list, G_ref_list, E_im_list, dps, impes_dict, sym_dict, exponent_p_q, basin_id=None):
             """
             Perform the gradient-based optimization to find R*
             that minimizes the sum of squared errors to reference QM energies.
@@ -3866,25 +3751,21 @@ class IMDatabasePointCollecter:
 
             
             if sample_size < 100:
-                size_label = 'small'
                 n_bh_iter = 10
                 gtol = 1e-3
                 ftol = 1e-4
                 maxiter = 300
             elif sample_size < 400:
-                size_label = 'small'
                 n_bh_iter = 1
                 gtol = 1e-3
                 ftol = 1e-4
                 maxiter = 300
             elif sample_size <= 800:
-                size_label = 'medium'
                 n_bh_iter = 1
                 gtol = 1e-3
                 ftol = 1e-4
                 maxiter = 220
             else:
-                size_label = 'large'
                 n_bh_iter = 0
                 gtol = 1e-3
                 ftol = 1e-4
@@ -3901,12 +3782,12 @@ class IMDatabasePointCollecter:
             opt = IMTrustRadiusOptimizer(z_matrix, impes_dict, sym_dict, dps,
                  geom_list, E_ref_list, G_ref_list, exponent_p_q,
                  e_x=energy_weight,
-                 beta=0.8, cluster_banks=cluster_banks)
+                 beta=0.8)
 
             history = []
             progress_header_printed = {"value": False}
             iter_counter = {"value": 0}
-            basin_label = "?"
+            basin_label = "Init"
             if basin_id is not None:
                 basin_label = str(int(basin_id))
 
@@ -4076,8 +3957,7 @@ class IMDatabasePointCollecter:
         
         
         stage_results = []
-        cluster_banks_all = self._resolve_trust_radius_cluster_bank(self.current_state)     
-        
+
         dp_eval_a = self._clone_datapoints_with_alphas(dp_wo_last, alphas_wo_last)
         stage_results.append(
             self._evaluate_interpolation_errors_on_reference_set(
