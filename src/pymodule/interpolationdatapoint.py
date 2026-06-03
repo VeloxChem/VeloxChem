@@ -415,8 +415,6 @@ class InterpolationDatapoint:
         # Make zero the values of s_inv that are smaller than tol
         s_inv = np.array([1 / s_i if s_i > tol else 0.0 for s_i in s])
         
-        # Critical assertion, check that the remaining positive values are equal to dimension (3N-6)
-        number_of_positive_values = np.count_nonzero(s_inv)
 
         g_minus_matrix = np.dot(U, np.dot(np.diag(s_inv), Vt))
 

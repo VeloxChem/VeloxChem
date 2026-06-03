@@ -241,15 +241,6 @@ class InterpolationDriver():
                 "implemented only for Cartesian base weighting coordinates."
             )
 
-        if (
-            self.use_tc_weights
-            and self.tc_weight_mode == "additive_rhee"
-        ):
-            raise NotImplementedError(
-                "The additive Rhee target-customized formalism currently "
-                "requires raw dihedral-angle rows. "
-            )
-
 
     def mark_runtime_data_cache_dirty(self):
         """

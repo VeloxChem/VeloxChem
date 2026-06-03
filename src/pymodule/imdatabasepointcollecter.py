@@ -2956,7 +2956,6 @@ class IMDatabasePointCollecter:
                                 
                             guarded_constraints = list(dict.fromkeys(main_constraint_list + fallback_constraints[:increasing_DOFs]))
                             ## determine constraint coupling:
-                            b_matrix = self.impes_drivers[state_to_optim].impes_coordinate.b_matrix
                             masks = []
 
                             for coord_idx, coord in enumerate(self.root_z_matrix[state_to_optim]['bonds'] + self.root_z_matrix[state_to_optim]['angles'] + self.root_z_matrix[state_to_optim]['dihedrals'] + self.root_z_matrix[state_to_optim]['impropers']):
@@ -3488,53 +3487,6 @@ class IMDatabasePointCollecter:
     #         trust_radii.append(bey_trust_radius)
             
     #     return trust_radii
-
-
-    def _build_dp_ref_distance_matrix(self, datapoints, molecules, symmetry_info):
-        """
-        Build size-aware geometric distances for trust-radius grouping.
-
-        Returned units:
-            angstrom RMS displacement per active atom after translation/rotation
-            alignment and symmetry filtering.
-        """
-        n_dp = len(datapoints)
-        n_ref = len(molecules)
-        D_db = np.full((n_dp, n_dp), np.inf, dtype=np.float64)
-        D_ref = np.full((n_ref, n_ref), np.inf, dtype=np.float64)
-        D_dpref = np.full((n_dp, n_ref), np.inf, dtype=np.float64)
-
-        if n_dp > 0:
-            n_atoms = datapoints[0].cartesian_coordinates.shape[0]
-        elif n_ref > 0:
-            n_atoms = molecules[0].get_coordinates_in_bohr().shape[0]
-        else:
-            return D_db, D_ref, D_dpref
-
-        active_atoms = np.delete(np.arange(n_atoms), symmetry_info[4])
-        n_active = max(1, int(active_atoms.size))
-        scale = bohr_in_angstrom() / np.sqrt(float(n_active))
-
-        def _normalized_distance(xyz_a, xyz_b):
-            _, dist_bohr, _ = self.calculate_distance_to_ref(xyz_a, xyz_b, symmetry_info)
-            return float(dist_bohr * scale)
-
-        for i, dp_i in enumerate(datapoints):
-            xyz_i = dp_i.cartesian_coordinates
-            for j, dp_j in enumerate(datapoints):
-                D_db[i, j] = _normalized_distance(xyz_i, dp_j.cartesian_coordinates)
-
-        for i, mol_i in enumerate(molecules):
-            xyz_i = mol_i.get_coordinates_in_bohr()
-            for j, mol_j in enumerate(molecules):
-                D_ref[i, j] = _normalized_distance(xyz_i, mol_j.get_coordinates_in_bohr())
-
-        for i, dp_i in enumerate(datapoints):
-            xyz_i = dp_i.cartesian_coordinates
-            for j, mol_j in enumerate(molecules):
-                D_dpref[i, j] = _normalized_distance(xyz_i, mol_j.get_coordinates_in_bohr())
-
-        return D_db, D_ref, D_dpref
     
     def _clone_datapoints_with_alphas(self, datapoints, alphas):
         alpha_vec = np.asarray(alphas, dtype=np.float64).reshape(-1)
