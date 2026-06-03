@@ -31,7 +31,9 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
+import h5py
 import copy
 import sys
 
@@ -82,11 +84,11 @@ class XPSDriver:
         # Core orbital energy ranges (in Hartree) for different elements and methods
         # Based on typical Hartree-Fock calculations
         self.energy_ranges_hf = {
-            'C': (-11.5, -11.0),
-            'N': (-15.7, -15.6),
-            'O': (-20.7, -20.5),
-            'F': (-26.4, -26.3),
-            'S': (-92.0, -91.0),
+            'C': (-11.8, -10.8),
+            'N': (-15.9, -15.2),
+            'O': (-21.2, -20.2),
+            'F': (-26.9, -26.1),
+            'S': (-92.0, -89.0),
         }
 
         # Based on typical DFT (B3LYP/PBE) calculations
@@ -100,6 +102,7 @@ class XPSDriver:
 
         # Default to DFT ranges for backward compatibility
         self.energy_ranges = self.energy_ranges_dft
+        self.filename = None
 
     def update_settings(self, xps_dict, method_dict=None):
         """
@@ -114,11 +117,76 @@ class XPSDriver:
         if method_dict is None:
             method_dict = {}
 
-        xps_keywords = {}
+        xps_keywords = {
+            'filename': str,
+        }
 
         for key in xps_dict:
             if key in xps_keywords:
                 setattr(self, key, xps_dict[key])
+
+    @staticmethod
+    def _get_hdf5_results(results, requested_elements):
+        """
+        Creates the XPS results dictionary for HDF5 output.
+
+        :param results:
+            The results dictionary returned by compute().
+        :param requested_elements:
+            The list of requested element symbols.
+
+        :return:
+            The dictionary to be written under the xps HDF5 group.
+        """
+
+        h5_results = {}
+
+        for element in requested_elements:
+            ionization_data = results.get(element, [])
+            sorted_data = sorted(ionization_data, key=lambda x: x[1])
+
+            h5_results[element] = {
+                'mo_indices': np.array([entry[0] for entry in sorted_data],
+                                       dtype=int),
+                'atom_indices': np.array([entry[1] for entry in sorted_data],
+                                         dtype=int),
+                'ionization_energies_ev': np.array(
+                    [entry[2] for entry in sorted_data], dtype=float),
+            }
+
+        return h5_results
+
+    def _write_hdf5(self, fname, results, requested_elements):
+        """
+        Writes XPS results to the specified HDF5 file.
+
+        :param fname:
+            Name of the HDF5 file.
+        :param results:
+            The results dictionary returned by compute().
+        :param requested_elements:
+            The list of requested element symbols.
+        """
+
+        if not fname:
+            raise ValueError('No filename given to _write_hdf5()')
+
+        fpath = Path(fname)
+        if fpath.suffix != '.h5':
+            fpath = fpath.with_suffix('.h5')
+
+        datasets = self._get_hdf5_results(results, requested_elements)
+
+        with h5py.File(fpath, 'a') as hf:
+            if 'xps' in hf:
+                del hf['xps']
+
+            xps_group = hf.create_group('xps')
+            for element, element_data in datasets.items():
+                element_group = xps_group.create_group(element)
+
+                for key, value in element_data.items():
+                    element_group.create_dataset(key, data=value)
 
     @staticmethod
     def _get_xcfun_label(xcfun):
@@ -560,6 +628,10 @@ class XPSDriver:
             self.ostream.print_blank()
             self.ostream.print_header('*** XPS Calculation Completed.'.ljust(92))
             self.ostream.print_blank()
+            if self.filename is not None:
+                self.ostream.print_info('Writing to files...')
+                self.ostream.print_blank()
+                self._write_hdf5(self.filename, results, elements_list)
             self.ostream.flush()
 
         return results
