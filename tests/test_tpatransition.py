@@ -1,11 +1,15 @@
 from mpi4py import MPI
 from pathlib import Path
+import h5py
+import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import (mpi_master, hartree_in_ev,
                                     hartree_in_inverse_nm)
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.outputstream import OutputStream
+from veloxchem.resultsio import read_results
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tpatransitiondriver import TpaTransitionDriver
 
@@ -161,6 +165,168 @@ class TestTpaTransition:
                                                           rel=1.0e-12,
                                                           abs=1.0e-12)
             assert all(val >= 0.0 for val in spectrum_au['y_data'])
+
+    def test_print_results_public(self, tmp_path):
+
+        tpa_results = self.compute_tpatransition('hf')
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        outfile = tmp_path / 'tpatransition_print.out'
+        tpa_drv = TpaTransitionDriver(MPI.COMM_WORLD, OutputStream(outfile))
+        tpa_drv.print_results(tpa_results)
+        tpa_drv.ostream.flush()
+
+        printed = outfile.read_text()
+        assert 'Components of TPA Transition Moments' in printed
+        assert 'TPA Strength (Linear Polarization)' in printed
+        assert 'TPA Strength (Circular Polarization)' in printed
+
+    def test_print_results_summary_public(self, tmp_path):
+
+        tpa_results = self.compute_tpatransition('hf')
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        outfile = tmp_path / 'tpatransition_summary.out'
+        tpa_drv = TpaTransitionDriver(MPI.COMM_WORLD, OutputStream(outfile))
+        tpa_drv.print_results(tpa_results, sections='summary', max_states=1)
+        tpa_drv.ostream.flush()
+
+        printed = outfile.read_text()
+        assert 'TPA Transition Summary' in printed
+        assert 'Osc. Strength' in printed
+        assert 'Components of TPA Transition Moments' not in printed
+        assert 'TPA Strength (Linear Polarization)' not in printed
+        assert 'additional state(s) omitted' in printed
+
+    def test_plot_spectrum_public(self):
+
+        matplotlib = pytest.importorskip('matplotlib')
+        matplotlib.use('Agg', force=True)
+        import matplotlib.pyplot as plt
+
+        tpa_results = self.compute_tpatransition('hf')
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        tpa_drv = TpaTransitionDriver()
+        tpa_drv.ostream.mute()
+        fig, ax = plt.subplots()
+        returned_ax = tpa_drv.plot_spectrum(tpa_results,
+                                            x_unit='ev',
+                                            broadening_value=0.123984,
+                                            broadening_unit='ev',
+                                            ax=ax)
+
+        assert returned_ax is ax
+        assert ax.get_xlabel() == 'Photon energy [eV]'
+        assert ax.get_ylabel() == 'TPA cross-section [GM]'
+        assert len(ax.lines) == 1
+        assert len(ax.figure.axes) == 2
+        plt.close(ax.figure)
+
+    def test_plot_spectrum_public_without_ax_returns_none(self):
+
+        matplotlib = pytest.importorskip('matplotlib')
+        matplotlib.use('Agg', force=True)
+
+        tpa_results = self.compute_tpatransition('hf')
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        tpa_drv = TpaTransitionDriver()
+        tpa_drv.ostream.mute()
+
+        assert tpa_drv.plot_spectrum(tpa_results,
+                                     x_unit='ev',
+                                     broadening_value=0.123984,
+                                     broadening_unit='ev') is None
+
+    def test_tpatransition_results_hdf5_roundtrip(self, tmp_path):
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        h5file = tmp_path / 'tpatransition_results.h5'
+        with h5py.File(h5file, 'w'):
+            pass
+
+        tpa_results = {
+            'photon_energies': [0.1656922537, 0.2119096339],
+            'transition_moments': [
+                np.array([[1.0 + 0.0j, 0.1 + 0.0j, 0.2 + 0.0j],
+                          [0.1 + 0.0j, 2.0 + 0.0j, 0.3 + 0.0j],
+                          [0.2 + 0.0j, 0.3 + 0.0j, 3.0 + 0.0j]]),
+                np.array([[4.0 + 0.0j, 0.4 + 0.0j, 0.5 + 0.0j],
+                          [0.4 + 0.0j, 5.0 + 0.0j, 0.6 + 0.0j],
+                          [0.5 + 0.0j, 0.6 + 0.0j, 6.0 + 0.0j]])
+            ],
+            'tpa_strengths': {
+                'linear': {
+                    0: 4.1302840736,
+                    1: 15.8381651150,
+                },
+                'circular': {
+                    0: 1.5,
+                    1: 2.5,
+                },
+            },
+            'oscillator_strengths': np.array([0.01, 0.02]),
+            'elec_trans_dipoles': np.array([[0.11, -0.22, 0.33],
+                                            [0.44, -0.55, 0.66]]),
+            'excitation_details': [['1a -> 2a (0.90)'], ['1b -> 3b (0.80)']],
+        }
+
+        tpa_drv = TpaTransitionDriver()
+        tpa_drv.ostream.mute()
+        tpa_drv._write_final_hdf5(str(h5file), tpa_results)
+
+        recovered = read_results(str(h5file), 'tpa_transition')
+
+        assert recovered == tpa_drv._get_hdf5_results(tpa_results)
+
+    def test_tpatransition_results_hdf5_roundtrip_without_suffix(self, tmp_path):
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        h5stem = tmp_path / 'tpatransition_results'
+        h5file = tmp_path / 'tpatransition_results.h5'
+        with h5py.File(h5file, 'w'):
+            pass
+
+        tpa_results = {
+            'photon_energies': [0.1656922537],
+            'transition_moments': [
+                np.array([[1.0 + 0.0j, 0.1 + 0.0j, 0.2 + 0.0j],
+                          [0.1 + 0.0j, 2.0 + 0.0j, 0.3 + 0.0j],
+                          [0.2 + 0.0j, 0.3 + 0.0j, 3.0 + 0.0j]])
+            ],
+            'tpa_strengths': {
+                'linear': {
+                    0: 4.1302840736,
+                },
+                'circular': {
+                    0: 1.5,
+                },
+            },
+            'oscillator_strengths': np.array([0.01]),
+            'elec_trans_dipoles': np.array([[0.11, -0.22, 0.33]]),
+            'excitation_details': [['1a -> 2a (0.90)']],
+        }
+
+        tpa_drv = TpaTransitionDriver()
+        tpa_drv.ostream.mute()
+        tpa_drv._write_final_hdf5(str(h5stem), tpa_results)
+
+        recovered = read_results(str(h5file), 'tpa_transition')
+
+        assert recovered == tpa_drv._get_hdf5_results(tpa_results)
 
     def test_update_settings_and_restart(self, tmp_path):
 

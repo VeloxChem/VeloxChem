@@ -90,6 +90,26 @@ class TpaReducedDriver(TpaDriverBase):
 
         super().update_settings(rsp_dict, method_dict)
 
+    def _get_hdf5_group_name(self):
+        """
+        Gets the HDF5 group name for reduced TPA results.
+
+        :return:
+            The group name.
+        """
+
+        return 'tpa_reduced'
+
+    def _get_hdf5_value_label(self):
+        """
+        Gets the HDF5 value label for reduced TPA results.
+
+        :return:
+            The value label.
+        """
+
+        return 'reduced TPA result'
+
     def get_densities(self, wi, Nx, mo, nocc, norb):
         """
         Computes the compounded densities needed for the compounded Fock
@@ -974,22 +994,58 @@ class TpaReducedDriver(TpaDriverBase):
 
         return None
 
-    def _print_results(self, rsp_results):
+    def _normalize_print_sections(self, sections):
         """
-        Prints the results from the reduced TPA calculation.
+        Normalize requested print sections for reduced TPA results.
 
-        :param rsp_results:
-            A dictonary containing the results of response calculation.
+        :param sections:
+            Section label or sequence of section labels.
+
+        :return:
+            Ordered list of normalized section labels.
         """
 
-        gamma = rsp_results['gamma']
+        if isinstance(sections, str):
+            requested_sections = [sections.lower()]
+        else:
+            requested_sections = [section.lower() for section in sections]
 
-        self.ostream.print_blank()
+        valid_sections = ('summary', 'note', 'gamma', 'reference', 'spectrum',
+                          'all')
+        invalid_sections = [
+            section for section in requested_sections if section not in valid_sections
+        ]
+        from .errorhandler import assert_msg_critical
+        assert_msg_critical(
+            not invalid_sections,
+            'TpaReducedDriver.print_results: Invalid section label(s).')
 
-        w_str = 'Isotropic Average gamma Tensor at Given Frequencies'
-        self.ostream.print_header(w_str)
-        self.ostream.print_header('=' * (len(w_str) + 2))
-        self.ostream.print_blank()
+        if 'all' in requested_sections:
+            requested_sections = ['note', 'gamma', 'reference', 'spectrum']
+
+        normalized_sections = []
+        for section in requested_sections:
+            if section not in normalized_sections:
+                normalized_sections.append(section)
+
+        return normalized_sections
+
+    def _get_summary_title(self):
+        """
+        Gets the summary-table title for reduced TPA results.
+
+        :return:
+            The title for summary output.
+        """
+
+        return 'Reduced TPA Summary'
+
+    def _print_note(self):
+        """
+        Prints the reduced TPA approximation note and reference.
+        """
+
+        width = 68
 
         w_str = '*** Note: The reduced expression is an approximation to the  '
         self.ostream.print_header(w_str)
@@ -997,19 +1053,6 @@ class TpaReducedDriver(TpaDriverBase):
         self.ostream.print_header(w_str)
         w_str = '    intended for use in one-photon off-resonance regions.    '
         self.ostream.print_header(w_str)
-        self.ostream.print_blank()
-
-        freqs = rsp_results['frequencies']
-
-        title = '{:<8s}{:>14s}{:>21s}{:>22s}'.format('', 'Photon Energy', 'Real',
-                                                     'Imaginary')
-        width = len(title)
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header(('-' * len(title)).ljust(width))
-
-        for w in freqs:
-            self._print_component('gamma', w, gamma[(w, -w, w)], width)
-
         self.ostream.print_blank()
 
         title = 'Reference: '
@@ -1020,8 +1063,3 @@ class TpaReducedDriver(TpaDriverBase):
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_blank()
 
-        spectrum = self.get_spectrum(rsp_results, x_unit='au')
-        self._print_spectrum(spectrum, width)
-
-        self.ostream.print_blank()
-        self.ostream.flush()
