@@ -437,7 +437,13 @@ def plot_xps_spectrum(xps_results,
 
     :param xps_results:
         The dictionary containing XPS results from XPSDriver.compute().
-        Format: {element: [(mo_idx, atom_idx, ionization_energy, contribution), ...]}
+        Format: {element: [{
+            'mo_index': int,
+            'atom_index': int,
+            'ionization_energy_ev': float,
+            'contribution': float,
+            'is_delocalized': bool,
+        }, ...]}
     :param element:
         Element symbol to plot (e.g., 'C', 'O', 'N', 'F', 'S').
         If None and xps_results contains only one element, that element is plotted.
@@ -511,14 +517,9 @@ def plot_xps_spectrum(xps_results,
     else:
         elem_color = vlx_color
 
-    # Extract data for the specified element
-    # Handle both old format (mo_idx, ie) and new format (mo_idx, atom_idx, ie, contribution)
-    if len(ionization_data[0]) == 2:
-        energies = np.array([ie for _, ie in ionization_data])
-        atom_indices = None
-    else:
-        energies = np.array([ie for _, _, ie, _ in ionization_data])
-        atom_indices = np.array([atom_idx for _, atom_idx, _, _ in ionization_data])
+    energies = np.array(
+        [record['ionization_energy_ev'] for record in ionization_data])
+    atom_indices = np.array([record['atom_index'] for record in ionization_data])
     intensities = np.ones(len(energies))
 
     # Create or use provided axis

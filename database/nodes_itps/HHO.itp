@@ -5,13 +5,13 @@
 
 [ moleculetype ]
 ;name            nrexcl
-MOL                  3
+HHO                  3
 
 [ atoms ]
 ;   nr  type  resi  res  atom  cgnr     charge       mass
-     1    ow      1    TIP     OW     1     -0.834000      15.99492 ; qtot -0.834  equiv. ow_00
-     2    hw      1    TIP     HW1    2      0.417000       1.00782 ; qtot -0.417  equiv. hw_00
-     3    hw      1    TIP     HW2    3      0.417000       1.00782 ; qtot  0.000  equiv. hw_00
+     1    ow      1    HHO     OW     1     -0.834000      15.99492 ; qtot -0.834  equiv. ow_00
+     2    hw      1    HHO     HW1    2      0.417000       1.00782 ; qtot -0.417  equiv. hw_00
+     3    hw      1    HHO     HW2    3      0.417000       1.00782 ; qtot  0.000  equiv. hw_00
 
 [ bonds ]
 ;   ai     aj    funct       r           k_r
