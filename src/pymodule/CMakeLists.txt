@@ -1,32 +1,19 @@
-# we glob the Python files in src/pymodule and let CMake add a rule such that
-# the glob is repeated every time we rebuild.
-# This is NOT RECOMMENDED by CMake
-# (https://cmake.org/cmake/help/v3.16/command/file.html#filesystem) but you only
-# live once!
-file(
-  GLOB
-    _veloxchemlib_pys
-  LIST_DIRECTORIES
-    FALSE
-  CONFIGURE_DEPENDS
-  ${CMAKE_CURRENT_SOURCE_DIR}/*.py
+# Install Python files from the source tree directly.
+# install(DIRECTORY ...) preserves subdirectory structure (e.g. mofbuilder/)
+# and resolves file matching at install time, so new or deleted .py files are
+# automatically picked up without a CMake reconfigure.
+# __init__.py is excluded from the directory install to allow commit-hash
+# injection and is handled separately below.
+install(
+  DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
+  DESTINATION ${PYMOD_INSTALL_FULLDIR}
+  FILES_MATCHING
+  PATTERN "*.py"
+  PATTERN "__init__.py" EXCLUDE
+  PATTERN "__pycache__" EXCLUDE
+  PATTERN "CMakeLists.txt" EXCLUDE
+  PATTERN "*.egg-info" EXCLUDE
   )
-
-# link the Python files under the build folder
-# note that __init__.py is skipped
-foreach(_py_path IN LISTS _veloxchemlib_pys)
-  get_filename_component(_py_name ${_py_path} NAME)
-  if(_py_name STREQUAL "__init__.py")
-    continue()
-  endif()
-  file(
-    CREATE_LINK
-      ${_py_path}
-      ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/${_py_name}
-    COPY_ON_ERROR
-    SYMBOLIC
-    )
-endforeach()
 
 # process commit hash
 set(_vlx_commit "unknown")
@@ -48,37 +35,23 @@ if(ENABLE_COMMIT_HASH)
     )
     if(_git_ret EQUAL 0 AND NOT _commit_hash_str STREQUAL "")
       set(_vlx_commit "${_commit_hash_str}")
-      message(STATUS "Setting _vlx_commit: ${_commit_hash_str}")
-      file(REMOVE
-          ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/__init__.py)
-      file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/__init__.py
-          DESTINATION ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR})
-      file(APPEND
-          ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/__init__.py
-          "\n__commit__ = \"${_vlx_commit}\"\n")
-      list(APPEND
-        _veloxchemlib_pys
-        ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/__init__.py)          
     endif()
   endif()
 endif()
 
-if(${_vlx_commit} STREQUAL "unknown")
-  file(REMOVE
-      ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/__init__.py)
-  file(CREATE_LINK
-      ${CMAKE_CURRENT_SOURCE_DIR}/__init__.py
-      ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/__init__.py
-      COPY_ON_ERROR
-      SYMBOLIC)
-  list(APPEND
-      _veloxchemlib_pys
-      ${CMAKE_CURRENT_SOURCE_DIR}/__init__.py)             
-endif()
-
-install(
-  FILES
-    ${_veloxchemlib_pys}
-  DESTINATION
-    ${PYMOD_INSTALL_FULLDIR}
+if(NOT _vlx_commit STREQUAL "unknown")
+  message(STATUS "Setting __commit__: ${_vlx_commit}")
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/__init__.py _init_content)
+  file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/veloxchem_init.py
+       "${_init_content}\n__commit__ = \"${_vlx_commit}\"\n")
+  install(
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/veloxchem_init.py
+    DESTINATION ${PYMOD_INSTALL_FULLDIR}
+    RENAME __init__.py
   )
+else()
+  install(
+    FILES ${CMAKE_CURRENT_SOURCE_DIR}/__init__.py
+    DESTINATION ${PYMOD_INSTALL_FULLDIR}
+  )
+endif()

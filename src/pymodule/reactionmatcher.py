@@ -32,7 +32,6 @@
 
 from mpi4py import MPI
 from networkx.algorithms.isomorphism import GraphMatcher
-from networkx.algorithms.isomorphism import categorical_node_match
 from itertools import permutations
 import networkx as nx
 import numpy as np
@@ -345,13 +344,13 @@ class ReactionMatcher:
             return rea_graph, pro_graph, {}
 
     def _calculate_assist_ids(self, rea_graph, pro_graph):
-        H_count = sum(
-            [1 for n in rea_graph.nodes if rea_graph.nodes[n]['elem'] == 1.0])
+        # H_count = sum(
+        #     [1 for n in rea_graph.nodes if rea_graph.nodes[n]['elem'] == 1.0])
 
         # # Upper bound for a starting guess. A linear molecule would need at least N/2 range to cover the entire molecule
         # depth = int((len(rea_graph.nodes) - H_count) / 4)
 
-        min_depth = 3
+        # min_depth = 3
         assisting_map = {}
         rea_cc = list(nx.connected_components(rea_graph))
         range_spans_cc = [False] * len(rea_cc)
@@ -450,7 +449,7 @@ class ReactionMatcher:
                     # map = GM.mapping
                     assisting_map.update(map)
                     self.ostream.print_info(
-                        f"Found matching subgraph between reactant atom {rea_id+ self.print_starting_index} and product atom {pro_id+self.print_starting_index} at depth {depth} with mapping: {self._print_mapping(map)}."
+                        f"Found matching subgraph between reactant atom {rea_id + self.print_starting_index} and product atom {pro_id + self.print_starting_index} at depth {depth} with mapping: {self._print_mapping(map)}."
                     )
                     self.ostream.flush()
                     for rea_node, pro_node in map.items():
@@ -573,7 +572,7 @@ class ReactionMatcher:
         if forming_edges is None:
             if not self._check_monomorphic:
                 self.ostream.print_info(
-                    f"Could not find forming edges from subgraph isomorphism, attempting subgraph monomorphism"
+                    "Could not find forming edges from subgraph isomorphism, attempting subgraph monomorphism"
                 )
                 self.ostream.flush()
                 self._check_monomorphic = True
@@ -591,7 +590,7 @@ class ReactionMatcher:
         GM = self.get_graph_matcher(A, B)
         map = next(GM.isomorphisms_iter())
 
-        self._check_time(f"finding mapping.")
+        self._check_time("finding mapping.")
         if swapped:
             # if we swapped A and B, we need to swap the mapping back
             self.ostream.print_info(
@@ -756,9 +755,9 @@ class ReactionMatcher:
     def _recurse_breaking_edges(self, A, A_assist, B, B_assist, depth,
                                 B_composition, forced_forming_edges):
         """
-        Search the minimal amount of edges that need to be removed from A so that all connected components of A are subgraphs of B. 
+        Search the minimal amount of edges that need to be removed from A so that all connected components of A are subgraphs of B.
         Searches recursively up to given depth. Returns None if no edges are found at a given depth, or when the time limit is exceeded.
-        In looping, it prioritizes breaking bonds involving combinations of elements that are more abundant in A then in B. 
+        In looping, it prioritizes breaking bonds involving combinations of elements that are more abundant in A then in B.
         After that, it prioritizes breaking bonds involving Hydrogen atoms.
         """
 
@@ -887,7 +886,7 @@ class ReactionMatcher:
                 if edge is not None:
                     break
             if edge is None:
-                self.ostream.print_info(f"Bond not found, aborting")
+                self.ostream.print_info("Bond not found, aborting")
                 self.ostream.flush()
                 return None
         return forming_edges
@@ -923,7 +922,7 @@ class ReactionMatcher:
 
     def _connected_components_are_subgraphs(self, A, B):
         """
-        Check if all connected components of A are subgraphs of B. If true, return a list of GraphMatchers for each connected component and their corresponding subgraphs. 
+        Check if all connected components of A are subgraphs of B. If true, return a list of GraphMatchers for each connected component and their corresponding subgraphs.
         Otherwise return None.
         """
         cc_A = list(nx.connected_components(A))

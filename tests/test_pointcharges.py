@@ -9,6 +9,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.scfgradientdriver import ScfGradientDriver
+from veloxchem.errorhandler import VeloxChemError
 
 
 @pytest.mark.solvers
@@ -92,7 +93,7 @@ class TestPointCharges:
         scf_drv.point_charges = str(potfile)
         scf_drv.ostream.mute()
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='potfile: Invalid data on point charge line 3'):
             scf_drv.compute(mol, bas)
 
@@ -111,6 +112,6 @@ class TestPointCharges:
         scf_drv.qm_vdw_params = str(vdwfile)
         scf_drv.ostream.mute()
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='qm_vdw_params: Invalid data on line 2'):
             scf_drv.compute(mol, bas)

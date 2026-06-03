@@ -54,7 +54,7 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .optimizationdriver import OptimizationDriver
 from .interpolationdriver import InterpolationDriver
 from .errorhandler import assert_msg_critical
-from .mofutils import svd_superimpose
+from .superimpose import svd_superimpose
 
 try:
     import openmm as mm
@@ -810,6 +810,8 @@ class OpenMMDynamics:
                 if not duplicate:
                     if partial_charges:
                         ff_gen.partial_charges = partial_charges[i]
+                    self.ostream.print_info(f'Generating force field for molecule {i+1}...')
+                    self.ostream.flush()
                     ff_gen.create_topology(mol, water_model=water_model)
                     ff_gen.generate_residue_xml(f'molecule_{i+1}.xml', f'M{i+1:02d}')
                     xml_files.append(f'molecule_{i+1}.xml')
@@ -914,7 +916,7 @@ class OpenMMDynamics:
         self.ostream.print_info("Recalculating energies for the conformations...")
         self.ostream.flush()
         simulation = app.Simulation(self.topology, real_system, self._create_integrator(), platform=self._create_platform())
-
+        
         for idx, conformation in enumerate(conformations):    
             simulation.context.setPositions(conformation)
             simulation.minimizeEnergy()
@@ -1069,7 +1071,7 @@ class OpenMMDynamics:
 
         equiv_conformer_pairs= []
         if unique_conformers:
-            msg = f'Filtering for unique conformers'
+            msg = 'Filtering for unique conformers'
             self.ostream.print_info(msg)
             self.ostream.flush()
             
@@ -2548,76 +2550,11 @@ class OpenMMDynamics:
 
         return potential_energy
     
-    def _calculate_rmsd(self, coord1, coord2):
-        """
-        Calculate the root mean square deviation (RMSD) between two sets of atomic coordinates
-        after optimal alignment using the Kabsch algorithm. This method accounts for rotational
-        and translational differences between the molecular conformations.
-
-        :param coord1: 
-            The coordinates of the first molecule.
-        :param coord2:
-            The coordinates of the second molecule.
-
-
-        :return:
-        - rmsd_value: float
-            The RMSD between the two aligned molecules.
-        """
-
-        # Center the coordinates to eliminate translational differences
-        centroid1 = np.mean(coord1, axis=0)  
-        centroid2 = np.mean(coord2, axis=0) 
-        coord1_centered = coord1 - centroid1
-        coord2_centered = coord2 - centroid2
-
-        # The covariance matrix captures how the centered coordinates of the two molecules relate
-        covariance_matrix = np.dot(coord1_centered.T, coord2_centered)
-        
-        # Perform Singular Value Decomposition (SVD) on the covariance matrix
-        V, S, Wt = np.linalg.svd(covariance_matrix)
-
-        # Correct for improper rotation (reflection)
-        # Calculate the determinant of the rotation matrix to check for reflection
-        # A determinant of -1 indicates a reflection, which we need to correct
-        d = np.sign(np.linalg.det(np.dot(V, Wt)))
-
-        # If the determinant is negative, adjust the matrices to ensure a proper rotation
-        if d < 0:
-            # Reflect the last column of V and invert the last singular value
-            V[:, -1] *= -1
-            S[-1] *= -1
-
-        # Compute the optimal rotation matrix
-        # Multiply V and Wt to get the rotation matrix that best aligns coord1 to coord2
-        rotation_matrix = np.dot(V, Wt)
-
-        # Apply the rotation to the centered coordinates of the first molecule
-        # Rotate coord1_centered using the rotation matrix
-        coord1_rotated = np.dot(coord1_centered, rotation_matrix)
-
-        #Calculate the RMSD between the rotated coordinates and the centered coordinates of the second molecule
-        diff = coord1_rotated - coord2_centered
-
-        # Square the differences
-        diff_squared = diff ** 2
-
-        # Sum the squared differences over all atoms and coordinate axes (x, y, z)
-        sum_diff_squared = np.sum(diff_squared)
-
-        # Calculate the mean squared deviation
-        mean_diff_squared = sum_diff_squared / len(coord1)
-
-        # Take the square root of the mean squared deviation to obtain the RMSD
-        rmsd_value = np.sqrt(mean_diff_squared)
-
-        return rmsd_value
-
     def _get_centroid(self,coords):
         centroid = np.mean(coords, axis=0)
         rg_sq = np.mean(np.sum((coords - centroid) ** 2, axis=1))
         
-        return np.sqrt(rg_sq)
+        return max(np.sqrt(rg_sq), 1.5)
 
     def _create_system_from_multiple_molecules(
         self, molecules, pdb_file='system.pdb', spacing_factor=1.5, max_attempts=1000, write_pdb = True
@@ -2760,10 +2697,8 @@ class OpenMMDynamics:
             pos_restraint.addPerParticleParameter('x0')
             pos_restraint.addPerParticleParameter('y0')
             pos_restraint.addPerParticleParameter('z0')
-            
+
             for mol_idx in position_restraint:
                 for atom_idx in groups[mol_idx - 1]:
                     pos_restraint.addParticle(atom_idx, self.positions[atom_idx])
-                    
-        
 

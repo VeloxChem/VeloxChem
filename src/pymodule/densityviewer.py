@@ -84,9 +84,6 @@ class DensityViewer:
         self.use_visualization_driver = False
         self.interpolate = False
 
-        # flag to indicate if using k3d
-        self.use_k3d = False
-
         # flag for the type of density
         self.den_type = denmat.rest
 
@@ -523,6 +520,22 @@ class DensityViewer:
 
         return np_density
 
+    def visualize(self, molecule, basis, den_inp, width=600, height=450):
+        """
+        Visualizes the densities, with a widget to choose which.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param den_inp:
+            The density matrix input (filename of h5 file storing the
+            densities, or a dictionary of density matrices (numpy arrays)
+            and their labels).
+        """
+
+        self._plot_using_py3dmol(molecule, basis, den_inp, width, height)
+
     def plot(self, molecule, basis, den_inp, width=600, height=450):
         """
         Plots the densities, with a widget to choose which.
@@ -537,10 +550,7 @@ class DensityViewer:
             and their labels).
         """
 
-        if self.use_k3d:
-            self.plot_using_k3d(molecule, basis, den_inp)
-        else:
-            self._plot_using_py3dmol(molecule, basis, den_inp, width, height)
+        self._plot_using_py3dmol(molecule, basis, den_inp, width, height)
 
     def plot_using_k3d(self, molecule, basis, den_inp, label=''):
         """

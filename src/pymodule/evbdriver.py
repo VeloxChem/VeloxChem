@@ -47,10 +47,8 @@ from .evbsystembuilder import EvbSystemBuilder
 from .evbfepdriver import EvbFepDriver
 from .reaffbuilder import ReactionForceFieldBuilder
 from .evbdataprocessing import EvbDataProcessing
-from .evbsystembuilder import EvbForceGroup
 from .solvationbuilder import SolvationBuilder
 from .errorhandler import assert_msg_critical
-from .sanitychecks import molecule_sanity_check
 
 try:
     import openmm as mm
@@ -168,8 +166,8 @@ class EvbDriver():
         """Build OpenMM systems for the given configurations with interpolated forcefields for each lambda value. Saves the systems as xml files, the topology as a pdb file and the options as a json file to the disk.
 
         Args:
-            configurations (list[str] | list[dict]): The given configurations for which to perform an FEP. The first configuration will be regarded as the reference configuration. 
-            Lambda (list[float] | np.ndarray): The Lambda vector to be used for the FEP. Should start with 0, end with 1 and be monotonically increasing. 
+            configurations (list[str] | list[dict]): The given configurations for which to perform an FEP. The first configuration will be regarded as the reference configuration.
+            Lambda (list[float] | np.ndarray): The Lambda vector to be used for the FEP. Should start with 0, end with 1 and be monotonically increasing.
                 Defaults to None, in which case default values will be assigned depending on if debugging is enabled or not.
                 If a string is given, the return value of default_system_configurations() will be used. See this function for default configurations.
             constraints (dict | list[dict] | None, optional): Dictionary of harmonic bond, angle or (improper) torsion forces to apply over in every FEP frame. Defaults to None.
@@ -211,9 +209,9 @@ class EvbDriver():
         Lambda = [round(lam, 3) for lam in Lambda]
         self.Lambda = Lambda
 
-        #Per configuration
+        # Per configuration
         for conf in self.configurations:
-            #create folders,
+            # create folders,
             data_folder = f"EVB_{self.name}_{conf['name']}_data_{self.t_label}"
             while Path(data_folder).exists():
                 self.t_label += 1
@@ -237,9 +235,9 @@ class EvbDriver():
                 str(data_folder_path / "product_struct.xyz"))
 
             MMForceFieldGenerator.save_forcefield(
-                self.reactant, str(data_folder_path / f"reactant_ff_data.json"))
+                self.reactant, str(data_folder_path / "reactant_ff_data.json"))
             MMForceFieldGenerator.save_forcefield(
-                self.product, str(data_folder_path / f"product_ff_data.json"))
+                self.product, str(data_folder_path / "product_ff_data.json"))
 
             if conf.get('solvent', None) is None and conf.get('pressure',
                                                               -1) > 0:
@@ -293,7 +291,6 @@ class EvbDriver():
 
         self.system_confs = configurations
 
-        self.create_viamd_environment_files()
         self.ostream.flush()
 
     def load_initialisation(self,
@@ -301,7 +298,7 @@ class EvbDriver():
                             name: str,
                             load_systems=False,
                             load_pdb=False):
-        """Load a configuration from a data folder for which the systems have already been generated, such that an FEP can be performed. 
+        """Load a configuration from a data folder for which the systems have already been generated, such that an FEP can be performed.
         The topology, initial positions, temperature and Lambda vector will be loaded from the data folder.
 
         Args:
@@ -314,13 +311,14 @@ class EvbDriver():
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbDriver.')
 
-        with open(str(Path(data_folder) / "options.json"), "r") as file:
+        options_path = Path(data_folder) / "options.json"
+        with options_path.open("r") as file:
             options = json.load(file)
             temperature = options["temperature"]
             Lambda = options["Lambda"]
         if self.Lambda != Lambda and self.Lambda is not None:
             self.ostream.print_warning(
-                f"Lambda vector in {data_folder}/options.json does not match the current Lambda vector. Overwriting current Lambda vector with the one from the file."
+                f"Lambda vector in {options_path} does not match the current Lambda vector. Overwriting current Lambda vector with the one from the file."
             )
 
         self.Lambda = Lambda
@@ -426,10 +424,14 @@ class EvbDriver():
                                                  time_sub_sample)
         self.ostream.flush()
 
-        if alpha is not None: dp.alpha = alpha
-        if H12 is not None: dp.H12 = H12
-        if alpha_guess is not None: dp.alpha_guess = alpha_guess
-        if H12_guess is not None: dp.H12_guess = H12_guess
+        if alpha is not None:
+            dp.alpha = alpha
+        if H12 is not None:
+            dp.H12 = H12
+        if alpha_guess is not None:
+            dp.alpha_guess = alpha_guess
+        if H12_guess is not None:
+            dp.H12_guess = H12_guess
         if dE_range is not None:
             dp.coordinate_bins = np.linspace(dE_range[0], dE_range[1], 200)
 
@@ -720,107 +722,6 @@ class EvbDriver():
 
             save_group(data, file)
 
-    def create_viamd_environment_files(self):
-        for conf in self.system_confs:
-            base = ("[Files]\n"
-                    "MoleculeFile=./topology.pdb\n"
-                    "TrajectoryFile=./trajectory.xtc\n"
-                    "CoarseGrained=0\n"
-                    "\n"
-                    "[RenderSettings]\n"
-                    "SsaoEnabled=0\n"
-                    "DofEnabled=0\n"
-                    "\n"
-                    "[Representation]\n"
-                    "Name=Reaction\n"
-                    'Filter=resname("REA")\n'
-                    "Enabled=1\n"
-                    "Type=2\n"
-                    "ColorMapping=1\n"
-                    "Saturation=1.000000\n"
-                    "Param=1.000000,1.000000,1.000000,1.000000\n"
-                    "DynamicEval=0\n")
-
-            script = ("[Script]\n"
-                      'Text="""\n')
-            rea_script = 'rea = resname("REA");'
-            sol_script = ""
-            if conf.get("solvent", None) is not None:
-
-                sol_script = (
-                    f'sol = resname("SOL");\n'
-                    'close_sol = (within(5, rea) and resname("SOL"));\n')
-            pdb_script = ""
-            if conf.get('pdb', None) is not None:
-                resids = [
-                    res['residue'] for res in conf.get("pdb_active_res", [])
-                ]
-
-                if len(resids) > 0:
-                    s = "".join([f" or resid({id})" for id in resids])
-                    rea_script = rea_script[:-1] + s + ";"
-                pdb_script = "pocket = residue(protein and within(3,rea)) and not element('H');\n"
-            script += rea_script + "\n"
-            script += sol_script + "\n"
-            script += pdb_script + "\n"
-
-            script += '"""'
-
-            solvent_rep = ("[Representation]\n"
-                           "Name=Solvent\n"
-                           "Filter=close_sol\n"
-                           "Enabled=1\n"
-                           "Type=1\n"
-                           "ColorMapping=1\n"
-                           "Saturation=1.000000\n"
-                           "Param=0.354000,1.000000,1.000000,1.000000\n"
-                           "DynamicEval=1\n")
-
-            protein_rep = ("[Representation]\n"
-                           "Name=Protein\n"
-                           "Filter=protein\n"
-                           "Enabled=1\n"
-                           "Type=4\n"
-                           "ColorMapping=8\n"
-                           "StaticColor=1.000000,1.000000,1.000000,1.000000\n"
-                           "Saturation=1.000000\n"
-                           "Param=1.000000,1.000000,1.000000,1.000000\n"
-                           "DynamicEval=0\n"
-                           "\n"
-                           "[Representation]\n"
-                           "Name=pocket\n"
-                           "Filter=pocket\n"
-                           "Enabled=1\n"
-                           "Type=0\n"
-                           "ColorMapping=1\n"
-                           "StaticColor=1.000000,1.000000,1.000000,1.000000\n"
-                           "Saturation=0.570000\n"
-                           "Param=1.000000,1.000000,1.000000,1.000000\n"
-                           "DynamicEval=0\n")
-
-            carbon_rep = ("[Representation]\n"
-                          "Name=Carbon\n"
-                          'Filter=resname("CCC")\n'
-                          "Enabled=1\n"
-                          "Type=2\n"
-                          "ColorMapping=1\n"
-                          "Saturation=1.000000\n"
-                          "Param=1.000000,1.000000,1.000000,1.000000\n"
-                          "DynamicEval=0\n")
-
-            string = base + "\n"
-            if conf.get("solvent", None) is not None:
-                string += solvent_rep + "\n"
-            if conf.get('pdb', None) is not None:
-                string += protein_rep + "\n"
-            if conf.get('CNT', False) or conf.get('graphene', False):
-                string += carbon_rep + "\n"
-
-            string += script + "\n"
-
-            with open(f"{conf['data_folder']}/workspace.via", "w") as file:
-                file.write(string)
-
     def default_system_configurations(self, name: str) -> dict:
         """Return a dictionary with a default configuration. Options not given in the dictionary will be set to default values in the build_systems function.
 
@@ -900,7 +801,7 @@ class EvbDriver():
             }
         else:
             try:
-                solvent = SolvationBuilder()._solvent_properties(name)
+                solvent_prop_not_used = SolvationBuilder()._solvent_properties(name)
                 conf = {
                     "name": name,
                     "solvent": name,
@@ -909,7 +810,8 @@ class EvbDriver():
                     "padding": 1.5,
                     "ion_count": 0,
                 }
-            except:
+            except ValueError:
+                # _solvent_properties raises ValueError for unrecognized names
                 raise ValueError(f"Unknown system configuration {name}")
 
         return conf

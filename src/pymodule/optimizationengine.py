@@ -41,7 +41,6 @@ from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .scfgradientdriver import ScfGradientDriver
 from .molecule import Molecule
-from .profiler import Profiler
 from .inputparser import write_unparsed_input_to_hdf5
 from .errorhandler import assert_msg_critical
 
