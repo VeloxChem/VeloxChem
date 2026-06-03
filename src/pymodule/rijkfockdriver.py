@@ -254,11 +254,12 @@ class RIJKFockDriver:
                                           screener,
                                           molecule,
                                           auxiliary_basis,
-                                          indices,
+                                          local_indices,
                                           ithreshold,
                                           verbose=True):
         """
-        Computes B^Q vectors (sreened, distributed) for the RI-JK Fock driver.
+        Computes B^Q vectors (screened, distributed) for the RI-JK Fock driver.
+        Only the auxiliary indices provided are computed on the current rank.
 
         :param screener:
             The two-electron ERI screener data.
@@ -299,7 +300,7 @@ class RIJKFockDriver:
         ri_prep_t0 = time.time()
 
         self._ri_drv.local_compute_screened_bq_vectors(screener, molecule, basis_ri,
-                                                 self.metric, ithreshold, indices)
+                                                 self.metric, ithreshold, local_indices)
 
         if verbose:
             self.ostream.print_info('Screened B^Q vectors for RI done in ' +
