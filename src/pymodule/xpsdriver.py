@@ -40,6 +40,7 @@ from .veloxchemlib import hartree_in_ev, mpi_master
 from .outputstream import OutputStream
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .errorhandler import assert_msg_critical
+from .inputparser import parse_seq_fixed
 from .resultsio import write_results_to_hdf5
 from .spectrumplot import plot_xps_spectrum
 from .sanitychecks import scf_results_sanity_check
@@ -143,12 +144,13 @@ class XPSDriver:
                             'XPSDriver.compute: Must specify element parameter.')
 
         if isinstance(element, str):
-            elements_list = [elem.strip() for elem in element.split(',')]
+            elements_list = list(parse_seq_fixed(element, flag='str'))
+        elif isinstance(element, (list, tuple)):
+            elements_list = list(element)
         else:
             assert_msg_critical(
-                isinstance(element, (list, tuple)),
+                False,
                 'XPSDriver.compute: Invalid element input.')
-            elements_list = list(element)
 
         assert_msg_critical(
             len(elements_list) > 0 and all(isinstance(elem, str)
@@ -173,14 +175,12 @@ class XPSDriver:
         """
 
         if not fname:
-            raise ValueError('No filename given to _write_final_hdf5()')
+            return
 
-        fpath = Path(fname)
-        if fpath.suffix != '.h5':
-            fpath = fpath.with_suffix('.h5')
+        fpath = Path(fname).with_suffix('.h5')
 
         if not fpath.is_file():
-            raise ValueError(f'XPS HDF5 file does not exist: {fpath}')
+            return
 
         write_results_to_hdf5(str(fpath),
                               'xps',
