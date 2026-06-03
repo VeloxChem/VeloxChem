@@ -852,17 +852,18 @@ def _main_body():
         xps_drv = XPSDriver(task.mpi_comm, task.ostream)
         xps_drv.update_settings(xps_dict, method_dict)
         element = xps_dict['element'] if 'element' in xps_dict else None
-        elements = xps_dict['elements'] if 'elements' in xps_dict else None
 
         assert_msg_critical(
-            element is not None or elements is not None,
-            'XPS task requires element or elements in the xps input group')
+            'elements' not in xps_dict,
+            'XPS task uses only element in the xps input group')
+
+        assert_msg_critical(element is not None,
+                            'XPS task requires element in the xps input group')
 
         xps_results = xps_drv.compute(task.molecule,
                                       task.ao_basis,
                                       scf_drv,
-                                      element=element,
-                                      elements=elements)
+                                      element=element)
         xps_drv.print_results(xps_results)
 
     # Cube file
