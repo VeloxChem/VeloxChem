@@ -109,7 +109,7 @@ class CXCMolecularGradient
             contracted with GTO gradient).
      @param gsDensityPointers the pointers to ground state AO density matrix.
      @param molecularGrid the molecular grid.
-     @param xcFunctional the exchange-correlation functional.
+     @param xcFuncLabel the label of exchange-correlation functional.
      @return the molecular gradient.
      */
     CDenseMatrix integrateFxcGradient(const CMolecule&                  molecule,

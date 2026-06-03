@@ -30,44 +30,30 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from mpi4py import MPI
-from copy import deepcopy
 import numpy as np
 import time as tm
-import h5py
-import sys
 
 from .oneeints import compute_electric_dipole_integrals
-from .veloxchemlib import XCFunctional, MolecularGrid
-from .veloxchemlib import (mpi_master, rotatory_strength_in_cgs, hartree_in_ev,
-                           hartree_in_inverse_nm, fine_structure_constant,
-                           extinction_coefficient_from_beta, avogadro_constant,
-                           bohr_in_angstrom, hartree_in_wavenumber)
+from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
 from .veloxchemlib import denmat
 from .aodensitymatrix import AODensityMatrix
-from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
-from .linearsolver import LinearSolver
+from .lreigensolverbase import LinearResponseEigenSolverBase
 from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check,
+                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
-from .checkpoint import (check_rsp_hdf5, write_rsp_solution,
-                         write_lr_rsp_results_to_hdf5,
-                         write_detach_attach_to_hdf5)
-
-try:
-    import matplotlib.pyplot as plt
-    import matplotlib.lines as mlines
-except ImportError:
-    pass
+from .mathutils import screened_eigh, symmetric_matrix_function
+from .checkpoint import check_rsp_hdf5
+from .resultsio import (write_lr_rsp_results_to_hdf5,
+                        write_detach_attach_to_hdf5, write_rsp_solution)
 
 
-class LinearResponseEigenSolver(LinearSolver):
+class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
     """
     Implements linear response eigensolver.
 
@@ -98,93 +84,23 @@ class LinearResponseEigenSolver(LinearSolver):
         Initializes linear response eigensolver to default setup.
         """
 
-        if comm is None:
-            comm = MPI.COMM_WORLD
-
-        if ostream is None:
-            if comm.Get_rank() == mpi_master():
-                ostream = OutputStream(sys.stdout)
-            else:
-                ostream = OutputStream(None)
-
         super().__init__(comm, ostream)
 
-        self.nstates = 3
-
-        self.core_excitation = False
-        self.num_core_orbitals = 0
-
-        self.nto = False
-        self.nto_pairs = None
-        self.nto_cubes = False
-        self.detach_attach = False
-        self.detach_attach_cubes = False
+        self.restricted_subspace = False
+        self.num_virtual_orbitals = 0
+        self.num_valence_orbitals = 0
         self.detach_attach_charges = False
-        self.cube_origin = None
-        self.cube_stepsize = None
-        self.cube_points = [80, 80, 80]
-
-        self.esa = False
-        self.esa_from_state = None
 
         self._input_keywords['response'].update({
-            'nstates': ('int', 'number of excited states'),
-            'core_excitation': ('bool', 'compute core-excited states'),
-            'num_core_orbitals': ('int', 'number of involved core-orbitals'),
-            'nto': ('bool', 'analyze natural transition orbitals'),
-            'nto_pairs': ('int', 'number of NTO pairs in NTO analysis'),
-            'nto_cubes': ('bool', 'write NTO cube files'),
-            'detach_attach': ('bool', 'analyze detachment/attachment density'),
-            'detach_attach_cubes':
-                ('bool', 'write detachment/attachment density cube files'),
+            'restricted_subspace':
+                ('bool', 'restricted subspace approximation'),
+            'num_valence_orbitals':
+                ('int', 'number of involved valence orbitals'),
+            'num_virtual_orbitals':
+                ('int', 'number of involved virtual orbitals'),
             'detach_attach_charges':
                 ('bool', 'print detachment/attachment charges on atoms'),
-            'esa': ('bool', 'compute excited state absorption'),
-            'esa_from_state':
-                ('int', 'the state to excite from (e.g. 1 for S1)'),
-            'cube_origin': ('seq_fixed', 'origin of cubic grid points'),
-            'cube_stepsize': ('seq_fixed', 'step size of cubic grid points'),
-            'cube_points': ('seq_fixed_int', 'number of cubic grid points'),
         })
-
-    def update_settings(self, rsp_dict, method_dict=None):
-        """
-        Updates response and method settings in linear response eigensolver.
-
-        :param rsp_dict:
-            The dictionary of response input.
-        :param method_dict:
-            The dictionary of method settings.
-        """
-
-        if method_dict is None:
-            method_dict = {}
-
-        super().update_settings(rsp_dict, method_dict)
-
-        if self.cube_origin is not None:
-            assert_msg_critical(
-                len(self.cube_origin) == 3,
-                'LinearResponseEigenSolver: cube origin needs 3 numbers')
-
-        if self.cube_stepsize is not None:
-            assert_msg_critical(
-                len(self.cube_stepsize) == 3,
-                'LinearResponseEigenSolver: cube stepsize needs 3 numbers')
-
-        if self.cube_points is not None:
-            assert_msg_critical(
-                len(self.cube_points) == 3,
-                'LinearResponseEigenSolver: cube points needs 3 integers')
-
-        # If the detachemnt and attachment cube files are requested
-        # set the detach_attach flag to True to get the detachment and
-        # attachment densities.
-        if self.detach_attach_cubes:
-            self.detach_attach = True
-
-        if self.detach_attach_charges:
-            self.detach_attach = True
 
     def compute(self, molecule, basis, scf_results):
         """
@@ -216,7 +132,7 @@ class LinearResponseEigenSolver(LinearSolver):
         self._dist_fock_ung = None
 
         # check molecule
-        molecule_sanity_check(molecule)
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -224,6 +140,9 @@ class LinearResponseEigenSolver(LinearSolver):
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute')
@@ -250,35 +169,36 @@ class LinearResponseEigenSolver(LinearSolver):
                                nstates=self.nstates)
 
         self.start_time = tm.time()
-
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            'LinearResponseEigenSolver: not implemented for unrestricted case')
-
         if self.rank == mpi_master():
             orb_ene = scf_results['E_alpha']
         else:
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
         norb = orb_ene.shape[0]
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
-        if self.rank == mpi_master():
+        # check number of excited states, core excitation, restricted subspace
+        assert_msg_critical(self.nstates <= nocc * (norb - nocc),
+                            f'{type(self).__name__}: too many excited states')
+
+        if self.core_excitation:
             assert_msg_critical(
-                self.nstates <= nocc * (norb - nocc),
-                'LinearResponseEigenSolver: too many excited states')
+                self.num_core_orbitals > 0,
+                f'{type(self).__name__}: num_core_orbitals not set or invalid')
+            assert_msg_critical(
+                self.num_core_orbitals < nocc,
+                f'{type(self).__name__}: num_core_orbitals too large')
 
-            if self.core_excitation:
-                assert_msg_critical(
-                    self.num_core_orbitals > 0,
-                    'LinearResponseEigenSolver: num_core_orbitals not set or invalid'
-                )
-                assert_msg_critical(
-                    self.num_core_orbitals < nocc,
-                    'LinearResponseEigenSolver: num_core_orbitals too large')
+        elif getattr(self, 'restricted_subspace', False):
+            assert_msg_critical(
+                self.nstates
+                <= ((self.num_core_orbitals + self.num_valence_orbitals) *
+                    (self.num_virtual_orbitals)),
+                f'{type(self).__name__}: too many excited states')
+
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_restricted(nocc, norb),
+            'excitation space')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -290,7 +210,7 @@ class LinearResponseEigenSolver(LinearSolver):
         pe_dict = self._init_pe(molecule, basis)
 
         # CPCM_information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
 
         if self.nonlinear:
             rsp_vector_labels = [
@@ -315,6 +235,8 @@ class LinearResponseEigenSolver(LinearSolver):
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
                                               rsp_vector_labels, molecule,
                                               basis, dft_dict, pe_dict)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file
@@ -323,8 +245,11 @@ class LinearResponseEigenSolver(LinearSolver):
 
             checkpoint_nstates = self._read_nstates_from_checkpoint()
 
+            # Note that we only handle the restart with additional nstates when
+            # `self.nonlinear` is inactive
+
             # print warning if nstates is not present in the restart file
-            if checkpoint_nstates is None:
+            if checkpoint_nstates is None and not self.nonlinear:
                 self.ostream.print_warning(
                     'Could not find the nstates key in the checkpoint file.')
                 self.ostream.print_blank()
@@ -336,7 +261,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
             # generate necessary initial guesses if more states are requested
             # in a restart calculation
-            elif checkpoint_nstates < self.nstates:
+            elif checkpoint_nstates < self.nstates and not self.nonlinear:
                 self.ostream.print_info(
                     'Generating initial guesses for ' +
                     f'{self.nstates - checkpoint_nstates} more states...')
@@ -344,13 +269,15 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 igs = self._initial_excitations(self.nstates, orb_ene, nocc,
                                                 norb, checkpoint_nstates)
-                bger, bung = self._setup_trials(igs, None, self._dist_bger,
-                                                self._dist_bung)
+                if igs:
+                    bger, bung = self._setup_trials(igs, None, self._dist_bger,
+                                                    self._dist_bung)
 
-                profiler.set_timing_key('Preparation')
+                    profiler.set_timing_key('Preparation')
 
-                self._e2n_half_size(bger, bung, molecule, basis, scf_results,
-                                    eri_dict, dft_dict, pe_dict, profiler)
+                    self._e2n_half_size(bger, bung, molecule, basis,
+                                        scf_results, eri_dict, dft_dict,
+                                        pe_dict, profiler)
 
         # generate initial guess from scratch
         else:
@@ -383,53 +310,16 @@ class LinearResponseEigenSolver(LinearSolver):
 
             self._cur_iter = iteration
 
-            e2gg = self._dist_bger.matmul_AtB(self._dist_e2bger, 2.0)
-            e2uu = self._dist_bung.matmul_AtB(self._dist_e2bung, 2.0)
-            s2ug = self._dist_bung.matmul_AtB(self._dist_bger, 2.0)
+            self.collapsed_subspace = False
+            self.collapsed_from_dim = None
+            self.collapsed_to_dim = None
 
-            if self.rank == mpi_master():
+            nroots = max(self.nstates, self._get_collapse_nvec())
 
-                # Equations:
-                # E[2] X_g - w S[2] X_u = 0
-                # E[2] X_u - w S[2] X_g = 0
-
-                # Solutions:
-                # (S_gu (E_uu)^-1 S_ug) X_g = 1/w^2 E_gg X_g
-                # X_u = w (E_uu)^-1 S_ug X_g
-
-                evals, evecs = np.linalg.eigh(e2uu)
-                e2uu_inv = np.linalg.multi_dot(
-                    [evecs, np.diag(1.0 / evals), evecs.T])
-                ses = np.linalg.multi_dot([s2ug.T, e2uu_inv, s2ug])
-
-                evals, evecs = np.linalg.eigh(e2gg)
-                tmat = np.linalg.multi_dot(
-                    [evecs, np.diag(1.0 / np.sqrt(evals)), evecs.T])
-                ses_tilde = np.linalg.multi_dot([tmat.T, ses, tmat])
-
-                evals, evecs = np.linalg.eigh(ses_tilde)
-                p = list(reversed(evals.argsort()))
-                evals = evals[p]
-                evecs = evecs[:, p]
-
-                wn = 1.0 / np.sqrt(evals[:self.nstates])
-                c_ger = np.matmul(tmat, evecs[:, :self.nstates].copy())
-                c_ung = wn * np.linalg.multi_dot([e2uu_inv, s2ug, c_ger])
-
-                for k in range(self.nstates):
-                    c_ger_k = c_ger[:, k].copy()
-                    c_ung_k = c_ung[:, k].copy()
-                    norm = np.sqrt(
-                        np.linalg.multi_dot([c_ung_k.T, s2ug, c_ger_k]) +
-                        np.linalg.multi_dot([c_ger_k.T, s2ug.T, c_ung_k]))
-                    c_ger[:, k] /= norm
-                    c_ung[:, k] /= norm
-            else:
-                wn = None
-                c_ger, c_ung = None, None
-            wn = self.comm.bcast(wn, root=mpi_master())
-            c_ger = self.comm.bcast(c_ger, root=mpi_master())
-            c_ung = self.comm.bcast(c_ung, root=mpi_master())
+            wn_all, c_ger_all, c_ung_all = self._solve_reduced_space(nroots)
+            wn = wn_all[:self.nstates].copy()
+            c_ger = c_ger_all[:, :self.nstates].copy()
+            c_ung = c_ung_all[:, :self.nstates].copy()
 
             for k in range(self.nstates):
                 w = wn[k]
@@ -525,6 +415,20 @@ class LinearResponseEigenSolver(LinearSolver):
             if self.is_converged:
                 break
 
+            if self._should_collapse_subspace():
+                self.ostream.print_info('Collapsing reduced space...')
+                self.ostream.print_blank()
+
+                self._collapse_current_subspace(c_ger_all, c_ung_all, molecule,
+                                                basis, scf_results, eri_dict,
+                                                dft_dict, pe_dict, profiler)
+
+                collapse_str = 'Collapsed reduced space: {:d}->{:d}'.format(
+                    self.collapsed_from_dim, self.collapsed_to_dim)
+                self.ostream.print_info(collapse_str)
+                self.ostream.print_blank()
+                self.ostream.flush()
+
             profiler.start_timer('Orthonorm.')
 
             # update trial vectors
@@ -604,6 +508,21 @@ class LinearResponseEigenSolver(LinearSolver):
             velo_trans_dipoles = np.zeros((self.nstates, 3))
             magn_trans_dipoles = np.zeros((self.nstates, 3))
 
+            if self.restricted_subspace:
+                orbital_details = {
+                    'nstates': self.nstates,
+                    'num_core': self.num_core_orbitals,
+                    'num_valence': self.num_valence_orbitals,
+                    'num_virtual': self.num_virtual_orbitals
+                }
+            else:
+                orbital_details = {
+                    'nstates': self.nstates,
+                    'num_core': self.num_core_orbitals,
+                    'num_valence': nocc,
+                    'num_virtual': norb - nocc
+                }
+
             if self.rank == mpi_master():
                 # final h5 file for response solutions
                 if self.filename is not None:
@@ -617,23 +536,17 @@ class LinearResponseEigenSolver(LinearSolver):
 
             excitation_details = []
 
+            detachment_charges = []
+            attachment_charges = []
+
+            if self.rank == mpi_master():
+                mo_occ, mo_vir = self._get_mo_occ_and_mo_vir(scf_results, nocc)
+
             for s in range(self.nstates):
                 eigvec = self.get_full_solution_vector(exc_solutions[s])
 
                 if self.rank == mpi_master():
-                    if self.core_excitation:
-                        mo_occ = scf_results['C_alpha'][:, :self.
-                                                        num_core_orbitals]
-                        mo_vir = scf_results['C_alpha'][:, nocc:]
-                        z_mat = eigvec[:eigvec.size // 2].reshape(
-                            self.num_core_orbitals, -1)
-                        y_mat = eigvec[eigvec.size // 2:].reshape(
-                            self.num_core_orbitals, -1)
-                    else:
-                        mo_occ = scf_results['C_alpha'][:, :nocc]
-                        mo_vir = scf_results['C_alpha'][:, nocc:]
-                        z_mat = eigvec[:eigvec.size // 2].reshape(nocc, -1)
-                        y_mat = eigvec[eigvec.size // 2:].reshape(nocc, -1)
+                    z_mat, y_mat = self._get_z_mat_and_y_mat(eigvec, nocc)
 
                 if self.nto or self.detach_attach:
                     vis_drv = VisualizationDriver(self.comm)
@@ -641,12 +554,11 @@ class LinearResponseEigenSolver(LinearSolver):
                     if self.detach_attach_charges:
                         atom_to_ao = vis_drv.map_atom_to_atomic_orbitals(
                             molecule, basis)
-                        S = scf_results['S']
-                        S_eigvals, S_eigvecs = np.linalg.eigh(S)
-                        S_eigvals = np.where(S_eigvals > 1.0e-12, S_eigvals,
-                                             0.0)
-                        S_sqrt = np.matmul(S_eigvecs * np.sqrt(S_eigvals),
-                                           S_eigvecs.T)
+                        if self.rank == mpi_master():
+                            S = scf_results['S']
+                            S_sqrt = symmetric_matrix_function(S,
+                                                               np.sqrt,
+                                                               thresh=1.0e-12)
 
                     if self.cube_origin is None or self.cube_stepsize is None:
                         cubic_grid = vis_drv.gen_cubic_grid(
@@ -662,7 +574,8 @@ class LinearResponseEigenSolver(LinearSolver):
                     self.ostream.flush()
 
                     if self.rank == mpi_master():
-                        nto_mo = self.get_nto(z_mat - y_mat, mo_occ, mo_vir)
+                        nto_mo = self._compute_nto(z_mat - y_mat, mo_occ,
+                                                   mo_vir)
 
                         nto_lam = nto_mo.occa_to_numpy()
                         lam_start = mo_occ.shape[1]
@@ -674,7 +587,7 @@ class LinearResponseEigenSolver(LinearSolver):
                         nto_label = f'NTO_S{s + 1}'
                         if final_h5_fname is not None:
                             nto_mo.write_hdf5(final_h5_fname,
-                                              label=f'rsp/{nto_label}')
+                                              label=f'rsp/nto/{nto_label}_')
                     else:
                         nto_mo = MolecularOrbitals()
                     nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())
@@ -710,6 +623,9 @@ class LinearResponseEigenSolver(LinearSolver):
                             for atomidx, aoinds in enumerate(atom_to_ao):
                                 chg_detach[atomidx] += np.sum(diag_DS[aoinds])
                                 chg_attach[atomidx] += np.sum(diag_AS[aoinds])
+
+                            detachment_charges.append(chg_detach)
+                            attachment_charges.append(chg_attach)
 
                             text = f'{"Atom index":>12s} '
                             text += f'{"Detachment charge":>20s} '
@@ -773,11 +689,15 @@ class LinearResponseEigenSolver(LinearSolver):
                         if self.rank == mpi_master():
                             half_size = eigvec_1.shape[0] // 2
 
-                            z_mat_1 = eigvec_1[:half_size].reshape(nocc, -1)
-                            y_mat_1 = eigvec_1[half_size:].reshape(nocc, -1)
+                            z_mat_1 = eigvec_1[:half_size].reshape(
+                                mo_occ.shape[1], -1)
+                            y_mat_1 = eigvec_1[half_size:].reshape(
+                                mo_occ.shape[1], -1)
 
-                            z_mat_2 = eigvec_2[:half_size].reshape(nocc, -1)
-                            y_mat_2 = eigvec_2[half_size:].reshape(nocc, -1)
+                            z_mat_2 = eigvec_2[:half_size].reshape(
+                                mo_occ.shape[1], -1)
+                            y_mat_2 = eigvec_2[half_size:].reshape(
+                                mo_occ.shape[1], -1)
 
                             esa_trans_dens = (
                                 np.linalg.multi_dot(
@@ -817,7 +737,7 @@ class LinearResponseEigenSolver(LinearSolver):
                         magn_trans_dipoles[s, ind] = np.vdot(
                             mdip_grad[ind], eigvec)
 
-                    # write to h5 file for response solutions
+                    # write response solutions to h5 file
                     if (self.save_solutions and final_h5_fname is not None):
                         write_rsp_solution(final_h5_fname,
                                            'S{:d}'.format(s + 1), eigvec)
@@ -849,6 +769,9 @@ class LinearResponseEigenSolver(LinearSolver):
                         'rotatory_strengths': rot_vel,
                         'excitation_details': excitation_details,
                         'number_of_states': self.nstates,
+                        'num_core': orbital_details['num_core'],
+                        'num_valence': orbital_details['num_valence'],
+                        'num_virtual': orbital_details['num_virtual']
                     }
 
                     if self.nto:
@@ -858,8 +781,10 @@ class LinearResponseEigenSolver(LinearSolver):
 
                     if self.detach_attach:
                         if self.detach_attach_charges:
-                            ret_dict['detachment_charges'] = chg_detach
-                            ret_dict['attachment_charges'] = chg_attach
+                            ret_dict['detachment_charges'] = np.array(
+                                detachment_charges)
+                            ret_dict['attachment_charges'] = np.array(
+                                attachment_charges)
                         if self.detach_attach_cubes:
                             ret_dict['density_cubes'] = dens_cube_files
 
@@ -871,20 +796,32 @@ class LinearResponseEigenSolver(LinearSolver):
                             'Response solution vectors written to file: ' +
                             final_h5_fname)
                         self.ostream.print_blank()
+                        self.ostream.flush()
 
-                        # Write the response results to the final checkpoint file
-                        write_lr_rsp_results_to_hdf5(final_h5_fname, ret_dict)
+                        # Keep the legacy rsp HDF5 layout for compatibility.
+                        # Solution vectors are written separately as S1/S2/...
+                        # datasets, so the distributed in-memory vectors do not
+                        # belong in this HDF5-facing payload.
+                        h5_ret_dict = {
+                            key: value
+                            for key, value in ret_dict.items()
+                            if key != 'eigenvectors_distributed'
+                        }
+                        write_lr_rsp_results_to_hdf5(final_h5_fname,
+                                                     h5_ret_dict)
 
                     self._print_results(ret_dict)
 
                     return ret_dict
                 else:
+                    # non-master rank
                     return {
                         'eigenvalues': eigvals,
                         'eigenvectors_distributed': exc_solutions,
                     }
 
             else:
+                # nonlinear
                 if self.rank != mpi_master():
                     elec_trans_dipoles = None
                     excitation_details = None
@@ -908,103 +845,158 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 return ret_dict
 
-        return None
-
-    def _add_nstates_to_checkpoint(self):
-        """
-        Add nstates to checkpoint file.
-        """
-
-        if self.checkpoint_file is None:
-            return
-
-        if self.rank == mpi_master():
-            hf = h5py.File(self.checkpoint_file, 'a')
-            key = 'nstates'
-            if key in hf:
-                del hf[key]
-            hf.create_dataset(key, data=np.array([self.nstates]))
-            hf.close()
-
-        self.comm.barrier()
-
-    def _read_nstates_from_checkpoint(self):
-        """
-        Read nstates from checkpoint file.
-
-        :return:
-            The number of states.
-        """
-
-        if self.checkpoint_file is None:
-            return None
-
-        nstates = None
-
-        if self.rank == mpi_master():
-            hf = h5py.File(self.checkpoint_file, 'r')
-            key = 'nstates'
-            if key in hf:
-                nstates = np.array(hf.get(key))[0]
-            hf.close()
-
-        nstates = self.comm.bcast(nstates, root=mpi_master())
-
-        return nstates
-
-    @staticmethod
-    def get_full_solution_vector(solution):
-        """
-        Gets a full solution vector from the distributed solution.
-
-        :param solution:
-            The distributed solution as a tuple.
-
-        :return:
-            The full solution vector.
-        """
-
-        x_ger = solution.get_full_vector(0)
-        x_ung = solution.get_full_vector(1)
-
-        if solution.rank == mpi_master():
-            x_ger_full = np.hstack((x_ger, x_ger))
-            x_ung_full = np.hstack((x_ung, -x_ung))
-            return x_ger_full + x_ung_full
         else:
-            return None
+            # not converged
+            return {}
 
-    def _print_iteration(self, relative_residual_norm, ws):
+    def _get_mo_occ_and_mo_vir(self, scf_results, nocc):
         """
-        Prints information of the iteration.
+        Gets occupied MO coefficients and virtual MO coefficients that are
+        involved in response calculation.
 
-        :param relative_residual_norm:
-            Relative residual norms.
-        :param ws:
-            Excitation energies.
+        :param scf_results:
+            The dictionary containing SCF results.
+        :param nocc:
+            The number of occupied orbitals.
+        :return:
+            The involved occupied MO coefficients and virtual MO coefficients.
         """
 
-        width = 92
-        output_header = '*** Iteration:   {} '.format(self._cur_iter + 1)
-        output_header += '* Residuals (Max,Min): '
-        output_header += '{:.2e} and {:.2e}'.format(
-            max(relative_residual_norm.values()),
-            min(relative_residual_norm.values()))
-        self.ostream.print_header(output_header.ljust(width))
-        self.ostream.print_blank()
+        if self.core_excitation:
+            mo_occ = scf_results['C_alpha'][:, :self.num_core_orbitals].copy()
+            mo_vir = scf_results['C_alpha'][:, nocc:].copy()
 
-        if self.print_level > 1:
-            for k, w in enumerate(ws):
-                state_label = 'Excitation {}'.format(k + 1)
-                rel_res = relative_residual_norm[k]
-                output_iter = '{:<15s}: {:15.8f} '.format(state_label, w)
-                output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
-                if relative_residual_norm[k] < self.conv_thresh:
-                    output_iter += '   converged'
-                self.ostream.print_header(output_iter.ljust(width))
-            self.ostream.print_blank()
+        elif self.restricted_subspace:
+            mo_occ = np.hstack(
+                (scf_results['C_alpha'][:, :self.num_core_orbitals].copy(),
+                 scf_results['C_alpha'][:, nocc -
+                                        self.num_valence_orbitals:nocc].copy()))
+            mo_vir = scf_results['C_alpha'][:, nocc:nocc +
+                                            self.num_virtual_orbitals].copy()
 
-        self.ostream.flush()
+        else:
+            mo_occ = scf_results['C_alpha'][:, :nocc].copy()
+            mo_vir = scf_results['C_alpha'][:, nocc:].copy()
+
+        return mo_occ, mo_vir
+
+    def _get_z_mat_and_y_mat(self, eigvec, nocc):
+        """
+        Gets excitation and de-excitation vectors in matrix form.
+
+        :param eigvec:
+            The eigen vector.
+        :param nocc:
+            The number of occupied orbitals.
+        :return:
+            The excitation and de-excitation vectors in matrix form.
+        """
+
+        if self.core_excitation:
+            z_mat = eigvec[:eigvec.size // 2].reshape(self.num_core_orbitals,
+                                                      -1)
+            y_mat = eigvec[eigvec.size // 2:].reshape(self.num_core_orbitals,
+                                                      -1)
+
+        elif self.restricted_subspace:
+            z_mat = eigvec[:eigvec.size // 2].reshape(
+                self.num_core_orbitals + self.num_valence_orbitals, -1)
+            y_mat = eigvec[eigvec.size // 2:].reshape(
+                self.num_core_orbitals + self.num_valence_orbitals, -1)
+
+        else:
+            z_mat = eigvec[:eigvec.size // 2].reshape(nocc, -1)
+            y_mat = eigvec[eigvec.size // 2:].reshape(nocc, -1)
+
+        return z_mat, y_mat
+
+    def _solve_reduced_space(self, nroots):
+        """
+        Solves the reduced-space eigenvalue problem.
+
+        :param nroots:
+            The number of Ritz pairs to retain from the reduced problem.
+
+        :return:
+            Tuple of excitation energies and gerade/ungerade coefficients.
+        """
+
+        e2gg = self._dist_bger.matmul_AtB(self._dist_e2bger, 2.0)
+        e2uu = self._dist_bung.matmul_AtB(self._dist_e2bung, 2.0)
+        s2ug = self._dist_bung.matmul_AtB(self._dist_bger, 2.0)
+
+        if self.rank == mpi_master():
+
+            # Equations:
+            # E[2] X_g - w S[2] X_u = 0
+            # E[2] X_u - w S[2] X_g = 0
+
+            # Solutions:
+            # (S_gu (E_uu)^-1 S_ug) X_g = 1/w^2 E_gg X_g
+            # X_u = w (E_uu)^-1 S_ug X_g
+
+            e2uu_inv = symmetric_matrix_function(e2uu,
+                                                 lambda x: 1.0 / x,
+                                                 thresh=1.0e-12)
+            ses = np.linalg.multi_dot([s2ug.T, e2uu_inv, s2ug])
+
+            tmat = symmetric_matrix_function(e2gg,
+                                             lambda x: 1.0 / np.sqrt(x),
+                                             thresh=1.0e-12)
+            ses_tilde = np.linalg.multi_dot([tmat.T, ses, tmat])
+
+            evals, evecs = screened_eigh(ses_tilde,
+                                         thresh=None,
+                                         descending=True)
+
+            nroots = min(nroots, evals.size)
+            wn = 1.0 / np.sqrt(evals[:nroots])
+            c_ger = np.matmul(tmat, evecs[:, :nroots].copy())
+            c_ung = wn * np.linalg.multi_dot([e2uu_inv, s2ug, c_ger])
+
+            for k in range(nroots):
+                c_ger_k = c_ger[:, k].copy()
+                c_ung_k = c_ung[:, k].copy()
+                norm = np.sqrt(
+                    np.linalg.multi_dot([c_ung_k.T, s2ug, c_ger_k]) +
+                    np.linalg.multi_dot([c_ger_k.T, s2ug.T, c_ung_k]))
+                c_ger[:, k] /= norm
+                c_ung[:, k] /= norm
+        else:
+            wn = None
+            c_ger = None
+            c_ung = None
+
+        wn = self.comm.bcast(wn, root=mpi_master())
+        c_ger = self.comm.bcast(c_ger, root=mpi_master())
+        c_ung = self.comm.bcast(c_ung, root=mpi_master())
+
+        return wn, c_ger, c_ung
+
+    def _collapse_current_subspace(self, c_ger, c_ung, molecule, basis,
+                                   scf_results, eri_dict, dft_dict, pe_dict,
+                                   profiler):
+        """
+        Collapses the reduced space to retained Ritz vectors and rebuilds
+        associated sigma data.
+        """
+
+        keep_nvec = min(self._get_collapse_nvec(), c_ger.shape[1])
+        prev_dim = self._reduced_space_size()
+
+        new_bger = self._dist_bger.matmul_AB_no_gather(c_ger[:, :keep_nvec])
+        new_bung = self._dist_bung.matmul_AB_no_gather(c_ung[:, :keep_nvec])
+
+        new_bger = self._orthonormalize_collapsed_space(new_bger)
+        new_bung = self._orthonormalize_collapsed_space(new_bung)
+
+        self._clear_subspace_data()
+        self._e2n_half_size(new_bger, new_bung, molecule, basis, scf_results,
+                            eri_dict, dft_dict, pe_dict, profiler)
+
+        self.collapsed_subspace = True
+        self.collapsed_from_dim = prev_dim
+        self.collapsed_to_dim = self._reduced_space_size()
 
     def _initial_excitations(self, nstates, ea, nocc, norb, n_excl_states=0):
         """
@@ -1031,6 +1023,15 @@ class LinearResponseEigenSolver(LinearSolver):
             excitations = [(i, a)
                            for i in range(self.num_core_orbitals)
                            for a in range(nocc, norb)]
+        elif self.restricted_subspace:
+            core_and_val_indices = (
+                list(range(self.num_core_orbitals)) +
+                list(range(nocc - self.num_valence_orbitals, nocc)))
+            excitations = [
+                (i, a)
+                for i in core_and_val_indices
+                for a in range(nocc, nocc + self.num_virtual_orbitals)
+            ]
         else:
             excitations = [
                 (i, a) for i in range(nocc) for a in range(nocc, norb)
@@ -1042,7 +1043,16 @@ class LinearResponseEigenSolver(LinearSolver):
         n_exc = len(excitations)
 
         final = {}
-        for k, (i, a) in enumerate(sorted(w, key=w.get)[n_excl_states:nstates]):
+
+        # number of excitations to be excluded from initial guess
+        guess_excl_nstates = self._get_initial_guess_size_for_excitations(
+            n_excl_states)
+
+        # total number of excitations in initial guess
+        guess_nstates = self._get_initial_guess_size_for_excitations(nstates)
+
+        for k, (i, a) in enumerate(
+                sorted(w, key=w.get)[guess_excl_nstates:guess_nstates]):
             if self.rank == mpi_master():
                 ia = excitations.index((i, a))
 
@@ -1067,47 +1077,6 @@ class LinearResponseEigenSolver(LinearSolver):
 
         return final
 
-    def _precond_trials(self, vectors, precond):
-        """
-        Applies preconditioner to distributed trial vectors.
-
-        :param vectors:
-            The set of vectors.
-        :param precond:
-            The preconditioner.
-
-        :return:
-            The preconditioned gerade and ungerade trial vectors.
-        """
-
-        trials_ger = []
-        trials_ung = []
-
-        for k, X in vectors.items():
-            if precond is not None:
-                v = self._preconditioning(precond[k], X)
-            else:
-                v = X
-            norms_2 = 2.0 * v.squared_norm(axis=0)
-            vn = np.sqrt(np.sum(norms_2))
-
-            if vn > self.norm_thresh:
-                norms = np.sqrt(norms_2)
-                # gerade
-                if norms[0] > self.norm_thresh:
-                    trials_ger.append(v.data[:, 0])
-                # ungerade
-                if norms[1] > self.norm_thresh:
-                    trials_ung.append(v.data[:, 1])
-
-        new_ger = np.array(trials_ger).T
-        new_ung = np.array(trials_ung).T
-
-        dist_new_ger = DistributedArray(new_ger, self.comm, distribute=False)
-        dist_new_ung = DistributedArray(new_ung, self.comm, distribute=False)
-
-        return dist_new_ger, dist_new_ung
-
     def _get_precond(self, orb_ene, nocc, norb, w):
         """
         Constructs the preconditioners.
@@ -1130,6 +1099,10 @@ class LinearResponseEigenSolver(LinearSolver):
         if self.core_excitation:
             ediag, sdiag = self.construct_ediag_sdiag_half(
                 orb_ene, nocc, norb, self.num_core_orbitals)
+        elif self.restricted_subspace:
+            ediag, sdiag = self.construct_ediag_sdiag_half(
+                orb_ene, nocc, norb, self.num_core_orbitals,
+                self.num_valence_orbitals, self.num_virtual_orbitals)
         else:
             ediag, sdiag = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)
 
@@ -1148,35 +1121,6 @@ class LinearResponseEigenSolver(LinearSolver):
         ))
 
         return DistributedArray(p_mat, self.comm)
-
-    def _preconditioning(self, precond, v_in):
-        """
-        Applies preconditioner to a tuple of distributed trial vectors.
-
-        :param precond:
-            The preconditioner.
-        :param v_in:
-            The input trial vectors.
-
-        :return:
-            A tuple of distributed trial vectors after preconditioning.
-        """
-
-        pa = precond.data[:, 0]
-        pb = precond.data[:, 1]
-
-        v_in_rg = v_in.data[:, 0]
-        v_in_ru = v_in.data[:, 1]
-
-        v_out_rg = pa * v_in_rg + pb * v_in_ru
-        v_out_ru = pb * v_in_rg + pa * v_in_ru
-
-        v_mat = np.hstack((
-            v_out_rg.reshape(-1, 1),
-            v_out_ru.reshape(-1, 1),
-        ))
-
-        return DistributedArray(v_mat, self.comm, distribute=False)
 
     def get_e2(self, molecule, basis, scf_results):
         """
@@ -1203,12 +1147,7 @@ class LinearResponseEigenSolver(LinearSolver):
         self._dist_e2bger = None
         self._dist_e2bung = None
 
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            'LinearResponseEigenSolver: not implemented for unrestricted case')
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         if self.rank == mpi_master():
             orb_ene = scf_results['E_alpha']
@@ -1216,7 +1155,7 @@ class LinearResponseEigenSolver(LinearSolver):
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
         norb = orb_ene.shape[0]
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -1276,501 +1215,54 @@ class LinearResponseEigenSolver(LinearSolver):
         else:
             return None
 
-    def _print_results(self, results):
+    def get_nto(self, molecule, basis, scf_results, rsp_results, state_label):
         """
-        Prints results to output stream.
+        Computes natural transition orbitals for a given excited state.
 
-        :param results:
-            The dictionary containing response results.
-        """
-
-        self._print_transition_dipoles(
-            'Electric Transition Dipole Moments (dipole length, a.u.)',
-            results['electric_transition_dipoles'])
-
-        self._print_transition_dipoles(
-            'Electric Transition Dipole Moments (dipole velocity, a.u.)',
-            results['velocity_transition_dipoles'])
-
-        self._print_transition_dipoles(
-            'Magnetic Transition Dipole Moments (a.u.)',
-            results['magnetic_transition_dipoles'])
-
-        self._print_absorption('One-Photon Absorption', results)
-        self._print_ecd('Electronic Circular Dichroism', results)
-        self._print_excitation_details('Character of excitations:', results)
-
-        if self.esa:
-            self._print_excited_state_absorption('Excited state absorption:',
-                                                 results)
-
-    def __deepcopy__(self, memo):
-        """
-        Implements deepcopy.
-
-        :param memo:
-            The memo dictionary for deepcopy.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_results:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param rsp_results:
+            The dictionary of results from a linear response calculation.
+        :param state_label:
+            A string label identifying the state, e.g. 'S1', 'S2'.
 
         :return:
-            A deepcopy of self.
+            The NTOs as a MolecularOrbitals object.
         """
 
-        new_rsp_drv = LinearResponseEigenSolver(self.comm, self.ostream)
+        # Extract 1-based state index from label (e.g. 'S1' -> 1)
+        state_index = int(state_label[1:])
 
-        for key, val in vars(self).items():
-            if isinstance(val, (MPI.Intracomm, OutputStream)):
-                pass
-            elif isinstance(val, XCFunctional):
-                new_rsp_drv.key = XCFunctional(val)
-            elif isinstance(val, MolecularGrid):
-                new_rsp_drv.key = MolecularGrid(val)
-            else:
-                new_rsp_drv.key = deepcopy(val)
-
-        return new_rsp_drv
-
-    def plot_uv_vis(self,
-                    rpa_results,
-                    broadening_type="lorentzian",
-                    broadening_value=(1000.0 / hartree_in_wavenumber() *
-                                      hartree_in_ev()),
-                    ax=None):
-        """
-        Plot the UV spectrum from the response calculation.
-
-        :param rpa_results:
-            The dictionary containing RPA results.
-        :param broadening_type:
-            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
-        :param broadening_value:
-            The broadening value in eV.
-        :param ax:
-            The matplotlib axis to plot on.
-        """
-
-        assert_msg_critical('matplotlib' in sys.modules,
-                            'matplotlib is required.')
-
-        ev_x_nm = hartree_in_ev() / hartree_in_inverse_nm()
-        au2ev = hartree_in_ev()
-        ev2au = 1.0 / au2ev
-
-        # initialize the plot
-        if ax is None:
-            fig, ax = plt.subplots(figsize=(8, 5))
-
-        ax.set_xlabel('Wavelength [nm]')
-        ax.set_ylabel(r'$\epsilon$ [L mol$^{-1}$ cm$^{-1}$]')
-
-        ax.set_title("Absorption Spectrum")
-
-        x = (rpa_results['eigenvalues'])
-        y = rpa_results['oscillator_strengths']
-        xmin = max(0.0, min(x) - 0.03)
-        xmax = max(x) + 0.03
-        xstep = 0.0001
-
-        ax2 = ax.twinx()
-
-        for i in np.arange(len(rpa_results['eigenvalues'])):
-            ax2.plot(
-                [
-                    ev_x_nm / (rpa_results['eigenvalues'][i] * au2ev),
-                    ev_x_nm / (rpa_results['eigenvalues'][i] * au2ev),
-                ],
-                [0.0, rpa_results['oscillator_strengths'][i]],
-                alpha=0.7,
-                linewidth=2,
-                color="darkcyan",
-            )
-
-        c = 1.0 / fine_structure_constant()
-        NA = avogadro_constant()
-        a_0 = bohr_in_angstrom() * 1.0e-10
-
-        if broadening_type.lower() == "lorentzian":
-            xi, yi = self.lorentzian_uv_vis(x, y, xmin, xmax, xstep,
-                                            broadening_value * ev2au)
-
-        elif broadening_type.lower() == "gaussian":
-            xi, yi = self.gaussian_uv_vis(x, y, xmin, xmax, xstep,
-                                          broadening_value * ev2au)
-
-        sigma = (2 * np.pi * np.pi * xi * yi) / c
-        sigma_m2 = sigma * a_0**2
-        sigma_cm2 = sigma_m2 * 10**4
-        epsilon = sigma_cm2 * NA / (np.log(10) * 10**3)
-        ax.plot(ev_x_nm / (xi * au2ev),
-                epsilon,
-                color="black",
-                alpha=0.9,
-                linewidth=2.5)
-
-        legend_bars = mlines.Line2D([], [],
-                                    color='darkcyan',
-                                    alpha=0.7,
-                                    linewidth=2,
-                                    label='Oscillator strength')
-        label_spectrum = f'{broadening_type.capitalize()} '
-        label_spectrum += f'broadening ({broadening_value:.3f} eV)'
-        legend_spectrum = mlines.Line2D([], [],
-                                        color='black',
-                                        linestyle='-',
-                                        linewidth=2.5,
-                                        label=label_spectrum)
-        ax2.legend(handles=[legend_bars, legend_spectrum],
-                   frameon=False,
-                   borderaxespad=0.,
-                   loc='center left',
-                   bbox_to_anchor=(1.15, 0.5))
-        ax2.set_ylim(0, max(abs(rpa_results['oscillator_strengths'])) * 1.1)
-        ax.set_ylim(0, max(epsilon) * 1.1)
-        ax.set_ylim(bottom=0)
-        ax2.set_ylim(bottom=0)
-        ax2.set_ylabel("Oscillator strength")
-        ax.set_xlim(ev_x_nm / (xmax * au2ev), ev_x_nm / (xmin * au2ev))
-
-    def plot_ecd(self,
-                 rpa_results,
-                 broadening_type="lorentzian",
-                 broadening_value=(1000.0 / hartree_in_wavenumber() *
-                                   hartree_in_ev()),
-                 ax=None):
-        """
-        Plot the ECD spectrum from the response calculation.
-
-        :param rpa_results:
-            The dictionary containing RPA results.
-        :param broadening_type:
-            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
-        :param broadening_value:
-            The broadening value in eV.
-        :param ax:
-            The matplotlib axis to plot on.
-        """
-
-        assert_msg_critical('matplotlib' in sys.modules,
-                            'matplotlib is required.')
-
-        ev_x_nm = hartree_in_ev() / hartree_in_inverse_nm()
-        au2ev = hartree_in_ev()
-
-        # initialize the plot
-        if ax is None:
-            fig, ax = plt.subplots(figsize=(8, 5))
-
-        ax.set_xlabel("Wavelength [nm]")
-        ax.set_title("ECD Spectrum")
-        ax.set_ylabel(r'$\Delta \epsilon$ [L mol$^{-1}$ cm$^{-1}$]')
-
-        ax2 = ax.twinx()
-        ax2.set_ylabel('Rotatory strength [10$^{-40}$ cgs]')
-
-        for i in np.arange(len(rpa_results["eigenvalues"])):
-            ax2.plot(
-                [
-                    ev_x_nm / (rpa_results["eigenvalues"][i] * au2ev),
-                    ev_x_nm / (rpa_results["eigenvalues"][i] * au2ev),
-                ],
-                [0.0, rpa_results["rotatory_strengths"][i]],
-                alpha=0.7,
-                linewidth=2,
-                color="darkcyan",
-            )
-        ax2.set_ylim(-max(abs(rpa_results["rotatory_strengths"])) * 1.1,
-                     max(abs(rpa_results["rotatory_strengths"])) * 1.1)
-
-        ax.axhline(y=0,
-                   marker=',',
-                   color='k',
-                   linestyle='-.',
-                   markersize=0,
-                   linewidth=0.2)
-
-        x = (rpa_results["eigenvalues"]) * au2ev
-        y = rpa_results["rotatory_strengths"]
-        xmin = max(0.0, min(x) - 0.8)
-        xmax = max(x) + 0.8
-        xstep = 0.003
-
-        if broadening_type.lower() == "lorentzian":
-            xi, yi = self.lorentzian_ecd(x, y, xmin, xmax, xstep,
-                                         broadening_value)
-
-        elif broadening_type.lower() == "gaussian":
-            xi, yi = self.gaussian_ecd(x, y, xmin, xmax, xstep,
-                                       broadening_value)
-
-        # denorm_factor is roughly 22.96 * PI
-        denorm_factor = (rotatory_strength_in_cgs() /
-                         (extinction_coefficient_from_beta() / 3.0))
-        yi = (yi * xi) / denorm_factor
-
-        ax.set_ylim(-max(abs(yi)) * 1.1, max(abs(yi)) * 1.1)
-
-        ax.plot(ev_x_nm / xi, yi, color="black", alpha=0.9, linewidth=2.5)
-        ax.set_xlim(ev_x_nm / xmax, ev_x_nm / xmin)
-
-        # include a legend for the bar and for the broadened spectrum
-        legend_bars = mlines.Line2D([], [],
-                                    color='darkcyan',
-                                    alpha=0.7,
-                                    linewidth=2,
-                                    label='Rotatory strength')
-        label_spectrum = f'{broadening_type.capitalize()} '
-        label_spectrum += f'broadening ({broadening_value:.3f} eV)'
-        legend_spectrum = mlines.Line2D([], [],
-                                        color='black',
-                                        linestyle='-',
-                                        linewidth=2.5,
-                                        label=label_spectrum)
-        ax.legend(handles=[legend_bars, legend_spectrum],
-                  frameon=False,
-                  borderaxespad=0.,
-                  loc='center left',
-                  bbox_to_anchor=(1.15, 0.5))
-
-    @staticmethod
-    def lorentzian_uv_vis(x, y, xmin, xmax, xstep, gamma):
-        xi = np.arange(xmin, xmax, xstep)
-        yi = np.zeros(len(xi))
-        for i in range(len(xi)):
-            for k in range(len(x)):
-                yi[i] = yi[i] + y[k] / x[k] * gamma / (
-                    (xi[i] - x[k])**2 + gamma**2)
-        yi = yi / np.pi
-        return xi, yi
-
-    @staticmethod
-    def gaussian_uv_vis(x, y, xmin, xmax, xstep, sigma):
-        xi = np.arange(xmin, xmax, xstep)
-        yi = np.zeros(len(xi))
-        for i in range(len(xi)):
-            for k in range(len(x)):
-                yi[i] = yi[i] + y[k] / x[k] * np.exp(-((xi[i] - x[k])**2) /
-                                                     (2 * sigma**2))
-        yi = yi / (sigma * np.sqrt(2 * np.pi))
-        return xi, yi
-
-    @staticmethod
-    def lorentzian_ecd(x, y, xmin, xmax, xstep, gamma):
-        xi = np.arange(xmin, xmax, xstep)
-        yi = np.zeros(len(xi))
-        for i in range(len(xi)):
-            for k in range(len(x)):
-                yi[i] = yi[i] + y[k] * (gamma) / ((xi[i] - x[k])**2 +
-                                                  (gamma)**2)
-        return xi, yi
-
-    @staticmethod
-    def gaussian_ecd(x, y, xmin, xmax, xstep, sigma):
-        xi = np.arange(xmin, xmax, xstep)
-        yi = np.zeros(len(xi))
-        for i in range(len(xi)):
-            for k in range(len(x)):
-                yi[i] = yi[i] + y[k] * np.exp(-((xi[i] - x[k])**2) /
-                                              (2 * sigma**2))
-        yi = np.pi * yi / (sigma * np.sqrt(2 * np.pi))
-        return xi, yi
-
-    def plot(self,
-             rpa_results,
-             broadening_type="lorentzian",
-             broadening_value=(1000.0 / hartree_in_wavenumber() *
-                               hartree_in_ev()),
-             plot_type="electronic"):
-        """
-        Plot the UV or ECD spectrum from the response calculation.
-
-        :param rpa_results:
-            The dictionary containing RPA results.
-        :param broadening_type:
-            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
-        :param broadening_value:
-            The broadening value in eV.
-        :param plot_type:
-            The type of plot to generate. Either 'uv', 'ecd' or 'electronic'.
-        """
-
-        assert_msg_critical('matplotlib' in sys.modules,
-                            'matplotlib is required.')
-
-        if plot_type.lower() in ["uv", "uv-vis", "uv_vis"]:
-            self.plot_uv_vis(rpa_results,
-                             broadening_type=broadening_type,
-                             broadening_value=broadening_value)
-
-        elif plot_type.lower() == "ecd":
-            self.plot_ecd(rpa_results,
-                          broadening_type=broadening_type,
-                          broadening_value=broadening_value)
-
-        elif plot_type.lower() == "electronic":
-            fig, axs = plt.subplots(2, 1, figsize=(8, 10))
-            # Increase the height space between subplots
-            fig.subplots_adjust(hspace=0.3)
-            self.plot_uv_vis(rpa_results,
-                             broadening_type=broadening_type,
-                             broadening_value=broadening_value,
-                             ax=axs[0])
-            self.plot_ecd(rpa_results,
-                          broadening_type=broadening_type,
-                          broadening_value=broadening_value,
-                          ax=axs[1])
-
+        # Extract eigenvector from rsp_results
+        if 'eigenvectors_distributed' in rsp_results:
+            eigvec = self.get_full_solution_vector(
+                rsp_results['eigenvectors_distributed'][state_index - 1])
         else:
-            assert_msg_critical(False, 'Invalid plot type')
+            if self.rank == mpi_master():
+                # for rsp_results read from h5 file
+                assert_msg_critical(
+                    state_label in rsp_results,
+                    f'{type(self).__name__}: No eigenvector found for {state_label}'
+                )
+                eigvec = rsp_results[state_label].copy()
+            else:
+                eigvec = None
 
-        plt.show()
+        if self.rank == mpi_master():
+            # Get MO coefficients and orbital information
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+            mo_occ, mo_vir = self._get_mo_occ_and_mo_vir(scf_results, nocc)
 
-    @staticmethod
-    def get_absorption_spectrum(rsp_results, x_data, x_unit, b_value, b_unit):
-        """
-        Gets absorption spectrum.
+            # Build transition density matrix in MO basis (RPA)
+            z_mat, y_mat = self._get_z_mat_and_y_mat(eigvec, nocc)
 
-        :param rsp_results:
-            A dictonary containing the result of response calculation.
-        :param x_data:
-            The list or array of x values.
-        :param x_unit:
-            The unit of x values.
-        :param b_value:
-            The value of the broadening parameter.
-        :param b_unit:
-            The unit of the broadening parameter.
+            nto_mo = self._compute_nto(z_mat - y_mat, mo_occ, mo_vir)
+        else:
+            nto_mo = MolecularOrbitals()
+        nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())
 
-        :return:
-            A dictionary containing the spectrum.
-        """
-
-        assert_msg_critical(
-            x_unit.lower() in ['au', 'ev', 'nm'],
-            'LinearResponseEigenSolver.get_absorption_spectrum: ' +
-            'x_data should be au, ev or nm')
-
-        assert_msg_critical(
-            b_unit.lower() in ['au', 'ev'],
-            'LinearResponseEigenSolver.get_absorption_spectrum: ' +
-            'broadening parameter should be au or ev')
-
-        au2ev = hartree_in_ev()
-        auxnm = 1.0 / hartree_in_inverse_nm()
-
-        exc_ene_au = rsp_results['eigenvalues']
-        osc_str = rsp_results['oscillator_strengths']
-
-        spectrum = {}
-
-        if x_unit.lower() == 'au':
-            spectrum['x_label'] = 'Photon energy [a.u.]'
-        elif x_unit.lower() == 'ev':
-            spectrum['x_label'] = 'Photon energy [eV]'
-        elif x_unit.lower() == 'nm':
-            spectrum['x_label'] = 'Wavelength [nm]'
-
-        spectrum['y_label'] = 'Absorption cross-section [a.u.]'
-
-        if x_unit.lower() == 'au':
-            x_data_au = list(x_data)
-        elif x_unit.lower() == 'ev':
-            x_data_au = [x / au2ev for x in x_data]
-        elif x_unit.lower() == 'nm':
-            x_data_au = [auxnm / x for x in x_data]
-
-        if b_unit.lower() == 'au':
-            b_au = b_value
-        elif b_unit.lower() == 'ev':
-            b_au = b_value / au2ev
-
-        y_data = []
-
-        sigma_factor = 2.0 * np.pi * fine_structure_constant()
-
-        for x_au in x_data_au:
-            y = 0.0
-            for e, f in zip(exc_ene_au, osc_str):
-                b_factor = b_au / ((e - x_au)**2 + b_au**2)
-                y += sigma_factor * b_factor * f
-            y_data.append(y)
-
-        spectrum['x_data'] = list(x_data)
-        spectrum['y_data'] = y_data
-
-        return spectrum
-
-    @staticmethod
-    def get_ecd_spectrum(rsp_results, x_data, x_unit, b_value, b_unit):
-        """
-        Gets ECD spectrum.
-
-        :param rsp_results:
-            A dictonary containing the result of response calculation.
-        :param x_data:
-            The list or array of x values.
-        :param x_unit:
-            The unit of x values.
-        :param b_value:
-            The value of the broadening parameter.
-        :param b_unit:
-            The unit of the broadening parameter.
-
-        :return:
-            A dictionary containing the spectrum.
-        """
-
-        assert_msg_critical(
-            x_unit.lower() in ['au', 'ev', 'nm'],
-            'LinearResponseEigenSolver.get_ecd_spectrum: ' +
-            'x_data should be au, ev or nm')
-
-        assert_msg_critical(
-            b_unit.lower() in ['au', 'ev'],
-            'LinearResponseEigenSolver.get_ecd_spectrum: ' +
-            'broadening parameter should be au or ev')
-
-        au2ev = hartree_in_ev()
-        auxnm = 1.0 / hartree_in_inverse_nm()
-
-        exc_ene_au = rsp_results['eigenvalues']
-        rot_str_au = rsp_results[
-            'rotatory_strengths'] / rotatory_strength_in_cgs()
-
-        spectrum = {}
-
-        if x_unit.lower() == 'au':
-            spectrum['x_label'] = 'Photon energy [a.u.]'
-        elif x_unit.lower() == 'ev':
-            spectrum['x_label'] = 'Photon energy [eV]'
-        elif x_unit.lower() == 'nm':
-            spectrum['x_label'] = 'Wavelength [nm]'
-
-        spectrum['y_label'] = 'Molar circular dichroism '
-        spectrum['y_label'] += '[L mol$^{-1}$ cm$^{-1}$]'
-
-        if x_unit.lower() == 'au':
-            x_data_au = list(x_data)
-        elif x_unit.lower() == 'ev':
-            x_data_au = [x / au2ev for x in x_data]
-        elif x_unit.lower() == 'nm':
-            x_data_au = [auxnm / x for x in x_data]
-
-        if b_unit.lower() == 'au':
-            b_au = b_value
-        elif b_unit.lower() == 'ev':
-            b_au = b_value / au2ev
-
-        y_data = []
-
-        delta_eps_factor = extinction_coefficient_from_beta() / 3.0
-
-        for x_au in x_data_au:
-            y = 0.0
-            for e, r in zip(exc_ene_au, rot_str_au):
-                b_factor = b_au / ((e - x_au)**2 + b_au**2)
-                y += delta_eps_factor * b_factor * e * r
-            y_data.append(y)
-
-        spectrum['x_data'] = list(x_data)
-        spectrum['y_data'] = y_data
-
-        return spectrum
+        return nto_mo

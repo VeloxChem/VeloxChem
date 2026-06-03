@@ -35,8 +35,9 @@ import sys
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
-from .cppsolver import ComplexResponse
-from .tdacppsolver import ComplexResponseTDA
+from .cppsolver import ComplexResponseSolver
+from .cppsolverunrest import ComplexResponseUnrestrictedSolver
+from .tdacppsolver import ComplexResponseTdaSolver
 from .lrsolver import LinearResponseSolver
 from .lrsolverunrest import LinearResponseUnrestrictedSolver
 from .lreigensolver import LinearResponseEigenSolver
@@ -44,9 +45,12 @@ from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from .c6driver import C6Driver
 from .tdaeigensolver import TdaEigenSolver
 from .tdaeigensolverunrest import TdaUnrestrictedEigenSolver
+from .rixsdriver import RixsDriver
 from .shgdriver import ShgDriver
+from .thgdriver import ThgDriver
+from .thgreddriver import ThgReducedDriver
 from .tpatransitiondriver import TpaTransitionDriver
-from .doubleresbeta import DoubleResBetaDriver
+from .excitedstatemomentdriver import ExcitedStateMomentDriver
 from .threepatransitiondriver import ThreePATransitionDriver
 from .tpafulldriver import TpaFullDriver
 from .tpareddriver import TpaReducedDriver
@@ -146,7 +150,7 @@ class ResponseProperty:
                 self._rsp_driver = LinearResponseSolver(self.comm, self.ostream)
 
             elif self._rsp_dict['is_complex'] == 'yes':
-                self._rsp_driver = ComplexResponse(self.comm, self.ostream)
+                self._rsp_driver = ComplexResponseSolver(self.comm, self.ostream)
 
         # Linear response real solver
         elif (self._rsp_dict['order'] == 'linear' and
@@ -159,43 +163,56 @@ class ResponseProperty:
                 self._rsp_driver = LinearResponseUnrestrictedSolver(
                     self.comm, self.ostream)
 
+            if self.prop_type in [
+                    'polarizability',
+                    'dipole polarizability',
+            ]:
+                self._rsp_driver.set_lr_property('polarizability')
+
         # Linear response complex solver
         elif (self._rsp_dict['order'] == 'linear' and
               self._rsp_dict['residue'] == 'none' and
               self._rsp_dict['onlystatic'] == 'no' and
               self._rsp_dict['is_complex'] == 'yes'):
 
-            assert_msg_critical(
-                method_type == 'restricted',
-                'ResponseProperty: This response property is ' +
-                'only implemented for restricted case')
-
             if self.tamm_dancoff:
-                self._rsp_driver = ComplexResponseTDA(self.comm, self.ostream)
+                if method_type == 'restricted':
+                    self._rsp_driver = ComplexResponseTdaSolver(
+                        self.comm, self.ostream)
+                elif method_type == 'unrestricted':
+                    assert_msg_critical(
+                        False, 'ResponseProperty: This response property is ' +
+                        'only implemented for restricted case')
             else:
-                self._rsp_driver = ComplexResponse(self.comm, self.ostream)
+                if method_type == 'restricted':
+                    self._rsp_driver = ComplexResponseSolver(self.comm, self.ostream)
+                elif method_type == 'unrestricted':
+                    self._rsp_driver = ComplexResponseUnrestrictedSolver(
+                        self.comm, self.ostream)
 
             self._rsp_driver._input_keywords['response'].update({
                 'tamm_dancoff': ('bool', 'use Tamm-Dancoff approximation'),
             })
 
             if self.prop_type in [
-                    'linear absorption cross-section',
+                    'linear absorption cross-section (cpp)',
+                    'linear absorption cross-section(cpp)',
                     'linear absorption (cpp)',
                     'linear absorption(cpp)',
                     'absorption (cpp)',
                     'absorption(cpp)',
             ]:
-                self._rsp_driver.set_cpp_flag('absorption')
+                self._rsp_driver.set_cpp_property('absorption')
 
             elif self.prop_type in [
-                    'circular dichroism spectrum',
+                    'circular dichroism spectrum (cpp)',
+                    'circular dichroism spectrum(cpp)',
                     'circular dichroism (cpp)',
                     'circular dichroism(cpp)',
                     'ecd (cpp)',
                     'ecd(cpp)',
             ]:
-                self._rsp_driver.set_cpp_flag('ecd')
+                self._rsp_driver.set_cpp_property('ecd')
 
         # Linear response C6 solver
         elif (self._rsp_dict['order'] == 'linear' and
@@ -228,6 +245,25 @@ class ResponseProperty:
                 elif method_type == 'unrestricted':
                     self._rsp_driver = LinearResponseUnrestrictedEigenSolver(
                         self.comm, self.ostream)
+
+            self._rsp_driver._input_keywords['response'].update({
+                'tamm_dancoff': ('bool', 'use Tamm-Dancoff approximation'),
+            })
+
+        # Resonant Inelastic X-ray Scattering (RIXS)
+        elif (self._rsp_dict['order'] == 'linear' and
+              self._rsp_dict['residue'] == 'single' and
+              self._rsp_dict['is_complex'] == 'yes'):
+
+            assert_msg_critical(self._rsp_dict['property'] == 'rixs',
+                                'This response property is only for RIXS')
+
+            assert_msg_critical(
+                method_type == 'restricted',
+                'ResponseProperty: This response property is ' +
+                'only implemented for restricted case')
+
+            self._rsp_driver = RixsDriver(self.comm, self.ostream)
 
             self._rsp_driver._input_keywords['response'].update({
                 'tamm_dancoff': ('bool', 'use Tamm-Dancoff approximation'),
@@ -280,7 +316,7 @@ class ResponseProperty:
                 'ResponseProperty: This response property is ' +
                 'only implemented for restricted case')
 
-            self._rsp_driver = DoubleResBetaDriver(self.comm, self.ostream)
+            self._rsp_driver = ExcitedStateMomentDriver(self.comm, self.ostream)
 
         # Cubic response driver
         elif (self.prop_type == 'custom' and
@@ -295,6 +331,20 @@ class ResponseProperty:
 
             self._rsp_driver = CubicResponseDriver(self.comm, self.ostream)
 
+        elif (self._rsp_dict['property'] == 'thg' and
+              self._rsp_dict['order'] == 'cubic' and
+              self._rsp_dict['residue'] == 'none' and
+              self._rsp_dict['is_complex'] == 'yes'):
+
+            self._rsp_driver = ThgDriver(self.comm, self.ostream)
+
+        elif (self._rsp_dict['property'] == 'thgred' and
+              self._rsp_dict['order'] == 'cubic' and
+              self._rsp_dict['residue'] == 'none' and
+              self._rsp_dict['is_complex'] == 'yes'):
+
+            self._rsp_driver = ThgReducedDriver(self.comm, self.ostream)
+
         # TPA (cubic response) driver
         elif (self._rsp_dict['order'] == 'cubic' and
               self._rsp_dict['residue'] == 'none' and
@@ -306,12 +356,12 @@ class ResponseProperty:
                 'only implemented for restricted case')
 
             if ('tpa_type' not in self._rsp_dict or
-                    self._rsp_dict['tpa_type'].lower() == 'full'):
-                self._rsp_driver = TpaFullDriver(self.comm, self.ostream)
+                    self._rsp_dict['tpa_type'].lower() == 'reduced'):
+                self._rsp_driver = TpaReducedDriver(self.comm, self.ostream)
 
             elif ('tpa_type' in self._rsp_dict and
-                  self._rsp_dict['tpa_type'].lower() == 'reduced'):
-                self._rsp_driver = TpaReducedDriver(self.comm, self.ostream)
+                    self._rsp_dict['tpa_type'].lower() == 'full'):
+                self._rsp_driver = TpaFullDriver(self.comm, self.ostream)
 
             self._rsp_driver._input_keywords['response'].update({
                 'tpa_type': ('str_lower', 'full or reduced TPA calculation'),
@@ -345,7 +395,7 @@ class ResponseProperty:
 
         self._rsp_driver.print_keywords()
 
-    def compute(self, molecule, basis, scf_tensors):
+    def compute(self, molecule, basis, scf_results):
         """
         Computes response property/spectroscopy.
 
@@ -353,12 +403,12 @@ class ResponseProperty:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         """
 
         self._rsp_property = self._rsp_driver.compute(molecule, basis,
-                                                      scf_tensors)
+                                                      scf_results)
 
     @property
     def rsp_driver(self):

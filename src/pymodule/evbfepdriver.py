@@ -35,13 +35,11 @@ from pathlib import Path
 import numpy as np
 import time
 import sys
-import os
-import glob
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .evbreporter import EvbReporter
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, print_exception_if_debug
 from .evbsystembuilder import EvbForceGroup
 
 try:
@@ -88,7 +86,7 @@ class EvbFepDriver():
         self.langevin_friction = 1.0  # 1/ps
 
         # a default of tau = 1000*dt is on the safe side, See discussion on Tdam: https://docs.lammps.org/fix_nh.html
-        self.nhc_frequency = 1.0  #1/ps,
+        self.nhc_frequency = 1.0  # 1/ps,
         self.nhc_small_length = 3
         self.nhc_bulk_length = 1
         self.temperature = -1
@@ -100,8 +98,8 @@ class EvbFepDriver():
         self.write_step = 1000
         self.initial_equil_NVT_steps = 150000
         self.initial_equil_NPT_steps = 150000
-        self.step_size = 0.001  #ps
-        self.equil_step_size = 0.001  #ps
+        self.step_size = 0.001  # ps
+        self.equil_step_size = 0.001  # ps
         self.minimize_every_lambda: bool = False
 
         self.crash_reporting_interval: int = 1
@@ -116,7 +114,7 @@ class EvbFepDriver():
         self.save_equil_traj: bool = True
         self.xml_crash_save_interval: int = 50
         self.pdb_crash_save_interval: int = 1
-        self.pdb_equil_start_temp = 10  #kelvin
+        self.pdb_equil_start_temp = 10  # kelvin
         self.pdb_equil_temp_step = 50  # kelvin
         self.pdb_temperatures = []
         self.NVT_integrator = "nose-hoover"
@@ -238,7 +236,7 @@ class EvbFepDriver():
         platform,
         platform_properties,
     ):
-        #todo add this to the configuration keywords
+        # todo add this to the configuration keywords
 
         self.platform = platform
         self.platform_properties = platform_properties
@@ -383,7 +381,7 @@ class EvbFepDriver():
         self._minimize(simulation)
         if self.save_equil_traj:
             equil_traj_reporter = mmapp.XTCReporter(
-                str(self.run_folder / f"equil_traj_initial.xtc"),
+                str(self.run_folder / "equil_traj_initial.xtc"),
                 self.write_step,
                 enforcePeriodicBox=True,
             )
@@ -435,7 +433,7 @@ class EvbFepDriver():
         )
         self._save_state(
             simulation,
-            f"equil_state_initial",
+            "equil_state_initial",
             xml=False,
             chk=True,
         )
@@ -579,8 +577,8 @@ class EvbFepDriver():
         if self.isothermal:
             if self.NVT_integrator == "langevin":
                 integrator = mm.LangevinMiddleIntegrator(
-                    self.temperature * mmunit.kelvin,  #type: ignore
-                    self.langevin_friction / mmunit.picosecond,  #type: ignore
+                    self.temperature * mmunit.kelvin,  # type: ignore
+                    self.langevin_friction / mmunit.picosecond,  # type: ignore
                     step_size * mmunit.picoseconds,
                 )
             elif self.NVT_integrator == "nose-hoover":
@@ -712,7 +710,7 @@ class EvbFepDriver():
         )
         self.ostream.flush()
         states = []
-        potwarning = False
+        # potwarning = False
         if steps % self._safe_step_batch != 0:
             self.ostream.print_warning(
                 f"Steps {steps} is not a multiple of safe step batch {self._safe_step_batch}, rounding down to {steps - steps % self._safe_step_batch}"
@@ -727,7 +725,7 @@ class EvbFepDriver():
                     f"Error during simulation step {i}: {e}")
                 self.ostream.flush()
                 self._save_states(states, simulation, i)
-                raise e
+                raise
 
             state = simulation.context.getState(
                 getPositions=True,
@@ -803,7 +801,8 @@ class EvbFepDriver():
                     energy = fg_state.getPotentialEnergy()
                     energy = energy.value_in_unit(mmunit.kilojoule_per_mole)
                     energies[j, k + 4] = energy
-            except:
+            except Exception:
+                print_exception_if_debug()
                 self.ostream.print_warning(
                     "Encountered error while saving forcegroups, continuing without forcegroups"
                 )
@@ -813,12 +812,11 @@ class EvbFepDriver():
 
             output_file = "combined_crash.pdb"
             pdb_pattern = "state_step_*.pdb"
-            pdb_files = sorted(
-                glob.glob(os.path.join(self.run_folder, pdb_pattern)))
-            with open(self.data_folder / output_file, 'w') as outfile:
+            pdb_files = sorted(self.run_folder.glob(pdb_pattern))
+            with (self.data_folder / output_file).open("w") as outfile:
                 for model_number, pdb_file in enumerate(pdb_files, start=1):
                     outfile.write(f"MODEL     {model_number}\n")
-                    with open(pdb_file, 'r') as infile:
+                    with pdb_file.open("r") as infile:
                         for line in infile:
                             if line.startswith(
                                 ('ATOM', 'HETATM', 'TER',
@@ -827,12 +825,12 @@ class EvbFepDriver():
                                              ):  # Skip headers/footers
                                 outfile.write(line)
                     outfile.write("ENDMDL\n")
-                    os.remove(pdb_file)
+                    pdb_file.unlink()
 
         header = "step, kinetic, potential, volume,"
         header += EvbForceGroup.get_header()
         np.savetxt(
-            self.data_folder / f"crash_energies.csv",
+            self.data_folder / "crash_energies.csv",
             energies,
             delimiter=",",
             header=header,

@@ -199,11 +199,6 @@ class CMolecule
     /// @return The vector of atom indices.
     auto atom_indices(const std::string &label) const -> std::vector<int>;
 
-    /// @brief Gets nuclear repulsion energy for molecule assuming point charge
-    /// model for nucleus.
-    /// @return The nuclear repulsion energy.
-    auto nuclear_repulsion_energy() const -> double;
-
     /// @brief Checks if any pair of atoms in molecule is closer than given
     /// minimal distance.
     /// @param distance The minimal distance between two atoms.
@@ -230,6 +225,11 @@ class CMolecule
     /// @brief Gets covalent radii of the atoms.
     /// @return the vector of covalent radii.
     auto get_covalent_radii() const -> std::vector<double>;
+    
+    /// @brief Shift orgin of Cartesian coordinates system to selected atom in molecule.
+    /// @param atom The selected atom to shift origin to.
+    /// @return the molecule with shifted Cartesian coordinates system.
+    auto shift_origin(const int atom) const -> CMolecule;
 
    private:
     /// @brief The charge of molecule.

@@ -40,7 +40,7 @@ from .griddriver import GridDriver
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .dftutils import get_default_grid_level
-from .inputparser import parse_input
+from .inputparser import parse_input, read_unparsed_input_from_hdf5
 from .sanitychecks import dft_sanity_check
 
 
@@ -97,8 +97,6 @@ class GradientDriver:
 
         self.potfile = None
 
-        self.checkpoint_file = None
-
         # verbosity of output (1-3)
         self.print_level = 1
 
@@ -145,6 +143,30 @@ class GradientDriver:
 
         dft_sanity_check(self, 'update_settings')
 
+    def read_settings(self, checkpoint_file):
+        """
+        Reads opt settings from checkpoint file.
+
+        :param checkpoint_file:
+            The checkpoint file to read settings from.
+        """
+
+        if self.rank == mpi_master():
+            checkpoint_grad_input = read_unparsed_input_from_hdf5(
+                checkpoint_file, group_name='grad_settings')
+            checkpoint_method_input = read_unparsed_input_from_hdf5(
+                checkpoint_file, group_name='method_settings')
+        else:
+            checkpoint_grad_input = None
+            checkpoint_method_input = None
+
+        checkpoint_grad_input = self.comm.bcast(checkpoint_grad_input,
+                                                root=mpi_master())
+        checkpoint_method_input = self.comm.bcast(checkpoint_method_input,
+                                                  root=mpi_master())
+
+        self.update_settings(checkpoint_grad_input, checkpoint_method_input)
+
     def compute(self, molecule, *args):
         """
         Performs calculation of nuclear gradient.
@@ -185,10 +207,10 @@ class GradientDriver:
 
         for i in range(natoms):
 
-            self.ostream.unmute()
             self.ostream.print_info(f'Processing atom {i + 1}/{natoms}...')
+            if i == natoms - 1:
+                self.ostream.print_blank()
             self.ostream.flush()
-            self.ostream.mute()
 
             for d in range(3):
                 coords[i, d] += self.delta_h
@@ -403,13 +425,15 @@ class GradientDriver:
 
         return tddft_xcgrad
 
-    def grad_nuc_contrib(self, molecule):
+    def grad_nuc_contrib(self, molecule, basis=None):
         """
         Calculates the contribution of the nuclear-nuclear repulsion
         to the analytical nuclear gradient.
 
         :param molecule:
             The molecule.
+        :param basis:
+            The optional AO basis set.
 
         :return:
             The nuclear contribution to the gradient.
@@ -425,7 +449,8 @@ class GradientDriver:
         coords = molecule.get_coordinates_in_bohr()
 
         # atomic charges
-        nuclear_charges = molecule.get_element_ids()
+        nuclear_charges = (molecule.get_effective_nuclear_charges(basis)
+                           if basis is not None else molecule.get_element_ids())
 
         # loop over all distinct atom pairs and add energy contribution
         for i in range(natm):
@@ -527,9 +552,11 @@ class GradientDriver:
 
         str_width = 70
 
+        title = f'{self.flag} Setup'
+
         self.ostream.print_blank()
-        self.ostream.print_header(self.flag)
-        self.ostream.print_header((len(self.flag) + 2) * '=')
+        self.ostream.print_header(title)
+        self.ostream.print_header((len(title) + 2) * '=')
         self.ostream.flush()
 
         cur_str = 'Gradient Type                   : '

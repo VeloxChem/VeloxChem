@@ -33,6 +33,7 @@
 import numpy as np
 import math
 
+from .veloxchemlib import chemical_element_identifier
 from .molecularorbitals import MolecularOrbitals, molorb
 from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
@@ -127,6 +128,26 @@ class OrbitalViewer:
         return ('Unable to import ipywidgets or IPython.display.\n' +
                 'Please install jupyter notebook via pip or conda.')
 
+    def _get_orbital_colors(self):
+        """
+        Gets the positive and negative orbital colors for the active scheme.
+
+        :return:
+            A tuple with positive and negative orbital colors.
+        """
+
+        valid_color_schemes = {
+            'default': (0x0000ff, 0xff0000),
+            'alternative': (0x62a0ea, 0xe5a50a),
+        }
+
+        errmsg = ('OrbitalViewer: orbital_color_scheme must be '
+                  '\'default\' or \'alternative\'')
+        assert_msg_critical(self.orbital_color_scheme in valid_color_schemes,
+                            errmsg)
+
+        return valid_color_schemes[self.orbital_color_scheme]
+
     def initialize(self, molecule, basis):
         """
         Initializes molecule and cubic grid; pre-computes atomic orbitals.
@@ -140,8 +161,18 @@ class OrbitalViewer:
         self._molecule = molecule
         self._basis = basis
 
-        # Define box size
         self._atomnr = np.array(molecule.get_identifiers()) - 1
+
+        # Take care of _atomnr for ghost atoms
+        for i_atom, (atom_bas_label, atom_bas_elem) in enumerate(
+                molecule.get_atom_basis_labels()):
+            if self._atomnr[i_atom] == -1:
+                elem_id = chemical_element_identifier(atom_bas_elem)
+                assert_msg_critical(
+                    elem_id > 0, 'OrbitalViewer: dummy atom is not supported')
+                self._atomnr[i_atom] = elem_id - 1
+
+        # Define box size
         self._coords = molecule.get_coordinates_in_bohr()
         if self.atom_centers is None:
             xmin = self._coords[:, 0].min() - self.grid_margins
@@ -181,27 +212,40 @@ class OrbitalViewer:
         atom_grid = CubicGrid(self._atom_origin, self.stepsize,
                               self._atom_npoints)
 
+        # Take care of mixed basis set by creating a list of atom basis labels
+        atom_basis_labels = []
+        for atom_bas_label, atom_bas_elem in molecule.get_atom_basis_labels():
+            atom_basis_labels.append(atom_bas_label)
+        for i_atom in range(len(atom_basis_labels)):
+            if not atom_basis_labels[i_atom]:
+                atom_basis_labels[i_atom] = basis.get_label()
+
         # Create atomic map
         vis_drv = VisualizationDriver()
         ao_info = vis_drv.get_atomic_orbital_info(molecule, basis)
 
         # Create reverse atomic map
         atom_to_ao = vis_drv.map_atom_to_atomic_orbitals(molecule, basis)
+
         self._ao_to_atom = [[] for i in range(len(ao_info))]
         for i_atom, atom_orbs in enumerate(atom_to_ao):
+            # Note: need atom_bas_label for distinguishing atoms that are same
+            # elements but with different basis set
+            atom_bas_label = atom_basis_labels[i_atom]
             for i_orb, orb in enumerate(atom_orbs):
-                self._ao_to_atom[orb] = [i_atom, i_orb]
+                self._ao_to_atom[orb] = (i_atom, atom_bas_label, i_orb)
 
         # Compute each unique AO on the grid
         self._ao_dict = {}
         for i_atom, atom in enumerate(self._atomnr):
-            if atom not in self._ao_dict:
+            atom_bas_label = atom_basis_labels[i_atom]
+            if (atom, atom_bas_label) not in self._ao_dict:
                 atomlist = []
                 for orb in atom_to_ao[i_atom]:
                     vis_drv.compute_atomic_orbital_for_grid(
                         atom_grid, basis, ao_info[orb])
                     atomlist.append(atom_grid.values_to_numpy())
-                self._ao_dict[atom] = atomlist
+                self._ao_dict[(atom, atom_bas_label)] = list(atomlist)
 
     def compute_orbital(self, orbital, index):
         """
@@ -243,9 +287,9 @@ class OrbitalViewer:
         # Loop over AOs
         for i_coef, coef in enumerate(this_orb):
             if abs(coef) > self.mo_threshold:
-                i_atom, i_orb = self._ao_to_atom[i_coef]
+                i_atom, atom_bas_label, i_orb = self._ao_to_atom[i_coef]
                 this_atom = self._atomnr[i_atom]
-                atom_orb = self._ao_dict[this_atom][i_orb]
+                atom_orb = self._ao_dict[(this_atom, atom_bas_label)][i_orb]
                 t = np.round(
                     (self._coords[i_atom] - self.origin + self._atom_origin) /
                     self.stepsize).astype('int')
@@ -298,9 +342,9 @@ class OrbitalViewer:
         # Loop over AOs
         for i_coef, orb_coef in enumerate(this_orb):
             if abs(orb_coef) > self.mo_threshold:
-                i_atom, i_orb = self._ao_to_atom[i_coef]
+                i_atom, atom_bas_label, i_orb = self._ao_to_atom[i_coef]
                 this_atom = self._atomnr[i_atom]
-                atom_orb = self._ao_dict[this_atom][i_orb]
+                atom_orb = self._ao_dict[(this_atom, atom_bas_label)][i_orb]
 
                 t = (self._coords[i_atom] - self.origin +
                      self._atom_origin) / self.stepsize
@@ -357,6 +401,21 @@ class OrbitalViewer:
 
         return np_orb
 
+    def visualize(self, molecule, basis, mo_inp, label='', width=600, height=450):
+        """
+        Visualizes the orbitals, with a widget to choose which.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param mo_inp:
+            The MolecularOrbitals input (filename of h5 file storing the
+            MolecularOrbitals, or a MolecularOrbitals object).
+        """
+
+        self._plot_using_py3dmol(molecule, basis, mo_inp, label, width, height)
+
     def plot(self, molecule, basis, mo_inp, label='', width=600, height=450):
         """
         Plots the orbitals, with a widget to choose which.
@@ -398,6 +457,16 @@ class OrbitalViewer:
 
         if isinstance(mo_inp, str):
             if (label and isinstance(label, str)):
+                # for backward compatibility, check and update label
+                if label.startswith('rsp/') and (
+                        not label.startswith('rsp/nto/')):
+                    new_label = label.replace('rsp/', 'rsp/nto/')
+                    if MolecularOrbitals.check_label_validity(
+                            mo_inp, new_label):
+                        label = new_label
+                    elif MolecularOrbitals.check_label_validity(
+                            mo_inp, new_label + '_'):
+                        label = new_label + '_'
                 mo_object = MolecularOrbitals.read_hdf5(mo_inp, label=label)
             else:
                 mo_object = MolecularOrbitals.read_hdf5(mo_inp)
@@ -410,13 +479,16 @@ class OrbitalViewer:
 
         self._is_uhf = (mo_object.get_orbitals_type() == molorb.unrest)
 
+        nalpha = molecule.number_of_alpha_occupied_orbitals(self._basis)
+        nbeta = molecule.number_of_beta_occupied_orbitals(self._basis)
+
         # i_orb is an instance variable accessed by MultiPsi
-        self._i_orb = molecule.number_of_alpha_electrons() - 1
+        self._i_orb = nalpha - 1
         self._mo_coefs = mo_object.alpha_to_numpy()
 
         # In some cases (for example NTOs) the number of orbitals is less than
         # the number of electrons. In this case, print the middle orbital
-        if self._mo_coefs.shape[1] < molecule.number_of_alpha_electrons():
+        if self._mo_coefs.shape[1] < nalpha:
             self._i_orb = self._mo_coefs.shape[1] // 2
         if self._is_uhf:
             self._mo_coefs_beta = mo_object.beta_to_numpy()
@@ -434,9 +506,6 @@ class OrbitalViewer:
         self._this_plot += self._plt_iso_one
         self._this_plot += self._plt_iso_two
         self._this_plot.display()
-
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
 
         # Create orbital list:
         orb_ene = mo_object.ea_to_numpy()
@@ -692,11 +761,8 @@ class OrbitalViewer:
         isovalue = self.orbital_isovalue
         opacity = self.orbital_opacity
         wireframe = False
-
-        if self.orbital_color_scheme == 'default':
-            color = 0x0000ff
-        elif self.orbital_color_scheme == 'alternative':
-            color = 0x62a0ea
+        positive_color, negative_color = self._get_orbital_colors()
+        color = positive_color
 
         # Find if the user changed the defaults
         if self._plt_iso_one:
@@ -718,11 +784,7 @@ class OrbitalViewer:
 
         # Find if the user changed the defaults
         isovalue = -isovalue
-
-        if self.orbital_color_scheme == 'default':
-            color = 0xff0000
-        elif self.orbital_color_scheme == 'alternative':
-            color = 0xe5a50a
+        color = negative_color
 
         if self._plt_iso_two:
             isovalue = self._plt_iso_two.level
@@ -770,6 +832,16 @@ class OrbitalViewer:
 
         if isinstance(mo_inp, str):
             if (label and isinstance(label, str)):
+                # for backward compatibility, check and update label
+                if label.startswith('rsp/') and (
+                        not label.startswith('rsp/nto/')):
+                    new_label = label.replace('rsp/', 'rsp/nto/')
+                    if MolecularOrbitals.check_label_validity(
+                            mo_inp, new_label):
+                        label = new_label
+                    elif MolecularOrbitals.check_label_validity(
+                            mo_inp, new_label + '_'):
+                        label = new_label + '_'
                 mo_object = MolecularOrbitals.read_hdf5(mo_inp, label=label)
             else:
                 mo_object = MolecularOrbitals.read_hdf5(mo_inp)
@@ -782,21 +854,21 @@ class OrbitalViewer:
 
         self._is_uhf = (mo_object.get_orbitals_type() == molorb.unrest)
 
+        nalpha = molecule.number_of_alpha_occupied_orbitals(self._basis)
+        nbeta = molecule.number_of_beta_occupied_orbitals(self._basis)
+
         # i_orb is an instance variable accessed by MultiPsi
-        self._i_orb = molecule.number_of_alpha_electrons() - 1
+        self._i_orb = nalpha - 1
         self._mo_coefs = mo_object.alpha_to_numpy()
 
         # In some cases (for example NTOs) the number of orbitals is less than
         # the number of electrons. In this case, print the middle orbital
-        if self._mo_coefs.shape[1] < molecule.number_of_alpha_electrons():
+        if self._mo_coefs.shape[1] < nalpha:
             self._i_orb = self._mo_coefs.shape[1] // 2
         if self._is_uhf:
             self._mo_coefs_beta = mo_object.beta_to_numpy()
         else:
             self._mo_coefs_beta = self._mo_coefs
-
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
 
         # Create orbital list:
         orb_ene = mo_object.ea_to_numpy()
@@ -845,22 +917,26 @@ class OrbitalViewer:
         self._viewer_width = width
         self._viewer_height = height
 
+        has_ghost_atom = (0 in molecule.get_identifiers())
+
         # draw the first orbital by default
         with out:
             display(HTML(self._draw_orbital_html(self._i_orb)))
 
         def update_view_alpha(change):
-            out.clear_output(wait=True)
-            with out:
-                display(HTML(self._draw_molecule_html()))
+            if not has_ghost_atom:
+                out.clear_output(wait=True)
+                with out:
+                    display(HTML(self._draw_molecule_html()))
             out.clear_output(wait=True)
             with out:
                 display(HTML(self._draw_orbital_html(change['new'], 'alpha')))
 
         def update_view_beta(change):
-            out.clear_output(wait=True)
-            with out:
-                display(HTML(self._draw_molecule_html()))
+            if not has_ghost_atom:
+                out.clear_output(wait=True)
+                with out:
+                    display(HTML(self._draw_molecule_html()))
             out.clear_output(wait=True)
             with out:
                 display(HTML(self._draw_orbital_html(change['new'], 'beta')))
@@ -942,12 +1018,7 @@ class OrbitalViewer:
 
         isovalue = self.orbital_isovalue
         opacity = self.orbital_opacity
-        if self.orbital_color_scheme == 'default':
-            positive_color = 0x0000ff
-            negative_color = 0xff0000
-        elif self.orbital_color_scheme == 'alternative':
-            positive_color = 0x62a0ea
-            negative_color = 0xe5a50a
+        positive_color, negative_color = self._get_orbital_colors()
 
         viewer.addVolumetricData(orbital_cube_str, "cube", {
             "isoval": isovalue,
@@ -983,7 +1054,7 @@ class OrbitalViewer:
         z = coords[:, 2]
 
         natoms = self._molecule.number_of_atoms()
-        elem_ids = self._molecule.get_identifiers()
+        elem_ids = self._atomnr + 1
 
         x0, y0, z0 = self.origin
         dx, dy, dz = self.stepsize

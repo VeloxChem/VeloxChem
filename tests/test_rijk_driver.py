@@ -1,4 +1,6 @@
+from mpi4py import MPI
 import numpy as np
+import pytest
 
 from veloxchem.veloxchemlib import T4CScreener
 from veloxchem.veloxchemlib import make_matrix, mat_t
@@ -25,6 +27,8 @@ class TestRIMODriver:
 
         return mol, bas, aux_bas
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='single MPI process only')
     def test_h2o_compute_fock(self):
 
         mol_h2o, bas_sto3g, bas_aux = self.get_data_h2o()

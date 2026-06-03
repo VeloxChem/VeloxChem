@@ -19,8 +19,7 @@ class TestPEForceFieldGenerator:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
-                                      task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
 
         pe_ff_gen = PEForceFieldGenerator(task.mpi_comm, task.ostream)
         pe_ff_results = pe_ff_gen.compute(task.molecule, task.ao_basis,

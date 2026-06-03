@@ -36,6 +36,8 @@ from .veloxchemlib import BasisFunction
 from .veloxchemlib import GtoBlock
 from .veloxchemlib import GtoPairBlock
 from .veloxchemlib import BlockedGtoPairBlock
+from .veloxchemlib import BaseCorePotential
+from .veloxchemlib import AtomCorePotential
 from .veloxchemlib import T3FlatBuffer
 from .veloxchemlib import OverlapDriver
 from .veloxchemlib import KineticEnergyDriver
@@ -62,6 +64,7 @@ from .veloxchemlib import ThreeCenterElectronRepulsionGeom100Driver
 from .veloxchemlib import ThreeCenterElectronRepulsionGeom010Driver
 from .veloxchemlib import TwoCenterElectronRepulsionDriver
 from .veloxchemlib import TwoCenterElectronRepulsionGeom100Driver
+from .veloxchemlib import EcpDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import FockGeom2000Driver
@@ -144,7 +147,9 @@ from .lreigensolver import LinearResponseEigenSolver
 from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from .lrsolver import LinearResponseSolver
 from .lrsolverunrest import LinearResponseUnrestrictedSolver
-from .cppsolver import ComplexResponse
+from .cppsolver import ComplexResponseSolver
+from .cppsolverunrest import ComplexResponseUnrestrictedSolver
+from .tdacppsolver import ComplexResponseTdaSolver
 from .c6driver import C6Driver
 from .quadraticresponsedriver import QuadraticResponseDriver
 from .cubicresponsedriver import CubicResponseDriver
@@ -153,6 +158,7 @@ from .tpatransitiondriver import TpaTransitionDriver
 from .threepatransitiondriver import ThreePATransitionDriver
 from .tpafulldriver import TpaFullDriver
 from .tpareddriver import TpaReducedDriver
+from .tpareddriver import TpaReducedDriver as TpaDriver
 from .espchargesdriver import EspChargesDriver
 from .respchargesdriver import RespChargesDriver
 from .rspproperty import ResponseProperty
@@ -163,19 +169,25 @@ from .rspabsorption import Absorption
 from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpa import TPA
-#from .rspcustomproperty import CustomProperty
+from .rspthg import THG
+from .rspthgred import ThgReduced
+from .rixsdriver import RixsDriver
+from .xpsdriver import XPSDriver
+from .localizationdriver import LocalizationDriver
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .peforcefieldgenerator import PEForceFieldGenerator
+from .firstorderpropdriver import FirstOrderPropertyDriver
 from .firstorderprop import FirstOrderProperties
+from .excitedstatemomentdriver import ExcitedStateMomentDriver
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .tddftgradientdriver import TddftGradientDriver
 from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
+from .tddfthessiandriver import TddftHessianDriver
 from .cphfsolver import CphfSolver
 from .hessianorbitalresponse import HessianOrbitalResponse
 from .hessianorbitalresponseunrest import UnrestrictedHessianOrbitalResponse
-from .tdhfhessiandriver import TdhfHessianDriver
 from .polorbitalresponse import PolOrbitalResponse
 from .polarizabilitygradient import PolarizabilityGradient
 from .vibrationalanalysis import VibrationalAnalysis
@@ -192,6 +204,7 @@ from .solvationbuilder import SolvationBuilder
 from .solvationfepdriver import SolvationFepDriver
 from .openmmdynamics import OpenMMDynamics
 from .excitedstateanalysisdriver import ExcitedStateAnalysisDriver
+from .valetanalyzer import ValetAnalyzer
 from .evbdriver import EvbDriver
 from .reaffbuilder import ReactionForceFieldBuilder
 from .evbsystembuilder import EvbSystemBuilder
@@ -203,13 +216,19 @@ from .imforcefieldgenerator import IMForceFieldGenerator
 from .imdatabasepointcollecter import IMDatabasePointCollecter
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
-from .mofbuilder import MofBuilder
+from .mofbuilder.core.builder import MetalOrganicFrameworkBuilder as MofBuilder
 from .conformergenerator import ConformerGenerator
 from .tsguesser import TransitionStateGuesser
 from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
+from .orbitallocalization import OrbitalLocalizationDriver
+from .ensembleparser import EnsembleParser
+from .ensembledriver import EnsembleDriver
+from .spectrumaverager import SpectrumAverager
 # for backward compatibility only
+from .cppsolver import ComplexResponseSolver as ComplexResponse
+from .tdacppsolver import ComplexResponseTdaSolver as ComplexResponseTDA
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 
 # Python functions
@@ -221,15 +240,14 @@ from .oneeints import compute_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
 from .oneeints import compute_linear_momentum_integrals
 from .oneeints import compute_angular_momentum_integrals
-from .checkpoint import read_results
+from .resultsio import read_molecule_and_basis, read_results
 
-# Environment variable: basis set path, number of OpenMP threads, MKL linking
+# Environment variable: basis set path, number of OpenMP threads
 from .environment import (set_vlxbasispath, get_basis_path, set_vlxdatapath,
-                          get_data_path, set_omp_num_threads, configure_mkl_rt)
+                          get_data_path, set_omp_num_threads)
 
 set_vlxbasispath()
 set_vlxdatapath()
 set_omp_num_threads()
-configure_mkl_rt()
 
 __version__ = "1.0rc4"

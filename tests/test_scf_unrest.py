@@ -24,12 +24,11 @@ class TestScfUnrestrictedDriver:
         mol.set_multiplicity(mult)
 
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
-        min_bas = MolecularBasis.read(mol, 'ao-start-guess', ostream=None)
 
         scf_drv = ScfUnrestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
-        scf_results = scf_drv.compute(mol, bas, min_bas)
+        scf_results = scf_drv.compute(mol, bas)
 
         if scf_drv.rank == mpi_master():
             assert abs(ref_scf_energy - scf_results['scf_energy']) < tol
@@ -54,7 +53,41 @@ class TestScfUnrestrictedDriver:
         self.run_scf_unrest('cam-b3lyp', 1, 2, -75.8737059513, 1.0e-6)
         self.run_scf_unrest('cam-b3lyp', 0, 3, -76.0523450131, 1.0e-6)
 
+    def test_camb3lyp_100(self):
+
+        self.run_scf_unrest('cam-b3lyp-100', 1, 2, -75.8251370791, 1.0e-6)
+        self.run_scf_unrest('cam-b3lyp-100', 0, 3, -76.0032834669, 1.0e-6)
+
     def test_tpssh(self):
 
         self.run_scf_unrest('tpssh', 1, 2, -75.9044411187, 1.0e-6)
         self.run_scf_unrest('tpssh', 0, 3, -76.0780524011, 1.0e-6)
+
+    def run_scf_unrest_with_ecp(self, xcfun_label, charge, mult, ref_scf_energy,
+                                tol):
+
+        xyz_string = """2
+        xyz
+        Au   0.000   0.000   0.000
+        H    0.000   1.550   0.000
+        """
+        basis_label = 'def2-svp'
+
+        mol = Molecule.read_xyz_string(xyz_string)
+        mol.set_charge(charge)
+        mol.set_multiplicity(mult)
+
+        bas = MolecularBasis.read(mol, basis_label, ostream=None)
+
+        scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = xcfun_label
+        scf_drv.acc_type = 'diis'
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            assert abs(ref_scf_energy - scf_results['scf_energy']) < tol
+
+    def test_hf_with_ecp(self):
+
+        self.run_scf_unrest_with_ecp('hf', 1, 2, -135.0230116586, 1.0e-8)

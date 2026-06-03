@@ -32,17 +32,16 @@
 
 import numpy as np
 import time as tm
-import h5py
 import sys
 
 from .veloxchemlib import bohr_in_angstrom
-from .molecule import Molecule
-from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
 from .visualizationdriver import VisualizationDriver
 from .lreigensolver import LinearResponseEigenSolver
 from .densityviewer import DensityViewer
 from .errorhandler import assert_msg_critical
+from .mathutils import symmetric_matrix_function
+from .resultsio import read_results
 
 
 class ExcitedStateAnalysisDriver:
@@ -54,6 +53,8 @@ class ExcitedStateAnalysisDriver:
 
     Instance variables
         - fragment_dict: dictionary of indices for atoms in each fragment.
+        - analysis_type: type of analysis for the transition
+                         density matrix (mulliken or lowdin)
     """
 
     def __init__(self, ostream=None):
@@ -66,10 +67,18 @@ class ExcitedStateAnalysisDriver:
 
         self.fragment_dict = None
 
+        self.analysis_type = "lowdin"
+
         # output stream
         self.ostream = ostream
 
-    def compute(self, molecule, basis, scf_results, rsp_results, state_index=1):
+    def compute(self,
+                molecule,
+                basis,
+                scf_results,
+                rsp_results,
+                state_index=1,
+                num_core_orbitals=None):
         """
         Computes dictionary containing excited state descriptors for
         excited state nstate.
@@ -85,6 +94,8 @@ class ExcitedStateAnalysisDriver:
         :param state_index:
             The excited state for which the descriptors are
             computed (indexing starts at 1).
+        :param num_core_orbitals:
+            The number of core orbitals for X-ray absorption.
 
         :return:
             A dictionary containing the transition, hole and particle density matrices
@@ -107,8 +118,9 @@ class ExcitedStateAnalysisDriver:
         self.print_header('Excited State Analysis.', state_index)
 
         start_time = tm.time()
-        dens_dict = self.compute_density_matrices(molecule, scf_results,
-                                                  rsp_results, state_index)
+        dens_dict = self.compute_density_matrices(molecule, basis, scf_results,
+                                                  rsp_results, state_index,
+                                                  num_core_orbitals)
         tdens_ao = dens_dict['transition_density_matrix_AO']
         ret_dict.update(dens_dict)
         self.ostream.print_info("Density matrices computed in " +
@@ -117,6 +129,13 @@ class ExcitedStateAnalysisDriver:
         self.ostream.print_blank()
 
         tmp_start_time = tm.time()
+
+        self.ostream.print_info(
+            "Charge transfer matrix computed using " +
+            "{:s} analysis.".format(self.analysis_type.capitalize()))
+
+        self.ostream.print_blank()
+
         ct_matrix = self.compute_ct_matrix(molecule, basis, scf_results,
                                            tdens_ao, self.fragment_dict)
         ret_dict['ct_matrix'] = ct_matrix
@@ -136,8 +155,8 @@ class ExcitedStateAnalysisDriver:
         self.ostream.print_blank()
 
         tmp_start_time = tm.time()
-        avg_pos_dict = self.compute_avg_position(molecule, ct_matrix,
-                                                 self.fragment_dict)
+        avg_pos_dict = self.compute_avg_position(molecule, basis, scf_results,
+                                                 tdens_ao)
         ret_dict.update(avg_pos_dict)
         self.ostream.print_info("Average positions and CT length computed in " +
                                 "{:.3f} sec.".format(tm.time() -
@@ -169,26 +188,9 @@ class ExcitedStateAnalysisDriver:
         :return:
             A tuple containing the scf and rsp dictionaries.
         """
-        h5f = h5py.File(filename, "r")
 
-        scf_results = {}
-        rsp_results = {}
-        for key in h5f:
-            if key == "atom_coordinates":
-                scf_results[key] = np.array(h5f[key])
-            if key == "nuclear_charges":
-                scf_results[key] = np.array(h5f[key])
-            if key == "basis_set":
-                scf_results[key] = np.array(h5f[key])
-            if key == "scf":
-                scf_results_dict = dict(h5f.get(key))
-                for scf_key in scf_results_dict:
-                    scf_results[scf_key] = np.array(scf_results_dict[scf_key])
-            elif key == "rsp":
-                rsp_results_dict = dict(h5f.get(key))
-                for rsp_key in rsp_results_dict:
-                    rsp_results[rsp_key] = np.array(rsp_results_dict[rsp_key])
-        h5f.close()
+        scf_results = read_results(filename, 'scf')
+        rsp_results = read_results(filename, 'rsp')
 
         return scf_results, rsp_results
 
@@ -222,52 +224,45 @@ class ExcitedStateAnalysisDriver:
 
         return rsp_results
 
-    def create_molecule_and_basis(self, scf_results):
-        """
-        Creates molecule and basis objects from scf dictionary.
-
-        :param scf_results:
-            The dictionary containing the scf results dictionary.
-
-        :return:
-            A tuple containing the Molecule and Basis objects.
-        """
-
-        coordinates = scf_results['atom_coordinates']
-        nuclear_charges = np.array(scf_results['nuclear_charges'])
-        nuclear_charges = nuclear_charges.astype(int)
-        basis_set_label = scf_results['basis_set'][0].decode("utf-8")
-        molecule = Molecule(nuclear_charges, coordinates, units="au")
-        basis = MolecularBasis.read(molecule, basis_set_label)
-
-        return molecule, basis
-
-    def compute_density_matrices(self, molecule, scf_results, rsp_results,
-                                 state_index):
+    def compute_density_matrices(self,
+                                 molecule,
+                                 basis,
+                                 scf_results,
+                                 rsp_results,
+                                 state_index,
+                                 num_core_orbitals=None):
         """
         Computes the transition density matrix (TDM) for state
         nstate in MO and AO basis.
 
         :param molecule:
             The Molecule object
+        :param basis:
+            The AO basis set object
         :param scf_results:
             The dictionary containing the scf results.
         :param rsp_results:
             The dictionary containing the rsp results.
         :param state_index:
             The excited state for which the TDM is computed.
+        :param num_core_orbitals:
+            The number of core orbitals (in case of X-ray absorption)
 
         :return:
             A tuple containing the transition, particle, and hole
             density matrices in MO and AO basis.
         """
 
+        assert_msg_critical(
+            scf_results['scf_type'] == 'restricted',
+            f'{type(self).__name__}: open-shell is not yet supported')
+
         if (any(key.startswith('eigenvector') for key in rsp_results) and
                 'formatted' not in rsp_results):
             rsp_results = self.format_rsp_results(rsp_results)
 
         mo = scf_results["C_alpha"]
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         norb = mo.shape[1]
         nvirt = norb - nocc
         mo_occ = mo[:, :nocc].copy()
@@ -276,21 +271,54 @@ class ExcitedStateAnalysisDriver:
         excstate = "S" + str(state_index)
         eigvec = rsp_results[excstate]
 
-        nexc = nocc * nvirt
+        # TODO: take care of restricted_subspace
+
+        if num_core_orbitals is None:
+            nexc = nocc * nvirt
+        else:
+            nocc = num_core_orbitals
+            nexc = nocc * nvirt
+            mo_occ = mo[:, :nocc].copy()
+
+        # Check if the shape of the vector matches the number
+        # of expected excitations
+        eigvec_shape = eigvec.shape[0]
+        error_text = 'eigenvectors not consistent with the expected number '
+        error_text += 'of occupied and virtual orbitals. For calculations which use '
+        error_text += 'the CVS approximation, please set num_core_orbitals.'
+        assert_msg_critical(nexc == eigvec_shape or 2 * nexc == eigvec_shape,
+                            error_text)
+
         z_mat = eigvec[:nexc]
         if eigvec.shape[0] == nexc:
             tdens_mo = np.reshape(z_mat, (nocc, nvirt))
+            tdens_ao = np.linalg.multi_dot([mo_occ, tdens_mo, mo_vir.T])
+            hole_dens_mo = -np.matmul(tdens_mo, tdens_mo.T)
+            hole_dens_ao = np.linalg.multi_dot([mo_occ, hole_dens_mo, mo_occ.T])
+
+            part_dens_mo = np.matmul(tdens_mo.T, tdens_mo)
+            part_dens_ao = np.linalg.multi_dot([mo_vir, part_dens_mo, mo_vir.T])
         else:
+            # Eqs. 2.129 - 2.133 of 'Computational Spectroscopy of D18 Photodegradation'
+            # Carl Svennerstedt, master thesis 2025
             y_mat = eigvec[nexc:]
-            tdens_mo = np.reshape(z_mat - y_mat, (nocc, nvirt))
+            tdens_mo = np.zeros((norb, norb))
+            if num_core_orbitals is None:
+                tdens_mo[:nocc, nocc:] = np.reshape(z_mat, (nocc, nvirt))
+                tdens_mo[nocc:, :nocc] = -np.reshape(y_mat,
+                                                     (nocc, nvirt)).transpose()
+            else:
+                start_virt = molecule.number_of_alpha_electrons()
 
-        tdens_ao = np.linalg.multi_dot([mo_occ, tdens_mo, mo_vir.T])
+                tdens_mo[:nocc, start_virt:] = np.reshape(z_mat, (nocc, nvirt))
+                tdens_mo[start_virt:, :nocc] = -np.reshape(
+                    y_mat, (nocc, nvirt)).transpose()
+            tdens_ao = np.linalg.multi_dot([mo, tdens_mo, mo.T])
+            hole_dens_mo = -np.matmul(tdens_mo, tdens_mo.T)
+            hole_dens_ao = np.linalg.multi_dot([mo, hole_dens_mo, mo.T])
 
-        hole_dens_mo = -np.matmul(tdens_mo, tdens_mo.T)
-        hole_dens_ao = np.linalg.multi_dot([mo_occ, hole_dens_mo, mo_occ.T])
-
-        part_dens_mo = np.matmul(tdens_mo.T, tdens_mo)
-        part_dens_ao = np.linalg.multi_dot([mo_vir, part_dens_mo, mo_vir.T])
+            part_dens_mo = np.matmul(tdens_mo.T, tdens_mo)
+            part_dens_ao = np.linalg.multi_dot([mo, part_dens_mo, mo.T])
 
         return {
             'transition_density_matrix_MO': tdens_mo,
@@ -332,7 +360,46 @@ class ExcitedStateAnalysisDriver:
     def compute_ct_matrix(self, molecule, basis, scf_results, T, fragment_dict):
         """
         Computes the charge transfer (CT) matrix from the
-        transition density matrix (TDM).
+        transition density matrix (TDM)
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_results:
+            The dictionary of results from converged SCF wavefunction.
+        :param T:
+            The transition density matrix in AO basis.
+        :param fragment_dict:
+            The dictionary containing the indices of atoms in each fragment.
+
+        :return:
+            The CT matrix.
+        """
+
+        if self.analysis_type in ["mulliken", "Mulliken"]:
+            return self.compute_ct_matrix_mulliken(molecule, basis, scf_results,
+                                                   T, fragment_dict)
+        elif self.analysis_type in ["lowdin", "Lowdin"]:
+            return self.compute_ct_matrix_lowdin(molecule, basis, scf_results,
+                                                 T, fragment_dict)
+        else:
+            self.ostream.print_warning(
+                "Unrecognized analysis type: {:s} analysis. ".format(
+                    self.analysis_type.capitalize()) +
+                "Reverting to Lowdin analysis.")
+            self.ostream.print_blank()
+            return self.compute_ct_matrix_lowdin(molecule, basis, scf_results,
+                                                 T, fragment_dict)
+
+    def compute_ct_matrix_mulliken(self, molecule, basis, scf_results, T,
+                                   fragment_dict):
+        """
+        Computes the charge transfer (CT) matrix from the
+        transition density matrix (TDM) using a Mulliken partitioning
+        of the transition density.
+
+        Eq. B4 in J. Chem. Phys. 141, 024106 (2014)
 
         :param molecule:
             The molecule.
@@ -369,6 +436,53 @@ class ExcitedStateAnalysisDriver:
                 ct_matrix[a, b] = np.sum(TSST_AB + T_STS_AB)
 
         return 0.5 * ct_matrix
+
+    def compute_ct_matrix_lowdin(self, molecule, basis, scf_results, T,
+                                 fragment_dict):
+        """
+        Computes the charge transfer (CT) matrix from the
+        transition density matrix (TDM) using a Lowdin partitioning
+        of the transition density.
+
+        Eqs. 15 and 16 Coord. Chem. Rev. 361 (2018) 74–97
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_results:
+            The dictionary of results from converged SCF wavefunction.
+        :param T:
+            The transition density matrix in AO basis.
+        :param fragment_dict:
+            The dictionary containing the indices of atoms in each fragment.
+
+        :return:
+            The CT matrix.
+        """
+
+        ao_map_fragments = self.map_fragments_to_atomic_orbitals(
+            molecule, basis, fragment_dict)
+
+        S = scf_results["S"]
+
+        # Calculate S^1/2 with threshold to avoid sqrt of negative eigenvalues
+        sqrt_S = symmetric_matrix_function(S, np.sqrt, thresh=1.0e-12)
+
+        # Calculate tilde_T as S^1/2 T S^1/2
+        tilde_T = np.linalg.multi_dot([sqrt_S, T, sqrt_S])
+
+        # Sum tilde_T**2 over the different fragments
+        n_fragments = len(fragment_dict.keys())
+        ct_matrix = np.zeros((n_fragments, n_fragments))
+        for a, A in enumerate(fragment_dict.keys()):
+            for b, B in enumerate(fragment_dict.keys()):
+                tilde_T_AB = tilde_T[ao_map_fragments[A]][:,
+                                                          ao_map_fragments[B]]
+                tilde_T_AB2 = tilde_T_AB**2
+                ct_matrix[a, b] = np.sum(tilde_T_AB2)
+
+        return ct_matrix
 
     def compute_participation_ratios(self, ct_matrix):
         """
@@ -417,7 +531,56 @@ class ExcitedStateAnalysisDriver:
                 np.sum(coord_array, axis=0) / coord_array.shape[0])
         return avg_coord_list
 
-    def compute_avg_position(self, molecule, ct_matrix, fragment_dict):
+    def compute_avg_position(self, molecule, basis, scf_results, T):
+        """
+        Computes the average particle position, average hole position, and the
+        the difference vector between them based on the atom-wise CT matrix.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param scf_results:
+            The SCF results.
+        :param T:
+            The transition density matrix in AO basis.
+
+        :return:
+            A dictionary containing the average particle position,
+            average hole position, the difference vector
+            from average hole to average particle,
+            and the charge transfer length.
+        """
+
+        fragment_dict = {}
+        for i in range(molecule.number_of_atoms()):
+            fragment_dict[i + 1] = [i + 1]
+
+        coords = molecule.get_coordinates_in_bohr()
+
+        ct_matrix = self.compute_ct_matrix(molecule, basis, scf_results, T,
+                                           fragment_dict)
+
+        omega = np.sum(ct_matrix)
+        hole_weight = np.sum(ct_matrix, axis=1) / omega
+        particle_weight = np.sum(ct_matrix, axis=0) / omega
+
+        avg_hole_position = np.matmul(hole_weight, coords) * bohr_in_angstrom()
+        avg_particle_position = np.matmul(particle_weight,
+                                          coords) * bohr_in_angstrom()
+        avg_diff_vec = avg_particle_position - avg_hole_position
+        ct_length = np.linalg.norm(avg_diff_vec)
+
+        return {
+            'avg_hole_position': avg_hole_position,
+            'avg_particle_position': avg_particle_position,
+            'avg_difference_vector': avg_diff_vec,
+            'ct_length': ct_length,
+            'atom_wise_ct_matrix': ct_matrix,
+        }
+
+    def compute_avg_position_based_on_fragments(self, molecule, ct_matrix,
+                                                fragment_dict):
         """
         Computes the average particle position, average hole position, and the
         the difference vector between them.
@@ -521,7 +684,12 @@ class ExcitedStateAnalysisDriver:
         viewer.zoomTo()
         viewer.show()
 
-    def show_density(self, molecule, basis, descriptors):
+    def show_density(self,
+                     molecule,
+                     basis,
+                     descriptors,
+                     use_k3d=False,
+                     interpolate=False):
         """Displays the particle and hole densities of molecule.
 
         :param molecule:
@@ -535,6 +703,8 @@ class ExcitedStateAnalysisDriver:
         """
 
         dens_viewer = DensityViewer()
+        dens_viewer.use_k3d = use_k3d
+        dens_viewer.interpolate = interpolate
         dens_viewer_dict = {}
         if 'hole_density_matrix_AO' in descriptors:
             dens_viewer_dict['particle'] = descriptors[
@@ -565,6 +735,9 @@ class ExcitedStateAnalysisDriver:
 
         str_width = 60
 
+        cur_str = 'Excited state analysis based on : transition density matrix'
+        self.ostream.print_header(cur_str.ljust(str_width))
+
         cur_str = 'Excited state index             : ' + str(state_index)
         self.ostream.print_header(cur_str.ljust(str_width))
 
@@ -590,6 +763,9 @@ class ExcitedStateAnalysisDriver:
         self.ostream.print_blank()
 
         self.ostream.print_reference('Reference: ' + self.get_reference())
+        self.ostream.print_reference('Reference: ' +
+                                     self.get_second_reference())
+        self.ostream.print_reference('Reference: ' + self.get_third_reference())
         self.ostream.print_blank()
 
         self.ostream.flush()
@@ -693,5 +869,27 @@ class ExcitedStateAnalysisDriver:
 
         ref_str = "F. Plasser, M. Wormit, A. Dreuw, "
         ref_str += "J. Chem. Phys., 2014, 141, 024106"
+
+        return ref_str
+
+    def get_second_reference(self):
+        """
+        Gets reference string for the method to compute the avg.
+        particle and hole positions based on the CT matrix.
+        """
+
+        ref_str = "F. Plasser, H. Lischka, "
+        ref_str += "J. Chem. Theory Comput., 2012, 8, 2777"
+
+        return ref_str
+
+    def get_third_reference(self):
+        """
+        Gets reference string for the method to compute the
+        CT matrix based on Lowdin analysis.
+        """
+
+        ref_str = "S. Mai, et al., "
+        ref_str += "Coord. Chem. Rev., 2018, 361, 74–97"
 
         return ref_str

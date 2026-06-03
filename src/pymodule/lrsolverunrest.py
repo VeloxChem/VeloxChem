@@ -30,24 +30,23 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from mpi4py import MPI
 import numpy as np
 import time as tm
-import sys
 
 from .veloxchemlib import mpi_master
-from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
-from .linearsolver import LinearSolver
+from .lrsolverbase import LinearResponseSolverBase
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check,
+                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
-from .errorhandler import assert_msg_critical, safe_solve
-from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_solve
+from .checkpoint import check_rsp_hdf5
+from .resultsio import write_rsp_solution_with_multiple_keys
 
 
-class LinearResponseUnrestrictedSolver(LinearSolver):
+class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
     """
     Implements linear response solver.
 
@@ -67,53 +66,7 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
         - frequencies: The frequencies.
     """
 
-    def __init__(self, comm=None, ostream=None):
-        """
-        Initializes linear response solver to default setup.
-        """
-
-        if comm is None:
-            comm = MPI.COMM_WORLD
-
-        if ostream is None:
-            if comm.Get_rank() == mpi_master():
-                ostream = OutputStream(sys.stdout)
-            else:
-                ostream = OutputStream(None)
-
-        super().__init__(comm, ostream)
-
-        # operators and frequencies
-        self.a_operator = 'electric dipole'
-        self.a_components = 'xyz'
-        self.b_operator = 'electric dipole'
-        self.b_components = 'xyz'
-        self.frequencies = (0,)
-
-        self._input_keywords['response'].update({
-            'a_operator': ('str_lower', 'A operator'),
-            'a_components': ('str_lower', 'Cartesian components of A operator'),
-            'b_operator': ('str_lower', 'B operator'),
-            'b_components': ('str_lower', 'Cartesian components of B operator'),
-            'frequencies': ('seq_range', 'frequencies'),
-        })
-
-    def update_settings(self, rsp_dict, method_dict=None):
-        """
-        Updates response and method settings in linear response solver.
-
-        :param rsp_dict:
-            The dictionary of response input.
-        :param method_dict:
-            The dictionary of method settings.
-        """
-
-        if method_dict is None:
-            method_dict = {}
-
-        super().update_settings(rsp_dict, method_dict)
-
-    def compute(self, molecule, basis, scf_tensors, v_grad=None):
+    def compute(self, molecule, basis, scf_results, v_grad=None):
         """
         Performs linear response calculation for a molecule and a basis set.
 
@@ -121,7 +74,7 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param v_grad:
             The gradients on the right-hand side. If not provided, v_grad will
@@ -145,15 +98,22 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
 
         self.has_external_rhs = False
 
+        # make sure that lr_property is properly set
+        if self.property is not None:
+            self.set_lr_property(self.property)
+
         # check molecule
         molecule_sanity_check(molecule)
 
         # check SCF results
-        scf_results_sanity_check(self, scf_tensors)
+        scf_results_sanity_check(self, scf_results)
 
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check dft setup
         dft_sanity_check(self, 'compute')
@@ -167,7 +127,7 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
         # check solvation model setup
         if self.rank == mpi_master():
             assert_msg_critical(
-                'solvation_model' not in scf_tensors,
+                'solvation_model' not in scf_results,
                 type(self).__name__ + ': Solvation model not implemented')
 
         # check print level (verbosity of output)
@@ -188,8 +148,8 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
         self.start_time = tm.time()
 
         if self.rank == mpi_master():
-            orb_ene_a = scf_tensors['E_alpha']
-            orb_ene_b = scf_tensors['E_beta']
+            orb_ene_a = scf_results['E_alpha']
+            orb_ene_b = scf_results['E_beta']
         else:
             orb_ene_a = None
             orb_ene_b = None
@@ -199,25 +159,28 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
 
         norb = orb_ene_a.shape[0]
 
-        nocc_a = molecule.number_of_alpha_electrons()
-        nocc_b = molecule.number_of_beta_electrons()
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+        nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
+
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_unrestricted(
+                nocc_a, nocc_b, norb), 'response space')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_results)
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
         # CPCM information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
 
         # TODO: enable PE
         assert_msg_critical(
-            not self._pe,
-            'LinearResponseUnrestrictedSolver: ' +
+            not self._pe, f'{type(self).__name__}: ' +
             'not yet implemented for polarizable embedding')
 
         # right-hand side (gradient)
@@ -229,17 +192,22 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
         # For now, 'has_external_rhs' is not supported for unrestricted case.
         assert_msg_critical(
             not self.has_external_rhs,
-            'LinearResponseUnrestrictedSolver: ' +
-            'not implemented for external rhs')
+            f'{type(self).__name__}: ' + 'not implemented for external rhs')
 
         sqrt_2 = np.sqrt(2.0)
 
         if not self.has_external_rhs:
-            b_grad_alpha = self.get_prop_grad(self.b_operator, self.b_components,
-                                              molecule, basis, scf_tensors,
+            b_grad_alpha = self.get_prop_grad(self.b_operator,
+                                              self.b_components,
+                                              molecule,
+                                              basis,
+                                              scf_results,
                                               spin='alpha')
-            b_grad_beta = self.get_prop_grad(self.b_operator, self.b_components,
-                                             molecule, basis, scf_tensors,
+            b_grad_beta = self.get_prop_grad(self.b_operator,
+                                             self.b_components,
+                                             molecule,
+                                             basis,
+                                             scf_results,
                                              spin='beta')
 
             # for unrestricted
@@ -248,8 +216,8 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
 
             if self.rank == mpi_master():
                 v_grad = {
-                    (op, w): (va, vb)
-                    for op, va, vb in zip(self.b_components, b_grad_alpha, b_grad_beta)
+                    (op, w): (va, vb) for op, va, vb in zip(
+                        self.b_components, b_grad_alpha, b_grad_beta)
                     for w in self.frequencies
                 }
 
@@ -266,8 +234,8 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
                 self.frequencies.append(w)
 
         precond = {
-            w: self._get_precond((orb_ene_a, orb_ene_b), (nocc_a, nocc_b), norb, w)
-            for w in self.frequencies
+            w: self._get_precond((orb_ene_a, orb_ene_b), (nocc_a, nocc_b), norb,
+                                 w) for w in self.frequencies
         }
 
         # distribute the right-hand side
@@ -307,13 +275,106 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
                                               rsp_vector_labels, molecule,
                                               basis, dft_dict, pe_dict)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file
         if self.restart:
             self._read_checkpoint(rsp_vector_labels)
 
-            # TODO: handle restarting with different frequencies
+            checkpoint_frequencies = self._read_frequencies_from_checkpoint()
+
+            # Note that we only handle the restart with additional frequencies when
+            # `self.nonlinear` is inactive (and also `self.has_external_rhs` for
+            # LR solver)
+
+            # print warning if frequencies is not present in the restart file
+            if checkpoint_frequencies is None and not (self.nonlinear or
+                                                       self.has_external_rhs):
+                self.ostream.print_warning(
+                    'Could not find the frequencies key in the checkpoint file.'
+                )
+                self.ostream.print_blank()
+                self.ostream.print_info(
+                    'Assuming that frequencies is not changed before and after '
+                    + 'the restart.')
+                self.ostream.print_blank()
+                self.ostream.flush()
+
+            # generate necessary initial guesses if more frequencies are requested
+            # in a restart calculation
+            elif not (self.nonlinear or self.has_external_rhs):
+                extra_freqs = []
+                for w in self.frequencies:
+                    if w not in checkpoint_frequencies:
+                        extra_freqs.append(w)
+
+                if extra_freqs:
+                    self.ostream.print_info(
+                        f'Generating initial guesses for {len(extra_freqs)} ' +
+                        'more frequencies...')
+                    self.ostream.print_blank()
+
+                    if self.rank == mpi_master():
+                        extra_v_grad = {
+                            (op, w): (va, vb) for op, va, vb in zip(
+                                self.b_components, b_grad_alpha, b_grad_beta)
+                            for w in extra_freqs
+                        }
+                        extra_op_freq_keys = list(extra_v_grad.keys())
+                    else:
+                        extra_op_freq_keys = None
+                    extra_op_freq_keys = self.comm.bcast(extra_op_freq_keys,
+                                                         root=mpi_master())
+
+                    extra_precond = {
+                        w: self._get_precond((orb_ene_a, orb_ene_b),
+                                             (nocc_a, nocc_b), norb,
+                                             w) for w in extra_freqs
+                    }
+
+                    extra_dist_grad = {}
+                    for key in extra_op_freq_keys:
+                        if self.rank == mpi_master():
+                            gradger_a, gradung_a = self._decomp_grad(
+                                extra_v_grad[key][0])
+                            gradger_b, gradung_b = self._decomp_grad(
+                                extra_v_grad[key][1])
+
+                            grad_mat_a = np.hstack((
+                                gradger_a.reshape(-1, 1),
+                                gradung_a.reshape(-1, 1),
+                            ))
+                            grad_mat_b = np.hstack((
+                                gradger_b.reshape(-1, 1),
+                                gradung_b.reshape(-1, 1),
+                            ))
+
+                            # put alpha and beta together
+                            grad_mat = np.vstack((grad_mat_a, grad_mat_b))
+                        else:
+                            grad_mat = None
+                        extra_dist_grad[key] = DistributedArray(
+                            grad_mat, self.comm)
+
+                    dist_grad.update(extra_dist_grad)
+
+                    bger, bung = self._setup_trials(extra_dist_grad,
+                                                    extra_precond)
+
+                    profiler.set_timing_key('Preparation')
+
+                    self._e2n_half_size(bger,
+                                        bung,
+                                        molecule,
+                                        basis,
+                                        scf_results,
+                                        eri_dict,
+                                        dft_dict,
+                                        pe_dict,
+                                        profiler,
+                                        method_type='unrestricted')
 
         # generate initial guess from scratch
         else:
@@ -321,8 +382,15 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
 
             profiler.set_timing_key('Preparation')
 
-            self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
-                                eri_dict, dft_dict, pe_dict, profiler,
+            self._e2n_half_size(bger,
+                                bung,
+                                molecule,
+                                basis,
+                                scf_results,
+                                eri_dict,
+                                dft_dict,
+                                pe_dict,
+                                profiler,
                                 method_type='unrestricted')
 
         profiler.check_memory_usage('Initial guess')
@@ -417,11 +485,11 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
                     x_full_a = np.hstack((
                         x_full[:n_ov_a],
                         x_full[n_ov_a + n_ov_b:n_ov_a + n_ov_b + n_ov_a],
-                        ))
+                    ))
                     x_full_b = np.hstack((
                         x_full[n_ov_a:n_ov_a + n_ov_b],
                         x_full[n_ov_a + n_ov_b + n_ov_a:],
-                        ))
+                    ))
 
                     xv = (np.dot(x_full_a, v_grad[(op, freq)][0]) +
                           np.dot(x_full_b, v_grad[(op, freq)][1]))
@@ -504,10 +572,18 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
             if self.force_checkpoint:
                 self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                        rsp_vector_labels)
+                self._add_frequencies_to_checkpoint()
 
-            self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
-                                scf_tensors, eri_dict, dft_dict, pe_dict,
-                                profiler, method_type='unrestricted')
+            self._e2n_half_size(new_trials_ger,
+                                new_trials_ung,
+                                molecule,
+                                basis,
+                                scf_results,
+                                eri_dict,
+                                dft_dict,
+                                pe_dict,
+                                profiler,
+                                method_type='unrestricted')
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trial_in_hours = iter_in_hours / n_new_trials
@@ -517,6 +593,7 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
 
         self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                rsp_vector_labels)
+        self._add_frequencies_to_checkpoint()
 
         # converged?
         if self.rank == mpi_master():
@@ -535,11 +612,17 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
 
         # calculate response functions
         if not self.has_external_rhs:
-            a_grad_alpha = self.get_prop_grad(self.a_operator, self.a_components,
-                                              molecule, basis, scf_tensors,
+            a_grad_alpha = self.get_prop_grad(self.a_operator,
+                                              self.a_components,
+                                              molecule,
+                                              basis,
+                                              scf_results,
                                               spin='alpha')
-            a_grad_beta = self.get_prop_grad(self.a_operator, self.a_components,
-                                             molecule, basis, scf_tensors,
+            a_grad_beta = self.get_prop_grad(self.a_operator,
+                                             self.a_components,
+                                             molecule,
+                                             basis,
+                                             scf_results,
                                              spin='beta')
 
             # for unrestricted
@@ -548,9 +631,10 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
 
             if self.is_converged:
                 if self.rank == mpi_master():
-                    v_op_a = {op: (va, vb)
-                              for op, va, vb in zip(
-                                  self.a_components, a_grad_alpha, a_grad_beta)}
+                    v_op_a = {
+                        op: (va, vb) for op, va, vb in zip(
+                            self.a_components, a_grad_alpha, a_grad_beta)
+                    }
                     rsp_funcs = {}
 
                     # final h5 file for response solutions
@@ -569,16 +653,16 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
                         x_alpha = np.hstack((
                             x[:n_ov_a],
                             x[n_ov_a + n_ov_b:n_ov_a + n_ov_b + n_ov_a],
-                            ))
+                        ))
                         x_beta = np.hstack((
                             x[n_ov_a:n_ov_a + n_ov_b],
                             x[n_ov_a + n_ov_b + n_ov_a:],
-                            ))
+                        ))
 
                         for aop in self.a_components:
-                            rsp_funcs[(aop, bop, w)] = (-1.0) * (
-                                np.dot(v_op_a[aop][0], x_alpha) +
-                                np.dot(v_op_a[aop][1], x_beta))
+                            rsp_funcs[(aop, bop, w)] = (
+                                -1.0) * (np.dot(v_op_a[aop][0], x_alpha) +
+                                         np.dot(v_op_a[aop][1], x_beta))
 
                             # Note: flip sign for imaginary a_operator
                             if self.is_imag(self.a_operator):
@@ -591,7 +675,8 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
                                 for aop in self.a_components
                             ]
                             write_rsp_solution_with_multiple_keys(
-                                final_h5_fname, solution_keys, x, self.group_label)
+                                final_h5_fname, solution_keys, x,
+                                self.group_label)
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
@@ -600,6 +685,7 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
                             'Response solution vectors written to file: ' +
                             final_h5_fname)
                         self.ostream.print_blank()
+                        self.ostream.flush()
 
                     self._print_results(rsp_funcs, self.ostream)
 
@@ -612,66 +698,18 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
                         'solutions': solutions,
                     }
                 else:
+                    # non-master rank
                     return {'solutions': solutions}
+            else:
+                # not converged
+                return {}
 
         else:
+            # has_external_rhs
             if self.is_converged:
                 return {'solutions': solutions}
-
-        return None
-
-    @staticmethod
-    def get_full_solution_vector(solution):
-        """
-        Gets a full solution vector from the distributed solution.
-
-        :param solution:
-            The distributed solution as a tuple.
-
-        :return:
-            The full solution vector.
-        """
-
-        x_ger = solution.get_full_vector(0)
-        x_ung = solution.get_full_vector(1)
-
-        if solution.rank == mpi_master():
-            x_ger_full = np.hstack((x_ger, x_ger))
-            x_ung_full = np.hstack((x_ung, -x_ung))
-            return x_ger_full + x_ung_full
-        else:
-            return None
-
-    def _print_iteration(self, relative_residual_norm, xvs):
-        """
-        Prints information of the iteration.
-
-        :param relative_residual_norm:
-            Relative residual norms.
-        :param xvs:
-            A list of tuples containing operator component, frequency, and
-            property.
-        """
-
-        width = 92
-        output_header = '*** Iteration:   {} '.format(self._cur_iter + 1)
-        output_header += '* Residuals (Max,Min): '
-        output_header += '{:.2e} and {:.2e}'.format(
-            max(relative_residual_norm.values()),
-            min(relative_residual_norm.values()))
-        self.ostream.print_header(output_header.ljust(width))
-        self.ostream.print_blank()
-
-        if self.print_level > 1:
-            for op, freq, xv in xvs:
-                ops_label = '<<{};{}>>_{:.4f}'.format(op, op, freq)
-                rel_res = relative_residual_norm[(op, freq)]
-                output_iter = '{:<15s}: {:15.8f} '.format(ops_label, -xv)
-                output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
-                self.ostream.print_header(output_iter.ljust(width))
-            self.ostream.print_blank()
-
-        self.ostream.flush()
+            else:
+                return {}
 
     def _get_precond(self, orb_ene, nocc, norb, w):
         """
@@ -695,8 +733,10 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
 
         # spawning needed components
 
-        ediag_a, sdiag_a = self.construct_ediag_sdiag_half(orb_ene_a, nocc_a, norb)
-        ediag_b, sdiag_b = self.construct_ediag_sdiag_half(orb_ene_b, nocc_b, norb)
+        ediag_a, sdiag_a = self.construct_ediag_sdiag_half(
+            orb_ene_a, nocc_a, norb)
+        ediag_b, sdiag_b = self.construct_ediag_sdiag_half(
+            orb_ene_b, nocc_b, norb)
 
         ediag_a_sq = ediag_a**2
         sdiag_a_sq = sdiag_a**2
@@ -727,106 +767,3 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
         p_mat = np.vstack((p_mat_alpha, p_mat_beta))
 
         return DistributedArray(p_mat, self.comm)
-
-    def _preconditioning(self, precond, v_in):
-        """
-        Applies preconditioner to a tuple of distributed trial vectors.
-
-        :param precond:
-            The preconditioner.
-        :param v_in:
-            The input trial vectors.
-
-        :return:
-            A tuple of distributed trial vectors after preconditioning.
-        """
-
-        pa = precond.data[:, 0]
-        pb = precond.data[:, 1]
-
-        v_in_rg = v_in.data[:, 0]
-        v_in_ru = v_in.data[:, 1]
-
-        v_out_rg = pa * v_in_rg + pb * v_in_ru
-        v_out_ru = pb * v_in_rg + pa * v_in_ru
-
-        v_mat = np.hstack((
-            v_out_rg.reshape(-1, 1),
-            v_out_ru.reshape(-1, 1),
-        ))
-
-        return DistributedArray(v_mat, self.comm, distribute=False)
-
-    def _precond_trials(self, vectors, precond):
-        """
-        Applies preconditioner to distributed trial vectors.
-
-        :param vectors:
-            The set of vectors.
-        :param precond:
-            The preconditioner.
-
-        :return:
-            The preconditioned gerade and ungerade trial vectors.
-        """
-
-        trials_ger = []
-        trials_ung = []
-
-        for (op, w), vec in vectors.items():
-            v = self._preconditioning(precond[w], vec)
-            norms_2 = 2.0 * v.squared_norm(axis=0)
-            vn = np.sqrt(np.sum(norms_2))
-
-            if vn > self.norm_thresh:
-                norms = np.sqrt(norms_2)
-                # gerade
-                if norms[0] > self.norm_thresh:
-                    trials_ger.append(v.data[:, 0])
-                # ungerade
-                if norms[1] > self.norm_thresh:
-                    trials_ung.append(v.data[:, 1])
-
-        new_ger = np.array(trials_ger).T
-        new_ung = np.array(trials_ung).T
-
-        dist_new_ger = DistributedArray(new_ger, self.comm, distribute=False)
-        dist_new_ung = DistributedArray(new_ung, self.comm, distribute=False)
-
-        return dist_new_ger, dist_new_ung
-
-    def _print_results(self, rsp_funcs, ostream):
-        """
-        Prints polarizability to output stream.
-
-        :param rsp_funcs:
-            The response functions.
-        :param ostream:
-            The output stream.
-        """
-
-        width = 92
-
-        dipole_ops = ['dipole', 'electric dipole', 'electric_dipole']
-
-        if self.a_operator in dipole_ops and self.b_operator in dipole_ops:
-
-            for w in self.frequencies:
-                w_str = 'Polarizability (w={:.4f})'.format(w)
-                ostream.print_header(w_str.ljust(width))
-                ostream.print_header(('-' * len(w_str)).ljust(width))
-
-                valstr = '{:<5s}'.format('')
-                for b in self.b_components:
-                    valstr += '{:>15s}'.format(b.upper())
-                ostream.print_header(valstr.ljust(width))
-
-                for a in self.a_components:
-                    valstr = '{:<5s}'.format(a.upper())
-                    for b in self.b_components:
-                        prop = -rsp_funcs[(a, b, w)]
-                        valstr += '{:15.8f}'.format(prop)
-                    ostream.print_header(valstr.ljust(width))
-                ostream.print_blank()
-
-        ostream.flush()

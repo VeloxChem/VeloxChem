@@ -30,11 +30,14 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from mpi4py import MPI
+from pathlib import Path
 from datetime import datetime
 import numpy as np
 import time as tm
 import math
 import sys
+import h5py
 
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import MolecularGrid, XCIntegrator
@@ -53,11 +56,13 @@ from .oneeints import (compute_electric_dipole_integrals,
                        compute_quadrupole_integrals,
                        compute_linear_momentum_integrals,
                        compute_angular_momentum_integrals)
-from .sanitychecks import (dft_sanity_check, pe_sanity_check,
+from .sanitychecks import (dft_sanity_check, ri_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
-                          get_random_string_parallel)
+                          get_random_string_parallel, unparse_input,
+                          write_unparsed_input_to_hdf5,
+                          read_unparsed_input_from_hdf5)
 from .dftutils import get_default_grid_level, print_xc_reference
 from .checkpoint import write_rsp_hdf5
 from .batchsize import get_batch_size
@@ -124,7 +129,9 @@ class LinearSolver:
 
         # RI-J
         self.ri_coulomb = False
+        self.ri_jk = False
         self.ri_auxiliary_basis = 'def2-universal-jfit'
+        self.ri_metric_threshold = 1.0e-12
         self._ri_drv = None
 
         # dft
@@ -344,9 +351,7 @@ class LinearSolver:
         if method_dict is None:
             method_dict = {}
 
-        rsp_keywords = {
-            key: val[0] for key, val in self._input_keywords['response'].items()
-        }
+        rsp_keywords = self._get_response_keywords()
 
         parse_input(self, rsp_keywords, rsp_dict)
 
@@ -357,12 +362,11 @@ class LinearSolver:
             if 'checkpoint_file' not in rsp_dict:
                 self.checkpoint_file = f'{self.filename}_rsp.h5'
 
-        method_keywords = {
-            key: val[0]
-            for key, val in self._input_keywords['method_settings'].items()
-        }
+        method_keywords = self._get_method_keywords()
 
         parse_input(self, method_keywords, method_dict)
+
+        ri_sanity_check(self)
 
         dft_sanity_check(self, 'update_settings')
 
@@ -386,6 +390,142 @@ class LinearSolver:
             # field
             self.restart = False
 
+    def _get_response_keywords(self):
+        """
+        Gets response keyword types.
+
+        :return:
+            The response keyword types.
+        """
+
+        return {
+            key: val[0] for key, val in self._input_keywords['response'].items()
+        }
+
+    def _get_method_keywords(self):
+        """
+        Gets method keyword types.
+
+        :return:
+            The method keyword types.
+        """
+
+        return {
+            key: val[0]
+            for key, val in self._input_keywords['method_settings'].items()
+        }
+
+    def read_settings(self, checkpoint_file):
+        """
+        Reads response and method settings from checkpoint file.
+
+        :param checkpoint_file:
+            The checkpoint file to read settings from.
+        """
+
+        if self.rank == mpi_master():
+            checkpoint_rsp_input = read_unparsed_input_from_hdf5(
+                checkpoint_file, group_name='response_settings')
+            checkpoint_method_input = read_unparsed_input_from_hdf5(
+                checkpoint_file, group_name='method_settings')
+        else:
+            checkpoint_rsp_input = None
+            checkpoint_method_input = None
+
+        checkpoint_rsp_input = self.comm.bcast(checkpoint_rsp_input,
+                                               root=mpi_master())
+        checkpoint_method_input = self.comm.bcast(checkpoint_method_input,
+                                                  root=mpi_master())
+
+        # Avoid importing restart state or checkpoint/output targets when
+        # copying settings from an external file.
+        checkpoint_rsp_input.pop('restart', None)
+        checkpoint_rsp_input.pop('checkpoint_file', None)
+        checkpoint_rsp_input.pop('filename', None)
+
+        self.update_settings(checkpoint_rsp_input, checkpoint_method_input)
+
+    def _write_settings_to_checkpoint(self, checkpoint_file=None):
+        """
+        Writes response and method settings to checkpoint file.
+
+        :param checkpoint_file:
+            The checkpoint file name.
+        """
+
+        if checkpoint_file is None:
+            checkpoint_file = self.checkpoint_file
+
+        if checkpoint_file is None:
+            return
+
+        if self.rank == mpi_master():
+            write_unparsed_input_to_hdf5(checkpoint_file,
+                                         unparse_input(
+                                             self,
+                                             self._get_response_keywords()),
+                                         group_name='response_settings')
+            write_unparsed_input_to_hdf5(checkpoint_file,
+                                         unparse_input(
+                                             self, self._get_method_keywords()),
+                                         group_name='method_settings')
+
+    def match_settings(self, checkpoint_file):
+        """
+        Checks whether response and method settings match a checkpoint file.
+
+        Missing settings groups are treated as a match for backward
+        compatibility.
+
+        :param checkpoint_file:
+            The checkpoint file to validate.
+
+        :return:
+            True if settings match or are unavailable, False otherwise.
+        """
+
+        valid_checkpoint = (checkpoint_file and
+                            isinstance(checkpoint_file, str) and
+                            Path(checkpoint_file).is_file())
+
+        if not valid_checkpoint:
+            return False
+
+        # Avoid comparing:
+        # 1) restart state or checkpoint/output targets
+        # 2) nstates or frequencies (to allow restarting with more states/frequencies)
+        # 3) print_level (can differ between input-file and python script)
+        # 4) tamm_dancoff (not needed since rsp_vector_labels are different)
+        excluded_rsp_keys = {
+            'restart',
+            'filename',
+            'checkpoint_file',
+            'nstates',
+            'frequencies',
+            'print_level',
+            'tamm_dancoff',
+        }
+
+        # for backward compatibility
+        with h5py.File(checkpoint_file, 'r') as h5f:
+            if ('response_settings' not in h5f or 'method_settings' not in h5f):
+                return True
+
+        checkpoint_rsp_input = read_unparsed_input_from_hdf5(
+            checkpoint_file, group_name='response_settings')
+        checkpoint_method_input = read_unparsed_input_from_hdf5(
+            checkpoint_file, group_name='method_settings')
+
+        current_rsp_input = unparse_input(self, self._get_response_keywords())
+        current_method_input = unparse_input(self, self._get_method_keywords())
+
+        for key in excluded_rsp_keys:
+            checkpoint_rsp_input.pop(key, None)
+            current_rsp_input.pop(key, None)
+
+        return (checkpoint_rsp_input == current_rsp_input and
+                checkpoint_method_input == current_method_input)
+
     def _init_eri(self, molecule, basis):
         """
         Initializes ERI.
@@ -398,6 +538,11 @@ class LinearSolver:
         :return:
             The dictionary of ERI information.
         """
+
+        # TODO: enable RI-JK
+        assert_msg_critical(
+            not self.ri_jk,
+            f'{type(self).__name__}.compute: RI-JK is not yet supported')
 
         if self.rank == mpi_master():
             screening = T4CScreener()
@@ -417,13 +562,13 @@ class LinearSolver:
             'screening': screening,
         }
 
-    def _init_dft(self, molecule, scf_tensors, silent=False):
+    def _init_dft(self, molecule, scf_results, silent=False):
         """
         Initializes DFT.
 
         :param molecule:
             The molecule.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -451,11 +596,11 @@ class LinearSolver:
 
             if self.rank == mpi_master():
                 # Note: make gs_density a tuple
-                if scf_tensors['scf_type'] == 'restricted':
-                    gs_density = (scf_tensors['D_alpha'].copy(),)
+                if scf_results['scf_type'] == 'restricted':
+                    gs_density = (scf_results['D_alpha'].copy(),)
                 else:
-                    gs_density = (scf_tensors['D_alpha'].copy(),
-                                  scf_tensors['D_beta'].copy())
+                    gs_density = (scf_results['D_alpha'].copy(),
+                                  scf_results['D_beta'].copy())
             else:
                 gs_density = None
             # TODO: bcast D_alpha and D_beta separately
@@ -473,7 +618,7 @@ class LinearSolver:
             'dft_func_label': dft_func_label,
         }
 
-    def _init_pe(self, molecule, basis):
+    def _init_pe(self, molecule, basis, silent=False):
         """
         Initializes polarizable embedding.
 
@@ -502,10 +647,11 @@ class LinearSolver:
 
             # TODO: print PyFraME info
 
-            pot_info = 'Reading polarizable embedding: {}'.format(
-                self.pe_options['potfile'])
-            self.ostream.print_info(pot_info)
-            self.ostream.print_blank()
+            if not silent:
+                pot_info = 'Reading polarizable embedding: {}'.format(
+                    self.pe_options['potfile'])
+                self.ostream.print_info(pot_info)
+                self.ostream.print_blank()
 
             with open(str(self.pe_options['potfile']), 'r') as f_pot:
                 potfile_text = '\n'.join(f_pot.readlines())
@@ -516,12 +662,14 @@ class LinearSolver:
             'potfile_text': potfile_text,
         }
 
-    def _init_cpcm(self, molecule):
+    def _init_cpcm(self, molecule, basis):
         """
         Initializes C-PCM.
 
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
         """
 
         # C-PCM setup
@@ -538,7 +686,7 @@ class LinearSolver:
 
             cpcm_grid_t0 = tm.time()
 
-            self.cpcm_drv.init(molecule, do_nuclear=False)
+            self.cpcm_drv.init(molecule, basis, do_nuclear=False)
 
             if self.print_level > 1:
                 self.ostream.print_info(
@@ -646,7 +794,198 @@ class LinearSolver:
         else:
             self._dist_fock_ung.append(fock_ung, axis=1)
 
-    def compute(self, molecule, basis, scf_tensors, v_grad=None):
+    def _clear_subspace_data(self):
+        """
+        Clears stored reduced-space trial, sigma, and nonlinear Fock data.
+        """
+
+        self._dist_bger = None
+        self._dist_bung = None
+        self._dist_e2bger = None
+        self._dist_e2bung = None
+
+        self._dist_fock_ger = None
+        self._dist_fock_ung = None
+
+    def _get_initial_guess_size_for_excitations(self, nstates):
+        """
+        Gets the initial guess size for initial excitations.
+
+        :param nstates:
+            The number of states requested.
+        :return:
+            The size of the initial guess.
+        """
+
+        # For RPA/TDA
+
+        if nstates <= self.guess_scaling_threshold:
+            # small nstates: guess size increases as multiple of nstates
+            return nstates * self.initial_guess_multiplier
+        else:
+            # large nstates: guess size increases as 1x nstates
+            return (
+                self.guess_scaling_threshold * self.initial_guess_multiplier +
+                (nstates - self.guess_scaling_threshold))
+
+    def _get_excitation_space_dimension_restricted(self, nocc, norb):
+        """
+        Gets the excitation-space dimension for restricted methods.
+
+        :param nocc:
+            Number of occupied orbitals.
+        :param norb:
+            Number of orbitals.
+
+        :return:
+            The excitation-space dimension.
+        """
+
+        if getattr(self, 'core_excitation', False):
+            return self.num_core_orbitals * (norb - nocc)
+
+        if getattr(self, 'restricted_subspace', False):
+            return ((self.num_core_orbitals + self.num_valence_orbitals) *
+                    self.num_virtual_orbitals)
+
+        return nocc * (norb - nocc)
+
+    def _get_excitation_space_dimension_unrestricted(self, nocc_a, nocc_b,
+                                                     norb):
+        """
+        Gets the excitation-space dimension for unrestricted methods.
+
+        :param nocc_a:
+            Number of alpha occupied orbitals.
+        :param nocc_b:
+            Number of beta occupied orbitals.
+        :param norb:
+            Number of orbitals.
+
+        :return:
+            The excitation-space dimension.
+        """
+
+        if getattr(self, 'core_excitation', False):
+            return (self.num_core_orbitals * (norb - nocc_a) +
+                    self.num_core_orbitals * (norb - nocc_b))
+
+        return (nocc_a * (norb - nocc_a) + nocc_b * (norb - nocc_b))
+
+    def _check_mpi_oversubscription(self, dimension, label):
+        """
+        Fails fast if the distributed space would assign zero rows to one or
+        more MPI ranks.
+
+        :param dimension:
+            The number of distributed rows.
+        :param label:
+            A short label for the distributed space.
+        """
+
+        assert_msg_critical(
+            dimension > 0,
+            f'{type(self).__name__}: invalid {label} dimension')
+        assert_msg_critical(
+            self.nodes <= dimension,
+            f'{type(self).__name__}: {self.nodes} MPI ranks exceed the '
+            f'{label} dimension ({dimension}). Please use at most {dimension} '
+            + 'MPI ranks for this calculation.')
+
+    def _add_nstates_to_checkpoint(self):
+        """
+        Add nstates to checkpoint file.
+        """
+
+        # For RPA/TDA
+
+        if self.checkpoint_file is None:
+            return
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'a')
+            key = 'nstates'
+            if key in hf:
+                del hf[key]
+            hf.create_dataset(key, data=np.array([self.nstates]))
+            hf.close()
+
+        self.comm.barrier()
+
+    def _read_nstates_from_checkpoint(self):
+        """
+        Read nstates from checkpoint file.
+
+        :return:
+            The number of excited states.
+        """
+
+        # For RPA/TDA
+
+        if self.checkpoint_file is None:
+            return None
+
+        nstates = None
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'r')
+            key = 'nstates'
+            if key in hf:
+                nstates = np.array(hf.get(key))[0]
+            hf.close()
+
+        nstates = self.comm.bcast(nstates, root=mpi_master())
+
+        return nstates
+
+    def _add_frequencies_to_checkpoint(self):
+        """
+        Add frequencies to checkpoint file.
+        """
+
+        # For LR/CPP
+
+        if self.checkpoint_file is None:
+            return
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'a')
+            key = 'frequencies'
+            if key in hf:
+                del hf[key]
+            hf.create_dataset(key, data=np.array(self.frequencies))
+            hf.close()
+
+        self.comm.barrier()
+
+    def _read_frequencies_from_checkpoint(self):
+        """
+        Read frequencies from checkpoint file.
+
+        :return:
+            The frequencies.
+        """
+
+        # For LR/CPP
+
+        if self.checkpoint_file is None:
+            return None
+
+        frequencies = None
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'r')
+            key = 'frequencies'
+            if key in hf:
+                frequencies = np.array(hf.get(key))
+                frequencies = [float(x) for x in frequencies]
+            hf.close()
+
+        frequencies = self.comm.bcast(frequencies, root=mpi_master())
+
+        return frequencies
+
+    def compute(self, molecule, basis, scf_results, v_grad=None):
         """
         Solves for the linear equations.
 
@@ -654,7 +993,7 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param v_grad:
             The gradients on the right-hand side. If not provided, v_grad will
@@ -671,7 +1010,7 @@ class LinearSolver:
                        vecs_ung,
                        molecule,
                        basis,
-                       scf_tensors,
+                       scf_results,
                        eri_dict,
                        dft_dict,
                        pe_dict,
@@ -690,7 +1029,7 @@ class LinearSolver:
         if self.use_subcomms:
             if method_type == 'restricted':
                 self._e2n_half_size_subcomms(vecs_ger, vecs_ung, molecule,
-                                             basis, scf_tensors, eri_dict,
+                                             basis, scf_results, eri_dict,
                                              dft_dict, pe_dict, profiler)
             else:
                 # TODO: enable subcomms for unrestricted
@@ -700,11 +1039,11 @@ class LinearSolver:
         else:
             if method_type == 'restricted':
                 self._e2n_half_size_single_comm(vecs_ger, vecs_ung, molecule,
-                                                basis, scf_tensors, eri_dict,
+                                                basis, scf_results, eri_dict,
                                                 dft_dict, pe_dict, profiler)
             else:
                 self._e2n_half_size_single_comm_unrestricted(
-                    vecs_ger, vecs_ung, molecule, basis, scf_tensors, eri_dict,
+                    vecs_ger, vecs_ung, molecule, basis, scf_results, eri_dict,
                     dft_dict, pe_dict, profiler)
 
     def _e2n_half_size_subcomms(self,
@@ -712,7 +1051,7 @@ class LinearSolver:
                                 vecs_ung,
                                 molecule,
                                 basis,
-                                scf_tensors,
+                                scf_results,
                                 eri_dict,
                                 dft_dict,
                                 pe_dict,
@@ -728,7 +1067,7 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param eri_dict:
             The dictionary containing ERI information.
@@ -767,10 +1106,10 @@ class LinearSolver:
                 'LinearSolver._e2n_half_size: '
                 'inconsistent shape of trial vectors')
 
-            mo = scf_tensors['C_alpha']
-            fa = scf_tensors['F_alpha']
+            mo = scf_results['C_alpha']
+            fa = scf_results['F_alpha']
 
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             norb = mo.shape[1]
 
             if getattr(self, 'core_excitation', False):
@@ -778,6 +1117,14 @@ class LinearSolver:
                     range(nocc, norb))
                 mo_core_exc = mo[:, core_exc_orb_inds]
                 fa_mo = np.linalg.multi_dot([mo_core_exc.T, fa, mo_core_exc])
+            elif getattr(self, 'restricted_subspace', False):
+                core_val_exc_inds = (
+                    list(range(self.num_core_orbitals)) +
+                    list(range(nocc - self.num_valence_orbitals, nocc)) +
+                    list(range(nocc, nocc + self.num_virtual_orbitals)))
+                mo_core_val_exc = mo[:, core_val_exc_inds]
+                fa_mo = np.linalg.multi_dot(
+                    [mo_core_val_exc.T, fa, mo_core_val_exc])
             else:
                 fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
 
@@ -978,6 +1325,22 @@ class LinearSolver:
                         mo_core_exc = mo[:, core_exc_orb_inds]
                         dak = np.linalg.multi_dot(
                             [mo_core_exc, dak, mo_core_exc.T])
+                    elif getattr(self, 'restricted_subspace', False):
+                        kn = self.lrvec2mat(vec, nocc, norb,
+                                            self.num_core_orbitals,
+                                            self.num_valence_orbitals,
+                                            self.num_virtual_orbitals)
+                        dak = self.commut_mo_density(kn, nocc,
+                                                     self.num_core_orbitals,
+                                                     self.num_valence_orbitals,
+                                                     self.num_virtual_orbitals)
+                        core_val_exc_inds = (
+                            list(range(self.num_core_orbitals)) + list(
+                                range(nocc - self.num_valence_orbitals, nocc)) +
+                            list(range(nocc, nocc + self.num_virtual_orbitals)))
+                        mo_core_val_exc = mo[:, core_val_exc_inds]
+                        dak = np.linalg.multi_dot(
+                            [mo_core_val_exc, dak, mo_core_val_exc.T])
                     else:
                         kn = self.lrvec2mat(vec, nocc, norb)
                         dak = self.commut_mo_density(kn, nocc)
@@ -1052,6 +1415,17 @@ class LinearSolver:
                             mo_core_exc = mo[:, core_exc_orb_inds]
                             fak_mo = np.linalg.multi_dot(
                                 [mo_core_exc.T, fak, mo_core_exc])
+                        elif getattr(self, 'restricted_subspace', False):
+                            core_val_exc_inds = (
+                                list(range(self.num_core_orbitals)) + list(
+                                    range(nocc - self.num_valence_orbitals,
+                                          nocc)) +
+                                list(
+                                    range(nocc,
+                                          nocc + self.num_virtual_orbitals)))
+                            mo_core_val_exc = mo[:, core_val_exc_inds]
+                            fak_mo = np.linalg.multi_dot(
+                                [mo_core_val_exc.T, fak, mo_core_val_exc])
                         else:
                             fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
 
@@ -1065,6 +1439,15 @@ class LinearSolver:
                             gmo_vec_halfsize = self.lrmat2vec(
                                 gmo, nocc, norb,
                                 self.num_core_orbitals)[:half_size]
+                        elif getattr(self, 'restricted_subspace', False):
+                            gmo = -self.commut_mo_density(
+                                fat_mo, nocc, self.num_core_orbitals,
+                                self.num_valence_orbitals,
+                                self.num_virtual_orbitals)
+                            gmo_vec_halfsize = self.lrmat2vec(
+                                gmo, nocc, norb, self.num_core_orbitals,
+                                self.num_valence_orbitals,
+                                self.num_virtual_orbitals)[:half_size]
                         else:
                             gmo = -self.commut_mo_density(fat_mo, nocc)
                             gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
@@ -1173,7 +1556,7 @@ class LinearSolver:
                                    vecs_ung,
                                    molecule,
                                    basis,
-                                   scf_tensors,
+                                   scf_results,
                                    eri_dict,
                                    dft_dict,
                                    pe_dict,
@@ -1189,7 +1572,7 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param eri_dict:
             The dictionary containing ERI information.
@@ -1226,10 +1609,10 @@ class LinearSolver:
                 'LinearSolver._e2n_half_size: '
                 'inconsistent shape of trial vectors')
 
-            mo = scf_tensors['C_alpha']
-            fa = scf_tensors['F_alpha']
+            mo = scf_results['C_alpha']
+            fa = scf_results['F_alpha']
 
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             norb = mo.shape[1]
 
             if getattr(self, 'core_excitation', False):
@@ -1237,6 +1620,14 @@ class LinearSolver:
                     range(nocc, norb))
                 mo_core_exc = mo[:, core_exc_orb_inds]
                 fa_mo = np.linalg.multi_dot([mo_core_exc.T, fa, mo_core_exc])
+            elif getattr(self, 'restricted_subspace', False):
+                core_val_exc_inds = (
+                    list(range(self.num_core_orbitals)) +
+                    list(range(nocc - self.num_valence_orbitals, nocc)) +
+                    list(range(nocc, nocc + self.num_virtual_orbitals)))
+                mo_core_val_exc = mo[:, core_val_exc_inds]
+                fa_mo = np.linalg.multi_dot(
+                    [mo_core_val_exc.T, fa, mo_core_val_exc])
             else:
                 fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
 
@@ -1340,6 +1731,22 @@ class LinearSolver:
                         mo_core_exc = mo[:, core_exc_orb_inds]
                         dak = np.linalg.multi_dot(
                             [mo_core_exc, dak, mo_core_exc.T])
+                    elif getattr(self, 'restricted_subspace', False):
+                        kn = self.lrvec2mat(vec, nocc, norb,
+                                            self.num_core_orbitals,
+                                            self.num_valence_orbitals,
+                                            self.num_virtual_orbitals)
+                        dak = self.commut_mo_density(kn, nocc,
+                                                     self.num_core_orbitals,
+                                                     self.num_valence_orbitals,
+                                                     self.num_virtual_orbitals)
+                        core_val_exc_inds = (
+                            list(range(self.num_core_orbitals)) + list(
+                                range(nocc - self.num_valence_orbitals, nocc)) +
+                            list(range(nocc, nocc + self.num_virtual_orbitals)))
+                        mo_core_val_exc = mo[:, core_val_exc_inds]
+                        dak = np.linalg.multi_dot(
+                            [mo_core_val_exc, dak, mo_core_val_exc.T])
                     else:
                         kn = self.lrvec2mat(vec, nocc, norb)
                         dak = self.commut_mo_density(kn, nocc)
@@ -1417,6 +1824,16 @@ class LinearSolver:
                         mo_core_exc = mo[:, core_exc_orb_inds]
                         fak_mo = np.linalg.multi_dot(
                             [mo_core_exc.T, fak, mo_core_exc])
+                        self.test_fock = fak_mo
+                    elif getattr(self, 'restricted_subspace', False):
+                        core_val_exc_inds = (
+                            list(range(self.num_core_orbitals)) + list(
+                                range(nocc - self.num_valence_orbitals, nocc)) +
+                            list(range(nocc, nocc + self.num_virtual_orbitals)))
+                        mo_core_val_exc = mo[:, core_val_exc_inds]
+                        fak_mo = np.linalg.multi_dot(
+                            [mo_core_val_exc.T, fak, mo_core_val_exc])
+                        self.test_fock = fak_mo
                     else:
                         fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
 
@@ -1429,6 +1846,15 @@ class LinearSolver:
                                                       self.num_core_orbitals)
                         gmo_vec_halfsize = self.lrmat2vec(
                             gmo, nocc, norb, self.num_core_orbitals)[:half_size]
+                    elif getattr(self, 'restricted_subspace', False):
+                        gmo = -self.commut_mo_density(fat_mo, nocc,
+                                                      self.num_core_orbitals,
+                                                      self.num_valence_orbitals,
+                                                      self.num_virtual_orbitals)
+                        gmo_vec_halfsize = self.lrmat2vec(
+                            gmo, nocc, norb, self.num_core_orbitals,
+                            self.num_valence_orbitals,
+                            self.num_virtual_orbitals)[:half_size]
                     else:
                         gmo = -self.commut_mo_density(fat_mo, nocc)
                         gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
@@ -1776,6 +2202,9 @@ class LinearSolver:
                 den_mat_for_ri_j.set_values(0.5 * (dens_Jab + dens_Jab.T))
 
                 fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
+
+                fock_mat_a_np = fock_mat.to_numpy()
+                fock_mat_b_np = fock_mat.to_numpy()
             else:
                 # for now we calculate Ka, Kb and Jab separately for open-shell
                 den_mat_for_Ka = make_matrix(basis, mat_t.general)
@@ -1897,7 +2326,7 @@ class LinearSolver:
                                                 vecs_ung,
                                                 molecule,
                                                 basis,
-                                                scf_tensors,
+                                                scf_results,
                                                 eri_dict,
                                                 dft_dict,
                                                 pe_dict,
@@ -1913,7 +2342,7 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param eri_dict:
             The dictionary containing ERI information.
@@ -1950,14 +2379,14 @@ class LinearSolver:
                 'LinearSolver._e2n_half_size: '
                 'inconsistent shape of trial vectors')
 
-            mo_a = scf_tensors['C_alpha']
-            mo_b = scf_tensors['C_beta']
+            mo_a = scf_results['C_alpha']
+            mo_b = scf_results['C_beta']
 
-            fa = scf_tensors['F_alpha']
-            fb = scf_tensors['F_beta']
+            fa = scf_results['F_alpha']
+            fb = scf_results['F_beta']
 
-            nocc_a = molecule.number_of_alpha_electrons()
-            nocc_b = molecule.number_of_beta_electrons()
+            nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+            nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
 
             norb = mo_a.shape[1]
 
@@ -2368,6 +2797,8 @@ class LinearSolver:
         success = self.comm.bcast(success, root=mpi_master())
 
         if success:
+            self._write_settings_to_checkpoint(self.checkpoint_file)
+
             if self.nonlinear:
                 dist_arrays = [
                     self._dist_bger, self._dist_bung, self._dist_e2bger,
@@ -2521,7 +2952,7 @@ class LinearSolver:
             cur_str += f'{self.cpcm_epsilon}'
             self.ostream.print_header(cur_str.ljust(str_width))
             if self.non_equilibrium_solv:
-                cur_str = 'C-PCM Optical Dielectric Constant: '
+                cur_str = 'C-PCM Optical Dielectric Const. : '
                 cur_str += f'{self.cpcm_optical_epsilon}'
                 self.ostream.print_header(cur_str.ljust(str_width))
 
@@ -2650,6 +3081,11 @@ class LinearSolver:
 
         dist_new_ger, dist_new_ung = self._precond_trials(vectors, precond)
 
+        if self.rank == mpi_master():
+            assert_msg_critical(
+                dist_new_ger.data.size > 0 or dist_new_ung.data.size > 0,
+                'LinearSolver: trial vectors are empty')
+
         if dist_new_ger.data.size == 0:
             dist_new_ger.data = np.zeros((dist_new_ung.shape(0), 0))
 
@@ -2669,24 +3105,25 @@ class LinearSolver:
             dist_new_ung.data -= dist_new_ung_proj.data
 
         if renormalize:
-            if dist_new_ger.data.ndim > 0 and dist_new_ger.shape(0) > 0:
+            has_global_ger_rows = self.comm.allreduce(
+                int(dist_new_ger.data.ndim > 0 and dist_new_ger.shape(0) > 0),
+                op=MPI.SUM) > 0
+            if has_global_ger_rows:
                 dist_new_ger = self._remove_linear_dependence_half_size(
                     dist_new_ger, self.lindep_thresh)
                 dist_new_ger = self._orthogonalize_gram_schmidt_half_size(
                     dist_new_ger)
                 dist_new_ger = self._normalize_half_size(dist_new_ger)
 
-            if dist_new_ung.data.ndim > 0 and dist_new_ung.shape(0) > 0:
+            has_global_ung_rows = self.comm.allreduce(
+                int(dist_new_ung.data.ndim > 0 and dist_new_ung.shape(0) > 0),
+                op=MPI.SUM) > 0
+            if has_global_ung_rows:
                 dist_new_ung = self._remove_linear_dependence_half_size(
                     dist_new_ung, self.lindep_thresh)
                 dist_new_ung = self._orthogonalize_gram_schmidt_half_size(
                     dist_new_ung)
                 dist_new_ung = self._normalize_half_size(dist_new_ung)
-
-        if self.rank == mpi_master():
-            assert_msg_critical(
-                dist_new_ger.data.size > 0 or dist_new_ung.data.size > 0,
-                'LinearSolver: trial vectors are empty')
 
         return dist_new_ger, dist_new_ung
 
@@ -2695,7 +3132,7 @@ class LinearSolver:
                       components,
                       molecule,
                       basis,
-                      scf_tensors,
+                      scf_results,
                       spin='alpha'):
         """
         Computes property gradients for linear response equations.
@@ -2708,7 +3145,7 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -2787,11 +3224,11 @@ class LinearSolver:
             integral_comps = [integrals[p] for p in components]
 
             if spin == 'alpha':
-                mo = scf_tensors['C_alpha']
-                nocc = molecule.number_of_alpha_electrons()
+                mo = scf_results['C_alpha']
+                nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             elif spin == 'beta':
-                mo = scf_tensors['C_beta']
-                nocc = molecule.number_of_beta_electrons()
+                mo = scf_results['C_beta']
+                nocc = molecule.number_of_beta_occupied_orbitals(basis)
             norb = mo.shape[1]
 
             factor = np.sqrt(2.0)
@@ -2808,6 +3245,24 @@ class LinearSolver:
                 gradients = tuple(
                     self.lrmat2vec(m, nocc, norb, self.num_core_orbitals)
                     for m in matrices)
+            elif getattr(self, 'restricted_subspace', False):
+                core_val_exc_inds = (
+                    list(range(self.num_core_orbitals)) +
+                    list(range(nocc - self.num_valence_orbitals, nocc)) +
+                    list(range(nocc, nocc + self.num_virtual_orbitals)))
+                mo_core_val_exc = mo[:, core_val_exc_inds]
+                matrices = [
+                    factor * (-1.0) * self.commut_mo_density(
+                        np.linalg.multi_dot([
+                            mo_core_val_exc.T, P, mo_core_val_exc
+                        ]), nocc, self.num_core_orbitals,
+                        self.num_valence_orbitals, self.num_virtual_orbitals)
+                    for P in integral_comps
+                ]
+                gradients = tuple(
+                    self.lrmat2vec(m, nocc, norb, self.num_core_orbitals,
+                                   self.num_valence_orbitals,
+                                   self.num_virtual_orbitals) for m in matrices)
             else:
                 matrices = [
                     factor * (-1.0) * self.commut_mo_density(
@@ -2822,8 +3277,13 @@ class LinearSolver:
         else:
             return tuple()
 
-    def get_complex_prop_grad(self, operator, components, molecule, basis,
-                              scf_tensors):
+    def get_complex_prop_grad(self,
+                              operator,
+                              components,
+                              molecule,
+                              basis,
+                              scf_results,
+                              spin='alpha'):
         """
         Computes complex property gradients for linear response equations.
 
@@ -2835,7 +3295,7 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -2915,8 +3375,12 @@ class LinearSolver:
         if self.rank == mpi_master():
             integral_comps = [integrals[p] for p in components]
 
-            mo = scf_tensors['C_alpha']
-            nocc = molecule.number_of_alpha_electrons()
+            if spin == 'alpha':
+                mo = scf_results['C_alpha']
+                nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+            elif spin == 'beta':
+                mo = scf_results['C_beta']
+                nocc = molecule.number_of_beta_occupied_orbitals(basis)
             norb = mo.shape[1]
 
             factor = np.sqrt(2.0)
@@ -2933,7 +3397,11 @@ class LinearSolver:
             return tuple()
 
     @staticmethod
-    def commut_mo_density(A, nocc, num_core_orbitals=None):
+    def commut_mo_density(A,
+                          nocc,
+                          num_core_orbitals=None,
+                          num_valence_orbitals=None,
+                          num_vir_orbitals=None):
         """
         Commutes matrix A and MO density
 
@@ -2951,11 +3419,22 @@ class LinearSolver:
 
         mat = np.zeros(A.shape, dtype=A.dtype)
 
-        if num_core_orbitals is not None and num_core_orbitals > 0:
+        if (num_core_orbitals is not None and
+            (None in (num_valence_orbitals, num_vir_orbitals)) and
+                num_core_orbitals > 0):
             mat[:num_core_orbitals,
                 num_core_orbitals:] = -A[:num_core_orbitals, num_core_orbitals:]
             mat[num_core_orbitals:, :num_core_orbitals] = A[
                 num_core_orbitals:, :num_core_orbitals]
+
+        elif ((None not in (num_core_orbitals, num_valence_orbitals,
+                            num_vir_orbitals)) and
+              num_core_orbitals + num_valence_orbitals > 0):
+            num_core_val_orbs = num_core_orbitals + num_valence_orbitals
+            mat[:num_core_val_orbs,
+                num_core_val_orbs:] = -A[:num_core_val_orbs, num_core_val_orbs:]
+            mat[num_core_val_orbs:, :num_core_val_orbs] = A[
+                num_core_val_orbs:, :num_core_val_orbs]
 
         else:
             mat[:nocc, nocc:] = -A[:nocc, nocc:]
@@ -2980,7 +3459,12 @@ class LinearSolver:
         return np.matmul(A, B) - np.matmul(B, A)
 
     @staticmethod
-    def lrvec2mat(vec, nocc, norb, num_core_orbitals=None):
+    def lrvec2mat(vec,
+                  nocc,
+                  norb,
+                  num_core_orbitals=None,
+                  num_valence_orbitals=None,
+                  num_vir_orbitals=None):
         """
         Converts vectors to matrices.
 
@@ -2997,7 +3481,9 @@ class LinearSolver:
 
         nvir = norb - nocc
 
-        if num_core_orbitals is not None and num_core_orbitals > 0:
+        if (num_core_orbitals is not None and
+            (None in (num_valence_orbitals, num_vir_orbitals)) and
+                num_core_orbitals > 0):
             n_ov = num_core_orbitals * nvir
             mat = np.zeros((num_core_orbitals + nvir, num_core_orbitals + nvir),
                            dtype=vec.dtype)
@@ -3006,6 +3492,20 @@ class LinearSolver:
                 num_core_orbitals, nvir)
             mat[num_core_orbitals:, :num_core_orbitals] = vec[n_ov:].reshape(
                 num_core_orbitals, nvir).T
+
+        elif ((None not in (num_core_orbitals, num_valence_orbitals,
+                            num_vir_orbitals)) and
+              num_core_orbitals + num_valence_orbitals > 0):
+            nvir = num_vir_orbitals
+            num_core_val_orbs = num_core_orbitals + num_valence_orbitals
+            n_ov = num_core_val_orbs * nvir
+            mat = np.zeros((num_core_val_orbs + nvir, num_core_val_orbs + nvir),
+                           dtype=vec.dtype)
+            # excitation and de-excitation
+            mat[:num_core_val_orbs, num_core_val_orbs:] = vec[:n_ov].reshape(
+                num_core_val_orbs, nvir)
+            mat[num_core_val_orbs:, :num_core_val_orbs] = vec[n_ov:].reshape(
+                num_core_val_orbs, nvir).T
 
         else:
             n_ov = nocc * nvir
@@ -3017,7 +3517,12 @@ class LinearSolver:
         return mat
 
     @staticmethod
-    def lrmat2vec(mat, nocc, norb, num_core_orbitals=None):
+    def lrmat2vec(mat,
+                  nocc,
+                  norb,
+                  num_core_orbitals=None,
+                  num_valence_orbitals=None,
+                  num_vir_orbitals=None):
         """
         Converts matrices to vectors.
 
@@ -3034,7 +3539,9 @@ class LinearSolver:
 
         nvir = norb - nocc
 
-        if num_core_orbitals is not None and num_core_orbitals > 0:
+        if (num_core_orbitals is not None and
+            (None in (num_valence_orbitals, num_vir_orbitals)) and
+                num_core_orbitals > 0):
             n_ov = num_core_orbitals * nvir
             vec = np.zeros(n_ov * 2, dtype=mat.dtype)
             # excitation and de-excitation
@@ -3042,7 +3549,18 @@ class LinearSolver:
                              num_core_orbitals:].reshape(n_ov)
             vec[n_ov:] = mat[num_core_orbitals:, :num_core_orbitals].T.reshape(
                 n_ov)
-
+        elif ((None not in (num_core_orbitals, num_valence_orbitals,
+                            num_vir_orbitals)) and
+              num_core_orbitals + num_valence_orbitals > 0):
+            nvir = num_vir_orbitals
+            num_core_val_orbs = num_core_orbitals + num_valence_orbitals
+            n_ov = num_core_val_orbs * nvir
+            vec = np.zeros(n_ov * 2, dtype=mat.dtype)
+            # excitation and de-excitation
+            vec[:n_ov] = mat[:num_core_val_orbs,
+                             num_core_val_orbs:].reshape(n_ov)
+            vec[n_ov:] = mat[num_core_val_orbs:, :num_core_val_orbs].T.reshape(
+                n_ov)
         else:
             n_ov = nocc * nvir
             vec = np.zeros(n_ov * 2, dtype=mat.dtype)
@@ -3199,7 +3717,12 @@ class LinearSolver:
         return vecs
 
     @staticmethod
-    def construct_ediag_sdiag_half(orb_ene, nocc, norb, num_core_orbitals=None):
+    def construct_ediag_sdiag_half(orb_ene,
+                                   nocc,
+                                   norb,
+                                   num_core_orbitals=None,
+                                   num_valence_orbitals=None,
+                                   num_vir_orbitals=None):
         """
         Gets the upper half of E0 and S0 diagonal elements as arrays.
 
@@ -3215,22 +3738,32 @@ class LinearSolver:
         """
 
         nvir = norb - nocc
+        evir = orb_ene[nocc:]
 
-        if num_core_orbitals is not None and num_core_orbitals > 0:
+        if (num_core_orbitals is not None and
+            (None in (num_valence_orbitals, num_vir_orbitals)) and
+                num_core_orbitals > 0):
             n_ov = num_core_orbitals * nvir
             eocc = orb_ene[:num_core_orbitals]
+        elif ((None not in (num_core_orbitals, num_valence_orbitals,
+                            num_vir_orbitals)) and
+              num_core_orbitals + num_valence_orbitals > 0):
+            nvir = num_vir_orbitals
+            num_core_val_orbs = num_core_orbitals + num_valence_orbitals
+            n_ov = num_core_val_orbs * nvir
+            eocc = np.hstack((orb_ene[:num_core_orbitals],
+                              orb_ene[nocc - num_valence_orbitals:nocc]))
+            evir = orb_ene[nocc:nocc + num_vir_orbitals]
         else:
             n_ov = nocc * nvir
             eocc = orb_ene[:nocc]
-
-        evir = orb_ene[nocc:]
 
         ediag = (-eocc.reshape(-1, 1) + evir).reshape(n_ov)
         sdiag = np.ones(ediag.shape)
 
         return ediag, sdiag
 
-    def get_nto(self, t_mat, mo_occ, mo_vir):
+    def _compute_nto(self, t_mat, mo_occ, mo_vir):
         """
         Gets the natural transition orbitals.
 
@@ -3268,7 +3801,7 @@ class LinearSolver:
 
         return nto_mo
 
-    def get_nto_unrestricted(self, t_mat, mo_occ, mo_vir):
+    def _compute_nto_unrestricted(self, t_mat, mo_occ, mo_vir):
         """
         Gets the natural transition orbitals.
 
@@ -3367,12 +3900,16 @@ class LinearSolver:
 
         if getattr(self, 'core_excitation', False):
             nocc = self.num_core_orbitals
+        elif getattr(self, 'restricted_subspace', False):
+            nocc = self.num_core_orbitals + self.num_valence_orbitals
         else:
             if nto_spin == '' or nto_spin == 'alpha':
-                nocc = molecule.number_of_alpha_electrons()
+                nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             elif nto_spin == 'beta':
-                nocc = molecule.number_of_beta_electrons()
+                nocc = molecule.number_of_beta_occupied_orbitals(basis)
         nvir = nto_mo.number_of_mos() - nocc
+        if getattr(self, 'restricted_subspace', False):
+            nvir = self.num_virtual_orbitals
 
         if nto_spin == '' or nto_spin == 'alpha':
             lam_diag = nto_mo.occa_to_numpy()[nocc:nocc + min(nocc, nvir)]
@@ -3545,6 +4082,11 @@ class LinearSolver:
         for i in range(nocc):
             if getattr(self, 'core_excitation', False):
                 homo_str = f'core_{i + 1}'
+            elif getattr(self, 'restricted_subspace', False):
+                if i < self.num_core_orbitals and self.num_core_orbitals > 0:
+                    homo_str = f'core_{i + 1}'
+                else:
+                    homo_str = 'HOMO' if i == nocc - 1 else f'HOMO-{nocc - 1 - i}'
             else:
                 homo_str = 'HOMO' if i == nocc - 1 else f'HOMO-{nocc - 1 - i}'
 

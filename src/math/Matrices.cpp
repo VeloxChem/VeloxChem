@@ -109,6 +109,19 @@ CMatrices::add(const CMatrix& matrix, const std::string& key) -> void
 }
 
 auto
+CMatrices::operator+(const CMatrices &other) const -> CMatrices
+{
+    CMatrices mats;
+
+    for (const auto& key : keys())
+    {
+        mats.add(*matrix(key) + *other.matrix(key), key);
+    }
+    
+    return mats;
+}
+
+auto
 CMatrices::add(const CMatrix& matrix, const int key) -> void
 {
     _matrices.insert({std::to_string(key), new CMatrix(matrix)});
