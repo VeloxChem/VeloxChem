@@ -1888,46 +1888,42 @@ class TpaFullDriver(TpaDriverBase):
         else:
             return None
 
-    def _print_results(self, rsp_results):
+    def _get_gamma_title(self):
         """
-        Prints the results from the TPA calculation.
+        Gets the gamma-table title for full TPA results.
 
-        :param rsp_results:
-            A dictonary containing the results of response calculation.
+        :return:
+            The title for gamma output.
         """
 
-        gamma = rsp_results['gamma']
+        return 'Isotropic Average of gamma Tensor at Given Frequencies'
 
-        self.ostream.print_blank()
+    def _get_hdf5_group_name(self):
+        """
+        Gets the HDF5 group name for full TPA results.
 
-        w_str = 'Isotropic Average of gamma Tensor at Given Frequencies'
-        self.ostream.print_header(w_str)
-        self.ostream.print_header('=' * (len(w_str) + 2))
-        self.ostream.print_blank()
+        :return:
+            The group name.
+        """
 
-        freqs = rsp_results['frequencies']
+        return 'tpa_full'
 
-        title = '{:<8s}{:>14s}{:>21s}{:>22s}'.format('', 'Photon Energy', 'Real',
-                                                     'Imaginary')
-        width = len(title)
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header(('-' * len(title)).ljust(width))
+    def _get_hdf5_value_label(self):
+        """
+        Gets the HDF5 value label for full TPA results.
 
-        for w in freqs:
-            self._print_component('gamma', w, gamma[(w, -w, w)], width)
+        :return:
+            The value label.
+        """
 
-        self.ostream.print_blank()
+        return 'full TPA result'
 
-        title = 'Reference: '
-        title += 'K. Ahmadzadeh, M. Scott, M. Brand, O. Vahtras, X. Li, '
-        self.ostream.print_header(title.ljust(width))
-        title = 'Z. Rinkevicius, and P. Norman, '
-        title += 'J. Chem. Phys. 154, 024111 (2021)'
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_blank()
+    def _get_summary_title(self):
+        """
+        Gets the summary-table title for full TPA results.
 
-        spectrum = self.get_spectrum(rsp_results, x_unit='au')
-        self._print_spectrum(spectrum, width)
+        :return:
+            The title for summary output.
+        """
 
-        self.ostream.print_blank()
-        self.ostream.flush()
+        return 'Full TPA Summary'
