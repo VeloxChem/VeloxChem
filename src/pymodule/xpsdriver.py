@@ -187,6 +187,9 @@ class XPSDriver:
                               results,
                               value_label='XPS result')
 
+        self.ostream.print_blank()
+        self.ostream.print_info('XPS results written to file: ' + str(fpath))
+
     @staticmethod
     def _get_xcfun_label(xcfun):
         """
@@ -614,8 +617,6 @@ class XPSDriver:
             self.ostream.print_header('*** XPS Calculation Completed.'.ljust(92))
             self.ostream.print_blank()
             if self.filename is not None:
-                self.ostream.print_info('Writing to files...')
-                self.ostream.print_blank()
                 self._write_final_hdf5(self.filename, results)
             self.ostream.flush()
 
@@ -632,17 +633,20 @@ class XPSDriver:
         if self.rank != mpi_master():
             return
 
+        width = 80
+
         self.ostream.print_blank()
         self.ostream.print_header('XPS Core Ionization Energies')
-        self.ostream.print_header('=' * 80)
+        self.ostream.print_header('=' * width)
         self.ostream.print_blank()
 
         for element, ionization_data in results.items():
-            self.ostream.print_info(f'Element: {element}')
-            self.ostream.print_info('-' * 80)
-            self.ostream.print_info(
-                f'{"Atom":<8} {"MO Index":<12} {"IE (eV)":<15} {"Localization":<15}')
-            self.ostream.print_info('-' * 80)
+            self.ostream.print_header(f'Element: {element}'.ljust(width))
+            self.ostream.print_header(('-' * width).ljust(width))
+            header = (f'{"Atom":<8} {"MO Index":<12} '
+                      f'{"IE (eV)":<15} {"Localization":<15}')
+            self.ostream.print_header(header.ljust(width))
+            self.ostream.print_header(('-' * width).ljust(width))
 
             # Sort by atom index for better readability
             sorted_data = sorted(ionization_data, key=lambda x: x['atom_index'])
@@ -652,12 +656,13 @@ class XPSDriver:
                 atom_idx = record['atom_index']
                 ie = record['ionization_energy_ev']
                 contribution = record['contribution']
-                self.ostream.print_info(
-                    f'{atom_idx+1:<8} {mo_idx:<12} {ie:>12.2f}   {contribution:>13.1%}')
+                line = (f'{atom_idx+1:<8} {mo_idx:<12} '
+                        f'{ie:>12.2f}   {contribution:>13.1%}')
+                self.ostream.print_header(line.ljust(width))
 
             self.ostream.print_blank()
 
-        self.ostream.print_header('=' * 80)
+        self.ostream.print_header('=' * width)
         self.ostream.print_blank()
         self.ostream.flush()
 
