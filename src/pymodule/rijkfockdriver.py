@@ -299,8 +299,10 @@ class RIJKFockDriver:
 
         ri_prep_t0 = time.time()
 
-        self._ri_drv.local_compute_screened_bq_vectors(screener, molecule, basis_ri,
-                                                 self.metric, ithreshold, local_indices)
+        self._ri_drv.local_compute_screened_bq_vectors(screener, molecule,
+                                                       basis_ri, self.metric,
+                                                       ithreshold,
+                                                       local_indices)
 
         if verbose:
             self.ostream.print_info('Screened B^Q vectors for RI done in ' +
@@ -478,12 +480,9 @@ class RIJKFockDriver:
 
         return self._ri_drv.compute_mo_bq_vectors(lambda_p, lambda_h, bstart,
                                                   bend)
-    
-    def estimate_memory_for_bq_vectors(self,
-                                        screener,
-                                        molecule,
-                                        auxiliary_basis,
-                                        ithreshold):
+
+    def estimate_memory_for_bq_vectors(self, screener, molecule,
+                                       auxiliary_basis, ithreshold):
         """
         Estimate size of B^Q vectors (screened, distributed) for the RI-JK Fock driver.
         
@@ -496,7 +495,7 @@ class RIJKFockDriver:
         :param ithreshold: 
             The integer threshold of screening important integral pairs.
         """
-        
+
         if isinstance(auxiliary_basis, str):
             if self.rank == mpi_master():
                 basis_ri = MolecularBasis.read(molecule, auxiliary_basis)
@@ -505,5 +504,6 @@ class RIJKFockDriver:
             basis_ri = self.comm.bcast(basis_ri, root=mpi_master())
         else:
             basis_ri = MolecularBasis(auxiliary_basis)
-            
-        return self._ri_drv.estimate_memory_for_bq_vectors(screener, molecule, basis_ri, ithreshold, self.rank, self.nodes)
+
+        return self._ri_drv.estimate_memory_for_bq_vectors(
+            screener, molecule, basis_ri, ithreshold, self.rank, self.nodes)
