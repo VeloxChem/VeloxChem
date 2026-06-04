@@ -77,6 +77,7 @@ from .trajectorydriver import TrajectoryDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
+from .xpsdriver import XPSDriver
 from .cli import cli
 from .errorhandler import assert_msg_critical, VeloxChemError
 
@@ -374,7 +375,7 @@ def _main_body():
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
         'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'uscf_gradient',
         'hessian', 'optimize', 'response', 'pulses', 'visualization', 'loprop',
-        'pe force field', 'vibrational', 'polarizability_gradient'
+        'pe force field', 'vibrational', 'polarizability_gradient', 'xps'
     ]
 
     run_scf_only = task_type in [
@@ -836,6 +837,34 @@ def _main_body():
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
         mp2_drv.update_settings(mp2_dict, method_dict)
         mp2_drv.compute(task.molecule, task.ao_basis, scf_results)
+
+    # XPS
+
+    if task_type == 'xps':
+        assert_msg_critical(
+            not use_xtb,
+            'XPS task is not supported with xTB; please use an SCF/DFT method.')
+
+        xps_dict = (dict(task.input_dict['xps'])
+                    if 'xps' in task.input_dict else {})
+        xps_dict['filename'] = task.input_dict['filename']
+
+        xps_drv = XPSDriver(task.mpi_comm, task.ostream)
+        xps_drv.update_settings(xps_dict, method_dict)
+        element = xps_dict['element'] if 'element' in xps_dict else None
+
+        assert_msg_critical(
+            'elements' not in xps_dict,
+            'XPS task uses only element in the xps input group')
+
+        assert_msg_critical(element is not None,
+                            'XPS task requires element in the xps input group')
+
+        xps_results = xps_drv.compute(task.molecule,
+                                      task.ao_basis,
+                                      scf_drv,
+                                      element=element)
+        xps_drv.print_results(xps_results)
 
     # Cube file
 

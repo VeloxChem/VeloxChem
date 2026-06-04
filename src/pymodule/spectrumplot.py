@@ -437,7 +437,13 @@ def plot_xps_spectrum(xps_results,
 
     :param xps_results:
         The dictionary containing XPS results from XPSDriver.compute().
-        Format: {element: [(mo_idx, atom_idx, ionization_energy, contribution), ...]}
+        Format: {element: [{
+            'mo_index': int,
+            'atom_index': int,
+            'ionization_energy_ev': float,
+            'contribution': float,
+            'is_delocalized': bool,
+        }, ...]}
     :param element:
         Element symbol to plot (e.g., 'C', 'O', 'N', 'F', 'S').
         If None and xps_results contains only one element, that element is plotted.
@@ -511,14 +517,9 @@ def plot_xps_spectrum(xps_results,
     else:
         elem_color = vlx_color
 
-    # Extract data for the specified element
-    # Handle both old format (mo_idx, ie) and new format (mo_idx, atom_idx, ie, contribution)
-    if len(ionization_data[0]) == 2:
-        energies = np.array([ie for _, ie in ionization_data])
-        atom_indices = None
-    else:
-        energies = np.array([ie for _, _, ie, _ in ionization_data])
-        atom_indices = np.array([atom_idx for _, atom_idx, _, _ in ionization_data])
+    energies = np.array(
+        [record['ionization_energy_ev'] for record in ionization_data])
+    atom_indices = np.array([record['atom_index'] for record in ionization_data])
     intensities = np.ones(len(energies))
 
     # Create or use provided axis
@@ -530,6 +531,194 @@ def plot_xps_spectrum(xps_results,
                              broadening_type, broadening_value,
                              elem_color, atom_indices, show_atom_labels,
                              color_by_atom)
+
+    return ax
+
+
+def plot_tpa_transition_spectrum(rsp_results,
+                                 spectrum,
+                                 x_unit='ev',
+                                 polarization='linear',
+                                 ax=None,
+                                 show_sticks=True):
+    """
+    Plot the TPA transition spectrum from broadened cross sections.
+
+    :param rsp_results:
+        The dictionary containing the TPA transition results.
+    :param spectrum:
+        The precomputed broadened spectrum dictionary from
+        ``TpaTransitionDriver.get_spectrum``.
+    :param x_unit:
+        The unit of x-axis. Either 'au', 'ev', or 'nm'.
+    :param polarization:
+        Polarization channel for stick strengths. Either 'linear' or
+        'circular'.
+    :param ax:
+        The matplotlib axis to plot on. If None, a new figure is created.
+    :param show_sticks:
+        If True, overlay stick/bar strengths on a secondary axis.
+
+    :return:
+        The matplotlib axis object.
+    """
+
+    assert_msg_critical('matplotlib' in sys.modules, 'matplotlib is required.')
+
+    assert_msg_critical(
+        x_unit.lower() in ['au', 'ev', 'nm'],
+        'plot_tpa_transition_spectrum: x_unit should be au, ev or nm')
+
+    assert_msg_critical(
+        polarization.lower() in ['linear', 'circular'],
+        'plot_tpa_transition_spectrum: polarization should be linear or circular')
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 5))
+
+    ax.set_title('TPA Transition Spectrum')
+    ax.set_xlabel(spectrum['x_label'])
+    ax.set_ylabel(spectrum['y_label'])
+
+    ax.plot(spectrum['x_data'],
+            spectrum['y_data'],
+            color='black',
+            alpha=0.9,
+            linewidth=2.5)
+
+    if show_sticks:
+        photon_energies = np.array(rsp_results['photon_energies'], dtype=float)
+        if x_unit.lower() == 'ev':
+            stick_x = photon_energies * hartree_in_ev()
+        elif x_unit.lower() == 'nm':
+            stick_x = 1.0 / (hartree_in_inverse_nm() * photon_energies)
+        else:
+            stick_x = photon_energies
+
+        strengths = [
+            rsp_results['tpa_strengths'][polarization.lower()][idx]
+            for idx in range(len(photon_energies))
+        ]
+
+        ax2 = ax.twinx()
+        if len(stick_x) > 1:
+            width = 0.01 * abs(float(np.max(stick_x) - np.min(stick_x)))
+        else:
+            width = 0.02 * abs(float(stick_x[0])) if len(stick_x) == 1 else 0.02
+        if width == 0.0:
+            width = 0.02
+
+        ax2.bar(stick_x,
+                strengths,
+                width=width,
+                alpha=0.45,
+                color='darkcyan')
+        ax2.set_ylabel(f'TPA strengths ({polarization.lower()}) [a.u.]')
+        ax2.set_ylim(0, max(strengths) * 1.1 if strengths else 1.0)
+        ax2.set_ylim(bottom=0)
+
+        legend_bars = mlines.Line2D([], [],
+                                    color='darkcyan',
+                                    alpha=0.7,
+                                    linewidth=2,
+                                    label=f'{polarization.capitalize()} TPA strength')
+        legend_spectrum = mlines.Line2D([], [],
+                                        color='black',
+                                        linestyle='-',
+                                        linewidth=2.5,
+                                        label='Broadened TPA cross-section')
+        ax2.legend(handles=[legend_bars, legend_spectrum],
+                   frameon=False,
+                   borderaxespad=0.,
+                   loc='center left',
+                   bbox_to_anchor=(1.15, 0.5))
+
+    ax.set_ylim(0, max(spectrum['y_data']) * 1.1 if spectrum['y_data'] else 1.0)
+    ax.set_ylim(bottom=0)
+    if spectrum['x_data']:
+        ax.set_xlim(min(spectrum['x_data']), max(spectrum['x_data']))
+
+    return ax
+
+
+def plot_tpa_spectrum(spectrum, ax=None, interpolate=True, show_points=True):
+    """
+    Plot a reduced/full TPA cross-section spectrum from discrete values.
+
+    :param spectrum:
+        The spectrum dictionary from ``TpaDriverBase.get_spectrum``.
+    :param ax:
+        The matplotlib axis to plot on. If None, a new figure is created.
+    :param interpolate:
+        If True, use a smooth cubic interpolation when enough points are
+        available.
+    :param show_points:
+        If True, show the discrete computed cross sections as markers.
+
+    :return:
+        The matplotlib axis object.
+    """
+
+    assert_msg_critical('matplotlib' in sys.modules, 'matplotlib is required.')
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 5))
+
+    x_data = np.array(spectrum['x_data'], dtype=float)
+    y_data = np.array(spectrum['y_data'], dtype=float)
+
+    ax.set_xlabel(spectrum['x_label'])
+    ax.set_ylabel(spectrum['y_label'])
+    ax.set_title('TPA Spectrum')
+
+    if interpolate and len(x_data) >= 3:
+        try:
+            from scipy.interpolate import CubicSpline
+            x_dense = np.linspace(float(np.min(x_data)), float(np.max(x_data)),
+                                  500)
+            cs = CubicSpline(x_data, y_data)
+            ax.plot(x_dense, cs(x_dense),
+                    color='black', alpha=0.9, linewidth=2.5)
+        except ImportError:
+            ax.plot(x_data, y_data, color='black', alpha=0.9, linewidth=2.0)
+    else:
+        ax.plot(x_data, y_data, color='black', alpha=0.9, linewidth=2.0)
+
+    if show_points:
+        ax.plot(x_data,
+                y_data,
+                linestyle='none',
+                marker='o',
+                markersize=5,
+                markerfacecolor='none',
+                markeredgecolor='darkcyan')
+
+    ax.set_ylim(bottom=0)
+    if len(x_data) > 0:
+        ax.set_xlim(float(np.min(x_data)), float(np.max(x_data)))
+
+    legend_handles = []
+    if show_points:
+        legend_handles.append(
+            mlines.Line2D([], [],
+                          linestyle='none',
+                          marker='o',
+                          markersize=5,
+                          markerfacecolor='none',
+                          markeredgecolor='darkcyan',
+                          label='Computed cross sections'))
+    legend_handles.append(
+        mlines.Line2D([], [],
+                      color='black',
+                      linestyle='-',
+                      linewidth=2.5 if interpolate and len(x_data) >= 3 else 2.0,
+                      label='Interpolated spectrum' if interpolate and len(x_data) >= 3 else 'Spectrum'))
+
+    ax.legend(handles=legend_handles,
+              frameon=False,
+              borderaxespad=0.,
+              loc='center left',
+              bbox_to_anchor=(1.02, 0.5))
 
     return ax
 
