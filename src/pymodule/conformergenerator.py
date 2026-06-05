@@ -164,7 +164,7 @@ class ConformerGenerator:
                         break
 
         return side_equiv, max_equiv_atoms
-    
+
     def _check_halogenide_group(self, dihedral_indices, atom_info_dict):
 
         side_j_index = dihedral_indices[1] + 1  # convert to 1 based index

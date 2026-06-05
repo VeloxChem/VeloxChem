@@ -1360,11 +1360,11 @@ class TpaTransitionDriver(NonlinearSolver):
                                      broadening_value, broadening_unit)
 
         plotted_ax = plot_tpa_transition_spectrum(rsp_results,
-                              spectrum,
-                              x_unit=x_unit,
-                              polarization=polarization,
-                              ax=ax,
-                              show_sticks=show_sticks)
+                                                  spectrum,
+                                                  x_unit=x_unit,
+                                                  polarization=polarization,
+                                                  ax=ax,
+                                                  show_sticks=show_sticks)
 
         return plotted_ax if ax is not None else None
 

@@ -1062,4 +1062,3 @@ class TpaReducedDriver(TpaDriverBase):
         title += 'J. Chem. Phys. 154, 024111 (2021)'
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_blank()
-
