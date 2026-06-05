@@ -264,7 +264,7 @@ class IMTrustRadiusOptimizer:
         )
 
         dG_dα_sub = term1 + term2 - term3
-        
+
         if nh > 1e-8:
             dL_dg_sub = (2.0 * gate) * ((beta/nsub)*(gper) + (1.0 - beta)*(gpar)) + (2.0 * (1.0 - gate) / nsub) * g_sub
         else:
@@ -291,7 +291,6 @@ class IMTrustRadiusOptimizer:
             raise ValueError("AlphaOptimizer.fun received non-finite alpha values")
 
         futs = (self._eval_structure((i, alphas_arr)) for i in range(self.S))
- 
 
         sum_loss = 0.0
         sum_grad = np.zeros(self.M, dtype=np.float64)
@@ -315,7 +314,6 @@ class IMTrustRadiusOptimizer:
             'loss_energy': mean_energy,
             'loss_force': mean_force,
         }
-    
 
         return mean_loss
 
@@ -343,7 +341,6 @@ class IMTrustRadiusOptimizer:
 
         return idx
 
-
     def _validate_full_alpha(self, alpha_full):
         alpha = np.asarray(alpha_full, dtype=np.float64).reshape(-1)
 
@@ -356,13 +353,11 @@ class IMTrustRadiusOptimizer:
 
         return alpha
 
-
     def pack_reduced_alphas(self, alpha_full, trainable_idx):
 
         alpha = self._validate_full_alpha(alpha_full)
         idx = self._validate_trainable_idx(trainable_idx)
         return alpha[idx].copy()
-
 
     def expand_reduced_alphas(self, x_var, trainable_idx, alpha_full_fixed):
 
@@ -381,7 +376,6 @@ class IMTrustRadiusOptimizer:
         alpha_full[idx] = x
         return alpha_full
 
-
     def project_full_gradient_to_reduced(self, grad_full, trainable_idx):
 
         g = np.asarray(grad_full, dtype=np.float64).reshape(-1)
@@ -392,12 +386,10 @@ class IMTrustRadiusOptimizer:
         idx = self._validate_trainable_idx(trainable_idx)
         return g[idx].copy()
 
-
     def fun_reduced(self, x_var, trainable_idx, alpha_full_fixed):
 
         alpha_full = self.expand_reduced_alphas(x_var, trainable_idx, alpha_full_fixed)
         return self.fun(alpha_full)
-
 
     def jac_reduced(self, x_var, trainable_idx, alpha_full_fixed):
 
@@ -405,11 +397,9 @@ class IMTrustRadiusOptimizer:
         g_full = self.jac(alpha_full)
         return self.project_full_gradient_to_reduced(g_full, trainable_idx)
 
-
     def get_metrics_reduced(self, x_var, trainable_idx, alpha_full_fixed, evaluate_if_missing=True):
         alpha_full = self.expand_reduced_alphas(x_var, trainable_idx, alpha_full_fixed)
         return self.get_metrics(alpha_full, evaluate_if_missing=evaluate_if_missing)
-
 
     def get_metrics(self, alphas=None, evaluate_if_missing=True):
 
