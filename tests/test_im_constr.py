@@ -1,9 +1,7 @@
-from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-import os
-import shutil
 
+import h5py
 import numpy as np
 import pytest
 
@@ -12,12 +10,6 @@ from veloxchem.interpolationdatapoint import InterpolationDatapoint
 from veloxchem.interpolationdriver import InterpolationDriver
 from veloxchem.molecule import Molecule
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.scfgradientdriver import ScfGradientDriver
-from veloxchem.scfhessiandriver import ScfHessianDriver
-
-
-def _h5py():
-    return pytest.importorskip("h5py")
 
 
 def _generated_db_name():
@@ -47,22 +39,24 @@ def _dataset_tolerances():
         ("_confidence_radius", 1.0e1, 0.0),
         ("/xyz", 1.0e-7, 0.0)
     )
+
+
 def get_xyz_structure():
-    
     xyz_string = """9
 
-C              2.166668000000         0.686818000000         0.513057000000
-C              1.154761000000         0.429392000000        -0.592696000000
-O              0.864913749557        -0.938822407390        -0.655145223589
-H              3.198553000000         0.616151000000         0.108204000000
-H              2.013132000000         1.703523000000         0.932376000000
-H              2.040982000000        -0.060527000000         1.325068000000
-H              1.578981171502         0.771155493744        -1.562992416868
-H              0.225958941360         1.003741703659        -0.378949193078
-H              0.204789196714        -1.046205204715        -1.388387358386
-"""
+    C              2.166668000000         0.686818000000         0.513057000000
+    C              1.154761000000         0.429392000000        -0.592696000000
+    O              0.864913749557        -0.938822407390        -0.655145223589
+    H              3.198553000000         0.616151000000         0.108204000000
+    H              2.013132000000         1.703523000000         0.932376000000
+    H              2.040982000000        -0.060527000000         1.325068000000
+    H              1.578981171502         0.771155493744        -1.562992416868
+    H              0.225958941360         1.003741703659        -0.378949193078
+    H              0.204789196714        -1.046205204715        -1.388387358386
+    """
 
     return xyz_string
+
 
 @dataclass
 class ConstructionContext:
@@ -73,51 +67,41 @@ class ConstructionContext:
     db_file: Path
 
 
-@contextmanager
-def _temporary_cwd(path: Path):
-    old_cwd = Path.cwd()
-    os.chdir(path)
-    try:
-        yield
-    finally:
-        os.chdir(old_cwd)
-
-
-def _run_construction_once(workdir: Path) -> ConstructionContext:
+def _run_construction_once(monkeypatch, workdir: Path) -> ConstructionContext:
     workdir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.chdir(workdir)
 
-    with _temporary_cwd(workdir):
-        mol = Molecule.from_xyz_string(get_xyz_structure())
-        mol.set_charge(0)
-        mol.set_multiplicity(1)
-        
-        qm_drvier = ScfRestrictedDriver()
-        qm_drvier.xcfun = "pbe"
-        qm_drvier.ri_coulomb = True
-        qm_drvier.dispersion = True
+    mol = Molecule.from_xyz_string(get_xyz_structure())
+    mol.set_charge(0)
+    mol.set_multiplicity(1)
 
-        ffg = IMForceFieldGenerator(
-            ground_state_driver=qm_drvier,
-            roots_to_follow=[0],
-        )
+    qm_driver = ScfRestrictedDriver()
+    qm_driver.xcfun = "pbe"
+    qm_driver.ri_coulomb = True
+    qm_driver.dispersion = True
 
-        ffg.gs_basis_set_label = "def2-svp"
-        ffg.add_conformal_structures = False
-        ffg.use_minimized_structures = [False, [], []]
-        ffg.use_opt_confidence_radius = [True, "multi_grad", 0.5, 0.3]
-        ffg.use_mass_weight = True
-        ffg.use_inverse_bond_length = True
-        ffg.use_tc_weights = False
-        ffg.nsteps = 3000
-        ffg.snapshots = 100
-        ffg.desired_point_density = 2
-        ffg.energy_threshold = 0.009
-        ffg.sampling_settings = {"enabled": False}
-        ffg.open_mm_platform = "CPU"
-        ffg.ensemble = "NVE"
+    ffg = IMForceFieldGenerator(
+        ground_state_driver=qm_driver,
+        roots_to_follow=[0],
+    )
 
-        ffg.set_up_the_system(mol)
-        results = ffg.compute(mol)
+    ffg.gs_basis_set_label = "def2-svp"
+    ffg.add_conformal_structures = False
+    ffg.use_minimized_structures = [False, [], []]
+    ffg.use_opt_confidence_radius = [True, "multi_grad", 0.5, 0.3]
+    ffg.use_mass_weight = True
+    ffg.use_inverse_bond_length = True
+    ffg.use_tc_weights = False
+    ffg.nsteps = 3000
+    ffg.snapshots = 100
+    ffg.desired_point_density = 2
+    ffg.energy_threshold = 0.009
+    ffg.sampling_settings = {"enabled": False}
+    ffg.open_mm_platform = "CPU"
+    ffg.ensemble = "NVE"
+
+    ffg.set_up_the_system(mol)
+    results = ffg.compute(mol)
 
     return ConstructionContext(
         workdir=workdir,
@@ -126,32 +110,6 @@ def _run_construction_once(workdir: Path) -> ConstructionContext:
         results=results,
         db_file=workdir / _generated_db_name(),
     )
-
-
-def _cleanup_generated_files(workdir: Path):
-    for pattern in (
-        "im_database*.h5",
-        "trajectory*.pdb",
-        "traj*.pdb",
-        "ref_structures.h5",
-        "checkpoint*",
-        "*.out",
-        "random_structure.xyz",
-    ):
-        for path in workdir.glob(pattern):
-            if path.is_dir():
-                shutil.rmtree(path)
-            elif path.exists():
-                path.unlink()
-
-
-@pytest.fixture()
-def construction_context(tmp_path):
-    workdir = tmp_path / "im_const_construction"
-    try:
-        yield _run_construction_once(workdir)
-    finally:
-        _cleanup_generated_files(workdir)
 
 
 def _label_key(label):
@@ -208,7 +166,6 @@ def _assert_database_is_runtime_readable(db_file: Path, settings: dict, molecule
 
 
 def _read_h5_datasets(db_file: Path):
-    h5py = _h5py()
     datasets = {}
 
     with h5py.File(db_file, "r") as h5f:
@@ -227,14 +184,15 @@ def _tolerance_for_dataset(name):
             return atol, rtol
     return 1.0e-12, 0.0
 
+
 def _parse_xyz_bytes(xyz_entry):
     if isinstance(xyz_entry, bytes):
         text = xyz_entry.decode("utf-8")
     else:
         text = str(xyz_entry)
 
+    # TODO: This is fragile and will not work for standard XYZ records with a non-empty comment line
     lines = [line.strip() for line in text.splitlines() if line.strip()]
-
     n_atoms = int(lines[0])
     atom_lines = lines[1:1 + n_atoms]
 
@@ -335,8 +293,9 @@ def _assert_nve_total_energy_conserved(ffg: IMForceFieldGenerator):
     )
 
 
-def test_generated_database_matches_reference_and_conserves_energy(construction_context):
-    ctx = construction_context
+@pytest.mark.timeconsuming
+def test_generated_database_matches_reference_and_conserves_energy(tmp_path, monkeypatch):
+    ctx = _run_construction_once(monkeypatch, tmp_path / "im_const_construction")
     root = int(ctx.ffg.roots_to_follow[0])
     settings = dict(ctx.ffg.states_interpolation_settings[root])
 

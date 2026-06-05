@@ -6,11 +6,11 @@ import pytest
 from veloxchem.molecule import Molecule
 from veloxchem.interpolationdatapoint import InterpolationDatapoint
 from veloxchem.interpolationdriver import InterpolationDriver
-import veloxchem.imtrustradiusoptimizer as alphaoptimizer_module
+from veloxchem.imtrustradiusoptimizer import IMTrustRadiusOptimizer
 
 
 def _reporting_enabled():
-    flag = os.environ.get("IM_TEST_REPORT", "1").strip().lower()
+    flag = os.environ.get("IM_TEST_REPORT", "0").strip().lower()
     return flag not in {"0", "false", "no", "off"}
 
 
@@ -21,12 +21,12 @@ def _detailed_arrays_enabled():
 
 def _debug_enabled():
     flag = os.environ.get("IM_TEST_DEBUG", "0").strip().lower()
-    return flag not in {"0", "false", "no", "off", ""}
+    return flag not in {"0", "false", "no", "off"}
 
 
 def _fd_dump_enabled():
     flag = os.environ.get("IM_TEST_PRINT_FD", "0").strip().lower()
-    return flag not in {"0", "false", "no", "off", ""}
+    return flag not in {"0", "false", "no", "off"}
 
 
 def _debug_print(message):
@@ -101,15 +101,15 @@ def _wrap_to_pi(delta):
 def _base_molecule_system():
     xyz = """9
 
-C             -0.661535066309         1.128097375722         1.298956571720
-C              0.160830459103        -0.078956848612         0.840928833654
-O             -0.545706317697        -1.293534712398         0.947688936392
-H             -1.201152069039         1.577440238953         0.467697680596
-H             -0.006154222315         1.890329398828         1.712599756591
-H             -1.363731740381         0.823716932687         2.070509517949
-H              1.028694858953        -0.210814780197         1.491718794709
-H              0.521388572669         0.070466580703        -0.186332296889
-H             -1.346953592312        -1.233309727019         0.415095469234"""
+    C             -0.661535066309         1.128097375722         1.298956571720
+    C              0.160830459103        -0.078956848612         0.840928833654
+    O             -0.545706317697        -1.293534712398         0.947688936392
+    H             -1.201152069039         1.577440238953         0.467697680596
+    H             -0.006154222315         1.890329398828         1.712599756591
+    H             -1.363731740381         0.823716932687         2.070509517949
+    H              1.028694858953        -0.210814780197         1.491718794709
+    H              0.521388572669         0.070466580703        -0.186332296889
+    H             -1.346953592312        -1.233309727019         0.415095469234"""
 
     molecule = Molecule.from_xyz_string(xyz)
     molecule.set_charge(0)
@@ -242,7 +242,7 @@ def _make_datapoint(
     inv_sqrt_masses = None
     if use_mass_weight:
         inv_sqrt_masses = 1.0 / np.sqrt(np.repeat(molecule.get_masses(), 3))
-    
+
     energy, gradient, hessian = _surface_values(coords, center)
 
     dp = InterpolationDatapoint(z_matrix)
@@ -940,7 +940,7 @@ def test_trust_radius_optimizer_jacobian_matches_fd_without_symmetry(
         qm_energies.append(e)
         qm_gradients.append(g)
 
-    optimizer = alphaoptimizer_module.IMTrustRadiusOptimizer(
+    optimizer = IMTrustRadiusOptimizer(
         z_matrix,
         settings,
         runtime_metadata,
