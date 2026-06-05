@@ -31,17 +31,14 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
-
 import os
 import random
 import h5py
 from mpi4py import MPI
-
 from contextlib import redirect_stderr
 from .outputstream import OutputStream
 from io import StringIO
 from copy import deepcopy
-
 
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
@@ -52,7 +49,6 @@ from .scfgradientdriver import ScfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
 from .tdaeigensolver import TdaEigenSolver
 from .lreigensolver import LinearResponseEigenSolver
-
 from .molecularbasis import MolecularBasis
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
@@ -60,11 +56,9 @@ from .imdatabasepointcollecter import IMDatabasePointCollecter
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .conformergenerator import ConformerGenerator
 from .optimizationdriver import OptimizationDriver
-# from .atommapper import AtomMapper
-
 from .molecule import Molecule
 from .errorhandler import assert_msg_critical
-from .veloxchemlib import mpi_master, hartree_in_kcalpermol, bohr_in_angstrom
+from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
 
 
 with redirect_stderr(StringIO()) as fg_err:

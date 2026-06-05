@@ -32,22 +32,17 @@
 
 from mpi4py import MPI
 import numpy as np
-from time import time
-from typing import List, Tuple, Dict, Any, Optional
+from typing import List, Tuple, Dict, Optional
 from sys import stdout
-
-from .profiler import Profiler
 import h5py
-
 from contextlib import redirect_stderr
 from io import StringIO
+
 from .interpolationdatapoint import InterpolationDatapoint
-
 from .outputstream import OutputStream
-from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
-
+from .veloxchemlib import mpi_master, bohr_in_angstrom
 from .errorhandler import assert_msg_critical
-from .inputparser import (parse_input)
+from .inputparser import parse_input
 
 
 

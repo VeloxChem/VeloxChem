@@ -31,30 +31,11 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-from mpi4py import MPI
 import numpy as np
-import scipy
-import copy
 import warnings
 
-from contextlib import redirect_stderr
-from io import StringIO
-
-from .veloxchemlib import mpi_master
 from.veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
 from .interpolationdriver import InterpolationDriver
-
-
-with redirect_stderr(StringIO()) as fg_err:
-    import geometric
-
-try:
-    import openmm as mm
-    import openmm.app as app
-    import openmm.unit as unit
-except ImportError:
-    pass
-
 
 
 class IMTrustRadiusOptimizer:

@@ -30,42 +30,19 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from math import cos
-
-import builtins
-from networkx import node_clique_number
 from mpi4py import MPI
 import numpy as np
-from scipy.optimize import minimize
-from scipy.optimize import basinhopping
-
-
-from scipy.sparse import csr_matrix
-from scipy.sparse.csgraph import connected_components
-
-
-import scipy
 import h5py
-import json
 import itertools
-import re
-import os, copy, math
-from os import environ
-from contextlib import contextmanager
-
+import copy, math
 from pathlib import Path
 from sys import stdout
 import sys
-import random
 from time import time
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
-from contextlib import redirect_stderr, contextmanager
+from contextlib import redirect_stderr
 from io import StringIO
-
-
-from typing import Callable, Optional, Dict, Any, List
-from copy import deepcopy
 
 from .molecule import Molecule
 from .veloxchemlib import mpi_master
@@ -74,18 +51,11 @@ from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .solvationbuilder import SolvationBuilder
 from .optimizationdriver import OptimizationDriver
-from .profiler import Profiler
-
-# Drivers
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .molecularbasis import MolecularBasis
 from .scfgradientdriver import ScfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
-from .tdaeigensolver import TdaEigenSolver
-from .lreigensolver import LinearResponseEigenSolver
-from .tddftgradientdriver import TddftGradientDriver
-from .tddfthessiandriver import TddftHessianDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
@@ -3441,28 +3411,6 @@ class IMDatabasePointCollecter:
 
         driver_object.mark_runtime_data_cache_dirty()
 
-
-
-    def _build_opt_constraint_list(self, constraints, index_offset=1):
-
-        opt_constraint_list = []
-        for constraint in constraints:
-            if isinstance(constraint, str):
-                opt_constraint_list.append(constraint)
-                continue
-
-            shifted = [value + index_offset for value in constraint]
-            if len(shifted) == 2:
-                opt_constraint = f"freeze distance {shifted[0]} {shifted[1]}"
-            elif len(shifted) == 3:
-                opt_constraint = f"freeze angle {shifted[0]} {shifted[1]} {shifted[2]}"
-            else:
-                opt_constraint = f"freeze dihedral {shifted[0]} {shifted[1]} {shifted[2]} {shifted[3]}"
-            opt_constraint_list.append(opt_constraint)
-
-        return opt_constraint_list
-
-    
     # def determine_beysian_trust_radius(self, molecules, qm_energies, current_datapoints, interpolation_setting, sym_datapoints, sym_dict, z_matrix):
     
     #     trust_radii = []
@@ -3683,6 +3631,14 @@ class IMDatabasePointCollecter:
         self.ostream.flush()
 
     def determine_trust_radius_gradient(self, molecules, qm_energies, qm_gradients, im_energies, datapoints, interpolation_setting, sym_dict, z_matrix, exponent_p_q):
+        try:
+            from scipy.optimize import minimize
+            from scipy.optimize import basinhopping
+            from scipy.sparse import csr_matrix
+            from scipy.sparse.csgraph import connected_components
+        except ImportError:
+            error_msg = 'Scipy is required for determine_trust_radius_gradient.'
+            assert_msg_critical(False, error_msg)
         
         def optimize_trust_radius(alpha_full_start, trainable_idx, geom_list, E_ref_list, G_ref_list, E_im_list, dps, impes_dict, sym_dict, exponent_p_q, basin_id=None):
             """
@@ -4120,7 +4076,12 @@ class IMDatabasePointCollecter:
     
     def _perform_symmetry_assignment(self, atom_map, sym_group, reference_group, datapoint_group):
         """ Performs the atom mapping. """
-        from scipy.optimize import linear_sum_assignment
+        try:
+            from scipy.optimize import linear_sum_assignment
+        except ImportError:
+            error_msg = 'Scipy is required for _perform_symmetry_assignment.'
+            assert_msg_critical(False, error_msg)
+
         new_map = np.array(atom_map.copy())
         mapping_dict = {}
         # cost = self.get_dihedral_cost(atom_map, sym_group, non_group_atoms)
