@@ -606,18 +606,19 @@ class IMForceFieldGenerator:
             elif root not in self.roots_z_matrix:
                 # generate the z-matrix based for the interpolation database provided
                 int_driver = InterpolationDriver()
-                int_driver.update_settings({ 'interpolation_type':self.interpolation_type,
-                                        'weightfunction_type':self.weightfunction_type,
-                                        'exponent_p':self.exponent_p,
-                                        'exponent_q':self.exponent_q,
-                                        'confidence_radius':self.confidence_radius,
-                                        'imforcefield_file':self.imforcefieldfiles[root],
-                                        'use_inverse_bond_length':self.use_inverse_bond_length,
-                                        'use_eq_bond_length':self.use_eq_bond_length,
-                                        'use_tc_weights':self.use_tc_weights,
-                                        'tc_weight_mode':self.tc_weight_mode,
-                                        'use_mass_weight':self.use_mass_weight,
-                                    })
+                int_driver.update_settings({
+                    'interpolation_type':self.interpolation_type,
+                    'weightfunction_type':self.weightfunction_type,
+                    'exponent_p':self.exponent_p,
+                    'exponent_q':self.exponent_q,
+                    'confidence_radius':self.confidence_radius,
+                    'imforcefield_file':self.imforcefieldfiles[root],
+                    'use_inverse_bond_length':self.use_inverse_bond_length,
+                    'use_eq_bond_length':self.use_eq_bond_length,
+                    'use_tc_weights':self.use_tc_weights,
+                    'tc_weight_mode':self.tc_weight_mode,
+                    'use_mass_weight':self.use_mass_weight,
+                })
 
                 _, z_matrix = int_driver.read_labels()
                 self.roots_z_matrix[root] = z_matrix
@@ -870,18 +871,19 @@ class IMForceFieldGenerator:
             self.ostream.flush()
 
             imforcefieldfile = self.imforcefieldfiles[self.roots_to_follow[0]]
-            self.states_interpolation_settings[self.roots_to_follow[0]] = { 'interpolation_type':self.interpolation_type,
-                                'weightfunction_type':self.weightfunction_type,
-                                'exponent_p':self.exponent_p,
-                                'exponent_q':self.exponent_q,
-                                'confidence_radius':self.confidence_radius,
-                                'imforcefield_file':imforcefieldfile,
-                                'use_inverse_bond_length':self.use_inverse_bond_length,
-                                'use_eq_bond_length':self.use_eq_bond_length,
-                                'use_tc_weights':self.use_tc_weights,
-                                'tc_weight_mode':self.tc_weight_mode,
-                                'use_mass_weight':self.use_mass_weight,
-                            }
+            self.states_interpolation_settings[self.roots_to_follow[0]] = {
+                'interpolation_type':self.interpolation_type,
+                'weightfunction_type':self.weightfunction_type,
+                'exponent_p':self.exponent_p,
+                'exponent_q':self.exponent_q,
+                'confidence_radius':self.confidence_radius,
+                'imforcefield_file':imforcefieldfile,
+                'use_inverse_bond_length':self.use_inverse_bond_length,
+                'use_eq_bond_length':self.use_eq_bond_length,
+                'use_tc_weights':self.use_tc_weights,
+                'tc_weight_mode':self.tc_weight_mode,
+                'use_mass_weight':self.use_mass_weight,
+            }
             self.sampling_states_interpolation_settings[self.roots_to_follow[0]] = self.states_interpolation_settings[self.roots_to_follow[0]].copy()
             self.sampling_states_interpolation_settings[self.roots_to_follow[0]]['imforcefield_file'] = self.sampling_imforcefieldfiles[self.roots_to_follow[0]]
 
@@ -1057,7 +1059,8 @@ class IMForceFieldGenerator:
                                             base_mol = cur_mol if frac <= 0.50 else nxt_mol
                                             scan_entries.append((target_deg, scan_mode, base_mol))
                                     self.ostream.print_blank()
-                                    self.ostream.print_line(f"optimized-minima scan schedule for {dih_key}: "
+                                    self.ostream.print_line(
+                                        f"optimized-minima scan schedule for {dih_key}: "
                                         f"{[(round(_signed_deg(a), 1), m) for a, m, _ in scan_entries]}")
                                     self.ostream.flush()
 
@@ -1660,8 +1663,9 @@ class IMForceFieldGenerator:
         # Then, determine the rotation matrix which
         # aligns data_point (target_coordinates)
         # to self.impes_coordinate (reference_coordinates)
-        rotation_matrix_core = geometric.rotate.get_rot(target_coordinates,
-                                                reference_coordinates)
+        rotation_matrix_core = geometric.rotate.get_rot(
+            target_coordinates,
+            reference_coordinates)
 
         # Rotate the data point
         rotated_coordinates_core = np.dot(rotation_matrix_core, target_coordinates.T).T
@@ -1754,8 +1758,9 @@ class IMForceFieldGenerator:
                 # Then, determine the rotation matrix which
                 # aligns data_point (target_coordinates)
                 # to self.impes_coordinate (reference_coordinates)
-                rotation_matrix = geometric.rotate.get_rot(target_coordinates,
-                                                        reference_coordinates)
+                rotation_matrix = geometric.rotate.get_rot(
+                    target_coordinates,
+                    reference_coordinates)
                 # Rotate the data point
                 rotated_coordinates = np.dot(rotation_matrix, target_coordinates.T).T
                 # Calculate the Cartesian distance
@@ -1872,7 +1877,8 @@ class IMForceFieldGenerator:
                         counter += 1
                         if rmsd >= 0.3:
                             self.ostream.print_header('------------------')
-                            self.ostream.print_header(f'The overall RMSD is {rmsd} -> '
+                            self.ostream.print_header(
+                                f'The overall RMSD is {rmsd} -> '
                                 'The current structures are well seperated from the database conformations! '
                                 'loop is discontinued')
                             self.ostream.print_blank()
@@ -1938,7 +1944,8 @@ class IMForceFieldGenerator:
                     self.ostream.print_blank()
                     self.ostream.print_header(f"#### Structure {i+1} ####")
                     self.ostream.print_blank()
-                    self.ostream.print_block(f'delta_E:  {abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol()} kcal/mol \n {abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol() / len(molecule.get_labels())} '
+                    self.ostream.print_block(
+                        f'delta_E:  {abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol()} kcal/mol \n {abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol() / len(molecule.get_labels())} '
                         'kcal/mol per atom  \n')
                     self.ostream.flush()
 

@@ -425,7 +425,6 @@ class IMDatabasePointCollecter:
                                           qm_atoms,
                                           molecule,
                                           filename,
-                                        #   write_xml=do_io_on_rank
                                           )
 
             # if do_io_on_rank:
@@ -868,10 +867,11 @@ class IMDatabasePointCollecter:
             self.gradient_rmsd_thrsh = dynamics_settings['grad_rmsd_thrsh']
 
         if 'sampling_drivers' in dynamics_settings:
-            sampling_settings = dynamics_settings.get('sampling_settings', {'enabled':False,
-            'e_thrsh_kcal_per_atom': 0.1,
-            'g_thrsh_kcal_ang_per_atom':2.0,
-            'force_orient_cos': 0.0001})
+            sampling_settings = dynamics_settings.get('sampling_settings', {
+                'enabled':False,
+                'e_thrsh_kcal_per_atom': 0.1,
+                'g_thrsh_kcal_ang_per_atom':2.0,
+                'force_orient_cos': 0.0001})
             self.sampling_enabled = bool(sampling_settings.get('enabled'))
             self.sampling_driver = dynamics_settings.get('sampling_drivers', None)
             self.sampling_settings = sampling_settings
@@ -2145,8 +2145,8 @@ class IMDatabasePointCollecter:
         bond_force = mm.HarmonicBondForce()
         for bond, params in bonds.items():
             bond_force.addBond(*bond,
-                            params['equilibrium'] * unit.nanometer,
-                            params['force_constant'] * unit.kilojoule_per_mole / unit.nanometer**2 * self.scaling_factor)
+                               params['equilibrium'] * unit.nanometer,
+                               params['force_constant'] * unit.kilojoule_per_mole / unit.nanometer**2 * self.scaling_factor)
         self.system.addForce(bond_force)
 
         # Harmonic angle contribution. Parameters are read from ff_gen_qm
@@ -2154,8 +2154,8 @@ class IMDatabasePointCollecter:
         angle_force = mm.HarmonicAngleForce()
         for angle, params in angles.items():
             angle_force.addAngle(*angle,
-                                params['equilibrium'] * np.pi / 180 * unit.radian,
-                                params['force_constant'] * unit.kilojoule_per_mole / unit.radian**2 * self.scaling_factor)
+                                 params['equilibrium'] * np.pi / 180 * unit.radian,
+                                 params['force_constant'] * unit.kilojoule_per_mole / unit.radian**2 * self.scaling_factor)
         self.system.addForce(angle_force)
 
         # Periodic torsion contribution. Parameters are read from ff_gen_qm
@@ -2184,9 +2184,9 @@ class IMDatabasePointCollecter:
         improper_force = mm.PeriodicTorsionForce()
         for improper, params in impropers.items():
             improper_force.addTorsion(*improper,
-                                    params['periodicity'],
-                                    params['phase'] * np.pi / 180 * unit.radian,
-                                    params['barrier'] * unit.kilojoule_per_mole * self.scaling_factor)
+                                      params['periodicity'],
+                                      params['phase'] * np.pi / 180 * unit.radian,
+                                      params['barrier'] * unit.kilojoule_per_mole * self.scaling_factor)
         self.system.addForce(improper_force)
 
     def update_gradient_and_energy(self, new_positions):
@@ -2664,11 +2664,12 @@ class IMDatabasePointCollecter:
                 self.allowed_molecules[root]['qm_energies'].append(state_specific_energies[root][0])
                 self.allowed_molecules[root]['qm_gradients'].append(state_specific_gradients[root][0])
 
-                self.write_qm_energy_determined_points_h5(self.allowed_molecules[root]['molecules'][self.last_added: ],
-                                                    self.allowed_molecules[root]['qm_energies'][self.last_added:],
-                                                    self.allowed_molecules[root]['qm_gradients'][self.last_added:],
-                                                    self.allowed_molecules[root]['im_energies'][self.last_added:],
-                                                    root)
+                self.write_qm_energy_determined_points_h5(
+                    self.allowed_molecules[root]['molecules'][self.last_added: ],
+                    self.allowed_molecules[root]['qm_energies'][self.last_added:],
+                    self.allowed_molecules[root]['qm_gradients'][self.last_added:],
+                    self.allowed_molecules[root]['im_energies'][self.last_added:],
+                    root)
                 self.last_added = len(self.allowed_molecules[root]['molecules'])
 
             if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) >= 10 and self.density_around_data_point[self.current_state] > 1 and self.density_around_data_point[self.current_state] % 1 == 0 and self.prev_dens_of_points[self.current_state] != self.density_around_data_point[self.current_state]:
@@ -2686,15 +2687,16 @@ class IMDatabasePointCollecter:
 
                 if self.use_opt_confidence_radius[1] == 'multi_grad':
 
-                    trust_radius = self.determine_trust_radius_gradient(chosen_structures,
-                                                            chosen_qm_energies,
-                                                            chosen_qm_gradients,
-                                                            chosen_im_energies,
-                                                            self.qm_data_point_dict[self.current_state],
-                                                            self.interpolation_settings[self.current_state],
-                                                            sym_dict,
-                                                            self.root_z_matrix[self.current_state],
-                                                            exponent_p_q = (self.impes_drivers[self.current_state].exponent_p, self.impes_drivers[self.current_state].exponent_q))
+                    trust_radius = self.determine_trust_radius_gradient(
+                        chosen_structures,
+                        chosen_qm_energies,
+                        chosen_qm_gradients,
+                        chosen_im_energies,
+                        self.qm_data_point_dict[self.current_state],
+                        self.interpolation_settings[self.current_state],
+                        sym_dict,
+                        self.root_z_matrix[self.current_state],
+                        exponent_p_q = (self.impes_drivers[self.current_state].exponent_p, self.impes_drivers[self.current_state].exponent_q))
 
                 for idx, trust_radius in enumerate(trust_radius):
 
@@ -3291,11 +3293,12 @@ class IMDatabasePointCollecter:
                         )
 
                     for root_idx in mol_basis[4]:
-                        self.write_qm_energy_determined_points_h5(self.allowed_molecules[root_idx]['molecules'][self.last_added: ],
-                                                            self.allowed_molecules[root_idx]['qm_energies'][self.last_added:],
-                                                            self.allowed_molecules[root_idx]['qm_gradients'][self.last_added:],
-                                                            self.allowed_molecules[root_idx]['im_energies'][self.last_added:],
-                                                            root_idx)
+                        self.write_qm_energy_determined_points_h5(
+                            self.allowed_molecules[root_idx]['molecules'][self.last_added: ],
+                            self.allowed_molecules[root_idx]['qm_energies'][self.last_added:],
+                            self.allowed_molecules[root_idx]['qm_gradients'][self.last_added:],
+                            self.allowed_molecules[root_idx]['im_energies'][self.last_added:],
+                            root_idx)
 
                 self.last_added = len(self.allowed_molecules[mol_basis[4][number]]['molecules'])
                 label_counter += 1
@@ -3650,10 +3653,11 @@ class IMDatabasePointCollecter:
             else:
                 energy_weight = 0.5
 
-            opt = IMTrustRadiusOptimizer(z_matrix, impes_dict, sym_dict, dps,
-                 geom_list, E_ref_list, G_ref_list, exponent_p_q,
-                 e_x=energy_weight,
-                 beta=0.8)
+            opt = IMTrustRadiusOptimizer(
+                z_matrix, impes_dict, sym_dict, dps,
+                geom_list, E_ref_list, G_ref_list, exponent_p_q,
+                e_x=energy_weight,
+                beta=0.8)
 
             history = []
             progress_header_printed = {"value": False}
@@ -4599,8 +4603,9 @@ class IMDatabasePointCollecter:
         # Then, determine the rotation matrix which
         # aligns data_point (target_coordinates)
         # to self.impes_coordinate (reference_coordinates)
-        rotation_matrix_core = geometric.rotate.get_rot(target_coordinates,
-                                                reference_coordinates)
+        rotation_matrix_core = geometric.rotate.get_rot(
+            target_coordinates,
+            reference_coordinates)
 
         # Rotate the data point
         rotated_coordinates_core = np.dot(rotation_matrix_core, target_coordinates.T).T
