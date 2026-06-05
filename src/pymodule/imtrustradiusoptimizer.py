@@ -34,7 +34,7 @@
 import numpy as np
 import warnings
 
-from.veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
+from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
 from .interpolationdriver import InterpolationDriver
 
 
@@ -111,8 +111,11 @@ class IMTrustRadiusOptimizer:
         W = self._worker_state
 
         drv    = W["driver"]
-        idx    = W["idx"]; nsub = W["nsub"]
-        beta   = W["beta"]; e_x = W["e_x"]; conv = W["conv"]
+        idx = W["idx"]
+        nsub = W["nsub"]
+        beta = W["beta"]
+        e_x = W["e_x"]
+        conv = W["conv"]
         mol = W["structures"][s_idx]
         E_qm = W["qm_e"][s_idx]
         G_qm_flat = W["qm_g_flat"][s_idx]

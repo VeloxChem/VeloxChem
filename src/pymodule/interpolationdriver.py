@@ -145,9 +145,9 @@ class InterpolationDriver():
         self.use_eq_bond_length = False
         self.use_mass_weight = False
 
-        ####### General target customized schemes #######
+        # General target customized schemes
         self.use_tc_weights = False
-        self.tc_weight_mode = "multiplicative" # additive_rhee
+        self.tc_weight_mode = "multiplicative"  # additive_rhee
         # original scheme YM 2024-06-17: multiplicative weight function scheme with fixed confidence radius and no coordinate-specific scaling
 
         # multiplicative weight function scheme
@@ -588,7 +588,7 @@ class InterpolationDriver():
 
         # --- 3.  accumulate energy and gradient --------------------------------------
         potentials   = np.array(potentials, dtype=np.float64)        # Uᵢ
-        gradients    = np.array(gradients,  dtype=np.float64)        # ∇Uᵢ  shape (n_pts, natms, 3)
+        gradients    = np.array(gradients, dtype=np.float64)        # ∇Uᵢ  shape (n_pts, natms, 3)
 
         self.impes_coordinate.energy   = np.dot(W_i, potentials)     # Σ Wᵢ Uᵢ
 
@@ -619,7 +619,7 @@ class InterpolationDriver():
         z_matrix = self.impes_coordinate.z_matrix
 
         for label in self.labels:
-            data_point = InterpolationDatapoint(z_matrix)#, self.comm, self.ostream)
+            data_point = InterpolationDatapoint(z_matrix)  # , self.comm, self.ostream
             data_point.update_settings(self.impes_dict)
             data_point.read_hdf5(self.imforcefield_file, label)
             qm_data_points.append(data_point)
@@ -807,40 +807,40 @@ class InterpolationDriver():
             raw_weight_gradient_base,
             A_imp,
             grad_A_imp,
-        ):
+    ):
 
-            if not np.isfinite(denominator_base) or denominator_base <= 0.0:
-                return np.inf, np.zeros_like(raw_weight_gradient_base)
+        if not np.isfinite(denominator_base) or denominator_base <= 0.0:
+            return np.inf, np.zeros_like(raw_weight_gradient_base)
 
-            lam = float(self.tc_imp_gate_lambda)
+        lam = float(self.tc_imp_gate_lambda)
 
-            raw_exponent = lam * float(A_imp)
-            clip = float(self.tc_imp_gate_exp_clip)
+        raw_exponent = lam * float(A_imp)
+        clip = float(self.tc_imp_gate_exp_clip)
 
-            if raw_exponent >= clip:
-                exponent = clip
-                lambda_eff = 0.0
-            else:
-                exponent = raw_exponent
-                lambda_eff = lam
+        if raw_exponent >= clip:
+            exponent = clip
+            lambda_eff = 0.0
+        else:
+            exponent = raw_exponent
+            lambda_eff = lam
 
-            gate = np.exp(-exponent)
-            w_base = 1.0 / denominator_base
+        gate = np.exp(-exponent)
+        w_base = 1.0 / denominator_base
 
-            grad_base_flat = np.asarray(raw_weight_gradient_base, dtype=np.float64).reshape(-1)
-            grad_A_flat = np.asarray(grad_A_imp, dtype=np.float64).reshape(-1)
+        grad_base_flat = np.asarray(raw_weight_gradient_base, dtype=np.float64).reshape(-1)
+        grad_A_flat = np.asarray(grad_A_imp, dtype=np.float64).reshape(-1)
 
-            grad_gate = -lambda_eff * gate * grad_A_flat
+        grad_gate = -lambda_eff * gate * grad_A_flat
 
-            w_mod = w_base * gate
-            grad_w_mod = gate * grad_base_flat + w_base * grad_gate
+        w_mod = w_base * gate
+        grad_w_mod = gate * grad_base_flat + w_base * grad_gate
 
-            if w_mod <= 1.0e-300:
-                return np.inf, np.zeros_like(raw_weight_gradient_base)
+        if w_mod <= 1.0e-300:
+            return np.inf, np.zeros_like(raw_weight_gradient_base)
 
-            denominator_mod = 1.0 / w_mod
+        denominator_mod = 1.0 / w_mod
 
-            return denominator_mod, grad_w_mod.reshape(raw_weight_gradient_base.shape)
+        return denominator_mod, grad_w_mod.reshape(raw_weight_gradient_base.shape)
 
     def _target_customized_additive_distance_term(self, data_point, active_dofs):
         """
@@ -1053,7 +1053,7 @@ class InterpolationDriver():
         term2 = 2.0 * ((p * u**(p - 1.0) + q * u**(q - 1.0)) * (p * u**p + q * u**q)) / (denom_base**3)
 
         # Common scaling factor analytically pulled out of the original expressions
-        multiplier = (4.0 * scale2* v) / (R**3)
+        multiplier = (4.0 * scale2 * v) / (R**3)
 
         trust_radius_weight_gradient_gradient = multiplier * (term1 - term2)
 
@@ -1109,37 +1109,37 @@ class InterpolationDriver():
 
     def trust_radius_tc_weight_gradient_gradient(self, confidence_radius, distance, distance_vector, imp_int_coords_distance, imp_int_coords_dist_derivative, scale2=1.0,):
 
-            # 1. Define base variables
-            R = confidence_radius
-            D = distance**2 + imp_int_coords_distance
-            v = imp_int_coords_dist_derivative + 2.0 * scale2 * distance_vector.reshape(-1)
+        # 1. Define base variables
+        R = confidence_radius
+        D = distance**2 + imp_int_coords_distance
+        v = imp_int_coords_dist_derivative + 2.0 * scale2 * distance_vector.reshape(-1)
 
-            p = float(self.exponent_p)
-            q = float(self.exponent_q)
+        p = float(self.exponent_p)
+        q = float(self.exponent_q)
 
-            # 2. Compute the dimensionless ratio
-            u = D / (R**2)
+        # 2. Compute the dimensionless ratio
+        u = D / (R**2)
 
-            # --- THE FIX: Early Exit for massive ratios ---
-            # If u is so large that u**(3 * max(p,q)) exceeds ~1e308, float64 overflows.
-            # Physically, the weight gradient at this immense relative distance is practically 0.0.
-            if np.isscalar(u) and u > 1e6:
-                return np.zeros((distance_vector.shape[0], 3), dtype=np.float64)
+        # --- THE FIX: Early Exit for massive ratios ---
+        # If u is so large that u**(3 * max(p,q)) exceeds ~1e308, float64 overflows.
+        # Physically, the weight gradient at this immense relative distance is practically 0.0.
+        if np.isscalar(u) and u > 1e6:
+            return np.zeros((distance_vector.shape[0], 3), dtype=np.float64)
 
-            # 3. Base denominator
-            denom_base = u**p + u**q
-            denom_base = np.clip(denom_base, a_min=1e-300, a_max=None)
+        # 3. Base denominator
+        denom_base = u**p + u**q
+        denom_base = np.clip(denom_base, a_min=1e-300, a_max=None)
 
-            # 4. Compute the grouped terms
-            term1 = (p**2 * u**(p - 1.0) + q**2 * u**(q - 1.0)) / (denom_base**2)
-            term2 = 2.0 * ((p * u**(p - 1.0) + q * u**(q - 1.0)) * (p * u**p + q * u**q)) / (denom_base**3)
+        # 4. Compute the grouped terms
+        term1 = (p**2 * u**(p - 1.0) + q**2 * u**(q - 1.0)) / (denom_base**2)
+        term2 = 2.0 * ((p * u**(p - 1.0) + q * u**(q - 1.0)) * (p * u**p + q * u**q)) / (denom_base**3)
 
-            # 5. Apply the common multiplier
-            multiplier = (2.0 * v) / (R**3)
+        # 5. Apply the common multiplier
+        multiplier = (2.0 * v) / (R**3)
 
-            trust_radius_weight_gradient_gradient = multiplier * (term1 - term2)
+        trust_radius_weight_gradient_gradient = multiplier * (term1 - term2)
 
-            return trust_radius_weight_gradient_gradient.reshape(distance_vector.shape[0], 3)
+        return trust_radius_weight_gradient_gradient.reshape(distance_vector.shape[0], 3)
 
     def additive_rhee_shepard_weight_gradient(
         self,
@@ -1461,17 +1461,17 @@ class InterpolationDriver():
         grad_s = 1.0
         Xc = center_reference_coordinates_core     # variable (current geometry)
         Yc = center_target_coordinates_core        # fixed (datapoint)
-        R_x  = geometric.rotate.get_rot(Yc, Xc)
+        R_x = geometric.rotate.get_rot(Yc, Xc)
 
         rotated_current = (R_x @ Yc.T).T
-        distance_vector_sub =  Xc - rotated_current
+        distance_vector_sub = Xc - rotated_current
         # scale = 1.0 / distance_vector_sub.shape[0]
         # distance = scale * np.linalg.norm(distance_vector_sub)
         # distance_vector_sub *= scale**2
 
-        n_dof = distance_vector_sub.size
-        scale2 = 1.0 #/ n_dof**(2.0 * 0.25)
-        distance = np.sqrt(scale2 * np.dot(distance_vector_sub.ravel(),distance_vector_sub.ravel()))
+        # n_dof = distance_vector_sub.size
+        scale2 = 1.0  # / n_dof**(2.0 * 0.25)
+        distance = np.sqrt(scale2 * np.dot(distance_vector_sub.ravel(), distance_vector_sub.ravel()))
 
         dihedral_dist = 0.0
         if distance < 1e-8:
@@ -1944,7 +1944,7 @@ class InterpolationDriver():
         global_coord_score = self._normalize_nonnegative(
             0.50 * global_source_blame
             + 0.50 * global_response
-)
+        )
         N_coords = N
 
         d_eff = self._effective_dimension(global_coord_score)
@@ -2576,7 +2576,7 @@ class InterpolationDriver():
             if kind == "dihedral":
                 d = self._principal_torsion_delta(q_current[idx] - q_ref[idx])
                 dq_raw[idx] = d
-                dq_eff[idx] = 2.0 *np.sin(0.5 * d)
+                dq_eff[idx] = 2.0 * np.sin(0.5 * d)
                 chain[idx] = np.cos(0.5 * d)
 
             elif kind == "improper":

@@ -381,8 +381,8 @@ class InterpolationDatapoint:
 
         if self.inv_sqrt_masses is not None:
             self.b2_matrix = (self.b2_matrix *
-                self.inv_sqrt_masses.reshape(1, -1, 1) *
-                self.inv_sqrt_masses.reshape(1,  1, -1))
+                              self.inv_sqrt_masses.reshape(1, -1, 1) *
+                              self.inv_sqrt_masses.reshape(1, 1, -1))
 
     def transform_gradient_to_internal_coordinates(self, tol=1e-6):
         """
@@ -441,7 +441,7 @@ class InterpolationDatapoint:
         # Make zero the values of s_inv that are smaller than tol
         s_inv = np.array([1 / s_i if s_i > tol else 0.0 for s_i in s])
 
-        number_of_positive_values = np.count_nonzero(s_inv)
+        # number_of_positive_values = np.count_nonzero(s_inv)
 
         g_minus_matrix = np.dot(U, np.dot(np.diag(s_inv), Vt))
 
@@ -933,8 +933,8 @@ class InterpolationDatapoint:
                 imp_int_coord_dict = self.get_imp_int_coord_as_np_arrays()
                 for key in imp_int_coord_dict.keys():
                     h5f.create_dataset(label + '_' + key,
-                                    data=imp_int_coord_dict[key],
-                                    compression='gzip')
+                                       data=imp_int_coord_dict[key],
+                                       compression='gzip')
 
             h5f.close()
 
@@ -1090,7 +1090,7 @@ class InterpolationDatapoint:
             label + "_imp_angles",
             label + "_imp_dihedrals",
             label + "_imp_impropers"
-            ]
+        ]
 
         with h5py.File(fname, 'r+') as h5f:
             for key in keys_to_remove:
