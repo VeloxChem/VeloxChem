@@ -994,42 +994,6 @@ class TpaReducedDriver(TpaDriverBase):
 
         return None
 
-    def _normalize_print_sections(self, sections):
-        """
-        Normalize requested print sections for reduced TPA results.
-
-        :param sections:
-            Section label or sequence of section labels.
-
-        :return:
-            Ordered list of normalized section labels.
-        """
-
-        if isinstance(sections, str):
-            requested_sections = [sections.lower()]
-        else:
-            requested_sections = [section.lower() for section in sections]
-
-        valid_sections = ('summary', 'note', 'gamma', 'reference', 'spectrum',
-                          'all')
-        invalid_sections = [
-            section for section in requested_sections if section not in valid_sections
-        ]
-        from .errorhandler import assert_msg_critical
-        assert_msg_critical(
-            not invalid_sections,
-            'TpaReducedDriver.print_results: Invalid section label(s).')
-
-        if 'all' in requested_sections:
-            requested_sections = ['note', 'gamma', 'reference', 'spectrum']
-
-        normalized_sections = []
-        for section in requested_sections:
-            if section not in normalized_sections:
-                normalized_sections.append(section)
-
-        return normalized_sections
-
     def _get_summary_title(self):
         """
         Gets the summary-table title for reduced TPA results.
@@ -1042,10 +1006,8 @@ class TpaReducedDriver(TpaDriverBase):
 
     def _print_note(self):
         """
-        Prints the reduced TPA approximation note and reference.
+        Prints the reduced TPA approximation note.
         """
-
-        width = 68
 
         w_str = '*** Note: The reduced expression is an approximation to the  '
         self.ostream.print_header(w_str)
@@ -1053,12 +1015,4 @@ class TpaReducedDriver(TpaDriverBase):
         self.ostream.print_header(w_str)
         w_str = '    intended for use in one-photon off-resonance regions.    '
         self.ostream.print_header(w_str)
-        self.ostream.print_blank()
-
-        title = 'Reference: '
-        title += 'K. Ahmadzadeh, M. Scott, M. Brand, O. Vahtras, X. Li, '
-        self.ostream.print_header(title.ljust(width))
-        title = 'Z. Rinkevicius, and P. Norman, '
-        title += 'J. Chem. Phys. 154, 024111 (2021)'
-        self.ostream.print_header(title.ljust(width))
         self.ostream.print_blank()

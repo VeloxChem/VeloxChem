@@ -166,6 +166,31 @@ class TestTpaTransition:
                                                           abs=1.0e-12)
             assert all(val >= 0.0 for val in spectrum_au['y_data'])
 
+    def test_get_spectrum_polarization(self):
+
+        tpa_results = {
+            'photon_energies': [0.16, 0.18],
+            'tpa_strengths': {
+                'linear': {
+                    0: 1.0,
+                    1: 2.0,
+                },
+                'circular': {
+                    0: 10.0,
+                    1: 20.0,
+                },
+            },
+        }
+
+        x_data = [0.17]
+        spectrum_linear = TpaTransitionDriver.get_spectrum(
+            tpa_results, x_data, 'au', 0.01, 'au', polarization='linear')
+        spectrum_circular = TpaTransitionDriver.get_spectrum(
+            tpa_results, x_data, 'au', 0.01, 'au', polarization='circular')
+
+        assert spectrum_circular['y_data'] == pytest.approx(
+            [10.0 * spectrum_linear['y_data'][0]])
+
     def test_print_results_public(self, tmp_path):
 
         tpa_results = self.compute_tpatransition('hf')
@@ -192,7 +217,7 @@ class TestTpaTransition:
 
         outfile = tmp_path / 'tpatransition_summary.out'
         tpa_drv = TpaTransitionDriver(MPI.COMM_WORLD, OutputStream(outfile))
-        tpa_drv.print_results(tpa_results, sections='summary', max_states=1)
+        tpa_drv.print_results(tpa_results, section='summary', max_states=1)
         tpa_drv.ostream.flush()
 
         printed = outfile.read_text()
@@ -288,7 +313,18 @@ class TestTpaTransition:
 
         recovered = read_results(str(h5file), 'tpa_transition')
 
-        assert recovered == tpa_drv._get_hdf5_results(tpa_results)
+        assert recovered['photon_energies'] == pytest.approx(
+            tpa_results['photon_energies'])
+        for rec_tensor, ref_tensor in zip(recovered['transition_moments'],
+                                          tpa_results['transition_moments']):
+            assert np.allclose(rec_tensor, ref_tensor)
+        assert recovered['tpa_strengths'] == tpa_results['tpa_strengths']
+        assert np.allclose(recovered['oscillator_strengths'],
+                           tpa_results['oscillator_strengths'])
+        assert np.allclose(recovered['elec_trans_dipoles'],
+                           tpa_results['elec_trans_dipoles'])
+        assert recovered['excitation_details'] == tpa_results[
+            'excitation_details']
 
     def test_tpatransition_results_hdf5_roundtrip_without_suffix(self, tmp_path):
 
@@ -326,7 +362,18 @@ class TestTpaTransition:
 
         recovered = read_results(str(h5file), 'tpa_transition')
 
-        assert recovered == tpa_drv._get_hdf5_results(tpa_results)
+        assert recovered['photon_energies'] == pytest.approx(
+            tpa_results['photon_energies'])
+        for rec_tensor, ref_tensor in zip(recovered['transition_moments'],
+                                          tpa_results['transition_moments']):
+            assert np.allclose(rec_tensor, ref_tensor)
+        assert recovered['tpa_strengths'] == tpa_results['tpa_strengths']
+        assert np.allclose(recovered['oscillator_strengths'],
+                           tpa_results['oscillator_strengths'])
+        assert np.allclose(recovered['elec_trans_dipoles'],
+                           tpa_results['elec_trans_dipoles'])
+        assert recovered['excitation_details'] == tpa_results[
+            'excitation_details']
 
     def test_update_settings_and_restart(self, tmp_path):
 

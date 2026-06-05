@@ -237,7 +237,7 @@ class TestTPA:
         outfile = tmp_path / 'tpa_reduced_summary.out'
         tpa_drv = TpaReducedDriver(MPI.COMM_WORLD, OutputStream(outfile))
         tpa_drv.frequencies = rsp_results['frequencies']
-        tpa_drv.print_results(rsp_results, sections='summary')
+        tpa_drv.print_results(rsp_results, section='summary')
         tpa_drv.ostream.flush()
 
         printed = outfile.read_text()
@@ -344,7 +344,7 @@ class TestTPA:
         outfile = tmp_path / 'tpa_full_summary.out'
         tpa_drv = TpaFullDriver(MPI.COMM_WORLD, OutputStream(outfile))
         tpa_drv.frequencies = rsp_results['frequencies']
-        tpa_drv.print_results(rsp_results, sections='summary')
+        tpa_drv.print_results(rsp_results, section='summary')
         tpa_drv.ostream.flush()
 
         printed = outfile.read_text()
@@ -433,7 +433,7 @@ class TestTPA:
 
         recovered = read_results(str(h5file), 'tpa_reduced')
 
-        assert recovered == tpa_drv._get_hdf5_results(rsp_results)
+        assert recovered == rsp_results
 
     def test_reduced_driver_results_hdf5_roundtrip_without_suffix(self, tmp_path):
 
@@ -460,7 +460,7 @@ class TestTPA:
 
         recovered = read_results(str(h5file), 'tpa_reduced')
 
-        assert recovered == tpa_drv._get_hdf5_results(rsp_results)
+        assert recovered == rsp_results
 
     def test_full_driver_results_hdf5_roundtrip(self, tmp_path):
 
@@ -487,7 +487,7 @@ class TestTPA:
 
         recovered = read_results(str(h5file), 'tpa_full')
 
-        assert recovered == tpa_drv._get_hdf5_results(rsp_results)
+        assert recovered == rsp_results
 
     def test_full_driver_results_hdf5_roundtrip_without_suffix(self, tmp_path):
 
@@ -514,7 +514,7 @@ class TestTPA:
 
         recovered = read_results(str(h5file), 'tpa_full')
 
-        assert recovered == tpa_drv._get_hdf5_results(rsp_results)
+        assert recovered == rsp_results
 
     def test_full_driver_defaults_and_restart(self, tmp_path):
 

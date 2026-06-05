@@ -674,13 +674,17 @@ def plot_tpa_spectrum(spectrum, ax=None, interpolate=True, show_points=True):
     if interpolate and len(x_data) >= 3:
         try:
             from scipy.interpolate import CubicSpline
-            x_dense = np.linspace(float(np.min(x_data)), float(np.max(x_data)),
-                                  500)
-            cs = CubicSpline(x_data, y_data)
-            ax.plot(x_dense, cs(x_dense),
-                    color='black', alpha=0.9, linewidth=2.5)
         except ImportError:
             ax.plot(x_data, y_data, color='black', alpha=0.9, linewidth=2.0)
+        else:
+            sort_idx = np.argsort(x_data)
+            x_sorted = x_data[sort_idx]
+            y_sorted = y_data[sort_idx]
+            x_dense = np.linspace(float(np.min(x_data)), float(np.max(x_data)),
+                                  500)
+            cs = CubicSpline(x_sorted, y_sorted)
+            ax.plot(x_dense, cs(x_dense),
+                    color='black', alpha=0.9, linewidth=2.5)
     else:
         ax.plot(x_data, y_data, color='black', alpha=0.9, linewidth=2.0)
 
