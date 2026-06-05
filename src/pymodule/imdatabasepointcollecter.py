@@ -2599,7 +2599,7 @@ class IMDatabasePointCollecter:
                 #       grad, self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.gradient)
 
                 gradient_difference = (grad - self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.gradient) * hartree_in_kcalpermol() / bohr_in_angstrom()
-                rmsd_gradient    = np.sqrt((gradient_difference**2).mean())
+                rmsd_gradient = np.sqrt((gradient_difference**2).mean())
 
                 # print("Gradients:", np.linalg.norm(grad) * hartree_in_kcalpermol() / bohr_in_angstrom(), np.linalg.norm(self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.gradient)  * hartree_in_kcalpermol() / bohr_in_angstrom())
                 self._print_point_correlation_result(
@@ -2961,7 +2961,7 @@ class IMDatabasePointCollecter:
                             delta_e = abs(opt_results['opt_energies'][-1] - self.impes_drivers[state_to_optim].get_energy()) * hartree_in_kcalpermol()
 
                             current_gradient_difference = (opt_gradient - self.impes_drivers[state_to_optim].impes_coordinate.gradient) * hartree_in_kcalpermol() / bohr_in_angstrom()
-                            current_rmsd_gradient    = np.sqrt((current_gradient_difference**2).mean())
+                            current_rmsd_gradient = np.sqrt((current_gradient_difference**2).mean())
 
                             self.ostream.print_blank()
                             self.ostream.print_info(f"IM-PES diagnostics for state {state_to_optim}")

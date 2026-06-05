@@ -501,13 +501,13 @@ class InterpolationDriver():
             weight_fallback_metrics.append(float(abs(distance)) if np.isfinite(distance) else np.inf)
 
         # --- initialise accumulators -------------------------------------------------
-        self.impes_coordinate.energy    = 0.0
-        self.impes_coordinate.gradient  = np.zeros((natms, 3))
-        self.impes_coordinate.NAC       = np.zeros((natms, 3))       # if you need it
+        self.impes_coordinate.energy = 0.0
+        self.impes_coordinate.gradient = np.zeros((natms, 3))
+        self.impes_coordinate.NAC = np.zeros((natms, 3))       # if you need it
 
         # --- 1.  raw (unnormalised) weights and their gradients ----------------------
-        w_i          = np.array(weights_cart, dtype=np.float64)        # ← rename
-        grad_w_i     = np.array(weight_gradients_cart, dtype=np.float64)   # shape (n_pts, natms, 3)
+        w_i = np.array(weights_cart, dtype=np.float64)        # ← rename
+        grad_w_i = np.array(weight_gradients_cart, dtype=np.float64)   # shape (n_pts, natms, 3)
 
         # --- 2. Normalize raw weights -----------------------------------------------
         S_raw = float(np.sum(w_i))
@@ -587,10 +587,10 @@ class InterpolationDriver():
         self.weight_eps = eps
 
         # --- 3.  accumulate energy and gradient --------------------------------------
-        potentials   = np.array(potentials, dtype=np.float64)        # Uᵢ
-        gradients    = np.array(gradients, dtype=np.float64)        # ∇Uᵢ  shape (n_pts, natms, 3)
+        potentials = np.array(potentials, dtype=np.float64)        # Uᵢ
+        gradients = np.array(gradients, dtype=np.float64)        # ∇Uᵢ  shape (n_pts, natms, 3)
 
-        self.impes_coordinate.energy   = np.dot(W_i, potentials)     # Σ Wᵢ Uᵢ
+        self.impes_coordinate.energy = np.dot(W_i, potentials)     # Σ Wᵢ Uᵢ
 
         self.impes_coordinate.gradient = (np.tensordot(W_i, gradients, axes=1) + np.tensordot(potentials, grad_W_i, axes=1))
 
@@ -598,7 +598,7 @@ class InterpolationDriver():
         for lbl, Wi in zip(used_labels, W_i):
             self.weights[lbl] = Wi
 
-        self.averaged_int_dist   = np.tensordot(W_i, averaged_int_dists, axes=1)
+        self.averaged_int_dist = np.tensordot(W_i, averaged_int_dists, axes=1)
 
     def read_qm_data_points(self):
         """ Reads the QM data points to be used for interpolation

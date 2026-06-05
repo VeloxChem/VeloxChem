@@ -55,19 +55,19 @@ class IMTrustRadiusOptimizer:
                 RuntimeWarning,
                 stacklevel=2,
             )
-        self.z_matrix       = z_matrix
-        self.impes_dict     = impes_dict
-        self.sym_dict       = sym_dict
-        self.dps            = dps
-        self.structures     = structure_list
-        self.qm_e           = np.asarray(qm_e, dtype=np.float64)
-        self.qm_g_flat      = np.stack([g.reshape(-1) for g in qm_g], axis=0)  # (S,D)
-        self.e_x            = float(e_x)
-        self.beta           = float(beta)
-        self.M              = len(dps)
-        self.S              = len(structure_list)
-        self.idx            = np.asarray([o*3 + i for o in sym_dict[3] for i in range(3)], dtype=int)
-        self.verbose        = bool(verbose)
+        self.z_matrix = z_matrix
+        self.impes_dict = impes_dict
+        self.sym_dict = sym_dict
+        self.dps = dps
+        self.structures = structure_list
+        self.qm_e = np.asarray(qm_e, dtype=np.float64)
+        self.qm_g_flat = np.stack([g.reshape(-1) for g in qm_g], axis=0)  # (S,D)
+        self.e_x = float(e_x)
+        self.beta = float(beta)
+        self.M = len(dps)
+        self.S = len(structure_list)
+        self.idx = np.asarray([o*3 + i for o in sym_dict[3] for i in range(3)], dtype=int)
+        self.verbose = bool(verbose)
 
         self._init_worker_state(exponent_p_q)
 
@@ -110,7 +110,7 @@ class IMTrustRadiusOptimizer:
 
         W = self._worker_state
 
-        drv    = W["driver"]
+        drv = W["driver"]
         idx = W["idx"]
         nsub = W["nsub"]
         beta = W["beta"]
@@ -273,7 +273,7 @@ class IMTrustRadiusOptimizer:
         else:
             dL_dg_sub = 2.0 * g_sub / nsub
 
-        grad_force_part  = dG_dα_sub @ dL_dg_sub                     # (M,)
+        grad_force_part = dG_dα_sub @ dL_dg_sub                     # (M,)
         grad_energy_part = 2.0 * e_x * dE_res * dE_dα                # (M,)
         grad_s = grad_energy_part + 0.5 * (1.0 - e_x) * grad_force_part   # (M,)
         return float(loss_s), grad_s, float(L_e), float(L_F)
