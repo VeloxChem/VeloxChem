@@ -31,11 +31,11 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
-import os
 import random
 import h5py
 from mpi4py import MPI
 from contextlib import redirect_stderr
+from pathlib import Path
 from .outputstream import OutputStream
 from io import StringIO
 from copy import deepcopy
@@ -573,7 +573,7 @@ class IMForceFieldGenerator:
             root_extract_z_matrix = {}
             for root_idx, standard_file in enumerate(standard_files):
                 
-                if os.path.exists(standard_file):
+                if Path(standard_file).exists():
                     if self.roots_to_follow[root_idx] not in root_extract_z_matrix:
                         root_extract_z_matrix[self.roots_to_follow[root_idx]] = True 
                 else:
@@ -763,7 +763,7 @@ class IMForceFieldGenerator:
         existing = set()
 
         # check if database already contains the given datapoint
-        if os.path.exists(sampling_file):
+        if Path(sampling_file).exists():
             sampling_drv = InterpolationDriver(self.roots_z_matrix[root])
             sampling_drv.update_settings(sampling_settings)
             samp_db_labels, _ = sampling_drv.read_labels()
@@ -851,7 +851,7 @@ class IMForceFieldGenerator:
 
         """
 
-        if self.reference_struc_energy_file is not None and not os.path.exists(self.reference_struc_energy_file):
+        if self.reference_struc_energy_file is not None and not Path(self.reference_struc_energy_file).exists():
             self.reference_struc_energy_file = None
 
         # First set up the system for which the database needs to be constructed
@@ -914,10 +914,10 @@ class IMForceFieldGenerator:
             files_to_add_conf = []
             molecules_to_add_info = []             
 
-            if not os.path.exists(self.imforcefieldfiles[self.roots_to_follow[0]]):
+            if not Path(self.imforcefieldfiles[self.roots_to_follow[0]]).exists():
                 files_to_add_conf.append(self.roots_to_follow[0])
 
-            if self.seed_structures is not None and not os.path.exists(imforcefieldfile):
+            if self.seed_structures is not None and not Path(imforcefieldfile).exists():
     
                 molecules_to_add_info = []
                 for counter, entry in enumerate(self.seed_structures.items()):
@@ -1096,7 +1096,7 @@ class IMForceFieldGenerator:
 
                         self.add_point(current_molecule_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
   
-            elif self.seed_structures is None and not os.path.exists(imforcefieldfile):
+            elif self.seed_structures is None and not Path(imforcefieldfile).exists():
         
                 molecules_to_add_info = []
                 if self.use_minimized_structures[0]:       
@@ -1174,7 +1174,7 @@ class IMForceFieldGenerator:
                     current_basis = MolecularBasis.read(molecule, states_basis['es'])
                     molecules_to_add_info.append((molecule, current_basis, self.roots_to_follow, []))
 
-                if not os.path.exists(imforcefieldfile):
+                if not Path(imforcefieldfile).exists():
                     self.add_point(molecules_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
 
             density_of_datapoints = self.determine_datapoint_density(self.states_interpolation_settings)
@@ -1631,7 +1631,7 @@ class IMForceFieldGenerator:
 
         for state in reseted_point_densities_dict.keys():
             qm_datapoints = []
-            if imforcefieldfile[state]['imforcefield_file'] in os.listdir(os.getcwd()):
+            if Path(imforcefieldfile[state]['imforcefield_file']).exists():
                 impes_driver = InterpolationDriver(self.roots_z_matrix[state])
                 impes_driver.update_settings(imforcefieldfile[state])
                 self.qmlabels, z_matrix = impes_driver.read_labels()
@@ -2154,7 +2154,7 @@ class IMForceFieldGenerator:
                     interpolation_driver.imforcefield_file = target_file
                     
                     sorted_labels = []
-                    if target_file in os.listdir(os.getcwd()):
+                    if Path(target_file).exists():
                         org_labels, z_matrix = interpolation_driver.read_labels()
                         labels = [label for label in org_labels if '_symmetry' not in label]
                         sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
