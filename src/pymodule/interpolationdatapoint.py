@@ -693,6 +693,10 @@ class InterpolationDatapoint:
         d2L = np.zeros_like(r_arr)
 
 
+        # R = - np.square(r_eq_arr) * (1.0 / r_arr - 1.0 / r_eq_arr)
+        # dR = np.square(r_eq_arr) / np.square(r_arr)
+        # d2R = -np.square(r_eq_arr) * 2.0 / np.power(r_arr, 3)
+
         R = - np.square(r_eq_arr) * (1.0 / r_arr - 1.0 / r_eq_arr)
         dR = np.square(r_eq_arr) / np.square(r_arr)
         d2R = -np.square(r_eq_arr) * 2.0 / np.power(r_arr, 3)
@@ -730,9 +734,13 @@ class InterpolationDatapoint:
         s[mask_outer] = 0.0
         ds[mask_outer] = 0.0
         d2s[mask_outer] = 0.0
-
+        
         q = s * L + (1.0 - s) * R
-
+        
+        # q = R
+        # dq_dr = dR
+        # d2q_dr2 = d2R
+        # here the switch derivativve is being assembled 
         dq_dr = ds * (L - R) + s * dL + (1.0 - s) * dR
         d2q_dr2 = d2s * (L - R) + 2.0 * ds * (dL - dR) + s * d2L + (1.0 - s) * d2R
 

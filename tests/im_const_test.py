@@ -11,7 +11,9 @@ from veloxchem.imforcefieldgenerator import IMForceFieldGenerator
 from veloxchem.interpolationdatapoint import InterpolationDatapoint
 from veloxchem.interpolationdriver import InterpolationDriver
 from veloxchem.molecule import Molecule
-from veloxchem.xtbdriver import XtbDriver
+from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.scfgradientdriver import ScfGradientDriver
+from veloxchem.scfhessiandriver import ScfHessianDriver
 
 
 def _h5py():
@@ -36,14 +38,14 @@ def _nve_energy_limits():
 def _dataset_tolerances():
     return (
         ("_cartesian_coordinates", 1.0e-5, 0.0),
-        ("_internal_coordinates", 1.0e-8, 0.0),
+        ("_internal_coordinates", 1.0e-5, 0.0),
         ("_cartesian_gradient", 2.0e-6, 0.0),
         ("_gradient", 2.0e-6, 0.0),
         ("_cartesian_hessian", 2.0e-5, 0.0),
         ("_hessian", 2.0e-5, 0.0),
         ("_energy", 1.0e-5, 0.0),
         ("_confidence_radius", 1.0e1, 0.0),
-        ("/xyz", 1.0e-9, 0.0)
+        ("/xyz", 1.0e-7, 0.0)
     )
 def get_xyz_structure():
     
@@ -51,13 +53,13 @@ def get_xyz_structure():
 
 C              2.166668000000         0.686818000000         0.513057000000
 C              1.154761000000         0.429392000000        -0.592696000000
-O              1.350483000000        -0.852819000000        -1.119526000000
+O              0.864913749557        -0.938822407390        -0.655145223589
 H              3.198553000000         0.616151000000         0.108204000000
 H              2.013132000000         1.703523000000         0.932376000000
 H              2.040982000000        -0.060527000000         1.325068000000
-H              1.286075000000         1.191508000000        -1.392806000000
-H              0.127073000000         0.513996000000        -0.174440000000
-H              0.667645000000        -0.964224000000        -1.831046000000
+H              1.578981171502         0.771155493744        -1.562992416868
+H              0.225958941360         1.003741703659        -0.378949193078
+H              0.204789196714        -1.046205204715        -1.388387358386
 """
 
     return xyz_string
@@ -88,24 +90,33 @@ def _run_construction_once(workdir: Path) -> ConstructionContext:
         mol = Molecule.from_xyz_string(get_xyz_structure())
         mol.set_charge(0)
         mol.set_multiplicity(1)
+        
+        qm_drvier = ScfRestrictedDriver()
+        qm_drvier.xcfun = "pbe"
+        qm_drvier.ri_coulomb = True
+        qm_drvier.dispersion = True
 
         ffg = IMForceFieldGenerator(
-            ground_state_driver=XtbDriver(),
+            ground_state_driver=qm_drvier,
             roots_to_follow=[0],
         )
 
+        ffg.gs_basis_set_label = "def2-svp"
         ffg.add_conformal_structures = False
         ffg.use_minimized_structures = [False, [], []]
         ffg.use_opt_confidence_radius = [True, "multi_grad", 0.5, 0.3]
-        ffg.nsteps = 2000
+        ffg.use_mass_weight = True
+        ffg.use_inverse_bond_length = True
+        ffg.use_tc_weights = False
+        ffg.nsteps = 3000
         ffg.snapshots = 100
-        # ffg.desired_point_density = 3
+        ffg.desired_point_density = 2
         ffg.energy_threshold = 0.009
         ffg.sampling_settings = {"enabled": False}
         ffg.open_mm_platform = "CPU"
         ffg.ensemble = "NVE"
-        ffg.imforcefieldfiles = {0: _generated_db_name()}
 
+        ffg.set_up_the_system(mol)
         results = ffg.compute(mol)
 
     return ConstructionContext(

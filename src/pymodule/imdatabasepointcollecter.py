@@ -2466,6 +2466,8 @@ class IMDatabasePointCollecter:
                 self.skipping_value = 0
         
         self.point_checker += 1 
+        # if self.point_checker % 100 == 0 and self.point_checker != 0:
+        #     self.add_a_point = True
 
         if self.add_a_point == True:
 
@@ -2657,6 +2659,7 @@ class IMDatabasePointCollecter:
                 gradient_difference = (grad - self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.gradient) * hartree_in_kcalpermol() / bohr_in_angstrom()
                 rmsd_gradient    = np.sqrt((gradient_difference**2).mean())
                 
+                # print("Gradients:", np.linalg.norm(grad) * hartree_in_kcalpermol() / bohr_in_angstrom(), np.linalg.norm(self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.gradient)  * hartree_in_kcalpermol() / bohr_in_angstrom())
                 self._print_point_correlation_result(
                     root=root,
                     energy_difference=energy_difference,
