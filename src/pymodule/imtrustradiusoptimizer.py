@@ -34,9 +34,7 @@
 from mpi4py import MPI
 import numpy as np
 import scipy
-import h5py
-import re
-import os, copy, math
+import copy
 import warnings
 
 from contextlib import redirect_stderr
@@ -60,7 +58,7 @@ except ImportError:
 
 
 class IMTrustRadiusOptimizer:
-    def __init__(self, z_matrix, impes_dict, sym_dict, dps, structure_list, qm_e, qm_g, exponent_p_q, e_x, beta=0.8, verbose=False, cluster_banks=None):
+    def __init__(self, z_matrix, impes_dict, sym_dict, dps, structure_list, qm_e, qm_g, exponent_p_q, e_x, beta=0.8, verbose=False):
 
         p, q = exponent_p_q
 
@@ -89,24 +87,6 @@ class IMTrustRadiusOptimizer:
         self.S              = len(structure_list)
         self.idx            = np.asarray([o*3 + i for o in sym_dict[3] for i in range(3)], dtype=int)
         self.verbose        = bool(verbose)
-        if isinstance(cluster_banks, dict) and len(cluster_banks) > 0:
-            self.cluster_banks = copy.deepcopy(cluster_banks)
-        else:
-            self.cluster_banks = {}
-
-        # self._pool = ProcessPoolExecutor(
-        #     max_workers=(n_workers or os.cpu_count() or 2),
-        #     initializer=_init_worker,
-        #     initargs=(
-        #         z_matrix, impes_dict, sym_dict, self.cluster_banks,
-        #         dps, self.idx, exponent_p_q, self.beta, self.e_x,
-        #         self.structures, self.qm_e, self.qm_g_flat,
-        #     )
-        # _init_worker(
-        #     z_matrix, impes_dict, sym_dict, self.cluster_banks,
-        #     dps, self.idx, exponent_p_q, self.beta, self.e_x,
-        #     self.structures, self.qm_e, self.qm_g_flat,
-        # )
 
         self._init_worker_state(exponent_p_q)
 
@@ -116,14 +96,6 @@ class IMTrustRadiusOptimizer:
         self._closed = False
 
     def _init_worker_state(self, exponent_p_q):
-        """
-        Build driver and static constants for this optimizer instance.
-
-        This replaces the global _W dictionary in serial mode.
-        """
-
-        # os.environ["OMP_NUM_THREADS"] = "1"
-        # os.environ["MKL_NUM_THREADS"] = "1"
 
         driver = InterpolationDriver(self.z_matrix)
         driver.update_settings(self.impes_dict)
@@ -137,7 +109,7 @@ class IMTrustRadiusOptimizer:
         driver.calc_optim_trust_radius = True
 
         # Keep this if datapoints are mutated during evaluation
-        driver.qm_data_points = [copy.deepcopy(dp) for dp in self.dps]
+        driver.qm_data_points = self.dps
 
         self._worker_state = {
             "driver": driver,
@@ -150,17 +122,6 @@ class IMTrustRadiusOptimizer:
             "qm_e": np.asarray(self.qm_e, dtype=np.float64),
             "qm_g_flat": np.asarray(self.qm_g_flat, dtype=np.float64),
         }
-
-        # _W["driver"] = driver
-        # _W["idx"]    = np.asarray(idx, dtype=int)
-        # _W["nsub"]   = len(idx)
-        # _W["beta"]   = float(beta)
-        # _W["e_x"]    = float(e_x)
-        # _W["conv"]   = float(hartree_in_kcalpermol())
-        # _W["structures"] = tuple(structures)
-        # _W["qm_e"] = np.asarray(qm_e, dtype=np.float64)
-        # _W["qm_g_flat"] = np.asarray(qm_g_flat, dtype=np.float64)
-
 
     def _eval_structure(self, payload):
         """Compute loss and grad contrib for one structure index."""
@@ -323,127 +284,6 @@ class IMTrustRadiusOptimizer:
 
         dG_dα_sub = term1 + term2 - term3
         
-        # Vectorized getters (M, MxD, etc.)
-        # P       = np.asarray(drv.potentials, dtype=np.float64)                # (M,)
-        # G       = np.asarray(drv.gradients, dtype=np.float64).reshape(len(P), -1)  # (M,D)
-        # w_dα    = np.asarray(drv.dw_dalpha_list, dtype=np.float64)                  # (M,)
-        # w_x_alpha     = np.asarray(drv.dw_dX_dalpha_list, dtype=np.float64).reshape(len(P), -1) # (M,D)
-        # S = float(getattr(drv, "raw_sum_of_weights", drv.sum_of_weights))
-        # S_x = np.asarray(drv.sum_of_weights_grad, dtype=np.float64).reshape(-1)
-
-        # used_weight_fallback = bool(
-        #     getattr(
-        #         drv,
-        #         "used_weight_fallback",
-        #         (not np.isfinite(S)) or (S <= 1.0e-12),
-        #     )
-        # )
-
-        # weight_eps = float(getattr(drv, "weight_eps", 1.0e-12))
-        # # Residuals in kcal/mol
-        # dE_res  = (E_interp - E_qm) * conv                                          # ()
-
-        # # ----- loss (your anisotropic force term) -----
-        # g_sub   = (G_interp[idx] - G_qm_flat[idx]) * conv / bohr_in_angstrom()   # (nsub,) in kcal/mol/Angstrom
-
-        # h_sub   = (G_qm_flat[idx]) * conv / bohr_in_angstrom()   # (nsub,) in kcal/mol/Angstrom
-        # nh      = np.linalg.norm(h_sub)
-        # L_iso   = (g_sub @ g_sub) / nsub
-
-        # if nh > 1e-8:
-        #     u    = h_sub / nh
-        #     tau  = 1e-8
-        #     gate = (nh*nh) / (nh*nh + tau*tau)
-        #     gpar = (u @ g_sub) * u
-        #     gper = g_sub - gpar
-        #     L_e   = dE_res**2
-        #     L_per = (gper @ gper) / nsub
-        #     L_par = (u @ g_sub)**2
-        #     L_F   = gate * (beta * L_per + (1.0 - beta) * L_par) + (1.0 - gate) * L_iso
-        # else:
-        #     L_e = dE_res**2
-        #     L_F = L_iso
-
-        # loss_s = 1.0 * e_x * L_e + 0.5 * (1.0 - e_x) * L_F
-        
-        # # ----- gradient wrt alphas (vector length M) -----
-        # # dE/dα
-        # # dE_dα = (w_dα * (P - E_interp)) * (conv / S)                                 # (M,)
-
-        # # # dG/dα only on relevant coordinates (matrix M x nsub), all in kcal/mol
-        # # G_sub = G[:, idx]
-        # # G_interp_sub = G_interp[idx]
-        # # w_x_alpha_sub = w_x_alpha[:, idx]
-        # # S_x_sub = S_x[idx]
-        # # term1 = (w_x_alpha_sub * (P - E_interp)[:, None]) * (conv/bohr_in_angstrom() / S)                  # (M,nsub)
-        # # term2 = (w_dα[:, None] * (G_sub - G_interp_sub[None, :])) * (conv/bohr_in_angstrom() / S)          # (M,nsub)
-        # # term3 = ((w_dα * (P - E_interp)) / (S**2))[:, None] * (conv/bohr_in_angstrom() * S_x_sub[None, :]) # (M,nsub)
-        # # dG_dα_sub = term1 + term2 - term3                                                # (M,nsub)
-
-        # # dE/dα and dG/dα
-        # #
-        # # The formulas below are valid only for the standard Shepard branch:
-        # #
-        # #     W_i = w_i / S
-        # #
-        # # If InterpolationDriver used the fallback branch:
-        # #
-        # #     W_i = 1 / n_pts
-        # #     grad_W_i = 0
-        # #
-        # # then dividing by raw S is mathematically invalid.
-        # # During trust-radius optimization, fallback should be treated as an invalid
-        # # alpha vector because it means the current alphas provide no Shepard support
-        # # for this reference structure.
-
-        # G_sub = G[:, idx]
-        # G_interp_sub = G_interp[idx]
-        # w_x_alpha_sub = w_x_alpha[:, idx]
-        # S_x_sub = S_x[idx]
-
-        # if used_weight_fallback or (not np.isfinite(S)) or (S <= weight_eps):
-        #     # Strong recommendation for trust-radius optimization:
-        #     # reject this alpha vector by returning a large penalty.
-        #     #
-        #     # The negative gradient pushes alpha upward because optimizers step roughly
-        #     # along -gradient. Thus a negative dL/dalpha favors increasing alpha.
-        #     penalty = 1.0e20
-        #     grad_penalty = -1.0e4 * np.ones(self.M, dtype=np.float64)
-
-        #     return float(penalty), grad_penalty, float(penalty), float(penalty)
-
-        # else:
-        #     invS = 1.0 / S
-        #     invS2 = invS * invS
-
-        #     # dE/dalpha_j = dw_j/dalpha_j * (P_j - E) / S
-        #     dE_dα = (w_dα * (P - E_interp)) * (conv * invS)
-
-        #     # dG/dalpha_j in the selected Cartesian subspace.
-        #     #
-        #     # This matches the derivative of:
-        #     #
-        #     # G = sum_i W_i G_i + sum_i P_i grad_X W_i
-        #     #
-        #     # under the standard normalized-weight branch.
-        #     term1 = (
-        #         w_x_alpha_sub * (P - E_interp)[:, None]
-        #     ) * (conv / bohr_in_angstrom() * invS)
-
-        #     term2 = (
-        #         w_dα[:, None] * (G_sub - G_interp_sub[None, :])
-        #     ) * (conv / bohr_in_angstrom() * invS)
-
-        #     term3 = (
-        #         (w_dα * (P - E_interp))[:, None]
-        #         * (conv / bohr_in_angstrom())
-        #         * S_x_sub[None, :]
-        #         * invS2
-        #     )
-
-        #     dG_dα_sub = term1 + term2 - term3
-
-        # dL/dg in subspace
         if nh > 1e-8:
             dL_dg_sub = (2.0 * gate) * ((beta/nsub)*(gper) + (1.0 - beta)*(gpar)) + (2.0 * (1.0 - gate) / nsub) * g_sub
         else:
@@ -469,10 +309,6 @@ class IMTrustRadiusOptimizer:
         if not np.all(np.isfinite(alphas_arr)):
             raise ValueError("AlphaOptimizer.fun received non-finite alpha values")
 
-        # payloads = [(i, alphas_arr) for i in range(self.S)]
-
-        # chunksize = max(1, math.ceil(self.S / (4 * self._pool._max_workers)))
-        # futs = self._pool.map(_eval_structure, payloads, chunksize=chunksize)
         futs = (self._eval_structure((i, alphas_arr)) for i in range(self.S))
  
 
@@ -498,12 +334,7 @@ class IMTrustRadiusOptimizer:
             'loss_energy': mean_energy,
             'loss_force': mean_force,
         }
-        if self.verbose:
-            print(
-                'loss function',
-                mean_loss,
-                f"(energy={mean_energy:.6f}, force={mean_force:.6f})"
-            )
+    
 
         return mean_loss
 
@@ -546,19 +377,14 @@ class IMTrustRadiusOptimizer:
 
 
     def pack_reduced_alphas(self, alpha_full, trainable_idx):
-        """
-        Extract reduced variables u = alpha[T].
-        """
+
         alpha = self._validate_full_alpha(alpha_full)
         idx = self._validate_trainable_idx(trainable_idx)
         return alpha[idx].copy()
 
 
     def expand_reduced_alphas(self, x_var, trainable_idx, alpha_full_fixed):
-        """
-        Build full alpha from reduced variables:
-        alpha_i(u) = u_k if i == T_k else alpha_fixed_i
-        """
+
         idx = self._validate_trainable_idx(trainable_idx)
         alpha_fixed = self._validate_full_alpha(alpha_full_fixed)
 
@@ -576,10 +402,7 @@ class IMTrustRadiusOptimizer:
 
 
     def project_full_gradient_to_reduced(self, grad_full, trainable_idx):
-        """
-        Chain-rule projection:
-        g_u = P_T^T g_alpha = g_alpha[T]
-        """
+
         g = np.asarray(grad_full, dtype=np.float64).reshape(-1)
         if g.size != self.M:
             raise ValueError(
@@ -590,19 +413,13 @@ class IMTrustRadiusOptimizer:
 
 
     def fun_reduced(self, x_var, trainable_idx, alpha_full_fixed):
-        """
-        Reduced objective:
-        J(u) = L(alpha(u))
-        """
+
         alpha_full = self.expand_reduced_alphas(x_var, trainable_idx, alpha_full_fixed)
         return self.fun(alpha_full)
 
 
     def jac_reduced(self, x_var, trainable_idx, alpha_full_fixed):
-        """
-        Reduced gradient:
-        ∇_u J(u) = P_T^T ∇_alpha L(alpha(u))
-        """
+
         alpha_full = self.expand_reduced_alphas(x_var, trainable_idx, alpha_full_fixed)
         g_full = self.jac(alpha_full)
         return self.project_full_gradient_to_reduced(g_full, trainable_idx)
@@ -614,12 +431,6 @@ class IMTrustRadiusOptimizer:
 
 
     def get_metrics(self, alphas=None, evaluate_if_missing=True):
-        """
-        Returns last cached objective components.
-
-        If ``alphas`` is provided and cache does not match, optionally evaluates
-        the objective once to populate the cache.
-        """
 
         if alphas is None:
             return dict(self._cache_metrics) if self._cache_metrics is not None else None

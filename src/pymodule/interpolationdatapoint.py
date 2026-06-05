@@ -30,16 +30,19 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from mpi4py import MPI
 from contextlib import redirect_stderr
 from io import StringIO
 import numpy as np
 import h5py
 from time import time
+from sys import stdout
 
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes)
+from .outputstream import OutputStream
+from .veloxchemlib import mpi_master
 
-from .mmforcefieldgenerator import MMForceFieldGenerator
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -68,8 +71,6 @@ class InterpolationDatapoint:
           internal coordinates with respect to Cartesian coordinates.
         - use_inverse_bond_length: Flag for using the inverse bond length
           instead of the bond length.
-        - use_cosine_dihedral: Flag for using the cosine of the dihedral angle
-          rather than the angle itself.
         - internal_coordinates: A list of geomeTRIC internal coordinate objects.
         - internal_coordinates_values: A numpy array with the values of the
           internal coordinates: in angstroms (bond lengths), 1/angstroms
@@ -77,21 +78,24 @@ class InterpolationDatapoint:
           cosine of radians (dihedral angles).
     """
 
-    def __init__(self, z_matrix=None, atom_labels=None):
+    def __init__(self, z_matrix=None, atom_labels=None, comm=None, ostream=None):
         """
         Initializes the InterpolationDatapoint object.
 
         :param z_matrix: a list of tuples with atom indices (starting at 0)
         that define bonds, bond angles, and dihedral angles.
         """
-        # if comm is None:
-        #     comm = MPI.COMM_WORLD
+        if comm is None:
+            comm = MPI.COMM_WORLD
 
-        # if ostream is None:
-        #     ostream = OutputStream(sys.stdout)
+        if ostream is None:
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(stdout)
+            else:
+                ostream = OutputStream(None)
 
-        # self.comm = None
-        # self.ostream = ostream
+        self.comm = None
+        self.ostream = ostream
 
         self.point_label = None
 
@@ -116,10 +120,13 @@ class InterpolationDatapoint:
 
         self.confidence_radius = None
         self.use_inverse_bond_length = True
-        self.use_cosine_dihedral = False
+        self.use_eq_bond_length = False
+        self.use_cos_angle = False
         self.use_vectorized_b_matrix = True
         self.use_vectorized_internal_coordinates_values = True
         self.identify_imp_int_coord = True
+        
+        self.eq_bond_lengths = None
         
         # internal_coordinates is a list of geomeTRIC objects which represent
         # different types of internal coordinates (distances, angles, dihedrals)
@@ -140,12 +147,13 @@ class InterpolationDatapoint:
                 'use_inverse_bond_length':
                     ('bool',
                      'use the inverse bond lengths'),
-                'use_cosine_dihedral':
-                    ('bool', 'use the cosine of dihedrals'
-                     ),
+                'use_eq_bond_length':
+                    ('bool',
+                     'use the log bond lengths'),
                 'use_vectorized_b_matrix':
                     ('bool', 'use vectorized Wilson B-matrix construction'
                      ),
+                'use_cos_angle':('bool', 'use cos angles -- careful for linear angles'),
                 'use_vectorized_internal_coordinates_values':
                     ('bool', 'use vectorized internal-coordinate value evaluation'
                      ),
@@ -188,7 +196,7 @@ class InterpolationDatapoint:
             impes_dict = {}
 
 
-        im_keywords = {
+        im_keywords: dict[str, str] = {
             key: val[0]
             for key, val in self._input_keywords['im_settings'].items()
         }
@@ -227,6 +235,7 @@ class InterpolationDatapoint:
                                 dtype=np.int8,
                                 count=n_rows)
         bond_rows = np.flatnonzero(row_sizes == 2)
+        angle_rows = np.flatnonzero(row_sizes == 3)
         dihedral_rows = np.flatnonzero(row_sizes == 4)
 
         dihedral_first = np.zeros(dihedral_rows.shape[0], dtype=bool)
@@ -243,11 +252,28 @@ class InterpolationDatapoint:
         self._b_matrix_row_cache = {
             'row_sizes': row_sizes,
             'bond_rows': bond_rows,
+            'angle_rows':  angle_rows,
             'dihedral_rows': dihedral_rows,
             'dihedral_first': dihedral_first,
         }
 
         return self._b_matrix_row_cache
+    
+    def _get_eq_bond_lengths_array(self, n_bonds):
+        """
+        Returns equilibrium bond lengths with shape validation.
+        """
+        assert_msg_critical(
+            self.eq_bond_lengths is not None,
+            'InterpolationDatapoint: No equilibrium bond lengths are defined.'
+        )
+        eq_values = np.asarray(self.eq_bond_lengths, dtype=np.float64).reshape(-1)
+        assert_msg_critical(
+            eq_values.size == int(n_bonds),
+            'InterpolationDatapoint: Equilibrium bond-length size mismatch '
+            f'(expected {int(n_bonds)}, got {eq_values.size}).'
+        )
+        return eq_values
 
     def _calculate_b_matrix_vectorized(self):
         """
@@ -268,8 +294,10 @@ class InterpolationDatapoint:
 
         use_original = (
             self.use_inverse_bond_length or
-            self.use_cosine_dihedral
+            self.use_eq_bond_length or 
+            self.use_cos_angle
         )
+        
         if use_original:
             self.original_b_matrix = derivatives.copy()
         else:
@@ -279,30 +307,32 @@ class InterpolationDatapoint:
         row_cache = self._get_b_matrix_row_cache()
 
         bond_rows = row_cache['bond_rows']
-        if bond_rows.size > 0 and (self.use_inverse_bond_length):
+        angle_rows = row_cache['angle_rows']
+        if bond_rows.size > 0 and (self.use_inverse_bond_length or self.use_eq_bond_length):
             bond_values = np.array(
                 [self.internal_coordinates[idx].value(coords) for idx in bond_rows],
                 dtype=np.float64)
 
             if self.use_inverse_bond_length:
                 row_scale[bond_rows] = -1.0 / np.square(bond_values)
+            elif self.use_eq_bond_length:
+                eq_values = self._get_eq_bond_lengths_array(bond_rows.size)
+                _, dq_dr, _ = self._switched_bond_transform(
+                    bond_values, eq_values, eps_inner=0.005, eps_outer=0.01)
+                row_scale[bond_rows] = dq_dr
 
-        if self.use_cosine_dihedral:
-            dihedral_rows = row_cache['dihedral_rows']
-            if dihedral_rows.size > 0:
-                dihedral_values = np.array(
-                    [self.internal_coordinates[idx].value(coords) for idx in dihedral_rows],
-                    dtype=np.float64)
-                row_scale[dihedral_rows] = np.where(
-                    row_cache['dihedral_first'],
-                    -np.sin(dihedral_values),
-                    np.cos(dihedral_values))
+        if angle_rows.size > 0 and self.use_cos_angle:
+            angle_values = np.array(
+            [self.internal_coordinates[idx].value(coords) for idx in angle_rows],
+            dtype=np.float64)
 
+            row_scale[angle_rows] = -np.sin(angle_values)
+        
         self.b_matrix = derivatives * row_scale[:, np.newaxis]
 
         if self.inv_sqrt_masses is not None:
             self.b_matrix = self.b_matrix * self.inv_sqrt_masses
-            if self.use_inverse_bond_length:
+            if self.use_inverse_bond_length or self.use_eq_bond_length or self.use_cos_angle:
                 self.original_b_matrix = self.original_b_matrix
 
     def calculate_b_matrix(self):
@@ -326,7 +356,13 @@ class InterpolationDatapoint:
         # self.b2_matrix = np.zeros((len(self.z_matrix), n_atoms * 3, n_atoms * 3))
         self.b2_matrix = np.zeros((len(self.z_matrix), n_atoms * 3, n_atoms * 3))
 
-        prev_dihedral = None
+        eq_bond_values = None
+        if self.use_eq_bond_length:
+            bond_rows = self._get_b_matrix_row_cache()['bond_rows']
+            eq_bond_values = self._get_eq_bond_lengths_array(bond_rows.size)
+
+        
+        # prev_dihedral = None
         bond_counter = 0
         for i, z in enumerate(self.z_matrix):
             q = self.internal_coordinates[i]
@@ -344,35 +380,31 @@ class InterpolationDatapoint:
                         for n in range(n_atoms):
                             self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += 2 * r_inv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
 
+                elif self.use_eq_bond_length:
+                    r = q.value(coords)
+                    _, r_deriv_2, r_deriv_3 = self._switched_bond_transform(
+                        r, eq_bond_values[bond_counter], eps_inner=0.005, eps_outer=0.01)
+                    self.b2_matrix[i] = r_deriv_2 * second_derivative
+                    for m in range(n_atoms):
+                        for n in range(n_atoms):
+                            self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += r_deriv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
+
                 else:
                     self.b2_matrix[i] = second_derivative
 
                 bond_counter += 1
-
-            elif len(z) == 4 and self.use_cosine_dihedral:
-
-                if prev_dihedral != z:
-                    prev_dihedral = z
-                    phi = q.value(coords)
-                    phi_dev_1 = -1.0 * np.sin(phi)
-                    phi_dev_2 = -1.0 * np.cos(phi)
-                    self.b2_matrix[i] = phi_dev_1 * second_derivative
-
-                    for m in range(n_atoms):
-                        for n in range(n_atoms):
-                            self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += phi_dev_2 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
             
-                else:
-                    
-                    phi = q.value(coords)
-                    phi_dev_1 =  1.0 * np.cos(phi)
-                    phi_dev_2 = -1.0 * np.sin(phi)
-                    self.b2_matrix[i] = phi_dev_1 * second_derivative
+            elif len(z) == 3 and self.use_cos_angle:
 
-                    for m in range(n_atoms):
-                        for n in range(n_atoms):
-                            self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += phi_dev_2 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
-            
+                a = q.value(coords)
+                a_sin_2 = -np.sin(a)
+                a_cos_3 = -np.cos(a)
+                self.b2_matrix[i] = a_sin_2 * second_derivative
+
+                for m in range(n_atoms):
+                    for n in range(n_atoms):
+                        self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += a_cos_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
+
             
             else:
                 self.b2_matrix[i] = second_derivative
@@ -408,24 +440,6 @@ class InterpolationDatapoint:
         # Make zero the values of s_inv that are smaller than tol
         s_inv = np.array([1 / s_i if s_i > tol else 0.0 for s_i in s])
         
-        # Critical assertion, check that the remaining positive values are equal to dimension (3N-6)
-        number_of_positive_values = np.count_nonzero(s_inv)
-        
-        # If more elements are zero than allowed, restore the largest ones
-        if number_of_positive_values > dimension:
-            print('InterpolationDatapoint: The number of positive singular values is not equal to the dimension of the Hessian., restoring the last biggest elements')
-            # Get indices of elements originally set to zero
-            zero_indices = np.where(s_inv == 0.0)[0]
-            
-            # Sort these indices based on their corresponding values in 's' (descending order)
-            sorted_zero_indices = zero_indices[np.argsort(s[zero_indices])[::-1]]
-            
-            # Calculate how many elements need to be restored
-            num_to_restore = abs(number_of_positive_values - dimension)
-            
-            # Restore the largest elements among those set to zero
-            for idx in sorted_zero_indices[:num_to_restore]:
-                s_inv[idx] = 1 / s[idx]
 
         g_minus_matrix = np.dot(U, np.dot(np.diag(s_inv), Vt))
 
@@ -461,22 +475,6 @@ class InterpolationDatapoint:
         s_inv = np.array([1 / s_i if s_i > tol else 0.0 for s_i in s])
 
         number_of_positive_values = np.count_nonzero(s_inv)
-
-        # If more elements are zero than allowed, restore the largest ones
-        if number_of_positive_values > dimension:
-            print('InterpolationDatapoint: The number of positive singular values is not equal to the dimension of the Hessian., restoring the last biggest elements')
-            # Get indices of elements originally set to zero
-            zero_indices = np.where(s_inv == 0.0)[0]
-            
-            # Sort these indices based on their corresponding values in 's' (descending order)
-            sorted_zero_indices = zero_indices[np.argsort(s[zero_indices])[::-1]]
-            
-            # Calculate how many elements need to be restored
-            num_to_restore = abs(number_of_positive_values - dimension)
-            
-            # Restore the largest elements among those set to zero
-            for idx in sorted_zero_indices[:num_to_restore]:
-                s_inv[idx] = 1 / s[idx]
 
         g_minus_matrix = np.dot(U, np.dot(np.diag(s_inv), Vt))
 
@@ -675,24 +673,109 @@ class InterpolationDatapoint:
         row_cache = self._get_b_matrix_row_cache()
 
         bond_rows = row_cache['bond_rows']
+        angle_rows = row_cache["angle_rows"]
 
         if bond_rows.size > 0:
             if self.use_inverse_bond_length:
                 int_coords[bond_rows] = 1.0 / base_values[bond_rows]
-
-        if self.use_cosine_dihedral:
-            dihedral_rows = row_cache['dihedral_rows']
-            if dihedral_rows.size > 0:
-                dihedral_values = base_values[dihedral_rows]
-                dihedral_first = row_cache['dihedral_first']
-                first_rows = dihedral_rows[dihedral_first]
-                second_rows = dihedral_rows[~dihedral_first]
-                if first_rows.size > 0:
-                    int_coords[first_rows] = np.cos(dihedral_values[dihedral_first])
-                if second_rows.size > 0:
-                    int_coords[second_rows] = np.sin(dihedral_values[~dihedral_first])
+            elif self.use_eq_bond_length:
+               
+                eq_values = self._get_eq_bond_lengths_array(bond_rows.size)
+                q_values, _, _ = self._switched_bond_transform(
+                    base_values[bond_rows],
+                    eq_values,
+                    eps_inner=0.005,
+                    eps_outer=0.01)
+                int_coords[bond_rows] = q_values
+        if angle_rows.size > 0 and self.use_cos_angle:
+            int_coords[angle_rows] = np.cos(base_values[angle_rows])
 
         self.internal_coordinates_values = int_coords
+    
+    def smoothstep5(self, t):
+        return 1.0 - 10.0*t**3 + 15.0*t**4 - 6.0*t**5
+
+    def dsmoothstep5_dt(self, t):
+        return -30.0*t**2 + 60.0*t**3 - 30.0*t**4
+
+    def d2smoothstep5_dt2(self, t):
+        return -60.0*t + 180.0*t**2 - 120.0*t**3
+
+
+    def _switched_bond_transform(self, r, r_eq, eps_inner=0.05, eps_outer=0.15):
+        """
+        Returns q(r), dq/dr, d2q/dr2 for a bond coordinate that is
+        smoothly switched from local r behavior near equilibrium to 1/r outside.
+        """
+        r_input = np.asarray(r, dtype=np.float64)
+        r_eq_input = np.asarray(r_eq, dtype=np.float64)
+        scalar_input = (r_input.ndim == 0 and r_eq_input.ndim == 0)
+
+        r_arr, r_eq_arr = np.broadcast_arrays(np.atleast_1d(r_input),
+                                              np.atleast_1d(r_eq_input))
+        r_arr = r_arr.astype(np.float64, copy=False)
+        r_eq_arr = r_eq_arr.astype(np.float64, copy=False)
+
+        L = r_arr - r_eq_arr
+        dL = np.ones_like(r_arr)
+        d2L = np.zeros_like(r_arr)
+
+
+        # R = - np.square(r_eq_arr) * (1.0 / r_arr - 1.0 / r_eq_arr)
+        # dR = np.square(r_eq_arr) / np.square(r_arr)
+        # d2R = -np.square(r_eq_arr) * 2.0 / np.power(r_arr, 3)
+
+        R = - np.square(r_eq_arr) * (1.0 / r_arr - 1.0 / r_eq_arr)
+        dR = np.square(r_eq_arr) / np.square(r_arr)
+        d2R = -np.square(r_eq_arr) * 2.0 / np.power(r_arr, 3)
+
+        x = np.log(r_arr / r_eq_arr)
+        y = np.square(x)
+
+        y1 = np.log(1.0 + eps_inner)**2
+        y2 = np.log(1.0 + eps_outer)**2
+        denom = y2 - y1
+
+        s = np.ones_like(y)
+        ds = np.zeros_like(y)
+        d2s = np.zeros_like(y)
+
+        mask_inner = (y <= y1)
+        mask_outer = (y >= y2)
+        mask_transition = (~mask_inner) & (~mask_outer)
+
+        if np.any(mask_transition):
+            t = (y[mask_transition] - y1) / denom
+            P = self.smoothstep5(t)
+            dP = self.dsmoothstep5_dt(t)
+            d2P = self.d2smoothstep5_dt2(t)
+
+            dy_dr = 2.0 * x[mask_transition] / r_arr[mask_transition]
+            d2y_dr2 = 2.0 * (1.0 - x[mask_transition]) / np.square(r_arr[mask_transition])
+            dt_dr = dy_dr / denom
+            d2t_dr2 = d2y_dr2 / denom
+
+            s[mask_transition] = P
+            ds[mask_transition] = dP * dt_dr
+            d2s[mask_transition] = d2P * np.square(dt_dr) + dP * d2t_dr2
+
+        s[mask_outer] = 0.0
+        ds[mask_outer] = 0.0
+        d2s[mask_outer] = 0.0
+        
+        q = s * L + (1.0 - s) * R
+        
+        # q = R
+        # dq_dr = dR
+        # d2q_dr2 = d2R
+        # here the switch derivativve is being assembled 
+        dq_dr = ds * (L - R) + s * dL + (1.0 - s) * dR
+        d2q_dr2 = d2s * (L - R) + 2.0 * ds * (dL - dR) + s * d2L + (1.0 - s) * d2R
+
+        if scalar_input:
+            return float(q[0]), float(dq_dr[0]), float(d2q_dr2[0])
+
+        return q, dq_dr, d2q_dr2
 
     def compute_internal_coordinates_values(self):
         """
@@ -775,13 +858,13 @@ class InterpolationDatapoint:
 
             if self.use_inverse_bond_length:
                 label += "_rinv"
+            elif self.use_eq_bond_length:
+                label += "_eq"
             else:
                 label += "_r"
 
-            if self.use_cosine_dihedral:
-                label += "_cosine"
-            else:
-                label += "_dihedral"
+            
+            label += "_dihedral"
 
             assert_msg_critical(self.energy is not None,
                                 'InterpolationDatapoint: No energy is defined.')
@@ -840,7 +923,18 @@ class InterpolationDatapoint:
                 h5f.create_dataset(full_label,
                                    data=self.internal_coordinates_values,
                                    compression='gzip')
-                
+            
+            if not self.use_eq_bond_length and self.eq_bond_lengths is None:
+                assert_msg_critical(
+                    self.eq_bond_lengths is not None,
+                    'InterpolationDatapoint: No eq bond lenths are defined.')
+
+            else:
+                # write internal coordinates
+                full_label = label + "_eq_bond_lengths"
+                h5f.create_dataset(full_label,
+                                   data=self.eq_bond_lengths,
+                                   compression='gzip')   
 
             assert_msg_critical(
                 self.confidence_radius is not None,
@@ -916,13 +1010,12 @@ class InterpolationDatapoint:
 
             if self.use_inverse_bond_length:
                 label += "_rinv"
+            elif self.use_eq_bond_length:
+                label += "_eq"
             else:
                 label += "_r"
 
-            if self.use_cosine_dihedral:
-                label += "_cosine"
-            else:
-                label += "_dihedral"
+            label += "_dihedral"
 
             energy_label = label + "_energy"
             gradient_label = label + "_gradient"
@@ -930,6 +1023,7 @@ class InterpolationDatapoint:
             cart_hess_label = label + "_cartesian_hessian"
             cart_grad_label = label + "_cartesian_gradient"
             coords_label = label + "_internal_coordinates"
+            eq_bond_length_label = label + "_eq_bond_lengths"
             cart_coords_label = label + "_cartesian_coordinates"
             confidence_radius_label = label + "_confidence_radius"
         
@@ -951,6 +1045,7 @@ class InterpolationDatapoint:
             self.internal_hessian = np.array(h5f.get(hessian_label))
             self.hessian = np.array(h5f.get(cart_hess_label))
             self.internal_coordinates_values = np.array(h5f.get(coords_label))
+            self.eq_bond_lengths = np.array(h5f.get(eq_bond_length_label))
             self.cartesian_coordinates = np.array(h5f.get(cart_coords_label))
             self.confidence_radius = np.array(h5f.get(confidence_radius_label))
 
@@ -1007,24 +1102,22 @@ class InterpolationDatapoint:
 
         return distance_vector
 
-    def remove_point_from_hdf5(self, fname, label, use_inverse_bond_length=False, use_cosine_dihedral=False, use_eq_bond_length=False):
+    def remove_point_from_hdf5(self, fname, label, use_inverse_bond_length=False, use_eq_bond_length=False):
         """
         Removes a point (i.e., corresponding datasets) from an HDF5 file based on label and internal settings.
         
         :param fname: HDF5 filename
         :param label: base label for the data
         :param use_inverse_bond_length: whether to append '_rinv' or '_r'
-        :param use_cosine_dihedral: whether to append '_cosine' or '_dihedral'
         """
         if use_inverse_bond_length:
             label += "_rinv"
+        if use_eq_bond_length:
+            label += "_eq"
         else:
             label += "_r"
 
-        if use_cosine_dihedral:
-            label += "_cosine"
-        else:
-            label += "_dihedral"
+        label += "_dihedral"
 
 
         keys_to_remove = [
@@ -1032,6 +1125,7 @@ class InterpolationDatapoint:
             label + "_gradient",
             label + "_hessian",
             label + "_internal_coordinates",
+            label + "eq_bond_lengths",
             label + "_cartesian_coordinates",
             label + "_cartesian_gradient",
             label + "_cartesian_hessian",
@@ -1066,13 +1160,12 @@ class InterpolationDatapoint:
         with h5py.File(fname, 'r+') as h5f:
             if self.use_inverse_bond_length:
                 label += "_rinv"
+            elif self.use_eq_bond_length:
+                label += "_eq"
             else:
                 label += "_r"
 
-            if self.use_cosine_dihedral:
-                label += "_cosine"
-            else:
-                label += "_dihedral"
+            label += "_dihedral"
 
             confidence_radius_label = label + "_confidence_radius"
 
