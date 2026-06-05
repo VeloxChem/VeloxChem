@@ -98,6 +98,8 @@ class ConformerGenerator:
         self.rmsd_threshold = 1.2
         self.energy_threshold = 1.2
 
+        self.dihedral_candidates = None
+
         self.implicit_solvent_model = None
         self.solute_dielectric = 1.0
         self.solvent_dielectric = 78.39
@@ -162,6 +164,37 @@ class ConformerGenerator:
                         break
 
         return side_equiv, max_equiv_atoms
+    
+    def _check_halogenide_group(self, dihedral_indices, atom_info_dict):
+
+        side_j_index = dihedral_indices[1] + 1  # convert to 1 based index
+        side_k_index = dihedral_indices[2] + 1  # convert to 1 based index
+
+        # check j and k side of dihedral
+        for a, b in [(side_j_index, side_k_index),
+                     (side_k_index, side_j_index)]:
+
+            if atom_info_dict[a]["AtomicSymbol"] == "C":
+                one_based_connected_atom_numbers = atom_info_dict[a][
+                    "ConnectedAtomsNumbers"]
+                connected_set = set(one_based_connected_atom_numbers)
+                connected_set = connected_set - {
+                    b
+                }  # remove the other dihedral atom
+                connected_elements = [
+                    atom_info_dict[idx]["AtomicSymbol"]
+                    for idx in connected_set
+                ]
+                if tuple(connected_elements) == ("F", "F", "F"):
+                    return True
+                if tuple(connected_elements) == ("Cl", "Cl", "Cl"):
+                    return True
+                if tuple(connected_elements) == ("Br", "Br", "Br"):
+                    return True
+                if tuple(connected_elements) == ("I", "I", "I"):
+                    return True
+
+        return False
 
     def _check_methyl_group(self, dihedral_indices, atom_info_dict):
 
@@ -298,6 +331,8 @@ class ConformerGenerator:
 
             # skip dihedral angle involving methyl group
             if self._check_methyl_group(dih_index, atom_info_dict):
+                continue
+            if self._check_halogenide_group(dih_index, atom_info_dict):
                 continue
 
             # look for equiv_atoms, and skip if number of equiv_atoms equals max_periodicity
@@ -505,7 +540,7 @@ class ConformerGenerator:
         dihedrals_candidates, atom_info_dict, dihedrals_dict = (
             self._get_dihedral_candidates(molecule, top_file_name,
                                           self.partial_charges))
-
+        self.dihedral_candidates = dihedrals_candidates
         # exit early if there is no candidate dihedral to rotate
         if not dihedrals_candidates:
             self.ostream.print_info(
