@@ -49,7 +49,7 @@ with redirect_stderr(StringIO()) as fg_err:
     import geometric
 
 
-class InterpolationDriver():
+class InterpolationDriver:
     """
     Implements the potential energy surface interpolation driver.
 

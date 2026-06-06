@@ -44,7 +44,7 @@ except ImportError:
     pass
 
 
-class EvbReporter():
+class EvbReporter:
 
     def __init__(
         self,
