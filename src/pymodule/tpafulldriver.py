@@ -1888,36 +1888,6 @@ class TpaFullDriver(TpaDriverBase):
         else:
             return None
 
-    def _get_gamma_title(self):
-        """
-        Gets the gamma-table title for full TPA results.
-
-        :return:
-            The title for gamma output.
-        """
-
-        return 'Isotropic Average of gamma Tensor at Given Frequencies'
-
-    def _get_hdf5_group_name(self):
-        """
-        Gets the HDF5 group name for full TPA results.
-
-        :return:
-            The group name.
-        """
-
-        return 'tpa_full'
-
-    def _get_hdf5_value_label(self):
-        """
-        Gets the HDF5 value label for full TPA results.
-
-        :return:
-            The value label.
-        """
-
-        return 'full TPA result'
-
     def _get_summary_title(self):
         """
         Gets the summary-table title for full TPA results.
@@ -1926,4 +1896,4 @@ class TpaFullDriver(TpaDriverBase):
             The title for summary output.
         """
 
-        return 'Full TPA Summary'
+        return 'TPA Summary (Full Expression)'

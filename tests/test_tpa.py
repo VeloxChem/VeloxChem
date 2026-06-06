@@ -194,7 +194,8 @@ class TestTPA:
         assert spectrum_ev['y_data'] == pytest.approx(expected_y_data)
         assert spectrum_nm['y_data'] == pytest.approx(expected_y_data)
 
-    def test_reduced_driver_print_results_public(self, tmp_path):
+    @pytest.mark.parametrize('section', ['all', 'summary'])
+    def test_reduced_driver_print_results(self, tmp_path, section):
 
         rsp_results = {
             'gamma': {
@@ -212,44 +213,21 @@ class TestTPA:
         outfile = tmp_path / 'tpa_reduced_print.out'
         tpa_drv = TpaReducedDriver(MPI.COMM_WORLD, OutputStream(outfile))
         tpa_drv.frequencies = rsp_results['frequencies']
-        tpa_drv.print_results(rsp_results)
+        tpa_drv.print_results(rsp_results, section=section)
         tpa_drv.ostream.flush()
 
         printed = outfile.read_text()
-        assert 'Isotropic Average gamma Tensor at Given Frequencies' in printed
-        assert 'Two-Photon Absorption Spectrum' in printed
+        assert 'TPA Summary (Reduced Expression)' in printed
+        assert 'Re(gamma)' in printed and 'Im(gamma)' in printed
+        assert '0.10000000 GM' in printed and '0.20000000 GM' in printed
+        if section == 'all':
+            assert 'The reduced expression is an approximation' in printed
+        elif section == 'summary':
+            assert 'The reduced expression is an approximation' not in printed
 
-    def test_reduced_driver_print_results_summary_public(self, tmp_path):
+    def test_reduced_driver_plot_spectrum(self):
 
-        rsp_results = {
-            'gamma': {
-                (0.0, -0.0, 0.0): 1.0 + 2.0j,
-                (0.05, -0.05, 0.05): 3.0 + 4.0j,
-                (0.10, -0.10, 0.10): 5.0 + 6.0j,
-            },
-            'frequencies': [0.0, 0.05, 0.10],
-            'cross_sections': [0.1, 0.2],
-        }
-
-        if MPI.COMM_WORLD.Get_rank() != mpi_master():
-            return
-
-        outfile = tmp_path / 'tpa_reduced_summary.out'
-        tpa_drv = TpaReducedDriver(MPI.COMM_WORLD, OutputStream(outfile))
-        tpa_drv.frequencies = rsp_results['frequencies']
-        tpa_drv.print_results(rsp_results, section='summary')
-        tpa_drv.ostream.flush()
-
-        printed = outfile.read_text()
-        assert 'Reduced TPA Summary' in printed
-        assert 'TPA cross-section[GM]' in printed
-        assert 'Isotropic Average gamma Tensor at Given Frequencies' not in printed
-        assert 'Two-Photon Absorption Spectrum' not in printed
-
-    def test_reduced_driver_plot_spectrum_public(self):
-
-        matplotlib = pytest.importorskip('matplotlib')
-        matplotlib.use('Agg', force=True)
+        pytest.importorskip('matplotlib')
         import matplotlib.pyplot as plt
 
         rsp_results = {
@@ -279,8 +257,7 @@ class TestTPA:
 
     def test_reduced_driver_plot_spectrum_without_ax_returns_none(self):
 
-        matplotlib = pytest.importorskip('matplotlib')
-        matplotlib.use('Agg', force=True)
+        pytest.importorskip('matplotlib')
 
         rsp_results = {
             'gamma': {
@@ -301,7 +278,8 @@ class TestTPA:
 
         assert tpa_drv.plot_spectrum(rsp_results, x_unit='ev') is None
 
-    def test_full_driver_print_results_public(self, tmp_path):
+    @pytest.mark.parametrize('section', ['all', 'summary'])
+    def test_full_driver_print_results(self, tmp_path, section):
 
         rsp_results = {
             'gamma': {
@@ -319,44 +297,18 @@ class TestTPA:
         outfile = tmp_path / 'tpa_full_print.out'
         tpa_drv = TpaFullDriver(MPI.COMM_WORLD, OutputStream(outfile))
         tpa_drv.frequencies = rsp_results['frequencies']
-        tpa_drv.print_results(rsp_results)
+        tpa_drv.print_results(rsp_results, section=section)
         tpa_drv.ostream.flush()
 
         printed = outfile.read_text()
-        assert 'Isotropic Average of gamma Tensor at Given Frequencies' in printed
-        assert 'Two-Photon Absorption Spectrum' in printed
+        assert 'TPA Summary (Full Expression)' in printed
+        assert 'Re(gamma)' in printed and 'Im(gamma)' in printed
+        assert '0.10000000 GM' in printed and '0.20000000 GM' in printed
+        assert 'The reduced expression is an approximation' not in printed
 
-    def test_full_driver_print_results_summary_public(self, tmp_path):
+    def test_full_driver_plot_spectrum(self):
 
-        rsp_results = {
-            'gamma': {
-                (0.0, -0.0, 0.0): 1.0 + 2.0j,
-                (0.05, -0.05, 0.05): 3.0 + 4.0j,
-                (0.10, -0.10, 0.10): 5.0 + 6.0j,
-            },
-            'frequencies': [0.0, 0.05, 0.10],
-            'cross_sections': [0.1, 0.2],
-        }
-
-        if MPI.COMM_WORLD.Get_rank() != mpi_master():
-            return
-
-        outfile = tmp_path / 'tpa_full_summary.out'
-        tpa_drv = TpaFullDriver(MPI.COMM_WORLD, OutputStream(outfile))
-        tpa_drv.frequencies = rsp_results['frequencies']
-        tpa_drv.print_results(rsp_results, section='summary')
-        tpa_drv.ostream.flush()
-
-        printed = outfile.read_text()
-        assert 'Full TPA Summary' in printed
-        assert 'TPA cross-section[GM]' in printed
-        assert 'Isotropic Average of gamma Tensor at Given Frequencies' not in printed
-        assert 'Two-Photon Absorption Spectrum' not in printed
-
-    def test_full_driver_plot_spectrum_public(self):
-
-        matplotlib = pytest.importorskip('matplotlib')
-        matplotlib.use('Agg', force=True)
+        pytest.importorskip('matplotlib')
         import matplotlib.pyplot as plt
 
         rsp_results = {
@@ -386,8 +338,7 @@ class TestTPA:
 
     def test_full_driver_plot_spectrum_without_ax_returns_none(self):
 
-        matplotlib = pytest.importorskip('matplotlib')
-        matplotlib.use('Agg', force=True)
+        pytest.importorskip('matplotlib')
 
         rsp_results = {
             'gamma': {
@@ -431,7 +382,7 @@ class TestTPA:
         tpa_drv.ostream.mute()
         tpa_drv._write_final_hdf5(str(h5file), rsp_results)
 
-        recovered = read_results(str(h5file), 'tpa_reduced')
+        recovered = read_results(str(h5file), 'tpa')
 
         assert recovered == rsp_results
 
@@ -458,7 +409,7 @@ class TestTPA:
         tpa_drv.ostream.mute()
         tpa_drv._write_final_hdf5(str(h5stem), rsp_results)
 
-        recovered = read_results(str(h5file), 'tpa_reduced')
+        recovered = read_results(str(h5file), 'tpa')
 
         assert recovered == rsp_results
 
@@ -485,7 +436,7 @@ class TestTPA:
         tpa_drv.ostream.mute()
         tpa_drv._write_final_hdf5(str(h5file), rsp_results)
 
-        recovered = read_results(str(h5file), 'tpa_full')
+        recovered = read_results(str(h5file), 'tpa')
 
         assert recovered == rsp_results
 
@@ -512,7 +463,7 @@ class TestTPA:
         tpa_drv.ostream.mute()
         tpa_drv._write_final_hdf5(str(h5stem), rsp_results)
 
-        recovered = read_results(str(h5file), 'tpa_full')
+        recovered = read_results(str(h5file), 'tpa')
 
         assert recovered == rsp_results
 

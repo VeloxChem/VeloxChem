@@ -90,26 +90,6 @@ class TpaReducedDriver(TpaDriverBase):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def _get_hdf5_group_name(self):
-        """
-        Gets the HDF5 group name for reduced TPA results.
-
-        :return:
-            The group name.
-        """
-
-        return 'tpa_reduced'
-
-    def _get_hdf5_value_label(self):
-        """
-        Gets the HDF5 value label for reduced TPA results.
-
-        :return:
-            The value label.
-        """
-
-        return 'reduced TPA result'
-
     def get_densities(self, wi, Nx, mo, nocc, norb):
         """
         Computes the compounded densities needed for the compounded Fock
@@ -1002,7 +982,7 @@ class TpaReducedDriver(TpaDriverBase):
             The title for summary output.
         """
 
-        return 'Reduced TPA Summary'
+        return 'TPA Summary (Reduced Expression)'
 
     def _print_note(self):
         """

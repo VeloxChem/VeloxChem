@@ -191,7 +191,9 @@ class TestTpaTransition:
         assert spectrum_circular['y_data'] == pytest.approx(
             [10.0 * spectrum_linear['y_data'][0]])
 
-    def test_print_results_public(self, tmp_path):
+    @pytest.mark.parametrize('section', ['all', 'summary'])
+    @pytest.mark.parametrize('max_states', [1, None])
+    def test_print_results(self, tmp_path, section, max_states):
 
         tpa_results = self.compute_tpatransition('hf')
 
@@ -200,37 +202,26 @@ class TestTpaTransition:
 
         outfile = tmp_path / 'tpatransition_print.out'
         tpa_drv = TpaTransitionDriver(MPI.COMM_WORLD, OutputStream(outfile))
-        tpa_drv.print_results(tpa_results)
-        tpa_drv.ostream.flush()
-
-        printed = outfile.read_text()
-        assert 'Components of TPA Transition Moments' in printed
-        assert 'TPA Strength (Linear Polarization)' in printed
-        assert 'TPA Strength (Circular Polarization)' in printed
-
-    def test_print_results_summary_public(self, tmp_path):
-
-        tpa_results = self.compute_tpatransition('hf')
-
-        if MPI.COMM_WORLD.Get_rank() != mpi_master():
-            return
-
-        outfile = tmp_path / 'tpatransition_summary.out'
-        tpa_drv = TpaTransitionDriver(MPI.COMM_WORLD, OutputStream(outfile))
-        tpa_drv.print_results(tpa_results, section='summary', max_states=1)
+        tpa_drv.print_results(tpa_results, section=section, max_states=max_states)
         tpa_drv.ostream.flush()
 
         printed = outfile.read_text()
         assert 'TPA Transition Summary' in printed
-        assert 'Osc. Strength' in printed
-        assert 'Components of TPA Transition Moments' not in printed
-        assert 'TPA Strength (Linear Polarization)' not in printed
-        assert 'additional state(s) omitted' in printed
+        assert 'TPA Str. (Linear)' in printed
+        assert 'TPA Str. (Circular)' in printed
+        assert 'OPA Osc. Str.' in printed
+        if section == 'all':
+            assert 'Components of TPA Transition Moments' in printed
+        elif section == 'summary':
+            assert 'Components of TPA Transition Moments' not in printed
+        if max_states == 1:
+            assert 'additional state(s) omitted' in printed
+        elif max_states is None:
+            assert 'additional state(s) omitted' not in printed
 
-    def test_plot_spectrum_public(self):
+    def test_plot_spectrum(self):
 
-        matplotlib = pytest.importorskip('matplotlib')
-        matplotlib.use('Agg', force=True)
+        pytest.importorskip('matplotlib')
         import matplotlib.pyplot as plt
 
         tpa_results = self.compute_tpatransition('hf')
@@ -254,10 +245,9 @@ class TestTpaTransition:
         assert len(ax.figure.axes) == 2
         plt.close(ax.figure)
 
-    def test_plot_spectrum_public_without_ax_returns_none(self):
+    def test_plot_spectrum_without_ax_returns_none(self):
 
-        matplotlib = pytest.importorskip('matplotlib')
-        matplotlib.use('Agg', force=True)
+        pytest.importorskip('matplotlib')
 
         tpa_results = self.compute_tpatransition('hf')
 
