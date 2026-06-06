@@ -1093,7 +1093,7 @@ class IMDatabasePointCollecter:
         self.sampling_qm_data_point_dict = {root: [] for root in self.roots_to_follow}
 
         for root in self.roots_to_follow:
-            drv = InterpolationDriver(self.root_z_matrix[root])
+            drv = InterpolationDriver(self.root_z_matrix[root], ostream=self.ostream)
             drv.update_settings(self.sampling_interpolation_settings[root])
             drv.symmetry_information = self.impes_drivers[root].symmetry_information
             drv.impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
@@ -1291,7 +1291,7 @@ class IMDatabasePointCollecter:
             # Dynamically create an attribute name
             attribute_name = f'impes_driver_{root}'
             # Initialize the object
-            driver_object = InterpolationDriver(self.root_z_matrix[root])
+            driver_object = InterpolationDriver(self.root_z_matrix[root], ostream=self.ostream)
             driver_object.update_settings(self.interpolation_settings[root])
             # print('Interpolation driver settings updated for root', root, self.eq_bond_force_constants)
             if self.interpolation_settings[root]["use_mass_weight"]:
@@ -3371,34 +3371,6 @@ class IMDatabasePointCollecter:
 
         driver_object.mark_runtime_data_cache_dirty()
 
-    # def determine_beysian_trust_radius(self, molecules, qm_energies, current_datapoints, interpolation_setting, sym_datapoints, sym_dict, z_matrix):
-
-    #     trust_radii = []
-    #     for dp in current_datapoints:
-    #         sum_sq_error = 0.0
-    #         combined_datapoints = [dp]
-
-    #         for i, mol in enumerate(molecules):
-    #             _, distance, _ = self.calculate_distance_to_ref(mol.get_coordinates_in_bohr(), dp.cartesian_coordinates)
-
-    #             interpolation_driver = InterpolationDriver(z_matrix)
-    #             interpolation_driver.update_settings(interpolation_setting)
-    #             interpolation_driver.symmetry_information = sym_dict
-    #             interpolation_driver.qm_symmetry_data_points = sym_datapoints
-    #             interpolation_driver.print = False
-    #             interpolation_driver.qm_data_points = combined_datapoints
-
-    #             interpolation_driver.compute(mol)
-    #             new_im_energy = interpolation_driver.get_energy()
-    #             diff = (new_im_energy - qm_energies[i]) * hartree_in_kcalpermol()
-    #             sum_sq_error += (diff)**2 / (0.1**2 * distance**6)
-
-    #         bey_trust_radius = (1/sum_sq_error)**(1/6)
-
-    #         trust_radii.append(bey_trust_radius)
-
-    #     return trust_radii
-
     def _clone_datapoints_with_alphas(self, datapoints, alphas):
         alpha_vec = np.asarray(alphas, dtype=np.float64).reshape(-1)
         if len(datapoints) != alpha_vec.size:
@@ -3423,7 +3395,7 @@ class IMDatabasePointCollecter:
         exponent_p_q,
         datapoints_eval,
     ):
-        drv = InterpolationDriver(z_matrix)
+        drv = InterpolationDriver(z_matrix, ostream=self.ostream)
         drv.update_settings(interpolation_setting)
         drv.symmetry_information = sym_dict
         drv.calc_optim_trust_radius = False

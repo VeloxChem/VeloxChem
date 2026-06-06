@@ -1172,12 +1172,12 @@ class IMForceFieldGenerator:
                 self._bootstrap_sampling_db_from_abinito_db(self.roots_to_follow[0])
 
             dynamics_molecule = molecules_to_add_info[self.roots_to_follow[0]][0]
-            forcefield_generator = MMForceFieldGenerator()
+            forcefield_generator = MMForceFieldGenerator(ostream=self.ostream)
             self.dynamics_settings['trajectory_file'] = f'trajectory_{self.roots_to_follow[0]}.pdb'
             forcefield_generator.partial_charges = dynamics_molecule.get_partial_charges(dynamics_molecule.get_charge())
 
             forcefield_generator.create_topology(dynamics_molecule)
-            im_database_driver = IMDatabasePointCollecter()
+            im_database_driver = IMDatabasePointCollecter(ostream=self.ostream)
             im_database_driver.distance_thrsh = self.distance_thrsh
             im_database_driver.non_core_symmetry_groups = self.symmetry_information
             im_database_driver.platform = self.open_mm_platform

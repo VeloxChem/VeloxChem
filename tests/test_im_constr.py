@@ -80,10 +80,14 @@ def _run_construction_once(monkeypatch, workdir: Path) -> ConstructionContext:
     qm_driver.ri_coulomb = True
     qm_driver.dispersion = True
 
+    qm_driver.ostream.mute()
+
     ffg = IMForceFieldGenerator(
         ground_state_driver=qm_driver,
         roots_to_follow=[0],
     )
+
+    ffg.ostream.mute()
 
     ffg.gs_basis_set_label = "def2-svp"
     ffg.add_conformal_structures = False
