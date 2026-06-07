@@ -730,12 +730,13 @@ class CpcmDriver:
         except ImportError:
             raise ImportError("Unable to import matplotlib.colors.")
 
-        if self._cpcm_grid is None:
-            raise TypeError("CPCM grid not available. Driver not initialized.")
+        assert_msg_critical(
+            self._cpcm_grid is not None,
+            "C-PCM grid not available. Driver not initialized.")
 
-        if self._cpcm_q is None:
-            raise TypeError("CPCM charges not available.\n"
-                            "Run SCF with CPCM first, then call this function")
+        assert_msg_critical(
+            self._cpcm_q is not None, "C-PCM charges not available.\n"
+            "Run SCF with C-PCM first, then call this function")
 
         grid = self._cpcm_grid
         q = self._cpcm_q
