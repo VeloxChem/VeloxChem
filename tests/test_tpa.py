@@ -18,6 +18,36 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.rsptpa import TPA
 
 
+def assert_nested_equal(actual, expected):
+
+    if isinstance(actual, np.ndarray) or isinstance(expected, np.ndarray):
+        actual_array = np.asarray(actual)
+        expected_array = np.asarray(expected)
+        if actual_array.dtype.kind in 'OUS' or expected_array.dtype.kind in 'OUS':
+            assert np.array_equal(actual_array, expected_array)
+        else:
+            np.testing.assert_allclose(actual_array, expected_array)
+        return
+
+    if isinstance(expected, dict):
+        assert set(actual.keys()) == set(expected.keys())
+        for key in expected:
+            assert_nested_equal(actual[key], expected[key])
+        return
+
+    if isinstance(expected, (list, tuple)):
+        assert len(actual) == len(expected)
+        for actual_item, expected_item in zip(actual, expected):
+            assert_nested_equal(actual_item, expected_item)
+        return
+
+    if isinstance(expected, (float, complex, np.floating, np.complexfloating)):
+        assert actual == pytest.approx(expected)
+        return
+
+    assert actual == expected
+
+
 @pytest.mark.solvers
 class TestTPA:
 
@@ -237,7 +267,7 @@ class TestTPA:
         outfile = tmp_path / 'tpa_reduced_summary.out'
         tpa_drv = TpaReducedDriver(MPI.COMM_WORLD, OutputStream(outfile))
         tpa_drv.frequencies = rsp_results['frequencies']
-        tpa_drv.print_results(rsp_results, sections='summary')
+        tpa_drv.print_results(rsp_results, section='summary')
         tpa_drv.ostream.flush()
 
         printed = outfile.read_text()
@@ -276,6 +306,59 @@ class TestTPA:
         assert ax.get_ylabel() == 'TPA cross-section [GM]'
         assert len(ax.lines) >= 1
         plt.close(ax.figure)
+
+    def test_reduced_driver_plot_spectrum_public_nm(self):
+
+        matplotlib = pytest.importorskip('matplotlib')
+        matplotlib.use('Agg', force=True)
+        import matplotlib.pyplot as plt
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+                (0.10, -0.10, 0.10): 5.0 + 6.0j,
+                (0.15, -0.15, 0.15): 7.0 + 8.0j,
+            },
+            'frequencies': [0.0, 0.05, 0.10, 0.15],
+            'cross_sections': [0.1, 0.2, 0.3],
+        }
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        tpa_drv = TpaReducedDriver()
+        tpa_drv.ostream.mute()
+        fig, ax = plt.subplots()
+        returned_ax = tpa_drv.plot_spectrum(rsp_results, x_unit='nm', ax=ax)
+
+        assert returned_ax is ax
+        assert ax.get_xlabel() == 'Wavelength [nm]'
+        plt.close(ax.figure)
+
+    def test_reduced_driver_note_follows_gamma_title(self, tmp_path):
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+            },
+            'frequencies': [0.0, 0.05],
+            'cross_sections': [0.1],
+        }
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        outfile = tmp_path / 'tpa_reduced_note.out'
+        tpa_drv = TpaReducedDriver(MPI.COMM_WORLD, OutputStream(outfile))
+        tpa_drv.frequencies = rsp_results['frequencies']
+        tpa_drv.print_results(rsp_results)
+        tpa_drv.ostream.flush()
+
+        printed = outfile.read_text()
+        assert printed.index('Isotropic Average gamma Tensor at Given Frequencies') < \
+            printed.index('Note: The reduced expression')
 
     def test_reduced_driver_plot_spectrum_without_ax_returns_none(self):
 
@@ -344,7 +427,7 @@ class TestTPA:
         outfile = tmp_path / 'tpa_full_summary.out'
         tpa_drv = TpaFullDriver(MPI.COMM_WORLD, OutputStream(outfile))
         tpa_drv.frequencies = rsp_results['frequencies']
-        tpa_drv.print_results(rsp_results, sections='summary')
+        tpa_drv.print_results(rsp_results, section='summary')
         tpa_drv.ostream.flush()
 
         printed = outfile.read_text()
@@ -433,7 +516,7 @@ class TestTPA:
 
         recovered = read_results(str(h5file), 'tpa_reduced')
 
-        assert recovered == tpa_drv._get_hdf5_results(rsp_results)
+        assert_nested_equal(recovered, rsp_results)
 
     def test_reduced_driver_results_hdf5_roundtrip_without_suffix(self, tmp_path):
 
@@ -460,7 +543,22 @@ class TestTPA:
 
         recovered = read_results(str(h5file), 'tpa_reduced')
 
-        assert recovered == tpa_drv._get_hdf5_results(rsp_results)
+        assert_nested_equal(recovered, rsp_results)
+
+    def test_reduced_driver_write_final_hdf5_without_filename_is_noop(self):
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+            },
+            'frequencies': [0.0, 0.05],
+            'cross_sections': [0.1],
+        }
+
+        tpa_drv = TpaReducedDriver()
+        tpa_drv.ostream.mute()
+        tpa_drv._write_final_hdf5(None, rsp_results)
 
     def test_full_driver_results_hdf5_roundtrip(self, tmp_path):
 
@@ -487,7 +585,7 @@ class TestTPA:
 
         recovered = read_results(str(h5file), 'tpa_full')
 
-        assert recovered == tpa_drv._get_hdf5_results(rsp_results)
+        assert_nested_equal(recovered, rsp_results)
 
     def test_full_driver_results_hdf5_roundtrip_without_suffix(self, tmp_path):
 
@@ -514,7 +612,22 @@ class TestTPA:
 
         recovered = read_results(str(h5file), 'tpa_full')
 
-        assert recovered == tpa_drv._get_hdf5_results(rsp_results)
+        assert_nested_equal(recovered, rsp_results)
+
+    def test_full_driver_write_final_hdf5_without_filename_is_noop(self):
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+            },
+            'frequencies': [0.0, 0.05],
+            'cross_sections': [0.1],
+        }
+
+        tpa_drv = TpaFullDriver()
+        tpa_drv.ostream.mute()
+        tpa_drv._write_final_hdf5(None, rsp_results)
 
     def test_full_driver_defaults_and_restart(self, tmp_path):
 

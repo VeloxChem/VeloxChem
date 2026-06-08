@@ -14,6 +14,36 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tpatransitiondriver import TpaTransitionDriver
 
 
+def assert_nested_equal(actual, expected):
+
+    if isinstance(actual, np.ndarray) or isinstance(expected, np.ndarray):
+        actual_array = np.asarray(actual)
+        expected_array = np.asarray(expected)
+        if actual_array.dtype.kind in 'OUS' or expected_array.dtype.kind in 'OUS':
+            assert np.array_equal(actual_array, expected_array)
+        else:
+            np.testing.assert_allclose(actual_array, expected_array)
+        return
+
+    if isinstance(expected, dict):
+        assert set(actual.keys()) == set(expected.keys())
+        for key in expected:
+            assert_nested_equal(actual[key], expected[key])
+        return
+
+    if isinstance(expected, (list, tuple)):
+        assert len(actual) == len(expected)
+        for actual_item, expected_item in zip(actual, expected):
+            assert_nested_equal(actual_item, expected_item)
+        return
+
+    if isinstance(expected, (float, complex, np.floating, np.complexfloating)):
+        assert actual == pytest.approx(expected)
+        return
+
+    assert actual == expected
+
+
 @pytest.mark.solvers
 class TestTpaTransition:
 
@@ -192,7 +222,7 @@ class TestTpaTransition:
 
         outfile = tmp_path / 'tpatransition_summary.out'
         tpa_drv = TpaTransitionDriver(MPI.COMM_WORLD, OutputStream(outfile))
-        tpa_drv.print_results(tpa_results, sections='summary', max_states=1)
+        tpa_drv.print_results(tpa_results, section='summary', max_states=1)
         tpa_drv.ostream.flush()
 
         printed = outfile.read_text()
@@ -227,6 +257,32 @@ class TestTpaTransition:
         assert ax.get_ylabel() == 'TPA cross-section [GM]'
         assert len(ax.lines) == 1
         assert len(ax.figure.axes) == 2
+        plt.close(ax.figure)
+
+    def test_plot_spectrum_public_circular(self):
+
+        matplotlib = pytest.importorskip('matplotlib')
+        matplotlib.use('Agg', force=True)
+        import matplotlib.pyplot as plt
+
+        tpa_results = self.compute_tpatransition('hf')
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        tpa_drv = TpaTransitionDriver()
+        tpa_drv.ostream.mute()
+        fig, ax = plt.subplots()
+        returned_ax = tpa_drv.plot_spectrum(tpa_results,
+                                            x_unit='ev',
+                                            broadening_value=0.123984,
+                                            broadening_unit='ev',
+                                            polarization='circular',
+                                            ax=ax)
+
+        assert returned_ax is ax
+        assert len(ax.figure.axes) == 2
+        assert ax.figure.axes[1].get_ylabel() == 'TPA strengths (circular) [a.u.]'
         plt.close(ax.figure)
 
     def test_plot_spectrum_public_without_ax_returns_none(self):
@@ -288,7 +344,7 @@ class TestTpaTransition:
 
         recovered = read_results(str(h5file), 'tpa_transition')
 
-        assert recovered == tpa_drv._get_hdf5_results(tpa_results)
+        assert_nested_equal(recovered, tpa_results)
 
     def test_tpatransition_results_hdf5_roundtrip_without_suffix(self, tmp_path):
 
@@ -326,7 +382,46 @@ class TestTpaTransition:
 
         recovered = read_results(str(h5file), 'tpa_transition')
 
-        assert recovered == tpa_drv._get_hdf5_results(tpa_results)
+        assert_nested_equal(recovered, tpa_results)
+
+    def test_tpatransition_write_final_hdf5_without_filename_is_noop(self):
+
+        tpa_results = {
+            'photon_energies': [0.1656922537],
+            'transition_moments': {
+                0: np.eye(3),
+            },
+            'tpa_strengths': {
+                'linear': {0: 4.1302840736},
+                'circular': {0: 1.5},
+            },
+            'oscillator_strengths': np.array([0.01]),
+            'elec_trans_dipoles': np.array([[0.11, -0.22, 0.33]]),
+            'excitation_details': [['1a -> 2a (0.90)']],
+        }
+
+        tpa_drv = TpaTransitionDriver()
+        tpa_drv.ostream.mute()
+        tpa_drv._write_final_hdf5(None, tpa_results)
+
+    def test_transition_timing_precedes_summary_header(self, tmp_path):
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        scf_results, molecule, ao_basis = self.run_scf('hf')
+
+        outfile = tmp_path / 'tpatransition_compute.out'
+        tpa_drv = TpaTransitionDriver(MPI.COMM_WORLD, OutputStream(outfile))
+        tpa_drv.xcfun = 'hf'
+        tpa_drv.nstates = 2
+        tpa_drv.conv_thresh = 1.0e-7
+        tpa_drv.compute(molecule, ao_basis, scf_results)
+        tpa_drv.ostream.flush()
+
+        printed = outfile.read_text()
+        assert printed.index('Time spent in quadratic response calculation') < \
+            printed.index('Summary of Two-photon Absorption')
 
     def test_update_settings_and_restart(self, tmp_path):
 
