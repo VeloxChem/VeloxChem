@@ -245,6 +245,31 @@ class TestTpaTransition:
         assert len(ax.figure.axes) == 2
         plt.close(ax.figure)
 
+    def test_plot_spectrum_circular(self):
+
+        pytest.importorskip('matplotlib')
+        import matplotlib.pyplot as plt
+
+        tpa_results = self.compute_tpatransition('hf')
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        tpa_drv = TpaTransitionDriver()
+        tpa_drv.ostream.mute()
+        fig, ax = plt.subplots()
+        returned_ax = tpa_drv.plot_spectrum(tpa_results,
+                                            x_unit='ev',
+                                            broadening_value=0.123984,
+                                            broadening_unit='ev',
+                                            polarization='circular',
+                                            ax=ax)
+
+        assert returned_ax is ax
+        assert len(ax.figure.axes) == 2
+        assert ax.figure.axes[1].get_ylabel() == 'TPA strengths (circular) [a.u.]'
+        plt.close(ax.figure)
+
     def test_plot_spectrum_without_ax_returns_none(self):
 
         pytest.importorskip('matplotlib')
@@ -364,6 +389,26 @@ class TestTpaTransition:
                            tpa_results['elec_trans_dipoles'])
         assert recovered['excitation_details'] == tpa_results[
             'excitation_details']
+
+    def test_tpatransition_write_final_hdf5_without_filename_is_noop(self):
+
+        tpa_results = {
+            'photon_energies': [0.1656922537],
+            'transition_moments': {
+                0: np.eye(3),
+            },
+            'tpa_strengths': {
+                'linear': {0: 4.1302840736},
+                'circular': {0: 1.5},
+            },
+            'oscillator_strengths': np.array([0.01]),
+            'elec_trans_dipoles': np.array([[0.11, -0.22, 0.33]]),
+            'excitation_details': [['1a -> 2a (0.90)']],
+        }
+
+        tpa_drv = TpaTransitionDriver()
+        tpa_drv.ostream.mute()
+        tpa_drv._write_final_hdf5(None, tpa_results)
 
     def test_update_settings_and_restart(self, tmp_path):
 

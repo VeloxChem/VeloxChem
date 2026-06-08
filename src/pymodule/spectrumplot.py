@@ -807,8 +807,9 @@ def plot_tpa_spectrum(spectrum, ax=None, interpolate=True, show_points=True):
         try:
             from scipy.interpolate import CubicSpline
         except ImportError:
-            ax.plot(x_data, y_data, color='black', alpha=0.9, linewidth=2.0)
-        else:
+            CubicSpline = None
+
+        if CubicSpline is not None:
             sort_idx = np.argsort(x_data)
             x_sorted = x_data[sort_idx]
             y_sorted = y_data[sort_idx]
@@ -817,6 +818,8 @@ def plot_tpa_spectrum(spectrum, ax=None, interpolate=True, show_points=True):
             cs = CubicSpline(x_sorted, y_sorted)
             ax.plot(x_dense, cs(x_dense),
                     color='black', alpha=0.9, linewidth=2.5)
+        else:
+            ax.plot(x_data, y_data, color='black', alpha=0.9, linewidth=2.0)
     else:
         ax.plot(x_data, y_data, color='black', alpha=0.9, linewidth=2.0)
 

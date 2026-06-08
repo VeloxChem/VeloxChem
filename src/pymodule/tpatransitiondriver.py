@@ -1105,11 +1105,12 @@ class TpaTransitionDriver(NonlinearSolver):
             section in ['summary', 'moments', 'strengths', 'all'],
             'TpaTransitionDriver.print_results: Invalid section label.')
 
-        self.ostream.print_blank()
-        title = 'Summary of Two-photon Absorption'
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
+        if section == 'all':
+            self.ostream.print_blank()
+            title = 'Summary of Two-photon Absorption'
+            self.ostream.print_header(title)
+            self.ostream.print_header('=' * (len(title) + 2))
+            self.ostream.print_blank()
 
         if section in ['summary', 'all']:
             self._print_summary(rsp_results, max_states=max_states)
