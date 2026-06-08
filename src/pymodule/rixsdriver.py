@@ -1110,3 +1110,46 @@ class RixsDriver(LinearSolver):
             self.ostream.print_header(valstr.ljust(92))
         self.ostream.print_blank()
         self.ostream.flush()
+
+    def plot_spectrum(self,
+                      results,
+                      broadening_type="lorentzian",
+                      broadening_value=0.15,
+                      x_unit='ev',
+                      energy_loss=True,
+                      photon_index=0,
+                      ax=None):
+        """
+        Plot the RIXS spectrum for a single element from the computed results.
+
+        :param results:
+            The results dictionary from compute method.
+        :param element:
+            Element symbol to plot (e.g., 'C', 'O', 'N', 'F', 'S').
+            If None and results contains only one element, that element is plotted.
+            If None and results contains multiple elements, an error is raised.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value (FWHM) in eV.
+        :param color:
+            Color scheme for plotting. Either 'vlx' for VeloxChem default color (darkcyan)
+            or 'cpk' for CPK coloring (element-specific colors). Default is 'vlx'.
+        :param show_atom_labels:
+            If True, display atom indices as labels above peaks. Default is True.
+        :param color_by_atom:
+            If True, color each peak according to its atom index instead of using 
+            element color. Default is False.
+        :param ax:
+            The matplotlib axis to plot on. If None, a new figure is created.
+
+        :return:
+            The matplotlib axis object.
+        """
+        plot_rixs_spectrum(results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value,
+                          photon_index=photon_index,
+                          x_unit=x_unit,
+                          energy_loss=energy_loss,
+                          ax=ax)
