@@ -227,6 +227,7 @@ from .atombdedriver import AtomBdeDriver
 from .orbitallocalization import OrbitalLocalizationDriver
 from .ensembleparser import EnsembleParser
 from .ensembledriver import EnsembleDriver
+from .descriptordriver import DescriptorDriver
 from .spectrumaverager import SpectrumAverager
 # for backward compatibility only
 from .cppsolver import ComplexResponseSolver as ComplexResponse
