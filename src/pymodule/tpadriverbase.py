@@ -452,6 +452,9 @@ class TpaDriverBase(NonlinearSolver):
 
             tpa_spectrum = self.get_spectrum(ret_dict, 'au')
             assert_msg_critical(
+                list(tpa_spectrum['x_data']) == [w for w in self.frequencies if w != 0.0],
+                'TpaDriverBase: spectrum x_data must match nonzero frequencies')
+            assert_msg_critical(
                 '[GM]' in tpa_spectrum['y_label'],
                 'TpaDriverBase: In valid unit in TPA spectrum y_label')
             ret_dict.update({
