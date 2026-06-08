@@ -187,8 +187,7 @@ class TransitionStateGuesser():
         """
         self.results = {}
         # Build forcefields and systems
-        if self.implicit_solvent_model is not None:
-            self.ffbuilder.calculate_resp = True
+        self.ffbuilder.calculate_resp = self.implicit_solvent_model is not None
         self.build_forcefields(reactant, product, **build_forcefields_kwargs)
         self.build_systems(constraints)
 
