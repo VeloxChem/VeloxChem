@@ -149,8 +149,8 @@ class TestEvb:
         wat_conf = EVB.default_system_configurations("water")
         impl_conf = EVB.default_system_configurations("vacuum")
         impl_conf['implicit_solvent_model'] = 'gbn'
-        impl_conf['solute_dielectric'] = 78.39
-        impl_conf['solvent_dielectric'] = 1.0
+        impl_conf['solute_dielectric'] = 1.0
+        impl_conf['solvent_dielectric'] = 78.39
 
         # 0.4 is chosen instead of 0.5 because for lambda=0.4, 1-lambda=/=lambda
         Lambda = [0, 0.4, 1]
