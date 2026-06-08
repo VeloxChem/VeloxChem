@@ -69,4 +69,3 @@ def svd_superimpose(src_arr, target_arr):
     trans = com2 - np.dot(com1, rot_mat)
 
     return rmsd, rot_mat, trans
-

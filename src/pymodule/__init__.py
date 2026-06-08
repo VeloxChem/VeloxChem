@@ -214,9 +214,11 @@ from .evbdataprocessing import EvbDataProcessing
 from .evbreporter import EvbReporter
 from .imforcefieldgenerator import IMForceFieldGenerator
 from .imdatabasepointcollecter import IMDatabasePointCollecter
+from .openmmimdynamics import OpenMMIMDynamics
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
 from .mofbuilder.core.builder import MetalOrganicFrameworkBuilder as MofBuilder
+from .imtrustradiusoptimizer import IMTrustRadiusOptimizer
 from .conformergenerator import ConformerGenerator
 from .tsguesser import TransitionStateGuesser
 from .reactionmatcher import ReactionMatcher

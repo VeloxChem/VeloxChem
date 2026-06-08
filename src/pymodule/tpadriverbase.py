@@ -452,13 +452,16 @@ class TpaDriverBase(NonlinearSolver):
 
             tpa_spectrum = self.get_spectrum(ret_dict, 'au')
             assert_msg_critical(
+                list(tpa_spectrum['x_data']) == [w for w in self.frequencies if w != 0.0],
+                'TpaDriverBase: spectrum x_data must match nonzero frequencies')
+            assert_msg_critical(
                 '[GM]' in tpa_spectrum['y_label'],
                 'TpaDriverBase: In valid unit in TPA spectrum y_label')
             ret_dict.update({
                 'cross_sections': list(tpa_spectrum['y_data'])
             })
 
-            self.print_results(ret_dict, sections='all')
+            self.print_results(ret_dict, section='all')
 
         profiler.check_memory_usage('End of TPA')
 
@@ -855,7 +858,7 @@ class TpaDriverBase(NonlinearSolver):
             The title for gamma output.
         """
 
-        return 'Isotropic Average gamma Tensor at Given Frequencies'
+        return 'Isotropic Average of gamma Tensor at Given Frequencies'
 
     def _get_hdf5_group_name(self):
         """
@@ -877,39 +880,6 @@ class TpaDriverBase(NonlinearSolver):
 
         return 'TPA result'
 
-    @staticmethod
-    def _get_hdf5_results(results):
-        """
-        Converts gamma-based TPA results to a readable HDF5 payload.
-
-        :param results:
-            The results dictionary returned by compute().
-
-        :return:
-            A dictionary suitable for HDF5 serialization.
-        """
-
-        frequencies = [float(w) for w in results['frequencies'] if w != 0.0]
-        cross_sections = [float(val) for val in results['cross_sections']]
-        gamma = results['gamma']
-
-        spectrum_points = []
-        for w, cross_section in zip(frequencies, cross_sections):
-            gamma_value = gamma[(w, -w, w)]
-            spectrum_points.append({
-                'photon_energy_au': w,
-                'photon_energy_ev': float(w * hartree_in_ev()),
-                'gamma_real': float(gamma_value.real),
-                'gamma_imag': float(gamma_value.imag),
-                'cross_section_gm': cross_section,
-            })
-
-        return {
-            'frequencies_au': frequencies,
-            'cross_sections_gm': cross_sections,
-            'spectrum_points': spectrum_points,
-        }
-
     def _write_final_hdf5(self, fname, results):
         """
         Writes gamma-based TPA results to the specified HDF5 file.
@@ -921,19 +891,19 @@ class TpaDriverBase(NonlinearSolver):
         """
 
         if not fname:
-            raise ValueError('No filename given to _write_final_hdf5()')
+            return
 
         fpath = Path(fname)
         if fpath.suffix != '.h5':
             fpath = fpath.with_suffix('.h5')
 
         if not fpath.is_file():
-            raise ValueError(f'TPA HDF5 file does not exist: {fpath}')
+            return
 
         write_results_to_hdf5(str(fpath),
-                              self._get_hdf5_group_name(),
-                              self._get_hdf5_results(results),
-                              value_label=self._get_hdf5_value_label())
+                              'tpa',
+                              results,
+                              value_label='TPA result')
 
     def _get_summary_title(self):
         """
@@ -968,41 +938,6 @@ class TpaDriverBase(NonlinearSolver):
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_blank()
 
-    def _normalize_print_sections(self, sections):
-        """
-        Normalize requested print sections for gamma-based TPA results.
-
-        :param sections:
-            Section label or sequence of section labels.
-
-        :return:
-            Ordered list of normalized section labels.
-        """
-
-        valid_sections = ('summary', 'gamma', 'reference', 'spectrum', 'all')
-
-        if isinstance(sections, str):
-            requested_sections = [sections.lower()]
-        else:
-            requested_sections = [section.lower() for section in sections]
-
-        invalid_sections = [
-            section for section in requested_sections if section not in valid_sections
-        ]
-        assert_msg_critical(
-            not invalid_sections,
-            'TpaDriverBase.print_results: Invalid section label(s).')
-
-        if 'all' in requested_sections:
-            requested_sections = ['gamma', 'reference', 'spectrum']
-
-        normalized_sections = []
-        for section in requested_sections:
-            if section not in normalized_sections:
-                normalized_sections.append(section)
-
-        return normalized_sections
-
     def _print_summary(self, rsp_results):
         """
         Prints a compact summary of gamma-based TPA results.
@@ -1011,7 +946,7 @@ class TpaDriverBase(NonlinearSolver):
             A dictionary containing the results of response calculation.
         """
 
-        width = 110
+        width = 82
         gamma = rsp_results['gamma']
         freqs = rsp_results['frequencies']
         cross_sections = list(rsp_results.get('cross_sections', []))
@@ -1019,11 +954,12 @@ class TpaDriverBase(NonlinearSolver):
         self.ostream.print_blank()
         title = self._get_summary_title()
         self.ostream.print_header(title)
-        self.ostream.print_header('-' * width)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
 
-        header = '{:<18s}{:>18s}{:>18s}{:>18s}{:>24s}'.format(
-            'Photon Energy[a.u.]', 'Photon Energy[eV]', 'Re(gamma)', 'Im(gamma)',
-            'TPA cross-section[GM]')
+        header = '{:>15s}{:>20}{:>20}{:>24s}'.format(
+            'Photon Energy', 'Re(gamma)', 'Im(gamma)',
+            'TPA cross-section')
         self.ostream.print_header(header.ljust(width))
         self.ostream.print_header('-' * width)
 
@@ -1033,100 +969,45 @@ class TpaDriverBase(NonlinearSolver):
             if w == 0.0:
                 cross_section_str = '-'
             else:
-                cross_section_str = '{:.8f}'.format(
+                cross_section_str = '{:.8f} GM'.format(
                     cross_sections[cross_section_index])
                 cross_section_index += 1
 
-            line = '{:<18.4f}{:>18.5f}{:>18.8f}{:>18.8f}{:>24s}'.format(
-                w, w * hartree_in_ev(), gamma_value.real, gamma_value.imag,
+            line = '{:>12.5f} eV{:>20.8f}{:>20.8f}{:>24s}'.format(
+                w * hartree_in_ev(), gamma_value.real, gamma_value.imag,
                 cross_section_str)
             self.ostream.print_header(line.ljust(width))
 
         self.ostream.print_blank()
 
-    def _print_gamma(self, rsp_results):
-        """
-        Prints the gamma table for TPA results.
-
-        :param rsp_results:
-            A dictionary containing the results of response calculation.
-        """
-
-        gamma = rsp_results['gamma']
-
-        self.ostream.print_blank()
-
-        title = self._get_gamma_title()
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
-
-        freqs = rsp_results['frequencies']
-
-        header = '{:<8s}{:>14s}{:>21s}{:>22s}'.format('', 'Photon Energy',
-                                                      'Real', 'Imaginary')
-        width = len(header)
-        self.ostream.print_header(header.ljust(width))
-        self.ostream.print_header(('-' * len(header)).ljust(width))
-
-        for w in freqs:
-            self._print_component('gamma', w, gamma[(w, -w, w)], width)
-
-        self.ostream.print_blank()
-
-    def _print_spectrum_section(self, rsp_results):
-        """
-        Prints the TPA spectrum table.
-
-        :param rsp_results:
-            A dictionary containing the results of response calculation.
-        """
-
-        width = len('{:<8s}{:>14s}{:>21s}{:>22s}'.format('', 'Photon Energy',
-                                                         'Real', 'Imaginary'))
-        spectrum = self.get_spectrum(rsp_results, x_unit='au')
-        self._print_spectrum(spectrum, width)
-
-    def _print_results(self, rsp_results, sections='all'):
-        """
-        Prints the selected sections of gamma-based TPA results.
-
-        :param rsp_results:
-            A dictionary containing the results of response calculation.
-        :param sections:
-            The sections to print.
-        """
-
-        for section in self._normalize_print_sections(sections):
-            if section == 'summary':
-                self._print_summary(rsp_results)
-            elif section == 'gamma':
-                self._print_note()
-                self._print_gamma(rsp_results)
-            elif section == 'reference':
-                width = len('{:<8s}{:>14s}{:>21s}{:>22s}'.format(
-                    '', 'Photon Energy', 'Real', 'Imaginary'))
-                self._print_reference(width)
-            elif section == 'spectrum':
-                self._print_spectrum_section(rsp_results)
-
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-    def print_results(self, rsp_results, sections='all'):
+    def print_results(self, rsp_results, section='all'):
         """
         Prints the selected sections of TPA results.
 
         :param rsp_results:
             A dictionary containing the results of response calculation.
-        :param sections:
-            Section label or sequence of section labels.
+        :param section:
+            Section label.
         """
 
-        if self.rank != mpi_master():
-            return
+        section = section.lower()
+        valid_sections = ('summary', 'note', 'gamma', 'reference', 'spectrum',
+                          'all')
+        assert_msg_critical(
+            section in valid_sections,
+            'TpaDriverBase.print_results: Invalid section label.')
 
-        self._print_results(rsp_results, sections=sections)
+        if section in ['summary', 'all']:
+            self._print_summary(rsp_results)
+        if section in ['note', 'all']:
+            self._print_note()
+        if section in ['reference', 'all']:
+            width = len('{:<8s}{:>14s}{:>21s}{:>22s}'.format(
+                '', 'Photon Energy', 'Real', 'Imaginary'))
+            self._print_reference(width)
+
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def plot_spectrum(self,
                       rsp_results,
