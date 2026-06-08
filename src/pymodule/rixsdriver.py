@@ -38,6 +38,7 @@ import sys
 
 from .veloxchemlib import hartree_in_ev, mpi_master
 from .oneeints import compute_electric_dipole_integrals
+from .spectrumplot import plot_rixs_spectrum
 from .outputstream import OutputStream
 from .linearsolver import LinearSolver
 from .lreigensolver import LinearResponseEigenSolver
@@ -1124,10 +1125,6 @@ class RixsDriver(LinearSolver):
 
         :param results:
             The results dictionary from compute method.
-        :param element:
-            Element symbol to plot (e.g., 'C', 'O', 'N', 'F', 'S').
-            If None and results contains only one element, that element is plotted.
-            If None and results contains multiple elements, an error is raised.
         :param broadening_type:
             The type of broadening to use. Either 'lorentzian' or 'gaussian'.
         :param broadening_value:
@@ -1135,11 +1132,6 @@ class RixsDriver(LinearSolver):
         :param color:
             Color scheme for plotting. Either 'vlx' for VeloxChem default color (darkcyan)
             or 'cpk' for CPK coloring (element-specific colors). Default is 'vlx'.
-        :param show_atom_labels:
-            If True, display atom indices as labels above peaks. Default is True.
-        :param color_by_atom:
-            If True, color each peak according to its atom index instead of using 
-            element color. Default is False.
         :param ax:
             The matplotlib axis to plot on. If None, a new figure is created.
 

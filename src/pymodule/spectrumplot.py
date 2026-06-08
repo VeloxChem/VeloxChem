@@ -538,8 +538,7 @@ def plot_rixs_spectrum(rixs_results,
                        photon_index=0,
                        energy_loss=True,
                       broadening_type="lorentzian",
-                      broadening_value=(1000.0 / hartree_in_wavenumber() *
-                                        hartree_in_ev()),
+                      broadening_value=0.15,
                         x_unit="ev",
                       ax=None):
     """
@@ -547,6 +546,11 @@ def plot_rixs_spectrum(rixs_results,
 
     :param rixs_results:
         The dictionary containing the RIXS results.
+    :param photon_index:
+        The index of the incoming photon to plot the spectrum for. (0-based)
+    :param energy_loss:
+        If True, plot the spectrum as a function of energy loss. 
+        If False, plot as a function of emission energy.
     :param broadening_type:
         The type of broadening to use. Either 'lorentzian' or 'gaussian'.
     :param broadening_value:
@@ -554,117 +558,140 @@ def plot_rixs_spectrum(rixs_results,
     :param ax:
         The matplotlib axis to plot on.
     """
-
     assert_msg_critical('matplotlib' in sys.modules, 'matplotlib is required.')
-
     assert_msg_critical(x_unit.lower() in ['nm', 'ev'], 'plot: Invalid x_unit')
 
     use_ev = (x_unit.lower() == 'ev')
 
     ev_x_nm = hartree_in_ev() / hartree_in_inverse_nm()
     au2ev = hartree_in_ev()
-    ev2au = 1.0 / au2ev
 
-    # initialize the plot
     if ax is None:
         fig, ax = plt.subplots(figsize=(8, 5))
 
     if energy_loss:
         if use_ev:
-            ax.set_xlabel('Energy-loss [eV]')
+            ax.set_xlabel('Energy loss [eV]')
         else:
-            ax.set_xlabel('Energy-loss [nm]')
+            ax.set_xlabel('Energy loss [nm]')
     else:
         if use_ev:
             ax.set_xlabel('Emission energy [eV]')
         else:
             ax.set_xlabel('Emission energy [nm]')
-    ax.set_ylabel(r'$\sigma$ [a.u.]')
 
+    ax.set_ylabel(r'Reduced cross section, $\sigma/r_e^2$')
     ax.set_title("RIXS Spectrum")
 
+    omega_ev = rixs_results['elastic_emission'][photon_index] * au2ev
+
+    ax.text(
+        0.03, 0.95,
+        rf'$\hbar \omega = {omega_ev:.2f}$ eV',
+        transform=ax.transAxes,
+        ha='left',
+        va='top'
+    )
+
     if energy_loss:
-        x = (rixs_results['energy_losses'][:,photon_index])
+        x = rixs_results['energy_losses'][:, photon_index]
     else:
-        x = (rixs_results['emission_energies'][:,photon_index])
-    y = rixs_results['cross_sections'][:,photon_index]
+        x = rixs_results['emission_energies'][:, photon_index]
+
+    y = rixs_results['cross_sections'][:, photon_index]
+
     xmin = max(0.0, min(x) - 0.03)
     xmax = max(x) + 0.03
     xstep = 0.0001
 
-    ax2 = ax.twinx()
+    x_ev = x * au2ev
+    xmin_ev = xmin * au2ev
+    xmax_ev = xmax * au2ev
+    xstep_ev = xstep * au2ev
 
-    for i in np.arange(len(rixs_results['cross_sections'][:,photon_index])):
+    ax2 = ax.twinx()
+    ax2.set_ylabel(r'Intensity, $d / d\omega (\sigma/r_e^2)$ [eV$^{-1}$]')
+
+    for i in np.arange(len(y)):
         if energy_loss:
-            if use_ev:
-                x_val = rixs_results['energy_losses'][i,photon_index] * au2ev,
-            else:
-                x_val = ev_x_nm / (rixs_results['energy_losses'][i,photon_index] * au2ev)
+            energy_au = rixs_results['energy_losses'][i, photon_index]
         else:
-            if use_ev:
-                x_val = rixs_results['emission_energies'][i,photon_index] * au2ev,
-            else:
-                x_val = ev_x_nm / (rixs_results['emission_energies'][i,photon_index] * au2ev)
-        ax2.plot(
+            energy_au = rixs_results['emission_energies'][i, photon_index]
+
+        energy_ev = energy_au * au2ev
+
+        if use_ev:
+            x_val = energy_ev
+        else:
+            x_val = ev_x_nm / energy_ev
+
+        ax.plot(
             [x_val, x_val],
-            [0.0, rixs_results['cross_sections'][i,photon_index]],
+            [0.0, rixs_results['cross_sections'][i, photon_index]],
             alpha=0.7,
             linewidth=2,
             color="darkcyan",
         )
 
-    c = 1.0 / fine_structure_constant()
-    NA = avogadro_constant()
-    a_0 = bohr_in_angstrom() * 1.0e-10
-
     if broadening_type.lower() == "lorentzian":
-        xi, yi = lorentzian_absorption(x, y, xmin, xmax, xstep,
-                                       broadening_value * ev2au)
+        xi, yi = lorentzian_xps(
+            x_ev, y, xmin_ev, xmax_ev, xstep_ev, broadening_value
+        )
 
     elif broadening_type.lower() == "gaussian":
-        xi, yi = gaussian_absorption(x, y, xmin, xmax, xstep,
-                                     broadening_value * ev2au)
+        xi, yi = gaussian_xps(
+            x_ev, y, xmin_ev, xmax_ev, xstep_ev, broadening_value
+        )
+
+    else:
+        assert_msg_critical(False, 'plot: Invalid broadening_type')
 
     xsection = yi
 
     if use_ev:
-        x_data = xi * au2ev
+        x_data = xi
     else:
-        x_data = ev_x_nm / (xi * au2ev)
-    ax.plot(x_data, xsection, color="black", alpha=0.9, linewidth=2.5)
+        x_data = ev_x_nm / xi
+
+    ax2.plot(x_data, xsection, color="black", alpha=0.9, linewidth=2.5)
 
     legend_bars = mlines.Line2D([], [],
                                 color='darkcyan',
                                 alpha=0.7,
                                 linewidth=2,
-                                label='Cross sections')
+                                label='Cross section')
+
     label_spectrum = f'{broadening_type.capitalize()} '
     label_spectrum += f'broadening ({broadening_value:.3f} eV)'
+
     legend_spectrum = mlines.Line2D([], [],
                                     color='black',
                                     linestyle='-',
                                     linewidth=2.5,
                                     label=label_spectrum)
+
     ax2.legend(handles=[legend_bars, legend_spectrum],
-               frameon=False,
-               borderaxespad=0.,
-               loc='center left',
-               bbox_to_anchor=(1.15, 0.5))
-    ax2.set_ylim(0, max(abs(rixs_results['cross_sections'][:, photon_index])) * 1.1)
-    ax.set_ylim(0, max(xsection) * 1.1)
+            frameon=False,
+            borderaxespad=0.,
+            loc='center left',
+            bbox_to_anchor=(1.15, 0.5))
+
+    ax.set_ylim(0, max(abs(y)) * 1.1)
     ax.set_ylim(bottom=0)
+
+    ax2.set_ylim(0, max(xsection) * 1.1)
     ax2.set_ylim(bottom=0)
-    ax2.set_ylabel("Cross sections")
 
     if use_ev:
-        x_lim = (xmin * au2ev, xmax * au2ev)
+        x_lim = (xmin_ev, xmax_ev)
     else:
-        x_lim = (ev_x_nm / (xmax * au2ev), ev_x_nm / (xmin * au2ev))
+        x_lim = (ev_x_nm / xmax_ev, ev_x_nm / xmin_ev)
 
     if energy_loss:
         x_lim = x_lim[::-1]
 
     ax.set_xlim(x_lim)
+    ax2.set_xlim(x_lim)
 
 
 def plot_tpa_transition_spectrum(rsp_results,
