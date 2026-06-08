@@ -283,6 +283,9 @@ class GBImplicitSolvent:
                 f'Unknown GB model "{model}". '
                 f'Valid options: {list(GBImplicitSolvent.VALID_MODELS)}')
 
+        if 'openmm' not in sys.modules:
+            raise ImportError('openmm is required to build implicit solvent forces.')
+
         sv, sl = sv_dielectric, sl_dielectric
         force = mm.CustomGBForce()
 
