@@ -90,6 +90,16 @@ class TpaReducedDriver(TpaDriverBase):
 
         super().update_settings(rsp_dict, method_dict)
 
+    def _get_tpa_type(self):
+        """
+        Gets the type of TPA calculation.
+
+        :return:
+            The TPA calculation type.
+        """
+
+        return 'reduced'
+
     def get_densities(self, wi, Nx, mo, nocc, norb):
         """
         Computes the compounded densities needed for the compounded Fock

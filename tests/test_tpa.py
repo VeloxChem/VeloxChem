@@ -64,6 +64,8 @@ class TestTPA:
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             tpa_result = tpa_prop.rsp_property
 
+            assert tpa_result['tpa_type'] == tpa_type
+
             for key, ref_val in ref_result['tpa_terms'].items():
                 calc_val = tpa_result['tpa_terms'][key][(w, -w, w)]
                 assert abs(calc_val.real / ref_val.real - 1.0) < 1.0e-6

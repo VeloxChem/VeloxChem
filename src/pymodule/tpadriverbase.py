@@ -106,6 +106,16 @@ class TpaDriverBase(NonlinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
+    def _get_tpa_type(self):
+        """
+        Gets the type of TPA calculation.
+
+        :return:
+            The TPA calculation type.
+        """
+
+        return None
+
     def compute(self, molecule, ao_basis, scf_results):
         """
         Computes the isotropic cubic response function for two-photon
@@ -442,6 +452,7 @@ class TpaDriverBase(NonlinearSolver):
                 'tpa_terms': {},
                 'gamma': gamma,
                 'frequencies': list(self.frequencies),
+                'tpa_type': self._get_tpa_type(),
             })
 
             ret_dict['tpa_terms'].update(other_dict)
