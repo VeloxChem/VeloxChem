@@ -538,7 +538,7 @@ def plot_rixs_spectrum(rixs_results,
                        photon_index=0,
                        energy_loss=True,
                       broadening_type="lorentzian",
-                      broadening_value=0.15,
+                      broadening_value=0.24,
                         x_unit="ev",
                       ax=None):
     """
@@ -554,7 +554,7 @@ def plot_rixs_spectrum(rixs_results,
     :param broadening_type:
         The type of broadening to use. Either 'lorentzian' or 'gaussian'.
     :param broadening_value:
-        The broadening value in eV.
+        The FWHM in eV.
     :param ax:
         The matplotlib axis to plot on.
     """
