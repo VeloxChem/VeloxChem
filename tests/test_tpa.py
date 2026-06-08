@@ -255,6 +255,34 @@ class TestTPA:
         assert len(ax.lines) >= 1
         plt.close(ax.figure)
 
+    def test_reduced_driver_plot_spectrum_nm(self):
+
+        pytest.importorskip('matplotlib')
+        import matplotlib.pyplot as plt
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+                (0.10, -0.10, 0.10): 5.0 + 6.0j,
+                (0.15, -0.15, 0.15): 7.0 + 8.0j,
+            },
+            'frequencies': [0.0, 0.05, 0.10, 0.15],
+            'cross_sections': [0.1, 0.2, 0.3],
+        }
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        tpa_drv = TpaReducedDriver()
+        tpa_drv.ostream.mute()
+        fig, ax = plt.subplots()
+        returned_ax = tpa_drv.plot_spectrum(rsp_results, x_unit='nm', ax=ax)
+
+        assert returned_ax is ax
+        assert ax.get_xlabel() == 'Wavelength [nm]'
+        plt.close(ax.figure)
+
     def test_reduced_driver_plot_spectrum_without_ax_returns_none(self):
 
         pytest.importorskip('matplotlib')
@@ -413,6 +441,21 @@ class TestTPA:
 
         assert recovered == rsp_results
 
+    def test_reduced_driver_write_final_hdf5_without_filename_is_noop(self):
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+            },
+            'frequencies': [0.0, 0.05],
+            'cross_sections': [0.1],
+        }
+
+        tpa_drv = TpaReducedDriver()
+        tpa_drv.ostream.mute()
+        tpa_drv._write_final_hdf5(None, rsp_results)
+
     def test_full_driver_results_hdf5_roundtrip(self, tmp_path):
 
         if MPI.COMM_WORLD.Get_rank() != mpi_master():
@@ -466,6 +509,21 @@ class TestTPA:
         recovered = read_results(str(h5file), 'tpa')
 
         assert recovered == rsp_results
+
+    def test_full_driver_write_final_hdf5_without_filename_is_noop(self):
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+            },
+            'frequencies': [0.0, 0.05],
+            'cross_sections': [0.1],
+        }
+
+        tpa_drv = TpaFullDriver()
+        tpa_drv.ostream.mute()
+        tpa_drv._write_final_hdf5(None, rsp_results)
 
     def test_full_driver_defaults_and_restart(self, tmp_path):
 
