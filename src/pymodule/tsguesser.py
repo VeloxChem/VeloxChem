@@ -134,8 +134,7 @@ class TransitionStateGuesser():
         self._conformer_phi_product: float | None = None
 
         # Implicit solvation during conformational sampling.
-        # Set implicit_solvent_model to one of 'gbn', 'gbn2', 'obc1', 'obc2',
-        # 'hct' to enable GB solvation; None runs in vacuum (default).
+        # Set implicit_solvent_model to one of 'gbn', 'gbn2', 'obc1', 'obc2', 'hct' to enable GB solvation; None runs in vacuum (default).
         self.implicit_solvent_model: str | None = None
         self.solute_dielectric: float = 1.0
         self.solvent_dielectric: float = 78.39
