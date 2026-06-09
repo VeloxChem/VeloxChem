@@ -889,7 +889,7 @@ comp_boys_args(CSimdArray<double>& bf_data, const size_t index_args, CSimdArray<
     const auto nelems = buffer.number_of_active_elements();
 
 #pragma omp simd aligned(bargs, pc_x, pc_y, pc_z, b_exps : 64)
-    for (int i = 0; i < nelems; i++)
+    for (int i = 0; i < static_cast<int>(nelems); i++)
     {
         bargs[i] = (a_exp + b_exps[i]) * (pc_x[i] * pc_x[i] + pc_y[i] * pc_y[i] + pc_z[i] * pc_z[i]);
     }
@@ -924,7 +924,7 @@ comp_boys_args(CSimdArray<double>& bf_data,
     const auto nelems = buffer.number_of_active_elements();
 
 #pragma omp simd aligned(bargs, pc_x, pc_y, pc_z, b_exps : 64)
-    for (int i = 0; i < nelems; i++)
+    for (int i = 0; i < static_cast<int>(nelems); i++)
     {
         const double frho = a_exp + b_exps[i];
 
@@ -958,7 +958,7 @@ comp_boys_args_with_rho(CSimdArray<double>& bf_data, const size_t index_args, CS
     const auto nelems = buffer.number_of_active_elements();
 
 #pragma omp simd aligned(bargs, ab_x, ab_y, ab_z, b_exps : 64)
-    for (int i = 0; i < nelems; i++)
+    for (int i = 0; i < static_cast<int>(nelems); i++)
     {
         bargs[i] = a_exp * b_exps[i] * (ab_x[i] * ab_x[i] + ab_y[i] * ab_y[i] + ab_z[i] * ab_z[i]) / (a_exp + b_exps[i]);
     }

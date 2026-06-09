@@ -106,8 +106,8 @@ class LocalizationDriver:
                 max_theta = 0.0
                 for i in range(m - 1):
                     for j in range(i+1, m):
-                        r_i  = r[:,i,i]
-                        r_j  = r[:,j,j]
+                        r_i = r[:,i,i]
+                        r_j = r[:,j,j]
                         d_ij = r[:,i,j]
 
                         r_ij = r_i - r_j

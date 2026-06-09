@@ -125,12 +125,14 @@ class CpcmDriver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def init(self, molecule, do_nuclear=True):
+    def init(self, molecule, basis, do_nuclear=True):
         """
         Initialize the driver for energy calculations.
 
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
         :param do_nuclear:
             Flag to compute or not the nuclear contribution.
         """
@@ -145,7 +147,8 @@ class CpcmDriver:
         self._cpcm_precond = np.hstack(self._cpcm_precond)
 
         if do_nuclear:
-            self._cpcm_Bzvec = self.form_vector_Bz(self._cpcm_grid, molecule)
+            self._cpcm_Bzvec = self.form_vector_Bz(self._cpcm_grid, molecule,
+                                                   basis)
         else:
             self._cpcm_Bzvec = None
 
@@ -264,7 +267,7 @@ class CpcmDriver:
         gradA += self.grad_Aii(molecule, self._cpcm_grid, self._cpcm_sw_func,
                                self._cpcm_q, self.epsilon, self.x)
 
-        gradB = self.grad_B(molecule, self._cpcm_grid, self._cpcm_q)
+        gradB = self.grad_B(molecule, basis, self._cpcm_grid, self._cpcm_q)
 
         gradC = self.grad_C(molecule, basis, self._cpcm_grid, self._cpcm_q,
                             density)
@@ -562,7 +565,7 @@ class CpcmDriver:
 
         return local_precond
 
-    def form_vector_Bz(self, grid, molecule):
+    def form_vector_Bz(self, grid, molecule, basis):
         """
         Forms the nuclear-cavity interaction vector.
 
@@ -571,6 +574,8 @@ class CpcmDriver:
             the Gaussian exponents, and indices for which atom they belong to.
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
 
         :return:
             The (nuclear) electrostatic potential at each grid point due to
@@ -580,7 +585,7 @@ class CpcmDriver:
         Bzvec = np.zeros(grid.shape[0])
 
         atom_coords = molecule.get_coordinates_in_bohr()
-        elem_ids = molecule.get_element_ids()
+        elem_ids = molecule.get_effective_nuclear_charges(basis)
 
         grid_coords = np.copy(grid[:, :3])
         grid_zeta = np.copy(grid[:, 4])
@@ -704,6 +709,84 @@ class CpcmDriver:
         v.zoomTo()
         v.show()
 
+    def visualize_cpcm_charges(self, molecule, colorbar=True):
+        """
+        Visualizes CPCM charges.
+
+        :param molecule:
+            The molecule.
+        """
+
+        try:
+            import py3Dmol as p3d
+        except ImportError:
+            raise ImportError("Unable to import py3Dmol.")
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            raise ImportError("Unable to import matplotlib.")
+        try:
+            import matplotlib.colors as mcolors
+        except ImportError:
+            raise ImportError("Unable to import matplotlib.colors.")
+
+        assert_msg_critical(
+            self._cpcm_grid is not None,
+            "C-PCM grid not available. Driver not initialized.")
+
+        assert_msg_critical(
+            self._cpcm_q is not None, "C-PCM charges not available.\n"
+            "Run SCF with C-PCM first, then call this function")
+
+        grid = self._cpcm_grid
+        q = self._cpcm_q
+
+        assert_msg_critical(grid.shape[1] == 6,
+                            "CpcmDriver.visualize_grid: Invalid grid size")
+        assert_msg_critical(
+            len(q) == len(grid),
+            "CpcmDriver.visualize_grid: Invalid q-vector size")
+
+        grid_in_angstrom = grid[:, :3] * bohr_in_angstrom()
+
+        grid_xyz_string = f"{grid_in_angstrom.shape[0]}\n\n"
+
+        for i in range(grid_in_angstrom.shape[0]):
+            x, y, z = grid_in_angstrom[i]
+            grid_xyz_string += f"He {x} {y} {z}\n"
+
+        q_absmax = np.max(np.abs(q))
+        norm = mcolors.TwoSlopeNorm(vmin=-q_absmax, vcenter=0.0, vmax=q_absmax)
+        v = p3d.view(width=600, height=600)
+
+        v.addModel(molecule.get_xyz_string(), "xyz")
+        v.setStyle({"stick": {}})
+        cmap = plt.get_cmap("coolwarm_r")
+
+        for k in range(grid_in_angstrom.shape[0]):
+            x, y, z = grid_in_angstrom[k, :3]
+
+            color = mcolors.to_hex(cmap(norm(q[k])))
+            v.addSphere({
+                "center": {
+                    "x": x,
+                    "y": y,
+                    "z": z
+                },
+                "radius": 0.05,
+                "color": color,
+                "opacity": 0.9,
+            })
+
+        v.zoomTo()
+        v.show()
+        if colorbar:
+            fig, ax = plt.subplots(figsize=(6, 1))
+            fig.subplots_adjust(bottom=0.5)
+            sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+            cb = plt.colorbar(sm, cax=ax, orientation="horizontal")
+            cb.set_label("Charge (a.u)")
+
     def grad_Aij(self, molecule, grid, q, eps, x):
         """
         Calculates the (off-diagonal) cavity-cavity gradient contribution.
@@ -792,12 +875,14 @@ class CpcmDriver:
 
         return grad_Aii
 
-    def grad_B(self, molecule, grid, q):
+    def grad_B(self, molecule, basis, grid, q):
         """
         Calculates the nuclear-cavity gradient contribution.
 
         :param molecule:
             The molecule.
+        :param basis:
+            The atomic basis.
         :param grid:
             The grid object containing the grid positions, weights,
             the Gaussian exponents, and indices for which atom they belong to.
@@ -817,7 +902,7 @@ class CpcmDriver:
 
         two_sqrt_invpi = 2.0 / np.sqrt(np.pi)
 
-        elem_ids = molecule.get_element_ids()
+        elem_ids = molecule.get_effective_nuclear_charges(basis)
         gradB_vec = np.zeros((natoms, 3))
 
         # np.einsum('ia,bia,iac,i,a->bc', dB_dr, factor, dr_iA, q, Z)

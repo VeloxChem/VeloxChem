@@ -31,13 +31,14 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
+from copy import deepcopy
 import numpy as np
 import sys
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import dipole_in_debye
 from .outputstream import OutputStream
-from .oneeints import compute_electric_dipole_integrals
+from .firstorderpropdriver import FirstOrderPropertyDriver
 
 
 class FirstOrderProperties:
@@ -74,6 +75,28 @@ class FirstOrderProperties:
 
         self.properties = {}
 
+        self._prop_drv = FirstOrderPropertyDriver(self.comm, self.ostream)
+
+    def _set_dipole_moment(self, dipole_moment):
+        """
+        Stores dipole moment under the canonical property key.
+
+        :param dipole_moment:
+            The dipole moment array for one or multiple states.
+        """
+
+        self.properties['dipole moment'] = deepcopy(dipole_moment)
+
+    def _get_dipole_moment(self):
+        """
+        Gets dipole moment from the canonical property key.
+
+        :return:
+            The dipole moment array.
+        """
+
+        return deepcopy(self.properties['dipole moment'])
+
     def compute_scf_prop(self, molecule, basis, scf_results):
         """
         Computes first-order properties for SCF.
@@ -105,45 +128,10 @@ class FirstOrderProperties:
             The total electron density.
         """
 
-        # choose center of nuclear charges as origin
-        coords = molecule.get_coordinates_in_bohr()
-        nuclear_charges = molecule.get_element_ids()
-        origin = np.sum(coords.T * nuclear_charges,
-                        axis=1) / np.sum(nuclear_charges)
+        dipole_dict = self._prop_drv.compute_electric_dipole_moment(
+            molecule, basis, total_density)
 
-        dipole_moment = None
-        if self.rank == mpi_master():
-            dipole_ints = compute_electric_dipole_integrals(
-                molecule, basis, origin)
-
-            # electronic contribution
-
-            # multiple states:
-            if len(total_density.shape) > 2:
-                dof = total_density.shape[0]
-                electronic_dipole = np.zeros((dof, 3))
-                for i in range(dof):
-                    electronic_dipole[i] = np.array([
-                        np.sum(dipole_ints[d] * total_density[i])
-                        for d in range(3)
-                    ])
-
-            # or single state:
-            else:
-                electronic_dipole = np.array(
-                    [np.sum(dipole_ints[d] * total_density) for d in range(3)])
-
-            # nuclear contribution
-            coords = molecule.get_coordinates_in_bohr()
-            nuclear_charges = molecule.get_element_ids()
-            nuclear_charges -= basis.get_number_of_ecp_core_electrons()
-            nuclear_dipole = np.sum((coords - origin).T * nuclear_charges,
-                                    axis=1)
-
-            dipole_moment = nuclear_dipole + electronic_dipole
-        dipole_moment = self.comm.bcast(dipole_moment, root=mpi_master())
-        self.properties['dipole moment'] = dipole_moment
-        self.properties['dipole_moment'] = dipole_moment
+        self._set_dipole_moment(dipole_dict['total'])
 
     def get_property(self, key):
         """
@@ -155,6 +143,16 @@ class FirstOrderProperties:
         :return:
             The property.
         """
+
+        dipole_keys = [
+            'dipole moment',
+            'dipole_moment',
+            'electric dipole moment',
+            'electric_dipole_moment',
+        ]
+
+        if key in dipole_keys:
+            return self._get_dipole_moment()
 
         return self.properties[key]
 
@@ -189,7 +187,7 @@ class FirstOrderProperties:
 
         self.ostream.print_blank()
 
-        dip = self.properties['dipole_moment']
+        dip = self._get_dipole_moment()
         if states is None:
             dip_au = list(dip) + [np.linalg.norm(dip)]
             dip_debye = [m * dipole_in_debye() for m in dip_au]
@@ -216,3 +214,23 @@ class FirstOrderProperties:
 
         self.ostream.print_blank()
         self.ostream.flush()
+
+    def __deepcopy__(self, memo):
+        """
+        Implements deepcopy.
+
+        :param memo:
+            The memo dictionary for deepcopy.
+
+        :return:
+            A deepcopy of self.
+        """
+
+        new_scf_prop = FirstOrderProperties(self.comm, self.ostream)
+
+        for key, val in vars(self).items():
+            if isinstance(val, (MPI.Intracomm, OutputStream)):
+                continue
+            setattr(new_scf_prop, key, deepcopy(val))
+
+        return new_scf_prop

@@ -62,8 +62,8 @@ class TestProjectedPECPGeom101Driver:
                     rmat.set_values(
                         np.ascontiguousarray(ref_mat[k, sbra:ebra, sket:eket]))
                     # compare submatrices
-                    print("(k,i,j) = ", k, " ", i, " ", j)
-                    print(np.max(np.abs(cmat.to_numpy()-rmat.to_numpy())))
+                    #print("(k,i,j) = ", k, " ", i, " ", j)
+                    #print(np.max(np.abs(cmat.to_numpy()-rmat.to_numpy())))
                     assert cmat == rmat
             smat = fmat.full_matrix()
             fref = SubMatrix([0, 0, 42, 42])
@@ -109,8 +109,8 @@ class TestProjectedPECPGeom101Driver:
                     rmat.set_values(
                         np.ascontiguousarray(ref_mat[k, sbra:ebra, sket:eket]))
                     # compare submatrices
-                    print("(k,i,j) = ", k, " ", i, " ", j)
-                    print(np.max(np.abs(cmat.to_numpy()-rmat.to_numpy())))
+                    #print("(k,i,j) = ", k, " ", i, " ", j)
+                    #print(np.max(np.abs(cmat.to_numpy()-rmat.to_numpy())))
                     assert cmat == rmat
             smat = fmat.full_matrix()
             fref = SubMatrix([0, 0, 42, 42])
@@ -156,8 +156,8 @@ class TestProjectedPECPGeom101Driver:
                     rmat.set_values(
                         np.ascontiguousarray(ref_mat[k, sbra:ebra, sket:eket]))
                     # compare submatrices
-                    print("(k,i,j) = ", k, " ", i, " ", j)
-                    print(np.max(np.abs(cmat.to_numpy()-rmat.to_numpy())))
+                    #print("(k,i,j) = ", k, " ", i, " ", j)
+                    #print(np.max(np.abs(cmat.to_numpy()-rmat.to_numpy())))
                     #assert cmat == rmat
             smat = fmat.full_matrix()
             fref = SubMatrix([0, 0, 42, 42])

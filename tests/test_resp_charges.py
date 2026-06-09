@@ -2,6 +2,7 @@ from pathlib import Path
 import numpy as np
 
 from veloxchem.veloxchemlib import mpi_master
+from veloxchem.molecule import Molecule
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.respchargesdriver import RespChargesDriver
@@ -22,8 +23,7 @@ class TestRespCharges:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
-                                      task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
 
         chg_dict = {'filename': task.input_dict['filename']}
         chg_dict.update(inp_chg_dict)
@@ -81,3 +81,32 @@ class TestRespCharges:
         chg_dict = {'number_layers': 1}
 
         self.run_resp(inpfile, ref_resp_charges, chg_dict, 'resp', ['C', 3.0])
+
+    def test_get_dipole_moment(self):
+
+        # H2 molecule: two H atoms separated by 1 bohr along the x-axis.
+        # Nuclear charges are both 1, so the nuclear charge centroid is at
+        # (0.5, 0, 0). With charges [+0.5, -0.5], the expected dipole is:
+        #   x: (0 - 0.5)*0.5 + (1 - 0.5)*(-0.5) = -0.25 - 0.25 = -0.5
+        #   y, z: 0
+
+        mol_str = 'H  0.0  0.0  0.0\nH  1.0  0.0  0.0'
+        molecule = Molecule.read_str(mol_str, units='au')
+
+        charges = np.array([0.5, -0.5])
+
+        chg_drv = RespChargesDriver()
+        dipole = chg_drv.get_dipole_moment(molecule, charges)
+
+        assert np.allclose(dipole, np.array([-0.5, 0.0, 0.0]), atol=1.0e-10)
+
+        # For a neutral charge set (sum of charges = 0), the dipole moment
+        # must be independent of the choice of origin (origin invariance).
+        # Shift the molecule by an arbitrary vector (5, 3, 2) bohr.
+
+        mol_str_shifted = 'H  5.0  3.0  2.0\nH  6.0  3.0  2.0'
+        molecule_shifted = Molecule.read_str(mol_str_shifted, units='au')
+
+        dipole_shifted = chg_drv.get_dipole_moment(molecule_shifted, charges)
+
+        assert np.allclose(dipole, dipole_shifted, atol=1.0e-10)

@@ -37,7 +37,7 @@ from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponseSolver
 from .cppsolverunrest import ComplexResponseUnrestrictedSolver
-from .tdacppsolver import ComplexResponseTDA
+from .tdacppsolver import ComplexResponseTdaSolver
 from .lrsolver import LinearResponseSolver
 from .lrsolverunrest import LinearResponseUnrestrictedSolver
 from .lreigensolver import LinearResponseEigenSolver
@@ -47,8 +47,10 @@ from .tdaeigensolver import TdaEigenSolver
 from .tdaeigensolverunrest import TdaUnrestrictedEigenSolver
 from .rixsdriver import RixsDriver
 from .shgdriver import ShgDriver
+from .thgdriver import ThgDriver
+from .thgreddriver import ThgReducedDriver
 from .tpatransitiondriver import TpaTransitionDriver
-from .doubleresbeta import DoubleResBetaDriver
+from .excitedstatemomentdriver import ExcitedStateMomentDriver
 from .threepatransitiondriver import ThreePATransitionDriver
 from .tpafulldriver import TpaFullDriver
 from .tpareddriver import TpaReducedDriver
@@ -175,7 +177,7 @@ class ResponseProperty:
 
             if self.tamm_dancoff:
                 if method_type == 'restricted':
-                    self._rsp_driver = ComplexResponseTDA(
+                    self._rsp_driver = ComplexResponseTdaSolver(
                         self.comm, self.ostream)
                 elif method_type == 'unrestricted':
                     assert_msg_critical(
@@ -314,7 +316,7 @@ class ResponseProperty:
                 'ResponseProperty: This response property is ' +
                 'only implemented for restricted case')
 
-            self._rsp_driver = DoubleResBetaDriver(self.comm, self.ostream)
+            self._rsp_driver = ExcitedStateMomentDriver(self.comm, self.ostream)
 
         # Cubic response driver
         elif (self.prop_type == 'custom' and
@@ -329,6 +331,20 @@ class ResponseProperty:
 
             self._rsp_driver = CubicResponseDriver(self.comm, self.ostream)
 
+        elif (self._rsp_dict['property'] == 'thg' and
+              self._rsp_dict['order'] == 'cubic' and
+              self._rsp_dict['residue'] == 'none' and
+              self._rsp_dict['is_complex'] == 'yes'):
+
+            self._rsp_driver = ThgDriver(self.comm, self.ostream)
+
+        elif (self._rsp_dict['property'] == 'thgred' and
+              self._rsp_dict['order'] == 'cubic' and
+              self._rsp_dict['residue'] == 'none' and
+              self._rsp_dict['is_complex'] == 'yes'):
+
+            self._rsp_driver = ThgReducedDriver(self.comm, self.ostream)
+
         # TPA (cubic response) driver
         elif (self._rsp_dict['order'] == 'cubic' and
               self._rsp_dict['residue'] == 'none' and
@@ -340,12 +356,12 @@ class ResponseProperty:
                 'only implemented for restricted case')
 
             if ('tpa_type' not in self._rsp_dict or
-                    self._rsp_dict['tpa_type'].lower() == 'full'):
-                self._rsp_driver = TpaFullDriver(self.comm, self.ostream)
+                    self._rsp_dict['tpa_type'].lower() == 'reduced'):
+                self._rsp_driver = TpaReducedDriver(self.comm, self.ostream)
 
             elif ('tpa_type' in self._rsp_dict and
-                  self._rsp_dict['tpa_type'].lower() == 'reduced'):
-                self._rsp_driver = TpaReducedDriver(self.comm, self.ostream)
+                    self._rsp_dict['tpa_type'].lower() == 'full'):
+                self._rsp_driver = TpaFullDriver(self.comm, self.ostream)
 
             self._rsp_driver._input_keywords['response'].update({
                 'tpa_type': ('str_lower', 'full or reduced TPA calculation'),

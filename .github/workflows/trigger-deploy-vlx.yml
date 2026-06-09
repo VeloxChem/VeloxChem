@@ -1,0 +1,21 @@
+name: Trigger deploy-vlx workflow
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger deploy-vlx workflow in meta-vlx repo
+        env:
+          GH_TOKEN: ${{ secrets.META_VLX_TOKEN }}
+        run: |
+          gh api \
+            repos/VeloxChem/meta-vlx/actions/workflows/deploy-vlx.yml/dispatches \
+            -f ref=main \
+            -f inputs[commit]="${GITHUB_SHA}" \
+            -f inputs[label]="main"

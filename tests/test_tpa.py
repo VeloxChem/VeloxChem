@@ -1,10 +1,18 @@
 from mpi4py import MPI
 from pathlib import Path
+import h5py
+import numpy as np
 import pytest
 
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import (mpi_master, bohr_in_angstrom,
+                                    hartree_in_ev, hartree_in_inverse_nm,
+                                    fine_structure_constant,
+                                    speed_of_light_in_vacuum_in_SI)
 from veloxchem.outputstream import OutputStream
-from veloxchem.tpadriver import TpaDriver
+from veloxchem.resultsio import read_results
+from veloxchem.tpadriverbase import TpaDriverBase
+from veloxchem.tpafulldriver import TpaFullDriver
+from veloxchem.tpareddriver import TpaReducedDriver
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.rsptpa import TPA
@@ -18,8 +26,22 @@ class TestTPA:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
-                                      task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        return scf_results
+
+    def run_scf_restart(self, task, filename):
+
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.update_settings(task.input_dict['scf'],
+                                task.input_dict['method_settings'])
+        scf_drv.filename = filename
+        scf_drv.ostream.mute()
+        scf_drv.compute(task.molecule, task.ao_basis)
+        scf_drv.restart = True
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        assert scf_drv.restart
 
         return scf_results
 
@@ -42,11 +64,22 @@ class TestTPA:
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             tpa_result = tpa_prop.rsp_property
 
-            for key in ref_result:
-                assert abs(tpa_result[key][(w, -w, w)].real /
-                           ref_result[key].real - 1.0) < 1.0e-6
-                assert abs(tpa_result[key][(w, -w, w)].imag /
-                           ref_result[key].imag - 1.0) < 1.0e-6
+            assert tpa_result['tpa_type'] == tpa_type
+
+            for key, ref_val in ref_result['tpa_terms'].items():
+                calc_val = tpa_result['tpa_terms'][key][(w, -w, w)]
+                assert abs(calc_val.real / ref_val.real - 1.0) < 1.0e-6
+                assert abs(calc_val.imag / ref_val.imag - 1.0) < 1.0e-6
+
+            ref_val = ref_result['gamma']
+            calc_val = tpa_result['gamma'][(w, -w, w)]
+            assert abs(calc_val.real / ref_val.real - 1.0) < 1.0e-6
+            assert abs(calc_val.imag / ref_val.imag - 1.0) < 1.0e-6
+
+            ref_sigma = ref_result['cross_sections']
+            calc_sigma = tpa_result['cross_sections']
+            assert np.max(np.abs(
+                np.array(calc_sigma) - np.array(ref_sigma))) < 1.0e-8
 
     def test_tpa_full(self):
 
@@ -55,13 +88,16 @@ class TestTPA:
         w = 0.05
 
         ref_result = {
-            't4_dict': 11.43071305 + 0.04957732j,
-            't3_dict': -42.19841751 - 0.28695214j,
-            'NaX3NyNz': -81.62345190 - 0.35812832j,
-            'NaA3NxNy': -27.21320341 - 0.03029788j,
-            'NaX2Nyz': 270.69041328 + 2.67837597j,
-            'NxA2Nyz': 270.83461366 + 0.52758094j,
+            'tpa_terms': {
+                't4_dict': 11.43071305 + 0.04957732j,
+                't3_dict': -42.19841751 - 0.28695214j,
+                'NaX3NyNz': -81.62345190 - 0.35812832j,
+                'NaA3NxNy': -27.21320341 - 0.03029788j,
+                'NaX2Nyz': 270.69041328 + 2.67837597j,
+                'NxA2Nyz': 270.83461366 + 0.52758094j,
+            },
             'gamma': 401.92066716 + 2.58015589j,
+            'cross_sections': [0.000025721482],
         }
 
         here = Path(__file__).parent
@@ -76,10 +112,13 @@ class TestTPA:
         w = 0.05
 
         ref_result = {
-            't3_dict': -15.12982062 - 0.19793495j,
-            'NaX2Nyz': 96.30910639 + 1.72679037j,
-            'NxA2Nyz': 96.36431088 + 0.51886895j,
+            'tpa_terms': {
+                't3_dict': -15.12982062 - 0.19793495j,
+                'NaX2Nyz': 96.30910639 + 1.72679037j,
+                'NxA2Nyz': 96.36431088 + 0.51886895j,
+            },
             'gamma': 177.54359664 + 2.04772438j,
+            'cross_sections': [0.000020413691],
         }
 
         here = Path(__file__).parent
@@ -104,7 +143,7 @@ class TestTPA:
             'memory_tracing': True,
         }
 
-        tpa_drv = TpaDriver(MPI.COMM_WORLD, OutputStream(None))
+        tpa_drv = TpaDriverBase(MPI.COMM_WORLD, OutputStream(None))
 
         for key, val in tpa_dict.items():
             assert getattr(tpa_drv, key) != val
@@ -113,3 +152,522 @@ class TestTPA:
 
         for key, val in tpa_dict.items():
             assert getattr(tpa_drv, key) == val
+
+    def test_get_spectrum(self):
+
+        alpha = fine_structure_constant()
+        a0_in_cm = bohr_in_angstrom() * 1.0e-8
+        c_in_cm_per_s = speed_of_light_in_vacuum_in_SI() * 100.0
+        au2gm = ((4.0 * pytest.importorskip('numpy').pi**2 * alpha *
+                  a0_in_cm**5) / c_in_cm_per_s * 1.0e+50)
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+                (0.10, -0.10, 0.10): 5.0 + 6.0j,
+            },
+            'frequencies': [0.0, 0.05, 0.10],
+        }
+
+        spectrum_au = TpaDriverBase.get_spectrum(rsp_results, 'au')
+        spectrum_ev = TpaDriverBase.get_spectrum(rsp_results, 'ev')
+        spectrum_nm = TpaDriverBase.get_spectrum(rsp_results, 'nm')
+
+        assert spectrum_au['x_label'] == 'Photon energy [a.u.]'
+        assert spectrum_ev['x_label'] == 'Photon energy [eV]'
+        assert spectrum_nm['x_label'] == 'Wavelength [nm]'
+        assert spectrum_au['y_label'] == 'TPA cross-section [GM]'
+
+        assert spectrum_au['x_data'] == pytest.approx([0.05, 0.10])
+        assert spectrum_ev['x_data'] == pytest.approx(
+            [0.05 * hartree_in_ev(), 0.10 * hartree_in_ev()])
+        assert spectrum_nm['x_data'] == pytest.approx([
+            1.0 / (hartree_in_inverse_nm() * 0.05),
+            1.0 / (hartree_in_inverse_nm() * 0.10),
+        ])
+
+        expected_y_data = [
+            4.0j.imag * 0.05**2 * au2gm,
+            6.0j.imag * 0.10**2 * au2gm,
+        ]
+
+        assert spectrum_au['y_data'] == pytest.approx(expected_y_data)
+        assert spectrum_ev['y_data'] == pytest.approx(expected_y_data)
+        assert spectrum_nm['y_data'] == pytest.approx(expected_y_data)
+
+    @pytest.mark.parametrize('section', ['all', 'summary'])
+    def test_reduced_driver_print_results(self, tmp_path, section):
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+                (0.10, -0.10, 0.10): 5.0 + 6.0j,
+            },
+            'frequencies': [0.0, 0.05, 0.10],
+            'cross_sections': [0.1, 0.2],
+        }
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        outfile = tmp_path / 'tpa_reduced_print.out'
+        tpa_drv = TpaReducedDriver(MPI.COMM_WORLD, OutputStream(outfile))
+        tpa_drv.frequencies = rsp_results['frequencies']
+        tpa_drv.print_results(rsp_results, section=section)
+        tpa_drv.ostream.flush()
+
+        printed = outfile.read_text()
+        assert 'TPA Summary (Reduced Expression)' in printed
+        assert 'Re(gamma)' in printed and 'Im(gamma)' in printed
+        assert '0.10000000 GM' in printed and '0.20000000 GM' in printed
+        if section == 'all':
+            assert 'The reduced expression is an approximation' in printed
+        elif section == 'summary':
+            assert 'The reduced expression is an approximation' not in printed
+
+    def test_reduced_driver_plot_spectrum(self):
+
+        pytest.importorskip('matplotlib')
+        import matplotlib.pyplot as plt
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+                (0.10, -0.10, 0.10): 5.0 + 6.0j,
+                (0.15, -0.15, 0.15): 7.0 + 8.0j,
+            },
+            'frequencies': [0.0, 0.05, 0.10, 0.15],
+            'cross_sections': [0.1, 0.2, 0.3],
+        }
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        tpa_drv = TpaReducedDriver()
+        tpa_drv.ostream.mute()
+        fig, ax = plt.subplots()
+        returned_ax = tpa_drv.plot_spectrum(rsp_results, x_unit='ev', ax=ax)
+
+        assert returned_ax is ax
+        assert ax.get_xlabel() == 'Photon energy [eV]'
+        assert ax.get_ylabel() == 'TPA cross-section [GM]'
+        assert len(ax.lines) >= 1
+        plt.close(ax.figure)
+
+    def test_reduced_driver_plot_spectrum_nm(self):
+
+        pytest.importorskip('matplotlib')
+        import matplotlib.pyplot as plt
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+                (0.10, -0.10, 0.10): 5.0 + 6.0j,
+                (0.15, -0.15, 0.15): 7.0 + 8.0j,
+            },
+            'frequencies': [0.0, 0.05, 0.10, 0.15],
+            'cross_sections': [0.1, 0.2, 0.3],
+        }
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        tpa_drv = TpaReducedDriver()
+        tpa_drv.ostream.mute()
+        fig, ax = plt.subplots()
+        returned_ax = tpa_drv.plot_spectrum(rsp_results, x_unit='nm', ax=ax)
+
+        assert returned_ax is ax
+        assert ax.get_xlabel() == 'Wavelength [nm]'
+        plt.close(ax.figure)
+
+    def test_reduced_driver_plot_spectrum_without_ax_returns_none(self):
+
+        pytest.importorskip('matplotlib')
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+                (0.10, -0.10, 0.10): 5.0 + 6.0j,
+                (0.15, -0.15, 0.15): 7.0 + 8.0j,
+            },
+            'frequencies': [0.0, 0.05, 0.10, 0.15],
+            'cross_sections': [0.1, 0.2, 0.3],
+        }
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        tpa_drv = TpaReducedDriver()
+        tpa_drv.ostream.mute()
+
+        assert tpa_drv.plot_spectrum(rsp_results, x_unit='ev') is None
+
+    @pytest.mark.parametrize('section', ['all', 'summary'])
+    def test_full_driver_print_results(self, tmp_path, section):
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+                (0.10, -0.10, 0.10): 5.0 + 6.0j,
+            },
+            'frequencies': [0.0, 0.05, 0.10],
+            'cross_sections': [0.1, 0.2],
+        }
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        outfile = tmp_path / 'tpa_full_print.out'
+        tpa_drv = TpaFullDriver(MPI.COMM_WORLD, OutputStream(outfile))
+        tpa_drv.frequencies = rsp_results['frequencies']
+        tpa_drv.print_results(rsp_results, section=section)
+        tpa_drv.ostream.flush()
+
+        printed = outfile.read_text()
+        assert 'TPA Summary (Full Expression)' in printed
+        assert 'Re(gamma)' in printed and 'Im(gamma)' in printed
+        assert '0.10000000 GM' in printed and '0.20000000 GM' in printed
+        assert 'The reduced expression is an approximation' not in printed
+
+    def test_full_driver_plot_spectrum(self):
+
+        pytest.importorskip('matplotlib')
+        import matplotlib.pyplot as plt
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+                (0.10, -0.10, 0.10): 5.0 + 6.0j,
+                (0.15, -0.15, 0.15): 7.0 + 8.0j,
+            },
+            'frequencies': [0.0, 0.05, 0.10, 0.15],
+            'cross_sections': [0.1, 0.2, 0.3],
+        }
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        tpa_drv = TpaFullDriver()
+        tpa_drv.ostream.mute()
+        fig, ax = plt.subplots()
+        returned_ax = tpa_drv.plot_spectrum(rsp_results, x_unit='ev', ax=ax)
+
+        assert returned_ax is ax
+        assert ax.get_xlabel() == 'Photon energy [eV]'
+        assert ax.get_ylabel() == 'TPA cross-section [GM]'
+        assert len(ax.lines) >= 1
+        plt.close(ax.figure)
+
+    def test_full_driver_plot_spectrum_without_ax_returns_none(self):
+
+        pytest.importorskip('matplotlib')
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+                (0.10, -0.10, 0.10): 5.0 + 6.0j,
+                (0.15, -0.15, 0.15): 7.0 + 8.0j,
+            },
+            'frequencies': [0.0, 0.05, 0.10, 0.15],
+            'cross_sections': [0.1, 0.2, 0.3],
+        }
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        tpa_drv = TpaFullDriver()
+        tpa_drv.ostream.mute()
+
+        assert tpa_drv.plot_spectrum(rsp_results, x_unit='ev') is None
+
+    def test_reduced_driver_results_hdf5_roundtrip(self, tmp_path):
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        h5file = tmp_path / 'tpa_reduced_results.h5'
+        with h5py.File(h5file, 'w'):
+            pass
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+                (0.10, -0.10, 0.10): 5.0 + 6.0j,
+            },
+            'frequencies': [0.0, 0.05, 0.10],
+            'cross_sections': [0.1, 0.2],
+        }
+
+        tpa_drv = TpaReducedDriver()
+        tpa_drv.ostream.mute()
+        tpa_drv._write_final_hdf5(str(h5file), rsp_results)
+
+        recovered = read_results(str(h5file), 'tpa')
+
+        assert recovered == rsp_results
+
+    def test_reduced_driver_results_hdf5_roundtrip_without_suffix(self, tmp_path):
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        h5stem = tmp_path / 'tpa_reduced_results'
+        h5file = tmp_path / 'tpa_reduced_results.h5'
+        with h5py.File(h5file, 'w'):
+            pass
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+            },
+            'frequencies': [0.0, 0.05],
+            'cross_sections': [0.1],
+        }
+
+        tpa_drv = TpaReducedDriver()
+        tpa_drv.ostream.mute()
+        tpa_drv._write_final_hdf5(str(h5stem), rsp_results)
+
+        recovered = read_results(str(h5file), 'tpa')
+
+        assert recovered == rsp_results
+
+    def test_reduced_driver_write_final_hdf5_without_filename_is_noop(self):
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+            },
+            'frequencies': [0.0, 0.05],
+            'cross_sections': [0.1],
+        }
+
+        tpa_drv = TpaReducedDriver()
+        tpa_drv.ostream.mute()
+        tpa_drv._write_final_hdf5(None, rsp_results)
+
+    def test_full_driver_results_hdf5_roundtrip(self, tmp_path):
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        h5file = tmp_path / 'tpa_full_results.h5'
+        with h5py.File(h5file, 'w'):
+            pass
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+                (0.10, -0.10, 0.10): 5.0 + 6.0j,
+            },
+            'frequencies': [0.0, 0.05, 0.10],
+            'cross_sections': [0.1, 0.2],
+        }
+
+        tpa_drv = TpaFullDriver()
+        tpa_drv.ostream.mute()
+        tpa_drv._write_final_hdf5(str(h5file), rsp_results)
+
+        recovered = read_results(str(h5file), 'tpa')
+
+        assert recovered == rsp_results
+
+    def test_full_driver_results_hdf5_roundtrip_without_suffix(self, tmp_path):
+
+        if MPI.COMM_WORLD.Get_rank() != mpi_master():
+            return
+
+        h5stem = tmp_path / 'tpa_full_results'
+        h5file = tmp_path / 'tpa_full_results.h5'
+        with h5py.File(h5file, 'w'):
+            pass
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+            },
+            'frequencies': [0.0, 0.05],
+            'cross_sections': [0.1],
+        }
+
+        tpa_drv = TpaFullDriver()
+        tpa_drv.ostream.mute()
+        tpa_drv._write_final_hdf5(str(h5stem), rsp_results)
+
+        recovered = read_results(str(h5file), 'tpa')
+
+        assert recovered == rsp_results
+
+    def test_full_driver_write_final_hdf5_without_filename_is_noop(self):
+
+        rsp_results = {
+            'gamma': {
+                (0.0, -0.0, 0.0): 1.0 + 2.0j,
+                (0.05, -0.05, 0.05): 3.0 + 4.0j,
+            },
+            'frequencies': [0.0, 0.05],
+            'cross_sections': [0.1],
+        }
+
+        tpa_drv = TpaFullDriver()
+        tpa_drv.ostream.mute()
+        tpa_drv._write_final_hdf5(None, rsp_results)
+
+    def test_full_driver_defaults_and_restart(self, tmp_path):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'data' / 'water_tpa.inp')
+
+        task = MpiTask([inpfile, None])
+        task.input_dict['scf']['checkpoint_file'] = None
+
+        filename = str(tmp_path / 'tpa_full_restart')
+        filename = task.mpi_comm.bcast(filename, root=mpi_master())
+
+        scf_results = self.run_scf_restart(task, filename)
+
+        rsp_settings = {
+            'damping': task.input_dict['response']['damping'],
+            'frequencies': task.input_dict['response']['frequencies'],
+            'conv_thresh': 1.0e-8,
+        }
+
+        tpa_drv = TpaFullDriver()
+        tpa_drv.ostream.mute()
+        tpa_drv.filename = filename
+        tpa_drv.update_settings(rsp_settings)
+        first_results = tpa_drv.compute(task.molecule, task.ao_basis,
+                                        scf_results)
+        assert tpa_drv.checkpoint_file == f'{filename}_rsp.h5'
+
+        tpa_drv.restart = True
+        restarted_results = tpa_drv.compute(task.molecule, task.ao_basis,
+                                            scf_results)
+        assert tpa_drv.restart
+
+        fresh_drv = TpaFullDriver()
+        fresh_drv.ostream.mute()
+        fresh_drv.filename = filename
+        fresh_drv.update_settings(rsp_settings)
+        fresh_drv.restart = False
+        fresh_results = fresh_drv.compute(task.molecule, task.ao_basis,
+                                          scf_results)
+        assert not fresh_drv.restart
+
+        if task.mpi_rank == mpi_master():
+            key = (0.05, -0.05, 0.05)
+
+            for result_key in ['t4_dict', 't3_dict', 'NaX3NyNz', 'NaA3NxNy',
+                               'NaX2Nyz', 'NxA2Nyz']:
+                assert restarted_results['tpa_terms'][result_key][
+                    key] == pytest.approx(
+                        fresh_results['tpa_terms'][result_key][key],
+                        abs=1.0e-7)
+                assert first_results['tpa_terms'][result_key][
+                    key] == pytest.approx(
+                        fresh_results['tpa_terms'][result_key][key],
+                        abs=1.0e-7)
+
+            assert restarted_results['gamma'][key] == pytest.approx(
+                fresh_results['gamma'][key], abs=1.0e-7)
+            assert first_results['gamma'][key] == pytest.approx(
+                fresh_results['gamma'][key], abs=1.0e-7)
+            assert restarted_results['cross_sections'] == pytest.approx(
+                fresh_results['cross_sections'], abs=1.0e-7)
+            assert first_results['cross_sections'] == pytest.approx(
+                fresh_results['cross_sections'], abs=1.0e-7)
+
+            for suffix in [
+                    '.h5',
+                    '_rsp_tpa_1.h5',
+                    '_rsp_tpa_2_full.h5',
+                    '_rsp_tpa_fock_1_full.h5',
+                    '_rsp_tpa_fock_2_full.h5',
+            ]:
+                assert Path(f'{filename}{suffix}').is_file()
+
+    def test_reduced_driver_defaults_and_restart(self, tmp_path):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'data' / 'water_tpa.inp')
+
+        task = MpiTask([inpfile, None])
+        task.input_dict['scf']['checkpoint_file'] = None
+
+        filename = str(tmp_path / 'tpa_reduced_restart')
+        filename = task.mpi_comm.bcast(filename, root=mpi_master())
+
+        scf_results = self.run_scf_restart(task, filename)
+
+        rsp_settings = {
+            'damping': task.input_dict['response']['damping'],
+            'frequencies': task.input_dict['response']['frequencies'],
+            'conv_thresh': 1.0e-8,
+        }
+
+        tpa_drv = TpaReducedDriver()
+        tpa_drv.ostream.mute()
+        tpa_drv.filename = filename
+        tpa_drv.update_settings(rsp_settings)
+        first_results = tpa_drv.compute(task.molecule, task.ao_basis,
+                                        scf_results)
+        assert tpa_drv.checkpoint_file == f'{filename}_rsp.h5'
+
+        tpa_drv.restart = True
+        restarted_results = tpa_drv.compute(task.molecule, task.ao_basis,
+                                            scf_results)
+        assert tpa_drv.restart
+
+        fresh_drv = TpaReducedDriver()
+        fresh_drv.ostream.mute()
+        fresh_drv.filename = filename
+        fresh_drv.update_settings(rsp_settings)
+        fresh_drv.restart = False
+        fresh_results = fresh_drv.compute(task.molecule, task.ao_basis,
+                                          scf_results)
+        assert not fresh_drv.restart
+
+        if task.mpi_rank == mpi_master():
+            key = (0.05, -0.05, 0.05)
+
+            for result_key in ['t3_dict', 'NaX2Nyz', 'NxA2Nyz']:
+                assert restarted_results['tpa_terms'][result_key][
+                    key] == pytest.approx(
+                        fresh_results['tpa_terms'][result_key][key],
+                        abs=1.0e-7)
+                assert first_results['tpa_terms'][result_key][
+                    key] == pytest.approx(
+                        fresh_results['tpa_terms'][result_key][key],
+                        abs=1.0e-7)
+
+            assert restarted_results['gamma'][key] == pytest.approx(
+                fresh_results['gamma'][key], abs=1.0e-7)
+            assert first_results['gamma'][key] == pytest.approx(
+                fresh_results['gamma'][key], abs=1.0e-7)
+            assert restarted_results['cross_sections'] == pytest.approx(
+                fresh_results['cross_sections'], abs=1.0e-7)
+            assert first_results['cross_sections'] == pytest.approx(
+                fresh_results['cross_sections'], abs=1.0e-7)
+
+            for suffix in [
+                    '.h5',
+                    '_rsp_tpa_1.h5',
+                    '_rsp_tpa_2_red.h5',
+                    '_rsp_tpa_fock_1_red.h5',
+                    '_rsp_tpa_fock_2_red.h5',
+            ]:
+                assert Path(f'{filename}{suffix}').is_file()

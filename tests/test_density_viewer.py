@@ -21,8 +21,7 @@ class TestDensityViewer:
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
-        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
-                                      task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
 
         density_viewer = DensityViewer()
         density_viewer.initialize(task.molecule, task.ao_basis)

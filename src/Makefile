@@ -77,7 +77,6 @@ debug: $(VLX_LIBS)
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
-	$(CP) pymodule/mklconf.py.in $(CURDIR)/../build/python/veloxchem/mklconf.py
 	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py
 	@echo "__commit__ = \"$(VLX_COMMIT)\"" >> $(CURDIR)/../build/python/veloxchem/__init__.py
 
@@ -92,7 +91,6 @@ release: $(VLX_LIBS)
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
-	$(CP) pymodule/mklconf.py.in $(CURDIR)/../build/python/veloxchem/mklconf.py
 	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py
 	@echo "__commit__ = \"$(VLX_COMMIT)\"" >> $(CURDIR)/../build/python/veloxchem/__init__.py
 

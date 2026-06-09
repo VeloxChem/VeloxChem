@@ -66,7 +66,6 @@ void serialGeneratePairDensityForLDA(double*               rho,
  @param densityMatrix the total density matrix.
  @param activeMOs the MO coefficients.
  @param twoBodyDensityMatrix the MO two-body density matrix.
- @param timer the timer.
  */
 
 void serialGeneratePairDensityForGGA(double*               rho,

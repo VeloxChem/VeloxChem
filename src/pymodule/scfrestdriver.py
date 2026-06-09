@@ -36,7 +36,6 @@ import numpy as np
 import math
 import sys
 
-from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import mpi_master, boltzmann_in_hartreeperkelvin
 from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
@@ -317,12 +316,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
-                pass
-            elif isinstance(val, XCFunctional):
-                new_scf_drv.key = XCFunctional(val)
-            elif isinstance(val, MolecularGrid):
-                new_scf_drv.key = MolecularGrid(val)
-            else:
-                new_scf_drv.key = deepcopy(val)
+                continue
+            setattr(new_scf_drv, key, deepcopy(val))
 
         return new_scf_drv
