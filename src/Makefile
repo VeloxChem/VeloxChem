@@ -7,6 +7,7 @@ include Makefile.setup
 VLX_BAS := ../basis
 VLX_TARGET := veloxchemlib.so
 VLX_MODULE := $(wildcard pymodule/*.py)
+VLX_PKGS := $(shell find pymodule -mindepth 1 -maxdepth 1 -type d -not -name __pycache__)
 VLX_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 
 LIB_LIST += -shared $(PYTHON_LD) $(OPENMP_LD) $(MATH_LD) $(LIBXC_LD)  $(LIBBST_LD)
@@ -75,6 +76,7 @@ debug: $(VLX_LIBS)
 	mkdir -p ../build/python/veloxchem
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
+	$(CP) -r $(VLX_PKGS) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
 	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py
@@ -89,6 +91,7 @@ release: $(VLX_LIBS)
 	mkdir -p ../build/python/veloxchem
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
+	$(CP) -r $(VLX_PKGS) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
 	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py
