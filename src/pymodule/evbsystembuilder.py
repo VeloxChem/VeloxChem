@@ -59,7 +59,7 @@ except ImportError:
     pass
 
 
-class EvbSystemBuilder():
+class EvbSystemBuilder:
 
     def __init__(self, comm=None, ostream=None):
         '''

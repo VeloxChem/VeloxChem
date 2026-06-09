@@ -62,7 +62,7 @@ except ImportError:
 # All positions are in Angsrom unless otherwise stated
 
 
-class TransitionStateGuesser():
+class TransitionStateGuesser:
 
     def __init__(self, comm=None, ostream=None):
         '''

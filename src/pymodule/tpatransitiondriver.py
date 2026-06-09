@@ -104,63 +104,6 @@ class TpaTransitionDriver(NonlinearSolver):
             'nstates': ('int', 'number of excited states'),
         })
 
-    @staticmethod
-    def _get_hdf5_results(results):
-        """
-        Converts TPA transition results to a readable HDF5 payload.
-
-        :param results:
-            The results dictionary returned by compute().
-
-        :return:
-            A dictionary suitable for HDF5 serialization.
-        """
-
-        def get_indexed_value(values, index):
-            if isinstance(values, dict):
-                return values[index]
-            return values[index]
-
-        states = []
-        photon_energies = results['photon_energies']
-
-        for state_index, energy_au in enumerate(photon_energies, start=1):
-            state_ind = state_index - 1
-            tensor = np.asarray(get_indexed_value(results['transition_moments'],
-                                                  state_ind))
-            dipole = np.asarray(get_indexed_value(results['elec_trans_dipoles'],
-                                                  state_ind))
-            exc_details = get_indexed_value(results['excitation_details'],
-                                            state_ind)
-
-            states.append({
-                'state_index': state_index,
-                'photon_energy_au': float(energy_au),
-                'photon_energy_ev': float(energy_au * hartree_in_ev()),
-                'transition_moment': {
-                    'Sxx': tensor[0, 0],
-                    'Syy': tensor[1, 1],
-                    'Szz': tensor[2, 2],
-                    'Sxy': tensor[0, 1],
-                    'Sxz': tensor[0, 2],
-                    'Syz': tensor[1, 2],
-                },
-                'tpa_strength_linear': get_indexed_value(
-                    results['tpa_strengths']['linear'], state_ind),
-                'tpa_strength_circular': get_indexed_value(
-                    results['tpa_strengths']['circular'], state_ind),
-                'oscillator_strength': get_indexed_value(
-                    results['oscillator_strengths'], state_ind),
-                'electric_transition_dipole': {
-                    'x': dipole[0],
-                    'y': dipole[1],
-                    'z': dipole[2],
-                },
-                'excitation_details': list(exc_details),
-            })
-
-        return {'states': states}
-
     def _write_final_hdf5(self, fname, results):
         """
         Writes TPA transition results to the specified HDF5 file.
@@ -172,18 +115,18 @@ class TpaTransitionDriver(NonlinearSolver):
         """
 
         if not fname:
-            raise ValueError('No filename given to _write_final_hdf5()')
+            return
 
         fpath = Path(fname)
         if fpath.suffix != '.h5':
             fpath = fpath.with_suffix('.h5')
 
         if not fpath.is_file():
-            raise ValueError(f'TPA transition HDF5 file does not exist: {fpath}')
+            return
 
         write_results_to_hdf5(str(fpath),
                               'tpa_transition',
-                              self._get_hdf5_results(results),
+                              results,
                               value_label='TPA transition result')
 
     def update_settings(self, rsp_dict, method_dict=None):
@@ -385,6 +328,7 @@ class TpaTransitionDriver(NonlinearSolver):
                                                 scf_results, molecule, ao_basis,
                                                 profiler, Xf)
 
+        self.ostream.print_blank()
         valstr = '*** Time spent in quadratic response calculation: '
         valstr += '{:.2f} sec ***'.format(time.time() - start_time)
         self.ostream.print_header(valstr)
@@ -691,12 +635,6 @@ class TpaTransitionDriver(NonlinearSolver):
             for key, tensor in M_tensors.items():
                 eigvals, eigvecs = np.linalg.eigh(tensor)
                 diagonalized_tensors[key] = np.diag(eigvals)
-
-        self.ostream.print_blank()
-        w_str = 'Summary of Two-photon Absorption'
-        self.ostream.print_header(w_str)
-        self.ostream.print_header('=' * (len(w_str) + 2))
-        self.ostream.print_blank()
 
         if self.rank == mpi_master():
             tpa_strengths = {'linear': {}, 'circular': {}}
@@ -1059,64 +997,6 @@ class TpaTransitionDriver(NonlinearSolver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def _print_component(self, value, width):
-        """
-        Prints QRF component.
-
-        :param value:
-            The complex value
-        :param width:
-            The width for the output
-        """
-
-        w_str = '{:>12s}{:20.5f} {:20.5f} {:20.5f}'.format(
-            'x', value[0][0].real, value[0][1].real, value[0][2].real)
-        self.ostream.print_header(w_str.ljust(width))
-
-        w_str = '{:>12s}{:20.5f} {:20.5f} {:20.5f}'.format(
-            'y', value[1][0].real, value[1][1].real, value[1][2].real)
-        self.ostream.print_header(w_str.ljust(width))
-
-        w_str = '{:>12s}{:20.5f} {:20.5f} {:20.5f}'.format(
-            'z', value[2][0].real, value[2][1].real, value[2][2].real)
-        self.ostream.print_header(w_str.ljust(width))
-
-    @staticmethod
-    def _normalize_print_sections(sections):
-        """
-        Normalize requested print sections for transition TPA results.
-
-        :param sections:
-            Section label or sequence of section labels.
-
-        :return:
-            Ordered list of normalized section labels.
-        """
-
-        valid_sections = ('summary', 'moments', 'strengths', 'all')
-
-        if isinstance(sections, str):
-            requested_sections = [sections.lower()]
-        else:
-            requested_sections = [section.lower() for section in sections]
-
-        invalid_sections = [
-            section for section in requested_sections if section not in valid_sections
-        ]
-        assert_msg_critical(
-            not invalid_sections,
-            'TpaTransitionDriver.print_results: Invalid section label(s).')
-
-        if 'all' in requested_sections:
-            requested_sections = ['moments', 'strengths']
-
-        normalized_sections = []
-        for section in requested_sections:
-            if section not in normalized_sections:
-                normalized_sections.append(section)
-
-        return normalized_sections
-
     def _print_summary(self, rsp_results, max_states=None):
         """
         Prints a compact summary of TPA transition results.
@@ -1127,7 +1007,7 @@ class TpaTransitionDriver(NonlinearSolver):
             Optional maximum number of states to print.
         """
 
-        width = 94
+        width = 92
         freqs = rsp_results['photon_energies']
         linear_strengths = rsp_results['tpa_strengths']['linear']
         circular_strengths = rsp_results['tpa_strengths']['circular']
@@ -1148,13 +1028,13 @@ class TpaTransitionDriver(NonlinearSolver):
         self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
 
-        header = '{:<8s}{:>18s}{:>20s}{:>20s}{:>18s}'.format(
-            'State', 'Photon Energy', 'Linear TPA', 'Circular TPA', 'Osc. Strength')
+        header = '{:>7s} {:>16s} {:>22} {:>22} {:>18}'.format(
+            'State', 'Photon Energy', 'TPA Str. (Linear)', 'TPA Str. (Circular)', 'OPA Osc. Str.')
         self.ostream.print_header(header.ljust(width))
         self.ostream.print_header('-' * width)
 
         for state_ind in range(states_to_print):
-            line = '{:<8d}{:>11.6f} eV{:>14.6f}{:>20.6f}{:>18.6f}'.format(
+            line = '{:>7d} {:>13.6f} eV {:>18.6f} {:>22.6f} {:>18.4f}'.format(
                 state_ind + 1,
                 freqs[state_ind] * hartree_in_ev(),
                 linear_strengths[state_ind],
@@ -1168,6 +1048,7 @@ class TpaTransitionDriver(NonlinearSolver):
             self.ostream.print_header(line.ljust(width))
 
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def _print_moments(self, rsp_results):
         """
@@ -1205,93 +1086,38 @@ class TpaTransitionDriver(NonlinearSolver):
             self.ostream.print_header(exec_str.ljust(width))
         self.ostream.print_blank()
         self.ostream.print_blank()
-
-    def _print_strengths(self, rsp_results):
-        """
-        Prints linear and circular TPA strengths.
-
-        :param rsp_results:
-            A dictionary containing the results of response calculation.
-        """
-
-        width = 92
-        freqs = rsp_results['photon_energies']
-        tpa_strengths = rsp_results['tpa_strengths']
-
-        title = 'TPA Strength (Linear Polarization)'
-        self.ostream.print_header(title)
-        self.ostream.print_header('-' * width)
-
-        title = '  {:<9s}{:>13s}{:>28s}'.format('State', 'Photon Energy',
-                                                'TPA strength    ')
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header('-' * width)
-
-        for w_ind, w in enumerate(freqs):
-            exec_str = '{:7d}   '.format(w_ind + 1)
-            exec_str += '{:11.6f} eV'.format(w * hartree_in_ev())
-            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['linear'][w_ind])
-            self.ostream.print_header(exec_str.ljust(width))
-        self.ostream.print_blank()
-        self.ostream.print_blank()
-
-        title = 'TPA Strength (Circular Polarization)'
-        self.ostream.print_header(title)
-        self.ostream.print_header('-' * width)
-
-        title = '  {:<9s}{:>13s}{:>28s}'.format('State', 'Photon Energy',
-                                                'TPA strength    ')
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header('-' * width)
-
-        for w_ind, w in enumerate(freqs):
-            exec_str = '{:7d}   '.format(w_ind + 1)
-            exec_str += '{:11.6f} eV'.format(w * hartree_in_ev())
-            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['circular'][w_ind])
-            self.ostream.print_header(exec_str.ljust(width))
-        self.ostream.print_blank()
-        self.ostream.print_blank()
-
-    def _print_results(self, rsp_results, sections='all', max_states=None):
-        """
-        Prints the results of TPA calculation.
-
-        :param rsp_results:
-            A dictonary containing the results of response calculation.
-        :param sections:
-            The sections to print.
-        :param max_states:
-            Optional maximum number of states to print in summary mode.
-        """
-
-        for section in self._normalize_print_sections(sections):
-            if section == 'summary':
-                self._print_summary(rsp_results, max_states=max_states)
-            elif section == 'moments':
-                self._print_moments(rsp_results)
-            elif section == 'strengths':
-                self._print_strengths(rsp_results)
-
         self.ostream.flush()
 
-    def print_results(self, rsp_results, sections='all', max_states=None):
+    def print_results(self, rsp_results, section='all', max_states=None):
         """
         Prints the results of TPA transition calculation.
 
         :param rsp_results:
             A dictionary containing the results of response calculation.
-        :param sections:
-            Section label or sequence of section labels.
+        :param section:
+            Section label.
         :param max_states:
             Optional maximum number of states to print in summary mode.
         """
 
-        if self.rank != mpi_master():
-            return
+        section = section.lower()
+        assert_msg_critical(
+            section in ['summary', 'moments', 'strengths', 'all'],
+            'TpaTransitionDriver.print_results: Invalid section label.')
 
-        self._print_results(rsp_results,
-                            sections=sections,
-                            max_states=max_states)
+        if section == 'all':
+            self.ostream.print_blank()
+            title = 'Summary of Two-photon Absorption'
+            self.ostream.print_header(title)
+            self.ostream.print_header('=' * (len(title) + 2))
+            self.ostream.print_blank()
+
+        if section in ['summary', 'all']:
+            self._print_summary(rsp_results, max_states=max_states)
+        if section in ['moments', 'all']:
+            self._print_moments(rsp_results)
+
+        self.ostream.flush()
 
     def plot_spectrum(self,
                       rsp_results,
@@ -1357,19 +1183,25 @@ class TpaTransitionDriver(NonlinearSolver):
             x_data = np.linspace(xmin, xmax, 1000)
 
         spectrum = self.get_spectrum(rsp_results, x_data, x_unit,
-                                     broadening_value, broadening_unit)
+                                     broadening_value, broadening_unit,
+                                     polarization)
 
         plotted_ax = plot_tpa_transition_spectrum(rsp_results,
-                              spectrum,
-                              x_unit=x_unit,
-                              polarization=polarization,
-                              ax=ax,
-                              show_sticks=show_sticks)
+                                                  spectrum,
+                                                  x_unit=x_unit,
+                                                  polarization=polarization,
+                                                  ax=ax,
+                                                  show_sticks=show_sticks)
 
         return plotted_ax if ax is not None else None
 
     @staticmethod
-    def get_spectrum(rsp_results, x_data, x_unit, b_value, b_unit):
+    def get_spectrum(rsp_results,
+                     x_data,
+                     x_unit,
+                     b_value,
+                     b_unit,
+                     polarization='linear'):
         """
         Gets two-photon absorption spectrum.
 
@@ -1383,6 +1215,9 @@ class TpaTransitionDriver(NonlinearSolver):
             The value of the broadening parameter.
         :param b_unit:
             The unit of the broadening parameter.
+        :param polarization:
+            Polarization channel for TPA strengths. Either 'linear' or
+            'circular'.
 
         :return:
             A dictionary containing photon energies and TPA cross-sections.
@@ -1395,6 +1230,11 @@ class TpaTransitionDriver(NonlinearSolver):
         assert_msg_critical(
             b_unit.lower() in ['au', 'ev'],
             'TpaTransitionDriver.get_spectrum: broadening parameter should be au or ev'
+        )
+
+        assert_msg_critical(
+            polarization.lower() in ['linear', 'circular'],
+            'TpaTransitionDriver.get_spectrum: polarization should be linear or circular'
         )
 
         au2ev = hartree_in_ev()
@@ -1412,7 +1252,8 @@ class TpaTransitionDriver(NonlinearSolver):
         tpa_ene_au = []
         tpa_str = []
 
-        for state_ind, s in rsp_results['tpa_strengths']['linear'].items():
+        for state_ind, s in rsp_results['tpa_strengths'][
+                polarization.lower()].items():
             tpa_ene_au.append(rsp_results['photon_energies'][state_ind])
             tpa_str.append(s)
 
