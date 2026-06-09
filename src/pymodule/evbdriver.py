@@ -58,7 +58,7 @@ except ImportError:
     pass
 
 
-class EvbDriver():
+class EvbDriver:
 
     def __init__(self, comm=None, ostream=None):
         '''

@@ -59,7 +59,7 @@ except ImportError:
     pass
 
 
-class ReactionForceFieldBuilder():
+class ReactionForceFieldBuilder:
 
     def __init__(self, comm=None, ostream=None):
         if comm is None:

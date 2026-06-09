@@ -50,7 +50,7 @@ except ImportError:
     pass
 
 
-class EvbFepDriver():
+class EvbFepDriver:
 
     def __init__(self, comm=None, ostream=None):
         '''

@@ -5,7 +5,7 @@
 
 [ moleculetype ]
 ;name            nrexcl
-MOL                  3
+TIP                  3
 
 [ atoms ]
 ;   nr  type  resi  res  atom  cgnr     charge       mass
