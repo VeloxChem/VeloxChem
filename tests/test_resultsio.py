@@ -327,6 +327,27 @@ def test_read_results_roundtrips_only_requested_group(tmp_path):
     np.testing.assert_allclose(recovered['F'][1], scf_results['F'][1])
 
 
+def test_atomic_property_metadata_for_scf_charge_datasets(tmp_path):
+
+    if MPI.COMM_WORLD.Get_rank() != mpi_master():
+        return
+
+    h5file = Path(tmp_path) / 'scf_charges.h5'
+    with h5py.File(h5file, 'w') as h5f:
+        h5f.create_dataset('basis_set', data=np.bytes_(['def2-svp']))
+
+    scf_results = {
+        'charges_esp': np.array([-0.4, 0.2, 0.2]),
+        'charges_resp': np.array([-0.5, 0.25, 0.25]),
+    }
+
+    write_scf_results_to_hdf5(str(h5file), scf_results)
+
+    with h5py.File(h5file, 'r') as h5f:
+        assert h5f['scf/charges_esp'].attrs['atomic_property'] == 'ESP Charges'
+        assert h5f['scf/charges_resp'].attrs['atomic_property'] == 'RESP Charges'
+
+
 def test_read_results_roundtrips_tda_rsp_and_preserves_legacy_solution_vectors(
         tmp_path):
 

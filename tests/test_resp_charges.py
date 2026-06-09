@@ -6,6 +6,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.respchargesdriver import RespChargesDriver
+from veloxchem.resultsio import read_results
 
 
 class TestRespCharges:
@@ -39,6 +40,10 @@ class TestRespCharges:
 
         if task.mpi_rank == mpi_master():
             assert np.max(np.abs(q_fit - ref_charges)) < 1.0e-5
+            np.testing.assert_allclose(scf_results['charges_resp'], q_fit)
+            np.testing.assert_allclose(
+                read_results(f'{chg_drv.filename}.h5', 'scf')['charges_resp'],
+                q_fit)
 
             pdb_file = Path(chg_drv.filename).with_suffix('.pdb')
             if pdb_file.is_file():
@@ -81,6 +86,31 @@ class TestRespCharges:
         chg_dict = {'number_layers': 1}
 
         self.run_resp(inpfile, ref_resp_charges, chg_dict, 'resp', ['C', 3.0])
+
+    def test_resp_writes_h5_without_input_scf_results(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'data' / 'methanol.inp')
+
+        task = MpiTask([inpfile, None])
+        chg_dict = {'filename': task.input_dict['filename'], 'number_layers': 1}
+
+        chg_drv = RespChargesDriver(task.mpi_comm, task.ostream)
+        chg_drv.update_settings(chg_dict, task.input_dict['method_settings'])
+
+        q_fit = chg_drv.compute(task.molecule, task.ao_basis, None, 'resp')
+
+        if task.mpi_rank == mpi_master():
+            scf_h5_results = read_results(f'{chg_drv.filename}.h5', 'scf')
+            np.testing.assert_allclose(scf_h5_results['charges_resp'], q_fit)
+
+            final_h5_file = Path(chg_drv.filename).with_suffix('.h5')
+            if final_h5_file.is_file():
+                final_h5_file.unlink()
+
+            scf_h5_file = Path(chg_drv.filename + '_scf.h5')
+            if scf_h5_file.is_file():
+                scf_h5_file.unlink()
 
     def test_get_dipole_moment(self):
 

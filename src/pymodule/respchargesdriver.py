@@ -263,11 +263,14 @@ class RespChargesDriver(EspChargesDriver):
             The ESP charges.
         """
 
-        grid_m, esp_m = self._get_grid_esp_for_single_mol(
+        grid_m, esp_m, scf_results = self._get_grid_esp_for_single_mol(
             molecule, basis, scf_results, use_resp_sanity_check=True)
 
         if self.rank == mpi_master():
             q = self.compute_resp_charges([molecule], [grid_m], [esp_m], [1.0])
+
+            self._store_atomic_charges(molecule, basis, scf_results,
+                                       'charges_resp', q)
         else:
             q = None
 

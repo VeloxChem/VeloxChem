@@ -46,6 +46,7 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .inputparser import parse_input, print_keywords
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
+from .resultsio import create_hdf5, write_scf_results_to_hdf5
 
 
 class EspChargesDriver:
@@ -243,6 +244,49 @@ class EspChargesDriver:
             # single molecule esp charges
             return self._compute_single_molecule(molecule, basis, scf_results)
 
+    def _store_atomic_charges(self, molecule, basis, scf_results, key, charges):
+        """
+        Stores fitted charges in SCF results and persists them in the SCF HDF5
+        file.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The molecular basis set.
+        :param scf_results:
+            The SCF results.
+        :param key:
+            The results key.
+        :param charges:
+            The fitted charges.
+        """
+
+        if scf_results is None:
+            return
+
+        scf_results[key] = charges
+
+        if self.filename is None:
+            return
+
+        h5_fname = Path(f'{self.filename}.h5')
+        if not h5_fname.is_file():
+            if basis is None:
+                return
+
+            dft_func_label = scf_results.get('xcfun', 'HF')
+            potfile = scf_results.get('potfile', None)
+            potfile_text = ''
+
+            if potfile and Path(str(potfile)).is_file():
+                with open(str(potfile), 'r') as f_pot:
+                    potfile_text = ''.join(f_pot.readlines())
+
+            create_hdf5(str(h5_fname), molecule, basis, dft_func_label,
+                        potfile_text)
+
+        write_scf_results_to_hdf5(str(h5_fname), scf_results)
+
     def _get_grid_esp_for_single_mol(self,
                                      molecule,
                                      basis=None,
@@ -259,7 +303,7 @@ class EspChargesDriver:
             The SCF results.
 
         :return:
-            The grid and ESP.
+            The grid, ESP, and SCF results.
         """
 
         if use_resp_sanity_check:
@@ -343,7 +387,7 @@ class EspChargesDriver:
         esp_m = self.get_electrostatic_potential(grid_m, molecule, basis,
                                                  scf_results)
 
-        return grid_m, esp_m
+        return grid_m, esp_m, scf_results
 
     def _compute_single_molecule(self, molecule, basis=None, scf_results=None):
         """
@@ -360,7 +404,7 @@ class EspChargesDriver:
             The ESP charges.
         """
 
-        grid_m, esp_m = self._get_grid_esp_for_single_mol(
+        grid_m, esp_m, scf_results = self._get_grid_esp_for_single_mol(
             molecule, basis, scf_results)
 
         if self.rank == mpi_master():
@@ -371,6 +415,9 @@ class EspChargesDriver:
             else:
                 q = self.compute_esp_charges([molecule], [grid_m], [esp_m],
                                              [1.0])
+
+            self._store_atomic_charges(molecule, basis, scf_results,
+                                       'charges_esp', q)
         else:
             q = None
 
