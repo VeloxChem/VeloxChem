@@ -275,7 +275,7 @@ class EnsembleParser:
         return prot_map
 
     def structures(self,
-                   trajectory_file: str,
+                   trajectory_file: str | None = None,
                    num_snapshots: int | None = None,
                    qm_region: str = "",
                    qm_charge: int = 0,
@@ -286,7 +286,8 @@ class EnsembleParser:
                    npe_cutoff: float | None = None,
                    start: float | None = None,
                    end: float | None = None,
-                   last_snapshot_only: bool = False):
+                   last_snapshot_only: bool = False,
+                   pdb_file: str | None = None):
         """
         Parse a set of structures and extract QM and MM region data.
 
@@ -294,6 +295,9 @@ class EnsembleParser:
             Path to the trajectory file:
                 - .xtc with a corresponding topology (.tpr) via topology_file
                 - .pdb (several configurations, or a single configuration; bonds are guessed
+        : param pdb_file:
+            Path to a PDB file. This is a convenience alternative to
+            trajectory_file and cannot be used together with trajectory_file.
         :param topology_file:
             Path to the topology file (e.g., .tpr).
         :param num_snapshots:
@@ -374,6 +378,22 @@ class EnsembleParser:
             - number_residues_npe (int):
                 Number of residues in the NPE region.
         """
+
+        if pdb_file is not None and trajectory_file is not None:
+            raise ValueError(
+                "Provide either pdb_file or trajectory_file, not both"
+            )
+        
+        if pdb_file is not None:
+            pdb_file = str(pdb_file)
+            if not pdb_file.lower().endswith(".pdb"):
+                raise ValueError("pdb_file must be a .pdb file")
+            trajectory_file = pdb_file
+
+        if trajectory_file is None:
+            raise ValueError("Either pdb_file or trajectory_file must be provided")
+        
+        trajectory_file = str(trajectory_file)
 
         assert_msg_critical(
             'MDAnalysis' in sys.modules,
