@@ -310,6 +310,7 @@ class RixsDriver(LinearSolver):
 
         if self.twoshot:
             self._approach_string = 'Running RIXS calculation in the two-shot approach'
+            self._method_ref_str = 'J. Chem. Theory Comput. 2021, 17, 3031-3038, DOI: 10.1021/acs.jctc.1c00144'
 
             if self.rank == mpi_master():
                 num_core_orbitals = cvs_rsp_results['num_core']
@@ -334,6 +335,7 @@ class RixsDriver(LinearSolver):
 
         else:
             self._approach_string = 'Running RIXS calculation in the restricted-subspace approach'
+            self._method_ref_str = 'Phys. Chem. Chem. Phys., 2021, 23, 1835-1848, DOI: 10.1039/d0cp04726k'
 
             if self.rank == mpi_master():
                 num_valence_orbitals = rsp_results['num_valence']
@@ -1074,8 +1076,14 @@ class RixsDriver(LinearSolver):
             )
             self.ostream.print_blank()
 
+        self._implementation_ref_str = 'J. Phys. Chem. A 2025, 129, 8783-8797, DOI: 10.1021/acs.jpca.5c04528'
+        self.ostream.print_info('Implementation details & benchmark: ')
+        self.ostream.print_reference('Reference: ' + self._implementation_ref_str)
+        self.ostream.print_blank()
+
         if getattr(self, "_approach_string", None):
             self.ostream.print_info(self._approach_string)
+            self.ostream.print_reference('Reference: ' + self._method_ref_str)
             self.ostream.print_blank()
 
         self.ostream.flush()
