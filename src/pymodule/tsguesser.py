@@ -111,7 +111,7 @@ class TransitionStateGuesser():
         self.force_conformer_search = False
         self.discont_conformer_search = False
         self.peak_conformer_search = False
-        self.peak_conformer_search_range = 1
+        self.peak_conformer_search_range = 2
         self.mm_conformer_equivalence_threshold = 1e-1  # kJ/mol
         self.mm_scan_backward = False
 
@@ -134,8 +134,7 @@ class TransitionStateGuesser():
         self._conformer_phi_product: float | None = None
 
         # Implicit solvation during conformational sampling.
-        # Set implicit_solvent_model to one of 'gbn', 'gbn2', 'obc1', 'obc2',
-        # 'hct' to enable GB solvation; None runs in vacuum (default).
+        # Set implicit_solvent_model to one of 'gbn', 'gbn2', 'obc1', 'obc2', 'hct' to enable GB solvation; None runs in vacuum (default).
         self.implicit_solvent_model: str | None = None
         self.solute_dielectric: float = 1.0
         self.solvent_dielectric: float = 78.39
@@ -188,8 +187,7 @@ class TransitionStateGuesser():
         """
         self.results = {}
         # Build forcefields and systems
-        if self.implicit_solvent_model is not None:
-            self.ffbuilder.calculate_resp = True
+        self.ffbuilder.calculate_resp = self.implicit_solvent_model is not None
         self.build_forcefields(reactant, product, **build_forcefields_kwargs)
         self.build_systems(constraints)
 
@@ -257,6 +255,11 @@ class TransitionStateGuesser():
         return self.results
 
     def build_systems(self, constraints=None):
+
+        self.lambda_vector = [round(l, 3) for l in self.lambda_vector]
+        self.ostream.print_info(
+            f"Rounding lambda vector to 3 decimal places: {self.lambda_vector}")
+
         sysbuilder = ReactionSystemBuilder()
         if self.mute_ff_build:
             sysbuilder.ostream.mute()
@@ -404,9 +407,10 @@ class TransitionStateGuesser():
                         # disjoint search windows whose edges are both marked.
                         if (peak_index in searched_conformers_indices
                                 and (max(0, peak_index - 1)
-                                     in searched_conformers_indices) and
-                            (min(peak_index + 1, len(self.lambda_vector))
-                             in searched_conformers_indices)):
+                                     in searched_conformers_indices)
+                                and (min(peak_index + 1,
+                                         len(self.lambda_vector) - 1)
+                                     in searched_conformers_indices)):
                             break
 
                         min_index = max(
@@ -835,8 +839,8 @@ class TransitionStateGuesser():
                     self.scf_drv,
                     'solvation_model') and self.scf_drv.solvation_model is None:
                 self.ostream.print_warning(
-                    'Implicit solvation turned on, but explicitly provided SCF'
-                    'driver has no solvation model activated. Continuing without QM solvation.'
+                    'Implicit solvation turned on, but explicitly provided SCF '
+                    'driver has no solvation model activated. Continuing without QM solvation. '
                     'Provide an SCF driver with a solvation model activated to enable QM solvation.'
                 )
 
@@ -897,9 +901,9 @@ class TransitionStateGuesser():
                 ts_results = self.results
 
         scan = ts_results['scan']
-        lambda_vec = [round(float(l), 3) for l in ts_results['lambda_vec']]
 
-        if TransitionStateGuesser._has_qm_results(scan, lambda_vec):
+        if TransitionStateGuesser._has_qm_results(scan,
+                                                  ts_results['lambda_vec']):
             final_lambda = round(float(ts_results.get('max_qm_lambda', 0)), 3)
         else:
             final_lambda = round(float(ts_results['max_mm_lambda']), 3)
@@ -911,7 +915,8 @@ class TransitionStateGuesser():
         def _best_conformer_index(step):
             best_index = 0
             min_energy = None
-            if TransitionStateGuesser._has_qm_results(scan, lambda_vec):
+            if TransitionStateGuesser._has_qm_results(scan,
+                                                      ts_results['lambda_vec']):
                 for i, conf in enumerate(scan[step]):
                     qm_E = conf.get('qm_energy', None)
                     if min_energy is None or (qm_E is not None
@@ -927,8 +932,11 @@ class TransitionStateGuesser():
 
         initial_best = _best_conformer_index(final_lambda)
 
+        rounded_lambda_vec = [
+            round(float(l), 3) for l in ts_results['lambda_vec']
+        ]
         step_selector = ipywidgets.SelectionSlider(
-            options=lambda_vec,
+            options=rounded_lambda_vec,
             description='Lambda',
             value=final_lambda,
         )
@@ -946,7 +954,7 @@ class TransitionStateGuesser():
             TransitionStateGuesser._show_conformer_iteration(
                 step,
                 min(conformer_id, n_conf),
-                lambda_vec,
+                rounded_lambda_vec,
                 scan,
                 bonds=bonds,
                 forming_bonds=forming_bonds,
@@ -1158,8 +1166,8 @@ class TransitionStateGuesser():
             marker='_',
             color='darkcyan',
             alpha=0.4,
-            s=80 / math.log(total_steps, 10),
-            linewidths=1.0,
+            s=30 / math.log(min(2, total_steps), 10),
+            linewidths=2.0,
             zorder=0.5,
         )
         ax1.scatter(
@@ -1167,7 +1175,7 @@ class TransitionStateGuesser():
             rel_mm_energies,
             color='black',
             alpha=0.7,
-            s=120 / math.log(total_steps, 10),
+            s=50 / math.log(min(2, total_steps), 10),
             facecolors="none",
             edgecolor="darkcyan",
             zorder=1,
@@ -1179,7 +1187,7 @@ class TransitionStateGuesser():
             marker='o',
             color='darkcyan',
             alpha=1.0,
-            s=120 / math.log(total_steps, 10),
+            s=50 / math.log(min(2, total_steps), 10),
             zorder=2,
         )
         ax1.set_xlabel(r'$\lambda$')
@@ -1202,15 +1210,15 @@ class TransitionStateGuesser():
                 marker='_',
                 color='darkorange',
                 alpha=0.4,
-                s=80 / math.log(total_steps, 10),
-                linewidths=1.0,
+                s=30 / math.log(min(2, total_steps), 10),
+                linewidths=2.0,
                 zorder=0.5,
             )
             ax1.scatter(
                 lambda_vec,
                 rel_qm_energies,
                 alpha=0.7,
-                s=120 / math.log(total_steps, 10),
+                s=50 / math.log(min(2, total_steps), 10),
                 facecolors="none",
                 edgecolor="darkorange",
                 zorder=1,
@@ -1228,7 +1236,7 @@ class TransitionStateGuesser():
                 marker='o',
                 color='darkorange',
                 alpha=1.0,
-                s=120 / math.log(total_steps, 10),
+                s=120 / math.log(min(2, total_steps), 10),
                 zorder=2,
             )
             ax1.set_ylabel('Relative QM energy [kJ/mol]')
@@ -1572,8 +1580,6 @@ class TransitionStateGuesser():
             self.ostream.print_header(self._param("solvation", "SMD"))
             self.ostream.print_header(
                 self._param("SMD solvent", self.smd_solvent))
-        else:
-            self.ostream.print_header(self._param("solvation", "vacuum"))
 
         self.ostream.print_blank()
         self.ostream.flush()
