@@ -15,6 +15,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.resultsio import read_results
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.vibrationalanalysis import VibrationalAnalysis
+from veloxchem.errorhandler import VeloxChemError
 
 
 class TestScfVibrationalAnalysisDriver:
@@ -439,7 +440,7 @@ class TestScfVibrationalAnalysisDriver:
         assert fake_view.shown is True
 
         with redirect_stdout(io.StringIO()):
-            with pytest.raises(AssertionError,
+            with pytest.raises(VeloxChemError,
                                match='No IR intensities available'):
                 vib_drv.print_info(
                     {
@@ -452,7 +453,7 @@ class TestScfVibrationalAnalysisDriver:
                     info_type='ir')
 
         with redirect_stdout(io.StringIO()):
-            with pytest.raises(AssertionError,
+            with pytest.raises(VeloxChemError,
                                match='No Raman activities available'):
                 vib_drv.print_info(
                     {
@@ -465,7 +466,7 @@ class TestScfVibrationalAnalysisDriver:
                     info_type='raman')
 
         with redirect_stdout(io.StringIO()):
-            with pytest.raises(AssertionError, match='Invalid plot type'):
+            with pytest.raises(VeloxChemError, match='Invalid plot type'):
                 vib_drv.print_info(
                     {
                         'molecule_xyz_string': molecule.get_xyz_string(),
@@ -476,7 +477,7 @@ class TestScfVibrationalAnalysisDriver:
                     },
                     info_type='unsupported')
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='molecule only has 1 normal modes'):
             vib_drv.animate(vib_results, mode=2)
 
@@ -489,7 +490,7 @@ class TestScfVibrationalAnalysisDriver:
         vib_drv = self._get_synthetic_vibanalysis()
         molecule = self._get_water_molecule()
 
-        with pytest.raises(AssertionError, match='Invalid plot type'):
+        with pytest.raises(VeloxChemError, match='Invalid plot type'):
             vib_drv.plot(
                 {
                     'molecule_xyz_string': molecule.get_xyz_string(),

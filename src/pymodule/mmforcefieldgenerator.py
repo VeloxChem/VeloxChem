@@ -1378,6 +1378,8 @@ class MMForceFieldGenerator:
         # Process water model if requested
         if use_water_model:
             self.apply_water_model(water_model)
+        else:
+            self._check_ow_hw_atoms()
 
         self.ostream.flush()
 
@@ -1457,7 +1459,7 @@ class MMForceFieldGenerator:
 
         assert_msg_critical(
             water_model.lower() in self.water_parameters,
-            f"Error: '{water_model}' is not available. Available models " +
+            f"MMForceFieldGenerator: '{water_model}' is not available. Available models " +
             f"are: {list(self.water_parameters.keys())}")
 
         self.ostream.print_info(f'Using water model parameters for {water_model}.')
@@ -1466,28 +1468,28 @@ class MMForceFieldGenerator:
 
         water_params = self.water_parameters[water_model.lower()]
 
-        labels = self.molecule.get_labels()
+        # labels = self.molecule.get_labels()
         atoms = self.atoms
-        
+
         hydrogen_indices = [idx for idx, atom in atoms.items() if atom['type'] == 'hw']
         oxygen_indices = [idx for idx, atom in atoms.items() if atom['type'] == 'ow']
-        
+
         water_bonds = [idx for idx, bond in self.bonds.items() if (idx[0] in oxygen_indices or idx[1] in oxygen_indices)]
         water_angles = [idx for idx, angle in self.angles.items() if (idx[1] in oxygen_indices)]
-        
+
         for hydrogen_idx in hydrogen_indices:
             self.atoms[hydrogen_idx]['sigma'] = water_params['hw']['sigma']
             self.atoms[hydrogen_idx]['epsilon'] = water_params['hw']['epsilon']
-            
+
             # Do not overwrite partial charges if the molecule is part of a larger system
             # This can cause the total charge to become a non-integer
             if self.molecule.is_water_molecule():
                 self.atoms[hydrogen_idx]['charge'] = water_params['hw']['charge']
-        
+
         for oxygen_idx in oxygen_indices:
             self.atoms[oxygen_idx]['sigma'] = water_params['ow']['sigma']
             self.atoms[oxygen_idx]['epsilon'] = water_params['ow']['epsilon']
-            
+
             if self.molecule.is_water_molecule():
                 self.atoms[oxygen_idx]['charge'] = water_params['ow']['charge']
 
@@ -1496,6 +1498,42 @@ class MMForceFieldGenerator:
 
         for angle_idx in water_angles:
             self.angles[angle_idx].update(water_params['angles'])
+
+    def _check_ow_hw_atoms(self):
+        """
+        Checks if ow/hw atom types exist in the system.
+        """
+
+        hydrogen_indices = [idx for idx, atom in self.atoms.items() if atom['type'] == 'hw']
+        oxygen_indices = [idx for idx, atom in self.atoms.items() if atom['type'] == 'ow']
+
+        # We have updated the ow/hw sigma/epsilon parameters in database/gaff-2.11.xml.
+        # By default, if no water model is used, the ow/hw sigma/epsilon parameters
+        # will follow the cSPE/E model (JCTC 2010, 6, 607).
+
+        # Here we double check the ow/hw sigma/epsilon parameters.
+        cspce_ow_sigma = self.water_parameters['cspce']['ow']['sigma']
+        cspce_ow_epsilon = self.water_parameters['cspce']['ow']['epsilon']
+        cspce_hw_sigma = self.water_parameters['cspce']['hw']['sigma']
+        cspce_hw_epsilon = self.water_parameters['cspce']['hw']['epsilon']
+
+        for idx in oxygen_indices:
+            assert_msg_critical(
+                (self.atoms[idx]['sigma'] == cspce_ow_sigma and
+                    self.atoms[idx]['epsilon'] == cspce_ow_epsilon),
+                "MMForceFieldGenerator: Incorrect 'ow' sigma/epsilon parameters.")
+
+        for idx in hydrogen_indices:
+            assert_msg_critical(
+                (self.atoms[idx]['sigma'] == cspce_hw_sigma and
+                    self.atoms[idx]['epsilon'] == cspce_hw_epsilon),
+                "MMForceFieldGenerator: Incorrect 'hw' sigma/epsilon parameters.")
+
+        if hydrogen_indices or oxygen_indices:
+            warnmsg = 'MMForceFieldGenerator: ow/hw atom types identified. '
+            warnmsg += 'Using sigma and epsilon parameters from the cSPE/E model. '
+            warnmsg += '(JCTC 2010, 6, 607)'
+            self.ostream.print_warning(warnmsg)
 
     def populate_impropers(self, use_xml, ff_data_dict, ff_data_lines, n_atoms,
                            angle_indices):
@@ -2187,8 +2225,7 @@ class MMForceFieldGenerator:
                         periodicity = int(
                             dihedral_data[f'periodicity{dih_param_idx}'])
                         barrier = float(dihedral_data[f'k{dih_param_idx}'])
-                        phase = float(dihedral_data[f'phase{dih_param_idx}']
-                                     ) / np.pi * 180.0
+                        phase = float(dihedral_data[f'phase{dih_param_idx}']) / np.pi * 180.0
 
                         dihedral_barriers.append(barrier)
                         dihedral_phases.append(phase)
@@ -2208,7 +2245,12 @@ class MMForceFieldGenerator:
                     try:
                         periodicity = int(dihedral_ff[3])
                     except ValueError:
-                        periodicity = int(float(dihedral_ff[3]))
+                        try:
+                            periodicity = int(float(dihedral_ff[3]))
+                        except ValueError:
+                            raise ValueError(
+                                'Invalid periodicity value: '
+                                f'{dihedral_ff[3]}') from None
 
                     dihedral_barriers.append(barrier)
                     dihedral_phases.append(phase)
@@ -2710,8 +2752,7 @@ class MMForceFieldGenerator:
                 continue
 
             # Check if any side atom of the bond is involved in a triple bond
-            if (bond[0] in ['c1', 'n1', 'cg', 'ch'
-                           ]) or (bond[1] in ['c1', 'n1', 'cg', 'ch']):
+            if (bond[0] in ['c1', 'n1', 'cg', 'ch']) or (bond[1] in ['c1', 'n1', 'cg', 'ch']):
                 bonds_to_delete.append((i, j))
                 continue
 
@@ -3877,8 +3918,7 @@ class MMForceFieldGenerator:
         ff_data = {
             "atoms": forcefield.atoms,
             "bonds": MMForceFieldGenerator._tuple_to_str_key(forcefield.bonds),
-            "angles": MMForceFieldGenerator._tuple_to_str_key(forcefield.angles
-                                                             ),
+            "angles": MMForceFieldGenerator._tuple_to_str_key(forcefield.angles),
             "dihedrals": MMForceFieldGenerator._tuple_to_str_key(
                 forcefield.dihedrals),
             "impropers": MMForceFieldGenerator._tuple_to_str_key(

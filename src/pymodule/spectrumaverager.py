@@ -36,23 +36,11 @@ import numpy as np
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 
+from .veloxchemlib import (hartree_in_ev, fine_structure_constant,
+                           avogadro_constant, bohr_in_angstrom,
+                           hartree_in_wavenumber)
 from .spectrumplot import lorentzian_absorption, gaussian_absorption
-from .veloxchemlib import (
-    hartree_in_ev,
-    fine_structure_constant,
-    avogadro_constant,
-    bohr_in_angstrom,
-    hartree_in_wavenumber,
-)
 
-try:
-    import matplotlib.pyplot as plt
-except ImportError:
-    plt = None
-
-au2ev = hartree_in_ev()
-ev2au = 1.0 / au2ev
-au2nm = 1.0e7 / hartree_in_wavenumber()
 
 class SpectrumAverager:
     """
@@ -84,7 +72,7 @@ class SpectrumAverager:
                 ostream = OutputStream(sys.stdout)
             else:
                 ostream = OutputStream(None)
-   
+
         self.broadening_type = "lorentzian"
         self.broadening_value_ev = 0.124
         self.xstep_ev = 0.01
@@ -154,6 +142,11 @@ class SpectrumAverager:
               - transitions_au: excitation energies per snapshot (a.u.)
               - oscillator_strengths: oscillator strengths per snapshot
         """
+
+        au2ev = hartree_in_ev()
+        ev2au = 1.0 / au2ev
+        auxnm = 1.0e7 / hartree_in_wavenumber()
+
         frames, results = self.unpack_snapshots(rsp_all)
 
         if len(results) == 0:
@@ -237,7 +230,7 @@ class SpectrumAverager:
 
         # Wavelength directly from a.u. grid: wl_nm = (nm * a.u.) / a.u.
         with np.errstate(divide="ignore", invalid="ignore"):
-            wl_nm = au2nm / xgrid_au
+            wl_nm = auxnm / xgrid_au
 
         # Drop non-finite wavelength points (e.g. xgrid_au == 0)
         mask = np.isfinite(wl_nm)
@@ -276,12 +269,14 @@ class SpectrumAverager:
         title="Absorption Spectrum (Averaged)",
         ax=None,
         xlim_nm=None,
+        save_averaged_spectra=True,
+        averaged_spectra_filename="averaged_spectra.csv",
     ):
         """
         Plot an averaged UV/Vis spectrum from multiple response results.
 
         :param rsp_all:
-            A list of response results dictionaries: (frame, rsp_results) tuples 
+            A list of response results dictionaries: (frame, rsp_results) tuples
             (as returned by the compute method).
         :param energy_min_ev:
             Minimum photon energy in eV for the common grid. If None, it is set to
@@ -302,19 +297,29 @@ class SpectrumAverager:
             created.
         :param xlim_nm:
             Tuple (xmin, xmax) to set x-axis limits in nm. If None, automatic limits are used.
+        :param save_averaged_spectra:
+            If True, saves the averaged spectra data to a CSV file.
+        :param averaged_spectra_filename:
+            Filename for saving the averaged spectra data if save_averaged_spectra is True.
+            Default is "averaged_spectra.csv" in current working directory.
         :return:
             The Matplotlib Axes object containing the plot.
         :raises ImportError:
             If matplotlib is not available.
         """
-        if plt is None:
+
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
             raise ImportError("matplotlib is required for plotting")
 
+        auxnm = 1.0e7 / hartree_in_wavenumber()
+
         spectrum = self.compute(
-                rsp_all,
-                energy_min_ev=energy_min_ev,
-                energy_max_ev=energy_max_ev,
-            )
+            rsp_all,
+            energy_min_ev=energy_min_ev,
+            energy_max_ev=energy_max_ev,
+        )
 
         if ax is None:
             _, ax = plt.subplots()
@@ -327,7 +332,7 @@ class SpectrumAverager:
         if show_individual:
             xgrid_au = spectrum["xgrid_au"]
             with np.errstate(divide="ignore", invalid="ignore"):
-                wl_forward = au2nm / xgrid_au  # forward (same ordering as eps arrays)
+                wl_forward = auxnm / xgrid_au  # forward (same ordering as eps arrays)
 
             if mask is None:
                 mask = np.isfinite(wl_forward)
@@ -357,10 +362,20 @@ class SpectrumAverager:
             for e_au, f in zip(spectrum["transitions_au"], spectrum["oscillator_strengths"]):
                 e_au = np.asarray(e_au, dtype=float)
                 with np.errstate(divide="ignore", invalid="ignore"):
-                    wl_t = au2nm / e_au
+                    wl_t = auxnm / e_au
                 ax2.vlines(wl_t, 0.0, f, alpha=0.35, linewidth=2, color=self.stick_color)
 
             ax2.set_ylim(0.0, max(0.2, ax2.get_ylim()[1]))
             ax2.set_xlim(ax.get_xlim())
+
+        if save_averaged_spectra:
+            data = np.column_stack((wl, ymean))
+            np.savetxt(
+                averaged_spectra_filename,
+                data,
+                delimiter=",",
+                header="Wavelength [nm],epsilon [L mol^-1 cm^-1]",
+                comments="",
+            )
 
         return ax

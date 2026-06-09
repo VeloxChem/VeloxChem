@@ -7,6 +7,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.excitedstatemomentdriver import ExcitedStateMomentDriver
+from veloxchem.errorhandler import VeloxChemError
 
 
 @pytest.mark.solvers
@@ -77,7 +78,7 @@ class TestTransitionDipoleMomentQR:
         tsm_drv.ostream.mute()
         tsm_drv.state = 0
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Expecting positive 1-based state index'):
             tsm_drv.compute(mol, bas, scf_results)
 
@@ -101,6 +102,6 @@ class TestTransitionDipoleMomentQR:
         tsm_drv.ostream.mute()
         tsm_drv.state = 1
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Complex response solver did not converge'):
             tsm_drv.compute(mol, bas, scf_results)

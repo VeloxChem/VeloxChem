@@ -433,19 +433,6 @@ CMolecule::atom_indices(const std::string &label) const -> std::vector<int>
 }
 
 auto
-CMolecule::nuclear_repulsion_energy() const -> double
-{
-    double nenergy = 0.0;
-
-    std::ranges::for_each(views::upper_triangular(_identifiers.size()), [&](const auto &index) {
-        const auto [i, j] = index;
-        nenergy += _identifiers[i] * _identifiers[j] / _coordinates[i].distance(_coordinates[j]);
-    });
-
-    return nenergy;
-}
-
-auto
 CMolecule::check_proximity(const double distance) const -> bool
 {
     const auto r2dist = distance * distance;

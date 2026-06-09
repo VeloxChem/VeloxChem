@@ -70,10 +70,7 @@ def _write_value_to_hdf5(parent, key, value, value_label='HDF5 value'):
         return
 
     if isinstance(value, (bytes, np.bytes_)):
-        dset = parent.create_dataset(key,
-                                     data=np.bytes_(value.decode('utf-8')
-                                                    if isinstance(value, bytes)
-                                                    else value.decode('utf-8')))
+        dset = parent.create_dataset(key, data=np.bytes_(value.decode('utf-8')))
         dset.attrs['value_type'] = 'str'
         return
 
@@ -210,7 +207,9 @@ def _read_value_from_hdf5(h5obj, value_label='HDF5 value'):
 
     if value_type == 'str':
         data = h5obj[()]
-        if isinstance(data, bytes):
+        if isinstance(data, np.ndarray):
+            return data[0].decode('utf-8')
+        if isinstance(data, (bytes, np.bytes_)):
             return data.decode('utf-8')
         return data.astype(str) if isinstance(data, np.ndarray) else str(data)
 
@@ -533,89 +532,6 @@ def write_detach_attach_to_hdf5(fname,
             hf.create_dataset(attach_label, data=chg_attach)
 
         hf.close()
-
-
-def read_results_old(fname, label):
-    """ Read the results dictionary from an HDF5 results file.
-
-        :param fname:
-            Name of the HDF5 file.
-        :param label:
-            The response dictionary label (scf, rsp, vib, opt, etc.).
-
-        :return:
-            the dictionary of results.
-    """
-
-    valid_filename = (fname and isinstance(fname, str))
-    assert_msg_critical(valid_filename, f"{fname!r} is not a valid filename.")
-
-    file_exists = Path(fname).is_file()
-    assert_msg_critical(file_exists, f"{fname!r} does not exist.")
-
-    res_dict = {}
-    h5f = h5py.File(fname, "r")
-
-    label_found = (label in h5f)
-
-    if not label_found:
-        h5f.close()
-
-    assert_msg_critical(label_found,
-                        label + " section not found in the checkpoint file.")
-
-    for key in h5f:
-        if key not in ["vib", "rsp", "scf", "opt"]:
-            data = np.array(h5f.get(key))
-            if len(data.shape) == 1 and data.shape[0] == 1:
-                res_dict[key] = data[0]
-            else:
-                res_dict[key] = data
-
-    h5f_dict = h5f[label]
-
-    known_keys_for_arrays = [
-        'normal_modes',
-        'vib_frequencies',
-        'force_constants',
-        'reduced_masses',
-        'ir_intensities',
-        'external_frequencies',
-        'raman_activities',
-    ]
-
-    for key in h5f_dict:
-        data = np.array(h5f_dict[key])
-        if (len(data.shape) == 1 and data.shape[0] == 1 and
-                key not in known_keys_for_arrays):
-            res_dict[key] = data[0]
-        else:
-            res_dict[key] = data
-
-    if "opt" in label:
-        nuclear_charges = np.array(res_dict["nuclear_charges"]).astype(int)
-        xyz_geometries = []
-        for coords in res_dict["opt_coordinates_au"]:
-            molecule = Molecule(nuclear_charges, coords, units="au")
-            xyz_geometries.append(molecule.get_xyz_string())
-        res_dict["opt_geometries"] = xyz_geometries
-
-    molecule, basis = read_molecule_and_basis(fname)
-
-    xyz_lines = molecule.get_xyz_string().splitlines()
-
-    xyz = []
-    for line in xyz_lines[2:]:
-        xyz.append(line)
-
-    res_dict["xyz"] = xyz
-
-    if "vib" in label:
-        res_dict["molecule_xyz_string"] = molecule.get_xyz_string()
-
-    h5f.close()
-
-    return res_dict
 
 
 def read_results(fname, label):
