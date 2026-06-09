@@ -549,7 +549,11 @@ class ComplexResponseSolverBase(LinearSolver):
             spectrum['y_label'] = r'Optical rotatory dispersion [10$^3$ deg dm$^{-1}$ (g cm$^{-3}$)$^{-1}$]'
             molecular_weight = float(molecular_mass_amu)
             au2wn = hartree_in_wavenumber()
-            alpha_prefactor = 1.3422940570573704e-4
+            # Rosenfeld-style specific rotation relation for beta(w) in a.u.:
+            # [alpha] = (28800 * pi^2 * N_A * a0^4) * nu_bar^2 * beta(w) / M,
+            # with a0 expressed in cm and M in g/mol.
+            alpha_prefactor = (28800.0 * math.pi**2 * avogadro_constant() *
+                               (bohr_in_angstrom() * 1.0e-8)**4)
         else:
             spectrum['y_label'] = 'Optical rotation parameter '
             spectrum['y_label'] += r'$\beta(\omega)$ [a.u.]'
@@ -578,6 +582,7 @@ class ComplexResponseSolverBase(LinearSolver):
                 nu_bar = au2wn * w
                 specific_rotation = alpha_prefactor * (nu_bar**2) * beta
                 specific_rotation /= molecular_weight
+                # Report in units of 10^3 deg dm^-1 (g cm^-3)^-1.
                 spectrum['y_data'].append(specific_rotation / 1000.0)
             else:
                 spectrum['y_data'].append(beta)
