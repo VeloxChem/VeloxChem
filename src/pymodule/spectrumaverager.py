@@ -113,9 +113,9 @@ class SpectrumAverager:
         """
         Compute an averaged UV/Vis spectrum from multiple response results.
 
-        A common energy grid (in a.u.) is constrcuted from the global minimum
+        A common energy grid (in a.u.) is constructed from the global minimum
         and maximum excitation energies across snapshots (plus padding). Each
-        snapshpt is broadened and converted to molar absorptivity epsilon on the
+        snapshot is broadened and converted to molar absorptivity epsilon on the
         common grid, and the mean and standard deviation are computed.
         Followed Eqn (1) and procedure here:
         https://doi.org/10.1021/acs.jctc.5c01719
@@ -130,7 +130,7 @@ class SpectrumAverager:
             Maximum photon energy in eV for the common grid. If None, it is set to
             (global max excitation energy + padding).
         :return:
-            A dictionary containing the averaged spectrum and auxilary data:
+            A dictionary containing the averaged spectrum and auxiliary data:
               - frames: frame indices (or None)
               - xgrid_au: energy grid in a.u.
               - xgrid_ev: energy grid in eV

@@ -68,7 +68,6 @@ def molecule_sanity_check(mol, method_type=None, caller_name=None):
 
     assert_msg_critical(mol.check_proximity(0.1), 'Molecule: Atoms too close')
 
-
 def scf_results_sanity_check(obj, scf_results):
     """
     Checks SCF results for ERI, DFT and PE information.
