@@ -36,6 +36,8 @@ import os
 import random
 import h5py
 from mpi4py import MPI
+from dataclasses import dataclass
+import networkx as nx
 
 from contextlib import redirect_stderr
 from .outputstream import OutputStream
@@ -520,7 +522,7 @@ class IMForceFieldGenerator:
                         methyl_h_groups=tuple(h_groups),
                         torsion_rows=rows,
                         torsion_coords=coords,
-                    ))
+                    ))/home/vlind06/phd_project/interpolation/workflow_paper_opt/salic/run_1_eq
 
             # Prefer maximal substituents; remove nested methyls inside larger alkyl groups.
             maximal = []
@@ -530,7 +532,7 @@ class IMForceFieldGenerator:
                     maximal.append(group)
             return maximal
         
-        def regroup_by_rotatable_connection(molecule, groups, rotatable_bonds, conn):
+        def regroup_by_rotatable_connection(molecule, groups, rotatable_bonds, conn):# -> tuple[dict[str, list], dict[str, list]]:
             new_groups = {'gs': [], 'es': [], 'non_rotatable': []}
             rot_groups = {'gs': [], 'es': []}
             labels = molecule.get_labels()
