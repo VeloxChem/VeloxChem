@@ -600,7 +600,8 @@ class OptimizationDriver:
             # conservative choice of disabling restart
             # since geometry is likely changed during an opt calculation
             vib_drv.cphf_dict = {'restart': False}
-            vib_results_not_used = vib_drv.compute(molecule, args[0])
+            vib_drv.vib_results_txt_file = f'{vib_drv.filename}-vib-results.out'
+            vib_results_not_used = vib_drv.compute(final_mol, args[0])
             # restore Hessian option
             if self.hessian == 'never':
                 need_scf_postopt_hessian = False

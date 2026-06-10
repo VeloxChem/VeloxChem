@@ -1790,7 +1790,7 @@ class ScfDriver:
                                                    oao_mat)
 
             # threshold for deactivating pseudo-FON and level-shifting
-            if e_grad < 1.0e-4:
+            if e_grad < 1.0e-4 or e_grad < (10.0 * self.conv_thresh):
                 if self.pfon:
                     self.pfon_temperature = 0
                 if self.level_shifting > 0.0:

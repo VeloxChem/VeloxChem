@@ -135,9 +135,11 @@ class FockDriver:
 
         if total_cores < 1024:
             extra_factor = 1
-        elif total_cores < 4096:
+        elif total_cores <= 4096:
             extra_factor = 2
-        else:
+        elif total_cores < 8192:
             extra_factor = 4
+        else:
+            extra_factor = 8
 
         self._fock_drv._set_block_size_factor(factor * extra_factor)

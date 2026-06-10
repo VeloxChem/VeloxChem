@@ -59,7 +59,7 @@ except ImportError:
     pass
 
 
-class EvbSystemBuilder():
+class EvbSystemBuilder:
 
     def __init__(self, comm=None, ostream=None):
         '''
@@ -310,7 +310,8 @@ class EvbSystemBuilder():
         system_mol = Molecule.read_pdb_file(self.pdb)
         posres_atoms = [atom for atom in topology.atoms()]
 
-        forcefield = mmapp.ForceField('amber14-all.xml', 'amber14/tip3pfb.xml')
+        forcefield = mmapp.ForceField(
+            "amber14-all.xml", str(Path("amber14") / "tip3pfb.xml"))
         templates, residues = forcefield.generateTemplatesForUnmatchedResidues(
             topology)
 

@@ -369,7 +369,7 @@ class TestPointGroup:
     def test_symmetrize_pointgroup_d6h_from_loose_geometry(self):
 
         mol = self.gen_mol_D6h()
-        distorted_mol = self.distort_molecule(mol, scale=1.0e-3)
+        distorted_mol = self.distort_molecule(mol, scale=5.0e-4)
 
         distorted_res = SymmetryAnalyzer().identify_pointgroup(distorted_mol)
         assert distorted_res['point_group'] != 'D6h'
