@@ -706,7 +706,7 @@ class SolvationFepDriver:
         for _ in range(self.num_snapshots):
             simulation.step(interval)
             state = simulation.context.getState(getPositions=True, getEnergy=True)
-            positions = state.getPositions() 
+            positions = state.getPositions(asNumpy=True) 
             energy = state.getPotentialEnergy() / self.kT # Reduced potential energy
             conformations.append(positions)
             energies.append(energy)
@@ -732,7 +732,7 @@ class SolvationFepDriver:
             self.ostream.flush()
             time_start_forcefield = time.time()
 
-            integrator = mm.VerletIntegrator(1.0 * unit.femtoseconds)
+            integrator = mm.VerletIntegrator(0.0 * unit.femtoseconds) #0.0 to prevent the integrator from allocating unnecessary velocity/force buffers on the GPU for a static energy evaluation
             simulation = app.Simulation(topology, forcefield, integrator, platform=self._create_platform())
 
             for n, snapshot in enumerate(snapshots):
