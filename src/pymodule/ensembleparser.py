@@ -295,7 +295,7 @@ class EnsembleParser:
             Path to the trajectory file:
                 - .xtc with a corresponding topology (.tpr) via topology_file
                 - .pdb (several configurations, or a single configuration; bonds are guessed
-        : param pdb_file:
+        :param pdb_file:
             Path to a PDB file. This is a convenience alternative to
             trajectory_file and cannot be used together with trajectory_file.
         :param topology_file:
@@ -383,7 +383,7 @@ class EnsembleParser:
             raise ValueError(
                 "Provide either pdb_file or trajectory_file, not both"
             )
-        
+ 
         if pdb_file is not None:
             pdb_file = str(pdb_file)
             if not pdb_file.lower().endswith(".pdb"):

@@ -360,7 +360,11 @@ class EnsembleDriver:
                 f"(normalized to '{db_resn}')."
             )
 
-        resolved_atom = self._resolve_atom_name_for_npe_db(raw_atom, db[db_resn].keys())
+        resolved_atom = self._resolve_atom_name_for_npe_db(
+            raw_atom, 
+            db[db_resn].keys(),
+            db_resn,
+            )
         if resolved_atom is None:
             raise KeyError(
                 f"No NPE charge for {raw_resn}/{raw_atom}. "
@@ -561,7 +565,10 @@ class EnsembleDriver:
         return resname
 
     @staticmethod
-    def _resolve_atom_name_for_npe_db(atom_name: str, available_atoms) -> str | None:
+    def _resolve_atom_name_for_npe_db(
+        atom_name: str, 
+        available_atoms,
+        resname: str) -> str | None: 
         """
         Resolve CHARMM-style atom names to names present in the NPE database.
 
@@ -569,10 +576,13 @@ class EnsembleDriver:
             The atom name to resolve.
         :param available_atoms:
             The set of atom names available in the NPE database for the given residue.
+        :param resname:
+            The normalized residue name.
         :return:
             The resolved atom name if found, or None if no match is found.
         """
         atom_name = str(atom_name)
+        resname = str(resname)
         avail = set(str(a) for a in available_atoms)
 
         # Exact match first
@@ -581,13 +591,15 @@ class EnsembleDriver:
 
         candidates: list[str] = []
 
-        # CHARMM/GROMACS TIP3 water atom names vs TIP3P database atom names
-        if atom_name == "OH2":
-            candidates.append("OW")
-        elif atom_name == "H1":
-            candidates.extend(["HW1", "HW"])
-        elif atom_name == "H2":
-            candidates.extend(["HW2", "HW"])
+        water_resnames = {"TIP3", "TIP3P", "WAT", "HOH", "SOL"}
+        if resname in water_resnames:
+            # CHARMM/GROMACS water atom names vs TIP3P database atom names
+            if atom_name == "OH2":
+                candidates.append("OW")
+            elif atom_name == "H1":
+                candidates.extend(["HW1", "HW"])
+            elif atom_name == "H2":
+                candidates.extend(["HW2", "HW"])
 
         # Backbone amide proton: CHARMM often uses HN, AMBER often uses H (varies by residue in db)
         if atom_name == "HN":
@@ -644,7 +656,10 @@ class EnsembleDriver:
         return resname
 
     @staticmethod
-    def _resolve_atom_name_for_pe_db(atom_name: str, available_atoms) -> str | None:
+    def _resolve_atom_name_for_pe_db(
+        atom_name: str, 
+        available_atoms,
+        resname: str) -> str | None:
         """
         Resolve atom names to names present in the PE database.
 
@@ -663,11 +678,14 @@ class EnsembleDriver:
             Atom name from the trajectory/topology.
         :param available_atoms:
             Atom names available in the selected PE db for the residue.
+        :param resname:
+            The normalized residue name.
         :return:
             A matching atom name in the db, or None.
         """
 
         atom_name = str(atom_name)
+        resname = str(resname)
         avail = set(str(a) for a in available_atoms)
 
         # Exact match first
@@ -676,13 +694,15 @@ class EnsembleDriver:
 
         candidates: list[str] = []
 
-        # CHARMM/GROMACS TIP3 water atom names vs SEP water atom names
-        if atom_name == "OH2":
-            candidates.append("OW")
-        elif atom_name == "H1":
-            candidates.extend(["HW1", "HW"])
-        elif atom_name == "H2":
-            candidates.extend(["HW2", "HW"])
+        water_resnames = {"TIP3", "TIP3P", "WAT", "HOH", "SOL"}
+        if resname in water_resnames:
+            # CHARMM/GROMACS water atom names vs SEP water atom names
+            if atom_name == "OH2":
+                candidates.append("OW")
+            elif atom_name == "H1":
+                candidates.extend(["HW1", "HW"])
+            elif atom_name == "H2":
+                candidates.extend(["HW2", "HW"])
 
         # Backbone amide proton name
         if atom_name == "HN":
@@ -1052,7 +1072,11 @@ class EnsembleDriver:
                         pe_atom_names, pe_resindices, pe_resnames, resn
                     )
                     for atom in pattern_atoms:
-                        resolved_atom = self._resolve_atom_name_for_pe_db(atom, pe_db[db_resn].keys())
+                        resolved_atom = self._resolve_atom_name_for_pe_db(
+                            atom, 
+                            pe_db[db_resn].keys(),
+                            db_resn,
+                        )
                         if resolved_atom is None:
                             raise KeyError(
                                 f"No PE params for {resn}/{atom}. Available: {sorted(pe_db[db_resn].keys())}"
@@ -1075,7 +1099,11 @@ class EnsembleDriver:
                         pe_atom_names, pe_resindices, pe_resnames, resn
                     )
                     for atom in pattern_atoms:
-                        resolved_atom = self._resolve_atom_name_for_pe_db(atom, pe_db[db_resn].keys())
+                        resolved_atom = self._resolve_atom_name_for_pe_db(
+                            atom, 
+                            pe_db[db_resn].keys(),
+                            db_resn,
+                        )
                         if resolved_atom is None:
                             raise KeyError(
                                 f"No PE params for {resn}/{atom}. Available: {sorted(pe_db[db_resn].keys())}"
