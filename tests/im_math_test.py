@@ -166,7 +166,6 @@ def _settings(weightfunction_type="cartesian", use_tc_weights=False):
         "exponent_q": 2,
         "confidence_radius": 0.5,
         "use_inverse_bond_length": True,
-        "use_cosine_dihedral": False,
         "use_mass_weight": False,
         "use_tc_weights": bool(use_tc_weights),
     }
@@ -309,9 +308,6 @@ def _build_current_framework_case(
 
 
 def _periodic_internal_rows(dp):
-    if getattr(dp, "use_cosine_dihedral", False):
-        return np.empty(0, dtype=np.int64)
-
     return np.asarray(
         [i for i, z_entry in enumerate(dp.z_matrix) if len(z_entry) == 4],
         dtype=np.int64,
@@ -357,14 +353,6 @@ def _evaluate_internal_values_at_xprime(dp, xprime):
     bond_rows = row_cache["bond_rows"]
     if bond_rows.size > 0 and dp.use_inverse_bond_length:
         values[bond_rows] = 1.0 / base_values[bond_rows]
-
-    if dp.use_cosine_dihedral:
-        dihedral_rows = row_cache["dihedral_rows"]
-        if dihedral_rows.size > 0:
-            phi = base_values[dihedral_rows]
-            first_mask = row_cache["dihedral_first"]
-            values[dihedral_rows[first_mask]] = np.cos(phi[first_mask])
-            values[dihedral_rows[~first_mask]] = np.sin(phi[~first_mask])
 
     return values
 

@@ -69,6 +69,15 @@ from .veloxchemlib import mpi_master, hartree_in_kcalpermol, bohr_in_angstrom
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
+    
+@dataclass(frozen=True)
+class DecoupledGroup:
+    kind: str                       # "methyl", "tert-butyl", "alkyl"
+    anchor_bond: tuple[int, int]     # zero-based core-anchor bond
+    atoms: tuple[int, ...]           # full side group atoms
+    methyl_h_groups: tuple[tuple[int, ...], ...]
+    torsion_rows: tuple[int, ...]
+    torsion_coords: tuple[tuple[int, int, int, int], ...]
 
 class IMForceFieldGenerator:
     """
@@ -271,7 +280,7 @@ class IMForceFieldGenerator:
         self.use_cos_angle = False
         self.use_tc_weights = True
         self.tc_weight_mode = "multiplicative" # "additive_rhee"
-        self.use_mass_weight = False
+        self.use_mass_weight = True
         
         self.eq_bond_length = None
         self.eq_bond_length_irc_bonds = None
@@ -299,7 +308,8 @@ class IMForceFieldGenerator:
         self.add_bias_force = None
         self.bias_force_reaction_idx = None
         self.bias_force_reaction_prop = None # this is being set by giving a dihedral, force constant and the final theta, steps_when_increased
-
+        self.consider_locality = False
+        
         # sampling settings
         self.sampling_settings = {
             'enabled':False,
@@ -404,6 +414,122 @@ class IMForceFieldGenerator:
             
         """
 
+        def graph_from_connectivity(conn):
+            g = nx.Graph()
+            n = conn.shape[0]
+            g.add_nodes_from(range(n))
+            g.add_edges_from((i, j) for i in range(n) for j in range(i + 1, n)
+                            if conn[i, j] == 1)
+            return g
+
+        def methyl_hs(g, labels, c):
+            return sorted(n for n in g.neighbors(c) if labels[n] == "H")
+
+        def heavy_neighbors(g, labels, a):
+            return sorted(n for n in g.neighbors(a) if labels[n] != "H")
+
+        def is_acyclic_sp3_carbon(ff_gen, labels, idx):
+            if labels[idx] != "C":
+                return False
+            if ff_gen.atom_info_dict[idx + 1]["CyclicStructure"] != "none":
+                return False
+            return ff_gen.atom_types[idx].strip() == "c3"
+
+        def is_alkyl_component(g, ff_gen, labels, atoms):
+            sub = g.subgraph(atoms)
+            if not nx.is_tree(sub):
+                return False
+            for a in atoms:
+                if labels[a] == "H":
+                    if len(list(g.neighbors(a))) != 1:
+                        return False
+                elif not is_acyclic_sp3_carbon(ff_gen, labels, a):
+                    return False
+            return any(labels[a] == "C" for a in atoms)
+
+        def classify_alkyl(g, labels, atoms, anchor):
+            carbons = [a for a in atoms if labels[a] == "C"]
+
+            if len(carbons) == 1 and len(methyl_hs(g, labels, anchor)) == 3:
+                return "methyl"
+
+            if len(carbons) == 4:
+                c_neighbors = [n for n in g.neighbors(anchor)
+                            if n in atoms and labels[n] == "C"]
+                if len(c_neighbors) == 3:
+                    if all(len(methyl_hs(g, labels, c)) == 3 and
+                        heavy_neighbors(g, labels, c) == [anchor]
+                        for c in c_neighbors):
+                        return "tert-butyl"
+
+            return "alkyl"
+
+        def torsion_rows_for_bond(zmat, bond):
+            dstart = len(zmat["bonds"]) + len(zmat["angles"])
+            rows, coords = [], []
+            bond_key = frozenset(bond)
+            for local_i, dih in enumerate(zmat["dihedrals"]):
+                dih = tuple(int(x) for x in dih)
+                if frozenset((dih[1], dih[2])) == bond_key:
+                    rows.append(dstart + local_i)
+                    coords.append(dih)
+            return tuple(rows), tuple(coords)
+
+        def detect_decoupled_alkyl_groups(molecule, ff_gen, zmat, core_seed_atoms=None):
+            labels = molecule.get_labels()
+            g = graph_from_connectivity(ff_gen.connectivity_matrix)
+            core_seed_atoms = set(core_seed_atoms or [])
+
+            groups = []
+            seen = set()
+
+            for a1, a2 in ff_gen.rotatable_bonds:      # stored one-based
+                i, j = a1 - 1, a2 - 1
+                if ff_gen.is_bond_in_ring(i, j):
+                    continue
+
+                cut = g.copy()
+                cut.remove_edge(i, j)
+                comps = [set(c) for c in nx.connected_components(cut)]
+                ci = next(c for c in comps if i in c)
+                cj = next(c for c in comps if j in c)
+
+                for side, other, anchor, core in ((ci, cj, i, j), (cj, ci, j, i)):
+                    if core_seed_atoms and side & core_seed_atoms:
+                        continue
+                    if core_seed_atoms and not (other & core_seed_atoms):
+                        continue
+                    if not is_alkyl_component(g, ff_gen, labels, side):
+                        continue
+
+                    key = frozenset(side)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+
+                    h_groups = []
+                    for c in side:
+                        if labels[c] == "C" and len(methyl_hs(g, labels, c)) == 3:
+                            h_groups.append(tuple(methyl_hs(g, labels, c)))
+
+                    rows, coords = torsion_rows_for_bond(zmat, (core, anchor))
+                    groups.append(DecoupledGroup(
+                        kind=classify_alkyl(g, labels, side, anchor),
+                        anchor_bond=tuple(sorted((core, anchor))),
+                        atoms=tuple(sorted(side)),
+                        methyl_h_groups=tuple(h_groups),
+                        torsion_rows=rows,
+                        torsion_coords=coords,
+                    ))
+
+            # Prefer maximal substituents; remove nested methyls inside larger alkyl groups.
+            maximal = []
+            for group in groups:
+                aset = set(group.atoms)
+                if not any(aset < set(other.atoms) for other in groups):
+                    maximal.append(group)
+            return maximal
+        
         def regroup_by_rotatable_connection(molecule, groups, rotatable_bonds, conn):
             new_groups = {'gs': [], 'es': [], 'non_rotatable': []}
             rot_groups = {'gs': [], 'es': []}
@@ -594,6 +720,8 @@ class IMForceFieldGenerator:
         ff_gen.ostream.mute()
         ff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
         ff_gen.create_topology(molecule)
+        
+        
 
         # The AtomMapper class is based on Turtlemap program which is used to
         # determine equivalent atoms within a molecular structure
@@ -638,6 +766,30 @@ class IMForceFieldGenerator:
        
                 _, z_matrix = int_driver.read_labels()
                 self.roots_z_matrix[root] = z_matrix
+            
+            decoupled = detect_decoupled_alkyl_groups(molecule, ff_gen, self.roots_z_matrix[root])
+
+            non_core_atoms = sorted({a for group in decoupled for a in group.atoms})
+            core_atoms = [i for i in range(molecule.number_of_atoms())
+                        if i not in non_core_atoms]
+
+            methyl_symmetry_groups = [
+                list(hgrp)
+                for group in decoupled
+                for hgrp in group.methyl_h_groups
+            ]
+
+            angles_to_set, periodicities, sym_dih_dict, dih_groups = (
+                self.adjust_symmetry_dihedrals(
+                    methyl_symmetry_groups,
+                    rotatable_bonds_zero_based,
+                    self.roots_z_matrix[root],
+                )
+            )
+            
+            print(core_atoms, angles_to_set, decoupled)
+            
+            exit()
             
 
             dihedral_start = len(self.roots_z_matrix[root]['bonds']) + len(self.roots_z_matrix[root]['angles'])
@@ -1207,6 +1359,7 @@ class IMForceFieldGenerator:
             im_database_driver.non_core_symmetry_groups = self.symmetry_information
             im_database_driver.platform = self.open_mm_platform
             im_database_driver.all_rot_bonds = self.all_rotatable_bonds
+            im_database_driver.consider_locality = self.consider_locality
             
             # set optimization features in the construction run
             im_database_driver.identfy_relevant_int_coordinates = (self.identfy_relevant_int_coordinates, self.use_minimized_structures[1])

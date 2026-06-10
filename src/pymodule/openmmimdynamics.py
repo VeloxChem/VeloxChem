@@ -36,11 +36,8 @@ from time import time
 from xml.dom import minidom
 import xml.etree.ElementTree as ET
 import numpy as np
-import json
-import h5py
 import sys
 from sys import stdout
-import math
 import random
 from copy import deepcopy
 
@@ -53,14 +50,6 @@ from .solvationbuilder import SolvationBuilder
 
 from .interpolationdatapoint import InterpolationDatapoint
 from .interpolationdriver import InterpolationDriver
-
-from .imrotorbuilder import (
-    RotorDefinition,
-    RotorClusterDefinition,
-    RotorClusterInformation,
-    RotorClusterStateDefinition,
-    RotorClusterAngleLibrary,
-)
 
 # from .atommapper import AtomMapper
 from .errorhandler import assert_msg_critical
@@ -144,19 +133,11 @@ class OpenMMIMDynamics:
                 ostream = OutputStream(None)
 
         self.comm = comm
-        try:
-            self._mpi_ctrl_comm = self.comm.Dup()
-        except Exception:
-            self._mpi_ctrl_comm = self.comm
 
-        try:
-            self._mpi_interp_comm = self.comm.Dup()
-        except Exception:
-            self._mpi_interp_comm = self._mpi_ctrl_comm
 
         # MPI information (based on control communicator)
-        self.rank = self._mpi_ctrl_comm.Get_rank()
-        self.nodes = self._mpi_ctrl_comm.Get_size()
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
 
         # output stream
         self.ostream = ostream
@@ -207,7 +188,7 @@ class OpenMMIMDynamics:
         self.roots_to_follow = None
         self.qm_symmetry_datapoint_dict = None
         self.qm_data_point_dict = None
-        self.qm_rotor_cluster_banks = None
+
         self.sorted_state_spec_im_labels = None
         self.root_spec_molecules = None
         self.interpolation_settings = None
@@ -229,179 +210,6 @@ class OpenMMIMDynamics:
 
         # Default value for the C-H linker distance
         self.linking_atom_distance = 1.0705 
-
-    # Loading methods
-    # # TODO: Integrate the guess with the read_pdb_file in Molecule.
-    # def load_system_PDB(self, filename):
-    #     """
-    #     Loads a system from a PDB file, extracting unique residues and their details.
-
-    #     :param filename: 
-    #         Path to the PDB file. Example: 'system.pdb'.
-    #     """
-        
-    #     pdb_path = Path(filename)
-    #     if not pdb_path.is_file():
-    #         raise FileNotFoundError(f"{filename} does not exist.")
-        
-    #     pdbstr = pdb_path.read_text()
-    #     residues = {}
-
-    #     # Formatting issues flags
-    #     label_guess_warning = False
-    #     conect_warning = True
-
-    #     self.unique_residues = []  # Initialize unique_residues earlier
-
-    #     for line in pdbstr.strip().splitlines():
-    #         # Skip the header lines
-    #         if line.startswith(('REMARK', 'HEADER', 'TITLE', 'COMPND', 'SOURCE')):
-    #             continue
-    #         # Skip the CRYST1 record it will be extracted from the System object
-    #         if line.startswith('CRYST1'):
-    #             continue
-    #         # Add the ATOM and HETATM records to the residues dictionary
-    #         if line.startswith(('ATOM', 'HETATM')):
-    #             atom_label = line[76:78].strip()
-    #             if not atom_label:
-    #                 label_guess_warning = True
-    #                 atom_name = line[12:16].strip()
-    #                 atom_label = atom_name[0]
-
-    #             residue = line[17:20].strip()
-    #             residue_number = int(line[22:26])
-    #             coordinates = [float(line[i:i+8]) for i in range(30, 54, 8)]
-
-    #             residue_identifier = (residue, residue_number)
-
-    #             if residue_identifier not in residues:
-    #                 residues[residue_identifier] = {
-    #                     'labels': [],
-    #                     'coordinates': []
-    #                 }
-                
-    #             residues[residue_identifier]['labels'].append(atom_label)
-    #             residues[residue_identifier]['coordinates'].append(coordinates)
-            
-    #         # If a line starts with TER, skip it
-    #         if line.startswith('TER'):
-    #             continue
-    #         # If any line starts with CONECT, set the conect_warning flag to False
-    #         if line.startswith('CONECT'):
-    #             conect_warning = False
-
-    #         # If a line starts with END, break the loop
-    #         if line.startswith('END'):
-    #             break
-            
-
-    #     # Overwrite the PDB file with the guessed atom labels in columns 77-78
-    #     # if the labels are missing
-    #     if label_guess_warning:
-    #         with open(filename, 'w') as f:
-    #             for line in pdbstr.strip().splitlines():
-    #                 if line.startswith(('ATOM', 'HETATM')):
-    #                     atom_name = line[12:16].strip()
-    #                     atom_label = atom_name[0]
-    #                     new_line = line[:76] + f"{atom_label:>2}" + line[78:] + '\n'
-    #                     f.write(new_line)
-    #                 else:
-    #                     f.write(line + '\n')
-    #         msg = 'Atom labels were guessed based on atom names (first character).'
-    #         msg += f'Please verify the atom labels in the {filename} PDB file.'
-    #         self.ostream.print_warning(msg)
-    #         self.ostream.flush()
-
-    #     if conect_warning:
-    #         msg = 'CONECT records not found in the PDB file.'
-    #         msg += 'The connectivity matrix will be used to determine the bonds.'
-    #         self.ostream.print_warning(msg)
-    #         self.ostream.flush()
-    #         # Create a molecule from the PDB file
-    #         molecule = Molecule.read_pdb_file(filename)
-    #         connectivity_matrix = molecule.get_connectivity_matrix()
-    #         # Determine all the bonds in the molecule
-    #         with open(filename, 'a') as f:
-    #             for i in range(connectivity_matrix.shape[0]):
-    #                 for j in range(i + 1, connectivity_matrix.shape[1]):
-    #                     if connectivity_matrix[i, j] == 1:
-    #                         # Convert indices to 1-based index for PDB format and ensure proper column alignment
-    #                         i_index = i + 1
-    #                         j_index = j + 1
-    #                         # Align to the right 
-    #                         con_string = "{:6s}{:>5d}{:>5d}".format('CONECT', i_index, j_index)
-    #                         f.write(con_string + '\n')
-
-    #     # Create VeloxChem Molecule objects for each unique residue
-
-    #     molecules = []
-    #     unq_residues = []
-
-    #     for (residue, number), data in residues.items():
-    #         coordinates_array = np.array(data['coordinates'])
-    #         mol = Molecule(data['labels'], coordinates_array, "angstrom")
-    #         molecules.append(mol)
-    #         unq_residues.append((residue, number))
-
-
-    #     # Initialize a set to track the first occurrence of each residue name
-    #     seen_residue_names = set()
-
-    #     # Lists to store the filtered residues and molecules
-    #     self.unique_residues = []
-    #     self.unique_molecules = []
-
-    #     for index, (residue_name, number) in enumerate(unq_residues):
-    #         if residue_name not in seen_residue_names:
-    #             seen_residue_names.add(residue_name)
-    #             self.unique_residues.append((residue_name, number))
-    #             self.unique_molecules.append(molecules[index])
-
-    #     # Print results
-    #     info_msg = f"Unique Residues: {self.unique_residues}, saved as molecules."
-    #     self.ostream.print_info(info_msg)
-    #     self.ostream.flush()
-    
-    # def load_system_from_files(self, system_xml, system_pdb):
-    #     """
-    #     Loads a preexisting system from an XML file and a PDB file.
-
-    #     :param system_xml: 
-    #         XML file containing the system parameters.
-    #     :param system_pdb: 
-    #         PDB file containing the system coordinates.
-    #     """
-    #     self.pdb = app.PDBFile(system_pdb)
-
-    #     with open(system_xml, 'r') as file:
-    #         self.system = mm.XmlSerializer.deserialize(file.read())
-
-    #     self.phase = 'gas'
-    #     self.qm_atoms = []
-    #     self.qm_force_index = -1  # Initialize with an invalid index
-
-    #     # Iterate over all forces in the system to find the CustomExternalForce and detect QM atoms
-    #     for i, force in enumerate(self.system.getForces()):
-    #         if isinstance(force, mm.CustomExternalForce):
-    #             self.qm_force_index = i  # Set the index of the QM force
-    #             # Assuming that the particle indices are directly stored in the force
-    #             for j in range(force.getNumParticles()):
-    #                 # Get the actual particle index (usually force index and particle index are the same)
-    #                 index, parameters = force.getParticleParameters(j)
-    #                 self.qm_atoms.append(index)
-    #             msg = f"QM Atoms detected: {self.qm_atoms}"
-    #             self.ostream.print_info(msg)
-    #             self.ostream.flush()
-    #             break
-
-    #     if self.qm_force_index == -1:
-    #         msg = "No CustomExternalForce found, no QM atoms detected."
-    #         self.ostream.print_info(msg)
-    #         self.ostream.flush()
-    #     else:
-    #         msg = f"CustomExternalForce found at index {self.qm_force_index}."
-    #         self.ostream.print_info(msg)
-    #         self.ostream.flush()
             
     # Method to generate OpenMM system from VeloxChem objects
     def create_system_from_molecule(self, 
@@ -556,221 +364,6 @@ class OpenMMIMDynamics:
         self.phase = phase
 
     # # Methods to build a custom system from a PDB file and custom XML files
-    # def create_md_system_from_files(self, 
-    #                         pdb_file, 
-    #                         xml_file,
-    #                         filename='custom'):
-    #     """
-    #     Creates a system from a PDB file containing multiple residues and custom XML files.
-        
-    #     :param system_pdb:
-    #         PDB file containing the system or a list of PDB files.
-    #     :param xml_file:
-    #         XML file containing the forcefield parameters or a list of XML files.
-    #     :param filename:
-    #         Base filename for output and intermediate files. Default is 'custom_system'.
-    #     """
-        
-    #     # Load the PDB file and format it correctly
-    #     # This method already prints the unique residues info!
-    #     self.load_system_PDB(pdb_file)
-
-    #     # Load the generated QM region topology and system PDB
-    #     self.pdb = app.PDBFile(pdb_file)
-    #     # Check if the system is periodic from the PDB file
-    #     if self.pdb.topology.getUnitCellDimensions() is not None:
-    #         periodic = True
-    #         msg = 'PBC detected from the PDB file.'
-    #         self.ostream.print_info(msg)
-    #         self.ostream.flush()
-    #     else:
-    #         periodic = False
-
-    #     # Combine XML files into a forcefield
-    #     xml_files = [xml_file] if isinstance(xml_file, str) else xml_file
-    #     msg = f'Added XML Files: {xml_files}'
-    #     self.ostream.print_info(msg)
-    #     self.ostream.flush()
-
-    #     # Combine XML files into a forcefield
-    #     forcefield = app.ForceField(*xml_files, self.parent_ff, self.water_ff)
-
-    #     # Create the system with appropriate nonbonded settings
-    #     if periodic:
-    #         nonbondedMethod = app.PME  # Particle Mesh Ewald method for periodic systems
-    #         nonbondedCutoff = self.cutoff * unit.nanometer  # Assuming self.cutoff is defined elsewhere appropriately
-    #         constraints = app.HBonds
-    #     else:
-    #         nonbondedMethod = app.NoCutoff  # No cutoff for non-periodic systems
-    #         nonbondedCutoff = None
-    #         constraints = app.HBonds
-
-    #     # Check if nonbondedCutoff is defined before using it in createSystem
-    #     system_arguments = {
-    #         'nonbondedMethod': nonbondedMethod,
-    #         'constraints': constraints
-    #     }   
-        
-    #     if nonbondedCutoff is not None:
-    #         system_arguments['nonbondedCutoff'] = nonbondedCutoff
-
-    #     self.system = forcefield.createSystem(self.pdb.topology, 
-    #                                           **system_arguments)
-
-    #     # Save system to XML and PDB for inspection and reuse
-    #     with open(f'{filename}_system.xml', 'w') as f:
-    #         f.write(mm.XmlSerializer.serialize(self.system))
-    #         msg = f'System parameters written to {filename}_system.xml'
-    #         self.ostream.print_info(msg)
-    #         self.ostream.flush()
-
-    #     with open(f'{filename}_system.pdb', 'w') as pdb_file:
-    #         app.PDBFile.writeFile(self.pdb.topology, 
-    #                               self.pdb.positions, 
-    #                               pdb_file)
-    #         msg = f'System coordinates written to {filename}_system.pdb'
-    #         self.ostream.print_info(msg)
-    #         self.ostream.flush()
-
-    #     self.phase = 'gas'
-
-    # def create_qmmm_system_from_files(self, 
-    #                         pdb_file, 
-    #                         xml_file, 
-    #                         qm_residue, 
-    #                         ff_gen_qm=None, 
-    #                         qm_atoms='all', 
-    #                         filename='custom'):
-    #     """
-    #     Builds a QM/MM system from a PDB file containing multiple residues and custom XML files.
-        
-    #     :param pdb_file: 
-    #         PDB file containing the system.
-    #     :param xml_file: 
-    #         XML file containing the forcefield parameters. Can be a list of XML files.
-    #     :param qm_residue: 
-    #         Tuple containing the name and number of the QM residue. (e.g. ('MOL', 1))
-    #     :param ff_gen_qm: 
-    #         Optional custom forcefield generator for the QM region. If None, a new one will be created.
-    #     :param qm_atoms:
-    #         Options: 'all' or a list of atom indices for QM region.
-    #     :param filename: 
-    #         Base filename for output and intermediate files.
-    #     """
-
-    #     # Load the PDB file and format it correctly
-    #     self.load_system_PDB(pdb_file)
-
-    #     # Extracting the residue name and number for clarity and correct usage
-    #     qm_residue_name, qm_residue_number = qm_residue
-    #     qm_residue_index = self.unique_residues.index((qm_residue_name, qm_residue_number))
-    #     msg = f'QM Residue: {qm_residue_name}'
-    #     self.ostream.print_info(msg)
-    #     self.ostream.flush()
-
-    #     qm_molecule = self.unique_molecules[qm_residue_index]
-
-    #     # Generate or use an existing forcefield generator for the QM region
-    #     if ff_gen_qm is None:
-    #         ff_gen_qm = MMForceFieldGenerator()
-    #         ff_gen_qm.create_topology(qm_molecule)
-
-    #     # Determine qm_atoms based on the QM residue
-    #     if qm_atoms == 'all':
-    #         msg = 'Full molecule as QM region'
-    #         self.ostream.print_info(msg)
-    #         qm_atoms = list(range(qm_molecule.number_of_atoms()))
-    #         self._create_QM_residue(ff_gen_qm,
-    #                     qm_atoms, 
-    #                     filename=filename, 
-    #                     residue_name=qm_residue_name)
-    #     elif isinstance(qm_atoms, list):
-    #         if qm_atoms == list(range(qm_molecule.number_of_atoms())): 
-    #             msg = 'Full molecule as QM region'
-    #             self.ostream.print_info(msg)
-    #             self._create_QM_residue(ff_gen_qm,
-    #                     qm_atoms, 
-    #                     filename=filename, 
-    #                     residue_name=qm_residue_name)
-    #         msg = 'QM/MM partition inside the molecule'
-    #         self.ostream.print_info(msg)
-    #         qm_atoms = qm_atoms
-    #         self._create_QM_subregion(ff_gen_qm,
-    #                                   qm_atoms, 
-    #                                   qm_molecule, 
-    #                                   filename,
-    #                                   residue_name=qm_residue_name)
-    #     else:
-    #         raise ValueError('Invalid value for qm_atoms. Please use "all" or a list of atom indices.')
-
-    #     # Load the generated QM region topology and system PDB
-    #     self.pdb = app.PDBFile(pdb_file)
-
-    #     # Check if the system is periodic from the PDB file
-    #     if self.pdb.topology.getUnitCellDimensions() is not None:
-    #         periodic = True
-    #         msg = 'PBC detected from the PDB file.'
-    #         self.ostream.print_info(msg)
-    #         self.ostream.flush()
-
-    #     # Get self.positions from the topology
-    #     self.positions = self.pdb.positions
-
-    #     # Combine XML files into a forcefield
-    #     xml_files = [f'{filename}.xml'] + ([xml_file] if isinstance(xml_file, str) else xml_file)
-    #     msg = f'Added XML Files: {xml_files}'
-    #     self.ostream.print_info(msg)
-    #     self.ostream.flush()
-
-    #     # Combine XML files into a forcefield
-    #     forcefield = app.ForceField(*xml_files)
-
-    #     # Create the system with appropriate nonbonded settings
-    #     if periodic:
-    #         nonbondedMethod = app.PME  # Particle Mesh Ewald method for periodic systems
-    #         nonbondedCutoff = self.cutoff * unit.nanometer  # Assuming self.cutoff is defined elsewhere appropriately
-    #         constraints = app.HBonds
-    #     else:
-    #         nonbondedMethod = app.NoCutoff  # No cutoff for non-periodic systems
-    #         nonbondedCutoff = None
-    #         constraints = app.HBonds
-
-    #     # Check if nonbondedCutoff is defined before using it in createSystem
-    #     system_arguments = {
-    #         'nonbondedMethod': nonbondedMethod,
-    #         'constraints': constraints
-    #     }   
-
-    #     if nonbondedCutoff is not None:
-    #         system_arguments['nonbondedCutoff'] = nonbondedCutoff
-
-    #     self.system = forcefield.createSystem(self.pdb.topology, **system_arguments)
-
-    #     # Set QM atoms based on the QM residue
-    #     #self.qm_atoms = [atom.index for atom in self.pdb.topology.atoms() if (atom.residue.name == qm_residue_name and atom.residue.id == str(qm_residue_number))]
-    #     self.qm_atoms = qm_atoms
-
-    #     # Setting QM/MM system
-    #     self.set_qm_mm_system('periodic' if periodic else 'gas', ff_gen_qm)
-
-    #     # Adding the stabilizer force to the QM region
-    #     # self.qm_stabilizer(ff_gen_qm)
-
-    #     # Save system to XML and PDB for inspection and reuse
-    #     with open(f'{filename}_system.xml', 'w') as f:
-    #         f.write(mm.XmlSerializer.serialize(self.system))
-    #         msg = f'System parameters written to {filename}_system.xml'
-    #         self.ostream.print_info(msg)
-    #         self.ostream.flush()
-
-    #     with open(f'{filename}_system.pdb', 'w') as pdb_file:
-    #         app.PDBFile.writeFile(self.pdb.topology, self.pdb.positions, pdb_file)
-    #         msg = f'System coordinates written to {filename}_system.pdb'
-    #         self.ostream.print_info(msg)
-    #         self.ostream.flush()
-
-    #     # Correct phase setting
-    #     self.phase = 'gas'
     
     def _reload_interpolation_root_from_hdf5(self, root, inv_sqrt_masses):
         driver_object = self.im_drivers[root]
@@ -781,168 +374,24 @@ class OpenMMIMDynamics:
         self.qm_symmetry_datapoint_dict[root] = {}
         self.sorted_state_spec_im_labels[root] = []
 
-        old_label = None
-
         for label in im_labels:
             qm_data_point = InterpolationDatapoint(self.roots_z_matrix[root])
             qm_data_point.update_settings(self.interpolation_settings[root])
             qm_data_point.read_hdf5(self.interpolation_settings[root]['imforcefield_file'], label)
             qm_data_point.inv_sqrt_masses = inv_sqrt_masses
-            
-            if qm_data_point.bank_role == "core" or "cluster" not in qm_data_point.point_label and "symmetry" not in qm_data_point.point_label:
+
+            self.qm_data_point_dict[root].append(qm_data_point)
+            self.sorted_state_spec_im_labels[root].append(label)
 
 
-                self.qm_data_point_dict[root].append(qm_data_point)
-                self.sorted_state_spec_im_labels[root].append(label)
-
-                old_label = qm_data_point.point_label
-                self.qm_symmetry_datapoint_dict[root][old_label] = [qm_data_point]
-            elif qm_data_point.bank_role == "symmetry":
-
-                self.qm_symmetry_datapoint_dict[root][old_label].append(qm_data_point)
-
-        driver_object.qm_symmetry_data_points = self.qm_symmetry_datapoint_dict[root]
         driver_object.qm_data_points = self.qm_data_point_dict[root]
         driver_object.labels = self.sorted_state_spec_im_labels[root]
-        
-        print(len(self.qm_data_point_dict[root]), driver_object.impes_coordinate.eq_bond_lengths, self.qm_data_point_dict[root][0].eq_bond_lengths)
+
         if len(self.qm_data_point_dict[root]) > 0:
             driver_object.impes_coordinate.eq_bond_lengths = self.qm_data_point_dict[root][0].eq_bond_lengths
 
         driver_object.mark_runtime_data_cache_dirty()
-        driver_object.prepare_runtime_data_cache(force=True)
 
-    def _load_rotor_cluster_bank_for_root(self, root):
-        out = {}
-        imff_file = self.interpolation_settings[root]["imforcefield_file"]
-        families = self._list_rotor_cluster_families_from_registry(root)
-
-        for family in families:
-            cluster_info, angle_library, point_index = self._read_cluster_registry_for_family(
-                imff_file, root, family
-            )
-            fam = {
-                "cluster_info": cluster_info,
-                "cluster_angle_library": angle_library,
-                "point_index": point_index,
-                "core": None,
-                "clusters": {
-                    cid: {
-                        "cluster_type": cluster.cluster_type,
-                        "rotor_ids": tuple(cluster.rotor_ids),
-                        "expected_states": {state.state_id: None for state in angle_library.state_banks[cid]},
-                    }
-                    for cid, cluster in cluster_info.clusters.items()
-                },
-            }
-
-            core_dp = InterpolationDatapoint(self.roots_z_matrix[root])
-            core_dp.update_settings(self.interpolation_settings[root])
-            core_dp.read_hdf5(imff_file, point_index["core_label"])
-            fam["core"] = core_dp
-
-            for cid, state_map in point_index["cluster_state_labels"].items():
-                for sid, label in state_map.items():
-                    dp = InterpolationDatapoint(self.roots_z_matrix[root])
-                    dp.update_settings(self.interpolation_settings[root])
-                    dp.read_hdf5(imff_file, label)
-                    fam["clusters"][cid]["expected_states"][sid] = dp
-
-            for cid, cbank in fam["clusters"].items():
-                expected = cbank["expected_states"]
-                if 0 in expected and expected[0] is None:
-                    expected[0] = fam["core"]
-
-            out[family] = fam
-        return out
-    
-    def _list_rotor_cluster_families_from_registry(self, root):
-        imff_file = self.interpolation_settings[root]["imforcefield_file"]
-        prefix = f"rotor_cluster_registry/root_{root}"
-        with h5py.File(imff_file, "r") as h5f:
-            if prefix not in h5f:
-                return []
-            return sorted(name.replace("family_", "", 1) for name in h5f[prefix].keys())
-
-
-    def _read_cluster_registry_for_family(self, imff_file, root, family_label):
-        def _read_scalar_string(ds):
-            val = ds[()]
-            return val.decode("utf-8") if isinstance(val, bytes) else str(val)
-
-        with h5py.File(imff_file, "r") as h5f:
-            prefix = f"rotor_cluster_registry/root_{root}/family_{family_label}"
-            info_json = _read_scalar_string(h5f[prefix + "/cluster_info_json"])
-            library_json = _read_scalar_string(h5f[prefix + "/cluster_angle_library_json"])
-            index_json = _read_scalar_string(h5f[prefix + "/point_index_json"])
-
-        info_payload = json.loads(info_json)
-        library_payload = json.loads(library_json)
-        index_payload = json.loads(index_json)
-        
-        rotor_to_cluster_map = {
-            int(rid): int(cid) for rid, cid in info_payload["rotor_to_cluster"].items()
-        }
-        cluster_info = RotorClusterInformation(
-            dihedral_start=int(info_payload["dihedral_start"]),
-            dihedral_end=int(info_payload["dihedral_end"]),
-            rotor_to_cluster=rotor_to_cluster_map,
-        )
-        for rotor_id, rotor_data in info_payload["rotors"].items():
-            cluster_info.rotors[int(rotor_id)] = RotorDefinition(
-                rotor_id=int(rotor_id),
-                center=tuple(rotor_data["center"]),
-                torsion_rows=tuple(rotor_data["torsion_rows"]),
-                torsion_coords=tuple(tuple(x) for x in rotor_data["torsion_coords"]),
-                symmetry_order=int(rotor_data["symmetry_order"]),
-                atom_group=tuple(rotor_data["atom_group"]),
-            )
-        for cid, cdata in info_payload["clusters"].items():
-            cluster_info.clusters[int(cid)] = RotorClusterDefinition(
-                cluster_id=int(cid),
-                rotor_ids=tuple(cdata["rotor_ids"]),
-                cluster_type=cdata["cluster_type"],
-                torsion_rows=tuple(cdata["torsion_rows"]),
-            )
-
-        angle_library = RotorClusterAngleLibrary()
-        for cid, state_list in library_payload.items():
-            bank = []
-            for state in state_list:
-                aa = {}
-                for key, val in state["angle_assignment"].items():
-                    aa[tuple(int(x) for x in key.split(","))] = float(val)
-                bank.append(
-                    RotorClusterStateDefinition(
-                        cluster_id=int(cid),
-                        state_id=int(state["state_id"]),
-                        cluster_type=state["cluster_type"],
-                        rotor_ids=tuple(state["rotor_ids"]),
-                        angle_assignment=aa,
-                        dihedrals_to_rotate=(
-                            None
-                            if state["dihedrals_to_rotate"] is None
-                            else tuple(tuple(int(x) for x in row) for row in state["dihedrals_to_rotate"])
-                        ),
-                        phase_signature=(
-                            None if state["phase_signature"] is None
-                            else np.asarray(state["phase_signature"], dtype=np.float64)
-                        ),
-                        is_anchor=bool(state.get("is_anchor", False)),
-                        label_suffix=str(state.get("label_suffix", "")),
-                    )
-                )
-            angle_library.state_banks[int(cid)] = tuple(bank)
-
-        point_index = {
-            "family_label": index_payload["family_label"],
-            "core_label": index_payload["core_label"],
-            "cluster_state_labels": {
-                int(cid): {int(sid): lbl for sid, lbl in smap.items()}
-                for cid, smap in index_payload["cluster_state_labels"].items()
-            },
-        }
-        return cluster_info, angle_library, point_index
 
     def run_immm(self, 
                  roots_to_follow=[0],
@@ -1009,7 +458,6 @@ class OpenMMIMDynamics:
         self.qm_data_point_dict = {root: [] for root in self.roots_to_follow}
         self.sorted_state_spec_im_labels = {root: [] for root in self.roots_to_follow}
         self.root_spec_molecules = {root: [] for root in self.roots_to_follow}
-        self.qm_rotor_cluster_banks = {root: {} for root in self.roots_to_follow}
         self.im_drivers = {root: None for root in self.roots_to_follow}
         self.interpolation_settings = interpolation_settings_dict
         masses = self.molecule.get_masses().copy()
@@ -1032,14 +480,7 @@ class OpenMMIMDynamics:
            
             self.im_drivers[root] = driver_object
             self._reload_interpolation_root_from_hdf5(root, inv_sqrt_masses)
-            self.qm_rotor_cluster_banks[root] = self._load_rotor_cluster_bank_for_root(root)
-            driver_object.qm_rotor_cluster_banks = self.qm_rotor_cluster_banks[root]
-            if driver_object.qm_rotor_cluster_banks:
-                first_family = next(iter(driver_object.qm_rotor_cluster_banks.values()))
-                driver_object.rotor_cluster_information = first_family.get("cluster_info")
-            else:
-                driver_object.rotor_cluster_information = None
-            print('In set up', driver_object.rotor_cluster_information)
+
             # Set the object as an attribute of the instance
             setattr(self, attribute_name, driver_object)
             # Append the object to the list
@@ -1110,26 +551,6 @@ class OpenMMIMDynamics:
         self.step = 0
         for step in range(nsteps):
 
-            # if self._mpi_is_active() and self.mpi_root_worker_mode and self._mpi_is_root():
-            # qm_positions_nm = np.array([
-            #     p.value_in_unit(unit.nanometer)
-            #     for p in self.simulation.context.getState(getPositions=True).getPositions()
-            # ])[self.qm_atoms]
-
-                # sync_roots = sorted(self._mpi_pending_sync_roots)
-                # self._mpi_pending_sync_roots.clear()
-
-                # if self.mpi_reload_from_hdf5 and len(sync_roots) > 0:
-                #     for root_sync in sync_roots:
-                #         self._reload_interpolation_root_from_hdf5(root_sync, self.inv_sqrt_masses)
-
-                # self._mpi_bcast_control({
-                #     'cmd': self._MPI_CMD_STEP,
-                #     'step_idx': int(step),
-                #     'qm_positions_nm': np.asarray(qm_positions_nm, dtype=np.float64),
-                #     'sync_roots': sync_roots,
-                # })
-
             self.update_forces(self.simulation.context)
             observables = self._collect_step_observables_optimized(
                     self.simulation.context,
@@ -1140,54 +561,6 @@ class OpenMMIMDynamics:
             self._print_run_qmmm_step(step, timestep, observables, save_freq)
             # Potential energies
             # QM region
-            # qm = self.get_qm_potential_energy()
-            # self.qm_potentials.append(qm)
-
-            # # QM/MM interactions
-            # qm_mm = self.simulation.context.getState(getEnergy=True, groups={1,2}).getPotentialEnergy()
-            # self.qm_mm_interaction_energies.append(qm_mm.value_in_unit(unit.kilojoules_per_mole))
-
-            # # MM region 
-            # mm = self.simulation.context.getState(getEnergy=True, groups={3,4,5,6,7}).getPotentialEnergy()
-            # self.mm_potentials.append(mm.value_in_unit(unit.kilojoules_per_mole))
-
-            # # Total potential energy
-            # pot = qm * unit.kilojoules_per_mole + qm_mm + mm
-            # self.total_potentials.append(pot.value_in_unit(unit.kilojoules_per_mole))
-
-            # # Kinetic energyex
-            
-            # kinetic = self.simulation.context.getState(getEnergy=True).getKineticEnergy()
-            # self.kinetic_energies.append(kinetic.value_in_unit(unit.kilojoules_per_mole))
-
-            # # Temperature
-            # dof = self.system.getNumParticles() * 3 - self.system.getNumConstraints()
-            # if hasattr(self.integrator, 'computeSystemTemperature'):
-            #     temp = self.integrator.computeSystemTemperature().value_in_unit(unit.kelvin)
-            # else:
-            #     temp = (2 * kinetic / (dof * unit.MOLAR_GAS_CONSTANT_R)).value_in_unit(unit.kelvin)
-            # self.temperatures.append(temp)
-
-            # # Total energy
-            # total = pot + kinetic
-            # self.total_energies.append(total.value_in_unit(unit.kilojoules_per_mole))
-
-
-            # # Information output
-            # if step % save_freq == 0:
-                
-            #     print(f"Step: {step} / {nsteps} Time: {round((step * timestep) / 1000, 2)} ps")
-            #     print('Potential Energy QM region:', qm, 'kJ/mol')
-            #     print('Potential Energy MM region:', mm)
-            #     print('QM/MM Interaction Energy:', qm_mm)
-            #     print('Total Potential Energy:', pot)
-            #     print('Kinetic Energy:', kinetic)
-            #     print('Temperature:', temp, 'K')
-            #     print('Total Energy:', total)
-            #     print('Current State (PES):', self.current_state)  
-            #     print('-' * 60)   
-
-            #     self.dynamic_molecules.append(self.current_molecule)    
 
             self.simulation.step(1)
             self.step += 1
@@ -2141,71 +1514,7 @@ class OpenMMIMDynamics:
         potential_energy = self.im_drivers[self.current_state].get_energy() * hartree_in_kjpermol()
 
         return potential_energy
-    
-    def _calculate_rmsd(self, coord1, coord2):
-        """
-        Calculate the root mean square deviation (RMSD) between two sets of atomic coordinates
-        after optimal alignment using the Kabsch algorithm. This method accounts for rotational
-        and translational differences between the molecular conformations.
 
-        :param coord1: 
-            The coordinates of the first molecule.
-        :param coord2:
-            The coordinates of the second molecule.
-
-
-        :return:
-        - rmsd_value: float
-            The RMSD between the two aligned molecules.
-        """
-
-        # Center the coordinates to eliminate translational differences
-        centroid1 = np.mean(coord1, axis=0)  
-        centroid2 = np.mean(coord2, axis=0) 
-        coord1_centered = coord1 - centroid1
-        coord2_centered = coord2 - centroid2
-
-        # The covariance matrix captures how the centered coordinates of the two molecules relate
-        covariance_matrix = np.dot(coord1_centered.T, coord2_centered)
-        
-        # Perform Singular Value Decomposition (SVD) on the covariance matrix
-        V, S, Wt = np.linalg.svd(covariance_matrix)
-
-        # Correct for improper rotation (reflection)
-        # Calculate the determinant of the rotation matrix to check for reflection
-        # A determinant of -1 indicates a reflection, which we need to correct
-        d = np.sign(np.linalg.det(np.dot(V, Wt)))
-
-        # If the determinant is negative, adjust the matrices to ensure a proper rotation
-        if d < 0:
-            # Reflect the last column of V and invert the last singular value
-            V[:, -1] *= -1
-            S[-1] *= -1
-
-        # Compute the optimal rotation matrix
-        # Multiply V and Wt to get the rotation matrix that best aligns coord1 to coord2
-        rotation_matrix = np.dot(V, Wt)
-
-        # Apply the rotation to the centered coordinates of the first molecule
-        # Rotate coord1_centered using the rotation matrix
-        coord1_rotated = np.dot(coord1_centered, rotation_matrix)
-
-        #Calculate the RMSD between the rotated coordinates and the centered coordinates of the second molecule
-        diff = coord1_rotated - coord2_centered
-
-        # Square the differences
-        diff_squared = diff ** 2
-
-        # Sum the squared differences over all atoms and coordinate axes (x, y, z)
-        sum_diff_squared = np.sum(diff_squared)
-
-        # Calculate the mean squared deviation
-        mean_diff_squared = sum_diff_squared / len(coord1)
-
-        # Take the square root of the mean squared deviation to obtain the RMSD
-        rmsd_value = np.sqrt(mean_diff_squared)
-
-        return rmsd_value
 
     def database_extracter(self, datafile, mol_labels):
         """Extracts molecular structures from a given database file.
@@ -2555,8 +1864,6 @@ class OpenMMIMDynamics:
             # and remove all symmetry-related rotatable bonds from the scan list.
             rotatable_bonds_zero_based = [tuple(sorted((i - 1, j - 1))) for (i, j) in rotatable_bonds]
 
-            self.roots_z_matrix[root] = _promote_nonrotatable_ring_torsions_to_impropers(self.roots_z_matrix[root], ff_gen, rotatable_bonds_zero_based)
-
             dihedral_start = len(self.roots_z_matrix[root]['bonds']) + len(self.roots_z_matrix[root]['angles'])
             dihedral_end = dihedral_start + len(self.roots_z_matrix[root]['dihedrals'])
 
@@ -2596,7 +1903,7 @@ class OpenMMIMDynamics:
             if root >= 2 and len(self.symmetry_information['es']) == 0 and self.drivers['es']:
                 non_core_atoms = [element for group in regrouped['es'] for element in group]
                 core_atoms = [element for element in symmetry_groups[0] if element not in non_core_atoms]
-                print(rot_groups['es'], rotatable_bonds_zero_based)
+
                 angles_to_set, _, _, self.symmetry_dihedral_lists, dih_list = self._adjust_symmetry_dihedrals(molecule, rot_groups['es'], rotatable_bonds_zero_based,  self.roots_z_matrix[root])
                 dihedrals_to_set = {key: [] for key in angles_to_set.keys()}
                 indices_list = []
@@ -2639,26 +1946,6 @@ class OpenMMIMDynamics:
 
         return z_matrix
         
-    def perform_symmetry_assignment(self, atom_map, sym_group, reference_group, datapoint_group):
-        """ Performs the atom mapping. """
-        from scipy.optimize import linear_sum_assignment
-        new_map = np.array(atom_map.copy())
-        mapping_dict = {}
-        # cost = self.get_dihedral_cost(atom_map, sym_group, non_group_atoms)
-        cost = np.linalg.norm(datapoint_group[:, np.newaxis, :] - reference_group[np.newaxis, :, :], axis=2)
-        row, col = linear_sum_assignment(cost)
-        assigned = False
-        if not np.equal(row, col).all():
-            assigned = True
-            
-            # atom_maps = self.linear_assignment_solver(cost)
-
-            reordred_arr = np.array(sym_group)[col]
-            new_map[sym_group] = new_map[reordred_arr]
-
-            mapping_dict = {org: new for org, new in zip(np.array(sym_group), reordred_arr)}
-        
-        return mapping_dict
 
     def _adjust_symmetry_dihedrals(self, molecule, symmetry_groups, rot_bonds, z_matrix):
         

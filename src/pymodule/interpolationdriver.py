@@ -2708,7 +2708,7 @@ class InterpolationDriver():
 
         delta_g_err = g_qm - g_model
         abs_err = np.abs(delta_g_err)
-        scaled_abs_err = coord_scales * abs_err
+        scaled_abs_err = abs_err
 
         source_indices = np.arange(N, dtype=np.int64)
         if isinstance(max_sources, int) and 0 < max_sources < N:
@@ -2732,7 +2732,7 @@ class InterpolationDriver():
             )
 
             err_wo_j = np.abs(g_qm - g_model_wo_j)
-            scaled_err_wo_j = coord_scales * err_wo_j
+            scaled_err_wo_j =  err_wo_j
 
             blame_matrix[:, j] = scaled_abs_err - scaled_err_wo_j
 
@@ -2747,7 +2747,7 @@ class InterpolationDriver():
         pair_score = harmful_matrix + harmful_matrix.T
         np.fill_diagonal(pair_score, 0.0)
 
-        rho = scaled_abs_err / (coord_scales * np.abs(g_model) + eps)
+        rho = scaled_abs_err / (np.abs(g_model) + eps)
 
         rows = []
         for idx, (coord, kind) in enumerate(zip(coords_flat, kinds_flat)):
