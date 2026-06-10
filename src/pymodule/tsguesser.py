@@ -134,8 +134,7 @@ class TransitionStateGuesser():
         self._conformer_phi_product: float | None = None
 
         # Implicit solvation during conformational sampling.
-        # Set implicit_solvent_model to one of 'gbn', 'gbn2', 'obc1', 'obc2',
-        # 'hct' to enable GB solvation; None runs in vacuum (default).
+        # Set implicit_solvent_model to one of 'gbn', 'gbn2', 'obc1', 'obc2', 'hct' to enable GB solvation; None runs in vacuum (default).
         self.implicit_solvent_model: str | None = None
         self.solute_dielectric: float = 1.0
         self.solvent_dielectric: float = 78.39
@@ -188,8 +187,7 @@ class TransitionStateGuesser():
         """
         self.results = {}
         # Build forcefields and systems
-        if self.implicit_solvent_model is not None:
-            self.ffbuilder.calculate_resp = True
+        self.ffbuilder.calculate_resp = self.implicit_solvent_model is not None
         self.build_forcefields(reactant, product, **build_forcefields_kwargs)
         self.build_systems(constraints)
 
@@ -257,6 +255,11 @@ class TransitionStateGuesser():
         return self.results
 
     def build_systems(self, constraints=None):
+
+        self.lambda_vector = [round(l, 3) for l in self.lambda_vector]
+        self.ostream.print_info(
+            f"Rounding lambda vector to 3 decimal places: {self.lambda_vector}")
+
         sysbuilder = EvbSystemBuilder()
         if self.mute_ff_build:
             sysbuilder.ostream.mute()
