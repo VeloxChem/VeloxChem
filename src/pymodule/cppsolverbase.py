@@ -502,22 +502,19 @@ class ComplexResponseSolverBase(LinearSolver):
         elif x_unit.lower() == 'nm':
             spectrum['x_label'] = 'Wavelength [nm]'
 
-        molecular_mass_amu = rsp_results.get('molecular_mass_amu', None)
-        convert_to_specific_rotation = (
-            molecular_mass_amu is not None and molecular_mass_amu > 0.0)
+        assert_msg_critical(
+            'molecular_mass_amu' in rsp_results,
+            f'{type(self).__name__}.plot: Cannot find molecular_mass_amu in rsp_results')
+        molecular_mass_amu = rsp_results['molecular_mass_amu']
 
-        if convert_to_specific_rotation:
-            spectrum['y_label'] = r'Optical rotatory dispersion [10$^3$ deg dm$^{-1}$ (g cm$^{-3}$)$^{-1}$]'
-            molecular_weight = float(molecular_mass_amu)
-            au2wn = hartree_in_wavenumber()
-            # Rosenfeld-style specific rotation relation for beta(w) in a.u.:
-            # [alpha] = (28800 * pi^2 * N_A * a0^4) * nu_bar^2 * beta(w) / M,
-            # with a0 expressed in cm and M in g/mol.
-            alpha_prefactor = (28800.0 * math.pi**2 * avogadro_constant() *
-                               (bohr_in_angstrom() * 1.0e-8)**4)
-        else:
-            spectrum['y_label'] = 'Optical rotation parameter '
-            spectrum['y_label'] += r'$\beta(\omega)$ [a.u.]'
+        spectrum['y_label'] = r'Optical rotatory dispersion [10$^3$ deg dm$^{-1}$ (g cm$^{-3}$)$^{-1}$]'
+        molecular_weight = float(molecular_mass_amu)
+        au2wn = hartree_in_wavenumber()
+        # Rosenfeld-style specific rotation relation for beta(w) in a.u.:
+        # [alpha] = (28800 * pi^2 * N_A * a0^4) * nu_bar^2 * beta(w) / M,
+        # with a0 expressed in cm and M in g/mol.
+        alpha_prefactor = (28800.0 * math.pi**2 * avogadro_constant() *
+                           (bohr_in_angstrom() * 1.0e-8)**4)
 
         freqs = rsp_results['frequencies']
         rsp_funcs = rsp_results['response_functions']
@@ -539,14 +536,11 @@ class ComplexResponseSolverBase(LinearSolver):
 
             beta = (Gxx + Gyy + Gzz) / (3.0 * w)
 
-            if convert_to_specific_rotation:
-                nu_bar = au2wn * w
-                specific_rotation = alpha_prefactor * (nu_bar**2) * beta
-                specific_rotation /= molecular_weight
-                # Report in units of 10^3 deg dm^-1 (g cm^-3)^-1.
-                spectrum['y_data'].append(specific_rotation / 1000.0)
-            else:
-                spectrum['y_data'].append(beta)
+            nu_bar = au2wn * w
+            specific_rotation = alpha_prefactor * (nu_bar**2) * beta
+            specific_rotation /= molecular_weight
+            # Report in units of 10^3 deg dm^-1 (g cm^-3)^-1.
+            spectrum['y_data'].append(specific_rotation / 1000.0)
 
         return spectrum
 
@@ -830,10 +824,18 @@ class ComplexResponseSolverBase(LinearSolver):
             ostream.print_blank()
             return
 
-        y_label = spectrum.get('y_label', 'ORD[10^3 deg dm^-1 (g cm^-3)^-1]')
-        title = '{:<20s}{:<20s}{:>28s}'.format(
-            'Frequency[a.u.]', 'Frequency[eV]', y_label
+        assert_msg_critical(
+            '[a.u.]' in spectrum['x_label'],
+            f'{type(self).__name__}._print_ord_results: In valid unit in x_label'
         )
+        assert_msg_critical(
+            r'[10$^3$ deg dm$^{-1}$ (g cm$^{-3}$)$^{-1}$]' in spectrum['y_label'],
+            f'{type(self).__name__}._print_ord_results: In valid unit in y_label'
+        )
+
+        title = '{:<20s}{:<20s}{:>28s}'.format('Frequency[a.u.]',
+                                               'Frequency[eV]',
+                                               'ORD[10^3 deg dm^-1 (g cm^-3)^-1]')
         ostream.print_header(title.ljust(width))
         ostream.print_header(('-' * len(title)).ljust(width))
 
