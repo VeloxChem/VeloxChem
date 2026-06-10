@@ -22,6 +22,7 @@ class TestRespCharges:
         task.input_dict['scf']['checkpoint_file'] = None
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.filename = task.input_dict['filename']
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
         scf_results = scf_drv.compute(task.molecule, task.ao_basis)
@@ -40,9 +41,8 @@ class TestRespCharges:
 
         if task.mpi_rank == mpi_master():
             assert np.max(np.abs(q_fit - ref_charges)) < 1.0e-5
-            np.testing.assert_allclose(scf_results['charges_resp'], q_fit)
             np.testing.assert_allclose(
-                read_results(f'{chg_drv.filename}.h5', 'scf')['charges_resp'],
+                read_results(f'{chg_drv.filename}.h5', 'resp')['resp_charges'],
                 q_fit)
 
             pdb_file = Path(chg_drv.filename).with_suffix('.pdb')
@@ -101,8 +101,8 @@ class TestRespCharges:
         q_fit = chg_drv.compute(task.molecule, task.ao_basis, None, 'resp')
 
         if task.mpi_rank == mpi_master():
-            scf_h5_results = read_results(f'{chg_drv.filename}.h5', 'scf')
-            np.testing.assert_allclose(scf_h5_results['charges_resp'], q_fit)
+            resp_h5_results = read_results(f'{chg_drv.filename}.h5', 'resp')
+            np.testing.assert_allclose(resp_h5_results['resp_charges'], q_fit)
 
             final_h5_file = Path(chg_drv.filename).with_suffix('.h5')
             if final_h5_file.is_file():

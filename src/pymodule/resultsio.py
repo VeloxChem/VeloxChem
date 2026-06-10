@@ -42,8 +42,8 @@ from .molecularbasis import MolecularBasis
 
 _ATOMIC_PROPERTY_DESCRIPTIONS = {
     'nuclear_charges': 'Nuclear Charges',
-    ('scf', 'charges_esp'): 'ESP Charges',
-    ('scf', 'charges_resp'): 'RESP Charges',
+    ('esp', 'esp_charges'): 'ESP Charges',
+    ('resp', 'resp_charges'): 'RESP Charges',
 }
 
 
