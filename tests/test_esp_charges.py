@@ -5,6 +5,7 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.espchargesdriver import EspChargesDriver
+from veloxchem.resultsio import read_results
 
 
 class TestEspCharges:
@@ -15,6 +16,7 @@ class TestEspCharges:
         task.input_dict['scf']['checkpoint_file'] = None
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.filename = task.input_dict['filename']
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
         scf_results = scf_drv.compute(task.molecule, task.ao_basis)
@@ -32,6 +34,9 @@ class TestEspCharges:
 
         if task.mpi_rank == mpi_master():
             assert np.max(np.abs(q_fit - ref_charges)) < 1.0e-5
+            np.testing.assert_allclose(
+                read_results(f'{chg_drv.filename}.h5', 'esp')['esp_charges'],
+                q_fit)
 
             pdb_file = Path(chg_drv.filename).with_suffix('.pdb')
             if pdb_file.is_file():
@@ -88,3 +93,29 @@ class TestEspCharges:
         chg_dict = {'number_layers': 4, 'fitting_points': esp_fitting_points}
 
         self.run_esp(inpfile, ref_esp_charges, chg_dict)
+
+    def test_esp_writes_h5_without_input_scf_results(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'data' / 'water_esp.inp')
+
+        task = MpiTask([inpfile, None])
+        chg_dict = dict(task.input_dict.get('esp_charges', {}))
+        chg_dict['filename'] = task.input_dict['filename']
+
+        chg_drv = EspChargesDriver(task.mpi_comm, task.ostream)
+        chg_drv.update_settings(chg_dict, task.input_dict['method_settings'])
+
+        q_fit = chg_drv.compute(task.molecule, task.ao_basis)
+
+        if task.mpi_rank == mpi_master():
+            esp_h5_results = read_results(f'{chg_drv.filename}.h5', 'esp')
+            np.testing.assert_allclose(esp_h5_results['esp_charges'], q_fit)
+
+            final_h5_file = Path(chg_drv.filename).with_suffix('.h5')
+            if final_h5_file.is_file():
+                final_h5_file.unlink()
+
+            scf_h5_file = Path(chg_drv.filename + '_scf.h5')
+            if scf_h5_file.is_file():
+                scf_h5_file.unlink()

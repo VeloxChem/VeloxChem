@@ -46,6 +46,7 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .inputparser import parse_input, print_keywords
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
+from .resultsio import write_results_to_hdf5
 
 
 class EspChargesDriver:
@@ -243,6 +244,28 @@ class EspChargesDriver:
             # single molecule esp charges
             return self._compute_single_molecule(molecule, basis, scf_results)
 
+    def _write_hdf5_results(self, key, charges):
+        """
+        Writes charge-fitting results to the final HDF5 file when available.
+
+        :param key:
+            The results key.
+        :param charges:
+            The fitted charges.
+        """
+
+        if self.filename is None:
+            return
+
+        h5_fname = Path(f'{self.filename}.h5')
+        if not h5_fname.is_file():
+            return
+
+        write_results_to_hdf5(str(h5_fname),
+                              key,
+                              {f'{key}_charges': charges},
+                              value_label=f'{key.upper()} charge result')
+
     def _get_grid_esp_for_single_mol(self,
                                      molecule,
                                      basis=None,
@@ -371,6 +394,8 @@ class EspChargesDriver:
             else:
                 q = self.compute_esp_charges([molecule], [grid_m], [esp_m],
                                              [1.0])
+
+            self._write_hdf5_results('esp', q)
         else:
             q = None
 

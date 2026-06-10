@@ -40,6 +40,66 @@ from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 
 
+_ATOMIC_PROPERTY_DESCRIPTIONS = {
+    'nuclear_charges': 'Nuclear Charges',
+    ('esp', 'esp_charges'): 'ESP Charges',
+    ('resp', 'resp_charges'): 'RESP Charges',
+}
+
+
+def _atomic_property_description(group_name, key):
+    """
+    Gets the atomic-property description for a dataset.
+
+    :param group_name:
+        The HDF5 group name containing the dataset, or ``None`` for root.
+    :param key:
+        The dataset name.
+
+    :return:
+        The metadata label, or ``None`` when the dataset is not atom-resolved.
+    """
+
+    if group_name is None:
+        return _ATOMIC_PROPERTY_DESCRIPTIONS.get(key)
+
+    return _ATOMIC_PROPERTY_DESCRIPTIONS.get((group_name, key))
+
+
+def _apply_atomic_property_metadata(h5obj, key, group_name=None):
+    """
+    Adds atomic-property metadata to an HDF5 dataset when applicable.
+
+    :param h5obj:
+        The HDF5 dataset or group.
+    :param key:
+        The dataset name.
+    :param group_name:
+        The immediate parent group name, or ``None`` for root.
+    """
+
+    if not isinstance(h5obj, h5py.Dataset):
+        return
+
+    description = _atomic_property_description(group_name, key)
+    if description is not None:
+        h5obj.attrs['atomic_property'] = description
+
+
+def _parent_group_name(parent):
+    """
+    Gets the immediate group name for an HDF5 parent object.
+
+    :param parent:
+        The HDF5 parent group.
+
+    :return:
+        The parent group name, or ``None`` for the HDF5 root.
+    """
+
+    return parent.name.rsplit('/', 1)[-1] if parent.name != '/' else None
+
+
 def _write_value_to_hdf5(parent, key, value, value_label='HDF5 value'):
     """
     Writes a Python value to HDF5 with metadata for future round-tripping.
@@ -62,16 +122,19 @@ def _write_value_to_hdf5(parent, key, value, value_label='HDF5 value'):
     if value is None:
         dset = parent.create_dataset(key, shape=(0,), dtype=string_type)
         dset.attrs['value_type'] = 'none'
+        _apply_atomic_property_metadata(dset, key, _parent_group_name(parent))
         return
 
     if isinstance(value, str):
         dset = parent.create_dataset(key, data=value, dtype=string_type)
         dset.attrs['value_type'] = 'str'
+        _apply_atomic_property_metadata(dset, key, _parent_group_name(parent))
         return
 
     if isinstance(value, (bytes, np.bytes_)):
         dset = parent.create_dataset(key, data=np.bytes_(value.decode('utf-8')))
         dset.attrs['value_type'] = 'str'
+        _apply_atomic_property_metadata(dset, key, _parent_group_name(parent))
         return
 
     if isinstance(value, dict):
@@ -118,26 +181,31 @@ def _write_value_to_hdf5(parent, key, value, value_label='HDF5 value'):
             dset = parent.create_dataset(key, data=value)
             dset.attrs['value_type'] = 'ndarray'
             dset.attrs['array_data_type'] = str(value.dtype)
+        _apply_atomic_property_metadata(dset, key, _parent_group_name(parent))
         return
 
     if isinstance(value, (np.bool_, bool)):
         dset = parent.create_dataset(key, data=bool(value))
         dset.attrs['value_type'] = 'bool'
+        _apply_atomic_property_metadata(dset, key, _parent_group_name(parent))
         return
 
     if isinstance(value, numbers.Integral):
         dset = parent.create_dataset(key, data=int(value))
         dset.attrs['value_type'] = 'int'
+        _apply_atomic_property_metadata(dset, key, _parent_group_name(parent))
         return
 
     if isinstance(value, numbers.Real):
         dset = parent.create_dataset(key, data=float(value))
         dset.attrs['value_type'] = 'float'
+        _apply_atomic_property_metadata(dset, key, _parent_group_name(parent))
         return
 
     if isinstance(value, numbers.Complex):
         dset = parent.create_dataset(key, data=complex(value))
         dset.attrs['value_type'] = 'complex'
+        _apply_atomic_property_metadata(dset, key, _parent_group_name(parent))
         return
 
     errmsg = (f'Unsupported {value_label} type for key {key!r}: '
@@ -267,7 +335,9 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
 
         hf.create_dataset('nuclear_repulsion', data=np.array([e_nuc]))
 
-        hf.create_dataset('nuclear_charges', data=molecule.get_element_ids())
+        nuclear_charges = hf.create_dataset('nuclear_charges',
+                            data=molecule.get_element_ids())
+        _apply_atomic_property_metadata(nuclear_charges, 'nuclear_charges')
 
         hf.create_dataset('atom_coordinates',
                           data=molecule.get_coordinates_in_bohr())
