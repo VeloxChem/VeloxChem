@@ -403,7 +403,7 @@ class IMForceFieldGenerator:
 
         return zmat
 
-    def _adjust_symmetry_dihedrals(self, molecule, symmetry_groups, rot_bonds, z_matrix):
+    def _adjust_symmetry_dihedrals(self, symmetry_groups, rot_bonds, z_matrix):
         
         def symmetry_group_dihedral(reference_set, dihedrals, rot_bonds):
             rot_bond_set = {frozenset(bond) for bond in rot_bonds}
@@ -833,7 +833,7 @@ class IMForceFieldGenerator:
                 for hgrp in group.methyl_h_groups
             ]
 
-            angles_to_set, periodicities, sym_dih_dict, dih_groups = (
+            angles_to_set, periodicities, sym_dih_dict, dih_groups, sym_dih_groups = (
                 self._adjust_symmetry_dihedrals(
                     methyl_symmetry_groups,
                     rotatable_bonds_zero_based,
@@ -841,9 +841,9 @@ class IMForceFieldGenerator:
                 )
             )
             
-            print(core_atoms, angles_to_set, decoupled)
+            # print(core_atoms, angles_to_set, decoupled, periodicities, sym_dih_dict, dih_groups, sym_dih_groups)
             
-            exit()
+            # exit()
             
 
             dihedral_start = len(self.roots_z_matrix[root]['bonds']) + len(self.roots_z_matrix[root]['angles'])
