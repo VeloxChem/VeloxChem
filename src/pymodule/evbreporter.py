@@ -35,7 +35,7 @@ import numpy as np
 from pathlib import Path
 
 from .errorhandler import print_exception_if_debug
-from .evbsystembuilder import EvbForceGroup, EvbSystemBuilder
+from .reactionsystembuilder import EvbForceGroup, ReactionSystemBuilder
 
 try:
     import openmm.app as mmapp
@@ -124,11 +124,11 @@ class EvbReporter():
             self.report_forcegroups = True
             forcegroup_path = Path(forcegroup_file)
             rea_fg = str(
-                forcegroup_path.with_name(
-                    forcegroup_path.stem + '_rea' + forcegroup_path.suffix))
+                forcegroup_path.with_name(forcegroup_path.stem + '_rea' +
+                                          forcegroup_path.suffix))
             pro_fg = str(
-                forcegroup_path.with_name(
-                    forcegroup_path.stem + '_pro' + forcegroup_path.suffix))
+                forcegroup_path.with_name(forcegroup_path.stem + '_pro' +
+                                          forcegroup_path.suffix))
 
             self.FG_out = open(forcegroup_file, 'a' if append else 'w')
             self.rea_FG_out = open(rea_fg, 'a' if append else 'w')
@@ -148,7 +148,7 @@ class EvbReporter():
             self.report_nb_decomp = True
             output_dir = Path(energy_file).parent
             filename = str(output_dir / 'NB_decompositions.csv')
-            self.decomp_out = open(filename,'a' if append else 'w')
+            self.decomp_out = open(filename, 'a' if append else 'w')
             self.out_streams.append(self.decomp_out)
             if not append:
                 header = ", ".join(self.decomp_names)
@@ -171,14 +171,18 @@ class EvbReporter():
                 if bond[1] not in active_atoms:
                     active_atoms.append(bond[1])
 
-            self.reactant_params = self._get_bonded_decomp_params(systems['reactant'],active_atoms)
-            self.product_params = self._get_bonded_decomp_params(systems['product'],active_atoms)
+            self.reactant_params = self._get_bonded_decomp_params(
+                systems['reactant'], active_atoms)
+            self.product_params = self._get_bonded_decomp_params(
+                systems['product'], active_atoms)
             self.measure_params = set()
-            for force in list(self.reactant_params.values()) + list(self.product_params.values()):
+            for force in list(self.reactant_params.values()) + list(
+                    self.product_params.values()):
                 for params in force.values():
                     self.measure_params.add(params[0])
             # self.measure_params = sorted(self.measure_params)
-            self.measure_params = sorted(self.measure_params, key=lambda x: (len(x), x))
+            self.measure_params = sorted(self.measure_params,
+                                         key=lambda x: (len(x), x))
             output_dir = Path(energy_file).parent
             filename = str(output_dir / 'bonded_E1_decomp.csv')
             self.bonded_E1_decomp_out = open(filename, 'a' if append else 'w')
@@ -212,39 +216,45 @@ class EvbReporter():
             stream.flush()
 
     @staticmethod
-    def _get_bonded_decomp_params(system,active_atoms):
+    def _get_bonded_decomp_params(system, active_atoms):
         params = {}
         for force in system.getForces():
             if force.getForceGroup() == EvbForceGroup.REA_MORSE_BOND.value:
                 morse_params = {}
                 for i in range(force.getNumBonds()):
-                    p1,p2,(D,a,r) = force.getBondParameters(i)
+                    p1, p2, (D, a, r) = force.getBondParameters(i)
                     if p1 in active_atoms or p2 in active_atoms:
                         morse_params[i] = ((p1, p2), (D, a, r))
                 params.update({force.getName(): morse_params})
 
-            if force.getForceGroup() == EvbForceGroup.REA_HARM_BOND_DYNAMIC.value or force.getForceGroup() == EvbForceGroup.REA_HARM_BOND_STATIC.value:
+            if force.getForceGroup(
+            ) == EvbForceGroup.REA_HARM_BOND_DYNAMIC.value or force.getForceGroup(
+            ) == EvbForceGroup.REA_HARM_BOND_STATIC.value:
                 harm_params = {}
                 for i in range(force.getNumBonds()):
-                    p1,p2,r,k = force.getBondParameters(i)
+                    p1, p2, r, k = force.getBondParameters(i)
                     if p1 in active_atoms or p2 in active_atoms:
-                        harm_params[i] = ((p1, p2), (r,k))
+                        harm_params[i] = ((p1, p2), (r, k))
                 params.update({force.getName(): harm_params})
 
             if force.getForceGroup() == EvbForceGroup.REA_ANGLE.value:
                 angle_params = {}
                 for i in range(force.getNumAngles()):
-                    p1,p2,p3,theta,k = force.getAngleParameters(i)
+                    p1, p2, p3, theta, k = force.getAngleParameters(i)
                     if p1 in active_atoms or p2 in active_atoms or p3 in active_atoms:
                         angle_params[i] = ((p1, p2, p3), (theta, k))
                 params.update({force.getName(): angle_params})
 
-            if force.getForceGroup() == EvbForceGroup.REA_TORSION.value or force.getForceGroup() == EvbForceGroup.REA_IMP.value:
+            if force.getForceGroup(
+            ) == EvbForceGroup.REA_TORSION.value or force.getForceGroup(
+            ) == EvbForceGroup.REA_IMP.value:
                 torsion_params = {}
                 for i in range(force.getNumTorsions()):
-                    p1,p2,p3,p4,periodicity,phase,k = force.getTorsionParameters(i)
+                    p1, p2, p3, p4, periodicity, phase, k = force.getTorsionParameters(
+                        i)
                     if p1 in active_atoms or p2 in active_atoms or p3 in active_atoms or p4 in active_atoms:
-                        torsion_params[i] = ((p1, p2, p3, p4), (periodicity, phase, k))
+                        torsion_params[i] = ((p1, p2, p3, p4), (periodicity,
+                                                                phase, k))
                 params.update({force.getName(): torsion_params})
         return params
 
@@ -281,7 +291,7 @@ class EvbReporter():
                 sim,
                 state=state,
             )
-            E.update({name:e})
+            E.update({name: e})
         E1_pes = E['reactant']
         E2_pes = E['product']
         E1_int = E[0]
@@ -337,11 +347,13 @@ class EvbReporter():
 
         if self.report_bonded_decomp:
             reasim = self.simulations['reactant_bonded_decomp']
-            E1 = self._get_bonded_decomp_energy(reasim, state,self.reactant_params)
+            E1 = self._get_bonded_decomp_energy(reasim, state,
+                                                self.reactant_params)
             line = ", ".join([f"{e:.10e}" for e in E1]) + '\n'
             self.bonded_E1_decomp_out.write(line)
             pro_sim = self.simulations['product_bonded_decomp']
-            E2 = self._get_bonded_decomp_energy(pro_sim, state,self.product_params)
+            E2 = self._get_bonded_decomp_energy(pro_sim, state,
+                                                self.product_params)
             line = ", ".join([f"{e:.10e}" for e in E2]) + '\n'
             self.bonded_E2_decomp_out.write(line)
 
@@ -350,13 +362,23 @@ class EvbReporter():
             for i, param in enumerate(self.measure_params):
                 val = ""
                 if len(param) == 2:
-                    val = EvbSystemBuilder.measure_length(positions[param[0]], positions[param[1]],)
+                    val = EvbSystemBuilder.measure_length(
+                        positions[param[0]],
+                        positions[param[1]],
+                    )
                 elif len(param) == 3:
                     val = EvbSystemBuilder.measure_angle(
-                        positions[param[0]], positions[param[1]], positions[param[2]],)
+                        positions[param[0]],
+                        positions[param[1]],
+                        positions[param[2]],
+                    )
                 elif len(param) == 4:
                     val = EvbSystemBuilder.measure_dihedral(
-                        positions[param[0]], positions[param[1]], positions[param[2]], positions[param[3]],)
+                        positions[param[0]],
+                        positions[param[1]],
+                        positions[param[2]],
+                        positions[param[3]],
+                    )
                 line += f"{val:.10e}, "
             line = line[:-2] + '\n'
             self.bonded_params_out.write(line)
@@ -392,9 +414,9 @@ class EvbReporter():
             stream.flush()
 
     @staticmethod
-    def _get_bonded_decomp_energy(sim,state,parameters):
+    def _get_bonded_decomp_energy(sim, state, parameters):
         E = []
-        for force, params in zip(sim.system.getForces(),parameters.values()):
+        for force, params in zip(sim.system.getForces(), parameters.values()):
             for i, param in params.items():
                 if force.getForceGroup() == EvbForceGroup.REA_MORSE_BOND.value:
                     force.setBondParameters(
@@ -405,14 +427,18 @@ class EvbReporter():
                     )
                     force.updateParametersInContext(sim.context)
                     e = EvbReporter._get_potential_energy(
-                        sim, state=state,)
+                        sim,
+                        state=state,
+                    )
                     force.setBondParameters(
                         i,
                         param[0][0],
                         param[0][1],
-                        (0,0,param[1][2]),
+                        (0, 0, param[1][2]),
                     )
-                elif force.getForceGroup() == EvbForceGroup.REA_HARM_BOND_DYNAMIC.value or force.getForceGroup() == EvbForceGroup.REA_HARM_BOND_STATIC.value:
+                elif force.getForceGroup(
+                ) == EvbForceGroup.REA_HARM_BOND_DYNAMIC.value or force.getForceGroup(
+                ) == EvbForceGroup.REA_HARM_BOND_STATIC.value:
                     force.setBondParameters(
                         i,
                         param[0][0],
@@ -422,12 +448,15 @@ class EvbReporter():
                     )
                     force.updateParametersInContext(sim.context)
                     e = EvbReporter._get_potential_energy(
-                        sim, state=state,)
+                        sim,
+                        state=state,
+                    )
                     force.setBondParameters(
                         i,
                         param[0][0],
                         param[0][1],
-                        param[1][0], 0,
+                        param[1][0],
+                        0,
                     )
                 elif force.getForceGroup() == EvbForceGroup.REA_ANGLE.value:
                     force.setAngleParameters(
@@ -440,15 +469,20 @@ class EvbReporter():
                     )
                     force.updateParametersInContext(sim.context)
                     e = EvbReporter._get_potential_energy(
-                        sim, state=state,)
+                        sim,
+                        state=state,
+                    )
                     force.setAngleParameters(
                         i,
                         param[0][0],
                         param[0][1],
                         param[0][2],
-                        param[1][0], 0,
+                        param[1][0],
+                        0,
                     )
-                elif force.getForceGroup() == EvbForceGroup.REA_TORSION.value or force.getForceGroup() == EvbForceGroup.REA_IMP.value:
+                elif force.getForceGroup(
+                ) == EvbForceGroup.REA_TORSION.value or force.getForceGroup(
+                ) == EvbForceGroup.REA_IMP.value:
                     force.setTorsionParameters(
                         i,
                         param[0][0],
@@ -461,14 +495,18 @@ class EvbReporter():
                     )
                     force.updateParametersInContext(sim.context)
                     e = EvbReporter._get_potential_energy(
-                        sim, state=state,)
+                        sim,
+                        state=state,
+                    )
                     force.setTorsionParameters(
                         i,
                         param[0][0],
                         param[0][1],
                         param[0][2],
                         param[0][3],
-                        param[1][0], 0, 0,
+                        param[1][0],
+                        0,
+                        0,
                     )
                 else:
                     e = 0

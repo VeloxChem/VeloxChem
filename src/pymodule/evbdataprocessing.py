@@ -38,7 +38,7 @@ import sys
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import boltzmann_in_hartreeperkelvin, hartree_in_kjpermol
-from .evbsystembuilder import EvbForceGroup
+from .reactionsystembuilder import EvbForceGroup
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical, print_exception_if_debug
 
