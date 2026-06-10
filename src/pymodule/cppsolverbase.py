@@ -141,12 +141,12 @@ class ComplexResponseSolverBase(LinearSolver):
             self.a_components = 'xyz'
             self.b_operator = 'linear momentum'
             self.b_components = 'xyz'
-        
+
         elif self.property == 'ord':
             self.a_operator = 'electric dipole'
             self.a_components = 'xyz'
             self.b_operator = 'magnetic dipole'
-            self.b_components = 'xyz'        
+            self.b_components = 'xyz'
 
     def _preconditioning(self, precond, v_in):
         """
@@ -349,45 +349,6 @@ class ComplexResponseSolverBase(LinearSolver):
 
         self.ostream.flush()
 
-    @staticmethod
-    def _get_molecular_mass_amu(molecule):
-        """
-        Gets molecular mass in atomic mass units.
-
-        :param molecule:
-            Molecule object.
-
-        :return:
-            Molecular mass in amu.
-        """
-
-        masses = molecule.get_masses()
-
-        assert_msg_critical(
-            masses is not None,
-            f'{ComplexResponseSolverBase.__name__}: unable to get atomic masses'
-        )
-
-        return float(np.sum(masses))
-
-    def _attach_molecular_metadata(self, rsp_results, molecule):
-        """
-        Attaches molecular metadata to response results.
-
-        :param rsp_results:
-            Response results dictionary.
-        :param molecule:
-            Molecule object.
-
-        :return:
-            Updated response results dictionary.
-        """
-
-        rsp_results['molecular_mass_amu'] = self._get_molecular_mass_amu(
-            molecule)
-
-        return rsp_results
-
     def get_spectrum(self, rsp_results, x_unit):
         """
         Gets spectrum.
@@ -406,9 +367,9 @@ class ComplexResponseSolverBase(LinearSolver):
 
         elif self.property == 'ecd':
             return self._get_ecd_spectrum(rsp_results, x_unit)
-        
+
         elif self.property == 'ord':
-            return self._get_ord_spectrum(rsp_results, x_unit)        
+            return self._get_ord_spectrum(rsp_results, x_unit)
 
         return None
 

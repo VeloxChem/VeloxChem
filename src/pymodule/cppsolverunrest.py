@@ -170,7 +170,7 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
             self.set_cpp_property(self.property)
             assert_msg_critical(
                 self.property in ['absorption', 'ecd'],
-                f'{type(self).__name__}.compute: ord is only supported for restricted reference'
+                f'{type(self).__name__}.compute: only absorption and ecd are supported for unrestricted case'
             )
 
         # check molecule
@@ -762,10 +762,8 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
                         'frequencies': list(self.frequencies),
                         'response_functions': rsp_funcs,
                         'solutions': solutions,
+                        'molecular_mass_amu': float(sum(molecule.get_masses())),
                     }
-
-                    ret_dict = self._attach_molecular_metadata(
-                        ret_dict, molecule)
 
                     self._print_results(ret_dict)
 

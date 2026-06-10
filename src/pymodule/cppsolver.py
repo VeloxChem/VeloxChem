@@ -597,10 +597,8 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                         'frequencies': list(self.frequencies),
                         'response_functions': rsp_funcs,
                         'solutions': solutions,
+                        'molecular_mass_amu': float(sum(molecule.get_masses())),
                     }
-
-                    ret_dict = self._attach_molecular_metadata(
-                        ret_dict, molecule)
 
                     self._print_results(ret_dict)
 
