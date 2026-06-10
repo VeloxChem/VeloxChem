@@ -522,7 +522,7 @@ class IMForceFieldGenerator:
                         methyl_h_groups=tuple(h_groups),
                         torsion_rows=rows,
                         torsion_coords=coords,
-                    ))/home/vlind06/phd_project/interpolation/workflow_paper_opt/salic/run_1_eq
+                    ))
 
             # Prefer maximal substituents; remove nested methyls inside larger alkyl groups.
             maximal = []
