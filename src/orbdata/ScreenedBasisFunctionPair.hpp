@@ -34,17 +34,18 @@
 #define ScreenedBasisFunctionPair_hpp
 
 #include <cstddef>
-#include <utility>
 #include <vector>
 
 #include "BasisFunction.hpp"
 #include "Point.hpp"
 
 /// @brief Class CScreenedBasisFunctionPair stores data about a screened pair of
-/// basis functions: the two basis functions together with the Cartesian
-/// coordinates and atomic orbital indices of the bra and ket atom pairs that
-/// survive a screening predicate. Coordinates are stored as separate x, y, z
-/// vectors (structure of arrays) on the bra and ket sides.
+/// basis functions: the two basis functions and their local basis function
+/// indices within the atom basis, together with the Cartesian coordinates and
+/// atom indices of the bra and ket atom pairs that survive a screening
+/// predicate. Coordinates are stored as separate x, y, z vectors (structure of
+/// arrays) on the bra and ket sides. The two basis functions are fixed for the
+/// whole object; only the atom pairs vary across the stored instances.
 class CScreenedBasisFunctionPair
 {
    public:
@@ -53,42 +54,56 @@ class CScreenedBasisFunctionPair
 
     /// @brief The constructor with explicit screened pair data.
     /// @param bra_function The basis function on bra side.
+    /// @param bra_bf_index The local basis function index of the bra function
+    /// within its atom basis.
     /// @param ket_function The basis function on ket side.
+    /// @param ket_bf_index The local basis function index of the ket function
+    /// within its atom basis.
     /// @param bra_x The vector of bra atom Cartesian X coordinates.
     /// @param bra_y The vector of bra atom Cartesian Y coordinates.
     /// @param bra_z The vector of bra atom Cartesian Z coordinates.
     /// @param ket_x The vector of ket atom Cartesian X coordinates.
     /// @param ket_y The vector of ket atom Cartesian Y coordinates.
     /// @param ket_z The vector of ket atom Cartesian Z coordinates.
-    /// @param orb_indices The vector of (bra, ket) atomic orbital index pairs.
-    CScreenedBasisFunctionPair(const CBasisFunction                         &bra_function,
-                               const CBasisFunction                         &ket_function,
-                               const std::vector<double>                    &bra_x,
-                               const std::vector<double>                    &bra_y,
-                               const std::vector<double>                    &bra_z,
-                               const std::vector<double>                    &ket_x,
-                               const std::vector<double>                    &ket_y,
-                               const std::vector<double>                    &ket_z,
-                               const std::vector<std::pair<size_t, size_t>> &orb_indices);
+    /// @param bra_atoms The vector of bra atom indices.
+    /// @param ket_atoms The vector of ket atom indices.
+    CScreenedBasisFunctionPair(const CBasisFunction      &bra_function,
+                               const int                  bra_bf_index,
+                               const CBasisFunction      &ket_function,
+                               const int                  ket_bf_index,
+                               const std::vector<double> &bra_x,
+                               const std::vector<double> &bra_y,
+                               const std::vector<double> &bra_z,
+                               const std::vector<double> &ket_x,
+                               const std::vector<double> &ket_y,
+                               const std::vector<double> &ket_z,
+                               const std::vector<int>    &bra_atoms,
+                               const std::vector<int>    &ket_atoms);
 
     /// @brief The constructor screening symmetric atom pairs of a single basis
     /// function. The ket basis function is identical to the bra basis function
     /// and the atom pairs are generated in a triangular pattern (i <= j),
     /// including the diagonal self-pairs.
     /// @param function The basis function on bra and ket side.
+    /// @param bf_index The local basis function index within the atom basis.
     /// @param coordinates The vector of atom Cartesian coordinates.
-    /// @param orb_indices The vector of atomic orbital indices.
+    /// @param atom_indices The vector of atom indices.
     /// @param keep_pair The predicate selecting important atom pairs; called as
     /// keep_pair(bra_center, ket_center) and returning true to keep the pair.
     template <typename Predicate>
     CScreenedBasisFunctionPair(const CBasisFunction              &function,
+                               const int                          bf_index,
                                const std::vector<TPoint<double>> &coordinates,
-                               const std::vector<size_t>         &orb_indices,
+                               const std::vector<int>            &atom_indices,
                                Predicate                        &&keep_pair)
 
         : _bra_function(function)
 
         , _ket_function(function)
+
+        , _bra_bf_index(bf_index)
+
+        , _ket_bf_index(bf_index)
 
         , _bra_x{}
         , _bra_y{}
@@ -96,7 +111,8 @@ class CScreenedBasisFunctionPair
         , _ket_x{}
         , _ket_y{}
         , _ket_z{}
-        , _orb_indices{}
+        , _bra_atoms{}
+        , _ket_atoms{}
     {
         const auto natoms = coordinates.size();
 
@@ -106,7 +122,7 @@ class CScreenedBasisFunctionPair
             {
                 if (keep_pair(coordinates[i], coordinates[j]))
                 {
-                    _append(coordinates[i], coordinates[j], orb_indices[i], orb_indices[j]);
+                    _append(coordinates[i], coordinates[j], atom_indices[i], atom_indices[j]);
                 }
             }
         }
@@ -116,25 +132,35 @@ class CScreenedBasisFunctionPair
     /// functions. The atom pairs are generated as the full product of bra and
     /// ket atoms.
     /// @param bra_function The basis function on bra side.
-    /// @param ket_function The basis function on ket side.
+    /// @param bra_bf_index The local basis function index of the bra function
+    /// within its atom basis.
     /// @param bra_coordinates The vector of bra atom Cartesian coordinates.
-    /// @param bra_orb_indices The vector of bra atomic orbital indices.
+    /// @param bra_atom_indices The vector of bra atom indices.
+    /// @param ket_function The basis function on ket side.
+    /// @param ket_bf_index The local basis function index of the ket function
+    /// within its atom basis.
     /// @param ket_coordinates The vector of ket atom Cartesian coordinates.
-    /// @param ket_orb_indices The vector of ket atomic orbital indices.
+    /// @param ket_atom_indices The vector of ket atom indices.
     /// @param keep_pair The predicate selecting important atom pairs; called as
     /// keep_pair(bra_center, ket_center) and returning true to keep the pair.
     template <typename Predicate>
     CScreenedBasisFunctionPair(const CBasisFunction              &bra_function,
-                               const CBasisFunction              &ket_function,
+                               const int                          bra_bf_index,
                                const std::vector<TPoint<double>> &bra_coordinates,
-                               const std::vector<size_t>         &bra_orb_indices,
+                               const std::vector<int>            &bra_atom_indices,
+                               const CBasisFunction              &ket_function,
+                               const int                          ket_bf_index,
                                const std::vector<TPoint<double>> &ket_coordinates,
-                               const std::vector<size_t>         &ket_orb_indices,
+                               const std::vector<int>            &ket_atom_indices,
                                Predicate                        &&keep_pair)
 
         : _bra_function(bra_function)
 
         , _ket_function(ket_function)
+
+        , _bra_bf_index(bra_bf_index)
+
+        , _ket_bf_index(ket_bf_index)
 
         , _bra_x{}
         , _bra_y{}
@@ -142,7 +168,8 @@ class CScreenedBasisFunctionPair
         , _ket_x{}
         , _ket_y{}
         , _ket_z{}
-        , _orb_indices{}
+        , _bra_atoms{}
+        , _ket_atoms{}
     {
         const auto nbra = bra_coordinates.size();
 
@@ -154,7 +181,7 @@ class CScreenedBasisFunctionPair
             {
                 if (keep_pair(bra_coordinates[i], ket_coordinates[j]))
                 {
-                    _append(bra_coordinates[i], ket_coordinates[j], bra_orb_indices[i], ket_orb_indices[j]);
+                    _append(bra_coordinates[i], ket_coordinates[j], bra_atom_indices[i], ket_atom_indices[j]);
                 }
             }
         }
@@ -200,6 +227,14 @@ class CScreenedBasisFunctionPair
     /// @return The ket basis function.
     auto ket_function() const -> CBasisFunction;
 
+    /// @brief Gets the local basis function index of the bra function.
+    /// @return The bra basis function index.
+    auto bra_bf_index() const -> int;
+
+    /// @brief Gets the local basis function index of the ket function.
+    /// @return The ket basis function index.
+    auto ket_bf_index() const -> int;
+
     /// @brief Gets the vector of bra atom Cartesian X coordinates.
     /// @return The vector of X coordinates.
     auto bra_x() const -> std::vector<double>;
@@ -224,9 +259,13 @@ class CScreenedBasisFunctionPair
     /// @return The vector of Z coordinates.
     auto ket_z() const -> std::vector<double>;
 
-    /// @brief Gets the vector of (bra, ket) atomic orbital index pairs.
-    /// @return The vector of orbital index pairs.
-    auto orbital_indices() const -> std::vector<std::pair<size_t, size_t>>;
+    /// @brief Gets the vector of bra atom indices.
+    /// @return The vector of bra atom indices.
+    auto bra_atoms() const -> std::vector<int>;
+
+    /// @brief Gets the vector of ket atom indices.
+    /// @return The vector of ket atom indices.
+    auto ket_atoms() const -> std::vector<int>;
 
     /// @brief Gets the number of screened basis function pairs.
     /// @return The number of pairs.
@@ -236,15 +275,21 @@ class CScreenedBasisFunctionPair
     /// @brief Appends a single screened atom pair to the structure of arrays.
     /// @param bra_center The Cartesian coordinates of the bra atom.
     /// @param ket_center The Cartesian coordinates of the ket atom.
-    /// @param bra_index The bra atomic orbital index.
-    /// @param ket_index The ket atomic orbital index.
-    auto _append(const TPoint<double> &bra_center, const TPoint<double> &ket_center, const size_t bra_index, const size_t ket_index) -> void;
+    /// @param bra_atom The bra atom index.
+    /// @param ket_atom The ket atom index.
+    auto _append(const TPoint<double> &bra_center, const TPoint<double> &ket_center, const int bra_atom, const int ket_atom) -> void;
 
     /// @brief The basis function on bra side.
     CBasisFunction _bra_function;
 
     /// @brief The basis function on ket side.
     CBasisFunction _ket_function;
+
+    /// @brief The local basis function index of the bra function within its atom basis.
+    int _bra_bf_index;
+
+    /// @brief The local basis function index of the ket function within its atom basis.
+    int _ket_bf_index;
 
     /// @brief The vector of bra atom Cartesian X coordinates.
     std::vector<double> _bra_x;
@@ -264,8 +309,11 @@ class CScreenedBasisFunctionPair
     /// @brief The vector of ket atom Cartesian Z coordinates.
     std::vector<double> _ket_z;
 
-    /// @brief The vector of (bra, ket) atomic orbital index pairs.
-    std::vector<std::pair<size_t, size_t>> _orb_indices;
+    /// @brief The vector of bra atom indices.
+    std::vector<int> _bra_atoms;
+
+    /// @brief The vector of ket atom indices.
+    std::vector<int> _ket_atoms;
 };
 
 #endif /* ScreenedBasisFunctionPair_hpp */

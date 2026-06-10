@@ -38,6 +38,10 @@ CScreenedBasisFunctionPair::CScreenedBasisFunctionPair()
 
     , _ket_function()
 
+    , _bra_bf_index(-1)
+
+    , _ket_bf_index(-1)
+
     , _bra_x{}
 
     , _bra_y{}
@@ -50,23 +54,32 @@ CScreenedBasisFunctionPair::CScreenedBasisFunctionPair()
 
     , _ket_z{}
 
-    , _orb_indices{}
+    , _bra_atoms{}
+
+    , _ket_atoms{}
 {
 }
 
-CScreenedBasisFunctionPair::CScreenedBasisFunctionPair(const CBasisFunction                         &bra_function,
-                                                       const CBasisFunction                         &ket_function,
-                                                       const std::vector<double>                    &bra_x,
-                                                       const std::vector<double>                    &bra_y,
-                                                       const std::vector<double>                    &bra_z,
-                                                       const std::vector<double>                    &ket_x,
-                                                       const std::vector<double>                    &ket_y,
-                                                       const std::vector<double>                    &ket_z,
-                                                       const std::vector<std::pair<size_t, size_t>> &orb_indices)
+CScreenedBasisFunctionPair::CScreenedBasisFunctionPair(const CBasisFunction      &bra_function,
+                                                       const int                  bra_bf_index,
+                                                       const CBasisFunction      &ket_function,
+                                                       const int                  ket_bf_index,
+                                                       const std::vector<double> &bra_x,
+                                                       const std::vector<double> &bra_y,
+                                                       const std::vector<double> &bra_z,
+                                                       const std::vector<double> &ket_x,
+                                                       const std::vector<double> &ket_y,
+                                                       const std::vector<double> &ket_z,
+                                                       const std::vector<int>    &bra_atoms,
+                                                       const std::vector<int>    &ket_atoms)
 
     : _bra_function(bra_function)
 
     , _ket_function(ket_function)
+
+    , _bra_bf_index(bra_bf_index)
+
+    , _ket_bf_index(ket_bf_index)
 
     , _bra_x(bra_x)
 
@@ -80,7 +93,9 @@ CScreenedBasisFunctionPair::CScreenedBasisFunctionPair(const CBasisFunction     
 
     , _ket_z(ket_z)
 
-    , _orb_indices(orb_indices)
+    , _bra_atoms(bra_atoms)
+
+    , _ket_atoms(ket_atoms)
 {
 }
 
@@ -89,6 +104,10 @@ CScreenedBasisFunctionPair::CScreenedBasisFunctionPair(const CScreenedBasisFunct
     : _bra_function(other._bra_function)
 
     , _ket_function(other._ket_function)
+
+    , _bra_bf_index(other._bra_bf_index)
+
+    , _ket_bf_index(other._ket_bf_index)
 
     , _bra_x(other._bra_x)
 
@@ -102,7 +121,9 @@ CScreenedBasisFunctionPair::CScreenedBasisFunctionPair(const CScreenedBasisFunct
 
     , _ket_z(other._ket_z)
 
-    , _orb_indices(other._orb_indices)
+    , _bra_atoms(other._bra_atoms)
+
+    , _ket_atoms(other._ket_atoms)
 {
 }
 
@@ -111,6 +132,10 @@ CScreenedBasisFunctionPair::CScreenedBasisFunctionPair(CScreenedBasisFunctionPai
     : _bra_function(std::move(other._bra_function))
 
     , _ket_function(std::move(other._ket_function))
+
+    , _bra_bf_index(other._bra_bf_index)
+
+    , _ket_bf_index(other._ket_bf_index)
 
     , _bra_x(std::move(other._bra_x))
 
@@ -124,7 +149,9 @@ CScreenedBasisFunctionPair::CScreenedBasisFunctionPair(CScreenedBasisFunctionPai
 
     , _ket_z(std::move(other._ket_z))
 
-    , _orb_indices(std::move(other._orb_indices))
+    , _bra_atoms(std::move(other._bra_atoms))
+
+    , _ket_atoms(std::move(other._ket_atoms))
 {
 }
 
@@ -134,6 +161,10 @@ CScreenedBasisFunctionPair::operator=(const CScreenedBasisFunctionPair &other) -
     _bra_function = other._bra_function;
 
     _ket_function = other._ket_function;
+
+    _bra_bf_index = other._bra_bf_index;
+
+    _ket_bf_index = other._ket_bf_index;
 
     _bra_x = other._bra_x;
 
@@ -147,7 +178,9 @@ CScreenedBasisFunctionPair::operator=(const CScreenedBasisFunctionPair &other) -
 
     _ket_z = other._ket_z;
 
-    _orb_indices = other._orb_indices;
+    _bra_atoms = other._bra_atoms;
+
+    _ket_atoms = other._ket_atoms;
 
     return *this;
 }
@@ -161,6 +194,10 @@ CScreenedBasisFunctionPair::operator=(CScreenedBasisFunctionPair &&other) noexce
 
         _ket_function = std::move(other._ket_function);
 
+        _bra_bf_index = other._bra_bf_index;
+
+        _ket_bf_index = other._ket_bf_index;
+
         _bra_x = std::move(other._bra_x);
 
         _bra_y = std::move(other._bra_y);
@@ -173,7 +210,9 @@ CScreenedBasisFunctionPair::operator=(CScreenedBasisFunctionPair &&other) noexce
 
         _ket_z = std::move(other._ket_z);
 
-        _orb_indices = std::move(other._orb_indices);
+        _bra_atoms = std::move(other._bra_atoms);
+
+        _ket_atoms = std::move(other._ket_atoms);
     }
 
     return *this;
@@ -182,9 +221,10 @@ CScreenedBasisFunctionPair::operator=(CScreenedBasisFunctionPair &&other) noexce
 auto
 CScreenedBasisFunctionPair::operator==(const CScreenedBasisFunctionPair &other) const -> bool
 {
-    return (_bra_function == other._bra_function) && (_ket_function == other._ket_function) && (_bra_x == other._bra_x) && (_bra_y == other._bra_y) &&
-           (_bra_z == other._bra_z) && (_ket_x == other._ket_x) && (_ket_y == other._ket_y) && (_ket_z == other._ket_z) &&
-           (_orb_indices == other._orb_indices);
+    return (_bra_function == other._bra_function) && (_ket_function == other._ket_function) && (_bra_bf_index == other._bra_bf_index) &&
+           (_ket_bf_index == other._ket_bf_index) && (_bra_x == other._bra_x) && (_bra_y == other._bra_y) && (_bra_z == other._bra_z) &&
+           (_ket_x == other._ket_x) && (_ket_y == other._ket_y) && (_ket_z == other._ket_z) && (_bra_atoms == other._bra_atoms) &&
+           (_ket_atoms == other._ket_atoms);
 }
 
 auto
@@ -194,10 +234,7 @@ CScreenedBasisFunctionPair::operator!=(const CScreenedBasisFunctionPair &other) 
 }
 
 auto
-CScreenedBasisFunctionPair::_append(const TPoint<double> &bra_center,
-                                    const TPoint<double> &ket_center,
-                                    const size_t          bra_index,
-                                    const size_t          ket_index) -> void
+CScreenedBasisFunctionPair::_append(const TPoint<double> &bra_center, const TPoint<double> &ket_center, const int bra_atom, const int ket_atom) -> void
 {
     const auto r_bra = bra_center.coordinates();
 
@@ -215,7 +252,9 @@ CScreenedBasisFunctionPair::_append(const TPoint<double> &bra_center,
 
     _ket_z.push_back(r_ket[2]);
 
-    _orb_indices.push_back({bra_index, ket_index});
+    _bra_atoms.push_back(bra_atom);
+
+    _ket_atoms.push_back(ket_atom);
 }
 
 auto
@@ -228,6 +267,18 @@ auto
 CScreenedBasisFunctionPair::ket_function() const -> CBasisFunction
 {
     return _ket_function;
+}
+
+auto
+CScreenedBasisFunctionPair::bra_bf_index() const -> int
+{
+    return _bra_bf_index;
+}
+
+auto
+CScreenedBasisFunctionPair::ket_bf_index() const -> int
+{
+    return _ket_bf_index;
 }
 
 auto
@@ -267,13 +318,19 @@ CScreenedBasisFunctionPair::ket_z() const -> std::vector<double>
 }
 
 auto
-CScreenedBasisFunctionPair::orbital_indices() const -> std::vector<std::pair<size_t, size_t>>
+CScreenedBasisFunctionPair::bra_atoms() const -> std::vector<int>
 {
-    return _orb_indices;
+    return _bra_atoms;
+}
+
+auto
+CScreenedBasisFunctionPair::ket_atoms() const -> std::vector<int>
+{
+    return _ket_atoms;
 }
 
 auto
 CScreenedBasisFunctionPair::number_of_pairs() const -> size_t
 {
-    return _orb_indices.size();
+    return _bra_atoms.size();
 }

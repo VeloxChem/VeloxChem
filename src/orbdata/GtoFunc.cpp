@@ -63,6 +63,78 @@ make_gto_blocks(const CMolecularBasis &basis, const CMolecule &molecule, const s
 }
 
 auto
+atom_coordinates(const CMolecularBasis &basis, const CMolecule &molecule, const CAtomBasis &atom_basis) -> std::vector<TPoint<double>>
+{
+    std::vector<TPoint<double>> coords;
+
+    const auto basis_sets = basis.basis_sets();
+
+    // locate the unique atom basis slot matching by basis name and element identifier
+
+    const auto pos = std::ranges::find_if(basis_sets, [&](const auto &abas) {
+        return (abas.get_name() == atom_basis.get_name()) && (abas.get_identifier() == atom_basis.get_identifier());
+    });
+
+    if (pos == basis_sets.end())
+    {
+        return coords;
+    }
+
+    const auto slot = static_cast<int>(std::distance(basis_sets.begin(), pos));
+
+    // gather coordinates (in au) of atoms mapped to the matched slot
+
+    const auto indices = basis.basis_sets_indices();
+
+    const auto mol_coords = molecule.coordinates();
+
+    for (size_t i = 0; i < indices.size(); i++)
+    {
+        if (indices[i] == slot)
+        {
+            coords.push_back(mol_coords[i]);
+        }
+    }
+
+    return coords;
+}
+
+auto
+atom_indices(const CMolecularBasis &basis, const CAtomBasis &atom_basis) -> std::vector<int>
+{
+    std::vector<int> atoms;
+
+    const auto basis_sets = basis.basis_sets();
+
+    // locate the unique atom basis slot matching by basis name and element identifier
+
+    const auto pos = std::ranges::find_if(basis_sets, [&](const auto &abas) {
+        return (abas.get_name() == atom_basis.get_name()) && (abas.get_identifier() == atom_basis.get_identifier());
+    });
+
+    if (pos == basis_sets.end())
+    {
+        return atoms;
+    }
+
+    const auto slot = static_cast<int>(std::distance(basis_sets.begin(), pos));
+
+    // gather indices of atoms mapped to the matched slot
+
+    const auto indices = basis.basis_sets_indices();
+
+    for (size_t i = 0; i < indices.size(); i++)
+    {
+        if (indices[i] == slot)
+        {
+            atoms.push_back(static_cast<int>(i));
+        }
+    }
+
+    return atoms;
+}
+
+auto
 getNumberOfAtomicOrbitals(const std::vector<CGtoBlock>& gto_blocks) -> int
 {
     int naos = 0;
