@@ -403,6 +403,58 @@ class IMForceFieldGenerator:
 
         return zmat
 
+    def _adjust_symmetry_dihedrals(self, molecule, symmetry_groups, rot_bonds, z_matrix):
+        
+        def symmetry_group_dihedral(reference_set, dihedrals, rot_bonds):
+            rot_bond_set = {frozenset(bond) for bond in rot_bonds}
+
+            filtered_dihedrals = []
+            for d in dihedrals:
+                middle_bond = frozenset([d[1], d[2]])
+
+                if middle_bond in rot_bond_set:
+                    common_elements = [x for x in [d[0], d[3]] if x in reference_set]
+                    if len(common_elements) == 1:
+                        filtered_dihedrals.append(d)
+            return filtered_dihedrals
+        
+        all_dihedrals = [element for element in z_matrix['dihedrals']]
+
+        symmetry_group_dihedral_dict = {} 
+
+        sym_groups_dih = {3: {}}
+
+        angles_to_set = {}
+        periodicities = {}
+        dihedral_groups = {2: {}, 3: {}}
+
+        for symmetry_group in symmetry_groups:
+            
+            symmetry_group_dihedral_list = symmetry_group_dihedral(symmetry_group, all_dihedrals, rot_bonds)
+
+            symmetry_group_dihedral_dict[tuple(symmetry_group)] = symmetry_group_dihedral_list
+            
+            if len(symmetry_group) == 3:
+
+                # angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/3.0])
+                angles_to_set[tuple(symmetry_group_dihedral_list[0])] = ([0.0, np.pi/6.0, np.pi/3.0, np.pi/2.0])
+
+                periodicities[tuple(symmetry_group_dihedral_list[0])] = 3
+                dihedral_groups[3][tuple(symmetry_group_dihedral_list[0][1:3])] = [tuple(sorted(element, reverse=False)) for element in symmetry_group_dihedral_list]
+                
+                sym_groups_dih[3][tuple(symmetry_group_dihedral_list[0][1:3])] = [tuple(element) for element in symmetry_group_dihedral_list]
+
+            elif len(symmetry_group) == 2:
+
+                # angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/3.0])
+                angles_to_set[tuple(symmetry_group_dihedral_list[0])] = ([0.0, np.pi/2.0])
+
+                periodicities[tuple(symmetry_group_dihedral_list[0])] = 2
+                dihedral_groups[2].extend([tuple(sorted(element, reverse=False)) for element in symmetry_group_dihedral_list])
+
+        return angles_to_set, periodicities, symmetry_group_dihedral_dict, dihedral_groups, sym_groups_dih
+
+
     def set_up_the_system(self, molecule, imforcefieldfiles=None):
 
         """
@@ -782,7 +834,7 @@ class IMForceFieldGenerator:
             ]
 
             angles_to_set, periodicities, sym_dih_dict, dih_groups = (
-                self.adjust_symmetry_dihedrals(
+                self._adjust_symmetry_dihedrals(
                     methyl_symmetry_groups,
                     rotatable_bonds_zero_based,
                     self.roots_z_matrix[root],
