@@ -577,6 +577,11 @@ export_orbdata(py::module &m)
           &osfunc::compute_pb,
           "Computes the Obara-Saika PB distances for a screened basis function pair.",
           "pair"_a);
+
+    m.def("compute_overlap",
+          &osfunc::compute_overlap,
+          "Computes the elementary primitive overlaps for a screened basis function pair.",
+          "pair"_a);
 }
 
 }  // namespace vlx_orbdata
