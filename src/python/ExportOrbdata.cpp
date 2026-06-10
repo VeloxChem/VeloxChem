@@ -54,6 +54,7 @@
 #include "MolecularBasis.hpp"
 #include "ScreenedBasisFunctionPair.hpp"
 #include "SparseMatrix.hpp"
+#include "SparseMatrixFunc.hpp"
 #include "BaseCorePotential.hpp"
 #include "AtomCorePotential.hpp"
 
@@ -558,6 +559,13 @@ export_orbdata(py::module &m)
           "mol_2"_a,
           "basis_1"_a,
           "basis_2"_a);
+
+    m.def("to_dense_matrix",
+          &sparsematfunc::to_dense_matrix,
+          "Converts a block sparse matrix to a full sized dense matrix in AO ordering.",
+          "matrix"_a,
+          "screened_pairs"_a,
+          "basis"_a);
 }
 
 }  // namespace vlx_orbdata
