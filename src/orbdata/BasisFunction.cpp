@@ -160,6 +160,32 @@ CBasisFunction::add(const double exponent, const double norm) -> void
 auto
 CBasisFunction::normalize() -> void
 {
+    // order primitives from largest to smallest exponent, keeping exponents and
+    // coefficients paired
+
+    const auto nprims = _exponents.size();
+
+    std::vector<size_t> order(nprims);
+
+    for (size_t i = 0; i < nprims; i++) order[i] = i;
+
+    std::ranges::sort(order, [&](const size_t a, const size_t b) { return _exponents[a] > _exponents[b]; });
+
+    auto sorted_exponents = _exponents;
+
+    auto sorted_norms = _norms;
+
+    for (size_t i = 0; i < nprims; i++)
+    {
+        sorted_exponents[i] = _exponents[order[i]];
+
+        sorted_norms[i] = _norms[order[i]];
+    }
+
+    _exponents = std::move(sorted_exponents);
+
+    _norms = std::move(sorted_norms);
+
     // TODO: Implemented for l > 6
     if (_angular_momentum > 6) return;
 

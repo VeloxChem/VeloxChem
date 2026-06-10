@@ -33,6 +33,7 @@
 #ifndef GtoFunc_hpp
 #define GtoFunc_hpp
 
+#include <algorithm>
 #include <vector>
 
 #include "AtomBasis.hpp"
@@ -84,76 +85,142 @@ auto atom_indices(const CMolecularBasis &basis, const CAtomBasis &atom_basis) ->
 
 /// @brief Creates vector of screened basis function pairs for a molecular basis
 /// and molecule. The unique symmetric pairs of atom bases are enumerated; for
-/// each atom basis pair the atom coordinates and indices are retrieved and a
-/// screened basis function pair is built for every basis function pair
-/// combination. When the two atom bases are identical a triangular loop over
-/// basis functions is used (with the symmetric, single-function constructor on
-/// the diagonal), otherwise a full loop is used.
+/// each atom basis pair a screened basis function pair is built for every basis
+/// function pair combination (a triangular loop over basis functions, with the
+/// symmetric single-function constructor on the diagonal, when the two atom
+/// bases are identical; a full loop otherwise). The per combination
+/// constructions are independent and run in parallel with OpenMP; pairs with no
+/// surviving atom pair are dropped.
 /// @param basis The molecular basis.
 /// @param molecule The molecule.
-/// @param keep_pair The predicate selecting important atom pairs; called as
-/// keep_pair(bra_center, ket_center) and returning true to keep the pair.
+/// @param make_keep_pair The predicate factory; called as
+/// make_keep_pair(bra_function, ket_function) and returning a center predicate
+/// keep_pair(bra_center, ket_center) -> bool selecting important atom pairs. A
+/// fresh predicate is built for each basis function pair combination, so the
+/// exponent dependent data can be precomputed once per combination. The factory
+/// must be safe to call concurrently from multiple threads.
 /// @return The vector of screened basis function pairs.
-template <typename Predicate>
+template <typename PredicateFactory>
 auto
-make_screened_basis_function_pairs(const CMolecularBasis &basis, const CMolecule &molecule, Predicate &&keep_pair)
+make_screened_basis_function_pairs(const CMolecularBasis &basis, const CMolecule &molecule, PredicateFactory &&make_keep_pair)
     -> std::vector<CScreenedBasisFunctionPair>
 {
-    std::vector<CScreenedBasisFunctionPair> screened_pairs;
+    const auto basis_sets = basis.basis_sets();
 
-    for (const auto &[bra_atom_basis, ket_atom_basis] : basis.unique_basis_pairs())
+    const auto nsets = basis_sets.size();
+
+    // precompute per unique atom basis: atom coordinates, atom indices and basis functions
+
+    std::vector<std::vector<TPoint<double>>> coordinates(nsets);
+
+    std::vector<std::vector<int>> atomic_indices(nsets);
+
+    std::vector<std::vector<CBasisFunction>> functions(nsets);
+
+    for (size_t k = 0; k < nsets; k++)
     {
-        const auto bra_coords = atom_coordinates(basis, molecule, bra_atom_basis);
+        coordinates[k] = atom_coordinates(basis, molecule, basis_sets[k]);
 
-        const auto bra_atoms = atom_indices(basis, bra_atom_basis);
+        atomic_indices[k] = atom_indices(basis, basis_sets[k]);
 
-        const auto bra_functions = bra_atom_basis.basis_functions();
+        functions[k] = basis_sets[k].basis_functions();
+    }
 
-        const auto same_atom_basis =
-            (bra_atom_basis.get_name() == ket_atom_basis.get_name()) && (bra_atom_basis.get_identifier() == ket_atom_basis.get_identifier());
+    // build flat list of basis function pair tasks over unique symmetric atom basis pairs
 
-        if (same_atom_basis)
+    struct CScreenedPairTask
+    {
+        size_t bra_slot;
+        size_t bra_func;
+        size_t ket_slot;
+        size_t ket_func;
+    };
+
+    std::vector<CScreenedPairTask> tasks;
+
+    for (size_t bi = 0; bi < nsets; bi++)
+    {
+        const auto nbra = functions[bi].size();
+
+        for (size_t bj = bi; bj < nsets; bj++)
         {
-            const auto nfuncs = bra_functions.size();
-
-            for (size_t i = 0; i < nfuncs; i++)
+            if (bi == bj)
             {
-                for (size_t j = i; j < nfuncs; j++)
-                {
-                    if (i == j)
-                    {
-                        // identical function on the identical atom set: triangular atom pairs
-
-                        screened_pairs.push_back(
-                            CScreenedBasisFunctionPair(bra_functions[i], static_cast<int>(i), bra_coords, bra_atoms, keep_pair));
-                    }
-                    else
-                    {
-                        // distinct functions on the same atom set: full atom product, shared coordinates
-
-                        screened_pairs.push_back(CScreenedBasisFunctionPair(
-                            bra_functions[i], static_cast<int>(i), bra_coords, bra_atoms, bra_functions[j], static_cast<int>(j), bra_coords, bra_atoms, keep_pair));
-                    }
-                }
+                for (size_t fi = 0; fi < nbra; fi++)
+                    for (size_t fj = fi; fj < nbra; fj++) tasks.push_back({bi, fi, bi, fj});
             }
+            else
+            {
+                const auto nket = functions[bj].size();
+
+                for (size_t fi = 0; fi < nbra; fi++)
+                    for (size_t fj = 0; fj < nket; fj++) tasks.push_back({bi, fi, bj, fj});
+            }
+        }
+    }
+
+    const auto ntasks = tasks.size();
+
+    // schedule larger atom-pair work first for better dynamic load balance
+
+    std::vector<size_t> schedule(ntasks);
+
+    for (size_t t = 0; t < ntasks; t++) schedule[t] = t;
+
+    std::ranges::sort(schedule, [&](const size_t a, const size_t b) {
+        return coordinates[tasks[a].bra_slot].size() * coordinates[tasks[a].ket_slot].size() >
+               coordinates[tasks[b].bra_slot].size() * coordinates[tasks[b].ket_slot].size();
+    });
+
+    // construct screened basis function pairs in parallel into per-task slots
+
+    std::vector<CScreenedBasisFunctionPair> results(ntasks);
+
+    const auto nsched = static_cast<long>(ntasks);
+
+#pragma omp parallel for schedule(dynamic)
+    for (long s = 0; s < nsched; s++)
+    {
+        const auto  t   = schedule[static_cast<size_t>(s)];
+        const auto &task = tasks[t];
+
+        const auto &bra_function = functions[task.bra_slot][task.bra_func];
+        const auto &ket_function = functions[task.ket_slot][task.ket_func];
+
+        auto keep_pair = make_keep_pair(bra_function, ket_function);
+
+        if ((task.bra_slot == task.ket_slot) && (task.bra_func == task.ket_func))
+        {
+            // identical function on the identical atom set: triangular atom pairs
+
+            results[t] = CScreenedBasisFunctionPair(
+                bra_function, static_cast<int>(task.bra_func), coordinates[task.bra_slot], atomic_indices[task.bra_slot], keep_pair);
         }
         else
         {
-            const auto ket_coords = atom_coordinates(basis, molecule, ket_atom_basis);
+            // distinct functions and/or atom sets: full atom product
 
-            const auto ket_atoms = atom_indices(basis, ket_atom_basis);
-
-            const auto ket_functions = ket_atom_basis.basis_functions();
-
-            for (size_t i = 0; i < bra_functions.size(); i++)
-            {
-                for (size_t j = 0; j < ket_functions.size(); j++)
-                {
-                    screened_pairs.push_back(CScreenedBasisFunctionPair(
-                        bra_functions[i], static_cast<int>(i), bra_coords, bra_atoms, ket_functions[j], static_cast<int>(j), ket_coords, ket_atoms, keep_pair));
-                }
-            }
+            results[t] = CScreenedBasisFunctionPair(bra_function,
+                                                    static_cast<int>(task.bra_func),
+                                                    coordinates[task.bra_slot],
+                                                    atomic_indices[task.bra_slot],
+                                                    ket_function,
+                                                    static_cast<int>(task.ket_func),
+                                                    coordinates[task.ket_slot],
+                                                    atomic_indices[task.ket_slot],
+                                                    keep_pair);
         }
+    }
+
+    // keep only pairs with at least one surviving atom pair, in task order
+
+    std::vector<CScreenedBasisFunctionPair> screened_pairs;
+
+    screened_pairs.reserve(ntasks);
+
+    for (size_t t = 0; t < ntasks; t++)
+    {
+        if (results[t].number_of_pairs() > 0) screened_pairs.push_back(std::move(results[t]));
     }
 
     return screened_pairs;
