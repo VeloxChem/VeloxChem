@@ -52,6 +52,8 @@
 #include "GtoPairBlock.hpp"
 #include "GtoPairBlockFunc.hpp"
 #include "MolecularBasis.hpp"
+#include "ScreenedBasisFunctionPair.hpp"
+#include "SparseMatrix.hpp"
 #include "BaseCorePotential.hpp"
 #include "AtomCorePotential.hpp"
 
@@ -491,6 +493,61 @@ export_orbdata(py::module &m)
         .def("__eq__", [](const CAtomCorePotential &self, const CAtomCorePotential &other) { return self == other; })
         .def("__copy__", [](const CAtomCorePotential &self) { return CAtomCorePotential(self); })
         .def("__deepcopy__", [](const CAtomCorePotential &self, py::dict) { return CAtomCorePotential(self); });
+
+    // CScreenedBasisFunctionPair class
+    PyClass<CScreenedBasisFunctionPair>(m, "ScreenedBasisFunctionPair")
+        .def(py::init<>())
+        .def(py::init<const CScreenedBasisFunctionPair &>())
+        .def(py::init<const CBasisFunction &,
+                      const int,
+                      const CBasisFunction &,
+                      const int,
+                      const std::vector<double> &,
+                      const std::vector<double> &,
+                      const std::vector<double> &,
+                      const std::vector<double> &,
+                      const std::vector<double> &,
+                      const std::vector<double> &,
+                      const std::vector<int> &,
+                      const std::vector<int> &>())
+        .def("bra_function", &CScreenedBasisFunctionPair::bra_function, "Gets the bra basis function.")
+        .def("ket_function", &CScreenedBasisFunctionPair::ket_function, "Gets the ket basis function.")
+        .def("bra_bf_index", &CScreenedBasisFunctionPair::bra_bf_index, "Gets the local bra basis function index.")
+        .def("ket_bf_index", &CScreenedBasisFunctionPair::ket_bf_index, "Gets the local ket basis function index.")
+        .def("bra_x", &CScreenedBasisFunctionPair::bra_x, "Gets the bra atom X coordinates.")
+        .def("bra_y", &CScreenedBasisFunctionPair::bra_y, "Gets the bra atom Y coordinates.")
+        .def("bra_z", &CScreenedBasisFunctionPair::bra_z, "Gets the bra atom Z coordinates.")
+        .def("ket_x", &CScreenedBasisFunctionPair::ket_x, "Gets the ket atom X coordinates.")
+        .def("ket_y", &CScreenedBasisFunctionPair::ket_y, "Gets the ket atom Y coordinates.")
+        .def("ket_z", &CScreenedBasisFunctionPair::ket_z, "Gets the ket atom Z coordinates.")
+        .def("bra_atoms", &CScreenedBasisFunctionPair::bra_atoms, "Gets the bra atom indices.")
+        .def("ket_atoms", &CScreenedBasisFunctionPair::ket_atoms, "Gets the ket atom indices.")
+        .def("number_of_pairs", &CScreenedBasisFunctionPair::number_of_pairs, "Gets the number of surviving atom pairs.")
+        .def("__eq__", [](const CScreenedBasisFunctionPair &self, const CScreenedBasisFunctionPair &other) { return self == other; })
+        .def("__copy__", [](const CScreenedBasisFunctionPair &self) { return CScreenedBasisFunctionPair(self); })
+        .def("__deepcopy__", [](const CScreenedBasisFunctionPair &self, py::dict) { return CScreenedBasisFunctionPair(self); });
+
+    // CSparseMatrix class
+    PyClass<CSparseMatrix>(m, "SparseMatrix")
+        .def(py::init<>())
+        .def(py::init<const std::vector<CScreenedBasisFunctionPair> &, const mat_t>(), "screened_pairs"_a, "mtype"_a)
+        .def(py::init<const CSparseMatrix &>())
+        .def("type", &CSparseMatrix::type, "Gets the symmetry type of the matrix.")
+        .def("number_of_keys", &CSparseMatrix::number_of_keys, "Gets the number of blocks in the layout.")
+        .def("number_of_blocks", &CSparseMatrix::number_of_blocks, "Gets the number of allocated blocks.")
+        .def("has_block", &CSparseMatrix::has_block, "Checks whether a block is allocated for a key.", "key"_a)
+        .def("block_rows", &CSparseMatrix::block_rows, "Gets the number of rows of the block for a key.", "key"_a)
+        .def("block_columns", &CSparseMatrix::block_columns, "Gets the number of columns of the block for a key.", "key"_a)
+        .def("block",
+             py::overload_cast<const size_t>(&CSparseMatrix::block),
+             "Gets the block for a key, creating a zero block if not yet allocated.",
+             "key"_a,
+             py::return_value_policy::reference_internal)
+        .def("keys", &CSparseMatrix::keys, "Gets the sorted keys of the allocated blocks.")
+        .def("zero", &CSparseMatrix::zero, "Zeroes the values of all allocated blocks.")
+        .def("__eq__", [](const CSparseMatrix &self, const CSparseMatrix &other) { return self == other; })
+        .def("__copy__", [](const CSparseMatrix &self) { return CSparseMatrix(self); })
+        .def("__deepcopy__", [](const CSparseMatrix &self, py::dict) { return CSparseMatrix(self); });
 
     // exposing functions
 
