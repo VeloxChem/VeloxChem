@@ -58,8 +58,10 @@ try:
 except ImportError:
     pass
 
+from .gbimplicitsolvent import GBImplicitSolvent
 
-class EvbSystemBuilder():
+
+class ReactionSystemBuilder():
 
     def __init__(self, comm=None, ostream=None):
         '''
@@ -97,8 +99,7 @@ class EvbSystemBuilder():
         # self.centroid_offset: float = -0.2 #A
         # self.centroid_complete_ligand: bool = True # If false, the centroid force will only be applied to the reacting atoms, if true, the complete ligand will be used for the centroid force
 
-        self.posres_residue_radius: float = -1  # A, cutoff measured from the com of the ligand for which residues to add to the position restraints, -1 includes the whole molecule
-        self.posres_k = 1000  # kj/mol nm^2, default in gromacs
+        self.frozen_k: float = 10000.0  # kJ/mol/nm², very stiff spring for frozen atoms
 
         # self.restraint_r_default: float = 0.5  # nm, default position restraint distance if none is given
         # self.restraint_r_offset: float = 0.1  # nm, distance added to the measured distance in a structure to set the position restraint distance
@@ -135,6 +136,7 @@ class EvbSystemBuilder():
         self.verbose = False
 
         self.constraints: list[dict] = []
+        self.frozen_atoms: list[int] = []
 
         self.k = 4.184 * hartree_in_kcalpermol() * 0.1 * bohr_in_angstrom(
         )  # Coulombic pre-factor
@@ -197,8 +199,7 @@ class EvbSystemBuilder():
             "neutralize": bool,
             "morse_D_default": float,
             "morse_couple": float,
-            "posres_k": float,
-            "posres_residue_radius": float,
+            "frozen_k": float,
             "coul14_scale": float,
             "lj14_scale": float,
             "pdb": str,
@@ -345,7 +346,6 @@ class EvbSystemBuilder():
         pdb_file = mmapp.PDBFile(self.pdb)
         topology = pdb_file.getTopology()
         system_mol = Molecule.read_pdb_file(self.pdb)
-        posres_atoms = [atom for atom in topology.atoms()]
 
         forcefield = mmapp.ForceField('amber14-all.xml', 'amber14/tip3pfb.xml')
         templates, residues = forcefield.generateTemplatesForUnmatchedResidues(
@@ -380,7 +380,6 @@ class EvbSystemBuilder():
         )
 
         self.positions = system_mol.get_coordinates_in_angstrom()
-        self._add_posres(system, posres_atoms, self.positions)
 
         reaction_atoms = {}
         if self.no_reactant:
@@ -580,7 +579,8 @@ class EvbSystemBuilder():
                     continue
                 mm_element = mmapp.Element.getBySymbol(elements[id])
                 name = f"{elements[id]}{id}"
-                system.addParticle(mm_element.mass)
+                mass = (0.0 if (id in self.frozen_atoms) else mm_element.mass)
+                system.addParticle(mass)
                 nb_force.addParticle(
                     0, 1, 0
                 )  # Placeholder values, actual values depend on lambda and will be set later
@@ -638,26 +638,24 @@ class EvbSystemBuilder():
 
         return
 
-    def _add_posres(self, system, atoms, positions):
-        posres_expr = "posres_k*periodicdistance(x, y, z, x0, y0, z0)^2"
-        posres_force = mm.CustomExternalForce(posres_expr)
-        posres_force.setName("protein_ligand_posres")
-        posres_force.setForceGroup(EvbForceGroup.POSRES.value)
-        posres_force.addGlobalParameter('posres_k', self.posres_k)
-        posres_force.addPerParticleParameter('x0')
-        posres_force.addPerParticleParameter('y0')
-        posres_force.addPerParticleParameter('z0')
-        count = 0
-        for atom in atoms:
-            if atom.element is not mmapp.element.hydrogen:
-                index = atom.index
-                position = self.positions[index]
-                posres_force.addParticle(index, position * 0.1)
-                count += 1
-
-        self.ostream.print_info(f"Adding {count} particles to posres force")
-        self.ostream.flush()
-        system.addForce(posres_force)
+    def _add_frozen(self, system, lam):
+        if not self.frozen_atoms:
+            return
+        rea_pos = self.reactant.molecule.get_coordinates_in_angstrom()
+        pro_pos = self.product.molecule.get_coordinates_in_angstrom()
+        frozen_force = mm.CustomExternalForce(
+            "frozen_k*periodicdistance(x, y, z, x0, y0, z0)^2")
+        frozen_force.setName("frozen")
+        frozen_force.addGlobalParameter('frozen_k', self.frozen_k)
+        frozen_force.addPerParticleParameter('x0')
+        frozen_force.addPerParticleParameter('y0')
+        frozen_force.addPerParticleParameter('z0')
+        for atom_id in self.frozen_atoms:
+            particle_index = self.reaction_atoms[atom_id].index
+            interp_pos_nm = ((1 - lam) * rea_pos[atom_id] +
+                             lam * pro_pos[atom_id]) * 0.1  # Å → nm
+            frozen_force.addParticle(particle_index, interp_pos_nm)
+        system.addForce(frozen_force)
 
     def _add_CNT_graphene(self, system, nb_force, topology, system_mol):
 
@@ -1231,12 +1229,6 @@ class EvbSystemBuilder():
     def _add_implicit_solvent(self, system, topology, nb_force):
         """Add a GB implicit solvent force to the system.
 
-        Mirrors the logic in OpenMM's implicit solvent XML scripts: selects the
-        appropriate CustomGBForce subclass, obtains per-atom radii and scaling
-        factors from getStandardParameters (element-based Bondi radii), reads
-        charges from the existing NonbondedForce, and attaches the finalized
-        force to the system.
-
         :param system: the OpenMM System to add the force to.
         :param topology: the OpenMM Topology (all atoms must already be added).
         :param nb_force: the NonbondedForce already present in the system.
@@ -1244,46 +1236,19 @@ class EvbSystemBuilder():
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
 
-        from openmm.app.internal.customgbforces import (
-            GBSAGBnForce,
-            GBSAGBn2Force,
-            GBSAOBC1Force,
-            GBSAOBC2Force,
-            GBSAHCTForce,
-        )
-
-        model_map = {
-            'gbn': GBSAGBnForce,
-            'gbn2': GBSAGBn2Force,
-            'obc1': GBSAOBC1Force,
-            'obc2': GBSAOBC2Force,
-            'hct': GBSAHCTForce,
-        }
-
-        model_key = self.implicit_solvent_model.lower()
+        model = self.implicit_solvent_model
         assert_msg_critical(
-            model_key in model_map,
-            f'EvbSystemBuilder: unknown implicit_solvent_model '
-            f'"{self.implicit_solvent_model}". '
-            f'Valid options are: {list(model_map.keys())}')
+            model.lower() in GBImplicitSolvent.get_valid_models(),
+            f'EvbSystemBuilder: unknown implicit_solvent_model "{model}". '
+            f'Valid options are: {list(GBImplicitSolvent.get_valid_models())}')
 
-        ForceClass = model_map[model_key]
-
-        gb_force = ForceClass(
-            solventDielectric=self.solvent_dielectric,
-            soluteDielectric=self.solute_dielectric,
-            SA='ACE',
+        gb_force = GBImplicitSolvent.build(
+            model=model,
+            topology=topology,
+            nb_force=nb_force,
+            sv_dielectric=self.solvent_dielectric,
+            sl_dielectric=self.solute_dielectric,
         )
-
-        # getStandardParameters returns [[radius, scalingFactor], ...] per atom,
-        # using element-based Bondi radii derived from the topology.
-        std_params = ForceClass.getStandardParameters(topology)
-        for i, gb_params in enumerate(std_params):
-            charge = nb_force.getParticleParameters(i)[0]
-            gb_force.addParticle([charge] + list(gb_params))
-
-        gb_force.finalize()
-        gb_force.setNonbondedMethod(mm.CustomNonbondedForce.NoCutoff)
 
         # Required by OpenMM when GB is active: set reaction-field dielectric
         # of the NonbondedForce to 1 so it does not double-count dielectric
@@ -1292,7 +1257,7 @@ class EvbSystemBuilder():
 
         system.addForce(gb_force)
         self.ostream.print_info(
-            f'Added implicit solvent ({self.implicit_solvent_model}) with '
+            f'Added implicit solvent ({model}) with '
             f'solvent_dielectric={self.solvent_dielectric}, '
             f'solute_dielectric={self.solute_dielectric}')
         self.ostream.flush()
@@ -1366,10 +1331,14 @@ class EvbSystemBuilder():
             # Add the bonded forces for the reaction system
             if not self.no_reactant:
                 self._add_reaction_forces(new_system, lam)
+
+            self._add_frozen(new_system, lam)
             systems[lam] = new_system
 
         self._add_reaction_forces(rea_system, 0, pes=True)
+        self._add_frozen(rea_system, 0)
         self._add_reaction_forces(pro_system, 1, pes=True)
+        self._add_frozen(pro_system, 1)
 
         if self.decompose_nb is not None:
             if self.solvent:
@@ -2355,9 +2324,8 @@ class EvbSystemBuilder():
             if i != base_particle:
                 exclusions.add(i)
             if current_level > 0:
-                EvbSystemBuilder._add_exclusions_to_set(bonded12, exclusions,
-                                                        base_particle, i,
-                                                        current_level - 1)
+                ReactionSystemBuilder._add_exclusions_to_set(
+                    bonded12, exclusions, base_particle, i, current_level - 1)
 
     def _create_constraint_forces(self, lam):
 
@@ -2593,11 +2561,11 @@ class EvbForceGroup(Enum):
     PDB = auto()  # Bonded forces added from the PDB
     SOL_COUL = auto()
     SOL_LJ = auto()
-    POSRES = auto()
+    FROZEN = auto()
 
     @classmethod
     def pes_forcegroups(cls):
-        max_ind = cls.POSRES.value
+        max_ind = cls.FROZEN.value
         return set(range(1, max_ind))
 
     @classmethod

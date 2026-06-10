@@ -1448,7 +1448,9 @@ def _Molecule_show(self,
                    breaking_bonds=None,
                    forming_width=0.15,
                    breaking_width=0.15,
-                   label_font_size=16):
+                   label_font_size=16,
+                   focus=None,
+                   focus_radius=0.1):
     """
     Creates a 3D view with py3dmol.
 
@@ -1614,7 +1616,24 @@ def _Molecule_show(self,
                         'fontSize': label_font_size,
                     })
         viewer.setViewStyle({"style": "outline", "width": 0.05})
-        viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
+        if focus:
+            focused_serials = [i - starting_index for i in focus]
+            viewer.setStyle({}, {
+                "stick": {
+                    "radius": focus_radius
+                },
+                "sphere": {
+                    "radius": focus_radius
+                }
+            })
+            viewer.setStyle({"serial": focused_serials}, {
+                "stick": {},
+                "sphere": {
+                    "scale": 0.25
+                }
+            })
+        else:
+            viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
         viewer.zoomTo()
         viewer.show()
 

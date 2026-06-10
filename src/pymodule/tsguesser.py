@@ -50,7 +50,7 @@ from .molecule import Molecule
 from .scfrestdriver import ScfRestrictedDriver
 from .molecularbasis import MolecularBasis
 from .reaffbuilder import ReactionForceFieldBuilder
-from .evbsystembuilder import EvbSystemBuilder
+from .reactionsystembuilder import ReactionSystemBuilder
 
 try:
     import openmm as mm
@@ -95,6 +95,7 @@ class TransitionStateGuesser():
         # system XML files to disk — useful for debugging but off by default
         # to avoid unnecessary file I/O on HPC shared filesystems.
         self.save_intermediates = False
+        self.frozen_atoms = []
         # Set save_results_file=True (default) to write the HDF5 results file
         # after each scan. This enables crash recovery and load_results().
         self.save_results_file = True
@@ -260,7 +261,7 @@ class TransitionStateGuesser():
         self.ostream.print_info(
             f"Rounding lambda vector to 3 decimal places: {self.lambda_vector}")
 
-        sysbuilder = EvbSystemBuilder()
+        sysbuilder = ReactionSystemBuilder()
         if self.mute_ff_build:
             sysbuilder.ostream.mute()
             self.ostream.print_info(
@@ -320,6 +321,46 @@ class TransitionStateGuesser():
             self.ostream.print_info(
                 f"Conformer restraint force constant: {self.conformer_k:.1f} kJ/mol."
             )
+            self.ostream.flush()
+
+        # Convert 1-indexed user input to 0-indexed internal representation
+
+        configuration['frozen_atoms'] = [i - 1 for i in self.frozen_atoms]
+        configuration['frozen_use_posres'] = self.frozen_use_posres
+
+        if len(self.frozen_atoms) > 0:
+            rea_pos = self.reactant.molecule.get_coordinates_in_angstrom()
+            pro_pos = self.product.molecule.get_coordinates_in_angstrom()
+            frozen_norm = 0
+            min_norm = 0
+            max_norm = -1
+            min_index = -1
+            max_index = -1
+            for i in self.frozen_atoms:
+                norm = np.linalg.norm(pro_pos[i] - rea_pos[i])
+                if min_index == -1 or norm < min_norm:
+                    min_norm = norm
+                    min_index = i
+                if max_index == -1 or norm > max_norm:
+                    max_norm = norm
+                    max_index = i
+                frozen_norm += norm
+
+            self.ostream.print_info(
+                f"Freezing {len(self.frozen_atoms)} atoms with average displacement of {frozen_norm / len(self.frozen_atoms):.2f} Å between reactant and product."
+            )
+            self.ostream.print_info(
+                f"Minimum frozen atom displacement: {min_norm:.2f} Å (atom index {min_index + 1})"
+            )
+            self.ostream.print_info(
+                f"Maximum frozen atom displacement: {max_norm:.2f} Å (atom index {max_index + 1})"
+            )
+            if max_norm > 0.5:
+                self.ostream.print_warning(
+                    "Maximum frozen atom displacement is greater than 0.5 Å. "
+                    "This may lead to unrealistic forces and convergence issues during the scan."
+                )
+
             self.ostream.flush()
 
         self.systems, self.topology, _ = sysbuilder.build_systems(
@@ -672,6 +713,11 @@ class TransitionStateGuesser():
         else:
             pdb_name = f'topology_{getrandbits(32):08x}.pdb'
 
+        rea_pos = self.reactant.molecule.get_coordinates_in_angstrom()
+        pro_pos = self.product.molecule.get_coordinates_in_angstrom()
+        init_pos = init_pos.copy()
+        init_pos[self.frozen_atoms] = ((1 - l) * rea_pos[self.frozen_atoms] +
+                                       l * pro_pos[self.frozen_atoms])
         pdb_not_used = mmapp.PDBFile.writeFile(
             topology,
             init_pos * mmunit.angstrom,
@@ -699,10 +745,12 @@ class TransitionStateGuesser():
                                    conformers_dict['molecules']):
             pos = temp_mol.get_coordinates_in_angstrom()
             v, e1, e2 = self._recalc_mm_energy(pos, l, reasim, prosim)
-            avg_x = np.mean(pos[:, 0])
-            avg_y = np.mean(pos[:, 1])
-            avg_z = np.mean(pos[:, 2])
-            pos -= [avg_x, avg_y, avg_z]
+
+            if not (self.frozen_atoms):
+                avg_x = np.mean(pos[:, 0])
+                avg_y = np.mean(pos[:, 1])
+                avg_z = np.mean(pos[:, 2])
+                pos -= [avg_x, avg_y, avg_z]
             xyz = temp_mol.get_xyz_string()
             temp_result = {
                 'v': v,

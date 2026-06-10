@@ -42,7 +42,7 @@ from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .evbreporter import EvbReporter
 from .errorhandler import assert_msg_critical, print_exception_if_debug
-from .evbsystembuilder import EvbForceGroup
+from .reactionsystembuilder import EvbForceGroup
 
 try:
     import openmm as mm
