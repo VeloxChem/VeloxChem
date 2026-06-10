@@ -248,6 +248,34 @@ class TestMolecularBasis:
         indexes = basis.basis_sets_indices()
         assert indexes == [0, 1, 1]
 
+    def test_unique_basis_pairs(self):
+
+        o_bas = self.get_oxygen_svp()
+        h_bas = self.get_hydrogen_svp()
+        h_basp = self.get_hydrogen_svpd()
+
+        # two unique basis sets -> upper triangle (O,O), (O,H), (H,H)
+        basis = self.get_h2o_svp()
+        pairs = basis.unique_basis_pairs()
+        ref_pairs = [(o_bas, o_bas), (o_bas, h_bas), (h_bas, h_bas)]
+        assert len(pairs) == len(ref_pairs)
+        for (a, b), (ra, rb) in zip(pairs, ref_pairs):
+            assert a == ra
+            assert b == rb
+
+        # (b,a) is skipped: no mirrored pair is present
+        assert (h_bas, o_bas) not in pairs
+
+        # three unique basis sets -> six unique symmetric pairs
+        mixed = self.get_h2o_mixed()
+        pairs = mixed.unique_basis_pairs()
+        ref_pairs = [(o_bas, o_bas), (o_bas, h_bas), (o_bas, h_basp),
+                     (h_bas, h_bas), (h_bas, h_basp), (h_basp, h_basp)]
+        assert len(pairs) == len(ref_pairs)
+        for (a, b), (ra, rb) in zip(pairs, ref_pairs):
+            assert a == ra
+            assert b == rb
+
     def test_max_angular_momentum(self):
 
         basis = self.get_h2o_svp()

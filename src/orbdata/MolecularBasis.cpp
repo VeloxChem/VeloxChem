@@ -169,6 +169,26 @@ CMolecularBasis::basis_sets_indices() const -> std::vector<int>
 }
 
 auto
+CMolecularBasis::unique_basis_pairs() const -> std::vector<std::pair<CAtomBasis, CAtomBasis>>
+{
+    const auto nsets = _basis_sets.size();
+
+    std::vector<std::pair<CAtomBasis, CAtomBasis>> pairs;
+
+    pairs.reserve(nsets * (nsets + 1) / 2);
+
+    for (size_t i = 0; i < nsets; i++)
+    {
+        for (size_t j = i; j < nsets; j++)
+        {
+            pairs.push_back({_basis_sets[i], _basis_sets[j]});
+        }
+    }
+
+    return pairs;
+}
+
+auto
 CMolecularBasis::max_angular_momentum() const -> int
 {
     auto pos = std::ranges::max_element(

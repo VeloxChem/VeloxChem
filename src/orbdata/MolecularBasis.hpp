@@ -36,6 +36,7 @@
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "AtomBasis.hpp"
@@ -107,6 +108,12 @@ class CMolecularBasis
     /// @brief Gets vector of indices for atom bases.
     /// @return The vector of indices for atom bases.
     auto basis_sets_indices() const -> std::vector<int>;
+
+    /// @brief Gets vector of unique symmetric combinations of unique atom bases.
+    /// Pairs are treated as symmetric, i.e. (a,b) is included while (b,a) is
+    /// skipped; self-pairs (a,a) are included.
+    /// @return The vector of unique atom basis pairs.
+    auto unique_basis_pairs() const -> std::vector<std::pair<CAtomBasis, CAtomBasis>>;
 
     /// @brief Gets maximum angular momentum of molecular basis.
     /// @return The maximum angular momentum.
