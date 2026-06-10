@@ -59,6 +59,7 @@ from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
+from .rspordspec import OpticalRotatoryDispersionSpectrum
 from .rspc6 import C6
 from .rsprixs import RIXS
 from .rspshg import SHG
@@ -198,6 +199,16 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
             'ecd(cpp)',
     ]:
         rsp_prop = CircularDichroismSpectrum(rsp_dict, method_dict)
+
+    elif prop_type in [
+            'optical rotatory dispersion (cpp)',
+            'optical rotatory dispersion(cpp)',
+            'optical rotation (cpp)',
+            'optical rotation(cpp)',
+            'ord (cpp)',
+            'ord(cpp)',
+    ]:
+        rsp_prop = OpticalRotatoryDispersionSpectrum(rsp_dict, method_dict)
 
     elif prop_type == 'c6':
         rsp_prop = C6(rsp_dict, method_dict)

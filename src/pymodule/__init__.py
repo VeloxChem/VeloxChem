@@ -164,6 +164,7 @@ from .respchargesdriver import RespChargesDriver
 from .rspproperty import ResponseProperty
 from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
+from .rspordspec import OpticalRotatoryDispersionSpectrum
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .rspc6 import C6
