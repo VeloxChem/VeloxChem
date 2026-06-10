@@ -52,6 +52,7 @@
 #include "GtoPairBlock.hpp"
 #include "GtoPairBlockFunc.hpp"
 #include "MolecularBasis.hpp"
+#include "ObaraSaikaFunc.hpp"
 #include "ScreenedBasisFunctionPair.hpp"
 #include "SparseMatrix.hpp"
 #include "SparseMatrixFunc.hpp"
@@ -566,6 +567,16 @@ export_orbdata(py::module &m)
           "matrix"_a,
           "screened_pairs"_a,
           "basis"_a);
+
+    m.def("compute_pa",
+          &osfunc::compute_pa,
+          "Computes the Obara-Saika PA distances for a screened basis function pair.",
+          "pair"_a);
+
+    m.def("compute_pb",
+          &osfunc::compute_pb,
+          "Computes the Obara-Saika PB distances for a screened basis function pair.",
+          "pair"_a);
 }
 
 }  // namespace vlx_orbdata
