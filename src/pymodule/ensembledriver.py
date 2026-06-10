@@ -922,8 +922,8 @@ class EnsembleDriver:
         Write PE environment snapshots to .pot files.
         Generates one .pot file per snapshot.
 
-        The file contains the @environment,
-        @charges, and @polarizabilities sections.
+        The file contains the @environment and @charges sections. The
+        @polarizabilities section is included only when PE atoms are present.
 
         :param snapshots:
             A list of snapshot dictionaries.
@@ -1092,29 +1092,30 @@ class EnsembleDriver:
                         fh.write(f"{p['element']:<2} {p['charge']:12.8f}  {resn}_npe\n")
                 fh.write("@end\n\n")
 
-                fh.write("@polarizabilities\n")
-                for resn in pe_resname_set:
-                    db_resn = self._normalize_resname_for_pe_db(pe_db, resn)
-                    pattern_atoms = self._first_residue_atom_pattern(
-                        pe_atom_names, pe_resindices, pe_resnames, resn
-                    )
-                    for atom in pattern_atoms:
-                        resolved_atom = self._resolve_atom_name_for_pe_db(
-                            atom, 
-                            pe_db[db_resn].keys(),
-                            db_resn,
+                if pe_coords.size > 0:
+                    fh.write("@polarizabilities\n")
+                    for resn in pe_resname_set:
+                        db_resn = self._normalize_resname_for_pe_db(pe_db, resn)
+                        pattern_atoms = self._first_residue_atom_pattern(
+                            pe_atom_names, pe_resindices, pe_resnames, resn
                         )
-                        if resolved_atom is None:
-                            raise KeyError(
-                                f"No PE params for {resn}/{atom}. Available: {sorted(pe_db[db_resn].keys())}"
+                        for atom in pattern_atoms:
+                            resolved_atom = self._resolve_atom_name_for_pe_db(
+                                atom,
+                                pe_db[db_resn].keys(),
+                                db_resn,
                             )
-                        p = pe_db[db_resn][resolved_atom]
-                        pol = p["polar"]
-                        fh.write(
-                            f"{p['element']:<2} {pol[0]:12.8f} {pol[1]:12.8f} {pol[2]:12.8f} "
-                            f"{pol[3]:12.8f} {pol[4]:12.8f} {pol[5]:12.8f}  {resn}_pe\n"
-                        )
-                fh.write("@end\n")
+                            if resolved_atom is None:
+                                raise KeyError(
+                                    f"No PE params for {resn}/{atom}. Available: {sorted(pe_db[db_resn].keys())}"
+                                )
+                            p = pe_db[db_resn][resolved_atom]
+                            pol = p["polar"]
+                            fh.write(
+                                f"{p['element']:<2} {pol[0]:12.8f} {pol[1]:12.8f} {pol[2]:12.8f} "
+                                f"{pol[3]:12.8f} {pol[4]:12.8f} {pol[5]:12.8f}  {resn}_pe\n"
+                            )
+                    fh.write("@end\n")
 
         # Ensure all ranks proceed only after master finished writing
         self.comm.barrier()
