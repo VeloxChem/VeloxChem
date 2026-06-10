@@ -73,6 +73,21 @@ auto compute_pb(const CScreenedBasisFunctionPair &pair) -> CDenseMatrix;
 /// @return The dense matrix of elementary primitive overlaps.
 auto compute_overlap(const CScreenedBasisFunctionPair &pair) -> CDenseMatrix;
 
+/// @brief Contracts primitive integrals into a contracted dense matrix by
+/// summing over primitive pairs. The number of primitive rows summed into each
+/// contracted row is the ratio of the row dimensions,
+///   primitives.number_of_rows() / contracted.number_of_rows(),
+/// with the primitive pairs stored as the innermost (contiguous) row groups, so
+/// contracted row r accumulates primitive rows [r * factor, (r + 1) * factor).
+/// The contracted values are accumulated (added) into the contracted matrix,
+/// which must have the same number of columns as the primitive matrix. For
+/// example a primitive overlap matrix (nprim_bra * nprim_ket rows) contracts
+/// into a single-row matrix, and a PA or PB matrix (3 * nprim_bra * nprim_ket
+/// rows) contracts into a three-row matrix.
+/// @param contracted The contracted dense matrix, accumulated into.
+/// @param primitives The primitive dense matrix.
+auto contract(CDenseMatrix &contracted, const CDenseMatrix &primitives) -> void;
+
 }  // namespace osfunc
 
 #endif /* ObaraSaikaFunc_hpp */

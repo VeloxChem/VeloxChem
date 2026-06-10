@@ -231,4 +231,41 @@ compute_overlap(const CScreenedBasisFunctionPair &pair) -> CDenseMatrix
     return smat;
 }
 
+auto
+contract(CDenseMatrix &contracted, const CDenseMatrix &primitives) -> void
+{
+    const auto n_out = contracted.getNumberOfRows();
+
+    const auto n_in = primitives.getNumberOfRows();
+
+    const auto npairs = primitives.getNumberOfColumns();
+
+    const auto factor = n_in / n_out;  // number of primitive pairs per contracted row
+
+    auto *cvals = contracted.values();
+
+    const auto *pvals = primitives.values();
+
+    // accumulate the factor primitive rows of each contracted row, vectorizing
+    // over the contiguous atom-pair dimension (the inner loop must be the simd
+    // loop; an omp simd over an outer loop with an inner reduction does not
+    // vectorize)
+
+    for (int r = 0; r < n_out; r++)
+    {
+        auto *crow = cvals + static_cast<size_t>(r) * npairs;
+
+        for (int k = 0; k < factor; k++)
+        {
+            const auto *prow = pvals + (static_cast<size_t>(r) * factor + k) * npairs;
+
+#pragma omp simd
+            for (int p = 0; p < npairs; p++)
+            {
+                crow[p] += prow[p];
+            }
+        }
+    }
+}
+
 }  // namespace osfunc
