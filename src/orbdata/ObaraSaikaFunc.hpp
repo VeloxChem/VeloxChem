@@ -61,6 +61,18 @@ auto compute_pa(const CScreenedBasisFunctionPair &pair) -> CDenseMatrix;
 /// @return The dense matrix of PB distances.
 auto compute_pb(const CScreenedBasisFunctionPair &pair) -> CDenseMatrix;
 
+/// @brief Computes the elementary primitive overlaps for a screened basis
+/// function pair:
+///   S_ij = c_i c_j (pi/(alpha_i+beta_j))^{3/2}
+///          exp(-alpha_i beta_j/(alpha_i+beta_j) R_AB^2),
+/// where c_i, c_j are the bra and ket primitive contraction coefficients,
+/// alpha_i, beta_j the exponents and R_AB the distance between the centers. The
+/// result is stored in a dense matrix with nprim_bra * nprim_ket rows
+/// (row = i_bra * nprim_ket + j_ket) and number_of_pairs columns.
+/// @param pair The screened basis function pair.
+/// @return The dense matrix of elementary primitive overlaps.
+auto compute_overlap(const CScreenedBasisFunctionPair &pair) -> CDenseMatrix;
+
 }  // namespace osfunc
 
 #endif /* ObaraSaikaFunc_hpp */

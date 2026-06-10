@@ -32,6 +32,10 @@
 
 #include "ObaraSaikaFunc.hpp"
 
+#include <cmath>
+
+#include "MathConst.hpp"
+
 namespace osfunc {  // osfunc namespace
 
 auto
@@ -152,6 +156,79 @@ compute_pb(const CScreenedBasisFunctionPair &pair) -> CDenseMatrix
     }
 
     return pbmat;
+}
+
+auto
+compute_overlap(const CScreenedBasisFunctionPair &pair) -> CDenseMatrix
+{
+    const auto bra_exponents = pair.bra_function().get_exponents();
+
+    const auto bra_coefficients = pair.bra_function().get_normalization_factors();
+
+    const auto ket_exponents = pair.ket_function().get_exponents();
+
+    const auto ket_coefficients = pair.ket_function().get_normalization_factors();
+
+    const auto npb = bra_exponents.size();
+
+    const auto npk = ket_exponents.size();
+
+    const auto npairs = static_cast<int>(pair.number_of_pairs());
+
+    // bra and ket atom coordinates (one entry per atom pair)
+
+    const auto *ax = pair.bra_x().data();
+    const auto *ay = pair.bra_y().data();
+    const auto *az = pair.bra_z().data();
+    const auto *bx = pair.ket_x().data();
+    const auto *by = pair.ket_y().data();
+    const auto *bz = pair.ket_z().data();
+
+    CDenseMatrix smat(static_cast<int>(npb * npk), npairs);
+
+    auto *svals = smat.values();
+
+    const auto fpi = mathconst::pi_value();
+
+    // exponents and coefficients are identical for all atom pairs, so the
+    // prefactor and decay exponent depend only on the primitive pair: loop over
+    // primitive pairs and vectorize over atoms
+
+    for (size_t i = 0; i < npb; i++)
+    {
+        const auto a = bra_exponents[i];
+
+        const auto ca = bra_coefficients[i];
+
+        for (size_t j = 0; j < npk; j++)
+        {
+            const auto b = ket_exponents[j];
+
+            const auto cb = ket_coefficients[j];
+
+            const auto sab = a + b;
+
+            const auto mu = a * b / sab;
+
+            const auto prefactor = ca * cb * (fpi / sab) * std::sqrt(fpi / sab);
+
+            auto *srow = svals + (i * npk + j) * npairs;
+
+#pragma omp simd
+            for (int p = 0; p < npairs; p++)
+            {
+                const auto abx = ax[p] - bx[p];
+                const auto aby = ay[p] - by[p];
+                const auto abz = az[p] - bz[p];
+
+                const auto r2 = abx * abx + aby * aby + abz * abz;
+
+                srow[p] = prefactor * std::exp(-mu * r2);
+            }
+        }
+    }
+
+    return smat;
 }
 
 }  // namespace osfunc
