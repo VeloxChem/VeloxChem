@@ -38,7 +38,7 @@ import sys
 
 from .veloxchemlib import hartree_in_ev, mpi_master
 from .oneeints import compute_electric_dipole_integrals
-from .spectrumplot import plot_rixs_spectrum
+from .spectrumplot import plot_rixs_spectrum, plot_rixs_map, plot_rixs_slices
 from .outputstream import OutputStream
 from .linearsolver import LinearSolver
 from .lreigensolver import LinearResponseEigenSolver
@@ -200,7 +200,7 @@ class RixsDriver(LinearSolver):
                 f'({ce_states}, {ve_states})')
 
     def compute(self, molecule, basis, scf_results,
-                rsp_results=None, cvs_rsp_results=None):
+                rsp_results=None, core_rsp_results=None):
         """
         Computes RIXS properties.
 
@@ -212,7 +212,7 @@ class RixsDriver(LinearSolver):
             The results dictionary from converged SCF wavefunction.
         :rsp_results:
             The linear-response results dictionary.
-        :cvs_rsp_results:
+        :core_rsp_results:
             The core-valence-separated (CVS) linear-response
             results dictionary.
 
@@ -267,7 +267,7 @@ class RixsDriver(LinearSolver):
 
             rsp_results = rsp_drv.compute(molecule, basis, scf_results)
 
-        if cvs_rsp_results is None and (not self.restricted_subspace):
+        if core_rsp_results is None and (not self.restricted_subspace):
 
             cvs_rsp_keys = [
                 'num_core_orbitals',
@@ -295,7 +295,7 @@ class RixsDriver(LinearSolver):
                 fpath = fpath.with_name(fpath.stem)
                 cvs_rsp_drv.checkpoint_file = str(fpath) + '_rixs_cvs.h5'
 
-            cvs_rsp_results = cvs_rsp_drv.compute(molecule, basis, scf_results)
+            core_rsp_results = cvs_rsp_drv.compute(molecule, basis, scf_results)
 
         nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
@@ -313,9 +313,9 @@ class RixsDriver(LinearSolver):
             self._method_ref_str = 'J. Chem. Theory Comput. 2021, 17, 3031-3038, DOI: 10.1021/acs.jctc.1c00144'
 
             if self.rank == mpi_master():
-                num_core_orbitals = cvs_rsp_results['num_core']
+                num_core_orbitals = core_rsp_results['num_core']
                 num_valence_orbitals = nocc - num_core_orbitals
-                num_intermediate_states = len(cvs_rsp_results['eigenvalues'])
+                num_intermediate_states = len(core_rsp_results['eigenvalues'])
                 num_final_states = len(rsp_results['eigenvalues'])
             else:
                 num_core_orbitals = None
@@ -373,7 +373,7 @@ class RixsDriver(LinearSolver):
             val_states = self.comm.bcast(val_states, root=mpi_master())
 
             # For compatibility with the two-shot approach
-            cvs_rsp_results = rsp_results
+            core_rsp_results = rsp_results
             occupied_core = num_core_orbitals + num_valence_orbitals
 
         mo_core_indices = list(range(num_core_orbitals))
@@ -384,7 +384,7 @@ class RixsDriver(LinearSolver):
             mo_occ = scf_results['C_alpha'][:, mo_core_indices + mo_val_indices].copy()
             mo_vir = scf_results['C_alpha'][:, mo_vir_indices].copy()
 
-            core_eigvals = cvs_rsp_results['eigenvalues'][core_states].copy()
+            core_eigvals = core_rsp_results['eigenvalues'][core_states].copy()
             valence_eigvals = rsp_results['eigenvalues'][val_states].copy()
         else:
             mo_occ = None
@@ -399,7 +399,7 @@ class RixsDriver(LinearSolver):
         core_eigvals = self.comm.bcast(core_eigvals, root=mpi_master())
         valence_eigvals = self.comm.bcast(valence_eigvals, root=mpi_master())
 
-        core_eigvecs = self._get_eigvecs(cvs_rsp_results, core_states, "core")
+        core_eigvecs = self._get_eigvecs(core_rsp_results, core_states, "core")
         valence_eigvecs = self._get_eigvecs(rsp_results, val_states, "valence")
 
         core_mats = self._preprocess_core_eigvecs(core_eigvecs, occupied_core,
@@ -428,10 +428,10 @@ class RixsDriver(LinearSolver):
             init_photon_set = False
 
             if self.rank == mpi_master():
-                if cvs_rsp_results is None:
+                if core_rsp_results is None:
                     osc_arr = rsp_results['oscillator_strengths']
                 else:
-                    osc_arr = cvs_rsp_results['oscillator_strengths']
+                    osc_arr = core_rsp_results['oscillator_strengths']
             else:
                 osc_arr = None
             osc_arr = self.comm.bcast(osc_arr, root=mpi_master())
@@ -552,6 +552,9 @@ class RixsDriver(LinearSolver):
             'scattering_amplitudes': self.scattering_amplitudes,
             'emission_energies': self.emission_enes,
             'energy_losses': self.ene_losses,
+            'core_eigenvalues': core_rsp_results['eigenvalues'][core_states],
+            'core_osc_strengths': core_rsp_results['oscillator_strengths'][core_states],
+            'gamma_fwhm_ev': self.gamma * hartree_in_ev(),
         }
 
         if self.filename is not None and self.rank == mpi_master():
@@ -1095,8 +1098,12 @@ class RixsDriver(LinearSolver):
 
         :param title:
             The title to be printed to the output stream.
-        :param results:
-            The dictionary containing response results.
+        :param ene_losses:
+            The list of energy losses.
+        :param cross_sections:
+            The list of cross-sections.
+        :param elastic_cross_section:
+            The elastic cross-section.
         """
 
         spin_str = 'S'
@@ -1120,36 +1127,159 @@ class RixsDriver(LinearSolver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def plot_spectrum(self,
-                      results,
-                      broadening_type="lorentzian",
-                      broadening_value=0.15,
-                      x_unit='ev',
-                      energy_loss=True,
-                      photon_index=0,
-                      ax=None):
+    @staticmethod
+    def _resolve_photon_selection(results, photon_index=None, photon_energy=None):
+        assert_msg_critical(
+            not (photon_index is not None and photon_energy is not None),
+            'plot_spectrum: specify only one of photon_index or photon_energy.'
+        )
+
+        incoming_ev = np.asarray(results['elastic_emission']) * hartree_in_ev()
+
+        if photon_index is None and photon_energy is None:
+            return 0
+
+        if photon_energy is not None:
+            energies = np.atleast_1d(photon_energy).astype(float)
+            indices = np.argmin(np.abs(incoming_ev[:, None] - energies[None, :]),
+                                axis=0)
+
+            if np.ndim(photon_energy) == 0:
+                return int(indices[0])
+
+            return indices.astype(int)
+
+        indices = np.atleast_1d(photon_index).astype(int)
+
+        assert_msg_critical(
+            np.all(indices >= 0) and np.all(indices < incoming_ev.size),
+            'plot_spectrum: photon_index out of range.'
+        )
+
+        if np.ndim(photon_index) == 0:
+            return int(indices[0])
+
+        return indices
+
+    def plot(self,
+            results,
+            broadening_type="lorentzian",
+            broadening_value_ev=0.24,
+            x_unit='ev',
+            energy_loss=True,
+            photon_index=None,
+            photon_energy_ev=None,
+            normalize=True,
+            ax=None):
         """
-        Plot the RIXS spectrum for a single element from the computed results.
+        Plot the RIXS spectrum.
+
+        Specify either photon_index or photon_energy, not both.
 
         :param results:
             The results dictionary from compute method.
         :param broadening_type:
             The type of broadening to use. Either 'lorentzian' or 'gaussian'.
         :param broadening_value:
-            The broadening value (FWHM) in eV.
-        :param color:
-            Color scheme for plotting. Either 'vlx' for VeloxChem default color (darkcyan)
-            or 'cpk' for CPK coloring (element-specific colors). Default is 'vlx'.
+            The broadening value, FWHM in eV.
+        :param x_unit:
+            Unit for the x-axis.
+        :param energy_loss:
+            If True, plot versus energy loss.
+            If False, plot versus emission energy.
+        :param photon_index:
+            Integer index for a single slice, or list of indices for stacked slices.
+        :param photon_energy_ev:
+            Photon energy in eV, or list of photon energies in eV. The closest
+            available calculated photon energy is used.
+        :param normalize:
+            If True, normalize the cross-sections (based on max intenstiy).
         :param ax:
-            The matplotlib axis to plot on. If None, a new figure is created.
+            The matplotlib axis to plot on.
 
         :return:
             The matplotlib axis object.
         """
-        plot_rixs_spectrum(results,
-                          broadening_type=broadening_type,
-                          broadening_value=broadening_value,
-                          photon_index=photon_index,
-                          x_unit=x_unit,
-                          energy_loss=energy_loss,
-                          ax=ax)
+
+        # if given as energies, find the closest calculated photon energy indices
+        photon_selection = self._resolve_photon_selection(
+            results,
+            photon_index=photon_index,
+            photon_energy=photon_energy_ev
+        )
+
+        if isinstance(photon_selection, np.ndarray):
+            return plot_rixs_slices(
+                results,
+                photon_indices=photon_selection,
+                broadening_type=broadening_type,
+                broadening_value=broadening_value_ev,
+                x_unit=x_unit,
+                energy_loss=energy_loss,
+                normalize=normalize,
+                ax=ax
+            )
+        else:
+            return plot_rixs_spectrum(
+                results,
+                broadening_type=broadening_type,
+                broadening_value=broadening_value_ev,
+                photon_index=photon_selection,
+                x_unit=x_unit,
+                energy_loss=energy_loss,
+                ax=ax
+            )
+        
+    def plot_map(self,
+                results,
+                broadening_type="lorentzian",
+                broadening_value_ev=0.24,
+                x_step=0.01,
+                x_unit='ev',
+                energy_loss=True,
+                min_photon_points=10,
+                colormap='cividis',
+                ax=None):
+        """
+        Plot the 2D RIXS map together with the corresponding XAS spectrum.
+
+        :param results:
+            The RIXS results dictionary from the compute method.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value_ev:
+            The broadening value, FWHM in eV.
+        :param x_step:
+            Grid spacing in eV for the broadened RIXS map.
+        :param x_unit:
+            Currently only 'ev' is supported.
+        :param energy_loss:
+            If True, plot versus energy loss.
+            If False, plot versus emission energy.
+        :param min_photon_points:
+            Minimum number of incoming photon energies required for a meaningful map.
+        :param colormap:
+            The colormap to use for the RIXS map.
+        :param ax:
+            If None, new axes are created.
+            Otherwise pass a tuple (ax_map, ax_xas).
+        """
+
+        n_photons = len(np.asarray(results['elastic_emission']))
+
+        assert_msg_critical(
+            n_photons >= min_photon_points,
+            'plot_map: too few incoming photon energies for a meaningful 2D RIXS map. '
+            'Use plot_spectrum(..., photon_index=[...]) for stacked slices instead.'
+        )
+
+        return plot_rixs_map(
+            results,
+            broadening_type=broadening_type,
+            broadening_value=broadening_value_ev,
+            x_step=x_step,
+            x_unit=x_unit,
+            energy_loss=energy_loss,
+            cmap=colormap,
+            ax=ax
+        )
