@@ -282,49 +282,49 @@ CScreenedBasisFunctionPair::ket_bf_index() const -> int
 }
 
 auto
-CScreenedBasisFunctionPair::bra_x() const -> std::vector<double>
+CScreenedBasisFunctionPair::bra_x() const -> const std::vector<double> &
 {
     return _bra_x;
 }
 
 auto
-CScreenedBasisFunctionPair::bra_y() const -> std::vector<double>
+CScreenedBasisFunctionPair::bra_y() const -> const std::vector<double> &
 {
     return _bra_y;
 }
 
 auto
-CScreenedBasisFunctionPair::bra_z() const -> std::vector<double>
+CScreenedBasisFunctionPair::bra_z() const -> const std::vector<double> &
 {
     return _bra_z;
 }
 
 auto
-CScreenedBasisFunctionPair::ket_x() const -> std::vector<double>
+CScreenedBasisFunctionPair::ket_x() const -> const std::vector<double> &
 {
     return _ket_x;
 }
 
 auto
-CScreenedBasisFunctionPair::ket_y() const -> std::vector<double>
+CScreenedBasisFunctionPair::ket_y() const -> const std::vector<double> &
 {
     return _ket_y;
 }
 
 auto
-CScreenedBasisFunctionPair::ket_z() const -> std::vector<double>
+CScreenedBasisFunctionPair::ket_z() const -> const std::vector<double> &
 {
     return _ket_z;
 }
 
 auto
-CScreenedBasisFunctionPair::bra_atoms() const -> std::vector<int>
+CScreenedBasisFunctionPair::bra_atoms() const -> const std::vector<int> &
 {
     return _bra_atoms;
 }
 
 auto
-CScreenedBasisFunctionPair::ket_atoms() const -> std::vector<int>
+CScreenedBasisFunctionPair::ket_atoms() const -> const std::vector<int> &
 {
     return _ket_atoms;
 }

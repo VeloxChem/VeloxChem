@@ -237,35 +237,35 @@ class CScreenedBasisFunctionPair
 
     /// @brief Gets the vector of bra atom Cartesian X coordinates.
     /// @return The vector of X coordinates.
-    auto bra_x() const -> std::vector<double>;
+    auto bra_x() const -> const std::vector<double> &;
 
     /// @brief Gets the vector of bra atom Cartesian Y coordinates.
     /// @return The vector of Y coordinates.
-    auto bra_y() const -> std::vector<double>;
+    auto bra_y() const -> const std::vector<double> &;
 
     /// @brief Gets the vector of bra atom Cartesian Z coordinates.
     /// @return The vector of Z coordinates.
-    auto bra_z() const -> std::vector<double>;
+    auto bra_z() const -> const std::vector<double> &;
 
     /// @brief Gets the vector of ket atom Cartesian X coordinates.
     /// @return The vector of X coordinates.
-    auto ket_x() const -> std::vector<double>;
+    auto ket_x() const -> const std::vector<double> &;
 
     /// @brief Gets the vector of ket atom Cartesian Y coordinates.
     /// @return The vector of Y coordinates.
-    auto ket_y() const -> std::vector<double>;
+    auto ket_y() const -> const std::vector<double> &;
 
     /// @brief Gets the vector of ket atom Cartesian Z coordinates.
     /// @return The vector of Z coordinates.
-    auto ket_z() const -> std::vector<double>;
+    auto ket_z() const -> const std::vector<double> &;
 
     /// @brief Gets the vector of bra atom indices.
     /// @return The vector of bra atom indices.
-    auto bra_atoms() const -> std::vector<int>;
+    auto bra_atoms() const -> const std::vector<int> &;
 
     /// @brief Gets the vector of ket atom indices.
     /// @return The vector of ket atom indices.
-    auto ket_atoms() const -> std::vector<int>;
+    auto ket_atoms() const -> const std::vector<int> &;
 
     /// @brief Gets the number of screened basis function pairs.
     /// @return The number of pairs.
