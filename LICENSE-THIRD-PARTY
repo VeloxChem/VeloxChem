@@ -7,6 +7,7 @@ the respective files.
   - src/moldata/AtomicPartialChargesModel.hpp
 
 - MIT-licensed files:
+  - src/pymodule/gbimplicitsolvent.py
   - database/gaff-2.11.xml
   - database/environment_parameters/protein.ff19SB.xml
 
