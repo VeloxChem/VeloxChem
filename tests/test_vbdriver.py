@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -952,6 +953,128 @@ def test_benzene_vbscf_defaults_to_equivalent_center_stabilization():
     assert diagnostics["organic_pi_vbscf_energy_lowering"] >= -1.0e-8
     assert vbscf["energy"] <= diagnostics["organic_pi_vbscf_initial_energy"] + 1.0e-8
     assert np.isclose(np.sum(vbscf["lowdin_weights"]), 1.0, atol=1.0e-8)
+
+
+def test_benzene_template_bovb_equivalent_center_optimizer_is_one_dimensional(monkeypatch):
+    """Regression test for the benzene BOVB finite-difference bottleneck."""
+    import scipy.optimize
+
+    driver = VbDriver()
+    template_count = 15
+    ao_count = 8
+    active_count = 6
+    base_coefficients = np.zeros((ao_count, active_count))
+    base_coefficients[:active_count, :active_count] = np.eye(active_count)
+    orbitals = [
+        SimpleNamespace(center=index, coefficients=base_coefficients[:, index])
+        for index in range(active_count)
+    ]
+    template_records = []
+    for index in range(template_count):
+        template_records.append({
+            "label": f"template_{index}",
+            "type": "benzene_kekule" if index < 2 else "benzene_dewar",
+            "bond_pairs": ((0, 1), (2, 3), (4, 5)),
+            "determinant_expansion": [],
+        })
+    active_space = SimpleNamespace(metadata={"active_pi_atoms": tuple(range(active_count))})
+    options = VbComputeOptions(
+        mode="bovb",
+        optimize_orbitals=True,
+        include_bovb=True,
+        orbital_amplitude_bound=0.20,
+        orbital_relaxation_symmetry="equivalent-centers",
+        orbital_relaxation_penalty=2.0,
+        max_iter=40,
+        conv_thresh=1.0e-6,
+    )
+    calls = {"matrix_builds": 0, "minimize": None}
+
+    def fake_ao_integrals(molecule, basis):
+        return (
+            np.eye(ao_count),
+            np.eye(ao_count),
+            np.zeros((ao_count, ao_count, ao_count, ao_count)),
+            0.0,
+        )
+
+    def fake_center_breathing_vector(molecule, basis, center, coefficients, active_vectors, s_ao):
+        vector = np.zeros(ao_count)
+        vector[active_count + int(center) % (ao_count - active_count)] = 1.0
+        return vector
+
+    def fake_build_matrices(structures, records, coefficient_sets, h_ao, s_ao, eri_ao, constant_energy):
+        calls["matrix_builds"] += 1
+        assert len(records) == template_count
+        assert len(coefficient_sets) == template_count
+        return np.eye(template_count), np.eye(template_count)
+
+    def fake_solve_generalized_vb(H, S, return_lowdin=False):
+        coefficients = np.zeros(template_count)
+        coefficients[0] = 1.0
+        weights = coefficients.copy()
+        kept = np.arange(template_count)
+        lowdin_weights = weights.copy()
+        return 1.0, coefficients, weights, kept, lowdin_weights
+
+    def fake_localized_template_energy_diagnostics(H, S, labels, total_energy):
+        return {
+            "best_localized_template_energy": 1.0,
+            "best_localized_template_label": labels[0],
+            "localized_template_energies": [1.0] * len(labels),
+            "resonance_energy": 0.0,
+        }
+
+    def fake_minimize(fun, x0, method=None, bounds=None, options=None):
+        calls["minimize"] = {
+            "x0_size": int(np.asarray(x0).size),
+            "bounds_size": len(bounds),
+            "method": method,
+        }
+        value = float(fun(np.asarray([0.01], dtype=float)))
+        return SimpleNamespace(
+            x=np.asarray([0.01], dtype=float),
+            fun=value,
+            success=True,
+            message="fake optimizer",
+        )
+
+    monkeypatch.setattr(driver, "_ao_integrals", fake_ao_integrals)
+    monkeypatch.setattr(driver, "_center_breathing_vector", fake_center_breathing_vector)
+    monkeypatch.setattr(driver, "_chemical_resonance_template_records", lambda structures, active_space: template_records)
+    monkeypatch.setattr(driver, "_build_template_specific_determinant_csf_matrices", fake_build_matrices)
+    monkeypatch.setattr(driver, "_solve_generalized_vb", fake_solve_generalized_vb)
+    monkeypatch.setattr(driver, "_localized_template_energy_diagnostics", fake_localized_template_energy_diagnostics)
+    monkeypatch.setattr(driver, "_s_normalize", lambda vector, s_ao: vector / np.linalg.norm(vector))
+    monkeypatch.setattr(scipy.optimize, "minimize", fake_minimize)
+
+    result = driver._compute_organic_pi_bovb_template_breathing(
+        molecule=None,
+        basis=None,
+        structures=[],
+        orbitals=orbitals,
+        options=options,
+        active_space=active_space,
+        analysis=None,
+        freeze_inactive=False,
+    )
+    diagnostics = result["diagnostics"]
+
+    assert calls["minimize"] == {
+        "x0_size": 1,
+        "bounds_size": 1,
+        "method": "L-BFGS-B",
+    }
+    assert calls["matrix_builds"] <= 4
+    assert diagnostics["organic_pi_bovb_model"] == "benzene-determinant-ci-template-specific-breathing"
+    assert diagnostics["organic_pi_bovb_equivalent_center_amplitude"] is True
+    assert diagnostics["organic_pi_bovb_optimizer_parameter_count"] == 1
+    assert diagnostics["organic_pi_bovb_optimizer_parameter_labels"] == [
+        "equivalent_center_template_amplitude"
+    ]
+    assert len(diagnostics["organic_pi_bovb_template_breathing_amplitudes"]) == template_count
+    assert np.allclose(diagnostics["organic_pi_bovb_template_breathing_amplitudes"], 0.01)
+    assert diagnostics["structure_specific_orbitals"] is True
 
 
 @pytest.mark.timeconsuming

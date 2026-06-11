@@ -70,6 +70,7 @@ class VbComputeOptions:
 	active_electron_count: optional number of active electrons for generated pi active spaces
 	active_spin: optional spin label for generated pi active spaces, currently 'singlet'
 	orbital_amplitude_bound: optional absolute bound for center-local orbital breathing amplitudes
+	orbital_relaxation_penalty: optional quadratic penalty applied to center-local orbital breathing amplitudes
 	orbital_relaxation_symmetry: optional orbital-relaxation pattern, e.g. 'independent' or 'equivalent-centers'
 	freeze_inactive_orbitals: embed the active pair in the frozen RHF density
 	use_active_space: whether automatic generated active spaces are enabled
@@ -90,6 +91,7 @@ class VbComputeOptions:
 	active_electron_count: Optional[int] = None
 	active_spin: str = "singlet"
 	orbital_amplitude_bound: Optional[float] = None
+	orbital_relaxation_penalty: Optional[float] = None
 	orbital_relaxation_symmetry: Optional[str] = None
 	freeze_inactive_orbitals: bool = True
 	use_active_space: bool = True
@@ -205,11 +207,12 @@ class VbDriver:
 							freeze_inactive=bool(options.freeze_inactive_orbitals),
 						)
 					else:
-						active_result = self._compute_organic_pi_bovb_determinant_fixed_limit(
+						active_result = self._compute_organic_pi_bovb_determinant_breathing(
 							molecule,
 							basis,
 							list(active_space.structures),
 							list(active_space.active_orbitals),
+							options,
 							active_space=active_space,
 							analysis=analysis,
 							freeze_inactive=bool(options.freeze_inactive_orbitals),
@@ -2998,9 +3001,21 @@ class VbDriver:
 		amplitude_bound = float(amplitude_bound_option or default_amplitude_bound)
 		if amplitude_bound <= 0.0:
 			amplitude_bound = 0.35
+		relaxation_penalty_option = getattr(options, 'orbital_relaxation_penalty', None)
+		relaxation_penalty = float(relaxation_penalty_option or 0.0)
+		if relaxation_penalty < 0.0:
+			relaxation_penalty = 0.0
+
+		def amplitude_penalty(parameters):
+			amplitudes = orbital_amplitudes(parameters)
+			return float(relaxation_penalty * np.dot(amplitudes, amplitudes))
+
+		def objective_for_parameters(parameters):
+			return float(compute_for_parameters(parameters)["energy"]) + amplitude_penalty(parameters)
+
 		if has_external_breathing:
 			result = minimize(
-				lambda parameters: float(compute_for_parameters(parameters)["energy"]),
+				objective_for_parameters,
 				x0=initial_parameters,
 				method='L-BFGS-B',
 				bounds=[(-amplitude_bound, amplitude_bound)] * parameter_count,
@@ -3010,7 +3025,10 @@ class VbDriver:
 					'maxiter': options.max_iter if options else 50,
 				},
 			)
-			optimizer_energy = float(result.fun) if np.isfinite(result.fun) else 1.0e6
+			optimizer_objective = float(result.fun) if np.isfinite(result.fun) else 1.0e6
+			optimizer_parameters = np.array(result.x, dtype=float)
+			optimizer_energy = float(compute_for_parameters(optimizer_parameters)["energy"])
+			optimizer_penalty = amplitude_penalty(optimizer_parameters)
 		else:
 			class FixedLimitResult:
 				success = True
@@ -3018,9 +3036,12 @@ class VbDriver:
 
 			result = FixedLimitResult()
 			optimizer_energy = initial_energy
+			optimizer_objective = initial_energy
+			optimizer_penalty = 0.0
 		used_fixed_limit = optimizer_energy > initial_energy + 1.0e-10 or not has_external_breathing
 		parameters = initial_parameters if used_fixed_limit else np.array(result.x, dtype=float)
 		per_orbital_amplitudes = orbital_amplitudes(parameters)
+		final_penalty = amplitude_penalty(parameters)
 		max_abs_amplitude = float(np.max(np.abs(per_orbital_amplitudes))) if len(per_orbital_amplitudes) else 0.0
 		hit_amplitude_bound = bool(
 			has_external_breathing and
@@ -3036,6 +3057,10 @@ class VbDriver:
 			"organic_pi_vbscf_equivalent_center_amplitude": bool(use_equivalent_center_amplitude),
 			"organic_pi_vbscf_initial_energy": initial_energy,
 			"organic_pi_vbscf_optimizer_energy": optimizer_energy,
+			"organic_pi_vbscf_optimizer_objective": optimizer_objective,
+			"organic_pi_vbscf_orbital_relaxation_penalty": relaxation_penalty,
+			"organic_pi_vbscf_penalty_energy": final_penalty,
+			"organic_pi_vbscf_optimizer_penalty_energy": optimizer_penalty,
 			"organic_pi_vbscf_energy_lowering": float(initial_energy - float(final_result["energy"])),
 			"organic_pi_vbscf_has_external_relaxation_space": bool(has_external_breathing),
 			"organic_pi_vbscf_optimizer_parameters": [float(value) for value in parameters],
@@ -3112,6 +3137,457 @@ class VbDriver:
 			"structure_specific_orbitals": False,
 		})
 		return result
+
+	def _determinant_transition_element(self,
+									left_structure,
+									right_structure,
+									s_cross,
+									h_cross,
+									eri_cross,
+									constant_energy):
+		"""Return overlap and Hamiltonian between nonorthogonal spin determinants."""
+		alpha_left = [index for index, value in enumerate(left_structure.occupation[0]) if int(value)]
+		beta_left = [index for index, value in enumerate(left_structure.occupation[1]) if int(value)]
+		alpha_right = [index for index, value in enumerate(right_structure.occupation[0]) if int(value)]
+		beta_right = [index for index, value in enumerate(right_structure.occupation[1]) if int(value)]
+
+		def minor_determinant(metric, remove_rows, remove_cols):
+			keep_rows = [index for index in range(metric.shape[0]) if index not in set(remove_rows)]
+			keep_cols = [index for index in range(metric.shape[1]) if index not in set(remove_cols)]
+			if not keep_rows and not keep_cols:
+				return 1.0
+			if len(keep_rows) != len(keep_cols):
+				return 0.0
+			return float(np.linalg.det(metric[np.ix_(keep_rows, keep_cols)]))
+
+		def spin_metric(left_occ, right_occ):
+			if len(left_occ) != len(right_occ):
+				return 0.0, np.zeros((0, 0)), np.zeros((0, 0)), left_occ, right_occ
+			if not left_occ:
+				return 1.0, np.zeros((0, 0)), np.zeros((0, 0)), left_occ, right_occ
+			metric = s_cross[np.ix_(left_occ, right_occ)]
+			determinant = float(np.linalg.det(metric))
+			cofactors = np.zeros_like(metric)
+			for left_pos in range(metric.shape[0]):
+				for right_pos in range(metric.shape[1]):
+					cofactors[left_pos, right_pos] = (
+						(-1.0) ** (left_pos + right_pos) *
+						minor_determinant(metric, (left_pos,), (right_pos,))
+					)
+			return determinant, cofactors, metric, left_occ, right_occ
+
+		det_alpha, cof_alpha, metric_alpha, alpha_left, alpha_right = spin_metric(alpha_left, alpha_right)
+		det_beta, cof_beta, metric_beta, beta_left, beta_right = spin_metric(beta_left, beta_right)
+		overlap = det_alpha * det_beta
+
+		def one_spin(left_occ, right_occ, cofactors):
+			value = 0.0
+			for left_pos, left_index in enumerate(left_occ):
+				for right_pos, right_index in enumerate(right_occ):
+					value += h_cross[left_index, right_index] * cofactors[left_pos, right_pos]
+			return value
+
+		one_electron = (
+			det_beta * one_spin(alpha_left, alpha_right, cof_alpha) +
+			det_alpha * one_spin(beta_left, beta_right, cof_beta)
+		)
+
+		def second_cofactor(metric, left_pos_a, left_pos_b, right_pos_a, right_pos_b):
+			if left_pos_a == left_pos_b or right_pos_a == right_pos_b:
+				return 0.0
+			row_sign = 1.0 if left_pos_a < left_pos_b else -1.0
+			col_sign = 1.0 if right_pos_a < right_pos_b else -1.0
+			rows = tuple(sorted((left_pos_a, left_pos_b)))
+			cols = tuple(sorted((right_pos_a, right_pos_b)))
+			return (
+				row_sign * col_sign *
+				((-1.0) ** (left_pos_a + left_pos_b + right_pos_a + right_pos_b)) *
+				minor_determinant(metric, rows, cols)
+			)
+
+		def same_spin_two(left_occ, right_occ, metric):
+			value = 0.0
+			for i_pos, i_index in enumerate(left_occ):
+				for k_pos, k_index in enumerate(left_occ):
+					for j_pos, j_index in enumerate(right_occ):
+						for l_pos, l_index in enumerate(right_occ):
+							transition = second_cofactor(metric, i_pos, k_pos, j_pos, l_pos)
+							value += transition * eri_cross[i_index, j_index, k_index, l_index]
+			return value
+
+		def opposite_spin_two(left_alpha, right_alpha, cofactors_alpha,
+							  left_beta, right_beta, cofactors_beta):
+			value = 0.0
+			for i_pos, i_index in enumerate(left_alpha):
+				for j_pos, j_index in enumerate(right_alpha):
+					for k_pos, k_index in enumerate(left_beta):
+						for l_pos, l_index in enumerate(right_beta):
+							transition = cofactors_alpha[i_pos, j_pos] * cofactors_beta[k_pos, l_pos]
+							value += transition * eri_cross[i_index, j_index, k_index, l_index]
+			return value
+
+		two_electron = (
+			0.5 * det_beta * same_spin_two(alpha_left, alpha_right, metric_alpha) +
+			0.5 * det_alpha * same_spin_two(beta_left, beta_right, metric_beta) +
+			2.0 * opposite_spin_two(
+				alpha_left,
+				alpha_right,
+				cof_alpha,
+				beta_left,
+				beta_right,
+				cof_beta,
+			)
+		)
+		hamiltonian = one_electron + two_electron + float(constant_energy) * overlap
+		return float(overlap), float(hamiltonian)
+
+	def _build_template_specific_determinant_csf_matrices(self,
+										structures,
+										template_records,
+										coefficient_sets,
+										h_ao,
+										s_ao,
+										eri_ao,
+										constant_energy):
+		"""Build compact CSF matrices when each template has its own active orbitals."""
+		template_count = len(template_records)
+		S = np.zeros((template_count, template_count))
+		H = np.zeros((template_count, template_count))
+		for left_index, left_record in enumerate(template_records):
+			left_coefficients = coefficient_sets[left_index]
+			for right_index, right_record in enumerate(template_records):
+				right_coefficients = coefficient_sets[right_index]
+				S_cross = left_coefficients.T @ s_ao @ right_coefficients
+				H_cross = left_coefficients.T @ h_ao @ right_coefficients
+				eri_cross = np.einsum(
+					'up,vq,lr,ms,uvlm->pqrs',
+					left_coefficients,
+					right_coefficients,
+					left_coefficients,
+					right_coefficients,
+					eri_ao,
+					optimize=True,
+				)
+				for left_term in left_record["determinant_expansion"]:
+					left_structure = structures[int(left_term["determinant_index"])]
+					left_coefficient = float(left_term["coefficient"])
+					for right_term in right_record["determinant_expansion"]:
+						right_structure = structures[int(right_term["determinant_index"])]
+						right_coefficient = float(right_term["coefficient"])
+						overlap, hamiltonian = self._determinant_transition_element(
+							left_structure,
+							right_structure,
+							S_cross,
+							H_cross,
+							eri_cross,
+							constant_energy,
+						)
+						factor = left_coefficient * right_coefficient
+						S[left_index, right_index] += factor * overlap
+						H[left_index, right_index] += factor * hamiltonian
+		return 0.5 * (S + S.T), 0.5 * (H + H.T)
+
+	def _compute_organic_pi_bovb_template_breathing(self,
+									 molecule,
+									 basis,
+									 structures,
+									 orbitals,
+									 options,
+									 active_space=None,
+									 analysis=None,
+									 freeze_inactive=False):
+		"""Template-specific BOVB relaxation for benzene determinant-CSF templates."""
+		from scipy.optimize import minimize
+
+		H_ao, S_ao, eri_ao, e_nuc = self._ao_integrals(molecule, basis)
+		embedding = None
+		if freeze_inactive and active_space is not None and analysis is not None:
+			embedding = self._frozen_hf_embedding(
+				H_ao,
+				S_ao,
+				eri_ao,
+				e_nuc,
+				active_space,
+				analysis,
+			)
+			if embedding is not None:
+				H_ao = embedding["h_effective"]
+				e_nuc = embedding["constant_energy"]
+
+		base_coefficients = np.column_stack([orb.coefficients for orb in orbitals])
+		active_vectors = tuple(base_coefficients[:, index] for index in range(base_coefficients.shape[1]))
+		breathing_vectors = [
+			self._center_breathing_vector(
+				molecule,
+				basis,
+				orbital.center,
+				orbital.coefficients,
+				active_vectors,
+				S_ao,
+			)
+			for orbital in orbitals
+		]
+		has_external_breathing = any(vector is not None for vector in breathing_vectors)
+		breathing_vectors = [
+			vector if vector is not None else np.zeros(base_coefficients.shape[0])
+			for vector in breathing_vectors
+		]
+
+		template_records = self._chemical_resonance_template_records(
+			structures,
+			active_space,
+		)
+		if not template_records:
+			return self._compute_organic_pi_bovb_determinant_fixed_limit(
+				molecule,
+				basis,
+				structures,
+				orbitals,
+				active_space=active_space,
+				analysis=analysis,
+				freeze_inactive=freeze_inactive,
+			)
+
+		active_pi_atoms = tuple(active_space.metadata.get("active_pi_atoms", ()))
+		atom_position = {int(atom): index for index, atom in enumerate(active_pi_atoms)}
+		amplitude_bound_option = getattr(options, 'orbital_amplitude_bound', None)
+		amplitude_bound = float(amplitude_bound_option or 0.20)
+		if amplitude_bound <= 0.0:
+			amplitude_bound = 0.20
+		relaxation_penalty_option = getattr(options, 'orbital_relaxation_penalty', None)
+		relaxation_penalty = float(relaxation_penalty_option or 0.0)
+		if relaxation_penalty < 0.0:
+			relaxation_penalty = 0.0
+		relaxation_symmetry = str(getattr(options, 'orbital_relaxation_symmetry', '') or '').lower()
+		use_equivalent_center_amplitude = relaxation_symmetry in {'equivalent-centers', 'equivalent_centers', 'symmetric'}
+		parameter_labels = (
+			['equivalent_center_template_amplitude']
+			if use_equivalent_center_amplitude else
+			[record["label"] for record in template_records]
+		)
+
+		def expand_parameters(parameters):
+			parameters = np.asarray(parameters, dtype=float)
+			if use_equivalent_center_amplitude:
+				amplitude = float(parameters[0]) if parameters.size else 0.0
+				return np.full(len(template_records), amplitude, dtype=float)
+			return parameters
+
+		def coefficient_sets(parameters):
+			template_amplitudes = expand_parameters(parameters)
+			sets = []
+			for template_index, record in enumerate(template_records):
+				amplitude = float(template_amplitudes[template_index])
+				matrix = np.array(base_coefficients, dtype=float, copy=True)
+				modified = set()
+				for atom_i, atom_j in record.get("bond_pairs", ()): 
+					for atom in (atom_i, atom_j):
+						orbital_index = atom_position.get(int(atom))
+						if orbital_index is None:
+							continue
+						matrix[:, orbital_index] += amplitude * breathing_vectors[orbital_index]
+						modified.add(orbital_index)
+				for orbital_index in modified:
+					try:
+						matrix[:, orbital_index] = self._s_normalize(
+							matrix[:, orbital_index],
+							S_ao,
+						)
+					except RuntimeError:
+						matrix = np.array(base_coefficients, dtype=float, copy=True)
+						break
+				sets.append(matrix)
+			return sets
+
+		def matrices_for_parameters(parameters):
+			return self._build_template_specific_determinant_csf_matrices(
+				structures,
+				template_records,
+				coefficient_sets(parameters),
+				H_ao,
+				S_ao,
+				eri_ao,
+				float(e_nuc),
+			)
+
+		def solve_for_parameters(parameters):
+			S_compact, H_compact = matrices_for_parameters(parameters)
+			energy, coeffs, weights, kept, lowdin_weights = self._solve_generalized_vb(
+				H_compact,
+				S_compact,
+				return_lowdin=True,
+			)
+			return energy, coeffs, weights, kept, lowdin_weights, S_compact, H_compact
+
+		def penalty_energy(parameters):
+			template_amplitudes = expand_parameters(parameters)
+			return float(relaxation_penalty * np.dot(template_amplitudes, template_amplitudes))
+
+		def objective_for_parameters(parameters):
+			try:
+				energy = solve_for_parameters(parameters)[0]
+			except Exception:
+				return 1.0e6
+			return float(energy) + penalty_energy(parameters)
+
+		initial_parameters = np.zeros(len(parameter_labels))
+		initial_energy = float(solve_for_parameters(initial_parameters)[0])
+		if has_external_breathing:
+			result = minimize(
+				objective_for_parameters,
+				x0=initial_parameters,
+				method='L-BFGS-B',
+				bounds=[(-amplitude_bound, amplitude_bound)] * len(parameter_labels),
+				options={
+					'ftol': options.conv_thresh if options else 1.0e-8,
+					'gtol': options.conv_thresh if options else 1.0e-8,
+					'maxiter': options.max_iter if options else 50,
+				},
+			)
+			optimizer_parameters = np.array(result.x, dtype=float)
+			optimizer_objective = float(result.fun) if np.isfinite(result.fun) else 1.0e6
+			optimizer_energy = float(solve_for_parameters(optimizer_parameters)[0])
+			optimizer_penalty = penalty_energy(optimizer_parameters)
+		else:
+			class FixedLimitResult:
+				success = True
+				message = "no external center-local pi breathing space; BOVB uses fixed-orbital limit"
+
+			result = FixedLimitResult()
+			optimizer_parameters = initial_parameters
+			optimizer_energy = initial_energy
+			optimizer_objective = initial_energy
+			optimizer_penalty = 0.0
+
+		used_fixed_limit = optimizer_energy > initial_energy + 1.0e-10 or not has_external_breathing
+		parameters = initial_parameters if used_fixed_limit else optimizer_parameters
+		template_parameters = expand_parameters(parameters)
+		energy, coeffs, weights, kept, lowdin_weights, S_compact, H_compact = solve_for_parameters(parameters)
+		final_penalty = penalty_energy(parameters)
+		max_abs_amplitude = float(np.max(np.abs(template_parameters))) if len(template_parameters) else 0.0
+		hit_amplitude_bound = bool(
+			has_external_breathing and
+			max_abs_amplitude >= amplitude_bound - 1.0e-8
+		)
+		details = []
+		for index, record in enumerate(template_records):
+			details.append({
+				"label": record["label"],
+				"type": record["type"],
+				"bond_pairs": record.get("bond_pairs", ()),
+				"coefficient": float(coeffs[index]),
+				"weight": float(weights[index]),
+				"lowdin_weight": float(lowdin_weights[index]),
+				"breathing_amplitude": float(template_parameters[index]),
+				"determinant_expansion": record["determinant_expansion"],
+			})
+
+		diagnostics = {
+			"message": "Organic pi determinant-space BOVB with benzene template-specific breathing orbitals.",
+			"organic_pi_bovb_model": "benzene-determinant-ci-template-specific-breathing",
+			"organic_pi_bovb_template_space_model": "graph-template-determinant-csf-nonorthogonal-template-orbitals",
+			"organic_pi_bovb_initial_energy": float(initial_energy),
+			"organic_pi_bovb_optimizer_energy": float(optimizer_energy),
+			"organic_pi_bovb_optimizer_objective": float(optimizer_objective),
+			"organic_pi_bovb_optimizer_penalty_energy": float(optimizer_penalty),
+			"organic_pi_bovb_energy_lowering": float(initial_energy - float(energy)),
+			"organic_pi_bovb_has_external_breathing_space": bool(has_external_breathing),
+			"organic_pi_bovb_orbital_amplitudes": [float(value) for value in template_parameters],
+			"organic_pi_bovb_template_breathing_amplitudes": [float(value) for value in template_parameters],
+			"organic_pi_bovb_optimizer_parameters": [float(value) for value in parameters],
+			"organic_pi_bovb_optimizer_parameter_labels": list(parameter_labels),
+			"organic_pi_bovb_optimizer_parameter_count": len(parameter_labels),
+			"organic_pi_bovb_equivalent_center_amplitude": bool(use_equivalent_center_amplitude),
+			"organic_pi_bovb_orbital_amplitude_bound": float(amplitude_bound),
+			"organic_pi_bovb_max_abs_orbital_amplitude": max_abs_amplitude,
+			"organic_pi_bovb_hit_amplitude_bound": hit_amplitude_bound,
+			"organic_pi_bovb_orbital_relaxation_penalty": float(relaxation_penalty),
+			"organic_pi_bovb_penalty_energy": float(final_penalty),
+			"organic_pi_bovb_optimizer_success": bool(result.success),
+			"organic_pi_bovb_optimizer_message": str(result.message),
+			"organic_pi_bovb_template_labels": [record["label"] for record in template_records],
+			"organic_pi_bovb_template_types": [record["type"] for record in template_records],
+			"organic_pi_bovb_template_details": details,
+			"organic_pi_bovb_template_count": len(template_records),
+			"organic_pi_bovb_common_orbital_prototype": False,
+			"bovb_used_fixed_orbital_limit": bool(used_fixed_limit),
+			"bovb_conservative_organic_pi_limit": False,
+			"organic_pi_orbital_relaxation_method": "bovb-benzene-template-specific-determinant-csf-breathing",
+			"compact_csf_model": "graph-template-determinant-ci-subspace",
+			"compact_csf_count": len(template_records),
+			"compact_csf_labels": [record["label"] for record in template_records],
+			"compact_csf_types": [record["type"] for record in template_records],
+			"compact_csf_details": details,
+			"overlap_condition": float(np.linalg.cond(S_compact)),
+			"overlap_eigenvalues": np.linalg.eigvalsh(S_compact).tolist(),
+			"retained_overlap_rank": int(len(kept)),
+			"determinant_count": len(structures),
+			"chemical_resonance_count": len(template_records),
+			"chemical_resonance_labels": [record["label"] for record in template_records],
+			"chemical_resonance_types": [record["type"] for record in template_records],
+			"weight_scheme": "Chirgwin-Coulson template-specific determinant-CSF weights",
+			"available_weight_schemes": ["Chirgwin-Coulson", "Lowdin"],
+			"structure_specific_orbitals": True,
+		}
+		diagnostics.update(self._localized_template_energy_diagnostics(
+			H_compact,
+			S_compact,
+			labels=[record["label"] for record in template_records],
+			total_energy=energy,
+		))
+		if embedding is not None:
+			diagnostics.update({
+				"frozen_hf_embedding": True,
+				"frozen_electron_count": embedding["frozen_electron_count"],
+				"active_reference_electron_count": embedding["active_electron_count"],
+				"frozen_constant_energy": embedding["constant_energy"],
+				"embedded_active_reference_energy": embedding["active_reference_energy"],
+				"reference_total_hf_energy": embedding["reference_total_energy"],
+				"embedding_model": "inactive HF density = total RHF density minus active reference density",
+			})
+		return {
+			"energy": float(energy),
+			"structure_coefficients": coeffs,
+			"overlap": S_compact,
+			"Hamiltonian": H_compact,
+			"weights": weights,
+			"lowdin_weights": lowdin_weights,
+			"orbitals": coefficient_sets(parameters),
+			"diagnostics": diagnostics,
+		}
+
+	def _compute_organic_pi_bovb_determinant_breathing(self,
+									 molecule,
+									 basis,
+									 structures,
+									 orbitals,
+									 options,
+									 active_space=None,
+									 analysis=None,
+									 freeze_inactive=False):
+		   """Generalized BOVB route for organic pi determinant spaces (arbitrary electron/spin counts, open-shells)."""
+		   if active_space is None or not bool(active_space.metadata.get("determinant_ci", False)):
+			   return self._compute_organic_pi_bovb_determinant_fixed_limit(
+				   molecule,
+				   basis,
+				   structures,
+				   orbitals,
+				   active_space=active_space,
+				   analysis=analysis,
+				   freeze_inactive=freeze_inactive,
+			   )
+
+		   # Try template-specific breathing; fallback to fixed limit if templates are not available
+		   return self._compute_organic_pi_bovb_template_breathing(
+			   molecule,
+			   basis,
+			   structures,
+			   orbitals,
+			   options,
+			   active_space=active_space,
+			   analysis=analysis,
+			   freeze_inactive=freeze_inactive,
+		   )
 
 	def _compute_metal_ligand_bovb(self,
 								molecule,
