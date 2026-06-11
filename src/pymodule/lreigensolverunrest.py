@@ -32,6 +32,7 @@
 
 import numpy as np
 import time as tm
+import h5py
 
 from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
@@ -50,8 +51,7 @@ from .errorhandler import assert_msg_critical
 from .mathutils import screened_eigh, symmetric_matrix_function
 from .checkpoint import check_rsp_hdf5
 from .resultsio import (write_lr_rsp_results_to_hdf5,
-                        write_detach_attach_to_hdf5, write_rsp_solution,
-                        clear_group_in_hdf5)
+                        write_detach_attach_to_hdf5, clear_group_in_hdf5)
 
 
 class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
@@ -792,10 +792,18 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
 
                     # write response solutions to h5 file
                     if (self.save_solutions and final_h5_fname is not None):
-                        write_rsp_solution(final_h5_fname,
-                                           'S{:d}(a)'.format(s + 1), eigvec_a)
-                        write_rsp_solution(final_h5_fname,
-                                           'S{:d}(b)'.format(s + 1), eigvec_b)
+                        hf = h5py.File(final_h5_fname, 'a')
+                        full_sol_label = 'rsp/full_solutions_matrix'
+                        if s == 0:
+                            if full_sol_label in hf:
+                                del hf[full_sol_label]
+                            full_sol_dset = hf.create_dataset(full_sol_label,
+                                                              shape=(self.nstates, len(eigvec_full)),
+                                                              dtype=eigvec_full.dtype)
+                        else:
+                            full_sol_dset = hf[full_sol_label]
+                        full_sol_dset[s, :] = eigvec_full
+                        hf.close()
 
                     # save excitation details
                     excitation_details.append(
@@ -827,6 +835,12 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                         'excitation_details': excitation_details,
                         'number_of_states': self.nstates,
                     }
+
+                    full_solutions_keys = ['S{:d}'.format(s + 1) for s in range(self.nstates)]
+                    ret_dict.update({'full_solutions_keys': full_solutions_keys})
+
+                    # add rsp type
+                    ret_dict.update({'rsp_type': 'rpa'})
 
                     if self.nto:
                         ret_dict['nto_lambdas_a'] = nto_lambdas_a
@@ -1259,35 +1273,32 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
         if 'eigenvectors_distributed' in rsp_results:
             eigvec_full = self.get_full_solution_vector(
                 rsp_results['eigenvectors_distributed'][state_index - 1])
-            if self.rank == mpi_master():
-                # Split eigenvector into alpha and beta components
-                n_ov_a = mo_occ_a.shape[1] * mo_vir_a.shape[1]
-                n_ov_b = mo_occ_b.shape[1] * mo_vir_b.shape[1]
-                eigvec_a = np.hstack((
-                    eigvec_full[:n_ov_a],
-                    eigvec_full[n_ov_a + n_ov_b:n_ov_a + n_ov_b + n_ov_a],
-                ))
-                eigvec_b = np.hstack((
-                    eigvec_full[n_ov_a:n_ov_a + n_ov_b],
-                    eigvec_full[n_ov_a + n_ov_b + n_ov_a:],
-                ))
-            else:
-                eigvec_a = None
-                eigvec_b = None
         else:
             if self.rank == mpi_master():
                 # for rsp_results read from h5 file
-                label_a = state_label + '(a)'
-                label_b = state_label + '(b)'
                 assert_msg_critical(
-                    label_a in rsp_results and label_b in rsp_results,
+                    state_label in rsp_results,
                     f'{type(self).__name__}: No eigenvector found for {state_label}'
                 )
-                eigvec_a = rsp_results[label_a].copy()
-                eigvec_b = rsp_results[label_b].copy()
+                eigvec_full = rsp_results[state_label].copy()
             else:
-                eigvec_a = None
-                eigvec_b = None
+                eigvec_full = None
+
+        if self.rank == mpi_master():
+            # Split eigenvector into alpha and beta components
+            n_ov_a = mo_occ_a.shape[1] * mo_vir_a.shape[1]
+            n_ov_b = mo_occ_b.shape[1] * mo_vir_b.shape[1]
+            eigvec_a = np.hstack((
+                eigvec_full[:n_ov_a],
+                eigvec_full[n_ov_a + n_ov_b:n_ov_a + n_ov_b + n_ov_a],
+            ))
+            eigvec_b = np.hstack((
+                eigvec_full[n_ov_a:n_ov_a + n_ov_b],
+                eigvec_full[n_ov_a + n_ov_b + n_ov_a:],
+            ))
+        else:
+            eigvec_a = None
+            eigvec_b = None
 
         if self.rank == mpi_master():
             # Build transition density matrices in MO basis (RPA)

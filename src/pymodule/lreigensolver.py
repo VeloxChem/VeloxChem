@@ -32,6 +32,7 @@
 
 import numpy as np
 import time as tm
+import h5py
 
 from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
@@ -50,8 +51,7 @@ from .errorhandler import assert_msg_critical
 from .mathutils import screened_eigh, symmetric_matrix_function
 from .checkpoint import check_rsp_hdf5
 from .resultsio import (write_lr_rsp_results_to_hdf5,
-                        write_detach_attach_to_hdf5, write_rsp_solution,
-                        clear_group_in_hdf5)
+                        write_detach_attach_to_hdf5, clear_group_in_hdf5)
 
 
 class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
@@ -742,8 +742,18 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
                     # write response solutions to h5 file
                     if (self.save_solutions and final_h5_fname is not None):
-                        write_rsp_solution(final_h5_fname,
-                                           'S{:d}'.format(s + 1), eigvec)
+                        hf = h5py.File(final_h5_fname, 'a')
+                        full_sol_label = 'rsp/full_solutions_matrix'
+                        if s == 0:
+                            if full_sol_label in hf:
+                                del hf[full_sol_label]
+                            full_sol_dset = hf.create_dataset(full_sol_label,
+                                                              shape=(self.nstates, len(eigvec)),
+                                                              dtype=eigvec.dtype)
+                        else:
+                            full_sol_dset = hf[full_sol_label]
+                        full_sol_dset[s, :] = eigvec
+                        hf.close()
 
                     # save excitation details
                     excitation_details.append(
@@ -776,6 +786,12 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                         'num_valence': orbital_details['num_valence'],
                         'num_virtual': orbital_details['num_virtual']
                     }
+
+                    full_solutions_keys = ['S{:d}'.format(s + 1) for s in range(self.nstates)]
+                    ret_dict.update({'full_solutions_keys': full_solutions_keys})
+
+                    # add rsp type
+                    ret_dict.update({'rsp_type': 'rpa'})
 
                     if self.nto:
                         ret_dict['nto_lambdas'] = nto_lambdas
