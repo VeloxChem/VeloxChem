@@ -541,6 +541,7 @@ def plot_rixs_spectrum(rixs_results,
                        broadening_type="lorentzian",
                        broadening_value=0.24,
                        x_unit="ev",
+                       x_step=0.01,
                        ax=None):
     """
     Plot the RIXS spectrum from a RIXS calculation.
@@ -559,6 +560,8 @@ def plot_rixs_spectrum(rixs_results,
         The type of broadening to use. Either 'lorentzian' or 'gaussian'.
     :param broadening_value:
         The FWHM in eV.
+    :param x_step:
+        Grid spacing in eV for the broadened RIXS spectrum.
     :param ax:
         The matplotlib axis to plot on.
     """
@@ -596,7 +599,7 @@ def plot_rixs_spectrum(rixs_results,
 
     omega_ev = incoming_ev[photon_index]
 
-    ax.set_ylabel(r'Reduced cross section, $\sigma/r_e^2$')
+    ax.set_ylabel(r'Cross section, $\sigma$ [$a_0^2$]')
     ax.set_title(rf"RIXS Spectrum @ $\hbar \omega = {omega_ev:.2f}$ eV")
 
     if energy_loss:
@@ -608,7 +611,7 @@ def plot_rixs_spectrum(rixs_results,
 
     xmin = max(0.0, min(x) - 0.03)
     xmax = max(x) + 0.03
-    xstep = 0.0001
+    xstep = x_step
 
     x_ev = x * au2ev
     xmin_ev = xmin * au2ev
@@ -616,7 +619,10 @@ def plot_rixs_spectrum(rixs_results,
     xstep_ev = xstep * au2ev
 
     ax2 = ax.twinx()
-    ax2.set_ylabel(r'Intensity, $d / d\omega (\sigma/r_e^2)$ [eV$^{-1}$]')
+    ax2.set_ylabel(
+        r'Intensity, $ \text{d} \sigma / \text{d} \omega $ [$a_0^2$ eV$^{-1}$]'
+        )
+    
 
     for i in np.arange(len(y)):
         if energy_loss:
@@ -698,207 +704,6 @@ def plot_rixs_spectrum(rixs_results,
 
     ax.set_xlim(x_lim)
     ax2.set_xlim(x_lim)
-
-    return ax
-
-def plot_rixs_slices(rixs_results,
-                     photon_indices,
-                     energy_loss=True,
-                     broadening_type="lorentzian",
-                     broadening_value=0.24,
-                     x_step=0.01,
-                     x_unit="ev",
-                     normalize=True,
-                     ax=None):
-    """
-    Plot several RIXS spectra as stacked 1D slices.
-
-    :param rixs_results:
-        The dictionary containing the RIXS results.
-    :param photon_indices:
-        List of incoming photon indices to plot.
-    :param energy_loss:
-        If True, plot as a function of energy loss.
-        If False, plot as a function of emission energy.
-    :param broadening_type:
-        The type of broadening to use. Either 'lorentzian' or 'gaussian'.
-    :param broadening_value:
-        The FWHM in eV.
-    :param x_step:
-        Grid spacing in eV for the broadened spectra.
-    :param x_unit:
-        Only 'ev' is supported.
-    :param normalize:
-        If True, normalize all broadened spectra by the global maximum.
-    :param ax:
-        The matplotlib axis to plot on.
-    """
-
-    assert_msg_critical('matplotlib' in sys.modules, 'matplotlib is required.')
-    assert_msg_critical(x_unit.lower() == 'ev',
-                        'plot_rixs_slices: only x_unit="ev" is currently supported.')
-
-    au2ev = hartree_in_ev()
-
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(8, 6))
-
-    photon_indices = np.asarray(photon_indices, dtype=int)
-
-    incoming_ev = np.asarray(rixs_results['elastic_emission']) * au2ev
-    cross_sections = np.asarray(rixs_results['cross_sections'])
-
-    if energy_loss:
-        x_au = np.asarray(rixs_results['energy_losses'])
-        ax.set_xlabel('Energy loss [eV]')
-    else:
-        x_au = np.asarray(rixs_results['emission_energies'])
-        ax.set_xlabel('Emission energy [eV]')
-
-    x_ev = x_au * au2ev
-
-    assert_msg_critical(
-        x_ev.shape == cross_sections.shape,
-        'plot_rixs_slices: x values and cross sections have incompatible shapes.'
-    )
-
-    assert_msg_critical(
-        np.all(photon_indices >= 0) and np.all(photon_indices < incoming_ev.size),
-        'plot_rixs_slices: photon_index out of range.'
-    )
-
-    sort_idx = np.argsort(incoming_ev[photon_indices])
-    photon_indices = photon_indices[sort_idx]
-
-    x_sel = x_ev[:, photon_indices]
-    y_sel = cross_sections[:, photon_indices]
-    incoming_sel_ev = incoming_ev[photon_indices]
-
-    x_sel = x_ev[:, photon_indices]
-    y_sel = cross_sections[:, photon_indices]
-    incoming_sel_ev = incoming_ev[photon_indices]
-
-    # pad x-range to ensure broadened spectra are not cut off at the edges
-    x_pad = max(0.25, 2.0 * broadening_value)
-
-    xmin_ev = np.min(x_sel) - x_pad
-    xmax_ev = np.max(x_sel) + x_pad
-
-    if energy_loss:
-        xmin_ev = max(0.0, xmin_ev)
-
-    spectra = []
-    xi = None
-
-    for col in range(len(photon_indices)):
-
-        if broadening_type.lower() == "lorentzian":
-            xi_tmp, yi_tmp = lorentzian_xps(
-                x_sel[:, col],
-                y_sel[:, col],
-                xmin_ev,
-                xmax_ev,
-                x_step,
-                broadening_value
-            )
-
-        elif broadening_type.lower() == "gaussian":
-            xi_tmp, yi_tmp = gaussian_xps(
-                x_sel[:, col],
-                y_sel[:, col],
-                xmin_ev,
-                xmax_ev,
-                x_step,
-                broadening_value
-            )
-
-        else:
-            assert_msg_critical(False, 'plot_rixs_slices: Invalid broadening_type')
-
-        if xi is None:
-            xi = xi_tmp
-
-        spectra.append(yi_tmp)
-
-    spectra = np.asarray(spectra)
-
-    # normalize all spectra by the global maximum if requested
-    if normalize:
-        max_intensity = np.max(np.abs(spectra))
-
-        if max_intensity > 0.0:
-            spectra = spectra / max_intensity
-    else:
-        max_intensity = 1.0
-
-    stick_heights = np.array(y_sel, copy=True)
-
-    if normalize:
-        max_stick = np.max(np.abs(stick_heights))
-
-        if max_stick > 0.0:
-            stick_heights = stick_heights / max_stick
-
-    offset = 1.2
-
-    for i, omega_ev in enumerate(incoming_sel_ev):
-        y_offset = i * offset
-
-        for k in range(x_sel.shape[0]):
-            ax.plot(
-                [x_sel[k, i], x_sel[k, i]],
-                [y_offset, y_offset + stick_heights[k, i]],
-                alpha=0.7,
-                linewidth=2,
-                color="darkcyan",
-            )
-
-        ax.plot(
-            xi,
-            spectra[i] + y_offset,
-            color='black',
-            linewidth=2.0
-        )
-
-    if energy_loss:
-        ax.set_xlim(xi.max(), xi.min())
-    else:
-        ax.set_xlim(xi.min(), xi.max())
-
-    ax.set_ylabel('Incoming photon energy [eV]')
-    ax.set_yticks(np.arange(len(incoming_sel_ev)) * offset)
-    ax.set_yticklabels([f'{omega:.2f}' for omega in incoming_sel_ev])
-
-    label_spectrum = f'{broadening_type.capitalize()} '
-    label_spectrum += f'broadening ({broadening_value:.3f} eV)'
-    title_spectrum = 'RIXS Spectra'
-
-    ax.set_title(title_spectrum)
-
-    ax.tick_params(axis='both', which='both',
-                   direction='out',
-                   bottom=True, top=False,
-                   left=True, right=False,
-                   labelbottom=True, labeltop=False,
-                   labelleft=True, labelright=False)
-
-    legend_bars = mlines.Line2D([], [],
-                                color='darkcyan',
-                                alpha=0.7,
-                                linewidth=2,
-                                label='Cross section')
-
-    legend_spectrum = mlines.Line2D([], [],
-                                    color='black',
-                                    linestyle='-',
-                                    linewidth=2.5,
-                                    label=label_spectrum)
-
-    ax.legend(handles=[legend_bars, legend_spectrum],
-              frameon=False,
-              borderaxespad=0.,
-              loc='center left',
-              bbox_to_anchor=(1.05, 0.5))
 
     return ax
 
@@ -1071,7 +876,7 @@ def plot_rixs_map(rixs_results,
     offset_text.set_ha('left')
 
     cbar.set_label(
-        r'Intensity, $d / d\omega (\sigma/r_e^2)$ [eV$^{-1}$]'
+        r'Intensity, $ \text{d} \sigma / \text{d} \omega $ [$a_0^2$ eV$^{-1}$]'
     )
 
     if energy_loss:
@@ -1136,7 +941,6 @@ def plot_rixs_map(rixs_results,
                        left=False, right=False,
                        labelbottom=False, labeltop=False,
                        labelleft=False, labelright=False)
-    
 
     return ax_map, ax_xas
 

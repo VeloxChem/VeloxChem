@@ -36,9 +36,9 @@ import numpy as np
 import h5py
 import sys
 
-from .veloxchemlib import hartree_in_ev, mpi_master
+from .veloxchemlib import hartree_in_ev, mpi_master, fine_structure_constant
 from .oneeints import compute_electric_dipole_integrals
-from .spectrumplot import plot_rixs_spectrum, plot_rixs_map, plot_rixs_slices
+from .spectrumplot import plot_rixs_spectrum, plot_rixs_map
 from .outputstream import OutputStream
 from .linearsolver import LinearSolver
 from .lreigensolver import LinearResponseEigenSolver
@@ -399,8 +399,8 @@ class RixsDriver(LinearSolver):
         core_eigvals = self.comm.bcast(core_eigvals, root=mpi_master())
         valence_eigvals = self.comm.bcast(valence_eigvals, root=mpi_master())
 
-        core_eigvecs = self._get_eigvecs(core_rsp_results, core_states, "core")
-        valence_eigvecs = self._get_eigvecs(rsp_results, val_states, "valence")
+        core_eigvecs = self._get_eigvecs(core_rsp_results, core_states)
+        valence_eigvecs = self._get_eigvecs(rsp_results, val_states)
 
         core_mats = self._preprocess_core_eigvecs(core_eigvecs, occupied_core,
                                                   num_valence_orbitals, num_vir_orbitals)
@@ -699,7 +699,7 @@ class RixsDriver(LinearSolver):
 
     def cross_section(self, F, omegaprime_omega=1):
         """
-        Computes the RIXS cross-section.
+        Computes the RIXS cross section.
 
         Journal of Chemical Theory and Computation 2021 17 (5), 3031-3038
         DOI: 10.1021/acs.jctc.1c00144
@@ -713,7 +713,7 @@ class RixsDriver(LinearSolver):
             The ratio between outgoing- and incoming frequencies, w'/w.
 
         :return:
-            The scattering cross-section.
+            The scattering cross section.
         """
 
         # F_xy (F^(xy))^*
@@ -723,13 +723,13 @@ class RixsDriver(LinearSolver):
         # F_xx (F^(yy))^*
         tr_F2 = np.abs(np.trace(F))**2
 
-        sigma_f = omegaprime_omega * (1.0/15.0) * (
+        sigma_f = (fine_structure_constant()**4) * omegaprime_omega * (1.0/15.0) * (
             (2.0 - 0.5*np.sin(self.theta)**2) * F2 +
             (0.75*np.sin(self.theta)**2 - 0.5) * (FF_T_conj + tr_F2))
 
         return sigma_f
 
-    def _get_eigvecs(self, rsp_results, states, label):
+    def _get_eigvecs(self, rsp_results, states):
         """
         Gets eigenvectors.
 
@@ -1128,48 +1128,43 @@ class RixsDriver(LinearSolver):
         self.ostream.flush()
 
     @staticmethod
-    def _resolve_photon_selection(results, photon_index=None, photon_energy=None):
+    def _select_photon_index(results, photon_index=None, photon_energy=None):
+        """
+        Function for returning the index of the selected photon. Based on either
+        the photon index or the photon energy. If both are None, return 0.
+        """
         assert_msg_critical(
             not (photon_index is not None and photon_energy is not None),
             'plot_spectrum: specify only one of photon_index or photon_energy.'
         )
 
-        incoming_ev = np.asarray(results['elastic_emission']) * hartree_in_ev()
-
         if photon_index is None and photon_energy is None:
             return 0
 
         if photon_energy is not None:
-            energies = np.atleast_1d(photon_energy).astype(float)
-            indices = np.argmin(np.abs(incoming_ev[:, None] - energies[None, :]),
-                                axis=0)
+            incoming_ev = np.asarray(results['elastic_emission']) * hartree_in_ev()
+            photon_energy = float(photon_energy)
 
-            if np.ndim(photon_energy) == 0:
-                return int(indices[0])
+            return int(np.argmin(np.abs(incoming_ev - photon_energy)))
 
-            return indices.astype(int)
-
-        indices = np.atleast_1d(photon_index).astype(int)
-
+        photon_index = int(photon_index)
+        n_photons = len(results['elastic_emission'])
         assert_msg_critical(
-            np.all(indices >= 0) and np.all(indices < incoming_ev.size),
+            0 <= photon_index < n_photons,
             'plot_spectrum: photon_index out of range.'
         )
 
-        if np.ndim(photon_index) == 0:
-            return int(indices[0])
-
-        return indices
+        return photon_index
 
     def plot(self,
             results,
             broadening_type="lorentzian",
             broadening_value_ev=0.24,
             x_unit='ev',
+            x_step=1e-3,
             energy_loss=True,
             photon_index=None,
             photon_energy_ev=None,
-            normalize=True,
             ax=None):
         """
         Plot the RIXS spectrum.
@@ -1184,16 +1179,16 @@ class RixsDriver(LinearSolver):
             The broadening value, FWHM in eV.
         :param x_unit:
             Unit for the x-axis.
+        :param x_step:
+            Grid spacing in eV for the broadened RIXS spectrum.
         :param energy_loss:
             If True, plot versus energy loss.
             If False, plot versus emission energy.
         :param photon_index:
-            Integer index for a single slice, or list of indices for stacked slices.
+            Integer index of the input energies.
         :param photon_energy_ev:
-            Photon energy in eV, or list of photon energies in eV. The closest
+            Photon energy in eV. The closest
             available calculated photon energy is used.
-        :param normalize:
-            If True, normalize the cross-sections (based on max intenstiy).
         :param ax:
             The matplotlib axis to plot on.
 
@@ -1201,40 +1196,29 @@ class RixsDriver(LinearSolver):
             The matplotlib axis object.
         """
 
-        # if given as energies, find the closest calculated photon energy indices
-        photon_selection = self._resolve_photon_selection(
+        # if given as energy, find the closest calculated photon energy index
+        photon_selection = self._select_photon_index(
             results,
             photon_index=photon_index,
             photon_energy=photon_energy_ev
         )
 
-        if isinstance(photon_selection, np.ndarray):
-            return plot_rixs_slices(
-                results,
-                photon_indices=photon_selection,
-                broadening_type=broadening_type,
-                broadening_value=broadening_value_ev,
-                x_unit=x_unit,
-                energy_loss=energy_loss,
-                normalize=normalize,
-                ax=ax
-            )
-        else:
-            return plot_rixs_spectrum(
-                results,
-                broadening_type=broadening_type,
-                broadening_value=broadening_value_ev,
-                photon_index=photon_selection,
-                x_unit=x_unit,
-                energy_loss=energy_loss,
-                ax=ax
-            )
+        return plot_rixs_spectrum(
+            results,
+            broadening_type=broadening_type,
+            broadening_value=broadening_value_ev,
+            photon_index=photon_selection,
+            x_unit=x_unit,
+            x_step=x_step,
+            energy_loss=energy_loss,
+            ax=ax
+        )
         
     def plot_map(self,
                 results,
                 broadening_type="lorentzian",
                 broadening_value_ev=0.24,
-                x_step=0.01,
+                x_step=1e-3,
                 x_unit='ev',
                 energy_loss=True,
                 min_photon_points=10,
