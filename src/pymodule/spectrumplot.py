@@ -1059,8 +1059,19 @@ def plot_rixs_map(rixs_results,
     ])
 
     cbar = fig.colorbar(im, cax=cax)
+
+    cbar.ax.ticklabel_format(
+        axis='y',
+        style='sci',
+        scilimits=(0, 0),
+        useMathText=True
+    )
+
+    offset_text = cbar.ax.yaxis.get_offset_text()
+    offset_text.set_ha('left')
+
     cbar.set_label(
-        r'Cross section, $d / d\omega (\sigma/r_e^2)$ [eV$^{-1}$]'
+        r'Intensity, $d / d\omega (\sigma/r_e^2)$ [eV$^{-1}$]'
     )
 
     if energy_loss:
