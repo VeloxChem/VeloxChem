@@ -49,7 +49,8 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
 from .errorhandler import assert_msg_critical
 from .checkpoint import read_rsp_hdf5, write_rsp_hdf5
 from .resultsio import (write_lr_rsp_results_to_hdf5,
-                        write_detach_attach_to_hdf5, write_rsp_solution)
+                        write_detach_attach_to_hdf5, write_rsp_solution,
+                        clear_group_in_hdf5)
 
 
 class TdaEigenSolver(TdaEigenSolverBase):
@@ -353,6 +354,9 @@ class TdaEigenSolver(TdaEigenSolverBase):
             # final hdf5 file to save response results
             if self.filename is not None:
                 final_h5_fname = f'{self.filename}.h5'
+                if self._is_converged:
+                    # clear stale group in final h5
+                    clear_group_in_hdf5(final_h5_fname, 'rsp')
             else:
                 final_h5_fname = None
 

@@ -46,6 +46,7 @@ from .mathutils import safe_solve
 from .checkpoint import check_rsp_hdf5
 from .inputparser import parse_seq_fixed
 from .resultsio import write_rsp_solution_with_multiple_keys
+from .resultsio import clear_group_in_hdf5
 
 
 class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
@@ -707,6 +708,8 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
                     # final h5 file for response solutions
                     if self.filename is not None:
                         final_h5_fname = f'{self.filename}.h5'
+                        # clear stale group in final h5
+                        clear_group_in_hdf5(final_h5_fname, 'rsp')
                     else:
                         final_h5_fname = None
 

@@ -50,7 +50,8 @@ from .errorhandler import assert_msg_critical
 from .mathutils import screened_eigh, symmetric_matrix_function
 from .checkpoint import check_rsp_hdf5
 from .resultsio import (write_lr_rsp_results_to_hdf5,
-                        write_detach_attach_to_hdf5, write_rsp_solution)
+                        write_detach_attach_to_hdf5, write_rsp_solution,
+                        clear_group_in_hdf5)
 
 
 class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
@@ -568,6 +569,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                 # final h5 file for response solutions
                 if self.filename is not None:
                     final_h5_fname = f'{self.filename}.h5'
+                    # clear stale group in final h5
+                    clear_group_in_hdf5(final_h5_fname, 'rsp')
                 else:
                     final_h5_fname = None
 

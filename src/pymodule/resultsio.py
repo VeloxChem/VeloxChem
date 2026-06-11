@@ -303,6 +303,24 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
         hf.close()
 
 
+def clear_group_in_hdf5(fname, label):
+    """
+    Clears a group in an HDF5 file.
+
+    :param fname:
+        Name of the HDF5 file.
+    :param label:
+        The HDF5 group label.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str) and
+                        Path(fname).is_file())
+    if valid_checkpoint:
+        with h5py.File(fname, 'a') as hf:
+            if label in hf:
+                del hf[label]
+
+
 def write_results_to_hdf5(fname,
                           label,
                           results,
