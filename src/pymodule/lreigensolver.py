@@ -798,6 +798,7 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                         self.ostream.print_blank()
                         self.ostream.flush()
 
+                    if final_h5_fname is not None:
                         # Keep the legacy rsp HDF5 layout for compatibility.
                         # Solution vectors are written separately as S1/S2/...
                         # datasets, so the distributed in-memory vectors do not

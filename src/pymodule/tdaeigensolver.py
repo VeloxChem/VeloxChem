@@ -528,6 +528,7 @@ class TdaEigenSolver(TdaEigenSolverBase):
                 self.ostream.print_blank()
                 self.ostream.flush()
 
+            if final_h5_fname is not None:
                 # Keep the legacy rsp HDF5 layout for compatibility.
                 # Eigenvectors are written separately as S1/S2/... datasets, so
                 # they do not belong in this HDF5-facing payload.
