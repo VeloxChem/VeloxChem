@@ -10,10 +10,13 @@ from veloxchem import (Molecule, MolecularBasis, OptimizationDriver, MpiTask,
                        ScfUnrestrictedDriver, mpi_master)
 from veloxchem.cppsolver import ComplexResponseSolver
 from veloxchem.c6driver import C6Driver
+from veloxchem.errorhandler import VeloxChemError
 from veloxchem.lrsolver import LinearResponseSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.lrsolverunrest import LinearResponseUnrestrictedSolver
 from veloxchem.resultsio import (read_results, write_results_to_hdf5,
+                                 write_rsp_full_solution_to_hdf5,
+                                 write_rsp_results_to_hdf5,
                                  write_scf_results_to_hdf5)
 from veloxchem.tdacppsolver import ComplexResponseTdaSolver
 from veloxchem.tdaeigensolver import TdaEigenSolver
@@ -35,7 +38,7 @@ def _get_water_and_basis():
     return molecule, basis
 
 
-def _run_water_rsp_roundtrip(tmp_path, solver_cls):
+def _run_water_rsp_roundtrip(tmp_path, solver_cls, save_solutions=True):
 
     molecule, basis = _get_water_and_basis()
     base = str(Path(tmp_path) / solver_cls.__name__.lower())
@@ -51,6 +54,7 @@ def _run_water_rsp_roundtrip(tmp_path, solver_cls):
     rsp_drv.filename = base
     rsp_drv.nstates = 2
     rsp_drv.max_subspace_dim = 10
+    rsp_drv.save_solutions = save_solutions
     if solver_cls is LinearResponseEigenSolver:
         rsp_drv.esa = True
     rsp_results = rsp_drv.compute(molecule, basis, scf_results)
@@ -308,6 +312,60 @@ def test_write_results_to_hdf5_stores_requested_group(tmp_path):
     assert recovered['projected'] is vib_results['projected']
 
 
+def test_write_rsp_results_pairs_solution_keys_and_matrix(tmp_path):
+
+    if MPI.COMM_WORLD.Get_rank() != mpi_master():
+        return
+
+    h5file = Path(tmp_path) / 'rsp_solutions.h5'
+    with h5py.File(h5file, 'w') as h5f:
+        h5f.create_group('rsp')
+
+    solution_keys = ['S1', 'S2']
+    solutions = [np.arange(3.0), np.arange(3.0, 6.0)]
+
+    for index, solution in enumerate(solutions):
+        write_rsp_full_solution_to_hdf5(str(h5file), solution, index,
+                                        len(solutions))
+
+    write_rsp_results_to_hdf5(str(h5file), {
+        'rsp_type': 'tda',
+        'full_solutions_keys': solution_keys,
+    })
+
+    recovered = read_results(str(h5file), 'rsp')
+
+    assert set(recovered) == {'rsp_type', 'S1', 'S2'}
+    np.testing.assert_allclose(recovered['S1'], solutions[0])
+    np.testing.assert_allclose(recovered['S2'], solutions[1])
+
+
+def test_write_rsp_full_solution_requires_numpy_array(tmp_path):
+
+    if MPI.COMM_WORLD.Get_rank() != mpi_master():
+        return
+
+    h5file = Path(tmp_path) / 'rsp_solutions.h5'
+    with h5py.File(h5file, 'w') as h5f:
+        h5f.create_group('rsp')
+
+    with pytest.raises(VeloxChemError, match='must be a NumPy array'):
+        write_rsp_full_solution_to_hdf5(str(h5file), [1.0, 2.0], 0, 1)
+
+
+def test_tda_rsp_omits_solution_keys_when_saving_is_disabled(tmp_path):
+
+    rsp_drv, rsp_results, h5file = _run_water_rsp_roundtrip(
+        tmp_path, TdaEigenSolver, save_solutions=False)
+
+    if rsp_drv.rank == mpi_master():
+        assert 'full_solutions_keys' not in rsp_results
+
+        with h5py.File(h5file, 'r') as h5f:
+            assert 'full_solutions_keys' not in h5f['rsp']
+            assert 'full_solutions_matrix' not in h5f['rsp']
+
+
 def test_write_results_to_hdf5_roundtrips_dict_with_non_string_keys(tmp_path):
 
     if MPI.COMM_WORLD.Get_rank() != mpi_master():
@@ -400,6 +458,8 @@ def test_read_results_roundtrips_tda_rsp_and_preserves_legacy_solution_vectors(
         tmp_path, TdaEigenSolver)
 
     if MPI.COMM_WORLD.Get_rank() == mpi_master():
+        assert 'full_solutions_keys' not in rsp_results
+
         recovered = read_results(h5file, 'rsp')
 
         assert 'eigenvectors' not in recovered
@@ -431,6 +491,8 @@ def test_read_results_roundtrips_rpa_rsp_and_preserves_legacy_solution_vectors(
 
     rsp_drv, rsp_results, h5file = _run_water_rsp_roundtrip(
         tmp_path, LinearResponseEigenSolver)
+
+    assert 'full_solutions_keys' not in rsp_results
 
     recovered = read_results(h5file, 'rsp')
 
@@ -468,6 +530,8 @@ def test_read_results_roundtrips_cpp_rsp_and_preserves_legacy_solution_vectors(
         tmp_path, solver_cls):
 
     rsp_drv, rsp_results, h5file = _run_cpp_rsp_roundtrip(tmp_path, solver_cls)
+
+    assert 'full_solutions_keys' not in rsp_results
 
     recovered = read_results(h5file, 'rsp')
 
@@ -520,6 +584,8 @@ def test_read_results_roundtrips_lr_rsp_and_preserves_solution_vectors(
 
     rsp_drv, rsp_results, h5file = _run_lr_rsp_roundtrip(tmp_path, solver_cls)
 
+    assert 'full_solutions_keys' not in rsp_results
+
     recovered = read_results(h5file, 'rsp')
 
     assert rsp_results['rsp_type'] == 'lr'
@@ -569,7 +635,6 @@ def test_read_results_roundtrips_c6_rsp_and_preserves_solution_vectors(
         'n_points',
         'response_functions',
         'solutions',
-        'full_solutions_keys',
         'rsp_type',
         'w0',
     }

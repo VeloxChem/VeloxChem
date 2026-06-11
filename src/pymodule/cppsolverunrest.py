@@ -32,7 +32,6 @@
 
 import numpy as np
 import time as tm
-import h5py
 
 from .veloxchemlib import (mpi_master, fine_structure_constant,
                            extinction_coefficient_from_beta)
@@ -46,7 +45,8 @@ from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
 from .checkpoint import check_rsp_hdf5
 from .inputparser import parse_seq_fixed
-from .resultsio import clear_group_in_hdf5
+from .resultsio import (clear_group_in_hdf5, write_rsp_full_solution_to_hdf5,
+                        write_rsp_results_to_hdf5)
 
 
 class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
@@ -740,18 +740,8 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
 
                         # write solutions to h5 file
                         if (self.save_solutions and final_h5_fname is not None):
-                            hf = h5py.File(final_h5_fname, 'a')
-                            full_sol_label = 'rsp/full_solutions_matrix'
-                            if op_w_ind == 0:
-                                if full_sol_label in hf:
-                                    del hf[full_sol_label]
-                                full_sol_dset = hf.create_dataset(full_sol_label,
-                                                                  shape=(len(solutions), len(x)),
-                                                                  dtype=x.dtype)
-                            else:
-                                full_sol_dset = hf[full_sol_label]
-                            full_sol_dset[op_w_ind, :] = x
-                            hf.close()
+                            write_rsp_full_solution_to_hdf5(
+                                final_h5_fname, x, op_w_ind, len(solutions))
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
@@ -773,8 +763,15 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
                         'molecular_mass_amu': float(sum(molecule.get_masses())),
                     }
 
-                    full_solutions_keys = ['{:s}_{:.8f}'.format(bop, w) for bop, w in solutions]
-                    ret_dict.update({'full_solutions_keys': full_solutions_keys})
+                    if (self.save_solutions and
+                            final_h5_fname is not None):
+                        full_solutions_keys = [
+                            '{:s}_{:.8f}'.format(bop, w)
+                            for bop, w in solutions
+                        ]
+                        write_rsp_results_to_hdf5(
+                            final_h5_fname,
+                            {'full_solutions_keys': full_solutions_keys})
 
                     # add rsp type
                     ret_dict.update({'rsp_type': 'cpp'})

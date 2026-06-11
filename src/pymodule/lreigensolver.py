@@ -32,7 +32,6 @@
 
 import numpy as np
 import time as tm
-import h5py
 
 from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
@@ -51,7 +50,8 @@ from .errorhandler import assert_msg_critical
 from .mathutils import screened_eigh, symmetric_matrix_function
 from .checkpoint import check_rsp_hdf5
 from .resultsio import (write_rsp_results_to_hdf5,
-                        write_detach_attach_to_hdf5, clear_group_in_hdf5)
+                        write_detach_attach_to_hdf5, clear_group_in_hdf5,
+                        write_rsp_full_solution_to_hdf5)
 
 
 class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
@@ -742,18 +742,8 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
                     # write response solutions to h5 file
                     if (self.save_solutions and final_h5_fname is not None):
-                        hf = h5py.File(final_h5_fname, 'a')
-                        full_sol_label = 'rsp/full_solutions_matrix'
-                        if s == 0:
-                            if full_sol_label in hf:
-                                del hf[full_sol_label]
-                            full_sol_dset = hf.create_dataset(full_sol_label,
-                                                              shape=(self.nstates, len(eigvec)),
-                                                              dtype=eigvec.dtype)
-                        else:
-                            full_sol_dset = hf[full_sol_label]
-                        full_sol_dset[s, :] = eigvec
-                        hf.close()
+                        write_rsp_full_solution_to_hdf5(
+                            final_h5_fname, eigvec, s, self.nstates)
 
                     # save excitation details
                     excitation_details.append(
@@ -787,8 +777,15 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                         'num_virtual': orbital_details['num_virtual']
                     }
 
-                    full_solutions_keys = ['S{:d}'.format(s + 1) for s in range(self.nstates)]
-                    ret_dict.update({'full_solutions_keys': full_solutions_keys})
+                    if (self.save_solutions and
+                            final_h5_fname is not None):
+                        full_solutions_keys = [
+                            'S{:d}'.format(s + 1)
+                            for s in range(self.nstates)
+                        ]
+                        write_rsp_results_to_hdf5(
+                            final_h5_fname,
+                            {'full_solutions_keys': full_solutions_keys})
 
                     # add rsp type
                     ret_dict.update({'rsp_type': 'rpa'})
@@ -818,17 +815,12 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                         self.ostream.flush()
 
                     if final_h5_fname is not None:
-                        # Keep the legacy rsp HDF5 layout for compatibility.
-                        # Solution vectors are written separately as S1/S2/...
-                        # datasets, so the distributed in-memory vectors do not
-                        # belong in this HDF5-facing payload.
                         h5_ret_dict = {
                             key: value
                             for key, value in ret_dict.items()
                             if key != 'eigenvectors_distributed'
                         }
-                        write_rsp_results_to_hdf5(final_h5_fname,
-                                                     h5_ret_dict)
+                        write_rsp_results_to_hdf5(final_h5_fname, h5_ret_dict)
 
                     self._print_results(ret_dict)
 

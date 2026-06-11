@@ -413,6 +413,57 @@ def write_rsp_results_to_hdf5(fname, rsp_results):
                           replace_group=False)
 
 
+def write_rsp_full_solution_to_hdf5(fname, solution, solution_index,
+                                    num_solutions):
+    """
+    Writes one row of the full response solutions matrix to an HDF5 file.
+
+    The first row initializes the matrix and removes stale solution keys.
+
+    :param fname:
+        Name of the HDF5 file.
+    :param solution:
+        The full response solution vector.
+    :param solution_index:
+        Row index of the solution vector.
+    :param num_solutions:
+        Total number of solution vectors.
+    """
+
+    assert_msg_critical(isinstance(solution, np.ndarray),
+                        'A full response solution must be a NumPy array.')
+    assert_msg_critical(solution.ndim == 1,
+                        'A full response solution must be one-dimensional.')
+    assert_msg_critical(
+        0 <= solution_index < num_solutions,
+        f'Invalid response solution index {solution_index} for '
+        f'{num_solutions} solutions.')
+
+    with h5py.File(fname, 'a') as hf:
+        matrix_label = 'rsp/full_solutions_matrix'
+        keys_label = 'rsp/full_solutions_keys'
+
+        if solution_index == 0:
+            if matrix_label in hf:
+                del hf[matrix_label]
+            if keys_label in hf:
+                del hf[keys_label]
+            matrix = hf.create_dataset(
+                matrix_label,
+                shape=(num_solutions, solution.size),
+                dtype=solution.dtype)
+        else:
+            assert_msg_critical(
+                matrix_label in hf,
+                'The full response solutions matrix has not been initialized.')
+            matrix = hf[matrix_label]
+            assert_msg_critical(
+                matrix.shape == (num_solutions, solution.size),
+                'Inconsistent full response solution vector dimensions.')
+
+        matrix[solution_index, :] = solution
+
+
 def write_detach_attach_to_hdf5(fname,
                                 state_label,
                                 dens_detach,
