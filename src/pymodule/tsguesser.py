@@ -326,7 +326,6 @@ class TransitionStateGuesser():
         # Convert 1-indexed user input to 0-indexed internal representation
 
         configuration['frozen_atoms'] = [i - 1 for i in self.frozen_atoms]
-        configuration['frozen_use_posres'] = self.frozen_use_posres
 
         if len(self.frozen_atoms) > 0:
             rea_pos = self.reactant.molecule.get_coordinates_in_angstrom()

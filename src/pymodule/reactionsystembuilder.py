@@ -579,7 +579,7 @@ class ReactionSystemBuilder():
                     continue
                 mm_element = mmapp.Element.getBySymbol(elements[id])
                 name = f"{elements[id]}{id}"
-                mass = (0.0 if (id in self.frozen_atoms) else mm_element.mass)
+                mass = mm_element.mass
                 system.addParticle(mass)
                 nb_force.addParticle(
                     0, 1, 0
@@ -1336,9 +1336,7 @@ class ReactionSystemBuilder():
             systems[lam] = new_system
 
         self._add_reaction_forces(rea_system, 0, pes=True)
-        self._add_frozen(rea_system, 0)
         self._add_reaction_forces(pro_system, 1, pes=True)
-        self._add_frozen(pro_system, 1)
 
         if self.decompose_nb is not None:
             if self.solvent:
