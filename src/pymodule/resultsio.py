@@ -554,7 +554,8 @@ def read_results(fname, label):
         results_dict = _read_value_from_hdf5(h5f[label], value_label='results')
 
         if ((label == 'rsp') and ('rsp_type' in results_dict) and
-                (results_dict['rsp_type'] in ['cpp', 'rpa', 'tda'])):
+                (results_dict['rsp_type'] in
+                 ['cpp', 'tdacpp', 'rpa', 'tda'])):
             if 'full_solutions_keys' in results_dict and 'full_solutions_matrix' in results_dict:
                 for idx, sol_key in enumerate(results_dict['full_solutions_keys']):
                     results_dict[sol_key] = results_dict['full_solutions_matrix'][idx].copy()

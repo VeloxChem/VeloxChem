@@ -12,6 +12,7 @@ from veloxchem.cppsolver import ComplexResponseSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.resultsio import (read_results, write_results_to_hdf5,
                                  write_scf_results_to_hdf5)
+from veloxchem.tdacppsolver import ComplexResponseTdaSolver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.vibrationalanalysis import VibrationalAnalysis
 
@@ -54,7 +55,7 @@ def _run_water_rsp_roundtrip(tmp_path, solver_cls):
     return rsp_drv, rsp_results, base + '.h5'
 
 
-def _run_cpp_rsp_roundtrip(tmp_path):
+def _run_cpp_rsp_roundtrip(tmp_path, solver_cls):
 
     xyz_string = """6
     xyz
@@ -68,7 +69,7 @@ def _run_cpp_rsp_roundtrip(tmp_path):
 
     molecule = Molecule.read_xyz_string(xyz_string)
     basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
-    base = str(Path(tmp_path) / 'cppsolver')
+    base = str(Path(tmp_path) / solver_cls.__name__.lower())
 
     scf_drv = ScfRestrictedDriver()
     scf_drv.ostream.mute()
@@ -78,7 +79,7 @@ def _run_cpp_rsp_roundtrip(tmp_path):
     scf_drv.acc_type = 'l2_c2diis'
     scf_results = scf_drv.compute(molecule, basis)
 
-    rsp_drv = ComplexResponseSolver()
+    rsp_drv = solver_cls()
     rsp_drv.ostream.mute()
     rsp_drv.filename = base
     rsp_drv.property = 'absorption'
@@ -396,12 +397,19 @@ def test_read_results_roundtrips_rpa_rsp_and_preserves_legacy_solution_vectors(
 
 @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() != 1,
                     reason='runs only on a single MPI rank')
+@pytest.mark.parametrize('solver_cls',
+                         [ComplexResponseSolver, ComplexResponseTdaSolver])
 def test_read_results_roundtrips_cpp_rsp_and_preserves_legacy_solution_vectors(
-        tmp_path):
+        tmp_path, solver_cls):
 
-    rsp_drv, rsp_results, h5file = _run_cpp_rsp_roundtrip(tmp_path)
+    rsp_drv, rsp_results, h5file = _run_cpp_rsp_roundtrip(tmp_path, solver_cls)
 
     recovered = read_results(h5file, 'rsp')
+
+    expected_rsp_type = (
+        'tdacpp' if solver_cls is ComplexResponseTdaSolver else 'cpp')
+    assert rsp_results['rsp_type'] == expected_rsp_type
+    assert recovered['rsp_type'] == expected_rsp_type
 
     assert 'solutions' not in recovered
     assert 'full_solutions_matrix' not in recovered
