@@ -32,6 +32,7 @@
 
 import numpy as np
 import time as tm
+import h5py
 
 from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
 from .veloxchemlib import denmat
@@ -48,8 +49,7 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
 from .errorhandler import assert_msg_critical
 from .checkpoint import read_rsp_hdf5, write_rsp_hdf5
 from .resultsio import (write_lr_rsp_results_to_hdf5,
-                        write_detach_attach_to_hdf5, write_rsp_solution,
-                        clear_group_in_hdf5)
+                        write_detach_attach_to_hdf5, clear_group_in_hdf5)
 
 
 class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
@@ -447,10 +447,19 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
 
                 # write eigenvectors to h5 file
                 if (self.save_solutions and final_h5_fname is not None):
-                    write_rsp_solution(final_h5_fname,
-                                       'S{:d}(a)'.format(s + 1), eigvecs[:n_ov_a, s])
-                    write_rsp_solution(final_h5_fname,
-                                       'S{:d}(b)'.format(s + 1), eigvecs[n_ov_a:, s])
+                    eigvec_full = eigvecs[:, s].copy()
+                    hf = h5py.File(final_h5_fname, 'a')
+                    full_sol_label = 'rsp/full_solutions_matrix'
+                    if s == 0:
+                        if full_sol_label in hf:
+                            del hf[full_sol_label]
+                        full_sol_dset = hf.create_dataset(full_sol_label,
+                                                          shape=(self.nstates, len(eigvec_full)),
+                                                          dtype=eigvec_full.dtype)
+                    else:
+                        full_sol_dset = hf[full_sol_label]
+                    full_sol_dset[s, :] = eigvec_full
+                    hf.close()
 
                 # save excitation details
                 excitation_details.append(
@@ -576,6 +585,12 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
                 'excitation_details': excitation_details,
                 'number_of_states': self.nstates,
             }
+
+            full_solutions_keys = ['S{:d}'.format(s + 1) for s in range(self.nstates)]
+            ret_dict.update({'full_solutions_keys': full_solutions_keys})
+
+            # add rsp type
+            ret_dict.update({'rsp_type': 'tda'})
 
             if self.nto:
                 ret_dict['nto_lambdas_a'] = nto_lambdas_a
@@ -942,13 +957,11 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
         else:
             if self.rank == mpi_master():
                 # for rsp_results read from h5 file
-                label_a = state_label + '(a)'
-                label_b = state_label + '(b)'
                 assert_msg_critical(
-                    label_a in rsp_results and label_b in rsp_results,
+                    state_label in rsp_results,
                     f'{type(self).__name__}: No eigenvector found for {state_label}'
                 )
-                eigvec = np.hstack((rsp_results[label_a], rsp_results[label_b]))
+                eigvec = rsp_results[state_label].copy()
             else:
                 eigvec = None
 
