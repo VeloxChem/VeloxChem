@@ -10,6 +10,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.lrsolverunrest import LinearResponseUnrestrictedSolver
 from veloxchem.errorhandler import VeloxChemError
+from veloxchem.resultsio import read_results
 
 
 @pytest.mark.solvers
@@ -168,8 +169,13 @@ class TestUnrestrictedLR:
 
             with h5py.File(solution_file, 'r') as h5file:
                 assert 'rsp' in h5file
-                assert 'x_x_0.00000000' in h5file['rsp']
-                assert 'z_z_0.05000000' in h5file['rsp']
+                assert 'full_solutions_matrix' in h5file['rsp']
+                assert 'full_solutions_keys' in h5file['rsp']
+
+            recovered = read_results(str(solution_file), 'rsp')
+            assert recovered['rsp_type'] == 'lr'
+            assert 'x_0.00000000' in recovered
+            assert 'z_0.05000000' in recovered
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')

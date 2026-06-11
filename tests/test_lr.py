@@ -9,6 +9,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lrsolver import LinearResponseSolver
 from veloxchem.errorhandler import VeloxChemError
+from veloxchem.resultsio import read_results
 
 
 @pytest.mark.solvers
@@ -318,8 +319,13 @@ class TestLR:
 
             with h5py.File(solution_file, 'r') as h5file:
                 assert 'rsp' in h5file
-                assert 'x_x_0.05000000' in h5file['rsp']
-                assert 'z_z_0.06000000' in h5file['rsp']
+                assert 'full_solutions_matrix' in h5file['rsp']
+                assert 'full_solutions_keys' in h5file['rsp']
+
+            recovered = read_results(str(solution_file), 'rsp')
+            assert recovered['rsp_type'] == 'lr'
+            assert 'x_0.05000000' in recovered
+            assert 'z_0.06000000' in recovered
 
     def test_compute_with_external_rhs_returns_solutions_only(self):
 

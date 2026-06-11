@@ -555,7 +555,7 @@ def read_results(fname, label):
 
         if ((label == 'rsp') and ('rsp_type' in results_dict) and
                 (results_dict['rsp_type'] in
-                 ['cpp', 'tdacpp', 'rpa', 'tda'])):
+                 ['cpp', 'tdacpp', 'lr', 'rpa', 'tda'])):
             if 'full_solutions_keys' in results_dict and 'full_solutions_matrix' in results_dict:
                 for idx, sol_key in enumerate(results_dict['full_solutions_keys']):
                     results_dict[sol_key] = results_dict['full_solutions_matrix'][idx].copy()
