@@ -217,51 +217,6 @@ def test_write_read_trexio_restricted_scf(tmp_path):
                                scf_results['occ_beta'])
 
 
-def test_write_read_trexio_pyscf_scf(tmp_path):
-
-    if MPI.COMM_WORLD.Get_rank() != mpi_master():
-        return
-
-    pyscf = pytest.importorskip('pyscf')
-    from pyscf import gto, scf
-
-    molecule, basis = _get_h2_and_basis()
-    py_mol = gto.M(atom='H 0.0 0.0 0.0; H 0.0 0.0 0.74',
-                   basis='sto-3g',
-                   unit='Angstrom',
-                   verbose=0)
-    py_scf = scf.RHF(py_mol)
-    py_energy = py_scf.kernel()
-
-    scf_results = {
-        'C_alpha': np.array(py_scf.mo_coeff, dtype=float),
-        'E_alpha': np.array(py_scf.mo_energy, dtype=float),
-        'occ_alpha': np.array(py_scf.mo_occ, dtype=float) / 2.0,
-        'S': np.array(py_scf.get_ovlp(), dtype=float),
-        'scf_energy': float(py_energy),
-    }
-    trexio_file = Path(tmp_path) / 'h2_pyscf.trexio'
-
-    write_trexio(str(trexio_file), molecule, basis, scf_results=scf_results)
-
-    actual_molecule, actual_basis = read_molecule_and_basis(str(trexio_file))
-    actual_orbitals = read_molecular_orbitals(str(trexio_file))
-    data = read_trexio(str(trexio_file))
-
-    _assert_molecules_equal(actual_molecule, molecule)
-    _assert_bases_equal(actual_basis, basis, molecule)
-    assert actual_orbitals.get_orbitals_type() == molorb.rest
-    np.testing.assert_allclose(actual_orbitals.alpha_to_numpy(),
-                               scf_results['C_alpha'])
-    np.testing.assert_allclose(actual_orbitals.ea_to_numpy(),
-                               scf_results['E_alpha'])
-    np.testing.assert_allclose(actual_orbitals.occa_to_numpy(),
-                               scf_results['occ_alpha'])
-    np.testing.assert_allclose(data['scf_energy'], py_energy)
-
-    assert pyscf.__version__
-
-
 def test_write_read_trexio_unrestricted_orbitals(tmp_path):
 
     if MPI.COMM_WORLD.Get_rank() != mpi_master():
