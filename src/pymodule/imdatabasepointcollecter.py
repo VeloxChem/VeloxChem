@@ -1185,6 +1185,7 @@ class IMDatabasePointCollecter:
         
         if len(self.qm_data_point_dict[root]) > 0:
             driver_object.impes_coordinate.eq_bond_lengths = self.qm_data_point_dict[root][0].eq_bond_lengths
+            
         
 
         driver_object.mark_runtime_data_cache_dirty()
@@ -3257,6 +3258,7 @@ class IMDatabasePointCollecter:
 
         for entries in state_specific_molecules:
             symmetry_point = False
+            
             adjusted_molecule['gs'].append((entries[0], entries[1], 1, None, [0], symmetry_point, entries[3])) 
 
         
@@ -3505,6 +3507,7 @@ class IMDatabasePointCollecter:
         for dp, alpha in zip(datapoints, alpha_vec):
             dp_clone = copy.copy(dp)
             dp_clone.confidence_radius = float(alpha)
+        
             cloned.append(dp_clone)
 
         return cloned
@@ -3531,6 +3534,7 @@ class IMDatabasePointCollecter:
             drv.impes_coordinate.inv_sqrt_masses = datapoints_eval[0].inv_sqrt_masses
         elif getattr(self, "inv_sqrt_masses", None) is not None:
             drv.impes_coordinate.inv_sqrt_masses = self.inv_sqrt_masses
+        
 
         drv.qm_data_points = datapoints_eval
 

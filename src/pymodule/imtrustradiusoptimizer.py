@@ -102,6 +102,7 @@ class IMTrustRadiusOptimizer:
         driver.symmetry_information = self.sym_dict
 
         driver.impes_coordinate.inv_sqrt_masses = self.dps[0].inv_sqrt_masses
+        driver.impes_coordinate.eq_bond_lengths = self.dps[0].eq_bond_lengths
 
         driver.exponent_p = exponent_p_q[0]
         driver.exponent_q = exponent_p_q[1]
