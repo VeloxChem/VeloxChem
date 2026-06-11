@@ -61,10 +61,18 @@ from networkx.algorithms import isomorphism
 from pathlib import Path
 from rdkit import Chem
 from rdkit.Chem import Draw, AllChem
+from veloxchem.atomtypeidentifier import AtomTypeIdentifier 
 
 
 
 log = logging.getLogger(__name__)
+
+
+def _status(msg: str, *args) -> None:
+    """Print and log a status message."""
+    rendered = msg % args if args else msg
+    print(rendered, flush=True)
+    log.info(rendered)
 
 
 # ---------------------------------------------------------------------------
@@ -823,7 +831,18 @@ def _save_to_h5(path: str, result: GibbsResult) -> None:
             except TypeError:
                 f.create_dataset(key, data=str(val))
 
-def _run_sp(mol_obj,basis_name: str, xcfun: str, ri_jk: bool, dispersion: bool, solvation: Optional[str], mult: int, tmp_prefix: str, solvent: Optional[str] = None, return_objects: bool = False,
+def _run_sp(
+    mol_obj,
+    basis_name: str,
+    xcfun: str,
+    ri_jk: bool,
+    dispersion: bool,
+    solvation: Optional[str],
+    mult: int,
+    tmp_prefix: str,
+    smd_solvent: Optional[str] = None,
+    cpcm_epsilon: Optional[float] = None,
+    return_objects: bool = False,
 ) -> dict:
     """Run one DFT single-point and return the SCF result dictionary.
 
@@ -837,6 +856,11 @@ def _run_sp(mol_obj,basis_name: str, xcfun: str, ri_jk: bool, dispersion: bool, 
     drv.max_iter = 200
     drv.dispersion = dispersion
     drv.solvation_model = solvation
+
+    if solvation == "smd" and smd_solvent:
+        drv.smd_solvent = smd_solvent
+    elif solvation == "cpcm" and cpcm_epsilon is not None and hasattr(drv, "cpcm_epsilon"):
+        drv.cpcm_epsilon = cpcm_epsilon
 
     if mult > 1:
         drv.level_shifting = 0.3
@@ -1117,6 +1141,87 @@ def _xtb_gibbs_correction(
     return g_corr
 
 
+
+def _scf_gibbs_correction(
+    mol_obj,
+    basis_name: str,
+    xcfun: str,
+    temperature: float = 298.15,
+    ri_jk: bool = False,
+    dispersion: bool = True,
+    solvation: Optional[str] = None,
+    mult: Optional[int] = None,
+    tmp_prefix: str = "scf_gibbs",
+    smd_solvent: Optional[str] = None,
+    cpcm_epsilon: Optional[float] = None,
+) -> float:
+    """
+    Compute a harmonic Gibbs thermal correction from an SCF/DFT Hessian.
+
+    The returned quantity is the additive thermal correction
+
+        g_corr = G(SCF) - E_elec(SCF)
+
+    suitable for the composite free-energy expression
+
+        G_total = E_SP(solvent) + g_corr
+    """
+    from veloxchem import VibrationalAnalysis
+    import io
+    from contextlib import redirect_stdout, redirect_stderr
+
+    if mult is None:
+        mult = int(mol_obj.get_multiplicity())
+
+    scf_drv = vlx.ScfUnrestrictedDriver() if mult > 1 else vlx.ScfRestrictedDriver()
+    scf_drv.xcfun = xcfun
+    scf_drv.conv_thresh = 1.0e-6
+    scf_drv.ri_jk = ri_jk
+    scf_drv.max_iter = 200
+    scf_drv.dispersion = dispersion
+
+    if mult > 1:
+        scf_drv.level_shifting = 0.3
+
+    scf_drv.filename = tmp_prefix
+    scf_drv.ostream.mute()
+
+    basis = vlx.MolecularBasis.read(mol_obj, basis_name)
+    scf_results = scf_drv.compute(mol_obj, basis)
+
+    vib = VibrationalAnalysis(scf_drv)
+    vib.ostream.mute()
+    vib.temperature = temperature
+
+    with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+        vib_results = vib.compute(mol_obj, basis)
+
+    gibbs = float(vib_results["gibbs_free_energy"])
+
+    e_scf = None
+    hess_drv = getattr(vib, "hessian_driver", None)
+    if hess_drv is not None and hasattr(hess_drv, "elec_energy"):
+        try:
+            e_scf = float(hess_drv.elec_energy)
+        except Exception:
+            e_scf = None
+    if e_scf is None and hasattr(scf_drv, "elec_energy"):
+        try:
+            e_scf = float(scf_drv.elec_energy)
+        except Exception:
+            e_scf = None
+    if e_scf is None and isinstance(scf_results, dict) and "scf_energy" in scf_results:
+        e_scf = float(scf_results["scf_energy"])
+    if e_scf is None:
+        raise RuntimeError("Could not determine SCF electronic energy for Gibbs correction.")
+
+    g_corr = gibbs - e_scf
+    log.debug(
+        "_scf_gibbs_correction: G(SCF)=%.6f  E_elec(SCF)=%.6f  g_corr=%.6f au",
+        gibbs, e_scf, g_corr,
+    )
+    return g_corr
+
 def _repair_ff_bonds(ff_gen, mol_obj, scale: float = 1.2) -> int:
     """
     Add any bonds present in the DFT geometry but missing from the GAFF
@@ -1309,7 +1414,7 @@ def _equiv_atom_groups(mol_obj) -> list[list[int]]:
     """
     #from veloxchem import atomtypeidentifier
     try:
-        idtf = atomtypeidentifier()
+        idtf = AtomTypeIdentifier()
         idtf.ostream.mute()
 
         # Generates the internal typing needed before identify_equivalences()
@@ -1427,35 +1532,49 @@ class RedoxCalculator:
 
     def __init__(
         self,
-        output_folder: str        = "redox_results",
-        basis_opt: str            = "def2-SVP",
-        basis_sp: str             = "def2-SVPD",
-        xcfun_opt: str            = "b3lyp",
-        xcfun_sp: str             = "b3lyp",
-        solvation_model: str      = "smd",
-        pH: float                 = 7.0,
-        temperature: float        = 298.15,
-        ri_jk: bool               = True,
-        sp_dispersion: bool       = True,
+        output_folder: str = "redox_results",
+        basis_opt: str = "def2-SVP",
+        basis_sp: str = "def2-tzvp",
+        xcfun_opt: str = "b3lyp",
+        xcfun_sp: str = "b3lyp",
+        solvation_model: str = "smd",
+        smd_solvent: str = "water",
+        conformer_use_solvent: bool = True,
+        conformer_cpcm_epsilon: float = 78.39,
+        max_conformers: int = 5,
+        conformer_basis: str = "def2-svp",
+        gibbs_correction_method: str = "xtb",
+        scf_gibbs_basis: Optional[str] = None,
+        scf_gibbs_xcfun: Optional[str] = None,
+        scf_gibbs_solvation: Optional[str] = None,
+        pH: float = 7.0,
+        temperature: float = 298.15,
+        ri_jk: bool = True,
+        sp_dispersion: bool = True,
     ) -> None:
-        self.output_folder     = output_folder
-        self.basis_opt         = basis_opt
-        self.basis_sp          = basis_sp
-        self.xcfun_opt         = xcfun_opt
-        self.xcfun_sp          = xcfun_sp
-        self.solvation_model   = solvation_model
-        self.pH                = pH
-        self.temperature       = temperature
-        self.ri_jk             = ri_jk
-        self.sp_dispersion     = sp_dispersion
+        self.output_folder = output_folder
+        self.basis_opt = basis_opt
+        self.basis_sp = basis_sp
+        self.xcfun_opt = xcfun_opt
+        self.xcfun_sp = xcfun_sp
+        self.solvation_model = solvation_model
+        self.smd_solvent = smd_solvent
+        self.conformer_use_solvent = conformer_use_solvent
+        self.conformer_cpcm_epsilon = conformer_cpcm_epsilon
+        self.max_conformers = max_conformers
+        self.conformer_basis = conformer_basis
+        self.gibbs_correction_method = str(gibbs_correction_method).lower()
+        self.scf_gibbs_basis = scf_gibbs_basis or basis_opt
+        self.scf_gibbs_xcfun = scf_gibbs_xcfun or xcfun_opt
+        self.scf_gibbs_solvation = scf_gibbs_solvation
+        self.pH = pH
+        self.temperature = temperature
+        self.ri_jk = ri_jk
+        self.sp_dispersion = sp_dispersion
 
-        # Named solvation registry: { "MD": {"M": -0.0145, "M+": -0.0089, ...}, ... }
-        # Populated via register_solvation(); values are attached to GibbsResult
-        # objects during compute_gibbs() so they travel with the results.
         self._solvation_registry: dict[str, dict[str, float]] = {}
-
         os.makedirs(self.output_folder, exist_ok=True)
-        
+
     def _state_h5_path(self, mol_obj, label: str, file_tag: str = "") -> str:
         """Return the exact HDF5 path for one state."""
         charge = int(mol_obj.get_charge())
@@ -1492,7 +1611,7 @@ class RedoxCalculator:
                     exc,
                 )
 
-        seed = self._conformer_search(mol_obj)
+        seed = self._conformer_search(mol_obj, label)
         return self.compute_gibbs(seed, label, file_tag=file_tag)
 
     def _get_or_compute_state(self, mol_obj, label: str, file_tag: str = "") -> Optional[GibbsResult]:
@@ -1625,114 +1744,116 @@ class RedoxCalculator:
 
         return str(path)
     
-    def _conformer_search(
-        self,
-        input_data,
-        max_conformers: int = 5,
-        basis_label: str = "def2-svp",
-        use_solvent: bool = True,
-        solvent_epsilon: float = 78.39,
-    ):
-        """
-        Generate/collect conformers and return the lowest-energy optimized conformer.
+    def _conformer_search(self, input_data, label: str):
+        max_conformers = self.max_conformers
+        basis_label = self.conformer_basis
 
-        The conformer pre-optimization is intentionally cheap (BLYP/def2-SVP)
-        and is applied independently to each charge state passed in.
-        """        
-        conf = vlx.ConformerGenerator()
+        conf_probe = vlx.ConformerGenerator()
+        dihedrals_candidates, _, _ = conf_probe._get_dihedral_candidates(input_data,"MOL",None)
 
-        dihedrals_candidates, _, _ = conf._get_dihedral_candidates(input_data, 'MOL', None)
-        dih_angles = [i[1] for i in dihedrals_candidates]
-        dihedrals_combinations = list(itertools.product(*dih_angles))
+        dih_angles = [item[1] for item in dihedrals_candidates]
 
-        n = len(dihedrals_combinations)
-        
-        if n < 10000:
+        n_combinations = 1
+        for angles in dih_angles:
+            n_combinations *= len(angles)
+
+        if n_combinations < 10000:
             conf = vlx.ConformerGenerator()
+            conf.implicit_solvation_model = "gbn2"
             conf.partial_charges = input_data.get_partial_charges(input_data.get_charge())
             conf.top_file_name = f"conf_{uuid.uuid4().hex[:8]}"
+            conf.solvent_dielectric = self.conformer_cpcm_epsilon
             conformers_dict = conf.generate(input_data)
             molecules = conformers_dict.get("molecules", [])
-            print('Fuck you')
         else:
-            print("Too many conformer combinations; using OpenMM conformational sampling.")
+            _status(
+                "[%s] Too many conformer combinations (%d); using OpenMM conformational sampling.",
+                label,
+                n_combinations,
+            )
             ff_gen = vlx.MMForceFieldGenerator()
-            ff_gen.create_topology(input_data, resp=False)
+            ff_gen.partial_charges = input_data.get_partial_charges(input_data.get_charge())
+            ff_gen.create_topology(input_data)
+
             omm = vlx.OpenMMDynamics()
             omm.create_system_from_molecule(input_data, ff_gen, solvent="implicit")
+            omm.solvent_dielectric = self.conformer_cpcm_epsilon
+
             sampled = omm.conformational_sampling(nsteps=10000, snapshots=100)
             molecules = sampled.get("molecules", [])
 
         if not molecules:
-            print("Conformer search produced no molecules")
+            _status("[%s] Conformer search produced no molecules; using input geometry.", label)
             return input_data
 
-        all_opt_results = []
-        n_to_opt = min(max_conformers, len(molecules))
+        ranked_results = []
+        n_to_rank = min(max_conformers, len(molecules))
 
-        for i, molecule in enumerate(molecules[:n_to_opt], start=1):
-            print(f"Optimizing conformer {i}...")
+        for i, molecule in enumerate(molecules[:n_to_rank], start=1):
+            _status("[%s] SMD SCF-ranking conformer %d/%d", label, i, n_to_rank)
 
             molecule.set_charge(input_data.get_charge())
             molecule.set_multiplicity(input_data.get_multiplicity())
 
-            basis = vlx.MolecularBasis.read(molecule, basis_label)
-            scf_drv = (
-                vlx.ScfUnrestrictedDriver()
-                if molecule.get_multiplicity() > 1
-                else vlx.ScfRestrictedDriver()
-            )
-            scf_drv.xcfun = "blyp"
-            scf_drv.ri_jk = False
-            if hasattr(scf_drv, "ri_coulomb"):
-                scf_drv.ri_coulomb = True
-            scf_drv.max_iter = 100
-            scf_drv.conv_thresh = 1.0e-4
-            scf_drv.ostream.mute()
-
-            if use_solvent:
-                scf_drv.solvation_model = "cpcm"
-                if hasattr(scf_drv, "cpcm_epsilon"):
-                    scf_drv.cpcm_epsilon = solvent_epsilon
-
             try:
-                scf_results = scf_drv.compute(molecule, basis)
-                opt_drv = vlx.OptimizationDriver(scf_drv)
-                opt_drv.conv_energy = 1.0e-3
-                opt_drv.conv_grms = 3.0e-4
-                opt_drv.conv_gmax = 1.2e-3
-                opt_drv.max_iter = 50
-                opt_drv.conv_maxiter = True
-                opt_drv.restart = False
-                opt_drv.ostream.mute()
+                basis = vlx.MolecularBasis.read(molecule, basis_label)
 
-                result = opt_drv.compute(molecule, basis, scf_results)
-                final_energy = result["opt_energies"][-1]
-                final_geometry = result["final_geometry"]
-
-                all_opt_results.append(
-                    {
-                        "conformer_index": i,
-                        "energy_au": final_energy,
-                        "final_geometry": final_geometry,
-                        "final_molecule": result.get("final_molecule"),
-                        "opt_results": result,
-                    }
+                scf_drv = (
+                    vlx.ScfUnrestrictedDriver()
+                    if molecule.get_multiplicity() > 1
+                    else vlx.ScfRestrictedDriver()
                 )
-            except Exception as exc:
-                log.warning("Conformer %d pre-optimization failed: %s", i, exc)
 
-        if not all_opt_results:
-            log.warning("All conformer pre-optimizations failed; using input geometry.")
+                scf_drv.xcfun = "blyp"
+                if hasattr(scf_drv, "ri_coulomb"):
+                    scf_drv.ri_coulomb = True
+                scf_drv.dispersion = True
+                scf_drv.solvation_model = "smd"
+                scf_drv.smd_solvent = self.smd_solvent
+                scf_drv.max_iter = 300
+                scf_drv.ostream.mute()
+
+                scf_results = scf_drv.compute(molecule, basis)
+
+                if scf_results is None:
+                    _status("[%s] Conformer %d SCF returned None; skipping.", label, i)
+                    continue
+
+                if "scf_energy" not in scf_results:
+                    _status("[%s] Conformer %d has no scf_energy; skipping.", label, i)
+                    continue
+
+                scf_energy = float(scf_results["scf_energy"])
+
+                ranked_results.append({
+                    "conformer_index": i,
+                    "energy_au": scf_energy,
+                    "geometry_xyz": _xyz_block(molecule),
+                })
+            except Exception as exc:
+                _status("[%s] Conformer %d SCF-ranking failed: %s", label, i, exc)
+                continue
+
+        if not ranked_results:
+            _status("[%s] No conformers passed SMD SCF ranking; using input geometry.", label)
             return input_data
 
-        all_opt_results.sort(key=lambda x: x["energy_au"])
-        mol = vlx.Molecule.read_xyz_string(all_opt_results[0]["final_geometry"])
+        ranked_results.sort(key=lambda x: x["energy_au"])
+        best = ranked_results[0]
+
+        _status(
+            "[%s] Selected conformer %d with SMD SCF energy %.8f au.",
+            label,
+            best["conformer_index"],
+            best["energy_au"],
+        )
+
+        mol = vlx.Molecule.read_xyz_string(best["geometry_xyz"])
         mol.set_charge(input_data.get_charge())
         mol.set_multiplicity(input_data.get_multiplicity())
+
         return mol
-        
-        
+
     def register_solvation(
         self,
         name: str,
@@ -2153,17 +2274,39 @@ class RedoxCalculator:
             opt_mol.set_charge(charge)
             opt_mol.set_multiplicity(mult)
 
-            # ---- MM Gibbs thermal correction (replaces xTB) ----------
-            log.info("  [%s] Step 3: xTB Gibbs correction", label)
+            # ---- Gibbs thermal correction -----------------------------
+            method = self.gibbs_correction_method
+            log.info("  [%s] Step 3: %s Gibbs correction", label, method.upper())
             try:
-                g_corr = _xtb_gibbs_correction(
-                    opt_mol,
-                    temperature = self.temperature,
-                )
+                if method == "xtb":
+                    g_corr = _xtb_gibbs_correction(
+                        opt_mol,
+                        temperature=self.temperature,
+                    )
+                elif method == "scf":
+                    g_corr = _scf_gibbs_correction(
+                        opt_mol,
+                        basis_name=self.scf_gibbs_basis,
+                        xcfun=self.scf_gibbs_xcfun,
+                        temperature=self.temperature,
+                        ri_jk=False,
+                        dispersion=self.sp_dispersion,
+                        solvation=self.scf_gibbs_solvation,
+                        mult=mult,
+                        tmp_prefix=os.path.join(tmpdir, "scf_gibbs"),
+                        smd_solvent=self.smd_solvent,
+                    )
+                else:
+                    raise ValueError(
+                        f"Unsupported gibbs_correction_method {method!r}. "
+                        "Use 'xtb' or 'scf'."
+                    )
+
                 # Sanity check: thermal correction should be small relative
-                # to molecule size. A broken xTB run can give wildly wrong values.
+                # to molecule size. A broken thermochemistry run can give
+                # wildly wrong values.
                 n_atoms_check = opt_mol.number_of_atoms()
-                g_corr_limit  = 0.05 * n_atoms_check
+                g_corr_limit = 0.05 * n_atoms_check
                 if abs(g_corr) > g_corr_limit:
                     raise ValueError(
                         f"g_corr = {g_corr:.4f} au exceeds the plausible "
@@ -2171,11 +2314,11 @@ class RedoxCalculator:
                         f"{n_atoms_check}-atom molecule."
                     )
                 log.info("  [%s] Step 3 done: g_corr = %.6f au", label, g_corr)
-            except Exception as mm_exc:
+            except Exception as corr_exc:
                 log.warning(
-                    "  [%s] MM Gibbs correction failed (%s). "
+                    "  [%s] Gibbs correction failed (%s). "
                     "Setting g_corr = 0.0 and continuing with E_SP only.",
-                    label, mm_exc,
+                    label, corr_exc,
                 )
                 g_corr = 0.0
             mm_corr_ok = (g_corr != 0.0)
@@ -2183,15 +2326,32 @@ class RedoxCalculator:
             # ---- DFT single-points --------------------------------------
             log.info("  [%s] Step 4: solvent single-point (%s/%s)", label, self.xcfun_sp, self.basis_sp)
 
-            sp_solv = _run_sp(opt_mol, self.basis_sp, self.xcfun_sp, self.ri_jk, self.sp_dispersion, self.solvation_model, mult,
-                os.path.join(tmpdir, "sp_solv"), return_objects=(mult != 1))
+            sp_solv = _run_sp(
+                opt_mol,
+                self.basis_sp,
+                self.xcfun_sp,
+                self.ri_jk,
+                self.sp_dispersion,
+                self.solvation_model,
+                mult,
+                os.path.join(tmpdir, "sp_solv"),
+                smd_solvent=self.smd_solvent,
+                return_objects=(mult != 1))
 
             log.info("  [%s] Step 4 done: E_solvent = %.6f au", label, sp_solv["scf_energy"])
 
             log.info("  [%s] Step 5: vacuum single-point", label)
 
-            sp_vac = _run_sp(opt_mol, self.basis_sp, self.xcfun_sp, self.ri_jk,
-                self.sp_dispersion, None, mult, os.path.join(tmpdir, "sp_vac"))
+            sp_vac = _run_sp(
+                opt_mol,
+                self.basis_sp,
+                self.xcfun_sp,
+                self.ri_jk,
+                self.sp_dispersion,
+                None,
+                mult,
+                os.path.join(tmpdir, "sp_vac"),
+                smd_solvent=None)
 
             log.info("  [%s] Step 5 done: E_vacuum = %.6f au", label, sp_vac["scf_energy"])
 
@@ -2478,89 +2638,6 @@ class RedoxCalculator:
                         g_red=g_M,
                         n=1,
                         m=1,
-                    )
-
-        # ---- pKa values ------------------------------------------------
-        if profile.MH_plus and profile.M:
-            g_mhp, g_M = _normalise_pair(profile.MH_plus, profile.M)
-            if g_mhp is not None:
-                profile.pKa_MH_plus = self.pka(g_acid=g_mhp, g_base=g_M)
-
-        if profile.MH_rad and profile.M_red:
-            g_mhr, g_red = _normalise_pair(profile.MH_rad, profile.M_red)
-            if g_mhr is not None:
-                profile.pKa_MH_rad = self.pka(g_acid=g_mhr, g_base=g_red)
-
-        if profile.M and profile.M_deprot:
-            g_M, g_dep = _normalise_pair(profile.M, profile.M_deprot)
-            if g_M is not None:
-                profile.pKa_M = self.pka(g_acid=g_M, g_base=g_dep)
-
-        if profile.M_ox and profile.M_deprot_rad:
-            g_ox, g_mdr = _normalise_pair(profile.M_ox, profile.M_deprot_rad)
-            if g_ox is not None:
-                profile.pKa_M_plus = self.pka(g_acid=g_ox, g_base=g_mdr)
-
-        self._print_summary(profile, label=mol_label)
-        return profile
-
-        # ---- thermal correction normalisation --------------------------
-        def _normalise_pair(
-            res_a: Optional[GibbsResult],
-            res_b: Optional[GibbsResult],
-        ) -> tuple:
-            """
-            Return (g_a, g_b) normalised to the same thermal level.
-
-            If one has a thermal correction and the other doesn't, strip the
-            correction from the one that has it. Returns (None, None) if
-            either result is missing.
-            """
-            if res_a is None or res_b is None:
-                return None, None
-            g_a = res_a.g_total
-            g_b = res_b.g_total
-            stripped = []
-            if res_a.mm_corr_available and not res_b.mm_corr_available:
-                g_a -= res_a.g_corr
-                stripped.append(res_a.label)
-            elif res_b.mm_corr_available and not res_a.mm_corr_available:
-                g_b -= res_b.g_corr
-                stripped.append(res_b.label)
-            if stripped:
-                log.warning(
-                    "Thermal normalisation: stripped g_corr from %s so that "
-                    "both states are at the E_SP(solvent) level for a "
-                    "consistent comparison. This pair is flagged SP-ONLY.",
-                    ", ".join(stripped),
-                )
-            return g_a, g_b
-
-        # ---- reduction potentials --------------------------------------
-        if profile.M:
-            if profile.M_ox:
-                g_ox, g_M = _normalise_pair(profile.M_ox, profile.M)
-                if g_ox is not None:
-                    profile.E_ox = self.reduction_potential(
-                        g_ox=g_ox, g_red=g_M
-                    )
-            if profile.M_red:
-                g_M, g_red = _normalise_pair(profile.M, profile.M_red)
-                if g_M is not None:
-                    profile.E_red = self.reduction_potential(
-                        g_ox=g_M, g_red=g_red
-                    )
-            if profile.MH_rad:
-                g_M, g_mhr = _normalise_pair(profile.M, profile.MH_rad)
-                if g_M is not None:
-                    profile.E_pcet_red = self.reduction_potential(
-                        g_ox=g_M, g_red=g_mhr, n=1, m=1
-                    )
-            if profile.M_deprot_rad:
-                g_mdr, g_M = _normalise_pair(profile.M_deprot_rad, profile.M)
-                if g_mdr is not None:
-                    profile.E_pcet_ox = self.reduction_potential(
-                        g_ox=g_mdr, g_red=g_M, n=1, m=1
                     )
 
         # ---- pKa values ------------------------------------------------
