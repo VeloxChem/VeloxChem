@@ -125,9 +125,9 @@ class TpaTransitionDriver(NonlinearSolver):
             return
 
         write_results_to_hdf5(str(fpath),
-                              'tpa_transition',
+                              'rsp',
                               results,
-                              value_label='TPA transition result')
+                              value_label='response result')
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -338,11 +338,15 @@ class TpaTransitionDriver(NonlinearSolver):
         profiler.end(self.ostream)
 
         if self.rank == mpi_master():
+            # add OPA results
             ret_dict.update({
                 'oscillator_strengths': oscillator_strengths,
                 'elec_trans_dipoles': elec_trans_dipoles,
                 'excitation_details': excitation_details
             })
+
+            # add property
+            ret_dict.update({'property': 'tpa transition'})
 
             self.print_results(ret_dict)
 
@@ -636,8 +640,7 @@ class TpaTransitionDriver(NonlinearSolver):
                 eigvals, eigvecs = np.linalg.eigh(tensor)
                 diagonalized_tensors[key] = np.diag(eigvals)
 
-        if self.rank == mpi_master():
-            tpa_strengths = {'linear': {}, 'circular': {}}
+            tpa_strengths_np = {'linear': [], 'circular': []}
 
             for state_ind in M_tensors.keys():
                 Df = 0.0
@@ -655,18 +658,25 @@ class TpaTransitionDriver(NonlinearSolver):
                 D_linear = 2.0 * Df + 4.0 * Dg
                 D_circular = -2.0 * Df + 6.0 * Dg
 
-                tpa_strengths['linear'][state_ind] = D_linear
-                tpa_strengths['circular'][state_ind] = D_circular
+                tpa_strengths_np['linear'].append(D_linear)
+                tpa_strengths_np['circular'].append(D_circular)
+
+            tpa_strengths_np['linear'] = np.array(tpa_strengths_np['linear'])
+            tpa_strengths_np['circular'] = np.array(tpa_strengths_np['circular'])
 
             profiler.check_memory_usage('End of QRF')
 
+            M_tensors_np = []
+            for state_ind in M_tensors.keys():
+                M_tensors_np.append(M_tensors[state_ind].copy())
+            M_tensors_np = np.array(M_tensors_np)
+
             ret_dict = {
-                'photon_energies': [float(-w) for w in freqs],
-                'transition_moments': M_tensors,
-                'tpa_strengths': tpa_strengths,
+                'photon_energies': np.array([float(-w) for w in freqs]),
+                'transition_moments': M_tensors_np,
+                'tpa_strengths': tpa_strengths_np,
                 'excited_state_dipole_moments': excited_state_dipole_moments,
-                'ground_state_dipole_moments':
-                    scf_prop.get_property('dipole moment')
+                'ground_state_dipole_moments': scf_prop.get_property('dipole moment'),
             }
 
             return ret_dict
@@ -1252,8 +1262,7 @@ class TpaTransitionDriver(NonlinearSolver):
         tpa_ene_au = []
         tpa_str = []
 
-        for state_ind, s in rsp_results['tpa_strengths'][
-                polarization.lower()].items():
+        for state_ind, s in enumerate(rsp_results['tpa_strengths'][polarization.lower()]):
             tpa_ene_au.append(rsp_results['photon_energies'][state_ind])
             tpa_str.append(s)
 

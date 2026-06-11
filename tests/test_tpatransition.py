@@ -57,13 +57,13 @@ class TestTpaTransition:
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             tpa_str = tpa_results['tpa_strengths']['linear']
-            assert list(tpa_str.keys()) == list(range(len(ref_strengths)))
+            assert len(tpa_str) == len(ref_strengths)
 
             for freq, ref_freq in zip(tpa_results['photon_energies'],
                                       ref_energies):
                 assert abs(freq / ref_freq - 1.0) < 1.0e-6
 
-            for val, ref_val in zip(tpa_str.values(), ref_strengths):
+            for val, ref_val in zip(tpa_str, ref_strengths):
                 assert abs(val / ref_val - 1.0) < 1.0e-6
 
     def compute_tpatransition(self, xcfun_label, ri_coulomb=False):
@@ -171,14 +171,8 @@ class TestTpaTransition:
         tpa_results = {
             'photon_energies': [0.16, 0.18],
             'tpa_strengths': {
-                'linear': {
-                    0: 1.0,
-                    1: 2.0,
-                },
-                'circular': {
-                    0: 10.0,
-                    1: 20.0,
-                },
+                'linear': [1.0, 2.0],
+                'circular': [10.0, 20.0],
             },
         }
 
@@ -465,10 +459,9 @@ class TestTpaTransition:
         assert not fresh_drv.restart
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            restarted_strengths = list(
-                restarted_results['tpa_strengths']['linear'].values())
-            first_strengths = list(first_results['tpa_strengths']['linear'].values())
-            fresh_strengths = list(fresh_results['tpa_strengths']['linear'].values())
+            restarted_strengths = list(restarted_results['tpa_strengths']['linear'])
+            first_strengths = list(first_results['tpa_strengths']['linear'])
+            fresh_strengths = list(fresh_results['tpa_strengths']['linear'])
 
             assert restarted_strengths == pytest.approx(fresh_strengths,
                                                         abs=1.0e-7)
