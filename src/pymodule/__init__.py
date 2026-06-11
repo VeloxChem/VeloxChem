@@ -243,6 +243,10 @@ from .oneeints import compute_electric_dipole_integrals
 from .oneeints import compute_linear_momentum_integrals
 from .oneeints import compute_angular_momentum_integrals
 from .resultsio import read_molecule_and_basis, read_results
+from .trexio import read_molecular_orbitals as read_trexio_molecular_orbitals
+from .trexio import read_molecule as read_trexio_molecule
+from .trexio import read_molecule_and_basis as read_trexio_molecule_and_basis
+from .trexio import read_trexio, write_trexio
 
 # Environment variable: basis set path, number of OpenMP threads
 from .environment import (set_vlxbasispath, get_basis_path, set_vlxdatapath,
