@@ -314,13 +314,14 @@ class TestTpaTransition:
             'elec_trans_dipoles': np.array([[0.11, -0.22, 0.33],
                                             [0.44, -0.55, 0.66]]),
             'excitation_details': [['1a -> 2a (0.90)'], ['1b -> 3b (0.80)']],
+            'property': 'tpa transition',
         }
 
         tpa_drv = TpaTransitionDriver()
         tpa_drv.ostream.mute()
         tpa_drv._write_final_hdf5(str(h5file), tpa_results)
 
-        recovered = read_results(str(h5file), 'tpa_transition')
+        recovered = read_results(str(h5file), 'rsp')
 
         assert recovered['photon_energies'] == pytest.approx(
             tpa_results['photon_energies'])
@@ -363,13 +364,14 @@ class TestTpaTransition:
             'oscillator_strengths': np.array([0.01]),
             'elec_trans_dipoles': np.array([[0.11, -0.22, 0.33]]),
             'excitation_details': [['1a -> 2a (0.90)']],
+            'property': 'tpa transition',
         }
 
         tpa_drv = TpaTransitionDriver()
         tpa_drv.ostream.mute()
         tpa_drv._write_final_hdf5(str(h5stem), tpa_results)
 
-        recovered = read_results(str(h5file), 'tpa_transition')
+        recovered = read_results(str(h5file), 'rsp')
 
         assert recovered['photon_energies'] == pytest.approx(
             tpa_results['photon_energies'])

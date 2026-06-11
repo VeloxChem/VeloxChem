@@ -549,7 +549,7 @@ def read_results(fname, label):
     with h5py.File(fname, "r") as h5f:
         label_found = (label in h5f)
         assert_msg_critical(label_found,
-                            label + " section not found in the checkpoint file.")
+                            label + " section not found in the hdf5 file.")
 
         return _read_value_from_hdf5(h5f[label], value_label='results')
 
