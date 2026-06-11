@@ -51,7 +51,7 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
 from .errorhandler import assert_msg_critical
 from .checkpoint import check_rsp_hdf5, write_rsp_hdf5
 from .inputparser import parse_seq_fixed
-from .resultsio import clear_group_in_hdf5, write_results_to_hdf5
+from .resultsio import clear_group_in_hdf5, write_rsp_results_to_hdf5
 
 try:
     import matplotlib.pyplot as plt
@@ -1030,11 +1030,7 @@ class ComplexResponseTdaSolver(LinearSolver):
             elif self.property == 'ecd':
                 h5_rsp_results['delta-epsilon'] = y_data
 
-        write_results_to_hdf5(fname,
-                              self.group_label,
-                              h5_rsp_results,
-                              value_label='response result',
-                              replace_group=False)
+        write_rsp_results_to_hdf5(fname, h5_rsp_results)
 
     def _get_absorption_spectrum(self, rsp_results, x_unit):
         """

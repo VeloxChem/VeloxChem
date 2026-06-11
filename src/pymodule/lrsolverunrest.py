@@ -44,7 +44,7 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
 from .checkpoint import check_rsp_hdf5
-from .resultsio import clear_group_in_hdf5, write_lr_rsp_results_to_hdf5
+from .resultsio import clear_group_in_hdf5, write_rsp_results_to_hdf5
 
 
 class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
@@ -721,7 +721,7 @@ class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
                             for key, value in ret_dict.items()
                             if key != 'solutions'
                         }
-                        write_lr_rsp_results_to_hdf5(final_h5_fname,
+                        write_rsp_results_to_hdf5(final_h5_fname,
                                                      h5_ret_dict)
 
                     return ret_dict

@@ -396,14 +396,14 @@ def write_opt_results_to_hdf5(fname, opt_results):
                           value_label='optimization result')
 
 
-def write_lr_rsp_results_to_hdf5(fname, rsp_results):
+def write_rsp_results_to_hdf5(fname, rsp_results):
     """
-    Writes the results of a linear response calculation to HDF5 file.
+    Writes response results to an HDF5 file.
 
     :param fname:
         Name of the HDF5 file.
     :param rsp_results:
-        The dictionary containing the linear response results.
+        The dictionary containing the response results.
     """
 
     write_results_to_hdf5(fname,

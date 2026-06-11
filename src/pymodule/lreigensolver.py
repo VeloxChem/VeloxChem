@@ -50,7 +50,7 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
 from .errorhandler import assert_msg_critical
 from .mathutils import screened_eigh, symmetric_matrix_function
 from .checkpoint import check_rsp_hdf5
-from .resultsio import (write_lr_rsp_results_to_hdf5,
+from .resultsio import (write_rsp_results_to_hdf5,
                         write_detach_attach_to_hdf5, clear_group_in_hdf5)
 
 
@@ -827,7 +827,7 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                             for key, value in ret_dict.items()
                             if key != 'eigenvectors_distributed'
                         }
-                        write_lr_rsp_results_to_hdf5(final_h5_fname,
+                        write_rsp_results_to_hdf5(final_h5_fname,
                                                      h5_ret_dict)
 
                     self._print_results(ret_dict)

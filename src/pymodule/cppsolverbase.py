@@ -43,7 +43,7 @@ from .outputstream import OutputStream
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
-from .resultsio import write_results_to_hdf5
+from .resultsio import write_rsp_results_to_hdf5
 
 try:
     import matplotlib.pyplot as plt
@@ -870,8 +870,4 @@ class ComplexResponseSolverBase(LinearSolver):
             elif self.property == 'ord':
                 h5_rsp_results['optical-rotation'] = y_data
 
-        write_results_to_hdf5(fname,
-                              self.group_label,
-                              h5_rsp_results,
-                              value_label='response result',
-                              replace_group=False)
+        write_rsp_results_to_hdf5(fname, h5_rsp_results)
