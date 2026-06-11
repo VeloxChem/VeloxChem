@@ -730,11 +730,13 @@ class TransitionStateGuesser():
         else:
             snapshots = 1
 
+        minimize = self.frozen_atoms != []
         conformers_dict = opm_dyn.conformational_sampling(
             ensemble='NVT',
             nsteps=self.mm_steps * snapshots,
             snapshots=snapshots,
             temperature=self.mm_temperature,
+            minimize=minimize,
         )
         if not self.save_intermediates:
             os.remove(pdb_name)
