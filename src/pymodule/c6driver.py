@@ -35,6 +35,7 @@ import numpy as np
 import time as tm
 import math
 import sys
+import h5py
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
@@ -47,8 +48,7 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
 from .checkpoint import check_rsp_hdf5
-from .resultsio import write_rsp_solution_with_multiple_keys
-from .resultsio import clear_group_in_hdf5
+from .resultsio import clear_group_in_hdf5, write_lr_rsp_results_to_hdf5
 
 
 class C6Driver(LinearSolver):
@@ -636,21 +636,28 @@ class C6Driver(LinearSolver):
                 else:
                     final_h5_fname = None
 
-            for bop, iw in solutions:
+            for op_iw_ind, (bop, iw) in enumerate(solutions):
                 x = self.get_full_solution_vector(solutions[(bop, iw)])
 
                 if self.rank == mpi_master():
                     for aop in self.a_components:
                         rsp_funcs[(aop, bop, iw)] = -np.dot(va[aop], x)
 
-                    # write to h5 file for response solutions
+                    # write solutions to h5 file
                     if (self.save_solutions and final_h5_fname is not None):
-                        solution_keys = [
-                            '{:s}_{:s}_{:.8f}'.format(aop, bop, iw)
-                            for aop in self.a_components
-                        ]
-                        write_rsp_solution_with_multiple_keys(
-                            final_h5_fname, solution_keys, x)
+                        hf = h5py.File(final_h5_fname, 'a')
+                        full_sol_label = 'rsp/full_solutions_matrix'
+                        if op_iw_ind == 0:
+                            if full_sol_label in hf:
+                                del hf[full_sol_label]
+                            full_sol_dset = hf.create_dataset(
+                                full_sol_label,
+                                shape=(len(solutions), len(x)),
+                                dtype=x.dtype)
+                        else:
+                            full_sol_dset = hf[full_sol_label]
+                        full_sol_dset[op_iw_ind, :] = x
+                        hf.close()
 
             if self.rank == mpi_master():
                 # print information about h5 file for response solutions
@@ -666,11 +673,29 @@ class C6Driver(LinearSolver):
 
                 self._print_results(c6, rsp_funcs, self.ostream)
 
-                return {
+                ret_dict = {
                     'c6': c6,
+                    'n_points': self.n_points,
                     'response_functions': rsp_funcs,
-                    'solutions': solutions
+                    'solutions': solutions,
+                    'w0': self.w0,
                 }
+
+                full_solutions_keys = [
+                    '{:s}_{:.8f}'.format(bop, iw) for bop, iw in solutions
+                ]
+                ret_dict.update({'full_solutions_keys': full_solutions_keys})
+                ret_dict.update({'rsp_type': 'c6'})
+
+                if final_h5_fname is not None:
+                    h5_ret_dict = {
+                        key: value
+                        for key, value in ret_dict.items()
+                        if key != 'solutions'
+                    }
+                    write_lr_rsp_results_to_hdf5(final_h5_fname, h5_ret_dict)
+
+                return ret_dict
             else:
                 # non-master rank
                 return {'solutions': solutions}
