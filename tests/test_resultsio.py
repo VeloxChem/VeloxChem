@@ -337,10 +337,13 @@ def test_read_results_roundtrips_tda_rsp_and_preserves_legacy_solution_vectors(
         recovered = read_results(h5file, 'rsp')
 
         assert 'eigenvectors' not in recovered
+        assert 'full_solutions_matrix' not in recovered
+        assert 'full_solutions_keys' not in recovered
 
         expected_rsp = {
             key: value
-            for key, value in rsp_results.items() if key != 'eigenvectors'
+            for key, value in rsp_results.items()
+            if key not in ['eigenvectors', 'full_solutions_matrix', 'full_solutions_keys']
         }
         recovered_rsp = {
             key: value
@@ -366,11 +369,13 @@ def test_read_results_roundtrips_rpa_rsp_and_preserves_legacy_solution_vectors(
     recovered = read_results(h5file, 'rsp')
 
     assert 'eigenvectors_distributed' not in recovered
+    assert 'full_solutions_matrix' not in recovered
+    assert 'full_solutions_keys' not in recovered
 
     expected_rsp = {
         key: value
         for key, value in rsp_results.items()
-        if key != 'eigenvectors_distributed'
+        if key not in ['eigenvectors_distributed', 'full_solutions_matrix', 'full_solutions_keys']
     }
     recovered_rsp = {
         key: value
@@ -399,9 +404,14 @@ def test_read_results_roundtrips_cpp_rsp_and_preserves_legacy_solution_vectors(
     recovered = read_results(h5file, 'rsp')
 
     assert 'solutions' not in recovered
+    assert 'full_solutions_matrix' not in recovered
+    assert 'full_solutions_keys' not in recovered
 
-    expected_rsp = {key: value for key, value in rsp_results.items()
-                    if key != 'solutions'}
+    expected_rsp = {
+        key: value
+        for key, value in rsp_results.items()
+        if key not in ['solutions', 'full_solutions_matrix', 'full_solutions_keys']
+    }
     spectrum = rsp_drv.get_spectrum(rsp_results, 'au')
     expected_rsp['sigma'] = np.array(spectrum['y_data'])
 
@@ -411,7 +421,7 @@ def test_read_results_roundtrips_cpp_rsp_and_preserves_legacy_solution_vectors(
         if key not in expected_rsp
     }
     expected_solution_keys = {
-        f'{aop}_{bop}_{w:.8f}'
+        f'{bop}_{w:.8f}'
         for (aop, bop, w) in rsp_results['response_functions']
     }
 
@@ -423,7 +433,7 @@ def test_read_results_roundtrips_cpp_rsp_and_preserves_legacy_solution_vectors(
     for key in rsp_results['solutions']:
         full_vec = rsp_drv.get_full_solution_vector(
             rsp_results['solutions'][key])
-        flat_key = f'{key[0]}_{key[0]}_{key[1]:.8f}'
+        flat_key = f'{key[0]}_{key[1]:.8f}'
         np.testing.assert_allclose(recovered[flat_key], full_vec)
 
 
