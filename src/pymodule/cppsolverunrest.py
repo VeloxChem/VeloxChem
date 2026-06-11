@@ -32,6 +32,7 @@
 
 import numpy as np
 import time as tm
+import h5py
 
 from .veloxchemlib import (mpi_master, fine_structure_constant,
                            extinction_coefficient_from_beta)
@@ -45,7 +46,6 @@ from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
 from .checkpoint import check_rsp_hdf5
 from .inputparser import parse_seq_fixed
-from .resultsio import write_rsp_solution_with_multiple_keys
 from .resultsio import clear_group_in_hdf5
 
 
@@ -713,7 +713,7 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
                     else:
                         final_h5_fname = None
 
-                for bop, w in solutions:
+                for op_w_ind, (bop, w) in enumerate(solutions):
                     x = self.get_full_solution_vector(solutions[(bop, w)])
 
                     if self.rank == mpi_master():
@@ -738,15 +738,20 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
                             if self.is_imag(self.a_operator):
                                 rsp_funcs[(aop, bop, w)] *= -1.0
 
-                        # write to h5 file for response solutions
+                        # write solutions to h5 file
                         if (self.save_solutions and final_h5_fname is not None):
-                            solution_keys = [
-                                '{:s}_{:s}_{:.8f}'.format(aop, bop, w)
-                                for aop in self.a_components
-                            ]
-                            write_rsp_solution_with_multiple_keys(
-                                final_h5_fname, solution_keys, x,
-                                self.group_label)
+                            hf = h5py.File(final_h5_fname, 'a')
+                            full_sol_label = 'rsp/full_solutions_matrix'
+                            if op_w_ind == 0:
+                                if full_sol_label in hf:
+                                    del hf[full_sol_label]
+                                full_sol_dset = hf.create_dataset(full_sol_label,
+                                                                  shape=(len(solutions), len(x)),
+                                                                  dtype=x.dtype)
+                            else:
+                                full_sol_dset = hf[full_sol_label]
+                            full_sol_dset[op_w_ind, :] = x
+                            hf.close()
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
@@ -762,11 +767,17 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
                         'a_components': self.a_components,
                         'b_operator': self.b_operator,
                         'b_components': self.b_components,
-                        'frequencies': list(self.frequencies),
+                        'frequencies': np.array(self.frequencies),
                         'response_functions': rsp_funcs,
                         'solutions': solutions,
                         'molecular_mass_amu': float(sum(molecule.get_masses())),
                     }
+
+                    full_solutions_keys = ['{:s}_{:.8f}'.format(bop, w) for bop, w in solutions]
+                    ret_dict.update({'full_solutions_keys': full_solutions_keys})
+
+                    # add rsp type
+                    ret_dict.update({'rsp_type': 'cpp'})
 
                     self._print_results(ret_dict)
 
@@ -1025,16 +1036,16 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
         else:
             if self.rank == mpi_master():
                 assert_msg_critical(
-                    f'x_x_{w:.8f}' in cpp_results and
-                    f'y_y_{w:.8f}' in cpp_results and
-                    f'z_z_{w:.8f}' in cpp_results,
+                    f'x_{w:.8f}' in cpp_results and
+                    f'y_{w:.8f}' in cpp_results and
+                    f'z_{w:.8f}' in cpp_results,
                     f'get_cpp_property_densities: Could not find frequency {w} in ' +
                     'CPP results')
 
                 # solution vectors
-                cpp_solution_vector_x = cpp_results[f'x_x_{w:.8f}']
-                cpp_solution_vector_y = cpp_results[f'y_y_{w:.8f}']
-                cpp_solution_vector_z = cpp_results[f'z_z_{w:.8f}']
+                cpp_solution_vector_x = cpp_results[f'x_{w:.8f}']
+                cpp_solution_vector_y = cpp_results[f'y_{w:.8f}']
+                cpp_solution_vector_z = cpp_results[f'z_{w:.8f}']
             else:
                 cpp_solution_vector_x = None
                 cpp_solution_vector_y = None

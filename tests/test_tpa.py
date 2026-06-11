@@ -406,7 +406,7 @@ class TestTPA:
             },
             'frequencies': [0.05, 0.10],
             'cross_sections': [0.1, 0.2],
-            'property': 'tpa',
+            'rsp_type': 'tpa',
             'tpa_type': 'reduced',
         }
 
@@ -435,7 +435,7 @@ class TestTPA:
             },
             'frequencies': [0.0, 0.05],
             'cross_sections': [0.1],
-            'property': 'tpa',
+            'rsp_type': 'tpa',
             'tpa_type': 'reduced',
         }
 
@@ -479,7 +479,7 @@ class TestTPA:
             },
             'frequencies': [0.05, 0.10],
             'cross_sections': [0.1, 0.2],
-            'property': 'tpa',
+            'rsp_type': 'tpa',
             'tpa_type': 'full',
         }
 
@@ -508,7 +508,7 @@ class TestTPA:
             },
             'frequencies': [0.05],
             'cross_sections': [0.1],
-            'property': 'tpa',
+            'rsp_type': 'tpa',
             'tpa_type': 'full',
         }
 

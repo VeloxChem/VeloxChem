@@ -345,8 +345,8 @@ class TpaTransitionDriver(NonlinearSolver):
                 'excitation_details': excitation_details
             })
 
-            # add property
-            ret_dict.update({'property': 'tpa transition'})
+            # add rsp type
+            ret_dict.update({'rsp_type': 'tpa transition'})
 
             self.print_results(ret_dict)
 

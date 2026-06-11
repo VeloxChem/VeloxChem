@@ -458,8 +458,8 @@ class TpaDriverBase(NonlinearSolver):
                 'tpa_type': self._get_tpa_type(),
             })
 
-            # add property
-            ret_dict.update({'property': 'tpa'})
+            # add rsp type
+            ret_dict.update({'rsp_type': 'tpa'})
 
             ret_dict['tpa_terms'].update(other_dict)
             ret_dict['tpa_terms'].update({
