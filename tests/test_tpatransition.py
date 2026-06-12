@@ -314,7 +314,7 @@ class TestTpaTransition:
             'elec_trans_dipoles': np.array([[0.11, -0.22, 0.33],
                                             [0.44, -0.55, 0.66]]),
             'excitation_details': [['1a -> 2a (0.90)'], ['1b -> 3b (0.80)']],
-            'rsp_type': 'tpa transition',
+            'rsp_type': 'tpa_transition',
         }
 
         tpa_drv = TpaTransitionDriver()
@@ -364,7 +364,7 @@ class TestTpaTransition:
             'oscillator_strengths': np.array([0.01]),
             'elec_trans_dipoles': np.array([[0.11, -0.22, 0.33]]),
             'excitation_details': [['1a -> 2a (0.90)']],
-            'rsp_type': 'tpa transition',
+            'rsp_type': 'tpa_transition',
         }
 
         tpa_drv = TpaTransitionDriver()

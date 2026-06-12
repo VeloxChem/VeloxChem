@@ -234,7 +234,6 @@ class TestScfVibrationalAnalysisDriver:
     def test_vibrational_analysis_writes_outputs_and_hdf5(self, tmp_path):
 
         molecule = self._get_water_molecule()
-        # basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
         synced_base_name = MPI.COMM_WORLD.bcast(
             str(tmp_path / 'synthetic-vib')
             if MPI.COMM_WORLD.Get_rank() == mpi_master() else None,

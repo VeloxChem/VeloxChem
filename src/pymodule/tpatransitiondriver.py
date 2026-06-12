@@ -346,7 +346,7 @@ class TpaTransitionDriver(NonlinearSolver):
             })
 
             # add rsp type
-            ret_dict.update({'rsp_type': 'tpa transition'})
+            ret_dict.update({'rsp_type': 'tpa_transition'})
 
             self.print_results(ret_dict)
 

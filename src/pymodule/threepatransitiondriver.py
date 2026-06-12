@@ -93,7 +93,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         # cpp settings
         self.damping = 0.0
 
-        # tpa transition settings
+        # 3pa transition settings
         self.nstates = 3
 
         # input keywords
