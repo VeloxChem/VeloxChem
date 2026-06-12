@@ -302,6 +302,7 @@ class IMDatabasePointCollecter:
         self.expansion_molecules = []
         self.dynamics_settings_interpolation_run = None
         self.sampled_molecules = None
+        self.consider_locality = False
 
 
         self.opt_mols_org_mol_swap = {}
@@ -562,7 +563,9 @@ class IMDatabasePointCollecter:
         Call this after any datapoint/symmetry update.
         """
         driver = self.impes_drivers[root]
+        sampling_driver = self.sampling_impes_drivers[root]
         driver.mark_runtime_data_cache_dirty()
+        sampling_driver.mark_runtime_data_cache_dirty()
 
 
     def add_bias_force(self, atoms, force_constant, target=0.109, anchor=False):
@@ -2943,7 +2946,7 @@ class IMDatabasePointCollecter:
                     needs_locality_fallback = (bool(fallback_constraints) and abs(delta_e) < abs(state_specific_energies[state_to_optim][0] - state_specific_energies[state_to_optim][1]) * hartree_in_kcalpermol() * 0.5 and
                                                                     bool(fallback_constraints) and current_rmsd_gradient < current_state_difference[state_to_optim][1] * 0.5)
                                         
-                    if needs_locality_fallback:
+                    if needs_locality_fallback and self.consider_locality:
                         self.ostream.print_blank()
                         self.ostream.print_info("Locality fallback triggered! --> Starting to include additional constraints based on the connectivity to the initially identified important coordinates.")
                         self.ostream.flush()

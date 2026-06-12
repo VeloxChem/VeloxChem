@@ -121,6 +121,7 @@ class InterpolationDatapoint:
         self.confidence_radius = None
         self.use_inverse_bond_length = True
         self.use_eq_bond_length = False
+        # self.use_cos_angle = False
         self.use_vectorized_b_matrix = True
         self.use_vectorized_internal_coordinates_values = True
         self.identify_imp_int_coord = True
@@ -152,6 +153,7 @@ class InterpolationDatapoint:
                 'use_vectorized_b_matrix':
                     ('bool', 'use vectorized Wilson B-matrix construction'
                      ),
+                # 'use_cos_angle':('bool', 'use cos angles -- careful for linear angles'),
                 'use_vectorized_internal_coordinates_values':
                     ('bool', 'use vectorized internal-coordinate value evaluation'
                      ),
@@ -194,7 +196,7 @@ class InterpolationDatapoint:
             impes_dict = {}
 
 
-        im_keywords = {
+        im_keywords: dict[str, str] = {
             key: val[0]
             for key, val in self._input_keywords['im_settings'].items()
         }
@@ -233,6 +235,7 @@ class InterpolationDatapoint:
                                 dtype=np.int8,
                                 count=n_rows)
         bond_rows = np.flatnonzero(row_sizes == 2)
+        angle_rows = np.flatnonzero(row_sizes == 3)
         dihedral_rows = np.flatnonzero(row_sizes == 4)
 
         dihedral_first = np.zeros(dihedral_rows.shape[0], dtype=bool)
@@ -249,6 +252,7 @@ class InterpolationDatapoint:
         self._b_matrix_row_cache = {
             'row_sizes': row_sizes,
             'bond_rows': bond_rows,
+            'angle_rows':  angle_rows,
             'dihedral_rows': dihedral_rows,
             'dihedral_first': dihedral_first,
         }
@@ -290,8 +294,10 @@ class InterpolationDatapoint:
 
         use_original = (
             self.use_inverse_bond_length or
-            self.use_eq_bond_length
+            self.use_eq_bond_length #or 
+            # self.use_cos_angle
         )
+        
         if use_original:
             self.original_b_matrix = derivatives.copy()
         else:
@@ -301,6 +307,7 @@ class InterpolationDatapoint:
         row_cache = self._get_b_matrix_row_cache()
 
         bond_rows = row_cache['bond_rows']
+        angle_rows = row_cache['angle_rows']
         if bond_rows.size > 0 and (self.use_inverse_bond_length or self.use_eq_bond_length):
             bond_values = np.array(
                 [self.internal_coordinates[idx].value(coords) for idx in bond_rows],
@@ -314,6 +321,13 @@ class InterpolationDatapoint:
                     bond_values, eq_values, eps_inner=0.005, eps_outer=0.01)
                 row_scale[bond_rows] = dq_dr
 
+        # if angle_rows.size > 0 and self.use_cos_angle:
+        #     angle_values = np.array(
+        #     [self.internal_coordinates[idx].value(coords) for idx in angle_rows],
+        #     dtype=np.float64)
+
+        #     row_scale[angle_rows] = -np.sin(angle_values)
+        
         self.b_matrix = derivatives * row_scale[:, np.newaxis]
 
         if self.inv_sqrt_masses is not None:
@@ -380,6 +394,17 @@ class InterpolationDatapoint:
 
                 bond_counter += 1
             
+            # elif len(z) == 3 and self.use_cos_angle:
+
+            #     a = q.value(coords)
+            #     a_sin_2 = -np.sin(a)
+            #     a_cos_3 = -np.cos(a)
+            #     self.b2_matrix[i] = a_sin_2 * second_derivative
+
+            #     for m in range(n_atoms):
+            #         for n in range(n_atoms):
+            #             self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += a_cos_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
+
             
             else:
                 self.b2_matrix[i] = second_derivative
@@ -648,6 +673,7 @@ class InterpolationDatapoint:
         row_cache = self._get_b_matrix_row_cache()
 
         bond_rows = row_cache['bond_rows']
+        angle_rows = row_cache["angle_rows"]
 
         if bond_rows.size > 0:
             if self.use_inverse_bond_length:
@@ -661,6 +687,8 @@ class InterpolationDatapoint:
                     eps_inner=0.005,
                     eps_outer=0.01)
                 int_coords[bond_rows] = q_values
+        # if angle_rows.size > 0 and self.use_cos_angle:
+        #     int_coords[angle_rows] = np.cos(base_values[angle_rows])
 
         self.internal_coordinates_values = int_coords
     
@@ -737,12 +765,12 @@ class InterpolationDatapoint:
         
         q = s * L + (1.0 - s) * R
         
-        # q = R
-        # dq_dr = dR
-        # d2q_dr2 = d2R
+        q = R
+        dq_dr = dR
+        d2q_dr2 = d2R
         # here the switch derivativve is being assembled 
-        dq_dr = ds * (L - R) + s * dL + (1.0 - s) * dR
-        d2q_dr2 = d2s * (L - R) + 2.0 * ds * (dL - dR) + s * d2L + (1.0 - s) * d2R
+        # dq_dr = ds * (L - R) + s * dL + (1.0 - s) * dR
+        # d2q_dr2 = d2s * (L - R) + 2.0 * ds * (dL - dR) + s * d2L + (1.0 - s) * d2R
 
         if scalar_input:
             return float(q[0]), float(dq_dr[0]), float(d2q_dr2[0])

@@ -149,6 +149,7 @@ class InterpolationDriver():
         self.labels = None
         self.use_inverse_bond_length = True
         self.use_eq_bond_length = False
+        # self.use_cos_angle = False
         self.use_mass_weight = False
         
 
@@ -186,6 +187,7 @@ class InterpolationDriver():
                     ('str', 'the name of the chk file with QM data'),
                     'use_inverse_bond_length': ('bool', 'whether to use inverse bond lengths in the Z-matrix'),
                     'use_eq_bond_length': ('bool', 'whether to use eq bond lengths in the Z-matrix'),
+                    # 'use_cos_angle': ('bool', 'wether to use cosine description for angles in Z-matrix'),
                     'use_tc_weights':('bool', 'weither to use target coustomized weights'),
                     'tc_weight_mode':('str', 'the mode for the target customized weights (multiplicative/additive)'),
                     'use_mass_weight':('bool', 'weither to use mass weighting in coordinates'),
@@ -2706,7 +2708,7 @@ class InterpolationDriver():
 
         delta_g_err = g_qm - g_model
         abs_err = np.abs(delta_g_err)
-        scaled_abs_err = coord_scales * abs_err
+        scaled_abs_err = abs_err
 
         source_indices = np.arange(N, dtype=np.int64)
         if isinstance(max_sources, int) and 0 < max_sources < N:
@@ -2730,7 +2732,7 @@ class InterpolationDriver():
             )
 
             err_wo_j = np.abs(g_qm - g_model_wo_j)
-            scaled_err_wo_j = coord_scales * err_wo_j
+            scaled_err_wo_j =  err_wo_j
 
             blame_matrix[:, j] = scaled_abs_err - scaled_err_wo_j
 
@@ -2745,7 +2747,7 @@ class InterpolationDriver():
         pair_score = harmful_matrix + harmful_matrix.T
         np.fill_diagonal(pair_score, 0.0)
 
-        rho = scaled_abs_err / (coord_scales * np.abs(g_model) + eps)
+        rho = scaled_abs_err / (np.abs(g_model) + eps)
 
         rows = []
         for idx, (coord, kind) in enumerate(zip(coords_flat, kinds_flat)):
