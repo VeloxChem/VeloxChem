@@ -1190,6 +1190,7 @@ class RixsDriver(LinearSolver):
                     f'plot_spectrum: photon_energy_ev={photon_energy_ev} eV,'
                     f' closest calculated photon energy is {closest_energy_ev:.2f} eV (index: {photon_index}).'
                 )
+            self.ostream.flush()
 
         elif photon_index is None:
             photon_index = 0
