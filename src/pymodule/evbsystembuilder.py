@@ -50,6 +50,7 @@ from .molecule import Molecule
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_arccos
 from .waterparameters import get_water_parameters
+from .gbimplicitsolvent import GBImplicitSolvent
 
 try:
     import openmm as mm
@@ -1232,12 +1233,6 @@ class EvbSystemBuilder():
     def _add_implicit_solvent(self, system, topology, nb_force):
         """Add a GB implicit solvent force to the system.
 
-        Mirrors the logic in OpenMM's implicit solvent XML scripts: selects the
-        appropriate CustomGBForce subclass, obtains per-atom radii and scaling
-        factors from getStandardParameters (element-based Bondi radii), reads
-        charges from the existing NonbondedForce, and attaches the finalized
-        force to the system.
-
         :param system: the OpenMM System to add the force to.
         :param topology: the OpenMM Topology (all atoms must already be added).
         :param nb_force: the NonbondedForce already present in the system.
@@ -1245,46 +1240,19 @@ class EvbSystemBuilder():
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
 
-        from openmm.app.internal.customgbforces import (
-            GBSAGBnForce,
-            GBSAGBn2Force,
-            GBSAOBC1Force,
-            GBSAOBC2Force,
-            GBSAHCTForce,
-        )
-
-        model_map = {
-            'gbn': GBSAGBnForce,
-            'gbn2': GBSAGBn2Force,
-            'obc1': GBSAOBC1Force,
-            'obc2': GBSAOBC2Force,
-            'hct': GBSAHCTForce,
-        }
-
-        model_key = self.implicit_solvent_model.lower()
+        model = self.implicit_solvent_model
         assert_msg_critical(
-            model_key in model_map,
-            f'EvbSystemBuilder: unknown implicit_solvent_model '
-            f'"{self.implicit_solvent_model}". '
-            f'Valid options are: {list(model_map.keys())}')
+            model.lower() in GBImplicitSolvent.get_valid_models(),
+            f'EvbSystemBuilder: unknown implicit_solvent_model "{model}". '
+            f'Valid options are: {list(GBImplicitSolvent.get_valid_models())}')
 
-        ForceClass = model_map[model_key]
-
-        gb_force = ForceClass(
-            solventDielectric=self.solvent_dielectric,
-            soluteDielectric=self.solute_dielectric,
-            SA='ACE',
+        gb_force = GBImplicitSolvent.build(
+            model=model,
+            topology=topology,
+            nb_force=nb_force,
+            sv_dielectric=self.solvent_dielectric,
+            sl_dielectric=self.solute_dielectric,
         )
-
-        # getStandardParameters returns [[radius, scalingFactor], ...] per atom,
-        # using element-based Bondi radii derived from the topology.
-        std_params = ForceClass.getStandardParameters(topology)
-        for i, gb_params in enumerate(std_params):
-            charge = nb_force.getParticleParameters(i)[0]
-            gb_force.addParticle([charge] + list(gb_params))
-
-        gb_force.finalize()
-        gb_force.setNonbondedMethod(mm.CustomNonbondedForce.NoCutoff)
 
         # Required by OpenMM when GB is active: set reaction-field dielectric
         # of the NonbondedForce to 1 so it does not double-count dielectric
@@ -1293,7 +1261,7 @@ class EvbSystemBuilder():
 
         system.addForce(gb_force)
         self.ostream.print_info(
-            f'Added implicit solvent ({self.implicit_solvent_model}) with '
+            f'Added implicit solvent ({model}) with '
             f'solvent_dielectric={self.solvent_dielectric}, '
             f'solute_dielectric={self.solute_dielectric}')
         self.ostream.flush()
