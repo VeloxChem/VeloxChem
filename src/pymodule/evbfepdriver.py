@@ -757,7 +757,7 @@ class EvbFepDriver:
 
             if self.save_crash_xml and j % self.xml_crash_save_interval == 0:
                 xml_name = f"state_step_{j}_{step_num}"
-                with open(path / f"{xml_name}.xml", "w") as f:
+                with (path / f"{xml_name}.xml").open("w") as f:
                     f.write(mm.XmlSerializer.serialize(state))
 
             if self.save_crash_pdb and j % self.pdb_crash_save_interval == 0:

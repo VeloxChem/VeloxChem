@@ -221,7 +221,7 @@ class EvbDriver:
             conf["data_folder"] = data_folder
             conf["run_folder"] = run_folder
 
-            cwd = Path().cwd()
+            cwd = Path.cwd()
             data_folder_path = cwd / data_folder
             run_folder_path = cwd / run_folder
 
@@ -384,16 +384,16 @@ class EvbDriver:
 
     def update_options_json(self, dict, conf):
 
-        cwd = Path().cwd()
+        cwd = Path.cwd()
         path = cwd / conf["data_folder"] / "options.json"
         if not path.exists():
-            with open(path, "w") as file:
+            with path.open("w") as file:
                 json.dump(dict, file, indent=4)
         else:
-            with open(path, "r") as file:
+            with path.open("r") as file:
                 options = json.load(file)
             options.update(dict)
-            with open(path, "w") as file:
+            with path.open("w") as file:
                 json.dump(options, file, indent=4)
 
     def compute_energy_profiles(
@@ -499,7 +499,7 @@ class EvbDriver:
 
         folders = [reference_folder] + target_folders
         results = {}
-        cwd = Path().cwd()
+        cwd = Path.cwd()
 
         common_results = []
         specific_results = {}
@@ -555,7 +555,7 @@ class EvbDriver:
         lambda_sub_sample_ends=False,
         time_sub_sample=1,
     ):
-        with open(options_file, "r") as file:
+        with Path(options_file).open("r") as file:
             options = json.load(file)
         Lambda = options["Lambda"]
         Temp_set = options["temperature"]
@@ -631,7 +631,7 @@ class EvbDriver:
             decomp_data = np.loadtxt(decomp_file, skiprows=1, delimiter=',').T
             decomp_rea = decomp_data[decomp_data.shape[0] // 2:, :]
             decomp_pro = decomp_data[:decomp_data.shape[0] // 2, :]
-            with open(decomp_file, "r") as file:
+            with Path(decomp_file).open("r") as file:
                 decomp_names = file.readline().strip().split(",")
             decomp_names = [name.replace("_rea", "") for name in decomp_names]
             decomp_names = decomp_names[:len(decomp_names) // 2]

@@ -9,11 +9,6 @@ from veloxchem.evbdriver import EvbDriver
 from veloxchem.optimizationdriver import OptimizationDriver
 from veloxchem.molecule import Molecule
 
-try:
-    import openmm as mm
-except ImportError:
-    pass
-
 
 class TestTransitionStateGuesser:
 
@@ -304,3 +299,168 @@ class TestTransitionStateGuesser:
         qm_energies, _ = TransitionStateGuesser._get_best_qm_E_from_scan_dict(
             self._make_scan_dict())
         assert all(e is None for e in qm_energies)
+
+    # -----------------------------------------------------------------------
+    # Helpers for conformational-TS tests
+    # -----------------------------------------------------------------------
+
+    @staticmethod
+    def _make_conformer_pair():
+        """Return (anti, gauche) Molecule objects for 1,2-difluoroethane.
+
+        Anti:   F-C-C-F dihedral ≈  180°
+        Gauche: F-C-C-F dihedral ≈   60°
+
+        Atom order (0-indexed):
+          0 C, 1 C, 2 F (on C0), 3 H, 4 H, 5 F (on C1), 6 H, 7 H
+        F-C-C-F torsion: indices (2, 0, 1, 5) / 1-based (3, 1, 2, 6)
+        """
+        anti = Molecule.read_str("""
+        C    0.000   0.000   0.762
+        C    0.000   0.000  -0.762
+        F    1.101   0.000   1.415
+        H   -0.520   0.901   1.153
+        H   -0.520  -0.901   1.153
+        F   -1.101   0.000  -1.415
+        H    0.520   0.901  -1.153
+        H    0.520  -0.901  -1.153""")
+
+        gauche = Molecule.read_str("""
+        C    0.000   0.000   0.762
+        C    0.000   0.000  -0.762
+        F    1.101   0.000   1.415
+        H   -0.520   0.901   1.153
+        H   -0.520  -0.901   1.153
+        F    0.551  -0.954  -1.415
+        H   -1.040  -0.001  -1.153
+        H    0.520   0.901  -1.153""")
+
+        return anti, gauche
+
+    # -----------------------------------------------------------------------
+    # _detect_active_dihedral
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.skipif(('openmm' not in sys.modules),
+                        reason='openmm not available')
+    def test_detect_active_dihedral_auto(self):
+        """Auto-detection picks the C-C bond with |Δφ| ≈ 120°."""
+        anti, gauche = self._make_conformer_pair()
+        tsguesser = TransitionStateGuesser()
+        tsguesser.ostream.mute()
+        tsguesser.save_results_file = False
+        tsguesser.build_forcefields(anti, gauche)
+
+        active_torsion, phi_rea, phi_pro = tsguesser._detect_active_dihedral()
+
+        # Central bond atoms (1-indexed j, k in the torsion) must be C–C (0,1)
+        central = tuple(sorted([active_torsion[1], active_torsion[2]]))
+        assert central == (0, 1), (
+            f"Expected C-C central bond (0,1), got {central}")
+
+        # Shortest-path angle difference should be ≈ 120°
+        delta = phi_pro - phi_rea
+        if delta > 180.0:
+            delta -= 360.0
+        elif delta <= -180.0:
+            delta += 360.0
+        assert abs(abs(delta) - 120.0) < 5.0, (
+            f"|Δφ| = {abs(delta):.1f}°, expected ≈ 120°")
+
+    @pytest.mark.skipif(('openmm' not in sys.modules),
+                        reason='openmm not available')
+    def test_detect_active_dihedral_threshold(self):
+        """Raises ValueError when no dihedral changes by more than 20°."""
+        anti, _ = self._make_conformer_pair()
+        # Use the anti geometry for both reactant and product (Δφ = 0°)
+        anti2 = Molecule.read_str("""
+        C    0.000   0.000   0.762
+        C    0.000   0.000  -0.762
+        F    1.101   0.000   1.415
+        H   -0.520   0.901   1.153
+        H   -0.520  -0.901   1.153
+        F   -1.101   0.000  -1.415
+        H    0.520   0.901  -1.153
+        H    0.520  -0.901  -1.153""")
+        tsguesser = TransitionStateGuesser()
+        tsguesser.ostream.mute()
+        tsguesser.save_results_file = False
+        tsguesser.build_forcefields(anti, anti2)
+
+        with pytest.raises(ValueError, match='20'):
+            tsguesser._detect_active_dihedral()
+
+    # -----------------------------------------------------------------------
+    # active_torsion explicit override
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.skipif(('openmm' not in sys.modules),
+                        reason='openmm not available')
+    def test_active_torsion_explicit_override(self):
+        """Explicit active_torsion bypasses auto-detection and is stored correctly."""
+        anti, gauche = self._make_conformer_pair()
+        tsguesser = TransitionStateGuesser()
+        tsguesser.ostream.mute()
+        tsguesser.save_results_file = False
+
+        # F-C-C-F torsion: 1-indexed (3, 1, 2, 6) → 0-indexed (2, 0, 1, 5)
+        tsguesser.active_torsion = (3, 1, 2, 6)
+
+        tsguesser.build_forcefields(anti, gauche)
+        tsguesser.build_systems()
+
+        # Stored torsion should be converted to 0-indexed
+        assert tsguesser._conformer_active_torsion == (2, 0, 1, 5)
+
+        # Stored angles should match a direct measurement on the molecules
+        expected_phi_rea = tsguesser.reactant.molecule.get_dihedral_in_degrees(
+            [3, 1, 2, 6])
+        expected_phi_pro = tsguesser.product.molecule.get_dihedral_in_degrees(
+            [3, 1, 2, 6])
+        assert abs(tsguesser._conformer_phi_reactant - expected_phi_rea) < 0.1
+        assert abs(tsguesser._conformer_phi_product - expected_phi_pro) < 0.1
+
+        # Reactant should be close to 180° (anti) and product to ±60° (gauche)
+        assert abs(abs(tsguesser._conformer_phi_reactant) - 180.0) < 5.0
+        assert abs(abs(tsguesser._conformer_phi_product) - 60.0) < 5.0
+
+    # -----------------------------------------------------------------------
+    # Implicit solvation
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.skipif(('openmm' not in sys.modules),
+                        reason='openmm not available')
+    def test_implicit_solvent_system_has_gb_force(self):
+        """Integration systems contain a CustomGBForce when implicit_solvent_model is set."""
+        rea = Molecule.read_str("""
+        C              1.340494446986         1.458194010980         2.002452328500
+        Cl            -0.248712060729         0.603810082277         1.884782585397
+        H              1.176565798320         2.498243131144         2.310601520444
+        H              1.973676790569         0.954059040738         2.742914700148
+        H              1.839289207801         1.441849856114         1.025499053148
+        Br             4.316943499142         3.074995880494         2.227046197863""")
+
+        pro = Molecule.read_str("""
+        C              1.644879612388        -0.508351390798        -0.616977056715
+        Cl             3.923435352318        -2.563707406826        -1.580365047563
+        H              2.132647869077        -0.956075482316         0.257650347399
+        H              2.384228922941         0.036800182006        -1.216446463266
+        H              1.178719053826        -1.293388510743        -1.224930701103
+        Br             0.244603286036         0.757235977330        -0.003426182246""")
+
+        rea.set_charge(-1)
+        pro.set_charge(-1)
+
+        tsguesser = TransitionStateGuesser()
+        tsguesser.ostream.mute()
+        tsguesser.save_results_file = False
+        tsguesser.implicit_solvent_model = 'gbn2'
+
+        tsguesser.build_forcefields(rea, pro)
+        tsguesser.build_systems()
+
+        # Every integration system (keyed by lambda float) should contain a GB force
+        sample_system = tsguesser.systems[0.5]
+        force_type_names = [type(f).__name__ for f in sample_system.getForces()]
+        assert 'CustomGBForce' in force_type_names, (
+            f"Expected CustomGBForce in system forces, got: {force_type_names}")
