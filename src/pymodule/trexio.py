@@ -48,7 +48,7 @@ _ANGULAR_LABELS = 'SPDFGHIKLMNOQRTUVWXYZ'
 
 
 def _trexio_module():
-    """Imports the external TREXIO Python module lazily."""
+    """Imports the external TREXIO Python module."""
 
     try:
         return importlib.import_module('trexio')
