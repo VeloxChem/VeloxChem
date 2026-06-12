@@ -232,13 +232,8 @@ def test_write_scf_results_to_hdf5_stores_all_entries_with_metadata(tmp_path):
         'restart': False,
         'grid_level': 4,
         'xcfun': 'b3lyp',
-        'scf_history': [{
-            'energy': -75.0,
-            'gradient_norm': 1.0e-3,
-        }, {
-            'energy': -75.123,
-            'gradient_norm': 1.0e-6,
-        }],
+        'scf_history_energy': np.array([-75.0, -75.123]),
+        'scf_history_gradient_norm': np.array([1.0e-3, 1.0e-6]),
         'S': np.eye(2),
         'dipole_moment': np.array([0.1, 0.2, 0.3]),
         'F': (np.eye(2), np.eye(2) * 2.0),
@@ -272,12 +267,13 @@ def test_write_scf_results_to_hdf5_stores_all_entries_with_metadata(tmp_path):
         np.testing.assert_allclose(np.array(f_group['0']), np.eye(2))
         np.testing.assert_allclose(np.array(f_group['1']), np.eye(2) * 2.0)
 
-        history_group = scf_group['scf_history']
-        assert history_group.attrs['value_type'] == 'list'
-        assert history_group.attrs['length'] == 2
-        assert history_group['0'].attrs['value_type'] == 'dict'
-        assert history_group['0']['energy'].attrs['value_type'] == 'float'
-        assert history_group['0']['gradient_norm'].attrs['value_type'] == 'float'
+        scf_history_ene = scf_group['scf_history_energy']
+        assert scf_history_ene.attrs['value_type'] == 'ndarray'
+        np.testing.assert_allclose(scf_history_ene, np.array([-75.0, -75.123]))
+
+        scf_history_grad = scf_group['scf_history_gradient_norm']
+        assert scf_history_grad.attrs['value_type'] == 'ndarray'
+        np.testing.assert_allclose(scf_history_grad, np.array([1.0e-3, 1.0e-6]))
 
 
 def test_write_results_to_hdf5_stores_requested_group(tmp_path):
@@ -418,13 +414,8 @@ def test_read_results_roundtrips_only_requested_group(tmp_path):
         'restart': False,
         'grid_level': 4,
         'xcfun': 'b3lyp',
-        'scf_history': [{
-            'energy': -75.0,
-            'gradient_norm': 1.0e-3,
-        }, {
-            'energy': -75.123,
-            'gradient_norm': 1.0e-6,
-        }],
+        'scf_history_energy': np.array([-75.0, -75.123]),
+        'scf_history_gradient_norm': np.array([1.0e-3, 1.0e-6]),
         'S': np.eye(2),
         'dipole_moment': np.array([0.1, 0.2, 0.3]),
         'F': (np.eye(2), np.eye(2) * 2.0),
@@ -690,7 +681,11 @@ def test_scf_results_hdf5_roundtrip_with_water_calculation(tmp_path):
 
         assert 'basis_set' not in recovered
         assert 'nuclear_charges' not in recovered
-        assert recovered['scf_history'] == scf_drv.history
+        assert 'scf_history' not in recovered
+        for key in scf_drv.history[0]:
+            expected = np.array([step[key] for step in scf_drv.history])
+            np.testing.assert_allclose(recovered[f'scf_history_{key}'],
+                                       expected)
 
 
 @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() != 1,
