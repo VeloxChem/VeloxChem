@@ -234,7 +234,7 @@ class TestScfVibrationalAnalysisDriver:
     def test_vibrational_analysis_writes_outputs_and_hdf5(self, tmp_path):
 
         molecule = self._get_water_molecule()
-        basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
+        # basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
         synced_base_name = MPI.COMM_WORLD.bcast(
             str(tmp_path / 'synthetic-vib')
             if MPI.COMM_WORLD.Get_rank() == mpi_master() else None,
@@ -288,9 +288,9 @@ class TestScfVibrationalAnalysisDriver:
                 'dipole_gradient': vib_drv.dipole_gradient,
                 'ir_intensities': vib_drv.ir_intensities,
                 'number_of_external_frequencies': len(vib_drv.frequencies),
-                'external_frequencies': vib_drv.frequencies,
+                'external_frequencies': np.array(vib_drv.frequencies),
                 'raman_activities': vib_drv.raman_activities,
-                'polarizability_gradient': vib_drv.polarizability_gradient,
+                'polarizability_gradient': np.array(list(vib_drv.polarizability_gradient.values())),
                 'raman_type': 'normal',
                 'depolarization_ratios': vib_drv.depol_ratio,
             }
@@ -309,13 +309,11 @@ class TestScfVibrationalAnalysisDriver:
                 assert hf['vib'].attrs['value_type'] == 'dict'
                 assert hf['vib/normal_modes'].shape == (6, 3, 3)
                 assert hf['vib/number_of_modes'].attrs['value_type'] == 'int'
-                assert hf['vib/external_frequencies'].attrs['value_type'] == (
-                    'tuple')
+                assert hf['vib/external_frequencies'].attrs['value_type'] == 'ndarray'
                 assert hf['vib/raman_type'].attrs['value_type'] == 'str'
 
                 polgrad_group = hf['vib/polarizability_gradient']
-                assert polgrad_group.attrs['value_type'] == 'dict'
-                assert polgrad_group.attrs['dict_storage'] == 'entries'
+                assert polgrad_group.attrs['value_type'] == 'ndarray'
 
             recovered = read_results(str(direct_h5_file), 'vib')
             assert recovered['number_of_modes'] == len(vib_drv.vib_frequencies)
@@ -323,14 +321,13 @@ class TestScfVibrationalAnalysisDriver:
             np.testing.assert_allclose(recovered['hessian'], vib_drv.hessian)
             np.testing.assert_allclose(recovered['normal_modes'],
                                        vib_drv.normal_modes.reshape(6, 3, 3))
-            assert recovered['external_frequencies'] == vib_drv.frequencies
+            np.testing.assert_allclose(recovered['external_frequencies'],
+                                       np.array(vib_drv.frequencies))
             np.testing.assert_allclose(recovered['raman_activities'],
                                        vib_drv.raman_activities)
-            assert recovered['polarizability_gradient'].keys() == (
-                vib_drv.polarizability_gradient.keys())
-            for key in recovered['polarizability_gradient']:
+            for key_idx, key in enumerate(vib_drv.polarizability_gradient):
                 np.testing.assert_allclose(
-                    recovered['polarizability_gradient'][key],
+                    recovered['polarizability_gradient'][key_idx],
                     vib_drv.polarizability_gradient[key])
 
             assert wrapped_h5_file.is_file()

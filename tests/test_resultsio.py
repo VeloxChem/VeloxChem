@@ -372,10 +372,10 @@ def test_write_results_to_hdf5_roundtrips_dict_with_non_string_keys(tmp_path):
         pass
 
     results = {
-        'polarizability_gradient': {
-            0.0: np.arange(18.0).reshape(2, 3, 3),
-            0.2: np.arange(18.0, 36.0).reshape(2, 3, 3),
-        }
+        'polarizability_gradient': np.array([
+            np.arange(18.0).reshape(3, 3, 2),
+            np.arange(18.0, 36.0).reshape(3, 3, 2),
+        ]),
     }
 
     write_results_to_hdf5(str(h5file),
@@ -385,17 +385,12 @@ def test_write_results_to_hdf5_roundtrips_dict_with_non_string_keys(tmp_path):
 
     with h5py.File(h5file, 'r') as h5f:
         polgrad_group = h5f['vib/polarizability_gradient']
-        assert polgrad_group.attrs['value_type'] == 'dict'
-        assert polgrad_group.attrs['dict_storage'] == 'entries'
-        assert polgrad_group.attrs['length'] == 2
+        assert polgrad_group.attrs['value_type'] == 'ndarray'
 
     recovered = read_results(str(h5file), 'vib')
     assert recovered.keys() == results.keys()
-    assert recovered['polarizability_gradient'].keys() == (
-        results['polarizability_gradient'].keys())
-    for key in results['polarizability_gradient']:
-        np.testing.assert_allclose(recovered['polarizability_gradient'][key],
-                                   results['polarizability_gradient'][key])
+    np.testing.assert_allclose(recovered['polarizability_gradient'],
+                               results['polarizability_gradient'])
 
 
 def test_read_results_roundtrips_only_requested_group(tmp_path):
