@@ -448,13 +448,10 @@ class TpaDriverBase(NonlinearSolver):
                     sum_val += val[(w, -w, w)]
                 gamma[(w, -w, w)] = sum_val
 
-            # only store nonzero frequencies in results
-            nonzero_freqs = [w for w in self.frequencies if w != 0.0]
-
             ret_dict.update({
                 'tpa_terms': {},
                 'gamma': gamma,
-                'frequencies': np.array(nonzero_freqs),
+                'frequencies': np.array(self.frequencies),
                 'tpa_type': self._get_tpa_type(),
             })
 
@@ -980,11 +977,24 @@ class TpaDriverBase(NonlinearSolver):
         self.ostream.print_header(header.ljust(width))
         self.ostream.print_header('-' * width)
 
-        assert_msg_critical(
-            len(freqs) == len(cross_sections),
-            'TpaDriverBase._print_summary: Inconsistent size in frequencies and cross sections')
+        # zero frequency: only print gamma
+        if 0.0 in freqs:
+            w = 0.0
+            gamma_value = gamma[(w, -w, w)]
+            cross_section_str = ''
+            line = '{:>12.5f} eV{:>20.8f}{:>20.8f}{:>24s}'.format(
+                w * hartree_in_ev(), gamma_value.real, gamma_value.imag,
+                cross_section_str)
+            self.ostream.print_header(line.ljust(width))
 
-        for w, cross_sec in zip(freqs, cross_sections):
+        # nonzero frequency sanity check
+        nonzero_freqs = [w for w in freqs if w != 0.0]
+        assert_msg_critical(
+            len(nonzero_freqs) == len(cross_sections),
+            'TpaDriverBase._print_summary: Inconsistent size in nonzero frequencies and cross sections')
+
+        # nonzero frequency: only print gamma and spectrum
+        for w, cross_sec in zip(nonzero_freqs, cross_sections):
             gamma_value = gamma[(w, -w, w)]
             cross_section_str = '{:.8f} GM'.format(cross_sec)
             line = '{:>12.5f} eV{:>20.8f}{:>20.8f}{:>24s}'.format(
