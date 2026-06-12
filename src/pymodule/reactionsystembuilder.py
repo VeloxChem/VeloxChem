@@ -360,6 +360,12 @@ class ReactionSystemBuilder():
         templates, residues = forcefield.generateTemplatesForUnmatchedResidues(
             topology)
 
+        if len(templates) > len(self.pdb_active_res):
+            self.ostream.print_warning(
+                f"More unmatched residues found in the PDB file than specified in pdb_active_res. If this leads to problems, consider fixing your pdb"
+            )
+            self.ostream.flush()
+
         for t, template in enumerate(templates):
             for i, atom in enumerate(template.atoms):
                 forcefield.registerAtomType({

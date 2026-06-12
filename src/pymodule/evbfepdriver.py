@@ -101,12 +101,14 @@ class EvbFepDriver():
 
         self.NVT_integrator = "Langevin"
 
-        self.equil_NVT_steps = 50000
-        self.equil_NPT_steps = 50000
         self.sample_steps = 250000
         self.write_step = 1000
+        self.equil_NVT_steps = 50000
+        self.equil_NPT_steps = 50000
         self.initial_equil_NVT_steps = 150000
         self.initial_equil_NPT_steps = 150000
+        self.warmup_NVT_steps = -1
+        self.warmup_NPT_steps = -1
         self.step_size = 0.001  # ps
         self.equil_step_size = 0.001  # ps
         self.minimize_every_lambda: bool = False
@@ -158,16 +160,22 @@ class EvbFepDriver():
             "equil_NPT_steps": {
                 "type": int
             },
-            "sample_steps": {
-                "type": int
-            },
-            "write_step": {
-                "type": int
-            },
             "initial_equil_NVT_steps": {
                 "type": int
             },
             "initial_equil_NPT_steps": {
+                "type": int
+            },
+            "warmup_NVT_steps":{
+                "type":int
+            },
+            "warmup_NPT_steps":{
+                "type":int
+            },
+            "sample_steps": {
+                "type": int
+            },
+            "write_step": {
                 "type": int
             },
             "step_size": {
@@ -252,8 +260,8 @@ class EvbFepDriver():
         for keyword, value in self.keywords.items():
             if keyword in configuration:
                 if (not isinstance(configuration[keyword], value["type"])
-                        and not (isinstance(configuration[keyword], int)
-                                 and value["type"] == float)):
+                        and not((isinstance(configuration[keyword], int)
+                                 and value["type"] == float))):
                     raise ValueError(
                         f"Configuration option {keyword} should be of type {value['type']}"
                     )
@@ -408,17 +416,23 @@ class EvbFepDriver():
             self.ostream.flush()
             for T in self.pdb_temperatures:
                 simulation.integrator.setTemperature(T)
+                if T == self.temperature:
+                    NVT_steps = self.initial_equil_NVT_steps
+                    NPT_steps = self.initial_equil_NPT_steps
+                else:
+                    NVT_steps = self.warmup_NVT_steps if self.warmup_NVT_steps > 0 else self.initial_equil_NVT_steps
+                    NPT_steps = self.warmup_NPT_steps if self.warmup_NPT_steps > 0 else self.initial_equil_NPT_steps
 
                 if self.isobaric:
                     barostat = self._get_barostat(simulation)
                     barostat.setFrequency(0)
-                    self._safe_step(simulation, self.initial_equil_NVT_steps,
+                    self._safe_step(simulation, NVT_steps,
                                     f"PDB warmup NVT equilibration T = {T}")
                     barostat.setFrequency(25)
-                    self._safe_step(simulation, self.initial_equil_NPT_steps,
+                    self._safe_step(simulation, NPT_steps,
                                     f"PDB warmup NPT equilibration T = {T}")
                 else:
-                    self._safe_step(simulation, self.initial_equil_NVT_steps,
+                    self._safe_step(simulation, NVT_steps,
                                     f"PDB warmup NVT equilibration T = {T}")
                 if self.debug:
                     self._save_state(
@@ -861,7 +875,6 @@ class Timer:
         self.start_time = time.time()
         self.total_steps = total_steps
         self.times = []
-        self.steps = []
         self.step = 0
 
     def start(self):
@@ -876,21 +889,22 @@ class Timer:
         print_str = f"Estimated remaining time: {remain_str}, elapsed time since last timing: {elapsed_str}, total elapsed time: {total_elapsed_str}"
         if message:
             print_str = f"{message} {print_str}"
-        print_str += f"(step {step} of {self.total_steps} total steps)"
+        print_str += f" (step {step} of {self.total_steps} total steps)"
         ostream.print_info(print_str)
         ostream.flush()
 
     def calculate_remaining(self, step):
         end_time = time.time()
         self.step = step
-        self.steps.append(step)
         elapsed_time = end_time - self.start_time
 
         self.times.append(elapsed_time)
 
-        avg_time_per_step = sum(self.times) / step
-        # avg_time_per_step = sum(self.times) / len(self.times)
-        remaining_steps = self.total_steps - self.step
+        if step > 0:
+            avg_time_per_step = sum(self.times) / step
+        else:
+            avg_time_per_step = 0.0
+        remaining_steps = max(self.total_steps - self.step, 0)
         estimated_time_remaining = avg_time_per_step * remaining_steps
 
         self.start_time = time.time()  # reset start time for next step
