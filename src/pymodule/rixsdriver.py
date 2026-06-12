@@ -1127,35 +1127,6 @@ class RixsDriver(LinearSolver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    @staticmethod
-    def _select_photon_index(results, photon_index=None, photon_energy=None):
-        """
-        Function for returning the index of the selected photon. Based on either
-        the photon index or the photon energy. If both are None, return 0.
-        """
-        assert_msg_critical(
-            not (photon_index is not None and photon_energy is not None),
-            'plot_spectrum: specify only one of photon_index or photon_energy.'
-        )
-
-        if photon_index is None and photon_energy is None:
-            return 0
-
-        if photon_energy is not None:
-            incoming_ev = np.asarray(results['elastic_emission']) * hartree_in_ev()
-            photon_energy = float(photon_energy)
-
-            return int(np.argmin(np.abs(incoming_ev - photon_energy)))
-
-        photon_index = int(photon_index)
-        n_photons = len(results['elastic_emission'])
-        assert_msg_critical(
-            0 <= photon_index < n_photons,
-            'plot_spectrum: photon_index out of range.'
-        )
-
-        return photon_index
-
     def plot(self,
             results,
             broadening_type="lorentzian",
@@ -1196,18 +1167,46 @@ class RixsDriver(LinearSolver):
             The matplotlib axis object.
         """
 
+        assert_msg_critical(
+            not (photon_index is not None and photon_energy_ev is not None),
+            'plot_spectrum: specify only one of photon_index or photon_energy_ev.'
+        )
+
+        nr_incoming_photons = len(results['elastic_emission'])
+
         # if given as energy, find the closest calculated photon energy index
-        photon_selection = self._select_photon_index(
-            results,
-            photon_index=photon_index,
-            photon_energy=photon_energy_ev
+        if photon_energy_ev is not None:
+            incoming_photon_energies_ev = np.asarray(results['elastic_emission']) * hartree_in_ev()
+            photon_index = int(np.argmin(np.abs(incoming_photon_energies_ev - float(photon_energy_ev))))
+            closest_energy_ev = incoming_photon_energies_ev[photon_index]
+
+            if abs(closest_energy_ev - photon_energy_ev) > 0.1:
+                self.ostream.print_warning(
+                    f'plot_spectrum: requested photon energy {photon_energy_ev} eV is far '
+                    f'from the closest calculated photon energy {closest_energy_ev:.2f} eV.'
+                )
+            else:
+                self.ostream.print_info(
+                    f'plot_spectrum: photon_energy_ev={photon_energy_ev} eV,'
+                    f' closest calculated photon energy is {closest_energy_ev:.2f} eV (index: {photon_index}).'
+                )
+
+        elif photon_index is None:
+            photon_index = 0
+
+        else:
+            photon_index = int(photon_index)
+
+        assert_msg_critical(
+            0 <= photon_index < nr_incoming_photons,
+            'plot_spectrum: photon_index out of range.'
         )
 
         return plot_rixs_spectrum(
             results,
             broadening_type=broadening_type,
             broadening_value=broadening_value_ev,
-            photon_index=photon_selection,
+            photon_index=photon_index,
             x_unit=x_unit,
             x_step=x_step,
             energy_loss=energy_loss,
