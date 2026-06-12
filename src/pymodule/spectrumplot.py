@@ -599,7 +599,7 @@ def plot_rixs_spectrum(rixs_results,
 
     omega_ev = incoming_ev[photon_index]
 
-    ax.set_ylabel(r'Cross section, $\sigma$ [$a_0^2$]')
+    ax.set_ylabel(r'Cross section, $\sigma$ [a.u.]')
     ax.set_title(rf"RIXS Spectrum @ $\hbar \omega = {omega_ev:.2f}$ eV")
 
     if energy_loss:
@@ -620,7 +620,7 @@ def plot_rixs_spectrum(rixs_results,
 
     ax2 = ax.twinx()
     ax2.set_ylabel(
-        r'Intensity, $ \text{d} \sigma / \text{d} \omega $ [$a_0^2$ eV$^{-1}$]'
+        r'Intensity [arb. units]'
         )
     
 
@@ -689,10 +689,10 @@ def plot_rixs_spectrum(rixs_results,
                bbox_to_anchor=(1.15, 0.5))
 
     ax.set_ylim(0, max(abs(y)) * 1.1)
-    ax.set_ylim(bottom=0)
+    ax.set_ylim(bottom=-0.02 * max(abs(y)))
 
     ax2.set_ylim(0, max(xsection) * 1.1)
-    ax2.set_ylim(bottom=0)
+    ax2.set_ylim(bottom=-0.02 * max(abs(xsection)))
 
     if use_ev:
         x_lim = (xmin_ev, xmax_ev)
@@ -714,6 +714,7 @@ def plot_rixs_map(rixs_results,
                   x_step=0.01,
                   x_unit="ev",
                   cmap='viridis',
+                  normalize='global_max',
                   ax=None):
     """
     Plot a 2D RIXS map together with the corresponding XAS.
@@ -756,7 +757,7 @@ def plot_rixs_map(rixs_results,
         ax_map, ax_xas = ax
         fig = ax_map.figure
 
-    incoming_ev = np.array(rixs_results['elastic_emission']) * au2ev
+    incoming_photon_energies_ev = np.array(rixs_results['elastic_emission']) * au2ev
     core_eigvals_ev = np.array(rixs_results['core_eigenvalues']) * au2ev
     gamma_fwhm_ev = float(rixs_results['gamma_fwhm_ev'])
     core_osc_strs = np.array(rixs_results['core_osc_strengths'])
@@ -774,8 +775,8 @@ def plot_rixs_map(rixs_results,
         'plot_rixs_map: number of core eigenvalues does not match oscillator strengths.'
     )
 
-    sort_idx = np.argsort(incoming_ev)
-    incoming_ev = incoming_ev[sort_idx]
+    sort_idx = np.argsort(incoming_photon_energies_ev)
+    incoming_photon_energies_ev = incoming_photon_energies_ev[sort_idx]
     x_ev = x_ev[:, sort_idx]
     cross_sections = cross_sections[:, sort_idx]
 
@@ -794,12 +795,12 @@ def plot_rixs_map(rixs_results,
         val_min_ev = xmin_ev - pad
         val_max_ev = xmax_ev + pad
 
-    n_photons = incoming_ev.size
+    nr_incoming_photons = incoming_photon_energies_ev.size
 
     xi = None
     rixs_map = None
 
-    for i in range(n_photons):
+    for i in range(nr_incoming_photons):
 
         if broadening_type.lower() == "lorentzian":
             xi_tmp, yi_tmp = lorentzian_xps(
@@ -826,7 +827,7 @@ def plot_rixs_map(rixs_results,
 
         if xi is None:
             xi = xi_tmp
-            rixs_map = np.zeros((len(xi), n_photons))
+            rixs_map = np.zeros((len(xi), nr_incoming_photons))
 
         assert_msg_critical(
             len(xi_tmp) == len(xi),
@@ -836,15 +837,34 @@ def plot_rixs_map(rixs_results,
         rixs_map[:, i] = yi_tmp
 
     # rows = incoming photon energies, cols = loss/emission
-    Z = rixs_map.T
+    rixs_map_T = rixs_map.T
 
-    ymin_map = incoming_ev.min()
-    ymax_map = incoming_ev.max()
+    if normalize is not None and normalize is not False:
+        normalize = normalize.lower()
+
+        if normalize == 'global_max':
+            max_intensity = np.max(rixs_map_T)
+
+            assert_msg_critical(
+                max_intensity > 0.0,
+                'plot_rixs_map: Cannot normalize RIXS map because maximum intensity is zero.'
+            )
+
+            rixs_map_T /= max_intensity
+
+        else:
+            assert_msg_critical(
+                False,
+                'plot_rixs_map: Invalid normalize option. Use None or "global_max".'
+            )
+
+    ymin_map = incoming_photon_energies_ev.min()
+    ymax_map = incoming_photon_energies_ev.max()
 
     limits = [xi.min(), xi.max(), ymin_map, ymax_map]
 
     im = ax_map.imshow(
-        Z,
+        rixs_map_T,
         extent=limits,
         origin='lower',
         aspect='auto',
@@ -876,7 +896,7 @@ def plot_rixs_map(rixs_results,
     offset_text.set_ha('left')
 
     cbar.set_label(
-        r'Intensity, $ \text{d} \sigma / \text{d} \omega $ [$a_0^2$ eV$^{-1}$]'
+        r'Intensity [arb. units]'
     )
 
     if energy_loss:
@@ -918,7 +938,7 @@ def plot_rixs_map(rixs_results,
 
     ax_xas.plot(xas_y, xas_x, lw=2.5, color='black')
     ax_xas.fill_betweenx(xas_x, 0.0, xas_y, alpha=0.2, color='black')
-    ax_xas.barh(core_eigvals_ev, core_osc_strs, height=0.025, color='darkcyan', alpha=0.7)
+    ax_xas.barh(core_eigvals_ev, core_osc_strs, height=0.05, color='darkcyan', alpha=0.7)
 
     ax_xas.set_title('XAS')
     ax_xas.set_xlabel('Intensity')

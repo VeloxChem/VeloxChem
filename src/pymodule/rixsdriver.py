@@ -1222,7 +1222,8 @@ class RixsDriver(LinearSolver):
                 x_unit='ev',
                 energy_loss=True,
                 min_photon_points=10,
-                colormap='cividis',
+                colormap='viridis',
+                normalize='global_max',
                 ax=None):
         """
         Plot the 2D RIXS map together with the corresponding XAS spectrum.
@@ -1244,17 +1245,22 @@ class RixsDriver(LinearSolver):
             Minimum number of incoming photon energies required for a meaningful map.
         :param colormap:
             The colormap to use for the RIXS map.
+        :param normalize:
+            Normalization method for the RIXS map.
+            'global_max': normalize by the global maximum of the RIXS intensities -> range of intensity [0-1] (default).
         :param ax:
             If None, new axes are created.
             Otherwise pass a tuple (ax_map, ax_xas).
         """
 
-        n_photons = len(np.asarray(results['elastic_emission']))
+        # the elastic emission energies correspond to the incoming photon energies,
+        # i.e., the x-axis of the XAS spectrum
+        nr_incoming_photons = len(np.asarray(results['elastic_emission']))
 
         assert_msg_critical(
-            n_photons >= min_photon_points,
-            'plot_map: too few incoming photon energies for a meaningful 2D RIXS map. '
-            'Use plot_spectrum(..., photon_index=[...]) for stacked slices instead.'
+            nr_incoming_photons >= min_photon_points,
+            f'plot_map: too few incoming photon energies for a meaningful 2D RIXS map.'
+            f' (min: {min_photon_points}, got: {nr_incoming_photons})'
         )
 
         return plot_rixs_map(
@@ -1265,5 +1271,6 @@ class RixsDriver(LinearSolver):
             x_unit=x_unit,
             energy_loss=energy_loss,
             cmap=colormap,
+            normalize=normalize,
             ax=ax
         )
