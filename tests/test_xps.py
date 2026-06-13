@@ -51,7 +51,7 @@ class TestXpsDriver:
             assert record['contribution'] == pytest.approx(0.6004496392,
                                                            abs=1.0e-6)
             assert record['ionization_energy_ev'] == pytest.approx(539.249,
-                                                                    abs=1.0e-2)
+                                                                   abs=1.0e-2)
             assert record['is_delocalized'] is True
 
     @staticmethod

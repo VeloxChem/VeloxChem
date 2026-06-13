@@ -6,7 +6,6 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.molecule import Molecule
 from veloxchem.veloxchemlib import BlockedGtoPairBlock
 from veloxchem.veloxchemlib import T4CScreener
-from veloxchem.veloxchemlib import make_gto_blocks
 from veloxchem.veloxchemlib import make_gto_pair_blocks
 
 

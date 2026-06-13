@@ -1,4 +1,3 @@
-from pathlib import Path
 import numpy as np
 
 from veloxchem import ThreeCenterOverlapDriver
@@ -15,7 +14,7 @@ class TestThreeCenterOverlapDriver:
 
         h2str = """
          H   0.0   0.0   0.0
-         H   0.3   0.2   1.0   
+         H   0.3   0.2   1.0
         """
         mol = Molecule.read_str(h2str, 'au')
 

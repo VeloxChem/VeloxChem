@@ -299,12 +299,12 @@ class TestTDA:
 
         for key in rsp_keywords:
             assert self.normalize_setting(getattr(second_drv,
-                                                 key)) == self.normalize_setting(
-                                                     getattr(driver, key))
+                                                  key)) == self.normalize_setting(
+                                                      getattr(driver, key))
         for key in method_keywords:
             assert self.normalize_setting(getattr(second_drv,
-                                                 key)) == self.normalize_setting(
-                                                     getattr(driver, key))
+                                                  key)) == self.normalize_setting(
+                                                      getattr(driver, key))
 
         third_drv = TdaEigenSolver()
         third_drv.ostream.mute()

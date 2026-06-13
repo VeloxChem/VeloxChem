@@ -11,7 +11,6 @@ from mpi4py import MPI
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
-from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.resultsio import read_results
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.vibrationalanalysis import VibrationalAnalysis
