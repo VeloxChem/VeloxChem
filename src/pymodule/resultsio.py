@@ -378,6 +378,22 @@ def write_opt_results_to_hdf5(fname, opt_results):
                           value_label='optimization result')
 
 
+def write_rixs_results_to_hdf5(fname, rixs_results):
+    """
+    Writes optimization results to HDF5 file.
+
+    :param fname:
+        Name of the HDF5 file.
+    :param rixs_results:
+        The dictionary containing RIXS results.
+    """
+
+    write_results_to_hdf5(fname,
+                          'rixs',
+                          rixs_results,
+                          value_label='rixs result')
+
+
 def write_rsp_solution(fname, key, vec, group_label='rsp'):
     """
     Writes a response solution vector to HDF5 file.

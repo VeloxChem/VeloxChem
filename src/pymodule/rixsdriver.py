@@ -44,6 +44,7 @@ from .linearsolver import LinearSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .tdaeigensolver import TdaEigenSolver
 from .errorhandler import assert_msg_critical
+from .resultsio import write_rixs_results_to_hdf5
 
 
 class RixsDriver(LinearSolver):
@@ -116,7 +117,7 @@ class RixsDriver(LinearSolver):
                 ('float', 'angle between incident polarization vector and ' +
                     'outgoing propagation vector'),
             'gamma': ('float', 'broadening term (FWHM)'),
-            'photon_energy': ('list', 'list of incoming photon energies'),
+            'photon_energy': ('seq_range', 'list of incoming photon energies'),
             'final_state_cutoff':
                 ('float', 'energy window of final states to include'),
             'nstates': ('int', 'number of excited states'),
@@ -142,35 +143,6 @@ class RixsDriver(LinearSolver):
 
         if method_dict is None:
             method_dict = {}
-
-        key = 'photon_energy'
-        if key in rsp_dict:
-            val = rsp_dict[key]
-
-            if isinstance(val, (list, tuple, np.ndarray)):
-                if len(val) == 0:
-                    raise ValueError(
-                        'RixsDriver.update_settings: photon_energy must '
-                        'contain at least one numeric value.')
-                try:
-                    rsp_dict[key] = [float(str(x).strip()) for x in val]
-                except ValueError as exc:
-                    raise ValueError(
-                        'RixsDriver.update_settings: Invalid photon_energy '
-                        'value. Expected numeric values.') from exc
-
-            elif isinstance(val, str):
-                parts = val.replace(',', ' ').split()
-                if len(parts) == 0:
-                    raise ValueError(
-                        'RixsDriver.update_settings: photon_energy must '
-                        'contain at least one numeric value.')
-                try:
-                    rsp_dict[key] = [float(x) for x in parts]
-                except ValueError as exc:
-                    raise ValueError(
-                        'RixsDriver.update_settings: Invalid photon_energy '
-                        'value. Expected numeric values.') from exc
 
         super().update_settings(rsp_dict, method_dict)
 
@@ -558,20 +530,14 @@ class RixsDriver(LinearSolver):
         }
 
         if self.filename is not None and self.rank == mpi_master():
-            self.ostream.print_info('Writing to files...')
-            self.ostream.print_blank()
-            self.ostream.flush()
-            self._write_hdf5(self.filename)
+            final_h5_fname = self.filename + ".h5"
+            self._write_hdf5(final_h5_fname, results_dict)
 
         if not init_photon_set:
             self.photon_energy = None
 
-        if self.rank == mpi_master():
-            self.ostream.print_info('...done.')
-            self.ostream.print_blank()
-            self.ostream.flush()
-
         return results_dict
+
 
     def _first_core_energy(self, rsp_results):
         """
@@ -895,52 +861,28 @@ class RixsDriver(LinearSolver):
         )
         return gs_to_core, core_to_val
 
-    def _write_hdf5(self, fname):
+    def _write_hdf5(self, fname, rixs_results):
         """
         Writes the RIXS results to the specified output file in h5
         format. The h5 file saved contains the following datasets:
 
-        - photon_energies
-            The incoming photon energies (w, or omega), at which the RIXS amplitudes
-            are computed and so also the cross-sections.
-        - cross_sections
-            The RIXS cross-sections per photon energy (w, or omega), per final state (f),
-            with shape: (f,w).
-        - emission_energies
-            The outgoing, or scattered, photon energy.
-        - energy_losses
-            The energy (> 0) which the molecule is left with, i.e., incoming - outgoing.
-        - elastic_cross_sections
-            The cross-section for elastic scattering, i.e., energy loss = 0.
-        - scattering_amplitudes
-            The scattering ampltitude tensor, with shape: (f,w,x,y).
-
         :param fname:
-            Name of the h5 file.
+            Name of the HDF5 file.
+        :param rixs_results:
+            The dictionary of rixs results.
         """
 
-        if not fname:
-            raise ValueError('No filename given to _write_hdf5()')
+        if (fname and isinstance(fname, str) and Path(fname).is_file()):
 
-        fpath = Path(fname)
-        if fpath.suffix != '.h5':
-            fpath = fpath.with_suffix('.h5')
+            write_rixs_results_to_hdf5(fname, rixs_results)
 
-        # Save all the internal data to the h5 datafile named 'fname'
-        with h5py.File(fpath, 'a') as hf:
-            datasets = {
-                'rixs/photon_energies': self.photon_energy,
-                'rixs/cross_sections': self.cross_sections,
-                'rixs/emission_energies': self.emission_enes,
-                'rixs/energy_losses': self.ene_losses,
-                'rixs/elastic_cross_sections': self.elastic_cross_sections,
-                'rixs/scattering_amplitudes': self.scattering_amplitudes,
-            }
+            valstr = 'RIXS results written to file: '
+            valstr += fname
+            self.ostream.print_info(valstr)
+            self.ostream.print_blank()
+            self.ostream.flush()
 
-            for name, data in datasets.items():
-                if name in hf:
-                    del hf[name]
-                hf.create_dataset(name, data=data)
+
 
     def _print_header(self, molecule, basis):
         """
