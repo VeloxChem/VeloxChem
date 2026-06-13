@@ -548,7 +548,7 @@ class RixsDriver(LinearSolver):
         results_dict = {
             'cross_sections': self.cross_sections,
             'elastic_cross_sections': self.elastic_cross_sections,
-            'elastic_emission': self.photon_energy,
+            'photon_energies': self.photon_energy,
             'scattering_amplitudes': self.scattering_amplitudes,
             'emission_energies': self.emission_enes,
             'energy_losses': self.ene_losses,
@@ -1128,19 +1128,16 @@ class RixsDriver(LinearSolver):
         self.ostream.flush()
 
     def plot(self,
-            results,
-            broadening_type="lorentzian",
-            broadening_value_ev=0.24,
-            x_unit='ev',
-            x_step=1e-3,
-            energy_loss=True,
-            photon_index=None,
-            photon_energy_ev=None,
-            ax=None):
+             results,
+             broadening_type="lorentzian",
+             broadening_value_ev=0.24,
+             x_unit='ev',
+             x_step=1e-3,
+             energy_loss=True,
+             photon_energy_ev=None,
+             ax=None):
         """
         Plot the RIXS spectrum.
-
-        Specify either photon_index or photon_energy, not both.
 
         :param results:
             The results dictionary from compute method.
@@ -1155,55 +1152,30 @@ class RixsDriver(LinearSolver):
         :param energy_loss:
             If True, plot versus energy loss.
             If False, plot versus emission energy.
-        :param photon_index:
-            Integer index of the input energies.
         :param photon_energy_ev:
-            Photon energy in eV. The closest
+            Incoming photon energy in eV. The closest
             available calculated photon energy is used.
         :param ax:
             The matplotlib axis to plot on.
 
-        :return:
-            The matplotlib axis object.
         """
 
-        assert_msg_critical(
-            not (photon_index is not None and photon_energy_ev is not None),
-            'plot_spectrum: specify only one of photon_index or photon_energy_ev.'
-        )
-
-        nr_incoming_photons = len(results['elastic_emission'])
-
-        # if given as energy, find the closest calculated photon energy index
         if photon_energy_ev is not None:
-            incoming_photon_energies_ev = np.asarray(results['elastic_emission']) * hartree_in_ev()
+            # Find the closest calculated photon energy index
+            incoming_photon_energies_ev = np.asarray(results['photon_energies']) * hartree_in_ev()
             photon_index = int(np.argmin(np.abs(incoming_photon_energies_ev - float(photon_energy_ev))))
             closest_energy_ev = incoming_photon_energies_ev[photon_index]
 
             if abs(closest_energy_ev - photon_energy_ev) > 0.1:
                 self.ostream.print_warning(
-                    f'plot_spectrum: requested photon energy {photon_energy_ev} eV is far '
-                    f'from the closest calculated photon energy {closest_energy_ev:.2f} eV.'
-                )
-            else:
-                self.ostream.print_info(
-                    f'plot_spectrum: photon_energy_ev={photon_energy_ev} eV,'
-                    f' closest calculated photon energy is {closest_energy_ev:.2f} eV (index: {photon_index}).'
+                    f'{type(self).__name__}: requested photon energy {photon_energy_ev} eV is more '
+                    f'than 0.1 eV far from the closest calculated photon energy {closest_energy_ev:.2f} eV.'
                 )
             self.ostream.flush()
-
-        elif photon_index is None:
+        else:
             photon_index = 0
 
-        else:
-            photon_index = int(photon_index)
-
-        assert_msg_critical(
-            0 <= photon_index < nr_incoming_photons,
-            'plot_spectrum: photon_index out of range.'
-        )
-
-        return plot_rixs_spectrum(
+        plot_rixs_spectrum(
             results,
             broadening_type=broadening_type,
             broadening_value=broadening_value_ev,
@@ -1213,18 +1185,18 @@ class RixsDriver(LinearSolver):
             energy_loss=energy_loss,
             ax=ax
         )
-        
+
     def plot_map(self,
-                results,
-                broadening_type="lorentzian",
-                broadening_value_ev=0.24,
-                x_step=1e-3,
-                x_unit='ev',
-                energy_loss=True,
-                min_photon_points=10,
-                colormap='viridis',
-                normalize='global_max',
-                ax=None):
+                 results,
+                 broadening_type="lorentzian",
+                 broadening_value_ev=0.24,
+                 x_step=1e-3,
+                 x_unit='ev',
+                 energy_loss=True,
+                 min_photon_points=10,
+                 colormap='viridis',
+                 normalize='global_max',
+                 ax=None):
         """
         Plot the 2D RIXS map together with the corresponding XAS spectrum.
 
@@ -1253,17 +1225,16 @@ class RixsDriver(LinearSolver):
             Otherwise pass a tuple (ax_map, ax_xas).
         """
 
-        # the elastic emission energies correspond to the incoming photon energies,
-        # i.e., the x-axis of the XAS spectrum
-        nr_incoming_photons = len(np.asarray(results['elastic_emission']))
+        # incoming photon energies
+        nr_incoming_photons = len(np.asarray(results['photon_energies']))
 
         assert_msg_critical(
             nr_incoming_photons >= min_photon_points,
-            f'plot_map: too few incoming photon energies for a meaningful 2D RIXS map.'
+            f'{type(self).__name__}: too few incoming photon energies for a meaningful 2D RIXS map.'
             f' (min: {min_photon_points}, got: {nr_incoming_photons})'
         )
 
-        return plot_rixs_map(
+        plot_rixs_map(
             results,
             broadening_type=broadening_type,
             broadening_value=broadening_value_ev,
