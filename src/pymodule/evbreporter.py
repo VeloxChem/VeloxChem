@@ -31,6 +31,8 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from importlib.metadata import version
+import re
+
 import numpy as np
 from pathlib import Path
 
@@ -65,7 +67,15 @@ class EvbReporter:
         self.ostream = outputstream
         self.debug = debug
         # OpenMM HIP version is slighly older and uses a different format for reporters
-        if version('openmm') < '8.2':
+        raw_openmm_version = version('openmm')
+        match = re.match(r"^(\d+)\.(\d+)", raw_openmm_version)
+        if not match:
+            raise RuntimeError(
+                "Cannot parse required major.minor version from "
+                f"OpenMM: {raw_openmm_version!r}"
+            )
+        openmm_version = int(match.group(1)), int(match.group(2))
+        if openmm_version < (8, 2):
             if not append:
                 outputstream.print_info(
                     'Older version of OpenMM detected. Using tuple format for returning reporter information.'

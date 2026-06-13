@@ -30,9 +30,12 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from importlib.metadata import version
+import re
+import sys
+
 from mpi4py import MPI
 import numpy as np
-import sys
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
@@ -410,7 +413,28 @@ class EnsembleParser:
             raise ValueError("qm_multiplicity must be a positive integer")
 
         if trajectory_file.lower().endswith(".pdb"):
-            mda_universe = mda.Universe(trajectory_file, guess_bonds=True)
+            raw_mda_version = version("MDAnalysis")
+            match = re.match(r"^(\d+)\.(\d+)", raw_mda_version)
+            if not match:
+                raise RuntimeError(
+                    "Cannot parse required major.minor version from "
+                    f"MDAnalysis: {raw_mda_version!r}"
+                )
+            mda_version = int(match.group(1)), int(match.group(2))
+            if mda_version >= (2, 8):
+                # https://docs.mdanalysis.org/2.8.0/documentation_pages/core/universe.html
+                # The `guess_bonds` keyword is deprecated and will be removed in MDAnalysis 3.0.
+                # Please pass ("bonds", "angles", "dihedrals") into to_guess or force_guess
+                # instead to guess bonds, angles, and dihedrals respectively.
+                mda_universe = mda.Universe(
+                    trajectory_file,
+                    to_guess=("bonds", "angles", "dihedrals"),
+                )
+            else:
+                mda_universe = mda.Universe(
+                    trajectory_file,
+                    guess_bonds=True,
+                )
         else:
             if topology_file is None:
                 raise ValueError("topology_file is required unless trajectory_file is a .pdb")
