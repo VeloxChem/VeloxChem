@@ -383,7 +383,7 @@ class EnsembleParser:
             raise ValueError(
                 "Provide either pdb_file or trajectory_file, not both"
             )
- 
+
         if pdb_file is not None:
             pdb_file = str(pdb_file)
             if not pdb_file.lower().endswith(".pdb"):
@@ -392,7 +392,7 @@ class EnsembleParser:
 
         if trajectory_file is None:
             raise ValueError("Either pdb_file or trajectory_file must be provided")
-        
+
         trajectory_file = str(trajectory_file)
 
         assert_msg_critical(

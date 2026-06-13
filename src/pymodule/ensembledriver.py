@@ -361,10 +361,10 @@ class EnsembleDriver:
             )
 
         resolved_atom = self._resolve_atom_name_for_npe_db(
-            raw_atom, 
+            raw_atom,
             db[db_resn].keys(),
             db_resn,
-            )
+        )
         if resolved_atom is None:
             raise KeyError(
                 f"No NPE charge for {raw_resn}/{raw_atom}. "
@@ -566,9 +566,10 @@ class EnsembleDriver:
 
     @staticmethod
     def _resolve_atom_name_for_npe_db(
-        atom_name: str, 
+        atom_name: str,
         available_atoms,
-        resname: str) -> str | None: 
+        resname: str,
+    ) -> str | None:
         """
         Resolve CHARMM-style atom names to names present in the NPE database.
 
@@ -631,19 +632,26 @@ class EnsembleDriver:
                 return cand
 
         return None
-    
+
     @staticmethod
     def _normalize_resname_for_pe_db(db: dict, resname: str) -> str:
         """
         This bridges common water residue naming differences, i.e. TIP3/TIP3P
         in CHARMM/GROMACS topologies vs WAT in SEP PE table.
+
+        :param db:
+            The PE database to check against.
+        :param resname:
+            The residue name to normalize.
+        :return:
+            The normalized residue name.
         """
 
         resname = str(resname)
 
         if resname in db:
             return resname
-        
+
         res_alias = {
             "TIP3": "WAT",
             "TIP3P": "WAT",
@@ -652,14 +660,15 @@ class EnsembleDriver:
         mapped = res_alias.get(resname, resname)
         if mapped in db:
             return mapped
-        
+
         return resname
 
     @staticmethod
     def _resolve_atom_name_for_pe_db(
-        atom_name: str, 
+        atom_name: str,
         available_atoms,
-        resname: str) -> str | None:
+        resname: str,
+    ) -> str | None:
         """
         Resolve atom names to names present in the PE database.
 
@@ -1073,7 +1082,7 @@ class EnsembleDriver:
                     )
                     for atom in pattern_atoms:
                         resolved_atom = self._resolve_atom_name_for_pe_db(
-                            atom, 
+                            atom,
                             pe_db[db_resn].keys(),
                             db_resn,
                         )
