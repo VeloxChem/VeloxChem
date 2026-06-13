@@ -12,6 +12,7 @@ from veloxchem.cppsolver import ComplexResponseSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.resultsio import (read_results, write_results_to_hdf5,
                                  write_scf_results_to_hdf5)
+from veloxchem.rixsdriver import RixsDriver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.vibrationalanalysis import VibrationalAnalysis
 
@@ -589,3 +590,35 @@ def test_vib_results_hdf5_roundtrip_with_water_calculation(tmp_path):
         _assert_roundtrip_equal(vib_results, recovered)
         assert 'basis_set' not in recovered
         assert 'nuclear_charges' not in recovered
+
+def test_rixs_results_hdf5_roundtrip_with_water_calculation(tmp_path):
+    here = Path(__file__).parent
+    inpfile = str(here / 'data' / 'water_rixs_scf.inp')
+
+    task = MpiTask([inpfile, None])
+    filename = str(tmp_path / 'water_rixs_results')
+    filename = task.mpi_comm.bcast(filename, root=mpi_master())
+
+    scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+    scf_drv.filename = filename
+    scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+    rixs_drv = RixsDriver()
+    rixs_drv.update_settings({
+        'num_core_orbitals': 1,
+        'num_core_states': 5,
+        'photon_energy': '20.17505501',
+        'nstates': 15,
+        'gamma': 0.00587,
+        'theta': 0,
+        'filename': filename,
+    }, {})
+    rixs_drv.ostream.mute()
+    rixs_results = rixs_drv.compute(task.molecule, task.ao_basis, scf_results)
+
+    if task.mpi_rank == mpi_master():
+        recovered = read_results(f'{filename}.h5', 'rixs')
+        _assert_roundtrip_equal(rixs_results, recovered)
+        assert 'basis_set' not in recovered
+        assert 'nuclear_charges' not in recovered
+
