@@ -897,7 +897,7 @@ def plot_rixs_map(rixs_results,
     offset_text.set_ha('left')
 
     cbar.set_label(
-        r'Normalized intensity [arb. units]'
+        r'Intensity [arb. units]'
     )
 
     if energy_loss:
