@@ -1132,7 +1132,7 @@ class RixsDriver(LinearSolver):
                  results,
                  broadening_type="lorentzian",
                  broadening_value_ev=0.24,
-                 x_step=1e-3,
+                 x_step=1e-2,
                  x_unit='ev',
                  energy_loss=True,
                  min_photon_points=10,
