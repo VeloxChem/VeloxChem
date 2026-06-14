@@ -5,8 +5,9 @@ import h5py
 import numpy as np
 import pytest
 
-from veloxchem import (Molecule, MolecularBasis, OptimizationDriver, MpiTask,
-                       OutputStream, ScfGradientDriver, ScfRestrictedDriver,
+from veloxchem import (__version__, Molecule, MolecularBasis,
+                       OptimizationDriver, MpiTask, OutputStream,
+                       ScfGradientDriver, ScfRestrictedDriver,
                        ScfUnrestrictedDriver, mpi_master)
 from veloxchem.cppsolver import ComplexResponseSolver
 from veloxchem.c6driver import C6Driver
@@ -14,7 +15,8 @@ from veloxchem.errorhandler import VeloxChemError
 from veloxchem.lrsolver import LinearResponseSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.lrsolverunrest import LinearResponseUnrestrictedSolver
-from veloxchem.resultsio import (read_results, write_results_to_hdf5,
+from veloxchem.resultsio import (create_hdf5, read_results,
+                                 write_results_to_hdf5,
                                  write_rsp_full_solution_to_hdf5,
                                  write_rsp_results_to_hdf5,
                                  write_scf_results_to_hdf5)
@@ -36,6 +38,20 @@ def _get_water_and_basis():
     basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
 
     return molecule, basis
+
+
+def test_create_hdf5_stores_veloxchem_version(tmp_path):
+
+    if MPI.COMM_WORLD.Get_rank() != mpi_master():
+        return
+
+    molecule, basis = _get_water_and_basis()
+    h5file = Path(tmp_path) / 'results.h5'
+
+    create_hdf5(str(h5file), molecule, basis, 'hf', '')
+
+    with h5py.File(h5file, 'r') as h5f:
+        assert h5f.attrs['veloxchem_version'] == __version__
 
 
 def _run_water_rsp_roundtrip(tmp_path, solver_cls, save_solutions=True):

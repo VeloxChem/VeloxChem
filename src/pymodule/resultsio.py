@@ -35,6 +35,7 @@ import numbers
 import numpy as np
 import h5py
 
+from ._version import __version__
 from .errorhandler import assert_msg_critical
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
@@ -262,6 +263,7 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
 
     if valid_checkpoint:
         hf = h5py.File(fname, 'w')
+        hf.attrs['veloxchem_version'] = __version__
 
         e_nuc = molecule.effective_nuclear_repulsion_energy(basis)
 

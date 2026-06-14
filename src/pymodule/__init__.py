@@ -245,6 +245,9 @@ from .oneeints import compute_linear_momentum_integrals
 from .oneeints import compute_angular_momentum_integrals
 from .resultsio import read_molecule_and_basis, read_results
 
+# Version
+from ._version import __version__
+
 # Environment variable: basis set path, number of OpenMP threads
 from .environment import (set_vlxbasispath, get_basis_path, set_vlxdatapath,
                           get_data_path, set_omp_num_threads)
@@ -252,5 +255,3 @@ from .environment import (set_vlxbasispath, get_basis_path, set_vlxdatapath,
 set_vlxbasispath()
 set_vlxdatapath()
 set_omp_num_threads()
-
-__version__ = "1.0rc4"
