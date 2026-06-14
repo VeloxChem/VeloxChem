@@ -49,8 +49,9 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
 from .errorhandler import assert_msg_critical
 from .mathutils import screened_eigh, symmetric_matrix_function
 from .checkpoint import check_rsp_hdf5
-from .resultsio import (write_lr_rsp_results_to_hdf5,
-                        write_detach_attach_to_hdf5, write_rsp_solution)
+from .resultsio import (write_rsp_results_to_hdf5,
+                        write_detach_attach_to_hdf5, clear_group_in_hdf5,
+                        write_rsp_full_solution_to_hdf5)
 
 
 class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
@@ -568,6 +569,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                 # final h5 file for response solutions
                 if self.filename is not None:
                     final_h5_fname = f'{self.filename}.h5'
+                    # clear stale group in final h5
+                    clear_group_in_hdf5(final_h5_fname, 'rsp')
                 else:
                     final_h5_fname = None
 
@@ -789,10 +792,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
 
                     # write response solutions to h5 file
                     if (self.save_solutions and final_h5_fname is not None):
-                        write_rsp_solution(final_h5_fname,
-                                           'S{:d}(a)'.format(s + 1), eigvec_a)
-                        write_rsp_solution(final_h5_fname,
-                                           'S{:d}(b)'.format(s + 1), eigvec_b)
+                        write_rsp_full_solution_to_hdf5(
+                            final_h5_fname, eigvec_full, s, self.nstates)
 
                     # save excitation details
                     excitation_details.append(
@@ -825,6 +826,19 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                         'number_of_states': self.nstates,
                     }
 
+                    if (self.save_solutions and
+                            final_h5_fname is not None):
+                        full_solutions_keys = [
+                            'S{:d}'.format(s + 1)
+                            for s in range(self.nstates)
+                        ]
+                        write_rsp_results_to_hdf5(
+                            final_h5_fname,
+                            {'full_solutions_keys': full_solutions_keys})
+
+                    # add rsp type
+                    ret_dict.update({'rsp_type': 'rpa'})
+
                     if self.nto:
                         ret_dict['nto_lambdas_a'] = nto_lambdas_a
                         ret_dict['nto_lambdas_b'] = nto_lambdas_b
@@ -845,17 +859,13 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                         self.ostream.print_blank()
                         self.ostream.flush()
 
-                        # Keep the legacy rsp HDF5 layout for compatibility.
-                        # Solution vectors are written separately as S1/S2/...
-                        # datasets, so the distributed in-memory vectors do not
-                        # belong in this HDF5-facing payload.
+                    if final_h5_fname is not None:
                         h5_ret_dict = {
                             key: value
                             for key, value in ret_dict.items()
                             if key != 'eigenvectors_distributed'
                         }
-                        write_lr_rsp_results_to_hdf5(final_h5_fname,
-                                                     h5_ret_dict)
+                        write_rsp_results_to_hdf5(final_h5_fname, h5_ret_dict)
 
                     self._print_results(ret_dict)
 
@@ -1255,35 +1265,32 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
         if 'eigenvectors_distributed' in rsp_results:
             eigvec_full = self.get_full_solution_vector(
                 rsp_results['eigenvectors_distributed'][state_index - 1])
-            if self.rank == mpi_master():
-                # Split eigenvector into alpha and beta components
-                n_ov_a = mo_occ_a.shape[1] * mo_vir_a.shape[1]
-                n_ov_b = mo_occ_b.shape[1] * mo_vir_b.shape[1]
-                eigvec_a = np.hstack((
-                    eigvec_full[:n_ov_a],
-                    eigvec_full[n_ov_a + n_ov_b:n_ov_a + n_ov_b + n_ov_a],
-                ))
-                eigvec_b = np.hstack((
-                    eigvec_full[n_ov_a:n_ov_a + n_ov_b],
-                    eigvec_full[n_ov_a + n_ov_b + n_ov_a:],
-                ))
-            else:
-                eigvec_a = None
-                eigvec_b = None
         else:
             if self.rank == mpi_master():
                 # for rsp_results read from h5 file
-                label_a = state_label + '(a)'
-                label_b = state_label + '(b)'
                 assert_msg_critical(
-                    label_a in rsp_results and label_b in rsp_results,
+                    state_label in rsp_results,
                     f'{type(self).__name__}: No eigenvector found for {state_label}'
                 )
-                eigvec_a = rsp_results[label_a].copy()
-                eigvec_b = rsp_results[label_b].copy()
+                eigvec_full = rsp_results[state_label].copy()
             else:
-                eigvec_a = None
-                eigvec_b = None
+                eigvec_full = None
+
+        if self.rank == mpi_master():
+            # Split eigenvector into alpha and beta components
+            n_ov_a = mo_occ_a.shape[1] * mo_vir_a.shape[1]
+            n_ov_b = mo_occ_b.shape[1] * mo_vir_b.shape[1]
+            eigvec_a = np.hstack((
+                eigvec_full[:n_ov_a],
+                eigvec_full[n_ov_a + n_ov_b:n_ov_a + n_ov_b + n_ov_a],
+            ))
+            eigvec_b = np.hstack((
+                eigvec_full[n_ov_a:n_ov_a + n_ov_b],
+                eigvec_full[n_ov_a + n_ov_b + n_ov_a:],
+            ))
+        else:
+            eigvec_a = None
+            eigvec_b = None
 
         if self.rank == mpi_master():
             # Build transition density matrices in MO basis (RPA)

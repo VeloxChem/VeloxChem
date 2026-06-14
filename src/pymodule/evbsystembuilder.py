@@ -50,6 +50,7 @@ from .molecule import Molecule
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_arccos
 from .waterparameters import get_water_parameters
+from .gbimplicitsolvent import GBImplicitSolvent
 
 try:
     import openmm as mm
@@ -159,6 +160,20 @@ class EvbSystemBuilder:
         self.water_model: str
         self.decompose_bonded = True
         self.decompose_nb: list | None = None
+
+        self.implicit_solvent_model: str | None = None
+        self.solute_dielectric: float = 1.0
+        self.solvent_dielectric: float = 78.39
+
+        # Conformational TS parameters.  Set by build_systems when
+        # 'conformer_active_torsion' is present in the configuration dict.
+        # conformer_active_torsion is handled outside the keywords loop
+        # because it is a tuple rather than a plain scalar.
+        self.conformer_active_torsion: tuple | None = None
+        self.conformer_phi_reactant: float = 0.0
+        self.conformer_phi_product: float = 0.0
+        self.conformer_k: float = 200.0
+
         self.keywords = {
             "temperature": float,  # -> system dependent
             "nb_cutoff": float,  # ->
@@ -197,6 +212,12 @@ class EvbSystemBuilder:
             "CNT_radius_nm": float,
             "decompose_nb": list,
             "decompose_bonded": bool,
+            "implicit_solvent_model": str,
+            "solute_dielectric": float,
+            "solvent_dielectric": float,
+            "conformer_phi_reactant": float,
+            "conformer_phi_product": float,
+            "conformer_k": float,
         }
 
     def build_systems(
@@ -227,6 +248,12 @@ class EvbSystemBuilder:
             else:
                 self.ostream.print_info(
                     f"{keyword}: {getattr(self, keyword)} (default)")
+        # conformer_active_torsion is a tuple, handled separately
+        if 'conformer_active_torsion' in configuration:
+            self.conformer_active_torsion = tuple(
+                configuration['conformer_active_torsion'])
+            self.ostream.print_info(
+                f"conformer_active_torsion: {self.conformer_active_torsion}")
         self.ostream.flush()
         self.reactant = reactant
         self.product = product
@@ -287,6 +314,17 @@ class EvbSystemBuilder:
 
         if self.pressure > 0:
             barostat_not_used = self._add_barostat(system)
+
+        if self.implicit_solvent_model is not None:
+            assert_msg_critical(
+                not self.solvent,
+                'EvbSystemBuilder: implicit_solvent_model and solvent (explicit) '
+                'cannot be used simultaneously.')
+            assert_msg_critical(
+                not self.CNT and not self.graphene,
+                'EvbSystemBuilder: implicit_solvent_model is not compatible '
+                'with CNT or graphene environments.')
+            self._add_implicit_solvent(system, topology, nb_force)
 
         E_field = None
         if np.any(np.array(self.E_field) > 0.001):
@@ -1192,8 +1230,56 @@ class EvbSystemBuilder:
         system.addForce(barostat)
         return barostat
 
+    def _add_implicit_solvent(self, system, topology, nb_force):
+        """Add a GB implicit solvent force to the system.
+
+        :param system: the OpenMM System to add the force to.
+        :param topology: the OpenMM Topology (all atoms must already be added).
+        :param nb_force: the NonbondedForce already present in the system.
+        """
+        assert_msg_critical('openmm' in sys.modules,
+                            'openmm is required for EvbSystemBuilder.')
+
+        model = self.implicit_solvent_model
+        assert_msg_critical(
+            model.lower() in GBImplicitSolvent.get_valid_models(),
+            f'EvbSystemBuilder: unknown implicit_solvent_model "{model}". '
+            f'Valid options are: {list(GBImplicitSolvent.get_valid_models())}')
+
+        gb_force = GBImplicitSolvent.build(
+            model=model,
+            topology=topology,
+            nb_force=nb_force,
+            sv_dielectric=self.solvent_dielectric,
+            sl_dielectric=self.solute_dielectric,
+        )
+
+        # Required by OpenMM when GB is active: set reaction-field dielectric
+        # of the NonbondedForce to 1 so it does not double-count dielectric
+        # screening.
+        nb_force.setReactionFieldDielectric(1)
+
+        system.addForce(gb_force)
+        self.ostream.print_info(
+            f'Added implicit solvent ({model}) with '
+            f'solvent_dielectric={self.solvent_dielectric}, '
+            f'solute_dielectric={self.solute_dielectric}')
+        self.ostream.flush()
+
     def _interpolate_system(self, system, lambda_vec, nb_force, E_field_force):
         systems = {}
+
+        # Locate the GB force once so we can keep its per-particle charges in
+        # sync with the interpolated NB charges before each deepcopy.
+        gb_force = None
+        if self.implicit_solvent_model is not None:
+            gb_candidates = [
+                f for f in system.getForces()
+                if isinstance(f, mm.CustomGBForce)
+            ]
+            if gb_candidates:
+                gb_force = gb_candidates[0]
+
         for lam in lambda_vec:
             total_charge = 0
             if not self.no_reactant:
@@ -1220,6 +1306,15 @@ class EvbSystemBuilder:
 
                     nb_force.setParticleParameters(self.reaction_atoms[i].index,
                                                    charge, sigma, epsilon)
+
+                    # Mirror the interpolated charge into the GB force so each
+                    # deepcopy carries the correct lambda-dependent charge.
+                    if gb_force is not None:
+                        atom_index = self.reaction_atoms[i].index
+                        gb_params = list(
+                            gb_force.getParticleParameters(atom_index))
+                        gb_params[0] = charge
+                        gb_force.setParticleParameters(atom_index, gb_params)
 
             # Add the interpolated charge to the E_field for both the system and environment
             for i in range(system.getNumParticles()):
@@ -1281,7 +1376,7 @@ class EvbSystemBuilder:
         angle = self._create_harmonic_angle_forces(lam, model_broken=False)
 
         # angle, angle_integration = self._create_angle_forces(lam)
-        torsion = self._create_proper_torsion_forces(lam)
+        torsion_forces = self._create_proper_torsion_forces(lam, pes=pes)
         improper = self._create_improper_torsion_forces(lam)
 
         if not pes:
@@ -1328,7 +1423,8 @@ class EvbSystemBuilder:
 
         system.addForce(static_bonded_harmonic)
         system.addForce(angle)
-        system.addForce(torsion)
+        for torsion_force in torsion_forces:
+            system.addForce(torsion_force)
         system.addForce(improper)
         system.addForce(bond_constraint)
         system.addForce(constant_force)
@@ -1728,8 +1824,20 @@ class EvbSystemBuilder:
             self._add_angle(harmonic_force, atom_ids, eq, fc)
         return harmonic_force
 
-    def _create_proper_torsion_forces(self, lam):
+    def _create_proper_torsion_forces(self, lam, pes=False):
+        """Build proper torsion forces for the reaction system at the given lambda.
 
+        For conformational TS integration systems (self.conformer_active_torsion
+        is set and pes=False), the Fourier terms on the active central bond are
+        omitted and a periodic restraint  k*(1 - cos(theta - theta0))  is added
+        instead, with theta0 shifting from phi_reactant (lam=0) to phi_product
+        (lam=1) along the shortest arc.
+
+        Returns:
+            list[mm.Force]: always a list — one PeriodicTorsionForce for the
+            normal case, plus a CustomTorsionForce appended for conformational
+            integration systems.
+        """
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
 
@@ -1738,9 +1846,24 @@ class EvbSystemBuilder:
         if not self.no_force_groups:
             fourier_force.setForceGroup(EvbForceGroup.REA_TORSION.value)
 
+        # When modelling a conformational TS integration system, identify the
+        # central bond to skip so the restraint below takes its place.
+        active_torsion = self.conformer_active_torsion
+        if active_torsion is not None and not pes:
+            active_torsion_central = tuple(
+                sorted([active_torsion[1], active_torsion[2]]))
+        else:
+            active_torsion_central = None
+
         dihedral_keys = list(
             set(self.reactant.dihedrals) | set(self.product.dihedrals))
         for key in dihedral_keys:
+            # Skip Fourier terms on the active central bond for integration
+            # systems; the periodic restraint below replaces them.
+            if (active_torsion_central is not None and tuple(
+                    sorted([key[1], key[2]])) == active_torsion_central):
+                continue
+
             atom_ids = self._key_to_id(key, self.reaction_atoms)
             if atom_ids is None:
                 continue
@@ -1758,7 +1881,6 @@ class EvbSystemBuilder:
                 self._add_torsion(fourier_force, dihedA, atom_ids, reascale)
                 self._add_torsion(fourier_force, dihedB, atom_ids, proscale)
             else:
-
                 # if the torsion on one side of the reaction completely disapears, then turn of the torsion much earlier / turn it on later
                 reascale, proscale = self._get_lambda_scaling(
                     lam, self.torsion_lambda_switch)
@@ -1770,7 +1892,42 @@ class EvbSystemBuilder:
                     dihed = self.product.dihedrals[key]
                 if scale > 0:
                     self._add_torsion(fourier_force, dihed, atom_ids, scale)
-        return fourier_force
+
+        forces = [fourier_force]
+
+        # For conformational TS integration systems, append the periodic
+        # restraint whose minimum shifts from phi_reactant to phi_product.
+        if active_torsion is not None and not pes:
+            phi_rea_rad = self.conformer_phi_reactant * self.deg_to_rad
+            phi_pro_rad = self.conformer_phi_product * self.deg_to_rad
+            delta_phi_rad = phi_pro_rad - phi_rea_rad
+            if delta_phi_rad > math.pi:
+                delta_phi_rad -= 2 * math.pi
+            elif delta_phi_rad <= -math.pi:
+                delta_phi_rad += 2 * math.pi
+            theta0 = phi_rea_rad + lam * delta_phi_rad
+
+            restraint_force = mm.CustomTorsionForce(
+                "k_dih * (1 - cos(theta - theta0))")
+            restraint_force.setName("Conformer dihedral restraint")
+            restraint_force.addGlobalParameter("k_dih", self.conformer_k)
+            restraint_force.addPerTorsionParameter("theta0")
+            if not self.no_force_groups:
+                restraint_force.setForceGroup(EvbForceGroup.REA_TORSION.value)
+
+            active_atom_ids = self._key_to_id(active_torsion,
+                                              self.reaction_atoms)
+            if active_atom_ids is not None:
+                restraint_force.addTorsion(
+                    active_atom_ids[0],
+                    active_atom_ids[1],
+                    active_atom_ids[2],
+                    active_atom_ids[3],
+                    [theta0],
+                )
+            forces.append(restraint_force)
+
+        return forces
 
     # Create a linear switching function that turns the force on only past the lambda-switch
     def _get_lambda_scaling(self, lam, lambda_switch):
@@ -2336,17 +2493,16 @@ class EvbSystemBuilder:
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbDriver.')
 
-        path = Path().cwd() / folder
+        path = Path.cwd() / folder
         self.ostream.print_info(f"Saving systems to {path}")
         self.ostream.flush()
-        if not path.exists():
-            path.mkdir(parents=True, exist_ok=True)
+        path.mkdir(parents=True, exist_ok=True)
         for name, system in systems.items():
             if isinstance(name, float) or isinstance(name, int):
                 filename = f"{name:.3f}_sys.xml"
             else:
                 filename = f"{name}_sys.xml"
-            with open(path / filename, mode="w", encoding="utf-8") as output:
+            with (path / filename).open(mode="w", encoding="utf-8") as output:
                 output.write(mm.XmlSerializer.serialize(system))
 
     def load_systems_from_xml(self, folder: str):
@@ -2362,10 +2518,10 @@ class EvbSystemBuilder:
                             'openmm is required for EvbDriver.')
 
         systems = {}
-        path = Path().cwd() / folder
+        path = Path.cwd() / folder
         for lam in self.Lambda:
-            with open(path / f"{lam:.3f}_sys.xml", mode="r",
-                      encoding="utf-8") as input:
+            with (path / f"{lam:.3f}_sys.xml").open(
+                    mode="r", encoding="utf-8") as input:
                 systems[lam] = mm.XmlSerializer.deserialize(input.read())
         return systems
 

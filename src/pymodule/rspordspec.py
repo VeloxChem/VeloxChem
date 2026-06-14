@@ -30,46 +30,44 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import argparse
-
-from ._version import __version__
+from .rspproperty import ResponseProperty
 
 
-def cli():
+class OpticalRotatoryDispersionSpectrum(ResponseProperty):
+    """Implements the optical rotatory dispersion spectrum property.
+
+    :param rsp_dict:
+        The dictionary of response input.
+    :param method_dict:
+        The dictionary of method settings.
     """
-    Generate command-line argument parser.
 
-    :return:
-        The parser.
-    """
+    def __init__(self, rsp_dict=None, method_dict=None):
+        """Initializes the optical rotatory dispersion spectrum property."""
 
-    usage = """
-=================   VeloxChem   =================
+        if rsp_dict is None:
+            rsp_dict = {}
+        else:
+            rsp_dict = dict(rsp_dict)
 
-%(prog)s input_file [output_file]
+        if method_dict is None:
+            method_dict = {}
+        else:
+            method_dict = dict(method_dict)
 
-or
+        rsp_dict['property'] = 'ord (cpp)'
+        rsp_dict['order'] = 'linear'
+        rsp_dict['residue'] = 'none'
+        rsp_dict['onlystatic'] = 'no'
+        rsp_dict['is_complex'] = 'yes'
 
-python -m veloxchem input_file [output_file]
-    """
-    parser = argparse.ArgumentParser(prog="vlx", usage=usage)
-    parser.add_argument(
-        '-v',
-        '--version',
-        action='version',
-        version=__version__,
-    )
-    parser.add_argument(
-        'input_file',
-        type=str,
-        help='Input file',
-    )
-    parser.add_argument(
-        'output_file',
-        type=str,
-        nargs="?",
-        default=".",
-        help='Output file (default: STDOUT)',
-    )
+        rsp_dict['a_operator'] = 'electric dipole'
+        rsp_dict['a_components'] = 'xyz'
 
-    return parser
+        rsp_dict['b_operator'] = 'magnetic dipole'
+        rsp_dict['b_components'] = 'xyz'
+
+        if 'frequencies' not in rsp_dict:
+            rsp_dict['frequencies'] = '0'
+
+        super().__init__(rsp_dict, method_dict)

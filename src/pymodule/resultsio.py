@@ -35,6 +35,7 @@ import numbers
 import numpy as np
 import h5py
 
+from ._version import __version__
 from .errorhandler import assert_msg_critical
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
@@ -262,6 +263,7 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
 
     if valid_checkpoint:
         hf = h5py.File(fname, 'w')
+        hf.attrs['veloxchem_version'] = __version__
 
         e_nuc = molecule.effective_nuclear_repulsion_energy(basis)
 
@@ -301,6 +303,24 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
         hf.create_dataset('potfile_text', data=np.bytes_([potfile_text]))
 
         hf.close()
+
+
+def clear_group_in_hdf5(fname, label):
+    """
+    Clears a group in an HDF5 file.
+
+    :param fname:
+        Name of the HDF5 file.
+    :param label:
+        The HDF5 group label.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str) and
+                        Path(fname).is_file())
+    if valid_checkpoint:
+        with h5py.File(fname, 'a') as hf:
+            if label in hf:
+                del hf[label]
 
 
 def write_results_to_hdf5(fname,
@@ -394,67 +414,14 @@ def write_rixs_results_to_hdf5(fname, rixs_results):
                           value_label='rixs result')
 
 
-def write_rsp_solution(fname, key, vec, group_label='rsp'):
+def write_rsp_results_to_hdf5(fname, rsp_results):
     """
-    Writes a response solution vector to HDF5 file.
-
-    :param fname:
-        The name of the HDF5 file.
-    :param key:
-        The key for the solution vector.
-    :param vec:
-        The solution vector.
-    :param group_label:
-        The HDF5 group label.
-    """
-
-    if fname and isinstance(fname, str):
-        with h5py.File(fname, 'a') as hf:
-            label = group_label + '/' + key
-            if label in hf:
-                del hf[label]
-            hf.create_dataset(label, data=vec)
-
-
-def write_rsp_solution_with_multiple_keys(fname,
-                                          keys,
-                                          vec,
-                                          group_label='rsp'):
-    """
-    Writes one response solution vector under multiple HDF5 keys.
-
-    :param fname:
-        The name of the HDF5 file.
-    :param keys:
-        The list of keys for the solution vector.
-    :param vec:
-        The solution vector.
-    :param group_label:
-        The HDF5 group label.
-    """
-
-    if fname and isinstance(fname, str):
-        with h5py.File(fname, 'a') as hf:
-            label = group_label + '/' + keys[0]
-            if label in hf:
-                del hf[label]
-            dset = hf.create_dataset(label, data=vec)
-
-            for key in keys[1:]:
-                label = group_label + '/' + key
-                if label in hf:
-                    del hf[label]
-                hf[label] = dset
-
-
-def write_lr_rsp_results_to_hdf5(fname, rsp_results):
-    """
-    Writes the results of a linear response calculation to HDF5 file.
+    Writes response results to an HDF5 file.
 
     :param fname:
         Name of the HDF5 file.
     :param rsp_results:
-        The dictionary containing the linear response results.
+        The dictionary containing the response results.
     """
 
     write_results_to_hdf5(fname,
@@ -462,6 +429,57 @@ def write_lr_rsp_results_to_hdf5(fname, rsp_results):
                           rsp_results,
                           value_label='response result',
                           replace_group=False)
+
+
+def write_rsp_full_solution_to_hdf5(fname, solution, solution_index,
+                                    num_solutions):
+    """
+    Writes one row of the full response solutions matrix to an HDF5 file.
+
+    The first row initializes the matrix and removes stale solution keys.
+
+    :param fname:
+        Name of the HDF5 file.
+    :param solution:
+        The full response solution vector.
+    :param solution_index:
+        Row index of the solution vector.
+    :param num_solutions:
+        Total number of solution vectors.
+    """
+
+    assert_msg_critical(isinstance(solution, np.ndarray),
+                        'A full response solution must be a NumPy array.')
+    assert_msg_critical(solution.ndim == 1,
+                        'A full response solution must be one-dimensional.')
+    assert_msg_critical(
+        0 <= solution_index < num_solutions,
+        f'Invalid response solution index {solution_index} for '
+        f'{num_solutions} solutions.')
+
+    with h5py.File(fname, 'a') as hf:
+        matrix_label = 'rsp/full_solutions_matrix'
+        keys_label = 'rsp/full_solutions_keys'
+
+        if solution_index == 0:
+            if matrix_label in hf:
+                del hf[matrix_label]
+            if keys_label in hf:
+                del hf[keys_label]
+            matrix = hf.create_dataset(
+                matrix_label,
+                shape=(num_solutions, solution.size),
+                dtype=solution.dtype)
+        else:
+            assert_msg_critical(
+                matrix_label in hf,
+                'The full response solutions matrix has not been initialized.')
+            matrix = hf[matrix_label]
+            assert_msg_critical(
+                matrix.shape == (num_solutions, solution.size),
+                'Inconsistent full response solution vector dimensions.')
+
+        matrix[solution_index, :] = solution
 
 
 def write_detach_attach_to_hdf5(fname,
@@ -547,9 +565,20 @@ def read_results(fname, label):
     with h5py.File(fname, "r") as h5f:
         label_found = (label in h5f)
         assert_msg_critical(label_found,
-                            label + " section not found in the checkpoint file.")
+                            label + " section not found in the hdf5 file.")
 
-        return _read_value_from_hdf5(h5f[label], value_label='results')
+        results_dict = _read_value_from_hdf5(h5f[label], value_label='results')
+
+        if ((label == 'rsp') and ('rsp_type' in results_dict) and
+                (results_dict['rsp_type'] in
+                 ['c6', 'cpp', 'tdacpp', 'lr', 'rpa', 'tda'])):
+            if 'full_solutions_keys' in results_dict and 'full_solutions_matrix' in results_dict:
+                for idx, sol_key in enumerate(results_dict['full_solutions_keys']):
+                    results_dict[sol_key] = results_dict['full_solutions_matrix'][idx].copy()
+                del results_dict['full_solutions_keys']
+                del results_dict['full_solutions_matrix']
+
+        return results_dict
 
 
 def read_molecule_and_basis(fname):

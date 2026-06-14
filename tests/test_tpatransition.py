@@ -57,13 +57,13 @@ class TestTpaTransition:
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             tpa_str = tpa_results['tpa_strengths']['linear']
-            assert list(tpa_str.keys()) == list(range(len(ref_strengths)))
+            assert len(tpa_str) == len(ref_strengths)
 
             for freq, ref_freq in zip(tpa_results['photon_energies'],
                                       ref_energies):
                 assert abs(freq / ref_freq - 1.0) < 1.0e-6
 
-            for val, ref_val in zip(tpa_str.values(), ref_strengths):
+            for val, ref_val in zip(tpa_str, ref_strengths):
                 assert abs(val / ref_val - 1.0) < 1.0e-6
 
     def compute_tpatransition(self, xcfun_label, ri_coulomb=False):
@@ -171,14 +171,8 @@ class TestTpaTransition:
         tpa_results = {
             'photon_energies': [0.16, 0.18],
             'tpa_strengths': {
-                'linear': {
-                    0: 1.0,
-                    1: 2.0,
-                },
-                'circular': {
-                    0: 10.0,
-                    1: 20.0,
-                },
+                'linear': [1.0, 2.0],
+                'circular': [10.0, 20.0],
             },
         }
 
@@ -320,13 +314,14 @@ class TestTpaTransition:
             'elec_trans_dipoles': np.array([[0.11, -0.22, 0.33],
                                             [0.44, -0.55, 0.66]]),
             'excitation_details': [['1a -> 2a (0.90)'], ['1b -> 3b (0.80)']],
+            'rsp_type': 'tpa_transition',
         }
 
         tpa_drv = TpaTransitionDriver()
         tpa_drv.ostream.mute()
         tpa_drv._write_final_hdf5(str(h5file), tpa_results)
 
-        recovered = read_results(str(h5file), 'tpa_transition')
+        recovered = read_results(str(h5file), 'rsp')
 
         assert recovered['photon_energies'] == pytest.approx(
             tpa_results['photon_energies'])
@@ -369,13 +364,14 @@ class TestTpaTransition:
             'oscillator_strengths': np.array([0.01]),
             'elec_trans_dipoles': np.array([[0.11, -0.22, 0.33]]),
             'excitation_details': [['1a -> 2a (0.90)']],
+            'rsp_type': 'tpa_transition',
         }
 
         tpa_drv = TpaTransitionDriver()
         tpa_drv.ostream.mute()
         tpa_drv._write_final_hdf5(str(h5stem), tpa_results)
 
-        recovered = read_results(str(h5file), 'tpa_transition')
+        recovered = read_results(str(h5file), 'rsp')
 
         assert recovered['photon_energies'] == pytest.approx(
             tpa_results['photon_energies'])
@@ -465,10 +461,9 @@ class TestTpaTransition:
         assert not fresh_drv.restart
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            restarted_strengths = list(
-                restarted_results['tpa_strengths']['linear'].values())
-            first_strengths = list(first_results['tpa_strengths']['linear'].values())
-            fresh_strengths = list(fresh_results['tpa_strengths']['linear'].values())
+            restarted_strengths = list(restarted_results['tpa_strengths']['linear'])
+            first_strengths = list(first_results['tpa_strengths']['linear'])
+            fresh_strengths = list(fresh_results['tpa_strengths']['linear'])
 
             assert restarted_strengths == pytest.approx(fresh_strengths,
                                                         abs=1.0e-7)

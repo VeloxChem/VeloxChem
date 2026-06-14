@@ -406,13 +406,15 @@ class TestTPA:
             },
             'frequencies': [0.0, 0.05, 0.10],
             'cross_sections': [0.1, 0.2],
+            'rsp_type': 'tpa',
+            'tpa_type': 'reduced',
         }
 
         tpa_drv = TpaReducedDriver()
         tpa_drv.ostream.mute()
         tpa_drv._write_final_hdf5(str(h5file), rsp_results)
 
-        recovered = read_results(str(h5file), 'tpa')
+        recovered = read_results(str(h5file), 'rsp')
 
         assert recovered == rsp_results
 
@@ -433,13 +435,15 @@ class TestTPA:
             },
             'frequencies': [0.0, 0.05],
             'cross_sections': [0.1],
+            'rsp_type': 'tpa',
+            'tpa_type': 'reduced',
         }
 
         tpa_drv = TpaReducedDriver()
         tpa_drv.ostream.mute()
         tpa_drv._write_final_hdf5(str(h5stem), rsp_results)
 
-        recovered = read_results(str(h5file), 'tpa')
+        recovered = read_results(str(h5file), 'rsp')
 
         assert recovered == rsp_results
 
@@ -475,13 +479,15 @@ class TestTPA:
             },
             'frequencies': [0.0, 0.05, 0.10],
             'cross_sections': [0.1, 0.2],
+            'rsp_type': 'tpa',
+            'tpa_type': 'full',
         }
 
         tpa_drv = TpaFullDriver()
         tpa_drv.ostream.mute()
         tpa_drv._write_final_hdf5(str(h5file), rsp_results)
 
-        recovered = read_results(str(h5file), 'tpa')
+        recovered = read_results(str(h5file), 'rsp')
 
         assert recovered == rsp_results
 
@@ -502,13 +508,15 @@ class TestTPA:
             },
             'frequencies': [0.0, 0.05],
             'cross_sections': [0.1],
+            'rsp_type': 'tpa',
+            'tpa_type': 'full',
         }
 
         tpa_drv = TpaFullDriver()
         tpa_drv.ostream.mute()
         tpa_drv._write_final_hdf5(str(h5stem), rsp_results)
 
-        recovered = read_results(str(h5file), 'tpa')
+        recovered = read_results(str(h5file), 'rsp')
 
         assert recovered == rsp_results
 

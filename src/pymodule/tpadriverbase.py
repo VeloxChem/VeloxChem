@@ -451,9 +451,12 @@ class TpaDriverBase(NonlinearSolver):
             ret_dict.update({
                 'tpa_terms': {},
                 'gamma': gamma,
-                'frequencies': list(self.frequencies),
+                'frequencies': np.array(self.frequencies),
                 'tpa_type': self._get_tpa_type(),
             })
+
+            # add rsp type
+            ret_dict.update({'rsp_type': 'tpa'})
 
             ret_dict['tpa_terms'].update(other_dict)
             ret_dict['tpa_terms'].update({
@@ -469,7 +472,7 @@ class TpaDriverBase(NonlinearSolver):
                 '[GM]' in tpa_spectrum['y_label'],
                 'TpaDriverBase: In valid unit in TPA spectrum y_label')
             ret_dict.update({
-                'cross_sections': list(tpa_spectrum['y_data'])
+                'cross_sections': np.array(tpa_spectrum['y_data'])
             })
 
             self.print_results(ret_dict, section='all')
@@ -912,9 +915,9 @@ class TpaDriverBase(NonlinearSolver):
             return
 
         write_results_to_hdf5(str(fpath),
-                              'tpa',
+                              'rsp',
                               results,
-                              value_label='TPA result')
+                              value_label='response result')
 
     def _get_summary_title(self):
         """
@@ -960,7 +963,7 @@ class TpaDriverBase(NonlinearSolver):
         width = 82
         gamma = rsp_results['gamma']
         freqs = rsp_results['frequencies']
-        cross_sections = list(rsp_results.get('cross_sections', []))
+        cross_sections = rsp_results['cross_sections']
 
         self.ostream.print_blank()
         title = self._get_summary_title()
@@ -974,16 +977,26 @@ class TpaDriverBase(NonlinearSolver):
         self.ostream.print_header(header.ljust(width))
         self.ostream.print_header('-' * width)
 
-        cross_section_index = 0
-        for w in freqs:
+        # zero frequency: only print gamma
+        if 0.0 in freqs:
+            w = 0.0
             gamma_value = gamma[(w, -w, w)]
-            if w == 0.0:
-                cross_section_str = '-'
-            else:
-                cross_section_str = '{:.8f} GM'.format(
-                    cross_sections[cross_section_index])
-                cross_section_index += 1
+            cross_section_str = ''
+            line = '{:>12.5f} eV{:>20.8f}{:>20.8f}{:>24s}'.format(
+                w * hartree_in_ev(), gamma_value.real, gamma_value.imag,
+                cross_section_str)
+            self.ostream.print_header(line.ljust(width))
 
+        # nonzero frequency sanity check
+        nonzero_freqs = [w for w in freqs if w != 0.0]
+        assert_msg_critical(
+            len(nonzero_freqs) == len(cross_sections),
+            'TpaDriverBase._print_summary: Inconsistent size in nonzero frequencies and cross sections')
+
+        # nonzero frequency: only print gamma and spectrum
+        for w, cross_sec in zip(nonzero_freqs, cross_sections):
+            gamma_value = gamma[(w, -w, w)]
+            cross_section_str = '{:.8f} GM'.format(cross_sec)
             line = '{:>12.5f} eV{:>20.8f}{:>20.8f}{:>24s}'.format(
                 w * hartree_in_ev(), gamma_value.real, gamma_value.imag,
                 cross_section_str)

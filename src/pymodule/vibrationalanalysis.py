@@ -365,10 +365,10 @@ class VibrationalAnalysis:
                      self.raw_normal_modes)
                 vib_results['number_of_external_frequencies'] = len(
                     self.frequencies)
-                vib_results['external_frequencies'] = self.frequencies
+                vib_results['external_frequencies'] = np.array(self.frequencies)
                 vib_results['raman_activities'] = self.raman_activities
-                vib_results['polarizability_gradient'] = (
-                    self.polarizability_gradient)
+                vib_results['polarizability_gradient'] = np.array(
+                    list(self.polarizability_gradient.values()))
                 vib_results['raman_type'] = (
                     'resonance'
                     if self.do_resonance_raman else 'normal')
