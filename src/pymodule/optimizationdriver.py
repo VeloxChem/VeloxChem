@@ -522,9 +522,8 @@ class OptimizationDriver:
                         all_energies[-1].append(energy)
                         all_coords_au[-1].append(xyz / geometric.nifty.bohr2ang)
 
-                    opt_results['scan_energies'] = [
-                        opt_energies[-1] for opt_energies in all_energies
-                    ]
+                    opt_results['scan_energies'] = np.array(
+                        [opt_energies[-1] for opt_energies in all_energies])
                     opt_results['scan_coordinates_au'] = np.array(
                         [opt_coords_au[-1] for opt_coords_au in all_coords_au])
 
@@ -536,7 +535,7 @@ class OptimizationDriver:
                 elif self.irc:
                     self.print_irc_result(m)
 
-                    opt_results['irc_energies'] = list(m.qm_energies)
+                    opt_results['irc_energies'] = np.array(m.qm_energies)
                     opt_results['ts_index'] = int(np.argmax(m.qm_energies))
 
                     opt_coordinates_au = [
@@ -550,7 +549,7 @@ class OptimizationDriver:
                 else:
                     self.print_opt_result(m)
 
-                    opt_results['opt_energies'] = list(m.qm_energies)
+                    opt_results['opt_energies'] = np.array(m.qm_energies)
 
                     opt_coordinates_au = [
                         xyz / geometric.nifty.bohr2ang for xyz in m.xyzs
