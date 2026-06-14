@@ -352,10 +352,9 @@ def test_write_rsp_results_pairs_solution_keys_and_matrix(tmp_path):
     np.testing.assert_allclose(recovered['S2'], solutions[1])
 
 
+@pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                    reason='skip pytest.raises for multiple MPI processes')
 def test_write_rsp_full_solution_requires_numpy_array(tmp_path):
-
-    if MPI.COMM_WORLD.Get_rank() != mpi_master():
-        return
 
     h5file = Path(tmp_path) / 'rsp_solutions.h5'
     with h5py.File(h5file, 'w') as h5f:
