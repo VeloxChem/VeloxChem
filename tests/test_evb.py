@@ -167,7 +167,7 @@ class TestEvb:
             Lambda,
             wat_conf,
         )
-        system_builder = EvbSystemBuilder()
+        system_builder = ReactionSystemBuilder()
         system_builder.ostream.mute()
 
         impl_systems, impl_topology, impl_positions = system_builder.build_systems(

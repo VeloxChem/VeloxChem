@@ -211,7 +211,7 @@ class TransitionStateGuesser:
             self.ffbuilder._reaction_matcher_assist_min_depth = int(
                 self._reaction_matcher_assist_min_depth)
 
-        self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_forcefields(
+        self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_force_fields(
             reactant=reactant,
             product=product,
             **build_forcefields_kwargs,
@@ -262,8 +262,6 @@ class TransitionStateGuesser:
         self.lambda_vector = [round(l, 3) for l in self.lambda_vector]
         self.ostream.print_info(
             f"Rounding lambda vector to 3 decimal places: {self.lambda_vector}")
-
-        sysbuilder = EvbSystemBuilder()
         sysbuilder = ReactionSystemBuilder()
         if self.mute_ff_build:
             sysbuilder.ostream.mute()

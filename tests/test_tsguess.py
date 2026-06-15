@@ -360,8 +360,8 @@ class TestTransitionStateGuesser:
             delta -= 360.0
         elif delta <= -180.0:
             delta += 360.0
-        assert abs(abs(delta) - 120.0) < 5.0, (
-            f"|Δφ| = {abs(delta):.1f}°, expected ≈ 120°")
+        assert abs(abs(delta) -
+                   120.0) < 5.0, (f"|Δφ| = {abs(delta):.1f}°, expected ≈ 120°")
 
     @pytest.mark.skipif(('openmm' not in sys.modules),
                         reason='openmm not available')
@@ -434,7 +434,8 @@ class TestTransitionStateGuesser:
         H              1.176565798320         2.498243131144         2.310601520444
         H              1.973676790569         0.954059040738         2.742914700148
         H              1.839289207801         1.441849856114         1.025499053148
-        Br             4.316943499142         3.074995880494         2.227046197863""")
+        Br             4.316943499142         3.074995880494         2.227046197863"""
+                                )
 
         pro = Molecule.read_str("""
         C              1.644879612388        -0.508351390798        -0.616977056715
@@ -442,7 +443,8 @@ class TestTransitionStateGuesser:
         H              2.132647869077        -0.956075482316         0.257650347399
         H              2.384228922941         0.036800182006        -1.216446463266
         H              1.178719053826        -1.293388510743        -1.224930701103
-        Br             0.244603286036         0.757235977330        -0.003426182246""")
+        Br             0.244603286036         0.757235977330        -0.003426182246"""
+                                )
 
         rea.set_charge(-1)
         pro.set_charge(-1)
