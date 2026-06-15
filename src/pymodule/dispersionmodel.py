@@ -89,6 +89,7 @@ class DispersionModel:
         known_aliases = {
             'wb97x-d4': 'wb97x-rev',
             'wb97m-d4': 'wb97m',
+            'b97m-d4': 'b97m',
             'lrc-wpbeh': 'lc-wpbeh',
             'm06-l': 'm06l',
         }
