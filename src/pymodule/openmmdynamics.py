@@ -54,7 +54,7 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .optimizationdriver import OptimizationDriver
 from .interpolationdriver import InterpolationDriver
 from .errorhandler import assert_msg_critical
-from .mofutils import svd_superimpose
+from .superimpose import svd_superimpose
 
 try:
     import openmm as mm
@@ -195,7 +195,7 @@ class OpenMMDynamics:
         """
         Loads a system from a PDB file, extracting unique residues and their details.
 
-        :param filename: 
+        :param filename:
             Path to the PDB file. Example: 'system.pdb'.
         """
 
@@ -326,9 +326,9 @@ class OpenMMDynamics:
         """
         Loads a preexisting system from an XML file and a PDB file.
 
-        :param system_xml: 
+        :param system_xml:
             XML file containing the system parameters.
-        :param system_pdb: 
+        :param system_pdb:
             PDB file containing the system coordinates.
         """
         self.pdb = app.PDBFile(system_pdb)
@@ -373,14 +373,14 @@ class OpenMMDynamics:
                                     residue_name='MOL'):
         """
         Creates an OpenMM system from a VeloxChem molecule and a forcefield generator.
-        
+
         :param molecule:
             VeloxChem molecule object.
         :param ff_gen:
             VeloxChem forcefield generator object.
         :param solvent:
             Available options:'gas', 'cspce', 'ctip3p', 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone',
-            'chloroform', 'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf', 
+            'chloroform', 'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf',
             'acetonitrile', 'other' or 'itself'.
         :param qm_atoms:
             Options: None, 'all', or list of atom indices for QM region.
@@ -519,7 +519,7 @@ class OpenMMDynamics:
                                     write_files=True):
         """
         Creates a system from a PDB file containing multiple residues and custom XML files.
-        
+
         :param system_pdb:
             PDB file containing the system or a list of PDB files.
         :param xml_file:
@@ -600,18 +600,18 @@ class OpenMMDynamics:
                                       filename='custom'):
         """
         Builds a QM/MM system from a PDB file containing multiple residues and custom XML files.
-        
-        :param pdb_file: 
+
+        :param pdb_file:
             PDB file containing the system.
-        :param xml_file: 
+        :param xml_file:
             XML file containing the forcefield parameters. Can be a list of XML files.
-        :param qm_residue: 
+        :param qm_residue:
             Tuple containing the name and number of the QM residue. (e.g. ('MOL', 1))
-        :param ff_gen_qm: 
+        :param ff_gen_qm:
             Optional custom forcefield generator for the QM region. If None, a new one will be created.
         :param qm_atoms:
             Options: 'all' or a list of atom indices for QM region.
-        :param filename: 
+        :param filename:
             Base filename for output and intermediate files.
         """
 
@@ -709,7 +709,7 @@ class OpenMMDynamics:
                                               **system_arguments)
 
         # Set QM atoms based on the QM residue
-        #self.qm_atoms = [atom.index for atom in self.pdb.topology.atoms() if (atom.residue.name == qm_residue_name and atom.residue.id == str(qm_residue_number))]
+        # self.qm_atoms = [atom.index for atom in self.pdb.topology.atoms() if (atom.residue.name == qm_residue_name and atom.residue.id == str(qm_residue_number))]
         self.qm_atoms = qm_atoms
 
         # Setting QM/MM system
@@ -784,7 +784,7 @@ class OpenMMDynamics:
             The water model to be used if water molecules are present.
 
         :return:
-            conformers_dict: Dictionary with lists of potential energies of the conformations, the minimized molecule objects, 
+            conformers_dict: Dictionary with lists of potential energies of the conformations, the minimized molecule objects,
             and their corresponding coordinates in XYZ format.
         """
         if molecules:
@@ -1058,9 +1058,9 @@ class OpenMMDynamics:
             If True, minimizes the energy of the system before starting the sampling. Default is False.
 
         :return:
-            conformers_dict: Dictionary with lists of potential energies of the conformations, the minimized molecule objects, 
+            conformers_dict: Dictionary with lists of potential energies of the conformations, the minimized molecule objects,
             and their corresponding coordinates in XYZ format.
-            
+
         """
 
         if self.system is None:
@@ -1244,17 +1244,17 @@ class OpenMMDynamics:
                                          unit='kj/mol'):
         """ 
         Calculate the Boltzmann distribution of conformers based on their energies.
-        
-        :param energies: 
+
+        :param energies:
             list of energies. If None, it will use the energies from the conformers_dict from the conformational sampling.
-        :param T: 
+        :param T:
             temperature in Kelvin
-        :param unit: 
+        :param unit:
             unit of energy, options are 'kj/mol', 'kcal/mol', 'hartree'
 
-        :return: 
+        :return:
             list of probabilities for each conformer
-        
+
         """
         if unit == 'kj/mol':
             R = 0.008314462618
@@ -2169,8 +2169,8 @@ class OpenMMDynamics:
             }
             ET.SubElement(NonbondedForce, "Atom", **attributes)
 
-        # Generate the tree and write to file
-        tree = ET.ElementTree(ForceField)
+        # Generate the XML and write to file
+        # tree = ET.ElementTree(ForceField)
         rough_string = ET.tostring(ForceField, 'utf-8')
         reparsed = minidom.parseString(rough_string)
         indented_string = reparsed.toprettyxml(indent="    ")
@@ -2391,8 +2391,8 @@ class OpenMMDynamics:
                 }
                 ET.SubElement(ImproperForce, "Torsion", **attributes)
 
-        # Generate the tree and write to file
-        tree = ET.ElementTree(ForceField)
+        # Generate the XML and write to file
+        # tree = ET.ElementTree(ForceField)
         rough_string = ET.tostring(ForceField, 'utf-8')
         reparsed = minidom.parseString(rough_string)
         indented_string = reparsed.toprettyxml(indent="    ")
@@ -2565,9 +2565,9 @@ class OpenMMDynamics:
         Implements a MM potential to stabilize the QM region.
         The forces are 1% of the regular MM forces.
 
-        :param qm_atoms: 
+        :param qm_atoms:
             List of atom indices to be included in the QM region.
-        :param ff_gen_qm: 
+        :param ff_gen_qm:
             MMForceFieldGenerator object from VeloxChem.
         """
 
@@ -2754,7 +2754,7 @@ class OpenMMDynamics:
         custom_force = self.system.getForce(self.qm_force_index)
 
         # Construct a set from the list of tuples self.broken_bonds
-        #broken_bond_atoms = set([atom for bond in self.broken_bonds for atom in bond])
+        # broken_bond_atoms = set([atom for bond in self.broken_bonds for atom in bond])
 
         for i, atom_idx in enumerate(self.qm_atoms):
             custom_force.setParticleParameters(i, atom_idx, force[i])
@@ -2846,7 +2846,7 @@ class OpenMMDynamics:
         centroid = np.mean(coords, axis=0)
         rg_sq = np.mean(np.sum((coords - centroid)**2, axis=1))
 
-        return np.sqrt(rg_sq)
+        return max(np.sqrt(rg_sq), 1.5)
 
     def _create_system_from_multiple_molecules(self,
                                                molecules,
@@ -3004,9 +3004,6 @@ class OpenMMDynamics:
             assert isinstance(position_restraint, (list, tuple)), (
                 f"'position_restraint' must be a list or tuple of 1-based molecule indices, "
                 f"got {type(position_restraint).__name__}.")
-            self.ostream.print_info(
-                f"Setting position restraint on molecule(s): {', '.join(map(str, position_restraint))}"
-            )
             self.ostream.flush()
 
             pos_restraint = mm.CustomExternalForce(

@@ -2,12 +2,172 @@ from pathlib import Path
 import pytest
 import numpy as np
 
+import veloxchem.ensembleparser as ensembleparser_module
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.ensembleparser import EnsembleParser
 from veloxchem.ensembledriver import EnsembleDriver
 
 pytest.importorskip("MDAnalysis")
 pytest.importorskip("pyframe")
+
+
+def make_simple_tip3_pdb(tmp_path):
+    """Writes a simple PDB containing one QM atom and one TIP3 water."""
+
+    def pdb_record(serial, atom_name, residue_name, resid, x, y, z, element):
+        return (
+            f'{"HETATM":<6s}{serial:5d} '
+            f'{atom_name:^4s} '
+            f'{residue_name:>4s}'
+            f'A'
+            f'{resid:4d}'
+            f'    '
+            f'{x:8.3f}{y:8.3f}{z:8.3f}'
+            f'{1.00:6.2f}{0.00:6.2f}'
+            f'          '
+            f'{element:>2s}'
+        )
+
+    pdb_path = tmp_path / "simple_tip3.pdb"
+    pdb_lines = [
+        pdb_record(1, "C1", "LIG", 1, 0.0, 0.0, 0.0, "C"),
+        pdb_record(2, "OH2", "TIP3", 2, 2.0, 0.0, 0.0, "O"),
+        pdb_record(3, "H1", "TIP3", 2, 2.7, 0.0, 0.0, "H"),
+        pdb_record(4, "H2", "TIP3", 2, 1.7, 0.7, 0.0, "H"),
+        "END",
+    ]
+    pdb_path.write_text("\n".join(pdb_lines) + "\n")
+    return pdb_path
+
+
+class TestEnsemblePdbAndWaterAliases:
+
+    @pytest.mark.parametrize(
+        ("mda_version", "expected_kwargs"),
+        [
+            ("2.7.9", {"guess_bonds": True}),
+            (
+                "2.8.0",
+                {"to_guess": ("bonds", "angles", "dihedrals")},
+            ),
+        ],
+    )
+    def test_mdanalysis_pdb_version_options(
+        self, monkeypatch, mda_version, expected_kwargs
+    ):
+        class UniverseCalled(Exception):
+            pass
+
+        universe_kwargs = {}
+
+        def fake_version(distribution_name):
+            assert distribution_name == "MDAnalysis"
+            return mda_version
+
+        def fake_universe(*args, **kwargs):
+            universe_kwargs.update(kwargs)
+            raise UniverseCalled
+
+        monkeypatch.setattr(ensembleparser_module, "version", fake_version)
+        monkeypatch.setattr(
+            ensembleparser_module.mda,
+            "Universe",
+            fake_universe,
+        )
+
+        ens_parser = EnsembleParser()
+        ens_parser.ostream.mute()
+
+        with pytest.raises(UniverseCalled):
+            ens_parser.structures(
+                pdb_file="structure.pdb",
+                qm_region="resname LIG",
+            )
+
+        assert universe_kwargs == expected_kwargs
+
+    def test_pdb_file_and_tip3_pe_pot_files(self, tmp_path):
+        simple_tip3_pdb = make_simple_tip3_pdb(tmp_path)
+        ens_parser = EnsembleParser()
+        ens_parser.ostream.mute()
+
+        snapshots = ens_parser.structures(
+            pdb_file=simple_tip3_pdb,
+            qm_region="resname LIG",
+            pe_cutoff=3.0,
+        )
+
+        assert len(snapshots) == 1
+        assert snapshots[0]["qm_atom_names"].tolist() == ["C1"]
+        assert snapshots[0]["pe_atom_names"].tolist() == ["OH2", "H1", "H2"]
+        assert snapshots[0]["pe_resnames"].tolist() == ["TIP3"] * 3
+
+        tip3p_snapshot = dict(snapshots[0])
+        tip3p_snapshot["frame"] = 1
+        tip3p_snapshot["pe_resnames"] = np.array(["TIP3P"] * 3, dtype=object)
+
+        ens_drv = EnsembleDriver()
+        ens_drv.ostream.mute()
+        ens_drv.set_env_models(pe_model="SEP")
+        ens_drv.write_pot_files(
+            [snapshots[0], tip3p_snapshot],
+            outdir=tmp_path,
+        )
+
+        if ens_drv.rank == mpi_master():
+            for frame, resname in ((0, "TIP3"), (1, "TIP3P")):
+                pot_text = (
+                    tmp_path / f"pe_frame_{frame:06d}.pot"
+                ).read_text()
+                charge_lines = pot_text.split(
+                    "@charges\n", 1
+                )[1].split("@end", 1)[0].splitlines()
+
+                assert [line.split() for line in charge_lines] == [
+                    ["O", "-0.67444000", f"{resname}_pe"],
+                    ["H", "0.33722000", f"{resname}_pe"],
+                    ["H", "0.33722000", f"{resname}_pe"],
+                ]
+                assert "@polarizabilities\n" in pot_text
+
+    def test_tip3_npe_only_pot_files(self, tmp_path):
+        simple_tip3_pdb = make_simple_tip3_pdb(tmp_path)
+        ens_parser = EnsembleParser()
+        ens_parser.ostream.mute()
+
+        snapshots = ens_parser.structures(
+            pdb_file=simple_tip3_pdb,
+            qm_region="resname LIG",
+            npe_cutoff=3.0,
+        )
+
+        tip3p_snapshot = dict(snapshots[0])
+        tip3p_snapshot["frame"] = 1
+        tip3p_snapshot["npe_resnames"] = np.array(["TIP3P"] * 3, dtype=object)
+
+        ens_drv = EnsembleDriver()
+        ens_drv.ostream.mute()
+        ens_drv.set_env_models(pe_model="SEP", npe_model="tip3p")
+        ens_drv.write_pot_files(
+            [snapshots[0], tip3p_snapshot],
+            outdir=tmp_path,
+        )
+
+        if ens_drv.rank == mpi_master():
+            for frame, resname in ((0, "TIP3"), (1, "TIP3P")):
+                pot_text = (
+                    tmp_path / f"pe_frame_{frame:06d}.pot"
+                ).read_text()
+                charge_lines = pot_text.split(
+                    "@charges\n", 1
+                )[1].split("@end", 1)[0].splitlines()
+
+                assert [line.split() for line in charge_lines] == [
+                    ["O", "-0.83400000", f"{resname}_npe"],
+                    ["H", "0.41700000", f"{resname}_npe"],
+                    ["H", "0.41700000", f"{resname}_npe"],
+                ]
+                assert "@polarizabilities\n" not in pot_text
 
 
 @pytest.mark.timeconsuming

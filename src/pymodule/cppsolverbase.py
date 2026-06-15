@@ -43,7 +43,7 @@ from .outputstream import OutputStream
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
-from .resultsio import write_results_to_hdf5
+from .resultsio import write_rsp_results_to_hdf5
 
 try:
     import matplotlib.pyplot as plt
@@ -119,13 +119,13 @@ class ComplexResponseSolverBase(LinearSolver):
 
     def set_cpp_property(self, prop):
         """
-        Sets CPP property (absorption or ecd).
+        Sets CPP property (absorption or ecd or ord).
 
         :param prop:
-            The CPP property (absorption or ecd).
+            The CPP property (absorption or ecd or ord).
         """
 
-        assert_msg_critical(prop.lower() in ['absorption', 'ecd'],
+        assert_msg_critical(prop.lower() in ['absorption', 'ecd', 'ord'],
                             f'{type(self).__name__}: invalid CPP property')
 
         self.property = prop.lower()
@@ -140,6 +140,12 @@ class ComplexResponseSolverBase(LinearSolver):
             self.a_operator = 'magnetic dipole'
             self.a_components = 'xyz'
             self.b_operator = 'linear momentum'
+            self.b_components = 'xyz'
+
+        elif self.property == 'ord':
+            self.a_operator = 'electric dipole'
+            self.a_components = 'xyz'
+            self.b_operator = 'magnetic dipole'
             self.b_components = 'xyz'
 
     def _preconditioning(self, precond, v_in):
@@ -362,6 +368,9 @@ class ComplexResponseSolverBase(LinearSolver):
         elif self.property == 'ecd':
             return self._get_ecd_spectrum(rsp_results, x_unit)
 
+        elif self.property == 'ord':
+            return self._get_ord_spectrum(rsp_results, x_unit)
+
         return None
 
     def _get_absorption_spectrum(self, rsp_results, x_unit):
@@ -463,6 +472,78 @@ class ComplexResponseSolverBase(LinearSolver):
 
         return spectrum
 
+    def _get_ord_spectrum(self, rsp_results, x_unit):
+        """
+        Gets optical rotatory dispersion spectrum.
+
+        :param rsp_results:
+            The dictionary containing response results.
+        :param x_unit:
+            The unit of x-axis.
+
+        :return:
+            A dictionary containing the optical rotatory dispersion spectrum.
+        """
+
+        assert_msg_critical(
+            x_unit.lower() in ['au', 'ev', 'nm'],
+            f'{type(self).__name__}.get_spectrum: x_unit should be au, ev or nm'
+        )
+
+        au2ev = hartree_in_ev()
+        auxnm = 1.0 / hartree_in_inverse_nm()
+
+        spectrum = {'x_data': [], 'y_data': []}
+
+        if x_unit.lower() == 'au':
+            spectrum['x_label'] = 'Photon energy [a.u.]'
+        elif x_unit.lower() == 'ev':
+            spectrum['x_label'] = 'Photon energy [eV]'
+        elif x_unit.lower() == 'nm':
+            spectrum['x_label'] = 'Wavelength [nm]'
+
+        assert_msg_critical(
+            'molecular_mass_amu' in rsp_results,
+            f'{type(self).__name__}.plot: Cannot find molecular_mass_amu in rsp_results')
+        molecular_mass_amu = rsp_results['molecular_mass_amu']
+
+        spectrum['y_label'] = r'Optical rotatory dispersion [10$^3$ deg dm$^{-1}$ (g cm$^{-3}$)$^{-1}$]'
+        molecular_weight = float(molecular_mass_amu)
+        au2wn = hartree_in_wavenumber()
+        # Rosenfeld-style specific rotation relation for beta(w) in a.u.:
+        # [alpha] = (28800 * pi^2 * N_A * a0^4) * nu_bar^2 * beta(w) / M,
+        # with a0 expressed in cm and M in g/mol.
+        alpha_prefactor = (28800.0 * math.pi**2 * avogadro_constant() *
+                           (bohr_in_angstrom() * 1.0e-8)**4)
+
+        freqs = rsp_results['frequencies']
+        rsp_funcs = rsp_results['response_functions']
+
+        for w in freqs:
+            if w == 0.0:
+                continue
+
+            if x_unit.lower() == 'au':
+                spectrum['x_data'].append(w)
+            elif x_unit.lower() == 'ev':
+                spectrum['x_data'].append(au2ev * w)
+            elif x_unit.lower() == 'nm':
+                spectrum['x_data'].append(auxnm / w)
+
+            Gxx = -rsp_funcs[('x', 'x', w)].imag
+            Gyy = -rsp_funcs[('y', 'y', w)].imag
+            Gzz = -rsp_funcs[('z', 'z', w)].imag
+
+            beta = (Gxx + Gyy + Gzz) / (3.0 * w)
+
+            nu_bar = au2wn * w
+            specific_rotation = alpha_prefactor * (nu_bar**2) * beta
+            specific_rotation /= molecular_weight
+            # Report in units of 10^3 deg dm^-1 (g cm^-3)^-1.
+            spectrum['y_data'].append(specific_rotation / 1000.0)
+
+        return spectrum
+
     def plot(self, cpp_results, x_unit='nm', plot_scatter=True):
         """
         Plot absorption or ECD spectrum from the CPP calculation.
@@ -525,6 +606,16 @@ class ComplexResponseSolverBase(LinearSolver):
                        linestyle='-.',
                        markersize=0,
                        linewidth=0.2)
+        elif self.property == 'ord':
+            ax.set_ylabel(cpp_spec['y_label'])
+            ax.set_title('Optical Rotatory Dispersion')
+            ax.set_ylim(-y_max * 1.1, y_max * 1.1)
+            ax.axhline(y=0,
+                       marker=',',
+                       color='k',
+                       linestyle='-.',
+                       markersize=0,
+                       linewidth=0.2)
 
         plt.plot(x_spl, y_spl, color='black', alpha=0.8, linewidth=2.0)
 
@@ -545,6 +636,8 @@ class ComplexResponseSolverBase(LinearSolver):
             self._print_absorption_results(rsp_results, ostream)
         elif self.property == 'ecd':
             self._print_ecd_results(rsp_results, ostream)
+        elif self.property == 'ord':
+            self._print_ord_results(rsp_results, ostream)
 
     def _print_response_functions(self, rsp_results, ostream=None):
         """
@@ -706,6 +799,54 @@ class ComplexResponseSolverBase(LinearSolver):
         ostream.print_blank()
         ostream.flush()
 
+    def _print_ord_results(self, rsp_results, ostream=None):
+        """
+        Prints ORD results to output stream.
+        """
+
+        if ostream is None:
+            ostream = self.ostream
+
+        width = 92
+
+        spectrum = self.get_spectrum(rsp_results, 'au')
+
+        title = 'Optical Rotatory Dispersion Spectrum'
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('=' * len(title)).ljust(width))
+        ostream.print_blank()
+
+        freqs = rsp_results['frequencies']
+
+        if len(freqs) == 1 and freqs[0] == 0.0:
+            text = '*** No optical rotatory dispersion spectrum at zero frequency.'
+            ostream.print_header(text.ljust(width))
+            ostream.print_blank()
+            return
+
+        assert_msg_critical(
+            '[a.u.]' in spectrum['x_label'],
+            f'{type(self).__name__}._print_ord_results: In valid unit in x_label'
+        )
+        assert_msg_critical(
+            r'[10$^3$ deg dm$^{-1}$ (g cm$^{-3}$)$^{-1}$]' in spectrum['y_label'],
+            f'{type(self).__name__}._print_ord_results: In valid unit in y_label'
+        )
+
+        title = '{:<20s}{:<20s}{:>28s}'.format('Frequency[a.u.]',
+                                               'Frequency[eV]',
+                                               'ORD[10^3 deg dm^-1 (g cm^-3)^-1]')
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('-' * len(title)).ljust(width))
+
+        for w, ord_value in zip(spectrum['x_data'], spectrum['y_data']):
+            output = '{:<20.4f}{:<20.5f}{:>18.8f}'.format(
+                w, w * hartree_in_ev(), ord_value)
+            ostream.print_header(output.ljust(width))
+
+        ostream.print_blank()
+        ostream.flush()
+
     def write_cpp_rsp_results_to_hdf5(self, fname, rsp_results):
         """
         Writes the results of a linear response calculation to HDF5 file.
@@ -726,9 +867,7 @@ class ComplexResponseSolverBase(LinearSolver):
                 h5_rsp_results['sigma'] = y_data
             elif self.property == 'ecd':
                 h5_rsp_results['delta-epsilon'] = y_data
+            elif self.property == 'ord':
+                h5_rsp_results['optical-rotation'] = y_data
 
-        write_results_to_hdf5(fname,
-                              self.group_label,
-                              h5_rsp_results,
-                              value_label='response result',
-                              replace_group=False)
+        write_rsp_results_to_hdf5(fname, h5_rsp_results)

@@ -33,7 +33,6 @@
 from mpi4py import MPI
 import sys
 import numpy as np
-import os
 import math
 import copy
 import h5py
@@ -62,7 +61,7 @@ except ImportError:
 # All positions are in Angsrom unless otherwise stated
 
 
-class TransitionStateGuesser():
+class TransitionStateGuesser:
 
     def __init__(self, comm=None, ostream=None):
         '''
@@ -111,7 +110,7 @@ class TransitionStateGuesser():
         self.force_conformer_search = False
         self.discont_conformer_search = False
         self.peak_conformer_search = False
-        self.peak_conformer_search_range = 1
+        self.peak_conformer_search_range = 2
         self.mm_conformer_equivalence_threshold = 1e-1  # kJ/mol
         self.mm_scan_backward = False
 
@@ -134,8 +133,7 @@ class TransitionStateGuesser():
         self._conformer_phi_product: float | None = None
 
         # Implicit solvation during conformational sampling.
-        # Set implicit_solvent_model to one of 'gbn', 'gbn2', 'obc1', 'obc2',
-        # 'hct' to enable GB solvation; None runs in vacuum (default).
+        # Set implicit_solvent_model to one of 'gbn', 'gbn2', 'obc1', 'obc2', 'hct' to enable GB solvation; None runs in vacuum (default).
         self.implicit_solvent_model: str | None = None
         self.solute_dielectric: float = 1.0
         self.solvent_dielectric: float = 78.39
@@ -188,8 +186,7 @@ class TransitionStateGuesser():
         """
         self.results = {}
         # Build forcefields and systems
-        if self.implicit_solvent_model is not None:
-            self.ffbuilder.calculate_resp = True
+        self.ffbuilder.calculate_resp = self.implicit_solvent_model is not None
         self.build_forcefields(reactant, product, **build_forcefields_kwargs)
         self.build_systems(constraints)
 
@@ -210,7 +207,11 @@ class TransitionStateGuesser():
             self.ostream.flush()
             self.ostream.mute()
 
-        self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_force_fields(
+        if self._reaction_matcher_assist_min_depth is not None:
+            self.ffbuilder._reaction_matcher_assist_min_depth = int(
+                self._reaction_matcher_assist_min_depth)
+
+        self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_forcefields(
             reactant=reactant,
             product=product,
             **build_forcefields_kwargs,
@@ -233,7 +234,7 @@ class TransitionStateGuesser():
         self.mol_multiplicity = self.molecule.get_multiplicity()
 
         if self.save_intermediates:
-            os.makedirs(self.folder_name, exist_ok=True)
+            Path(self.folder_name).mkdir(parents=True, exist_ok=True)
             self.ostream.print_info(
                 f"Saving reactant and product forcefield as json to {self.folder_name}"
             )
@@ -257,6 +258,12 @@ class TransitionStateGuesser():
         return self.results
 
     def build_systems(self, constraints=None):
+
+        self.lambda_vector = [round(l, 3) for l in self.lambda_vector]
+        self.ostream.print_info(
+            f"Rounding lambda vector to 3 decimal places: {self.lambda_vector}")
+
+        sysbuilder = EvbSystemBuilder()
         sysbuilder = ReactionSystemBuilder()
         if self.mute_ff_build:
             sysbuilder.ostream.mute()
@@ -283,6 +290,16 @@ class TransitionStateGuesser():
             )
             self.ostream.flush()
             if self.active_torsion is not None:
+                assert_msg_critical(
+                    len(self.active_torsion) == 4,
+                    'TransitionStateGuesser: active_torsion must contain '
+                    'exactly four 1-based atom indices')
+                reactant_natoms = self.reactant.molecule.number_of_atoms()
+                assert_msg_critical(
+                    all(1 <= a <= reactant_natoms for a in self.active_torsion),
+                    'TransitionStateGuesser: active_torsion indices must be '
+                    f'between 1 and {reactant_natoms}')
+
                 # Convert user-supplied 1-indexed tuple to 0-indexed
                 torsion_0idx = tuple(a - 1 for a in self.active_torsion)
                 one_based = list(self.active_torsion)
@@ -331,8 +348,9 @@ class TransitionStateGuesser():
             self.ostream.flush()
             sysbuilder.ostream.unmute()
         if self.save_intermediates:
-            systems_dir = str(Path(self.folder_name) / "systems")
-            os.makedirs(systems_dir, exist_ok=True)
+            systems_dir_path = Path(self.folder_name) / "systems"
+            systems_dir_path.mkdir(parents=True, exist_ok=True)
+            systems_dir = str(systems_dir_path)
             self.ostream.print_info(f"Saving systems as xml to {systems_dir}")
             self.ostream.flush()
             sysbuilder.save_systems_as_xml(self.systems, systems_dir)
@@ -340,7 +358,7 @@ class TransitionStateGuesser():
 
     def scan_mm(self):
 
-        self.folder = Path().cwd() / self.folder_name
+        self.folder = Path.cwd() / self.folder_name
 
         # pdbs are saved in angstrom
 
@@ -404,9 +422,10 @@ class TransitionStateGuesser():
                         # disjoint search windows whose edges are both marked.
                         if (peak_index in searched_conformers_indices
                                 and (max(0, peak_index - 1)
-                                     in searched_conformers_indices) and
-                            (min(peak_index + 1, len(self.lambda_vector))
-                             in searched_conformers_indices)):
+                                     in searched_conformers_indices)
+                                and (min(peak_index + 1,
+                                         len(self.lambda_vector) - 1)
+                                     in searched_conformers_indices)):
                             break
 
                         min_index = max(
@@ -688,7 +707,7 @@ class TransitionStateGuesser():
             temperature=self.mm_temperature,
         )
         if not self.save_intermediates:
-            os.remove(pdb_name)
+            Path(pdb_name).unlink()
 
         result = []
         for e_int, temp_mol in zip(conformers_dict['energies'],
@@ -835,8 +854,8 @@ class TransitionStateGuesser():
                     self.scf_drv,
                     'solvation_model') and self.scf_drv.solvation_model is None:
                 self.ostream.print_warning(
-                    'Implicit solvation turned on, but explicitly provided SCF'
-                    'driver has no solvation model activated. Continuing without QM solvation.'
+                    'Implicit solvation turned on, but explicitly provided SCF '
+                    'driver has no solvation model activated. Continuing without QM solvation. '
                     'Provide an SCF driver with a solvation model activated to enable QM solvation.'
                 )
 
@@ -897,9 +916,9 @@ class TransitionStateGuesser():
                 ts_results = self.results
 
         scan = ts_results['scan']
-        lambda_vec = [round(float(l), 3) for l in ts_results['lambda_vec']]
 
-        if TransitionStateGuesser._has_qm_results(scan, lambda_vec):
+        if TransitionStateGuesser._has_qm_results(scan,
+                                                  ts_results['lambda_vec']):
             final_lambda = round(float(ts_results.get('max_qm_lambda', 0)), 3)
         else:
             final_lambda = round(float(ts_results['max_mm_lambda']), 3)
@@ -911,7 +930,8 @@ class TransitionStateGuesser():
         def _best_conformer_index(step):
             best_index = 0
             min_energy = None
-            if TransitionStateGuesser._has_qm_results(scan, lambda_vec):
+            if TransitionStateGuesser._has_qm_results(scan,
+                                                      ts_results['lambda_vec']):
                 for i, conf in enumerate(scan[step]):
                     qm_E = conf.get('qm_energy', None)
                     if min_energy is None or (qm_E is not None
@@ -927,8 +947,11 @@ class TransitionStateGuesser():
 
         initial_best = _best_conformer_index(final_lambda)
 
+        rounded_lambda_vec = [
+            round(float(l), 3) for l in ts_results['lambda_vec']
+        ]
         step_selector = ipywidgets.SelectionSlider(
-            options=lambda_vec,
+            options=rounded_lambda_vec,
             description='Lambda',
             value=final_lambda,
         )
@@ -946,7 +969,7 @@ class TransitionStateGuesser():
             TransitionStateGuesser._show_conformer_iteration(
                 step,
                 min(conformer_id, n_conf),
-                lambda_vec,
+                rounded_lambda_vec,
                 scan,
                 bonds=bonds,
                 forming_bonds=forming_bonds,
@@ -1158,8 +1181,8 @@ class TransitionStateGuesser():
             marker='_',
             color='darkcyan',
             alpha=0.4,
-            s=80 / math.log(total_steps, 10),
-            linewidths=1.0,
+            s=30 / math.log(min(2, total_steps), 10),
+            linewidths=2.0,
             zorder=0.5,
         )
         ax1.scatter(
@@ -1167,7 +1190,7 @@ class TransitionStateGuesser():
             rel_mm_energies,
             color='black',
             alpha=0.7,
-            s=120 / math.log(total_steps, 10),
+            s=50 / math.log(min(2, total_steps), 10),
             facecolors="none",
             edgecolor="darkcyan",
             zorder=1,
@@ -1179,7 +1202,7 @@ class TransitionStateGuesser():
             marker='o',
             color='darkcyan',
             alpha=1.0,
-            s=120 / math.log(total_steps, 10),
+            s=50 / math.log(min(2, total_steps), 10),
             zorder=2,
         )
         ax1.set_xlabel(r'$\lambda$')
@@ -1202,15 +1225,15 @@ class TransitionStateGuesser():
                 marker='_',
                 color='darkorange',
                 alpha=0.4,
-                s=80 / math.log(total_steps, 10),
-                linewidths=1.0,
+                s=30 / math.log(min(2, total_steps), 10),
+                linewidths=2.0,
                 zorder=0.5,
             )
             ax1.scatter(
                 lambda_vec,
                 rel_qm_energies,
                 alpha=0.7,
-                s=120 / math.log(total_steps, 10),
+                s=50 / math.log(min(2, total_steps), 10),
                 facecolors="none",
                 edgecolor="darkorange",
                 zorder=1,
@@ -1228,7 +1251,7 @@ class TransitionStateGuesser():
                 marker='o',
                 color='darkorange',
                 alpha=1.0,
-                s=120 / math.log(total_steps, 10),
+                s=120 / math.log(min(2, total_steps), 10),
                 zorder=2,
             )
             ax1.set_ylabel('Relative QM energy [kJ/mol]')
@@ -1572,8 +1595,6 @@ class TransitionStateGuesser():
             self.ostream.print_header(self._param("solvation", "SMD"))
             self.ostream.print_header(
                 self._param("SMD solvent", self.smd_solvent))
-        else:
-            self.ostream.print_header(self._param("solvation", "vacuum"))
 
         self.ostream.print_blank()
         self.ostream.flush()

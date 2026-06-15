@@ -23,7 +23,7 @@ jobs:
 
     defaults:
       run:
-        shell: bash -leo pipefail {0}
+        shell: bash -l -e -o pipefail {0}
 
     container:
       image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-2074132
@@ -33,7 +33,9 @@ jobs:
 
     steps:
       - name: checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: build and test
         run: |

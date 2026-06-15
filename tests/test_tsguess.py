@@ -1,11 +1,7 @@
-from mpi4py import MPI
-from pathlib import Path
 import pytest
 import sys
 
-from veloxchem.veloxchemlib import mpi_master
 from veloxchem.tsguesser import TransitionStateGuesser
-from veloxchem.evbdriver import EvbDriver
 from veloxchem.optimizationdriver import OptimizationDriver
 from veloxchem.molecule import Molecule
 
