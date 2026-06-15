@@ -33,7 +33,7 @@
 from mpi4py import MPI
 import numpy as np
 import sys
-import os
+from pathlib import Path
 from .veloxchemlib import mpi_master
 from .sanitychecks import molecule_sanity_check
 from .molecule import Molecule
@@ -59,7 +59,7 @@ except ImportError:
     pass
 
 
-class ReactionForceFieldBuilder():
+class ReactionForceFieldBuilder:
 
     def __init__(self, comm=None, ostream=None):
         if comm is None:
@@ -206,7 +206,7 @@ class ReactionForceFieldBuilder():
             product_ff.bonds[bond]['comment'] += ', formed in reaction'
 
         self.ostream.flush()
-        
+
         if self.optimize_ff and (len(forming_bonds) > 0 or len(breaking_bonds) > 0):
             # TODO this optimisation can likely be taken care of by the openmmdynamics class
             reactant_ff.molecule = self._optimize_molecule(
@@ -530,6 +530,8 @@ class ReactionForceFieldBuilder():
         # Turn the reactand and product into graphs
 
         rm = ReactionMatcher(ostream=self.ostream)
+        if self._reaction_matcher_assist_min_depth is not None:
+            rm._assist_min_depth = int(self._reaction_matcher_assist_min_depth)
         total_mapping, breaking_bonds, forming_bonds = rm.get_mapping(
             reactant,
             product,
@@ -720,6 +722,7 @@ class ReactionForceFieldBuilder():
 
         pdb = mmapp.PDBFile(f'{name}.pdb')
         ff = mmapp.ForceField(f'{name}.xml')
+        sys_xml_path = Path(f'{name}_sys.xml')
 
         modeller = mmapp.Modeller(pdb.topology, pdb.positions)
 
@@ -739,7 +742,7 @@ class ReactionForceFieldBuilder():
                     mmsys = self._add_reaction_bonds(forcefield, mmsys,
                                                      changing_bonds, note)
 
-                with open(f'{name}_sys.xml', 'w') as f:
+                with sys_xml_path.open('w') as f:
                     f.write(mm.XmlSerializer.serialize(mmsys))
 
                 opm_dyn = OpenMMDynamics()
@@ -789,9 +792,9 @@ class ReactionForceFieldBuilder():
         self.optimize_dist_restraint_offset = 0.5  # Reset for next use
         new_molecule.set_charge(forcefield.molecule.get_charge())
         new_molecule.set_multiplicity(forcefield.molecule.get_multiplicity())
-        os.unlink(f'{name}.xml')
-        os.unlink(f'{name}.pdb')
-        os.unlink(f'{name}_sys.xml')
+        Path(f'{name}.xml').unlink()
+        Path(f'{name}.pdb').unlink()
+        sys_xml_path.unlink()
         return new_molecule
 
     def _add_reaction_bonds(self, forcefield, mmsys, changing_bonds, note):

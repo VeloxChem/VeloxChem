@@ -33,7 +33,6 @@
 from mpi4py import MPI
 import sys
 import numpy as np
-import os
 import math
 import copy
 import h5py
@@ -62,7 +61,7 @@ except ImportError:
 # All positions are in Angsrom unless otherwise stated
 
 
-class TransitionStateGuesser():
+class TransitionStateGuesser:
 
     def __init__(self, comm=None, ostream=None):
         '''
@@ -209,6 +208,9 @@ class TransitionStateGuesser():
             self.ostream.flush()
             self.ostream.mute()
 
+        if self._reaction_matcher_assist_min_depth is not None:
+            self.ffbuilder._reaction_matcher_assist_min_depth = int(self._reaction_matcher_assist_min_depth)
+
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_forcefields(
             reactant=reactant,
             product=product,
@@ -232,7 +234,7 @@ class TransitionStateGuesser():
         self.mol_multiplicity = self.molecule.get_multiplicity()
 
         if self.save_intermediates:
-            os.makedirs(self.folder_name, exist_ok=True)
+            Path(self.folder_name).mkdir(parents=True, exist_ok=True)
             self.ostream.print_info(
                 f"Saving reactant and product forcefield as json to {self.folder_name}"
             )
@@ -287,6 +289,16 @@ class TransitionStateGuesser():
             )
             self.ostream.flush()
             if self.active_torsion is not None:
+                assert_msg_critical(
+                    len(self.active_torsion) == 4,
+                    'TransitionStateGuesser: active_torsion must contain '
+                    'exactly four 1-based atom indices')
+                reactant_natoms = self.reactant.molecule.number_of_atoms()
+                assert_msg_critical(
+                    all(1 <= a <= reactant_natoms for a in self.active_torsion),
+                    'TransitionStateGuesser: active_torsion indices must be '
+                    f'between 1 and {reactant_natoms}')
+
                 # Convert user-supplied 1-indexed tuple to 0-indexed
                 torsion_0idx = tuple(a - 1 for a in self.active_torsion)
                 one_based = list(self.active_torsion)
@@ -374,8 +386,9 @@ class TransitionStateGuesser():
             self.ostream.flush()
             sysbuilder.ostream.unmute()
         if self.save_intermediates:
-            systems_dir = str(Path(self.folder_name) / "systems")
-            os.makedirs(systems_dir, exist_ok=True)
+            systems_dir_path = Path(self.folder_name) / "systems"
+            systems_dir_path.mkdir(parents=True, exist_ok=True)
+            systems_dir = str(systems_dir_path)
             self.ostream.print_info(f"Saving systems as xml to {systems_dir}")
             self.ostream.flush()
             sysbuilder.save_systems_as_xml(self.systems, systems_dir)
@@ -383,7 +396,7 @@ class TransitionStateGuesser():
 
     def scan_mm(self):
 
-        self.folder = Path().cwd() / self.folder_name
+        self.folder = Path.cwd() / self.folder_name
 
         # pdbs are saved in angstrom
 
@@ -739,7 +752,7 @@ class TransitionStateGuesser():
             minimize=minimize,
         )
         if not self.save_intermediates:
-            os.remove(pdb_name)
+            Path(pdb_name).unlink()
 
         result = []
         for e_int, temp_mol in zip(conformers_dict['energies'],

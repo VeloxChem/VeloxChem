@@ -1,25 +1,26 @@
-# This file contains derivative work of OpenMM,
-# which is licensed under the MIT License.
-
-# A recreation of the various GB variants implemented via CustomGBForce
-
-# This is part of the OpenMM molecular simulation toolkit.
-# See https://openmm.org/development.
-
+#
+# This file contains derivative work of the OpenMM molecular simulation toolkit
+# and is licensed under the MIT License. Portions of this file are adapted from
+# openmm.app.internal.customgbforces.
+#
+# SPDX-License-Identifier: MIT
+#
 # Portions copyright (c) 2012-2022 University of Virginia and the Authors.
 # Authors: Christoph Klein, Michael R. Shirts
 # Contributors: Jason M. Swails, Peter Eastman, Justin L. MacCallum
-
+#
+# Modifications made by VeloxChem developers, 2026.
+#
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
 # to deal in the Software without restriction, including without limitation
 # the rights to use, copy, modify, merge, publish, distribute, sublicense,
 # and/or sell copies of the Software, and to permit persons to whom the
 # Software is furnished to do so, subject to the following conditions:
-
+#
 # The above copyright notice and this permission notice shall be included in
 # all copies or substantial portions of the Software.
-
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
@@ -27,13 +28,6 @@
 # DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 # USE OR OTHER DEALINGS IN THE SOFTWARE.
-"""Generalized Born implicit solvent force builder.
-
-Builds OpenMM CustomGBForce objects for the HCT, OBC1, OBC2, GBn, and GBn2
-models using only the public OpenMM API. All parameters and formulas are ported
-verbatim from openmm.app.internal.customgbforces so behaviour is identical
-without depending on that private subpackage.
-"""
 
 import math
 import sys
@@ -43,11 +37,6 @@ try:
     import openmm as mm
 except ImportError:
     pass
-
-# ---------------------------------------------------------------------------
-# Neck lookup tables (GBn / GBn2).
-# Original values are in Angstrom; rescaled to nanometers (d0/=10, m0*=10).
-# ---------------------------------------------------------------------------
 
 
 class GBImplicitSolvent:

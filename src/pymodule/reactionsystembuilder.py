@@ -50,6 +50,7 @@ from .molecule import Molecule
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_arccos
 from .waterparameters import get_water_parameters
+from .gbimplicitsolvent import GBImplicitSolvent
 
 try:
     import openmm as mm
@@ -347,7 +348,8 @@ class ReactionSystemBuilder():
         topology = pdb_file.getTopology()
         system_mol = Molecule.read_pdb_file(self.pdb)
 
-        forcefield = mmapp.ForceField('amber14-all.xml', 'amber14/tip3pfb.xml')
+        forcefield = mmapp.ForceField("amber14-all.xml",
+                                      str(Path("amber14") / "tip3pfb.xml"))
         templates, residues = forcefield.generateTemplatesForUnmatchedResidues(
             topology)
 
@@ -2490,17 +2492,16 @@ class ReactionSystemBuilder():
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbDriver.')
 
-        path = Path().cwd() / folder
+        path = Path.cwd() / folder
         self.ostream.print_info(f"Saving systems to {path}")
         self.ostream.flush()
-        if not path.exists():
-            path.mkdir(parents=True, exist_ok=True)
+        path.mkdir(parents=True, exist_ok=True)
         for name, system in systems.items():
             if isinstance(name, float) or isinstance(name, int):
                 filename = f"{name:.3f}_sys.xml"
             else:
                 filename = f"{name}_sys.xml"
-            with open(path / filename, mode="w", encoding="utf-8") as output:
+            with (path / filename).open(mode="w", encoding="utf-8") as output:
                 output.write(mm.XmlSerializer.serialize(system))
 
     def load_systems_from_xml(self, folder: str):
@@ -2516,10 +2517,10 @@ class ReactionSystemBuilder():
                             'openmm is required for EvbDriver.')
 
         systems = {}
-        path = Path().cwd() / folder
+        path = Path.cwd() / folder
         for lam in self.Lambda:
-            with open(path / f"{lam:.3f}_sys.xml", mode="r",
-                      encoding="utf-8") as input:
+            with (path / f"{lam:.3f}_sys.xml").open(mode="r",
+                                                    encoding="utf-8") as input:
                 systems[lam] = mm.XmlSerializer.deserialize(input.read())
         return systems
 
