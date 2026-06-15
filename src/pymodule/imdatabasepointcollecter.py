@@ -121,6 +121,9 @@ class IMDatabasePointCollecter:
         - driver_flag: The flag to determine the driver to be used.
         - scaling_factor: The scaling factor for the QM stabilizer.
         - linking_atom_distance: The distance between the QM and MM regions in angstroms.
+        - consider_locality: False -->  This key_word allows the constraint optimization part to allow more constraints to be considered to keep the optimized
+                                        molecule closer to the current molecule. This might lead to more contamination of the interpolation database, should be 
+                                        used when system is not improving without stricter locality constraints!
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -531,9 +534,10 @@ class IMDatabasePointCollecter:
         Call this after any datapoint/symmetry update.
         """
         driver = self.impes_drivers[root]
-        sampling_driver = self.sampling_impes_drivers[root]
         driver.mark_runtime_data_cache_dirty()
-        sampling_driver.mark_runtime_data_cache_dirty()
+        if self.sampling_enabled:
+            sampling_driver = self.sampling_impes_drivers[root]
+            sampling_driver.mark_runtime_data_cache_dirty()
 
     def add_bias_force(self, atoms, force_constant, target=0.109, anchor=False):
         """
