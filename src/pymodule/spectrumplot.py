@@ -541,7 +541,7 @@ def plot_rixs_spectrum(rixs_results,
                        broadening_type="lorentzian",
                        broadening_value=0.24,
                        x_unit="ev",
-                       x_step=0.01,
+                       xstep=0.01,
                        ax=None):
     """
     Plot the RIXS spectrum from a RIXS calculation.
@@ -557,7 +557,7 @@ def plot_rixs_spectrum(rixs_results,
         The type of broadening to use. Either 'lorentzian' or 'gaussian'.
     :param broadening_value:
         The FWHM in eV.
-    :param x_step:
+    :param xstep:
         Grid spacing in eV for the broadened RIXS spectrum.
     :param ax:
         The matplotlib axis to plot on.
@@ -604,14 +604,12 @@ def plot_rixs_spectrum(rixs_results,
 
     y = rixs_results['cross_sections'][:, photon_index]
 
-    xmin = max(0.0, min(x) - 0.03)
-    xmax = max(x) + 0.03
-    xstep = x_step
+    x_ev = np.asarray(x)
 
-    x_ev = x * au2ev
-    xmin_ev = xmin * au2ev
-    xmax_ev = xmax * au2ev
-    xstep_ev = xstep * au2ev
+    pad_ev = 0.03
+    xmin_ev = max(0.0, np.min(x_ev) - pad_ev)
+    xmax_ev = np.max(x_ev) + pad_ev
+    xstep = xstep
 
     ax2 = ax.twinx()
     ax2.set_ylabel(r'Cross section, $\sigma$ [a.u.]')
@@ -639,12 +637,12 @@ def plot_rixs_spectrum(rixs_results,
 
     if broadening_type.lower() == "lorentzian":
         xi, yi = lorentzian_xps(
-            x_ev, y, xmin_ev, xmax_ev, xstep_ev, broadening_value
+            x_ev, y, xmin_ev, xmax_ev, xstep, broadening_value
         )
 
     elif broadening_type.lower() == "gaussian":
         xi, yi = gaussian_xps(
-            x_ev, y, xmin_ev, xmax_ev, xstep_ev, broadening_value
+            x_ev, y, xmin_ev, xmax_ev, xstep, broadening_value
         )
 
     else:
@@ -712,7 +710,7 @@ def plot_rixs_map(rixs_results,
                   energy_loss=True,
                   broadening_type="lorentzian",
                   broadening_value=0.24,
-                  x_step=0.01,
+                  xstep=0.01,
                   x_unit="ev",
                   cmap='viridis',
                   normalize='global_max',
@@ -729,7 +727,7 @@ def plot_rixs_map(rixs_results,
         The type of broadening to use. Either 'lorentzian' or 'gaussian'.
     :param broadening_value:
         The FWHM in eV.
-    :param x_step:
+    :param xstep:
         Grid spacing in eV for the broadened RIXS map.
     :param x_unit:
         Only 'ev' is supported.
@@ -798,6 +796,14 @@ def plot_rixs_map(rixs_results,
 
     nr_incoming_photons = incoming_photon_energies_ev.size
 
+    photon_diffs_ev = np.diff(incoming_photon_energies_ev)
+    photon_step_ev = photon_diffs_ev[0]
+
+    assert_msg_critical(
+        np.allclose(photon_diffs_ev, photon_step_ev, rtol=1.0e-5, atol=1.0e-8),
+        'plot_rixs_map: imshow requires uniformly spaced incoming photon energies. '
+    )
+
     xi = None
     rixs_map = None
 
@@ -809,7 +815,7 @@ def plot_rixs_map(rixs_results,
                 cross_sections[:, i],
                 val_min_ev,
                 val_max_ev,
-                x_step,
+                xstep,
                 broadening_value
             )
 
@@ -819,7 +825,7 @@ def plot_rixs_map(rixs_results,
                 cross_sections[:, i],
                 val_min_ev,
                 val_max_ev,
-                x_step,
+                xstep,
                 broadening_value
             )
 
@@ -859,8 +865,8 @@ def plot_rixs_map(rixs_results,
                 'plot_rixs_map: Invalid normalize option. Use None or "global_max".'
             )
 
-    ymin_map = incoming_photon_energies_ev.min()
-    ymax_map = incoming_photon_energies_ev.max()
+    ymin_map = incoming_photon_energies_ev.min() - 0.5 * photon_step_ev
+    ymax_map = incoming_photon_energies_ev.max() + 0.5 * photon_step_ev
 
     limits = [xi.min(), xi.max(), ymin_map, ymax_map]
 

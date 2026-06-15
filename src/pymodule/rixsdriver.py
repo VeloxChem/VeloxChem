@@ -1021,17 +1021,33 @@ class RixsDriver(LinearSolver):
             )
             self.ostream.print_blank()
 
-        self._implementation_ref_str = 'J. Phys. Chem. A 2025, 129, 8783-8797, DOI: 10.1021/acs.jpca.5c04528'
         self.ostream.print_info('Implementation details & benchmark: ')
-        self.ostream.print_reference('Reference: ' + self._implementation_ref_str)
+        self.ostream.print_reference('Reference: ' + self._reference_dictionary()['implementation'])
         self.ostream.print_blank()
 
-        if getattr(self, "_approach_string", None):
-            self.ostream.print_info(self._approach_string)
-            self.ostream.print_reference('Reference: ' + self._method_ref_str)
-            self.ostream.print_blank()
+        #if getattr(self, "_approach_string", None):
+        if self.twoshot:
+            approach_string = 'Running RIXS calculation in the two-shot approach'
+            approach_key = 'twoshot'
+        else:
+            approach_string = 'Running RIXS calculation in the restricted-subspace approach'
+            approach_key = 'rsa'
+        self.ostream.print_info(approach_string)
+        self.ostream.print_reference(self._reference_dictionary()[approach_key])
+        self.ostream.print_blank()
 
         self.ostream.flush()
+
+    def _reference_dictionary(self):
+        """
+        Returns a dictionary of references for the method used.
+        """
+
+        return {
+            'implementation': 'J. Phys. Chem. A 2025, 129, 8783-8797, DOI: 10.1021/acs.jpca.5c04528',
+            'rsa': 'J. Chem. Theory Comput. 2019, 15, 5925-5942, DOI: 10.1021/acs.jctc.9b00638',
+            'twoshot': 'J. Phys. Chem. A 2025, 129, 8783-8797, DOI: 10.1021/acs.jpca.5c04528',
+        }
 
     def _print_rixs_data(self, title, ene_losses,
                          cross_sections, elastic_cross_section):
@@ -1074,7 +1090,7 @@ class RixsDriver(LinearSolver):
              broadening_type="lorentzian",
              broadening_value_ev=0.24,
              x_unit='ev',
-             x_step=1e-4,
+             xstep=1e-4,
              energy_loss=True,
              photon_energy_ev=None,
              ax=None):
@@ -1085,11 +1101,11 @@ class RixsDriver(LinearSolver):
             The results dictionary from compute method.
         :param broadening_type:
             The type of broadening to use. Either 'lorentzian' or 'gaussian'.
-        :param broadening_value:
+        :param broadening_value_ev:
             The broadening value, FWHM in eV.
         :param x_unit:
             Unit for the x-axis.
-        :param x_step:
+        :param xstep:
             Grid spacing in eV for the broadened RIXS spectrum.
         :param energy_loss:
             If True, plot versus energy loss.
@@ -1123,7 +1139,7 @@ class RixsDriver(LinearSolver):
             broadening_value=broadening_value_ev,
             photon_index=photon_index,
             x_unit=x_unit,
-            x_step=x_step,
+            xstep=xstep,
             energy_loss=energy_loss,
             ax=ax
         )
@@ -1132,7 +1148,7 @@ class RixsDriver(LinearSolver):
                  results,
                  broadening_type="lorentzian",
                  broadening_value_ev=0.24,
-                 x_step=1e-2,
+                 xstep=1e-2,
                  x_unit='ev',
                  energy_loss=True,
                  min_photon_points=10,
@@ -1148,7 +1164,7 @@ class RixsDriver(LinearSolver):
             The type of broadening to use. Either 'lorentzian' or 'gaussian'.
         :param broadening_value_ev:
             The broadening value, FWHM in eV.
-        :param x_step:
+        :param xstep:
             Grid spacing in eV for the broadened RIXS map.
         :param x_unit:
             Currently only 'ev' is supported.
@@ -1180,7 +1196,7 @@ class RixsDriver(LinearSolver):
             results,
             broadening_type=broadening_type,
             broadening_value=broadening_value_ev,
-            x_step=x_step,
+            xstep=xstep,
             x_unit=x_unit,
             energy_loss=energy_loss,
             cmap=colormap,
