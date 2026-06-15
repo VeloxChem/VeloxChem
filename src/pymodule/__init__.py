@@ -226,6 +226,9 @@ from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
 from .orbitallocalization import OrbitalLocalizationDriver
+from .qmtrajectoryparser import QMTrajectoryParser
+from .qmtrajectorydriver import QMTrajectoryDriver
+from .qmtrajectoryanalyzer import QMTrajectoryAnalyzer
 from .ensembleparser import EnsembleParser
 from .ensembledriver import EnsembleDriver
 from .spectrumaverager import SpectrumAverager
