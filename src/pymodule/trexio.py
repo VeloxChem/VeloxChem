@@ -117,6 +117,23 @@ def _read_if_present(trexio_file, name, default=None):
     return getattr(trexio, f'read_{name}')(trexio_file)
 
 
+def _normalize_trexio_label(value):
+    """Returns a normalized lowercase string label from TREXIO metadata."""
+
+    if value is None:
+        return None
+
+    if isinstance(value, np.ndarray):
+        if value.size == 0:
+            return None
+        value = value.reshape(-1)[0]
+
+    if isinstance(value, bytes):
+        value = value.decode('utf-8')
+
+    return str(value).strip().lower()
+
+
 def _angular_momentum_from_label(label):
     """Returns angular momentum for a VeloxChem AO label token."""
 
@@ -183,6 +200,11 @@ def _primitive_normalization_factors(exponents, angular_momentum):
 
     exponents = np.array(exponents, dtype=float)
     factors = np.power(2.0 * exponents / np.pi, 0.75)
+
+    assert_msg_critical(
+        angular_momentum <= 6,
+        'TREXIO export does not support primitive normalization for '
+        f'angular momentum l={angular_momentum}.')
 
     if angular_momentum == 0:
         return factors
@@ -468,7 +490,15 @@ def _write_ecp(trexio_file, molecule, basis):
 def _molecular_orbitals_from_scf_results(scf_results):
     """Creates MolecularOrbitals from an SCF results dictionary."""
 
-    scf_type = scf_results.get('scf_type', 'restricted')
+    scf_type = scf_results.get('scf_type')
+
+    if scf_type is None:
+        if 'C_beta' in scf_results or 'E_beta' in scf_results:
+            scf_type = 'unrestricted'
+        elif 'occ_beta' in scf_results:
+            scf_type = 'restricted_openshell'
+        else:
+            scf_type = 'restricted'
 
     if scf_type == 'unrestricted':
         return MolecularOrbitals(
@@ -503,6 +533,15 @@ def _write_molecular_orbitals(trexio_file,
             (mol_orbs.alpha_to_numpy()[ao_permutation, :].T,
              mol_orbs.beta_to_numpy()[ao_permutation, :].T))
         energy = np.hstack((mol_orbs.ea_to_numpy(), mol_orbs.eb_to_numpy()))
+        occupation = np.hstack(
+            (mol_orbs.occa_to_numpy(), mol_orbs.occb_to_numpy()))
+        spin = np.hstack((np.zeros(mol_orbs.number_of_mos(), dtype=np.int64),
+                          np.ones(mol_orbs.number_of_mos(), dtype=np.int64)))
+    elif orbitals_type == molorb.restopen:
+        restricted_coef = mol_orbs.alpha_to_numpy()[ao_permutation, :].T
+        restricted_energy = mol_orbs.ea_to_numpy()
+        coef = np.vstack((restricted_coef, restricted_coef))
+        energy = np.hstack((restricted_energy, restricted_energy))
         occupation = np.hstack(
             (mol_orbs.occa_to_numpy(), mol_orbs.occb_to_numpy()))
         spin = np.hstack((np.zeros(mol_orbs.number_of_mos(), dtype=np.int64),
@@ -594,7 +633,20 @@ def write_trexio(fname,
         if mol_orbs is not None:
             mo_type = 'VeloxChem'
             if scf_results is not None:
-                mo_type = scf_results.get('scf_type', mo_type)
+                mo_type = _molecular_orbitals_from_scf_results(
+                    scf_results).get_orbitals_type()
+                if mo_type == molorb.rest:
+                    mo_type = 'restricted'
+                elif mo_type == molorb.unrest:
+                    mo_type = 'unrestricted'
+                elif mo_type == molorb.restopen:
+                    mo_type = 'restricted_openshell'
+            elif mol_orbs.get_orbitals_type() == molorb.rest:
+                mo_type = 'restricted'
+            elif mol_orbs.get_orbitals_type() == molorb.unrest:
+                mo_type = 'unrestricted'
+            elif mol_orbs.get_orbitals_type() == molorb.restopen:
+                mo_type = 'restricted_openshell'
             _write_molecular_orbitals(trexio_file, mol_orbs, mo_type,
                                       ao_permutation)
 
@@ -696,18 +748,20 @@ def _read_basis_from_open_trexio(trexio_file, molecule):
                                            int(shell_ang_mom[atom_shell_index]))
             atom_basis.add(basis_function)
 
-        basis.add(atom_basis)
+        atom_ecp = _read_atom_ecp_from_open_trexio(trexio_file, atom_index)
+        if atom_ecp is not None:
+            atom_basis.set_ecp_potential(atom_ecp)
 
-    _read_ecp_into_basis(trexio_file, basis)
+        basis.add(atom_basis)
 
     return basis
 
 
-def _read_ecp_into_basis(trexio_file, basis):
-    """Reads ECP data into an existing molecular basis when present."""
+def _read_atom_ecp_from_open_trexio(trexio_file, atom_index):
+    """Reads ECP data for one atom from an open TREXIO file."""
 
     if not _has(trexio_file, 'ecp_num'):
-        return
+        return None
 
     max_ang_mom_plus_1 = np.array(_read_if_present(trexio_file,
                                                    'ecp_max_ang_mom_plus_1'),
@@ -722,35 +776,31 @@ def _read_ecp_into_basis(trexio_file, basis):
                            dtype=float)
     power = np.array(_read_if_present(trexio_file, 'ecp_power'), dtype=int)
 
-    for atom_index, atom_basis in enumerate(basis.basis_sets()):
-        if atom_index >= max_ang_mom_plus_1.size or z_core[atom_index] == 0:
+    if atom_index >= max_ang_mom_plus_1.size or z_core[atom_index] == 0:
+        return None
+
+    local_ang = int(max_ang_mom_plus_1[atom_index])
+    atom_items = np.where(nucleus_index == atom_index)[0]
+    local_items = atom_items[ang_mom[atom_items] == local_ang]
+
+    local_potential = BaseCorePotential(exponent[local_items].tolist(),
+                                        coefficient[local_items].tolist(),
+                                        power[local_items].tolist())
+
+    projected_potentials = []
+    projected_angular = []
+    for proj_ang in sorted(set(ang_mom[atom_items].tolist())):
+        if proj_ang == local_ang:
             continue
+        proj_items = atom_items[ang_mom[atom_items] == proj_ang]
+        projected_angular.append(int(proj_ang))
+        projected_potentials.append(
+            BaseCorePotential(exponent[proj_items].tolist(),
+                              coefficient[proj_items].tolist(),
+                              power[proj_items].tolist()))
 
-        local_ang = int(max_ang_mom_plus_1[atom_index])
-        atom_items = np.where(nucleus_index == atom_index)[0]
-        local_items = atom_items[ang_mom[atom_items] == local_ang]
-
-        local_potential = BaseCorePotential(exponent[local_items].tolist(),
-                                            coefficient[local_items].tolist(),
-                                            power[local_items].tolist())
-
-        projected_potentials = []
-        projected_angular = []
-        for proj_ang in sorted(set(ang_mom[atom_items].tolist())):
-            if proj_ang == local_ang:
-                continue
-            proj_items = atom_items[ang_mom[atom_items] == proj_ang]
-            projected_angular.append(int(proj_ang))
-            projected_potentials.append(
-                BaseCorePotential(exponent[proj_items].tolist(),
-                                  coefficient[proj_items].tolist(),
-                                  power[proj_items].tolist()))
-
-        if projected_potentials:
-            atom_ecp = AtomCorePotential(local_potential, projected_potentials,
-                                         projected_angular,
-                                         int(z_core[atom_index]))
-            atom_basis.set_ecp_potential(atom_ecp)
+    return AtomCorePotential(local_potential, projected_potentials,
+                             projected_angular, int(z_core[atom_index]))
 
 
 def read_molecule_and_basis(fname, backend='hdf5'):
@@ -776,6 +826,8 @@ def read_molecular_orbitals(fname, backend='hdf5'):
                             'TREXIO file does not contain molecular orbitals.')
         nmo = int(_read_if_present(trexio_file, 'mo_num'))
         nao = int(_read_if_present(trexio_file, 'ao_num'))
+        mo_type = _normalize_trexio_label(
+            _read_if_present(trexio_file, 'mo_type', None))
         molecule = read_molecule(fname, backend)
         basis = _read_basis_from_open_trexio(trexio_file, molecule)
         shells = _basis_shells(molecule, basis)
@@ -801,13 +853,29 @@ def read_molecular_orbitals(fname, backend='hdf5'):
         if has_alpha and has_beta:
             alpha = np.where(spin == 0)[0]
             beta = np.where(spin == 1)[0]
+
+            alpha_coeff = coefficient[alpha, :].T[vlx_to_trexio, :]
+            beta_coeff = coefficient[beta, :].T[vlx_to_trexio, :]
+            alpha_energy = energy[alpha]
+            beta_energy = energy[beta]
+            alpha_occ = occupation[alpha]
+            beta_occ = occupation[beta]
+
+            if mo_type == 'restricted_openshell':
+                assert_msg_critical(
+                    alpha_coeff.shape == beta_coeff.shape and
+                    np.allclose(alpha_coeff, beta_coeff) and
+                    np.allclose(alpha_energy, beta_energy),
+                    'TREXIO restricted open-shell orbitals are inconsistent '
+                    'between alpha and beta channels.')
+
+                return MolecularOrbitals([alpha_coeff], [alpha_energy],
+                                         [alpha_occ, beta_occ],
+                                         molorb.restopen)
+
             return MolecularOrbitals(
-                [
-                    coefficient[alpha, :].T[vlx_to_trexio, :],
-                    coefficient[beta, :].T[vlx_to_trexio, :]
-                ],
-                [energy[alpha], energy[beta]],
-                [occupation[alpha], occupation[beta]], molorb.unrest)
+                [alpha_coeff, beta_coeff], [alpha_energy, beta_energy],
+                [alpha_occ, beta_occ], molorb.unrest)
 
         half_occupation = 0.5 * occupation
         return MolecularOrbitals([coefficient.T[vlx_to_trexio, :]], [energy],
