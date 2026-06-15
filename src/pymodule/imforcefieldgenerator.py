@@ -259,7 +259,8 @@ class IMForceFieldGenerator:
         self.use_eq_bond_length = False
         self.use_tc_weights = True
         self.tc_weight_mode = "multiplicative"  # "additive_rhee"
-        self.use_mass_weight = False
+        self.use_mass_weight = True
+        self.consider_locality = False
 
         self.eq_bond_length = None
         self.eq_bond_length_irc_bonds = None
@@ -1182,6 +1183,7 @@ class IMForceFieldGenerator:
             im_database_driver.non_core_symmetry_groups = self.symmetry_information
             im_database_driver.platform = self.open_mm_platform
             im_database_driver.all_rot_bonds = self.all_rotatable_bonds
+            im_database_driver.consider_locality = self.consider_locality
 
             # set optimization features in the construction run
             im_database_driver.identfy_relevant_int_coordinates = (self.identfy_relevant_int_coordinates, self.use_minimized_structures[1])
