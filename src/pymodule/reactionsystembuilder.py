@@ -64,6 +64,8 @@ try:
 except ImportError:
     pass
 
+from .gbimplicitsolvent import GBImplicitSolvent
+
 
 class ReactionSystemBuilder():
 
@@ -98,9 +100,11 @@ class ReactionSystemBuilder():
         self.morse_D_default: float = 500  # kj/mol, default dissociation energy if none is given
         self.morse_couple: float = 1  # kj/mol, scaling for the morse potential to emulate a coupling between two overlapping bonded states
 
-        self.posres_residue_radius: float = -1  # A, cutoff measured from the com of the ligand for which residues to add to the position restraints, -1 includes the whole molecule
-        self.posres_k = 1000  # kj/mol nm^2, default in gromacs
-        self.carbon_k = 100  # kj/mol nm, centroid for bringing the system and CNT or graphene close
+        # self.centroid_k: float = 50000  # kj/mol nm, force constant for the position restraints
+        # self.centroid_offset: float = -0.2 #A
+        # self.centroid_complete_ligand: bool = True # If false, the centroid force will only be applied to the reacting atoms, if true, the complete ligand will be used for the centroid force
+
+        self.frozen_k: float = 10000.0  # kJ/mol/nm², very stiff spring for frozen atoms
 
         self.coul14_scale: float = 0.833
         self.lj14_scale: float = 0.5
@@ -135,6 +139,7 @@ class ReactionSystemBuilder():
         self.verbose = False
 
         self.constraints: list[dict] = []
+        self.frozen_atoms: list[int] = []
 
         self.k = 4.184 * hartree_in_kcalpermol() * 0.1 * bohr_in_angstrom(
         )  # Coulombic pre-factor
@@ -199,8 +204,7 @@ class ReactionSystemBuilder():
             "neutralize": bool,
             "morse_D_default": float,
             "morse_couple": float,
-            "posres_k": float,
-            "posres_residue_radius": float,
+            "frozen_k": float,
             "coul14_scale": float,
             "lj14_scale": float,
             "pdb": str,
@@ -770,7 +774,8 @@ class ReactionSystemBuilder():
                     continue
                 mm_element = mmapp.Element.getBySymbol(elements[id])
                 name = f"{elements[id]}{id}"
-                system.addParticle(mm_element.mass)
+                mass = mm_element.mass
+                system.addParticle(mass)
                 nb_force.addParticle(
                     0, 1, 0
                 )  #Placeholder values, actual values depend on lambda and will be set later
@@ -828,26 +833,24 @@ class ReactionSystemBuilder():
 
         return
 
-    # def _add_posres(self, system, atoms, positions):
-    #     posres_expr = "posres_k*periodicdistance(x, y, z, x0, y0, z0)^2"
-    #     posres_force = mm.CustomExternalForce(posres_expr)
-    #     posres_force.setName("protein_ligand_posres")
-    #     posres_force.setForceGroup(EvbForceGroup.POSRES.value)
-    #     posres_force.addGlobalParameter('posres_k', self.posres_k)
-    #     posres_force.addPerParticleParameter('x0')
-    #     posres_force.addPerParticleParameter('y0')
-    #     posres_force.addPerParticleParameter('z0')
-    #     count = 0
-    #     for atom in atoms:
-    #         if atom.element is not mmapp.element.hydrogen:
-    #             index = atom.index
-    #             position = self.positions[index]
-    #             posres_force.addParticle(index, position * 0.1)
-    #             count += 1
-
-    #     self.ostream.print_info(f"Adding {count} particles to posres force")
-    #     self.ostream.flush()
-    #     system.addForce(posres_force)
+    def _add_frozen(self, system, lam):
+        if not self.frozen_atoms:
+            return
+        rea_pos = self.reactant.molecule.get_coordinates_in_angstrom()
+        pro_pos = self.product.molecule.get_coordinates_in_angstrom()
+        frozen_force = mm.CustomExternalForce(
+            "frozen_k*periodicdistance(x, y, z, x0, y0, z0)^2")
+        frozen_force.setName("frozen")
+        frozen_force.addGlobalParameter('frozen_k', self.frozen_k)
+        frozen_force.addPerParticleParameter('x0')
+        frozen_force.addPerParticleParameter('y0')
+        frozen_force.addPerParticleParameter('z0')
+        for atom_id in self.frozen_atoms:
+            particle_index = self.reaction_atoms[atom_id].index
+            interp_pos_nm = ((1 - lam) * rea_pos[atom_id] +
+                             lam * pro_pos[atom_id]) * 0.1  # Å → nm
+            frozen_force.addParticle(particle_index, interp_pos_nm)
+        system.addForce(frozen_force)
 
     def _add_CNT_graphene(self, system, nb_force, topology, system_mol):
 
@@ -1560,6 +1563,8 @@ class ReactionSystemBuilder():
             # Add the bonded forces for the reaction system
             if not self.no_reactant:
                 self._add_reaction_forces(new_system, lam)
+
+            self._add_frozen(new_system, lam)
             systems[lam] = new_system
 
         self._add_reaction_forces(rea_system, 0, pes=True)
@@ -1679,8 +1684,7 @@ class ReactionSystemBuilder():
                 to_remove.append(i)
         for i in reversed(to_remove):
             system.removeForce(i)
-            
-            
+
         # Set all force constants in the remaining forces to 0
         for force in system.getForces():
             if force.getForceGroup() == EvbForceGroup.REA_MORSE_BOND.value:
@@ -2762,7 +2766,9 @@ class ReactionSystemBuilder():
                     try:
                         lam = float(name)
                     except ValueError:
-                        self.ostream.print_info(f"Could not parse lambda value from filename {file.name}. Loading system with full name")
+                        self.ostream.print_info(
+                            f"Could not parse lambda value from filename {file.name}. Loading system with full name"
+                        )
                         lam = name
                     systems[lam] = mm.XmlSerializer.deserialize(input.read())
         return systems
@@ -2803,11 +2809,11 @@ class EvbForceGroup(Enum):
     PDB = auto()  # Bonded forces added from the PDB
     SOL_COUL = auto()
     SOL_LJ = auto()
-    POSRES = auto()
+    FROZEN = auto()
 
     @classmethod
     def pes_forcegroups(cls):
-        max_ind = cls.POSRES.value
+        max_ind = cls.FROZEN.value
         return set(range(1, max_ind))
 
     @classmethod

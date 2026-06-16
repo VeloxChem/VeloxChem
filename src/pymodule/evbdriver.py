@@ -44,7 +44,6 @@ from .molecule import Molecule
 from .outputstream import OutputStream
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .reactionsystembuilder import ReactionSystemBuilder
-from .reactionsystembuilder import ReactionSystemBuilder
 from .evbfepdriver import EvbFepDriver
 from .reaffbuilder import ReactionForceFieldBuilder
 from .evbdataprocessing import EvbDataProcessing
@@ -298,7 +297,7 @@ class EvbDriver:
                             name: str,
                             load_systems=False,
                             load_pdb=False,
-                            restart: str|None = None):
+                            restart: str | None = None):
         """Load a configuration from a data folder for which the systems have already been generated, such that an FEP can be performed.
         The topology, initial positions, temperature and Lambda vector will be loaded from the data folder.
 
@@ -315,17 +314,15 @@ class EvbDriver:
         options_path = Path(data_folder) / "options.json"
         with options_path.open("r") as file:
             conf = json.load(file)
-            
-        
+
         if self.lambda_vec != conf["Lambda"] and self.lambda_vec is not None:
             self.ostream.print_warning(
                 f"Lambda vector in {options_path} does not match the current Lambda vector. Overwriting current Lambda vector with the one from the file."
             )
         self.temperature = conf['temperature']
         self.lambda_vec = conf['Lambda']
-        conf["data_folder"] =  str(data_folder)
+        conf["data_folder"] = str(data_folder)
         conf["run_folder"] = str(Path(data_folder) / "run")
-
 
         if load_systems:
             sysbuilder = ReactionSystemBuilder()
@@ -334,14 +331,20 @@ class EvbDriver:
             conf["systems"] = systems
         else:
             systems = []
-        
+
         if restart is not None:
             try:
                 pdb = mmapp.PDBFile(str(Path(data_folder) / restart))
             except Exception as e:
-                raise ValueError(f"Could not load restart pdb file {restart} from {data_folder}. Error: {e}")
-            self.ostream.print_info(f"Loading topology and initial positions from restart pdb file {restart} from {data_folder}.")
-            self.ostream.print_info("Turning on skip_initial_equil, so the FEP will start directly with sampling instead of equilibration.")
+                raise ValueError(
+                    f"Could not load restart pdb file {restart} from {data_folder}. Error: {e}"
+                )
+            self.ostream.print_info(
+                f"Loading topology and initial positions from restart pdb file {restart} from {data_folder}."
+            )
+            self.ostream.print_info(
+                "Turning on skip_initial_equil, so the FEP will start directly with sampling instead of equilibration."
+            )
             self.ostream.flush()
             conf["topology"] = pdb.getTopology()
             conf["initial_positions"] = pdb.getPositions(
@@ -360,19 +363,21 @@ class EvbDriver:
         self.ostream.print_info(
             f"Current configurations: {[conf['name'] for conf in self.system_confs]}"
         )
-        
+
         #If there are any csv or xtc files in the data folder
-        if any(Path(data_folder).glob("*.csv")) or any(Path(data_folder).glob("*.xtc")):
+        if any(Path(data_folder).glob("*.csv")) or any(
+                Path(data_folder).glob("*.xtc")):
             self.ostream.print_warning(
                 f"Found csv or xtc files in {data_folder}. These might be from a previous FEP run using the same folder. The files will be renamed with the prefix OLD_ to avoid overwriting them during the new FEP run."
             )
             for file in Path(data_folder).iterdir():
-                if file.is_file() and (file.name.endswith(".csv") or file.name.endswith(".xtc")):
+                if file.is_file() and (file.name.endswith(".csv")
+                                       or file.name.endswith(".xtc")):
                     new_name = file.parent / f"OLD_{file.name}"
                     file.rename(new_name)
-                    self.ostream.print_info(f"Renamed {file.name} to {new_name.name}")
-        
-        
+                    self.ostream.print_info(
+                        f"Renamed {file.name} to {new_name.name}")
+
         self.ostream.flush()
 
     def run_FEP(

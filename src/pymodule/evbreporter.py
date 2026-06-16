@@ -161,8 +161,8 @@ class EvbReporter:
         self.report_nb_decomp = False
         if len(self.decomp_names) > 0:
             self.report_nb_decomp = True
-            dir = '/'.join(energy_file.split('/')[:-1])
-            filename = dir + '/NB_decompositions.csv'
+            output_dir = Path(energy_file).parent
+            filename = str(output_dir / 'NB_decompositions.csv')
             self.decomp_out = open(filename, 'a' if append else 'w')
             self.out_streams.append(self.decomp_out)
             if not append:
@@ -198,12 +198,8 @@ class EvbReporter:
             # self.measure_params = sorted(self.measure_params)
             self.measure_params = sorted(self.measure_params,
                                          key=lambda x: (len(x), x))
-            dir = Path(energy_file).parent
-
-            # dir = '/'.join(energy_file.split('/')[:-1])
-            filename = dir / 'bonded_E1_decomp.csv'
-            filename = dir / 'bonded_E2_decomp.csv'
-            filename = dir / 'bonded_params.csv'
+            output_dir = Path(energy_file).parent
+            filename = str(output_dir / 'bonded_E1_decomp.csv')
             self.bonded_E1_decomp_out = open(filename, 'a' if append else 'w')
             self.bonded_E2_decomp_out = open(filename, 'a' if append else 'w')
             self.bonded_params_out = open(filename, 'a' if append else 'w')

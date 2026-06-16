@@ -39,7 +39,7 @@ import sys
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .evbreporter import EvbReporter
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, print_exception_if_debug
 from .reactionsystembuilder import EvbForceGroup
 
 try:
@@ -338,8 +338,8 @@ class EvbFepDriver:
         self.total_steps = 0
         self.run_steps = 0
         # Per-lambda equilibration + sampling (runs for every lambda point)
-        self.total_steps += (self.equil_NVT_steps +
-                             self.sample_steps) * len(self.Lambda)
+        self.total_steps += (self.equil_NVT_steps + self.sample_steps) * len(
+            self.Lambda)
         if self.isobaric:
             self.total_steps += self.equil_NPT_steps * len(self.Lambda)
 
@@ -358,14 +358,13 @@ class EvbFepDriver:
                         if self.isobaric:
                             self.total_steps += self.initial_equil_NPT_steps
                     else:
-                        self.total_steps += (
-                            self.warmup_NVT_steps if self.warmup_NVT_steps > 0
-                            else self.initial_equil_NVT_steps)
+                        self.total_steps += (self.warmup_NVT_steps
+                                             if self.warmup_NVT_steps > 0 else
+                                             self.initial_equil_NVT_steps)
                         if self.isobaric:
-                            self.total_steps += (
-                                self.warmup_NPT_steps
-                                if self.warmup_NPT_steps > 0 else
-                                self.initial_equil_NPT_steps)
+                            self.total_steps += (self.warmup_NPT_steps if
+                                                 self.warmup_NPT_steps > 0 else
+                                                 self.initial_equil_NPT_steps)
 
         self.ostream.print_info(info)
         self.ostream.flush()

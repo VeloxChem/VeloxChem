@@ -1030,7 +1030,7 @@ class OpenMMDynamics:
                                 qm_driver=None,
                                 basis=None,
                                 constraints=None,
-                                initial_minimize=False):
+                                minimize=False):
         """
         Runs a high-temperature MD simulation to sample conformations and minimize the energy of these conformations.
 
@@ -1053,9 +1053,7 @@ class OpenMMDynamics:
         :param constraints:
             Constraints for the system. Default is None.
         :param minimize:
-            If True, the energy of the conformations will be minimized. Default is True.
-        :param initial_minimize:
-            If True, minimizes the energy of the system before starting the sampling. Default is False.
+            If True, the initial structure will be minimised before assigning velocities. Default is False.
 
         :return:
             conformers_dict: Dictionary with lists of potential energies of the conformations, the minimized molecule objects,
@@ -1082,6 +1080,8 @@ class OpenMMDynamics:
                                          self.integrator,
                                          platform=self._create_platform())
         self.simulation.context.setPositions(self.positions)
+        if minimize:
+            self.simulation.minimizeEnergy()
         self.simulation.context.setVelocitiesToTemperature(self.temperature)
 
         if self.molecule is None:
