@@ -550,6 +550,8 @@ class OptimizationDriver:
                         self._get_xyz_string(labels, coords_au)
                         for coords_au in opt_coordinates_au
                     ]
+                    opt_results['irc_coordinates_au'] = np.array(
+                        opt_coordinates_au)
 
                 else:
                     self.print_opt_result(m)
