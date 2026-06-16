@@ -33,7 +33,6 @@
 from mpi4py import MPI
 from pathlib import Path
 import numpy as np
-import h5py
 import sys
 
 from .veloxchemlib import hartree_in_ev, mpi_master, fine_structure_constant
@@ -44,7 +43,8 @@ from .linearsolver import LinearSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .tdaeigensolver import TdaEigenSolver
 from .errorhandler import assert_msg_critical
-from .resultsio import write_rixs_results_to_hdf5
+from .resultsio import clear_group_in_hdf5
+from .resultsio import write_rsp_results_to_hdf5
 
 
 class RixsDriver(LinearSolver):
@@ -358,18 +358,21 @@ class RixsDriver(LinearSolver):
 
             core_eigvals = core_rsp_results['eigenvalues'][core_states].copy()
             valence_eigvals = rsp_results['eigenvalues'][val_states].copy()
+            core_osc_strengths = core_rsp_results['oscillator_strengths'][core_states].copy()
         else:
             mo_occ = None
             mo_vir = None
 
             core_eigvals = None
             valence_eigvals = None
+            core_osc_strengths = None
 
         mo_occ = self.comm.bcast(mo_occ, root=mpi_master())
         mo_vir = self.comm.bcast(mo_vir, root=mpi_master())
 
         core_eigvals = self.comm.bcast(core_eigvals, root=mpi_master())
         valence_eigvals = self.comm.bcast(valence_eigvals, root=mpi_master())
+        core_osc_strengths = self.comm.bcast(core_osc_strengths, root=mpi_master())
 
         core_eigvecs = self._get_eigvecs(core_rsp_results, core_states)
         valence_eigvecs = self._get_eigvecs(rsp_results, val_states)
@@ -524,20 +527,28 @@ class RixsDriver(LinearSolver):
             'scattering_amplitudes': self.scattering_amplitudes,
             'emission_energies': self.emission_enes,
             'energy_losses': self.ene_losses,
-            'core_eigenvalues': core_rsp_results['eigenvalues'][core_states],
-            'core_osc_strengths': core_rsp_results['oscillator_strengths'][core_states],
+            'core_eigenvalues': core_eigvals,
+            'core_osc_strengths': core_osc_strengths,
             'gamma_fwhm_ev': self.gamma * hartree_in_ev(),
         }
 
+        # add rsp type
+        results_dict.update({'rsp_type': 'rixs'})
+
         if self.filename is not None and self.rank == mpi_master():
-            final_h5_fname = self.filename + ".h5"
-            self._write_hdf5(final_h5_fname, results_dict)
+            final_h5_fname = f'{self.filename}.h5'
+            if Path(final_h5_fname).is_file():
+                clear_group_in_hdf5(final_h5_fname, 'rsp')
+                write_rsp_results_to_hdf5(final_h5_fname, results_dict)
+                valstr = f'RIXS results written to file: {final_h5_fname}'
+                self.ostream.print_info(valstr)
+                self.ostream.print_blank()
+                self.ostream.flush()
 
         if not init_photon_set:
             self.photon_energy = None
 
         return results_dict
-
 
     def _first_core_energy(self, rsp_results):
         """
@@ -703,8 +714,6 @@ class RixsDriver(LinearSolver):
             The dictionay containint response results.
         :param states:
             The excited states.
-        :param label:
-            The label.
 
         :return:
             The eigenvectors as a list of 1D numpy arrays.
@@ -861,29 +870,6 @@ class RixsDriver(LinearSolver):
         )
         return gs_to_core, core_to_val
 
-    def _write_hdf5(self, fname, rixs_results):
-        """
-        Writes the RIXS results to the specified output file in h5
-        format. The h5 file saved contains the following datasets:
-
-        :param fname:
-            Name of the HDF5 file.
-        :param rixs_results:
-            The dictionary of rixs results.
-        """
-
-        if (fname and isinstance(fname, str) and Path(fname).is_file()):
-
-            write_rixs_results_to_hdf5(fname, rixs_results)
-
-            valstr = 'RIXS results written to file: '
-            valstr += fname
-            self.ostream.print_info(valstr)
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-
-
     def _print_header(self, molecule, basis):
         """
         Prints RIXS calculation setup details to output stream.
@@ -1025,7 +1011,6 @@ class RixsDriver(LinearSolver):
         self.ostream.print_reference('Reference: ' + self._reference_dictionary()['implementation'])
         self.ostream.print_blank()
 
-        #if getattr(self, "_approach_string", None):
         if self.twoshot:
             approach_string = 'Running RIXS calculation in the two-shot approach'
             approach_key = 'twoshot'

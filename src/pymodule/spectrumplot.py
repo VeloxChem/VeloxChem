@@ -610,7 +610,6 @@ def plot_rixs_spectrum(rixs_results,
     pad_ev = 1.25
     xmin_ev = np.min(x_ev) - pad_ev
     xmax_ev = np.max(x_ev) + pad_ev
-    xstep = xstep
 
     ax2 = ax.twinx()
     ax2.set_ylabel(r'Cross section, $\sigma$ [a.u.]')

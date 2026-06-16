@@ -863,6 +863,7 @@ def test_vib_results_hdf5_roundtrip_with_water_calculation(tmp_path):
         assert 'basis_set' not in recovered
         assert 'nuclear_charges' not in recovered
 
+
 def test_rixs_results_hdf5_roundtrip_with_water_calculation(tmp_path):
     here = Path(__file__).parent
     inpfile = str(here / 'data' / 'water_rixs_scf.inp')
@@ -889,8 +890,7 @@ def test_rixs_results_hdf5_roundtrip_with_water_calculation(tmp_path):
     rixs_results = rixs_drv.compute(task.molecule, task.ao_basis, scf_results)
 
     if task.mpi_rank == mpi_master():
-        recovered = read_results(f'{filename}.h5', 'rixs')
+        recovered = read_results(f'{filename}.h5', 'rsp')
         _assert_roundtrip_equal(rixs_results, recovered)
         assert 'basis_set' not in recovered
         assert 'nuclear_charges' not in recovered
-
