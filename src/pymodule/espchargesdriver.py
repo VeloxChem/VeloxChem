@@ -266,8 +266,7 @@ class EspChargesDriver:
         write_results_to_hdf5(str(h5_fname),
                               label,
                               {key: charges},
-                              value_label=f'{label.upper()} charge result',
-                              replace_group=True)
+                              value_label=f'{label.upper()} charge result')
 
     def _get_grid_esp_for_single_mol(self,
                                      molecule,
