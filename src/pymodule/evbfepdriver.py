@@ -337,18 +337,35 @@ class EvbFepDriver:
         )
         self.total_steps = 0
         self.run_steps = 0
-        self.total_steps += self.initial_equil_NVT_steps + (
-            self.equil_NVT_steps + self.sample_steps) * len(self.Lambda)
+        # Per-lambda equilibration + sampling (runs for every lambda point)
+        self.total_steps += (self.equil_NVT_steps +
+                             self.sample_steps) * len(self.Lambda)
         if self.isobaric:
-            self.total_steps += self.initial_equil_NPT_steps + (
-                self.equil_NPT_steps * len(self.Lambda))
+            self.total_steps += self.equil_NPT_steps * len(self.Lambda)
 
-        if self.pdb is not None:
-            self.total_steps += self.initial_equil_NVT_steps * len(
-                self.pdb_temperatures)
-            if self.isobaric:
-                self.total_steps += self.initial_equil_NPT_steps * len(
-                    self.pdb_temperatures)
+        # Initial equilibration / PDB warm-up. This is only executed for the
+        # l == 0 window and only when skip_initial_equil is not set, so mirror
+        # exactly the step counts that _initial_equilibrate will actually run.
+        if not self.skip_initial_equil and 0 in self.Lambda:
+            if self.pdb is None:
+                self.total_steps += self.initial_equil_NVT_steps
+                if self.isobaric:
+                    self.total_steps += self.initial_equil_NPT_steps
+            else:
+                for T in self.pdb_temperatures:
+                    if T == self.temperature:
+                        self.total_steps += self.initial_equil_NVT_steps
+                        if self.isobaric:
+                            self.total_steps += self.initial_equil_NPT_steps
+                    else:
+                        self.total_steps += (
+                            self.warmup_NVT_steps if self.warmup_NVT_steps > 0
+                            else self.initial_equil_NVT_steps)
+                        if self.isobaric:
+                            self.total_steps += (
+                                self.warmup_NPT_steps
+                                if self.warmup_NPT_steps > 0 else
+                                self.initial_equil_NPT_steps)
 
         self.ostream.print_info(info)
         self.ostream.flush()
@@ -754,6 +771,7 @@ class EvbFepDriver:
 
     def _safe_step(self, simulation, steps, name=""):
         if not self.safe_step:
+            self.run_steps += steps
             simulation.step(steps)
             state = simulation.context.getState(
                 getPositions=True,
