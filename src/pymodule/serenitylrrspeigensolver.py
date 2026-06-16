@@ -38,6 +38,10 @@ from .veloxchemlib import mpi_master, hartree_in_ev
 from .errorhandler import assert_msg_critical
 from .serenityscfdriver import SerenityScfDriver
 
+from .resultsio import write_lr_rsp_results_to_hdf5
+from .resultsio import write_rsp_solution
+from .resultsio import write_scf_results_to_hdf5
+
 try:
     from qcserenity import serenipy as spy
     import qcserenity as qc
@@ -314,14 +318,19 @@ class SerenityLinearResponseSolver:
             with self.scf_driver._serenity_output_context():
                 self._lr_task.run()
             
-            transitions = np.array(self._lr_task.getTransitions(), dtype=float)
-            self._rsp_results = self._build_rsp_results(transitions)
-            self._rsp_results['exc_method'] = self.exc_method
+            transitions = self._get_serenity_transitions()
+            eigvecs = self._get_serenity_excitation_vectors()
 
-            self._last_rsp_geom_signature = geom_signature
-            self._last_rsp_settings_signature = rsp_signature
-            self._last_system_signature = system_signature
+            rsp_results = self._build_rsp_results(transitions)
+            rsp_results["exc_method"] = self.exc_method
+            rsp_results["eigenvectors"] = eigvecs
 
+            self._add_native_rsp_metadata(rsp_results, eigvecs)
+            self._rsp_results = rsp_results
+
+            self._write_final_hdf5(molecule, self._rsp_results)
+            self._write_response_vectors(self.scf_driver.get_final_h5py_file(), eigvecs)
+                        
         return self._copy_rsp_results(self._rsp_results)
 
     def _configure_lr_task(self):
@@ -365,6 +374,171 @@ class SerenityLinearResponseSolver:
             self.grid_accuracy,
             self.small_grid_accuracy,
         )
+    
+    def _get_serenity_transitions(self):
+        transitions = np.array(self._lr_task.getTransitions(), dtype=float)
+
+        if transitions.size == 0:
+            return np.zeros((0, 6), dtype=float)
+
+        if transitions.ndim == 1:
+            transitions = transitions.reshape(1, -1)
+
+        return transitions
+    
+    # def _get_serenity_excitation_vectors(self):
+    #     controller = self._lr_task.getLRSCFControllers()[0]
+
+    #     try:
+    #         eigvecs_ser = np.array(
+    #             controller.getExcitationVectors(spy.LRSCF_TYPE.ISOLATED),
+    #             dtype=float,
+    #         )
+    #     except Exception:
+    #         eigvecs_ser = np.array(controller.getExcitationVectors(), dtype=float)
+
+    #     if eigvecs_ser.ndim == 3:
+    #         if self.exc_method in ("tda", "cis"):
+    #             return eigvecs_ser[0, :, :]
+    #         return np.vstack((eigvecs_ser[0, :, :], eigvecs_ser[1, :, :]))
+
+    #     return eigvecs_ser
+    
+    def _get_serenity_excitation_vectors(self):
+        controller = self._lr_task.getLRSCFControllers()[0]
+
+        try:
+            eigvecs_ser = np.array(
+                controller.getExcitationVectors(spy.LRSCF_TYPE.ISOLATED),
+                dtype=float,
+            )
+        except Exception:
+            eigvecs_ser = np.array(controller.getExcitationVectors(), dtype=float)
+
+        if eigvecs_ser.ndim == 3:
+            tda_like = self.spinflip or self.exc_method in ("tda", "cis")
+            if tda_like:
+                return eigvecs_ser[0, :, :]
+            return np.vstack((eigvecs_ser[0, :, :], eigvecs_ser[1, :, :]))
+
+        return eigvecs_ser
+    
+    def _build_spinflip_effective_scf_results(self, eigvecs):
+        scf = self.scf_driver._scf_results.copy()
+
+        C_a = np.asarray(scf["C_alpha"])
+        C_b = np.asarray(scf["C_beta"])
+        E_a = np.asarray(scf["E_alpha"])
+        E_b = np.asarray(scf["E_beta"])
+        occ_a = np.asarray(scf["occ_alpha"])
+        occ_b = np.asarray(scf["occ_beta"])
+
+        nocc_a = int(np.count_nonzero(occ_a > 0.0))
+        nocc_b = int(np.count_nonzero(occ_b > 0.0))
+        nvir_a = C_a.shape[1] - nocc_a
+        nvir_b = C_b.shape[1] - nocc_b
+
+        vector_dim = eigvecs.shape[0]
+
+        if vector_dim == nocc_a * nvir_b:
+            # alpha -> beta spin flip
+            C_eff = np.hstack((C_a[:, :nocc_a], C_b[:, nocc_b:]))
+            E_eff = np.hstack((E_a[:nocc_a], E_b[nocc_b:]))
+            nocc_eff = nocc_a
+            nvir_eff = nvir_b
+            direction = "alpha_to_beta"
+
+        elif vector_dim == nocc_b * nvir_a:
+            # beta -> alpha spin flip
+            C_eff = np.hstack((C_b[:, :nocc_b], C_a[:, nocc_a:]))
+            E_eff = np.hstack((E_b[:nocc_b], E_a[nocc_a:]))
+            nocc_eff = nocc_b
+            nvir_eff = nvir_a
+            direction = "beta_to_alpha"
+
+        else:
+            raise RuntimeError(
+                "Serenity spin-flip vector size does not match either "
+                "alpha->beta or beta->alpha transition space."
+            )
+
+        occ_eff = np.zeros(nocc_eff + nvir_eff)
+        occ_eff[:nocc_eff] = 1.0
+
+        scf["scf_type"] = "restricted"
+        scf["C_alpha"] = C_eff
+        scf["C_beta"] = C_eff.copy()
+        scf["E_alpha"] = E_eff
+        scf["E_beta"] = E_eff.copy()
+        scf["occ_alpha"] = occ_eff
+        scf["occ_beta"] = occ_eff.copy()
+
+        return scf, {
+            "num_core": 0,
+            "num_valence": nocc_eff,
+            "num_virtual": nvir_eff,
+            "scf_type": "restricted",
+            "response_vector_layout": "tda",
+            "serenity_spinflip_direction": direction,
+        }
+    
+    def _add_native_rsp_metadata(self, rsp_results, eigvecs):
+        scf_results = self.scf_driver._scf_results
+        if scf_results is None:
+            return
+
+        occ_alpha = np.array(scf_results["occ_alpha"], dtype=float)
+        nocc = int(np.count_nonzero(occ_alpha > 0.0))
+        nmo = int(len(occ_alpha))
+        nvir = nmo - nocc
+
+        rsp_results["num_core"] = 0
+        rsp_results["num_valence"] = nocc
+        rsp_results["num_virtual"] = nvir
+
+        nstates = int(rsp_results["number_of_states"])
+        details = []
+
+        for state in range(min(nstates, eigvecs.shape[1])):
+            if self.scf_driver._current_scf_mode == "restricted" and not self.spinflip:
+                details.append(
+                    self._get_excitation_details(eigvecs[:, state], nocc, nvir)
+                )
+            else:
+                details.append([])
+
+        rsp_results["excitation_details"] = details
+        
+    def _get_excitation_details(self, eigvec, nocc, nvir, coef_thresh=0.2):
+        n_ov = nocc * nvir
+        if eigvec.size not in (n_ov, 2 * n_ov):
+            return []
+
+        excitations = []
+        de_excitations = []
+
+        for i in range(nocc):
+            homo = "HOMO" if i == nocc - 1 else f"HOMO-{nocc - 1 - i}"
+            for a in range(nvir):
+                lumo = "LUMO" if a == 0 else f"LUMO+{a}"
+                ia = i * nvir + a
+
+                c = eigvec[ia]
+                if abs(c) > coef_thresh:
+                    excitations.append(
+                        (abs(c), f"{homo:<8s} -> {lumo:<8s} {c:10.4f}")
+                    )
+
+                if eigvec.size == 2 * n_ov:
+                    y = eigvec[n_ov + ia]
+                    if abs(y) > coef_thresh:
+                        de_excitations.append(
+                            (abs(y), f"{homo:<8s} <- {lumo:<8s} {y:10.4f}")
+                        )
+
+        return [x[1] for x in sorted(excitations, reverse=True)] + [
+            x[1] for x in sorted(de_excitations, reverse=True)
+        ]
 
     @staticmethod
     def _build_rsp_results(transitions):
@@ -386,6 +560,8 @@ class SerenityLinearResponseSolver:
         else:
             rot = np.zeros((nroots, 3), dtype=float)
 
+        
+        
         return {
             'eigenvalues': eigenvalues,
             'eigenvalues_ev': eigenvalues * hartree_in_ev(),
@@ -413,3 +589,111 @@ class SerenityLinearResponseSolver:
             else:
                 copied[key] = val
         return copied
+
+    def _write_response_vectors(self, fname, eigvecs):
+        if fname is None:
+            return
+
+        eigvecs = np.array(eigvecs, dtype=float)
+
+        if eigvecs.ndim == 1:
+            eigvecs = eigvecs.reshape(-1, 1)
+
+        for state in range(eigvecs.shape[1]):
+            write_rsp_solution(fname, f"S{state + 1}", eigvecs[:, state])
+        
+    def _write_final_hdf5(self, molecule, rsp_results):
+        final_h5_fname = self.scf_driver.get_final_h5py_file()
+        if final_h5_fname is None:
+            return
+
+        # # Guarantees root metadata and /scf exist before /rsp is appended.
+        # self.scf_driver.write_final_hdf5(final_h5_fname, molecule)
+
+        # h5_results = self._build_hdf5_rsp_results(rsp_results)
+        # write_lr_rsp_results_to_hdf5(final_h5_fname, h5_results)
+        
+        if self.spinflip:
+            effective_scf_results, sf_rsp_metadata = (
+                self._build_spinflip_effective_scf_results(rsp_results["eigenvectors"])
+            )
+
+            # write pseudo-restricted /scf for the visualizer
+            self.scf_driver.write_final_hdf5(final_h5_fname, molecule)
+            write_scf_results_to_hdf5(final_h5_fname, effective_scf_results)
+
+            h5_results = self._build_hdf5_rsp_results(rsp_results)
+            h5_results.update(sf_rsp_metadata)
+        else:
+            self.scf_driver.write_final_hdf5(final_h5_fname, molecule)
+            h5_results = self._build_hdf5_rsp_results(rsp_results)
+
+        write_lr_rsp_results_to_hdf5(final_h5_fname, h5_results)
+
+    def _build_hdf5_rsp_results(self, rsp_results):
+        transitions = np.array(rsp_results.get('transitions', []), dtype=float)
+        eigenvalues = np.array(rsp_results['eigenvalues'], dtype=float)
+        oscillator_strengths = np.array(
+            rsp_results['oscillator_strengths'], dtype=float)
+
+        nstates = int(rsp_results.get('number_of_states', len(eigenvalues)))
+
+        scf_results = self.scf_driver._scf_results
+        if scf_results is not None and 'occ_alpha' in scf_results:
+            occ_alpha = np.array(scf_results['occ_alpha'], dtype=float)
+            nocc = int(np.count_nonzero(occ_alpha > 0.0))
+            nmo = int(len(occ_alpha))
+        else:
+            nocc = 0
+            nmo = 0
+
+        h5_results = {
+            'eigenvalues': eigenvalues,
+            'oscillator_strengths': oscillator_strengths,
+            'number_of_states': nstates,
+            'num_core': 0,
+            'num_valence': nocc,
+            'num_virtual': max(nmo - nocc, 0),
+            'serenity_transitions': transitions,
+            'exc_method': self.exc_method,
+        }
+        
+        transition_dipole_keys = (
+            "electric_transition_dipoles",
+            "velocity_transition_dipoles",
+            "magnetic_transition_dipoles",
+        )
+        missing_transition_dipoles = []
+        for key in transition_dipole_keys:
+            if key in rsp_results:
+                h5_results[key] = np.array(rsp_results[key], dtype=float)
+            else:
+                h5_results[key] = np.zeros((nstates, 3), dtype=float)
+                missing_transition_dipoles.append(key)
+
+        h5_results["serenity_transition_dipoles_are_placeholders"] = bool(
+            missing_transition_dipoles)
+
+        if "excitation_details" in rsp_results:
+            h5_results["excitation_details"] = rsp_results["excitation_details"]
+
+        if 'eigenvalues_ev' in rsp_results:
+            h5_results['eigenvalues_ev'] = np.array(
+                rsp_results['eigenvalues_ev'], dtype=float)
+
+        if 'oscillator_strengths_velocity' in rsp_results:
+            h5_results['oscillator_strengths_velocity'] = np.array(
+                rsp_results['oscillator_strengths_velocity'], dtype=float)
+
+        # Native VeloxChem expects 1D rotatory_strengths. Serenity currently
+        # exposes extra transition columns; verify their physical meaning before
+        # using them for production ECD analysis.
+        if transitions.ndim == 2 and transitions.shape[1] >= 6:
+            h5_results["serenity_rotatory_strengths_length"] = transitions[:, 3]
+            h5_results["serenity_rotatory_strengths_velocity"] = transitions[:, 4]
+            h5_results["serenity_rotatory_strengths_modified"] = transitions[:, 5]
+
+            # Native VeloxChem uses one rotatory_strengths vector.
+            h5_results["rotatory_strengths"] = transitions[:, 4]
+
+        return h5_results

@@ -43,6 +43,15 @@ from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 
+from pathlib import Path
+from .molecularbasis import MolecularBasis
+from .resultsio import create_hdf5, write_scf_results_to_hdf5
+from .inputparser import write_unparsed_input_to_hdf5
+
+from .firstorderprop import FirstOrderProperties
+from .oneeints import compute_overlap_integrals
+from .resultsio import create_hdf5, write_scf_results_to_hdf5, write_results_to_hdf5
+
 try:
     from qcserenity import serenipy as spy
     import qcserenity as qc
@@ -119,12 +128,16 @@ class SerenityScfDriver:
         self._last_scf_geom_signature = None
         self._last_grad_geom_signature = None
         
-        self.max_cycles = 100
+        self.max_cycles = 1000
 
         self._energy = None
         self._gradient = None
         self._scf_results = None
         self._current_scf_mode = None
+        
+        # h5 part of the file
+        self.filename = None
+        self._skip_writing_h5 = False
 
     @staticmethod
     def is_available():
@@ -278,16 +291,23 @@ class SerenityScfDriver:
         assert_msg_critical(self.is_available(), errmsg)
         if self.rank == mpi_master():
             results = self._compute_energy_master(molecule)
-            energy = float(results['energy'])
+            energy = float(results['scf_energy'])
         else:
             results = None
             energy = None
 
         self._energy = self.comm.bcast(energy, root=mpi_master())
 
+        self.write_final_hdf5(self.get_final_hdf5_file(), molecule, basis)
+        
         if self.rank == mpi_master():
             return dict(results)
         return None
+
+    def get_final_hdf5_file(self):
+        if self.filename is None:
+            return None
+        return f'{self.filename}.h5'
 
     def compute_gradient(self, molecule):
         """
@@ -374,7 +394,8 @@ class SerenityScfDriver:
                 self.print_title()
                 self._scf_task.run()
                 self._energy = float(self._system.getEnergy())
-                self._scf_results = self._collect_scf_results()
+                ao_basis = self._veloxchem_basis(molecule)
+                self._scf_results = self._collect_scf_results(molecule, ao_basis)
                 self._last_scf_geom_signature = geom_signature
                 self._last_grad_geom_signature = None
                 self._gradient = None
@@ -393,25 +414,25 @@ class SerenityScfDriver:
                                       dtype=float)
             self._last_grad_geom_signature = geom_signature
 
-    def _collect_scf_results(self):
-        results = {'energy': float(self._energy)}
+    # def _collect_scf_results(self):
+    #     results = {'energy': float(self._energy)}
 
-        mode = self._current_scf_mode
-        try:
-            if mode == 'restricted':
-                es = self._system.getElectronicStructure_R()
-                results['orbital_energies'] = np.array(es.orbEn(), dtype=float)
-            else:
-                es = self._system.getElectronicStructure_U()
-                results['orbital_energies_alpha'] = np.array(es.alphaOrbEn(),
-                                                             dtype=float)
-                results['orbital_energies_beta'] = np.array(es.betaOrbEn(),
-                                                            dtype=float)
-        except Exception:
-            # Keep SCF results minimal if optional details are unavailable.
-            pass
+    #     mode = self._current_scf_mode
+    #     try:
+    #         if mode == 'restricted':
+    #             es = self._system.getElectronicStructure_R()
+    #             results['orbital_energies'] = np.array(es.orbEn(), dtype=float)
+    #         else:
+    #             es = self._system.getElectronicStructure_U()
+    #             results['orbital_energies_alpha'] = np.array(es.alphaOrbEn(),
+    #                                                          dtype=float)
+    #             results['orbital_energies_beta'] = np.array(es.betaOrbEn(),
+    #                                                         dtype=float)
+    #     except Exception:
+    #         # Keep SCF results minimal if optional details are unavailable.
+    #         pass
 
-        return results
+    #     return results
 
     def _ensure_system(self, molecule):
 
@@ -551,3 +572,186 @@ class SerenityScfDriver:
         if self.serenity_verbose and not self.ostream.is_muted:
             return nullcontext()
         return qc.redirectOutputToFile(os.devnull)
+    
+    def get_final_h5py_file(self):
+        
+        if self.filename is None:
+            return None
+        else:
+            return f"{self.filename}.h5"
+        
+    def _veloxchem_basis(self, molecule, basis_label=None):
+        
+        if basis_label is None:
+            return MolecularBasis.read(molecule, self.basis)
+        else:
+            return MolecularBasis.read(molecule, basis_label)
+    
+    def create_final_hdf5(self, fname, molecule, basis=None):
+        if self.rank != mpi_master() or self._skip_writing_h5:
+            return False
+        if Path(fname).is_file():
+            return True
+
+        ao_basis = self._veloxchem_basis(molecule, basis)
+        xc_label = self.dft_functional if self.method == 'dft' else 'HF'
+        create_hdf5(fname, molecule, ao_basis, xc_label, '')
+        return Path(fname).is_file()
+
+    def write_final_hdf5(self, fname, molecule, basis=None):
+        if fname is None:
+            return False
+        if not self.create_final_hdf5(fname, molecule, basis):
+            return False
+
+        if self._scf_results is not None:
+            write_scf_results_to_hdf5(fname, self._scf_results)
+
+            write_results_to_hdf5(fname, 'serenity', {
+                'program': 'Serenity',
+                'method': self.method,
+                'scf_mode': self._current_scf_mode,
+                'basis_label_serenity': self.basis,
+            })
+
+        return True
+
+    def _collect_scf_results(self, molecule, ao_basis):
+        mode = self._current_scf_mode
+
+        if mode == 'restricted':
+            es = self._system.getElectronicStructure_R()
+            C_alpha = np.array(es.coeff(), dtype=float)
+            C_beta = C_alpha.copy()
+            E_alpha = np.array(es.orbEn(), dtype=float)
+            E_beta = E_alpha.copy()
+            F_alpha = np.array(es.fock(), dtype=float)
+            F_beta = F_alpha.copy()
+            S = np.array(es.overlap(), dtype=float)
+
+            # Serenity totalDens is total alpha+beta density.
+            D_total = np.array(es.totalDens(), dtype=float)
+            D_alpha = 0.5 * D_total
+            D_beta = 0.5 * D_total
+
+            scf_type = 'restricted'
+
+        else:
+            es = self._system.getElectronicStructure_U()
+            C_alpha = np.array(es.alphaCoeff(), dtype=float)
+            C_beta = np.array(es.betaCoeff(), dtype=float)
+            E_alpha = np.array(es.alphaOrbEn(), dtype=float)
+            E_beta = np.array(es.betaOrbEn(), dtype=float)
+            F_alpha = np.array(es.alphaFock(), dtype=float)
+            F_beta = np.array(es.betaFock(), dtype=float)
+            D_alpha = np.array(es.alphaDens(), dtype=float)
+            D_beta = np.array(es.betaDens(), dtype=float)
+            S = np.array(es.overlap(), dtype=float)
+
+            scf_type = 'unrestricted'
+        
+        perm = self._serenity_to_veloxchem_ao_indices(molecule, ao_basis)
+
+        S = self._reorder_serenity_ao_matrix_to_veloxchem(S, perm)
+        D_alpha = self._reorder_serenity_ao_matrix_to_veloxchem(D_alpha, perm)
+        D_beta = self._reorder_serenity_ao_matrix_to_veloxchem(D_beta, perm)
+        F_alpha = self._reorder_serenity_ao_matrix_to_veloxchem(F_alpha, perm)
+        F_beta = self._reorder_serenity_ao_matrix_to_veloxchem(F_beta, perm)
+
+        C_alpha = self._reorder_serenity_mo_coefficients_to_veloxchem(C_alpha, perm)
+        C_beta = self._reorder_serenity_mo_coefficients_to_veloxchem(C_beta, perm)
+
+        S_vlx = compute_overlap_integrals(molecule, ao_basis)
+        max_overlap_error = np.max(np.abs(S - S_vlx))
+
+        assert_msg_critical(
+            np.allclose(S, S_vlx, atol=1.0e-10, rtol=1.0e-10),
+            'Serenity AO reordering failed: reordered overlap matrix does not match '
+            f'VeloxChem ordering. Max error: {max_overlap_error:.3e}'
+        )
+
+        n_mo = C_alpha.shape[1]
+        occ_alpha = molecule.get_aufbau_alpha_occupation(n_mo, ao_basis)
+        occ_beta = molecule.get_aufbau_beta_occupation(n_mo, ao_basis)
+
+        scf_results = {
+            'eri_thresh': 1.0e-12,
+            'scf_type': scf_type,
+            'scf_energy': float(self._energy),
+            'restart': False,
+            'filename': self.filename,
+            'scf_history': [],
+            'S': S,
+            'C_alpha': C_alpha,
+            'C_beta': C_beta,
+            'E_alpha': E_alpha,
+            'E_beta': E_beta,
+            'occ_alpha': occ_alpha,
+            'occ_beta': occ_beta,
+            'D_alpha': D_alpha,
+            'D_beta': D_beta,
+            'F_alpha': F_alpha,
+            'F_beta': F_beta,
+            'F': (F_alpha, F_beta),
+        }
+
+        if self.method == 'dft':
+            scf_results['xcfun'] = self.dft_functional.upper()
+
+        try:
+            prop = FirstOrderProperties(self.comm, self.ostream)
+            prop.compute_scf_prop(molecule, ao_basis, scf_results)
+            scf_results['dipole_moment'] = np.array(
+                prop.get_property('dipole_moment'))
+        except Exception:
+            pass
+
+        return scf_results
+    
+    def _serenity_to_veloxchem_ao_indices(self, molecule, ao_basis):
+        serenity_order = []
+    
+        for atomidx in range(molecule.number_of_atoms()):
+            for ang in range(ao_basis.max_angular_momentum() + 1):
+                nrad = ao_basis.number_of_basis_functions([atomidx], ang)
+                ncomp = 2 * ang + 1
+
+                for radial in range(nrad):
+                    for comp in range(ncomp):
+                        serenity_order.append((atomidx, ang, radial, comp))
+
+        serenity_index = {
+            label: idx for idx, label in enumerate(serenity_order)
+        }
+
+        perm = []
+        for ang in range(ao_basis.max_angular_momentum() + 1):
+            ncomp = 2 * ang + 1
+
+            for comp in range(ncomp):
+                for atomidx in range(molecule.number_of_atoms()):
+                    nrad = ao_basis.number_of_basis_functions([atomidx], ang)
+
+                    for radial in range(nrad):
+                        perm.append(serenity_index[(atomidx, ang, radial, comp)])
+
+        nao = ao_basis.get_dimensions_of_basis()
+        assert_msg_critical(
+            len(perm) == nao,
+            'Serenity AO reordering: inconsistent number of AO indices.'
+        )
+
+        return np.array(perm, dtype=int)
+
+
+    @staticmethod
+    def _reorder_serenity_ao_matrix_to_veloxchem(matrix, perm):
+        matrix = np.array(matrix, dtype=float)
+        return matrix[np.ix_(perm, perm)]
+
+
+    @staticmethod
+    def _reorder_serenity_mo_coefficients_to_veloxchem(coefficients, perm):
+        coefficients = np.array(coefficients, dtype=float)
+        return coefficients[perm, :]
+                
