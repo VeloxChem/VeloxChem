@@ -203,6 +203,9 @@ class RixsDriver(LinearSolver):
             f'{type(self).__name__}.compute: ECPs are not supported for ' +
             'RIXS calculations. Explicit core orbitals are required.')
 
+        self._is_converged = False
+        solver_convergence = []
+
         if rsp_results is None:
 
             rsp_keys = [
@@ -238,6 +241,10 @@ class RixsDriver(LinearSolver):
                 rsp_drv.checkpoint_file = str(fpath) + '_rixs.h5'
 
             rsp_results = rsp_drv.compute(molecule, basis, scf_results)
+            solver_convergence.append(rsp_drv.is_converged)
+
+            if not rsp_drv.is_converged:
+                return {}
 
         if core_rsp_results is None and (not self.restricted_subspace):
 
@@ -268,6 +275,10 @@ class RixsDriver(LinearSolver):
                 cvs_rsp_drv.checkpoint_file = str(fpath) + '_rixs_cvs.h5'
 
             core_rsp_results = cvs_rsp_drv.compute(molecule, basis, scf_results)
+            solver_convergence.append(cvs_rsp_drv.is_converged)
+
+            if not cvs_rsp_drv.is_converged:
+                return {}
 
         nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
@@ -281,9 +292,6 @@ class RixsDriver(LinearSolver):
         num_vir_orbitals = self.comm.bcast(num_vir_orbitals, root=mpi_master())
 
         if self.twoshot:
-            self._approach_string = 'Running RIXS calculation in the two-shot approach'
-            self._method_ref_str = 'J. Chem. Theory Comput. 2021, 17, 3031-3038, DOI: 10.1021/acs.jctc.1c00144'
-
             if self.rank == mpi_master():
                 num_core_orbitals = core_rsp_results['num_core']
                 num_valence_orbitals = nocc - num_core_orbitals
@@ -306,9 +314,6 @@ class RixsDriver(LinearSolver):
             val_states = list(range(num_final_states))
 
         else:
-            self._approach_string = 'Running RIXS calculation in the restricted-subspace approach'
-            self._method_ref_str = 'Phys. Chem. Chem. Phys., 2021, 23, 1835-1848, DOI: 10.1039/d0cp04726k'
-
             if self.rank == mpi_master():
                 num_valence_orbitals = rsp_results['num_valence']
                 num_core_orbitals = rsp_results['num_core']
@@ -523,7 +528,7 @@ class RixsDriver(LinearSolver):
         results_dict = {
             'cross_sections': self.cross_sections,
             'elastic_cross_sections': self.elastic_cross_sections,
-            'photon_energies': self.photon_energy,
+            'photon_energies': np.array(self.photon_energy),
             'scattering_amplitudes': self.scattering_amplitudes,
             'emission_energies': self.emission_enes,
             'energy_losses': self.ene_losses,
@@ -547,6 +552,13 @@ class RixsDriver(LinearSolver):
 
         if not init_photon_set:
             self.photon_energy = None
+
+        if solver_convergence:
+            self._is_converged = all(solver_convergence)
+        else:
+            # Externally supplied response result dictionaries are trusted as
+            # converged inputs once RIXS post-processing completes.
+            self._is_converged = True
 
         return results_dict
 
@@ -1007,32 +1019,24 @@ class RixsDriver(LinearSolver):
             )
             self.ostream.print_blank()
 
-        self.ostream.print_info('Implementation details & benchmark: ')
-        self.ostream.print_reference('Reference: ' + self._reference_dictionary()['implementation'])
-        self.ostream.print_blank()
-
         if self.twoshot:
-            approach_string = 'Running RIXS calculation in the two-shot approach'
-            approach_key = 'twoshot'
+            self.ostream.print_info(
+                'Running RIXS calculation in the two-shot approach')
+            self.ostream.print_blank()
+            self.ostream.print_reference(
+                'J. Phys. Chem. A, 2025, 129, 8783-8797, DOI: 10.1021/acs.jpca.5c04528')
+            self.ostream.print_blank()
         else:
-            approach_string = 'Running RIXS calculation in the restricted-subspace approach'
-            approach_key = 'rsa'
-        self.ostream.print_info(approach_string)
-        self.ostream.print_reference(self._reference_dictionary()[approach_key])
-        self.ostream.print_blank()
+            self.ostream.print_info(
+                'Running RIXS calculation in the restricted-subspace approach')
+            self.ostream.print_blank()
+            self.ostream.print_reference(
+                'J. Phys. Chem. A, 2025, 129, 8783-8797, DOI: 10.1021/acs.jpca.5c04528')
+            self.ostream.print_reference(
+                'Phys. Chem. Chem. Phys., 2021, 23, 1835-1848, DOI: 10.1039/D0CP04726K')
+            self.ostream.print_blank()
 
         self.ostream.flush()
-
-    def _reference_dictionary(self):
-        """
-        Returns a dictionary of references for the method used.
-        """
-
-        return {
-            'implementation': 'J. Phys. Chem. A 2025, 129, 8783-8797, DOI: 10.1021/acs.jpca.5c04528',
-            'rsa': 'J. Chem. Theory Comput. 2019, 15, 5925-5942, DOI: 10.1021/acs.jctc.9b00638',
-            'twoshot': 'J. Phys. Chem. A 2025, 129, 8783-8797, DOI: 10.1021/acs.jpca.5c04528',
-        }
 
     def _print_rixs_data(self, title, ene_losses,
                          cross_sections, elastic_cross_section):

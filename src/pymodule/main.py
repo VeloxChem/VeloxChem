@@ -736,10 +736,8 @@ def _main_body():
                              method_type=scf_drv.scf_type)
         rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
-        # is_converged does not apply to RIXS
-        if not isinstance(rsp_prop, RIXS):
-            if not rsp_prop.is_converged:
-                return 1
+        if not rsp_prop.is_converged:
+            return 1
 
         # Calculate the excited-state gradient if requested
 
