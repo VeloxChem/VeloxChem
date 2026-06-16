@@ -1093,6 +1093,7 @@ class RixsDriver(LinearSolver):
              xstep=1e-4,
              energy_loss=True,
              photon_energy_ev=None,
+             plot_elastic_line=False,
              ax=None):
         """
         Plot the RIXS spectrum.
@@ -1113,6 +1114,8 @@ class RixsDriver(LinearSolver):
         :param photon_energy_ev:
             Incoming photon energy in eV. The closest
             available calculated photon energy is used.
+        :param plot_elastic_line:
+            If True, include the elastic line in the plot.
         :param ax:
             The matplotlib axis to plot on.
 
@@ -1141,6 +1144,7 @@ class RixsDriver(LinearSolver):
             x_unit=x_unit,
             xstep=xstep,
             energy_loss=energy_loss,
+            plot_elastic_line=plot_elastic_line,
             ax=ax
         )
 
@@ -1154,6 +1158,7 @@ class RixsDriver(LinearSolver):
                  min_photon_points=10,
                  colormap='viridis',
                  normalize='global_max',
+                 plot_elastic_line=False,
                  ax=None):
         """
         Plot the 2D RIXS map together with the corresponding XAS spectrum.
@@ -1178,6 +1183,8 @@ class RixsDriver(LinearSolver):
         :param normalize:
             Normalization method for the RIXS map.
             'global_max': normalize by the global maximum of the RIXS intensities -> range of intensity [0-1] (default).
+        :param plot_elastic_line:
+            If True, include the elastic line in the RIXS map.
         :param ax:
             If None, new axes are created.
             Otherwise pass a tuple (ax_map, ax_xas).
@@ -1201,5 +1208,6 @@ class RixsDriver(LinearSolver):
             energy_loss=energy_loss,
             cmap=colormap,
             normalize=normalize,
+            plot_elastic_line=plot_elastic_line,
             ax=ax
         )

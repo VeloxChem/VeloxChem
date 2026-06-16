@@ -542,6 +542,7 @@ def plot_rixs_spectrum(rixs_results,
                        broadening_value=0.24,
                        x_unit="ev",
                        xstep=0.01,
+                       plot_elastic_line=False,
                        ax=None):
     """
     Plot the RIXS spectrum from a RIXS calculation.
@@ -557,17 +558,18 @@ def plot_rixs_spectrum(rixs_results,
         The type of broadening to use. Either 'lorentzian' or 'gaussian'.
     :param broadening_value:
         The FWHM in eV.
+    :param x_unit:
+        The unit of x-axis, only 'ev' is enabled.
     :param xstep:
         Grid spacing in eV for the broadened RIXS spectrum.
+    :param plot_elastic_line:
+        If True, include the elastic line in the plot.
     :param ax:
         The matplotlib axis to plot on.
     """
     assert_msg_critical('matplotlib' in sys.modules, 'matplotlib is required.')
-    assert_msg_critical(x_unit.lower() in ['nm', 'ev'], 'plot: Invalid x_unit')
+    assert_msg_critical(x_unit.lower() in ['ev'], 'plot: Invalid x_unit')
 
-    use_ev = (x_unit.lower() == 'ev')
-
-    ev_x_nm = hartree_in_ev() / hartree_in_inverse_nm()
     au2ev = hartree_in_ev()
 
     # incoming photon energies in eV
@@ -582,54 +584,41 @@ def plot_rixs_spectrum(rixs_results,
         fig, ax = plt.subplots(figsize=(8, 5))
 
     if energy_loss:
-        if use_ev:
-            ax.set_xlabel('Energy loss [eV]')
-        else:
-            ax.set_xlabel('Energy loss [nm]')
+        ax.set_xlabel('Energy loss [eV]')
     else:
-        if use_ev:
-            ax.set_xlabel('Emission energy [eV]')
-        else:
-            ax.set_xlabel('Emission energy [nm]')
+        ax.set_xlabel('Emission energy [eV]')
 
     omega_ev = incoming_ev[photon_index]
 
     ax.set_ylabel(r'Normalized intensity [arb. units]')
     ax.set_title(rf"RIXS Spectrum @ $\hbar \omega = {omega_ev:.2f}$ eV")
 
-    if energy_loss:
-        x = rixs_results['energy_losses'][:, photon_index]
-    else:
-        x = rixs_results['emission_energies'][:, photon_index]
+    x_key = 'energy_losses' if energy_loss else 'emission_energies'
 
-    y = rixs_results['cross_sections'][:, photon_index]
+    x = np.asarray(rixs_results[x_key])[:, photon_index]
+    y = np.asarray(rixs_results['cross_sections'])[:, photon_index]
 
-    x_ev = np.asarray(x)
+    if plot_elastic_line:
+        x0 = 0.0 if energy_loss else rixs_results['photon_energies'][photon_index]
+        y0 = rixs_results['elastic_cross_sections'][photon_index]
 
-    pad_ev = 0.03
-    xmin_ev = max(0.0, np.min(x_ev) - pad_ev)
+        x = np.insert(x, 0, x0)
+        y = np.insert(y, 0, y0)
+
+    x_ev = x * au2ev
+
+    pad_ev = 1.25
+    xmin_ev = np.min(x_ev) - pad_ev
     xmax_ev = np.max(x_ev) + pad_ev
     xstep = xstep
 
     ax2 = ax.twinx()
     ax2.set_ylabel(r'Cross section, $\sigma$ [a.u.]')
 
-    for i in np.arange(len(y)):
-        if energy_loss:
-            energy_au = rixs_results['energy_losses'][i, photon_index]
-        else:
-            energy_au = rixs_results['emission_energies'][i, photon_index]
-
-        energy_ev = energy_au * au2ev
-
-        if use_ev:
-            x_val = energy_ev
-        else:
-            x_val = ev_x_nm / energy_ev
-
+    for x_val, y_val in zip(x_ev, y):
         ax2.plot(
             [x_val, x_val],
-            [0.0, rixs_results['cross_sections'][i, photon_index]],
+            [0.0, y_val],
             alpha=0.7,
             linewidth=2,
             color="darkcyan",
@@ -658,10 +647,7 @@ def plot_rixs_spectrum(rixs_results,
 
     norm_intensity = yi / max_intensity
 
-    if use_ev:
-        x_data = xi
-    else:
-        x_data = ev_x_nm / xi
+    x_data = xi
 
     ax.plot(x_data, norm_intensity, color="black", alpha=0.9, linewidth=2.5)
 
@@ -692,10 +678,7 @@ def plot_rixs_spectrum(rixs_results,
     ax.set_ylim(0, max(norm_intensity) * 1.1)
     ax.set_ylim(bottom=-0.02 * max(abs(norm_intensity)))
 
-    if use_ev:
-        x_lim = (xmin_ev, xmax_ev)
-    else:
-        x_lim = (ev_x_nm / xmax_ev, ev_x_nm / xmin_ev)
+    x_lim = (xmin_ev, xmax_ev)
 
     if energy_loss:
         x_lim = x_lim[::-1]
@@ -714,6 +697,7 @@ def plot_rixs_map(rixs_results,
                   x_unit="ev",
                   cmap='viridis',
                   normalize='global_max',
+                  plot_elastic_line=False,
                   ax=None):
     """
     Plot a 2D RIXS map together with the corresponding XAS.
@@ -775,9 +759,21 @@ def plot_rixs_map(rixs_results,
     )
 
     sort_idx = np.argsort(incoming_photon_energies_ev)
+
     incoming_photon_energies_ev = incoming_photon_energies_ev[sort_idx]
     x_ev = x_ev[:, sort_idx]
     cross_sections = cross_sections[:, sort_idx]
+
+    if plot_elastic_line:
+        elastic_cross_sections = np.array(rixs_results['elastic_cross_sections'])[sort_idx]
+
+        if energy_loss:
+            elastic_x_ev = np.zeros_like(incoming_photon_energies_ev)
+        else:
+            elastic_x_ev = incoming_photon_energies_ev.copy()
+
+        x_ev = np.vstack((elastic_x_ev, x_ev))
+        cross_sections = np.vstack((elastic_cross_sections, cross_sections))
 
     xas_sort_idx = np.argsort(core_eigvals_ev)
     core_eigvals_ev = core_eigvals_ev[xas_sort_idx]
@@ -788,7 +784,7 @@ def plot_rixs_map(rixs_results,
 
     pad = 0.5
     if energy_loss:
-        val_min_ev = max(0.0, xmin_ev - pad)
+        val_min_ev = xmin_ev - pad
         val_max_ev = xmax_ev + pad
     else:
         val_min_ev = xmin_ev - pad
