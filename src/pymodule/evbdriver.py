@@ -83,7 +83,7 @@ class EvbDriver:
         self.nodes = self.comm.Get_size()
 
         self.temperature: float = 300
-        self.Lambda: list[float] = None
+        self.lambda_vec: list[float] = None
 
         self.reactant: MMForceFieldGenerator = None
         self.product: MMForceFieldGenerator = None
@@ -207,7 +207,7 @@ class EvbDriver:
             np.diff(Lambda) >
             0), f"Lambda must be monotonically increasing. Lambda = {Lambda}"
         Lambda = [round(lam, 3) for lam in Lambda]
-        self.Lambda = Lambda
+        self.lambda_vec = Lambda
 
         # Per configuration
         for conf in self.configurations:
@@ -254,7 +254,7 @@ class EvbDriver:
             systems, topology, initial_positions = system_builder.build_systems(
                 reactant=self.reactant,
                 product=self.product,
-                Lambda=self.Lambda,
+                lambda_vec=self.lambda_vec,
                 configuration=conf,
                 constraints=constraints,
             )
@@ -297,7 +297,8 @@ class EvbDriver:
                             data_folder: str,
                             name: str,
                             load_systems=False,
-                            load_pdb=False):
+                            load_pdb=False,
+                            restart: str|None = None):
         """Load a configuration from a data folder for which the systems have already been generated, such that an FEP can be performed.
         The topology, initial positions, temperature and Lambda vector will be loaded from the data folder.
 
@@ -305,7 +306,7 @@ class EvbDriver:
             data_folder (str): The folder to load the data from
             name (str): The name of the configuration. Can be arbitrary, but should be unique.
             load_systems (bool, optional): If set to true, the systems will be loaded from the xml files. Used for debugging. Defaults to False.
-            lead_pdb (bool, optional): If set to true, the topology will be loaded from the pdb file. Used for debugging. Defaults to False.
+            load_pdb (bool, optional): If set to true, the topology will be loaded from the pdb file. Used for debugging. Defaults to False.
         """
 
         assert_msg_critical('openmm' in sys.modules,
@@ -313,32 +314,40 @@ class EvbDriver:
 
         options_path = Path(data_folder) / "options.json"
         with options_path.open("r") as file:
-            options = json.load(file)
-            temperature = options["temperature"]
-            Lambda = options["Lambda"]
-        if self.Lambda != Lambda and self.Lambda is not None:
+            conf = json.load(file)
+            
+        
+        if self.lambda_vec != conf["Lambda"] and self.lambda_vec is not None:
             self.ostream.print_warning(
                 f"Lambda vector in {options_path} does not match the current Lambda vector. Overwriting current Lambda vector with the one from the file."
             )
+        self.temperature = conf['temperature']
+        self.lambda_vec = conf['Lambda']
+        conf["data_folder"] =  str(data_folder)
+        conf["run_folder"] = str(Path(data_folder) / "run")
 
-        self.Lambda = Lambda
 
-        conf = {
-            "name": name,
-            "data_folder": data_folder,
-            "run_folder": str(Path(data_folder) / "run"),
-            "temperature": temperature,
-            "Lambda": Lambda
-        }
         if load_systems:
-            sysbuilder = EvbSystemBuilder()
+            sysbuilder = ReactionSystemBuilder()
             systems = sysbuilder.load_systems_from_xml(
                 str(Path(data_folder) / "run"))
             conf["systems"] = systems
         else:
             systems = []
-
-        if load_pdb:
+        
+        if restart is not None:
+            try:
+                pdb = mmapp.PDBFile(str(Path(data_folder) / restart))
+            except Exception as e:
+                raise ValueError(f"Could not load restart pdb file {restart} from {data_folder}. Error: {e}")
+            self.ostream.print_info(f"Loading topology and initial positions from restart pdb file {restart} from {data_folder}.")
+            self.ostream.print_info("Turning on skip_initial_equil, so the FEP will start directly with sampling instead of equilibration.")
+            self.ostream.flush()
+            conf["topology"] = pdb.getTopology()
+            conf["initial_positions"] = pdb.getPositions(
+                asNumpy=True).value_in_unit(mmunit.nanometers)
+            conf['skip_initial_equil'] = True
+        elif load_pdb:
             pdb = mmapp.PDBFile(str(Path(data_folder) / "topology.pdb"))
             conf["topology"] = pdb.getTopology()
             conf["initial_positions"] = pdb.getPositions(
@@ -346,11 +355,24 @@ class EvbDriver:
 
         self.system_confs.append(conf)
         self.ostream.print_info(
-            f"Initialised configuration with {len(systems)} systems, topology, initial positions, temperatue {temperature} and Lambda vector {Lambda} from {data_folder}"
+            f"Initialised configuration with {len(systems)} systems, temperatue {self.temperature} and Lambda vector {self.lambda_vec} from {data_folder}"
         )
         self.ostream.print_info(
             f"Current configurations: {[conf['name'] for conf in self.system_confs]}"
         )
+        
+        #If there are any csv or xtc files in the data folder
+        if any(Path(data_folder).glob("*.csv")) or any(Path(data_folder).glob("*.xtc")):
+            self.ostream.print_warning(
+                f"Found csv or xtc files in {data_folder}. These might be from a previous FEP run using the same folder. The files will be renamed with the prefix OLD_ to avoid overwriting them during the new FEP run."
+            )
+            for file in Path(data_folder).iterdir():
+                if file.is_file() and (file.name.endswith(".csv") or file.name.endswith(".xtc")):
+                    new_name = file.parent / f"OLD_{file.name}"
+                    file.rename(new_name)
+                    self.ostream.print_info(f"Renamed {file.name} to {new_name.name}")
+        
+        
         self.ostream.flush()
 
     def run_FEP(
@@ -376,7 +398,7 @@ class EvbDriver:
             self.ostream.flush()
             FEP = EvbFepDriver(ostream=self.ostream)
             FEP.run_FEP(
-                Lambda=self.Lambda,
+                Lambda=self.lambda_vec,
                 configuration=conf,
                 platform=platform,
                 platform_properties=platform_properties,

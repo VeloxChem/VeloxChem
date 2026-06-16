@@ -105,6 +105,7 @@ class EvbFepDriver:
         self.equil_NPT_steps = 50000
         self.initial_equil_NVT_steps = 150000
         self.initial_equil_NPT_steps = 150000
+        self.skip_initial_equil = False
         self.warmup_NVT_steps = -1
         self.warmup_NPT_steps = -1
         self.step_size = 0.001  # ps
@@ -115,12 +116,14 @@ class EvbFepDriver:
         self.constrain_H: bool = False
         self.report_forces: bool = False
         self.report_velocities: bool = False
-        self.report_forcegroups: bool = True
+        self.report_forcegroups: bool = False
+
         self.debug: bool = False
         self.save_frames: int = 1000
         self.save_crash_pdb: bool = True
         self.save_crash_xml: bool = True
         self.save_equil_traj: bool = False
+        self.save_equil_pdb: bool = True
         self.xml_crash_save_interval: int = 50
         self.pdb_crash_save_interval: int = 1
         self.pdb_equil_start_temp = 10  # kelvin
@@ -128,6 +131,7 @@ class EvbFepDriver:
         self.pdb_temperatures = []
 
         self.pdb = None
+        self.safe_step: bool = False
         self._safe_step_batch = 10
 
         self.keywords = {
@@ -164,11 +168,14 @@ class EvbFepDriver:
             "initial_equil_NPT_steps": {
                 "type": int
             },
-            "warmup_NVT_steps":{
-                "type":int
+            "skip_initial_equil": {
+                "type": bool
             },
-            "warmup_NPT_steps":{
-                "type":int
+            "warmup_NVT_steps": {
+                "type": int
+            },
+            "warmup_NPT_steps": {
+                "type": int
             },
             "sample_steps": {
                 "type": int
@@ -215,6 +222,9 @@ class EvbFepDriver:
             "save_equil_traj": {
                 "type": bool
             },
+            "save_equil_pdb": {
+                "type": bool
+            },
             "xml_crash_save_interval": {
                 "type": int
             },
@@ -235,6 +245,9 @@ class EvbFepDriver:
             },
             "pdb_equil_start_temp": {
                 "type": int
+            },
+            "safe_step": {
+                "type": bool
             },
         }
 
@@ -258,8 +271,8 @@ class EvbFepDriver:
         for keyword, value in self.keywords.items():
             if keyword in configuration:
                 if (not isinstance(configuration[keyword], value["type"])
-                        and not((isinstance(configuration[keyword], int)
-                                 and value["type"] == float))):
+                        and not ((isinstance(configuration[keyword], int)
+                                  and value["type"] == float))):
                     raise ValueError(
                         f"Configuration option {keyword} should be of type {value['type']}"
                     )
@@ -361,10 +374,14 @@ class EvbFepDriver:
                 self.ostream.print_info(
                     "Constraining all bonds involving H atoms")
                 system = self._constrain_H_bonds(system)
-            if l == 0:
+            if l == 0 and not self.skip_initial_equil:
                 state = self._initial_equilibrate(system, positions)
                 positions = state.getPositions()
                 velocities = state.getVelocities()
+            elif self.sample_steps:
+                self.ostream.print_info(
+                    "Skipping initial equilibration because skip_initial_equil is set to True."
+                )
             equil_state = self._equilibrate(system, l, positions, velocities)
 
             if self.constrain_H:
@@ -527,12 +544,15 @@ class EvbFepDriver:
             # getIntegratorParameters=True,
             enforcePeriodicBox=True,
         )
+        if self.save_equil_pdb:
 
-        self._save_state(
-            simulation,
-            f"equil_state_{l:.3f}",
-            xml=False,
-        )
+            self._save_state(
+                simulation,
+                f"equil_state_{l:.3f}",
+                chk=False,
+                xml=False,
+                pdb=True,
+            )
 
         return equil_state
 
@@ -733,6 +753,17 @@ class EvbFepDriver:
             )
 
     def _safe_step(self, simulation, steps, name=""):
+        if not self.safe_step:
+            simulation.step(steps)
+            state = simulation.context.getState(
+                getPositions=True,
+                getVelocities=True,
+                getForces=self.report_forces or self.debug,
+                getEnergy=True,
+                enforcePeriodicBox=True,
+            )
+            return [state]
+
         self.ostream.print_info(
             f"Running {name} for {steps} steps for total time: {steps*self.step_size} ps with step size {self.step_size} ps"
         )

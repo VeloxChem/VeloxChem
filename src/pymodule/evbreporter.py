@@ -70,10 +70,8 @@ class EvbReporter:
         raw_openmm_version = version('openmm')
         match = re.match(r"^(\d+)\.(\d+)", raw_openmm_version)
         if not match:
-            raise RuntimeError(
-                "Cannot parse required major.minor version from "
-                f"OpenMM: {raw_openmm_version!r}"
-            )
+            raise RuntimeError("Cannot parse required major.minor version from "
+                               f"OpenMM: {raw_openmm_version!r}")
         openmm_version = int(match.group(1)), int(match.group(2))
         if openmm_version < (8, 2):
             if not append:
@@ -93,10 +91,16 @@ class EvbReporter:
 
         self.lambda_val = lambda_val
 
+        # These auxiliary simulations only evaluate potential energies; run
+        # them on the CPU platform so they don't each reserve a separate CUDA
+        # context. Building them on the GPU can crash the GPU.
+        cpu_platform = mm.Platform.getPlatformByName('CPU')
         self.simulations = {}
         for name, system in systems.items():
-            sim = mmapp.Simulation(topology, system,
-                                   mm.LangevinIntegrator(1, 1, 1))
+            sim = mmapp.Simulation(topology,
+                                   system,
+                                   mm.LangevinIntegrator(1, 1, 1),
+                                   platform=cpu_platform)
             self.simulations.update({name: sim})
 
         if not append:

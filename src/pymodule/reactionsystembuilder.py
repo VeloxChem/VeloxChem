@@ -90,7 +90,6 @@ class ReactionSystemBuilder():
         self.size = comm.Get_size()
 
         self.temperature: float = 300
-        self.Lambda: list[float]
 
         self.sc_alpha_lj: float = 0.7
         self.sc_alpha_q: float = 0.3
@@ -160,7 +159,7 @@ class ReactionSystemBuilder():
 
         self.begin_index = 0
         self.water_model: str
-        self.decompose_bonded = True
+        self.decompose_bonded = False
         self.decompose_nb: list | None = None
 
         self.implicit_solvent_model: str | None = None
@@ -226,7 +225,7 @@ class ReactionSystemBuilder():
         self,
         reactant: MMForceFieldGenerator,
         product: MMForceFieldGenerator,
-        Lambda: list,
+        lambda_vec: list,
         configuration: dict,
         constraints: list | None = None,
     ):
@@ -334,7 +333,7 @@ class ReactionSystemBuilder():
         self.topology: mmapp.Topology = topology
         self.systems = self._interpolate_system(
             system,
-            Lambda,
+            lambda_vec,
             nb_force,
             E_field,
         )
@@ -1659,8 +1658,11 @@ class ReactionSystemBuilder():
 
         return system
 
+    # Removes all forces from the system that are not related to the reaction, and sets the remaining force constants to 0
+    # The evbreporter can then be used to report the energy of each contributing force separately
     def _add_bonded_decompositions(self, system):
         system = copy.deepcopy(system)
+        # Remove all forces that are not directly related to the reaction
         bonded_fgs = [
             EvbForceGroup.REA_HARM_BOND_STATIC.
             value,  # Bonded forces for the reaction atoms
@@ -1677,7 +1679,9 @@ class ReactionSystemBuilder():
                 to_remove.append(i)
         for i in reversed(to_remove):
             system.removeForce(i)
-
+            
+            
+        # Set all force constants in the remaining forces to 0
         for force in system.getForces():
             if force.getForceGroup() == EvbForceGroup.REA_MORSE_BOND.value:
                 for i in range(force.getNumBonds()):
@@ -1704,6 +1708,7 @@ class ReactionSystemBuilder():
 
         return system
 
+    # Decomposes the total nonbonded energy into contributions in a baseline solute LJ and Coul system, and systems for each specified reactant atom with the solvent
     def _add_nb_decompositions(self, system, state_name):
         systems = {}
         nbforce = copy.deepcopy([
@@ -2748,10 +2753,18 @@ class ReactionSystemBuilder():
 
         systems = {}
         path = Path.cwd() / folder
-        for lam in self.Lambda:
-            with (path / f"{lam:.3f}_sys.xml").open(mode="r",
-                                                    encoding="utf-8") as input:
-                systems[lam] = mm.XmlSerializer.deserialize(input.read())
+        self.ostream.print_info(f"Loading systems from {path}")
+        self.ostream.flush()
+        for file in path.iterdir():
+            if file.is_file() and file.name.endswith("_sys.xml"):
+                with file.open(mode="r", encoding="utf-8") as input:
+                    name = file.name[:-8]
+                    try:
+                        lam = float(name)
+                    except ValueError:
+                        self.ostream.print_info(f"Could not parse lambda value from filename {file.name}. Loading system with full name")
+                        lam = name
+                    systems[lam] = mm.XmlSerializer.deserialize(input.read())
         return systems
 
 
