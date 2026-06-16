@@ -2651,7 +2651,7 @@ class InterpolationDriver:
         if q_current.size != N or q_ref.size != N or g_qm.size != N:
             raise ValueError("runtime diagnostics: size mismatch")
 
-        coord_scales = self._internal_coordinate_error_scales(
+        coord_scales_not_used = self._internal_coordinate_error_scales(
             q_ref=q_ref,
             coords_flat=coords_flat,
             kinds_flat=kinds_flat,

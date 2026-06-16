@@ -669,7 +669,7 @@ class InterpolationDatapoint:
         R = - np.square(r_eq_arr) * (1.0 / r_arr - 1.0 / r_eq_arr)
         dR = np.square(r_eq_arr) / np.square(r_arr)
         d2R = -np.square(r_eq_arr) * 2.0 / np.power(r_arr, 3)
-        
+
         q = R
         dq_dr = dR
         d2q_dr2 = d2R

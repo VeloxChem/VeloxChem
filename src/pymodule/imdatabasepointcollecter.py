@@ -122,7 +122,7 @@ class IMDatabasePointCollecter:
         - scaling_factor: The scaling factor for the QM stabilizer.
         - linking_atom_distance: The distance between the QM and MM regions in angstroms.
         - consider_locality: False -->  This key_word allows the constraint optimization part to allow more constraints to be considered to keep the optimized
-                                        molecule closer to the current molecule. This might lead to more contamination of the interpolation database, should be 
+                                        molecule closer to the current molecule. This might lead to more contamination of the interpolation database, should be
                                         used when system is not improving without stricter locality constraints!
     """
 
