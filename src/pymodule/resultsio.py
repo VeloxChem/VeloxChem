@@ -41,11 +41,26 @@ from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 
 
-_ATOMIC_PROPERTY_DESCRIPTIONS = {
-    'nuclear_charges': 'Nuclear Charges',
-    ('esp', 'esp_charges'): 'ESP Charges',
-    ('resp', 'resp_charges'): 'RESP Charges',
-}
+def _get_atomic_property_description(label, key):
+    """
+    Gets the description for an atom-resolved HDF5 dataset.
+
+    :param label:
+        The HDF5 group label, or ``None`` for root-level datasets.
+    :param key:
+        The HDF5 dataset key.
+
+    :return:
+        The atomic-property description, or ``None``.
+    """
+
+    descriptions = {
+        (None, 'nuclear_charges'): 'Nuclear Charges',
+        ('esp', 'esp_charges'): 'ESP Charges',
+        ('resp', 'resp_charges'): 'RESP Charges',
+    }
+
+    return descriptions.get((label, key))
 
 
 def _write_value_to_hdf5(parent, key, value, value_label='HDF5 value'):
@@ -276,10 +291,10 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
 
         hf.create_dataset('nuclear_repulsion', data=np.array([e_nuc]))
 
-        nuclear_charges = hf.create_dataset('nuclear_charges',
-                                            data=molecule.get_element_ids())
-        nuclear_charges.attrs['atomic_property'] = (
-            _ATOMIC_PROPERTY_DESCRIPTIONS['nuclear_charges'])
+        nuclear_charges_dset = hf.create_dataset(
+            'nuclear_charges', data=molecule.get_element_ids())
+        nuclear_charges_dset.attrs['atomic_property'] = (
+            _get_atomic_property_description(None, 'nuclear_charges'))
 
         hf.create_dataset('atom_coordinates',
                           data=molecule.get_coordinates_in_bohr())
@@ -374,8 +389,7 @@ def write_results_to_hdf5(fname,
                                      key,
                                      value,
                                      value_label=value_label)
-                atomic_property = _ATOMIC_PROPERTY_DESCRIPTIONS.get(
-                    (label, key))
+                atomic_property = _get_atomic_property_description(label, key)
                 if atomic_property is not None:
                     result_group[key].attrs[
                         'atomic_property'] = atomic_property
