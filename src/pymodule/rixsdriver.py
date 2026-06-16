@@ -1105,7 +1105,8 @@ class RixsDriver(LinearSolver):
         :param broadening_value_ev:
             The broadening value, FWHM in eV.
         :param x_unit:
-            Unit for the x-axis.
+            Unit for the x-axis. Currently only 'ev' is supported.
+            NOTE: does not affect other inputs, which are expected to be in eV.
         :param xstep:
             Grid spacing in eV for the broadened RIXS spectrum.
         :param energy_loss:
@@ -1172,7 +1173,8 @@ class RixsDriver(LinearSolver):
         :param xstep:
             Grid spacing in eV for the broadened RIXS map.
         :param x_unit:
-            Currently only 'ev' is supported.
+            Unit for the x-axis. Currently only 'ev' is supported.
+            NOTE: does not affect other inputs, which are expected to be in eV.
         :param energy_loss:
             If True, plot versus energy loss.
             If False, plot versus emission energy.
