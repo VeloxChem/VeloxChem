@@ -108,17 +108,15 @@ class TestTpaFromCrf:
         tpa_results = tpa.compute(molecule, basis, scf_results)
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            for key in ref_tpa_results:
-                ref_tpa_results[key] /= 15.0
-                ref_tpa_results[key] *= -1.0  # rsp func. -> gamma
+            ref_tpa_results['gamma'] /= 15.0
+            ref_tpa_results['gamma'] *= -1.0  # rsp func. -> gamma
 
             tol = 1.0e-5
 
-            for key in ref_tpa_results:
-                ref_val = ref_tpa_results[key]
-                calc_val = tpa_results[key][(w1, w2, w3)]
-                assert abs(abs(calc_val.real / ref_val.real) - 1.0) < tol
-                assert abs(abs(calc_val.imag / ref_val.imag) - 1.0) < tol
+            ref_val = ref_tpa_results['gamma']
+            calc_val = tpa_results['gamma'][(w1, w2, w3)]
+            assert abs(abs(calc_val.real / ref_val.real) - 1.0) < tol
+            assert abs(abs(calc_val.imag / ref_val.imag) - 1.0) < tol
 
     def test_tpa_from_crf_lda(self):
 

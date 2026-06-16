@@ -6,6 +6,7 @@ from mpi4py import MPI
 from veloxchem.molecule import Molecule
 from veloxchem.symmetryanalyzer import SymmetryAnalyzer
 from veloxchem.symmetryoperations import ImproperRotation, Rotation
+from veloxchem.errorhandler import VeloxChemError
 
 
 class TestPointGroup:
@@ -368,7 +369,7 @@ class TestPointGroup:
     def test_symmetrize_pointgroup_d6h_from_loose_geometry(self):
 
         mol = self.gen_mol_D6h()
-        distorted_mol = self.distort_molecule(mol, scale=1.0e-3)
+        distorted_mol = self.distort_molecule(mol, scale=5.0e-4)
 
         distorted_res = SymmetryAnalyzer().identify_pointgroup(distorted_mol)
         assert distorted_res['point_group'] != 'D6h'
@@ -479,12 +480,12 @@ class TestPointGroup:
 
         sym_analyzer = SymmetryAnalyzer()
 
-        with pytest.raises(AssertionError, match='Invalid tolerance keyword'):
+        with pytest.raises(VeloxChemError, match='Invalid tolerance keyword'):
             sym_analyzer.identify_pointgroup(self.gen_mol_C2v(),
                                              tolerance='invalid')
 
         sym_analyzer.identify_pointgroup(self.gen_mol_C2v())
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Identity matrix should not be checked'):
             sym_analyzer._check_symmetry_operation(Rotation([1.0, 0.0, 0.0]),
                                                    'C1')

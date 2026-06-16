@@ -32,6 +32,9 @@
 
 from mpi4py import MPI
 from datetime import datetime, timedelta
+import traceback
+import sys
+import os
 
 from .veloxchemlib import mpi_master
 from .mpitask import MpiTask
@@ -43,7 +46,6 @@ from .mmforcefieldgenerator import MMForceFieldGenerator
 from .respchargesdriver import RespChargesDriver
 from .espchargesdriver import EspChargesDriver
 from .excitondriver import ExcitonModelDriver
-from .rixsdriver import RixsDriver
 from .numerovdriver import NumerovDriver
 from .mp2driver import Mp2Driver
 from .peforcefieldgenerator import PEForceFieldGenerator
@@ -66,6 +68,8 @@ from .rsptpatransition import TpaTransition
 from .rspdoublerestrans import DoubleResTransition
 from .rspthreepatransition import ThreePATransition
 from .rsptpa import TPA
+from .lrsolver import LinearResponseSolver
+from .cppsolver import ComplexResponseSolver
 from .polarizabilitygradient import PolarizabilityGradient
 from .vibrationalanalysis import VibrationalAnalysis
 from .visualizationdriver import VisualizationDriver
@@ -73,8 +77,9 @@ from .trajectorydriver import TrajectoryDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
+from .xpsdriver import XPSDriver
 from .cli import cli
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, VeloxChemError
 
 
 def select_scf_driver(task, scf_type):
@@ -259,6 +264,23 @@ def main():
     """
     Runs VeloxChem with command line arguments.
     """
+    try:
+        return _main_body()
+    except VeloxChemError as e:
+        sys.stdout.flush()
+        sys.stderr.flush()
+        if os.environ.get("VLX_DEBUG"):
+            traceback.print_exc()
+        else:
+            print(f'* VeloxChemError * {e}', file=sys.stderr)
+            print("(set VLX_DEBUG=1 for full traceback)", file=sys.stderr)
+        return 1
+
+
+def _main_body():
+    """
+    Implementation of main.
+    """
 
     program_start_time = datetime.now()
 
@@ -353,7 +375,12 @@ def main():
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
         'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'uscf_gradient',
         'hessian', 'optimize', 'response', 'pulses', 'visualization', 'loprop',
-        'pe force field', 'vibrational', 'polarizability_gradient'
+        'pe force field', 'vibrational', 'polarizability_gradient', 'xps'
+    ]
+
+    run_scf_only = task_type in [
+        'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
+        'wave function'
     ]
 
     scf_type = 'restricted'
@@ -380,7 +407,7 @@ def main():
             xtb_drv = XtbDriver(task.mpi_comm, task.ostream)
             xtb_drv.set_method(method_dict['xtb'].lower())
             xtb_drv.xtb_verbose = True
-            xtb_results = xtb_drv.compute(task.molecule)
+            xtb_results_not_used = xtb_drv.compute(task.molecule)
         else:
             scf_drv = select_scf_driver(task, scf_type)
             scf_drv.update_settings(scf_dict, method_dict)
@@ -398,10 +425,12 @@ def main():
                 if 'response' not in task.input_dict:
                     # restart is default or True for optimization driver
                     if ('restart' not in opt_dict) or opt_dict['restart']:
-                        # check validity of checkpoint
-                        use_checkpoint_geometry = scf_drv.validate_checkpoint(
-                            task.molecule.get_element_ids(),
-                            task.ao_basis.get_label(), scf_drv.scf_type)
+                        # not an irc
+                        if not ('irc' in opt_dict and opt_dict['irc']):
+                            # check validity of checkpoint
+                            use_checkpoint_geometry = scf_drv.validate_checkpoint(
+                                task.molecule.get_element_ids(),
+                                task.ao_basis.get_label(), scf_drv.scf_type)
 
             if not use_checkpoint_geometry:
                 scf_results = scf_drv.compute(task.molecule, task.ao_basis,
@@ -411,12 +440,15 @@ def main():
                 density = scf_drv.density
 
                 if not scf_drv.is_converged:
-                    return
+                    return 1
 
                 if (scf_drv.electric_field is not None and
                         task.molecule.get_charge() != 0):
-                    task.finish()
-                    return
+                    if not run_scf_only:
+                        task.ostream.print_warning(
+                            'Charged molecule in electric field: stopping after SCF.')
+                        task.finish()
+                        return 0
 
     # Gradient
 
@@ -474,7 +506,6 @@ def main():
                                   rsp_prop._rsp_driver, rsp_prop._rsp_property)
 
     # Hessian
-    # TODO reconsider keeping this after introducing vibrationalanalysis class
     if task_type == 'hessian':
         hessian_dict = (dict(task.input_dict['hessian'])
                         if 'hessian' in task.input_dict else {})
@@ -522,14 +553,15 @@ def main():
                 opt_drv = OptimizationDriver(grad_drv)
                 opt_drv.keep_files = True
                 opt_drv.update_settings(opt_dict)
-                opt_results = opt_drv.compute(task.molecule)
+                opt_results_not_used = opt_drv.compute(task.molecule)
 
             else:
                 grad_drv = ScfGradientDriver(scf_drv)
                 opt_drv = OptimizationDriver(grad_drv)
                 opt_drv.keep_files = True
                 opt_drv.update_settings(opt_dict)
-                opt_results = opt_drv.compute(task.molecule, task.ao_basis)
+                opt_results_not_used = opt_drv.compute(task.molecule,
+                                                       task.ao_basis)
 
         elif run_excited_state_gradient:
 
@@ -560,9 +592,10 @@ def main():
             opt_drv = OptimizationDriver(tddftgrad_drv)
             opt_drv.keep_files = True
             opt_drv.update_settings(opt_dict)
-            opt_results = opt_drv.compute(task.molecule, task.ao_basis, scf_drv,
-                                          rsp_prop._rsp_driver,
-                                          rsp_prop._rsp_property)
+            opt_results_not_used = opt_drv.compute(task.molecule, task.ao_basis,
+                                                   scf_drv,
+                                                   rsp_prop._rsp_driver,
+                                                   rsp_prop._rsp_property)
 
     # Vibrational analysis
 
@@ -637,7 +670,8 @@ def main():
                                                 rsp_dict=rsp_dict,
                                                 polgrad_dict=polgrad_dict)
 
-        vib_results = vibrational_drv.compute(task.molecule, task.ao_basis)
+        vib_results_not_used = vibrational_drv.compute(task.molecule,
+                                                       task.ao_basis)
 
     # Polarizability gradient
 
@@ -654,15 +688,25 @@ def main():
         rsp_dict['filename'] = task.input_dict['filename']
         rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
 
-        rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
-        rsp_prop.init_driver(task.mpi_comm, task.ostream)
-        rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
-
         polgrad_drv = PolarizabilityGradient(scf_drv, task.mpi_comm,
                                              task.ostream)
         polgrad_drv.update_settings(polgrad_dict, orbrsp_dict, method_dict)
-        polgrad_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_results,
-                            rsp_prop._rsp_property)
+
+        polgrad_drv.print_level = 2
+        polgrad_drv.do_print_polgrad = True
+
+        if polgrad_drv.is_complex:
+            lr_drv = ComplexResponseSolver()
+        else:
+            lr_drv = LinearResponseSolver()
+        lr_drv.a_operator = "electric dipole"
+        lr_drv.b_operator = "electric dipole"
+        lr_drv.update_settings(rsp_dict, method_dict)
+        lr_drv.frequencies = polgrad_drv.frequencies
+        lr_results = lr_drv.compute(task.molecule, task.ao_basis, scf_results)
+
+        polgrad_results_not_used = polgrad_drv.compute(
+            task.molecule, task.ao_basis, scf_drv.scf_results, lr_results)
 
     # Response
 
@@ -682,7 +726,7 @@ def main():
         rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
         if not rsp_prop.is_converged:
-            return
+            return 1
 
         # Calculate the excited-state gradient if requested
 
@@ -758,8 +802,8 @@ def main():
                                                 rsp_dict=rsp_dict,
                                                 polgrad_dict=polgrad_dict)
 
-                vib_results = vibrational_drv.compute(task.molecule,
-                                                      task.ao_basis)
+                vib_results_not_used = vibrational_drv.compute(
+                    task.molecule, task.ao_basis)
 
             # Excited state optimization
             if 'optimize_excited_state' in task.input_dict:
@@ -793,6 +837,34 @@ def main():
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
         mp2_drv.update_settings(mp2_dict, method_dict)
         mp2_drv.compute(task.molecule, task.ao_basis, scf_results)
+
+    # XPS
+
+    if task_type == 'xps':
+        assert_msg_critical(
+            not use_xtb,
+            'XPS task is not supported with xTB; please use an SCF/DFT method.')
+
+        xps_dict = (dict(task.input_dict['xps'])
+                    if 'xps' in task.input_dict else {})
+        xps_dict['filename'] = task.input_dict['filename']
+
+        xps_drv = XPSDriver(task.mpi_comm, task.ostream)
+        xps_drv.update_settings(xps_dict, method_dict)
+        element = xps_dict['element'] if 'element' in xps_dict else None
+
+        assert_msg_critical(
+            'elements' not in xps_dict,
+            'XPS task uses only element in the xps input group')
+
+        assert_msg_critical(element is not None,
+                            'XPS task requires element in the xps input group')
+
+        xps_results = xps_drv.compute(task.molecule,
+                                      task.ao_basis,
+                                      scf_drv,
+                                      element=element)
+        xps_drv.print_results(xps_results)
 
     # Cube file
 
@@ -846,3 +918,4 @@ def main():
     # All done
 
     task.finish()
+    return 0

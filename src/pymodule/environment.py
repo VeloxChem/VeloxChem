@@ -42,7 +42,7 @@ def get_basis_path():
         The location of basis files within module.
     """
 
-    return Path(__file__).parent / "basis"
+    return Path(__file__).resolve().parent / "basis"
 
 
 def set_vlxbasispath():
@@ -62,7 +62,7 @@ def get_data_path():
         The location of data files within module.
     """
 
-    return Path(__file__).parent / "database"
+    return Path(__file__).resolve().parent / "database"
 
 
 def set_vlxdatapath():

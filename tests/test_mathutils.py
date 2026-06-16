@@ -7,6 +7,7 @@ from veloxchem.mathutils import safe_arccos, safe_arcsin
 from veloxchem.mathutils import (safe_solve, screened_eigh,
                                  symmetric_matrix_function,
                                  solve_in_orthogonal_basis)
+from veloxchem.errorhandler import VeloxChemError
 
 
 class TestMathUtils:
@@ -21,7 +22,7 @@ class TestMathUtils:
                         reason="pytest.raises only valid in serial")
     def test_safe_arccos_rejects_invalid_input(self):
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match="arccos: Invalid cosine value"):
             safe_arccos(1.0 + 1.0e-8)
 
@@ -35,7 +36,7 @@ class TestMathUtils:
                         reason="pytest.raises only valid in serial")
     def test_safe_arcsin_rejects_invalid_input(self):
 
-        with pytest.raises(AssertionError, match="arcsin: Invalid sine value"):
+        with pytest.raises(VeloxChemError, match="arcsin: Invalid sine value"):
             safe_arcsin(-1.0 - 1.0e-8)
 
     def test_safe_solve_matches_numpy_for_nonsingular_system(self):

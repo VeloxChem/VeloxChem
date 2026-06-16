@@ -152,7 +152,7 @@ export_general(py::module &m) -> void
     m.def("rotatory_strength_in_cgs", &units::getRotatoryStrengthInCGS, "Gets convertion factor for rotatory strength (a.u. -> 10^-40 cgs).");
     m.def("extinction_coefficient_from_beta",
           &units::getExtinctionCoefficientFromBeta,
-          "Gets factor needed for the calculation of the extinction coefficent from the electric-dipole magnetic-dipole polarizability beta.");
+          "Gets factor needed for the calculation of the extinction coefficient from the electric-dipole magnetic-dipole polarizability beta.");
     m.def("fine_structure_constant", &units::getFineStructureConstant, "Gets fine-structure constant.");
 
     // exposing functions from AtomicRadii.hpp

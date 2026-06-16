@@ -656,6 +656,7 @@ class C6Driver(LinearSolver):
                         'Response solution vectors written to file: ' +
                         final_h5_fname)
                     self.ostream.print_blank()
+                    self.ostream.flush()
 
                 c6 = self._integrate_c6(self.w0, points, weights, imagfreqs,
                                         rsp_funcs)

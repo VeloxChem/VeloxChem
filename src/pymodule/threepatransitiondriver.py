@@ -39,8 +39,7 @@ import sys
 
 from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_ev,
-                           hartree_in_inverse_nm, fine_structure_constant,
-                           speed_of_light_in_vacuum_in_SI)
+                           fine_structure_constant, speed_of_light_in_vacuum_in_SI)
 from .profiler import Profiler
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponseSolver
@@ -49,7 +48,6 @@ from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check)
-from .errorhandler import assert_msg_critical
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
 from .lreigensolver import LinearResponseEigenSolver
@@ -250,7 +248,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         freqs = [-1/3 * a for a in rpa_results['eigenvalues']]
         freqs_for_response_vectors = freqs + [0.0]
 
-        # print("freqs_for_response_vectors",freqs_for_response_vectors)
+        # print("freqs_for_response_vectors", freqs_for_response_vectors)
 
         # Storing the dipole integral matrices used for the X[2] and
         # A[2] contractions in MO basis
@@ -301,8 +299,8 @@ class ThreePATransitionDriver(NonlinearSolver):
         profiler.check_memory_usage('CPP')
 
         ret_dict = self.compute_cubic_components(Focks, freqs, X, d_a_mo, Nx,
-                                                scf_results, molecule, ao_basis,
-                                                profiler, Xf)
+                                                 scf_results, molecule, ao_basis,
+                                                 profiler, Xf)
 
         valstr = '*** Time spent in 3PA response calculation: '
         valstr += '{:.2f} sec ***'.format(time.time() - start_time)
@@ -322,7 +320,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         return ret_dict
 
     def compute_cubic_components(self, Focks, freqs, X, d_a_mo, Nx, scf_results,
-                                molecule, ao_basis, profiler, Xf):
+                                 molecule, ao_basis, profiler, Xf):
         """
         Computes all the relevent terms to compute a general quadratic response function
 
@@ -383,7 +381,7 @@ class ThreePATransitionDriver(NonlinearSolver):
 
         # Needs tgo be fixed
         density_list1_two, density_list2_two = self.get_densities_II(freqs, Nx, Nxy, mo, nocc, norb,Xf)
-        
+
         # Needs tgo be fixed
         fock_dict_two = self.get_fock_dict_II(freqs, density_list1_two,density_list2_two, F0, mo,molecule, ao_basis, eri_dict,dft_dict)
 
@@ -443,7 +441,6 @@ class ThreePATransitionDriver(NonlinearSolver):
                             A3NbNcNf += np.dot(self._a3_contract(kb, kf, op_A, d_a_mo, nocc, norb), Nc)
                             A3NbNcNf += np.dot(self._a3_contract(kf, kb, op_A, d_a_mo, nocc, norb), Nc)
 
-                            
                             # X3 contraction
                             NaB3NcNf = np.dot(Na.T, self._x3_contract(kc, kf, op_B, d_a_mo, nocc, norb))
                             NaB3NfNc = np.dot(Na.T, self._x3_contract(kf, kc, op_B, d_a_mo, nocc, norb))
@@ -464,7 +461,7 @@ class ThreePATransitionDriver(NonlinearSolver):
                             NaB2Ncf = np.dot(Na.T,self._x2_contract(kcf, op_B, d_a_mo, nocc, norb))
                             NaC2Nbf = np.dot(Na.T,self._x2_contract(kbf, op_C, d_a_mo, nocc, norb))
 
-                            # E3 contractions  
+                            # E3 contractions
                             NaE3NbNcf = np.dot(Na, e3_dict[(f"{b_comp}{c_comp}", w)])
 
                             # T4 contraction
@@ -472,22 +469,21 @@ class ThreePATransitionDriver(NonlinearSolver):
                             NaS4NbNcNd = np.dot(Na, s4_dict[(f"{b_comp}{c_comp}", w)])
 
                             # Check signs of the contractions
-                            T_abc = A3NbNcNf 
-                            T_abc +=  -(NaB3NcNf + NaB3NfNc + NaC3NbNf + NaC3NfNb)
-                            T_abc +=  NbA2Ncf + NcA2Nbf + NfA2Nbc
-                            T_abc +=  NaB2Ncf + NaC2Nbf 
-                            T_abc += - NaE3NbNcf 
-                            T_abc +=  -(NaE4NbNcNf - NaS4NbNcNd)
+                            T_abc = A3NbNcNf
+                            T_abc += -(NaB3NcNf + NaB3NfNc + NaC3NbNf + NaC3NfNb)
+                            T_abc += NbA2Ncf + NcA2Nbf + NfA2Nbc
+                            T_abc += NaB2Ncf + NaC2Nbf
+                            T_abc += - NaE3NbNcf
+                            T_abc += -(NaE4NbNcNf - NaS4NbNcNd)
 
                             T_tensors[(f"{a_comp}{b_comp}{c_comp}", round(float(w), 4))] = T_abc
 
+        # diagonalized_tensors = {}
 
-        diagonalized_tensors = {}
-
-        #if self.rank == mpi_master():
-            #for key, tensor in M_tensors.items():
-            #    eigvals, eigvecs = np.linalg.eigh(tensor)
-            #    diagonalized_tensors[key] = np.diag(eigvals)
+        # if self.rank == mpi_master():
+        #     for key, tensor in M_tensors.items():
+        #         eigvals, eigvecs = np.linalg.eigh(tensor)
+        #         diagonalized_tensors[key] = np.diag(eigvals)
 
         self.ostream.print_blank()
         w_str = 'Summary of Three-photon Absorption'
@@ -502,7 +498,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         c = speed_of_light_in_vacuum_in_SI() * 100.0
         gamma = 0.1 / hartree_in_ev()
         # TODO: double check au2gm for 3PA
-        au2gm = (4.0 * np.pi**3 * alpha * a0**8) / (3.0 * c **2  * gamma) * 1.0e+50
+        au2gm = (4.0 * np.pi**3 * alpha * a0**8) / (3.0 * c**2 * gamma) * 1.0e+50
 
         if self.rank == mpi_master():
             tpa_strengths = {'linear': {}, 'circular': {}}
@@ -536,30 +532,27 @@ class ThreePATransitionDriver(NonlinearSolver):
 
             profiler.check_memory_usage('End of 3PA')
 
-        
-            #a_target, b_target, c_target = 'z', 'z', 'y'
+            # a_target, b_target, c_target = 'z', 'z', 'y'
 
-            #for key, value in debugg_dict.items():
+            # for key, value in debugg_dict.items():
             #    if isinstance(key, tuple) and len(key) == 3:
             #        abc, w, T = key
             #        if abc == f"{a_target}{b_target}{c_target}":
             #            print(f"{key}: {value}")
 
             ret_dict = {
-                'photon_energies': [-w for w in freqs],
+                'photon_energies': [float(-w) for w in freqs],
                 'transition_moments': T_tensors,
-                #'cross_sections': tpa_cross_sections,
+                # 'cross_sections': tpa_cross_sections,
                 '3pa_strengths': tpa_strengths,
                 'ground_state_dipole_moments':scf_prop.get_property('dipole moment')
             }
-
 
             self._print_results(ret_dict)
 
             return ret_dict
         else:
             return None, None, None, None
-
 
     def get_es4(self, wi, N, fo, fo2, nocc, norb, D0,Xf):
         """
@@ -623,24 +616,24 @@ class ThreePATransitionDriver(NonlinearSolver):
 
             vec_pack = vec_pack.T.copy().reshape(-1, norb, norb)
 
-            (Fbfx, 
-             Fbfy, 
-             Fbfz, 
-             Fbc_xx, 
-             Fbc_yy, 
-             Fbc_zz, 
-             Fbc_xy, 
-             Fbc_xz, 
-             Fbc_yz, 
+            (Fbfx,
+             Fbfy,
+             Fbfz,
+             Fbc_xx,
+             Fbc_yy,
+             Fbc_zz,
+             Fbc_xy,
+             Fbc_xz,
+             Fbc_yz,
              Fbcf_yz,
              Fbcf_xz,
              Fbcf_xy,
              Fbcf_xx,
              Fbcf_yy,
              Fbcf_zz,
-             fx, 
-             fy, 
-             fz, 
+             fx,
+             fy,
+             fz,
              ff) = vec_pack
 
             # First-order Fock matrices
@@ -658,7 +651,7 @@ class ThreePATransitionDriver(NonlinearSolver):
             kz = (self.complex_lrvec2mat(Nz, nocc, norb)).T
             kf = (self.complex_lrvec2mat(Nf, nocc, norb)).T
 
-            # xx 
+            # xx
             zi_bcd_xx = self._zi(kx, kx, kf, fx, ff, Fbfx, F0_a)
             zi_cbd_xx = self._zi(kx, kx, kf, fx, ff, Fbfx, F0_a)
             zi_dbc_xx = self._zi(kf, kx, kx, fx, fx, Fbc_xx, F0_a)
@@ -666,7 +659,7 @@ class ThreePATransitionDriver(NonlinearSolver):
             e4fock_xx = (zi_bcd_xx + zi_cbd_xx + zi_dbc_xx) + (Fbcf_xx)
             e4_vec[('xx',w)] = 2. / 6 * self.anti_sym(LinearSolver.lrmat2vec(e4fock_xx.T, nocc, norb))
 
-            # yy 
+            # yy
             zi_bcd_yy = self._zi(ky, ky, kf, fy, ff, Fbfy, F0_a)
             zi_cbd_yy = self._zi(ky, ky, kf, fy, ff, Fbfy, F0_a)
             zi_dbc_yy = self._zi(kf, ky, ky, fy, fy, Fbc_yy, F0_a)
@@ -674,7 +667,7 @@ class ThreePATransitionDriver(NonlinearSolver):
             e4fock_yy = (zi_bcd_yy + zi_cbd_yy + zi_dbc_yy) + (Fbcf_yy)
             e4_vec[('yy',w)] = 2. / 6 * self.anti_sym(LinearSolver.lrmat2vec(e4fock_yy.T, nocc, norb))
 
-            # zz 
+            # zz
             zi_bcd_zz = self._zi(kz, kz, kf, fz, ff, Fbfz, F0_a)
             zi_cbd_zz = self._zi(kz, kz, kf, fz, ff, Fbfz, F0_a)
             zi_dbc_zz = self._zi(kf, kz, kz, fz, fz, Fbc_zz, F0_a)
@@ -682,8 +675,7 @@ class ThreePATransitionDriver(NonlinearSolver):
             e4fock_zz = (zi_bcd_zz + zi_cbd_zz + zi_dbc_zz) + (Fbcf_zz)
             e4_vec[('zz',w)] = 2. / 6 * self.anti_sym(LinearSolver.lrmat2vec(e4fock_zz.T, nocc, norb))
 
-
-            ## xy 
+            # xy
             zi_bcd_xy = self._zi(kx, ky, kf, fy, ff, Fbfy, F0_a)
             zi_cbd_xy = self._zi(ky, kx, kf, fx, ff, Fbfx, F0_a)
             zi_dbc_xy = self._zi(kf, kx, ky, fx, fy, Fbc_xy, F0_a)
@@ -711,10 +703,10 @@ class ThreePATransitionDriver(NonlinearSolver):
             e4_vec[('zy',w)] = e4_vec[('yz',w)]
 
             # xx
-            kx = kx.T 
-            ky = ky.T 
-            kz = kz.T 
-            kf = kf.T 
+            kx = kx.T
+            ky = ky.T
+            kz = kz.T
+            kf = kf.T
 
             # xx
             s4_term_xx = w * self._s4(kx, kx, kf, D0, nocc, norb)
@@ -755,9 +747,7 @@ class ThreePATransitionDriver(NonlinearSolver):
             s4_vec[('yz',w)] = s4_term_yz
             s4_vec[('zy',w)] = s4_term_yz
 
-
         return e4_vec, s4_vec
-
 
     def get_nxy(self, freqs, Nx, fo, fo2, nocc, norb, d_a_mo, X, molecule,ao_basis, scf_results,Xf):
         """
@@ -792,7 +782,7 @@ class ThreePATransitionDriver(NonlinearSolver):
                 fo2[('z', w)].data,
                 fo2[w_ind].data,
                 fo['Fbfx'][w].data,
-                fo['Fbfy' ][w].data,
+                fo['Fbfy'][w].data,
                 fo['Fbfz'][w].data,
                 fo['Fbc_xx'][w].data,
                 fo['Fbc_yy'][w].data,
@@ -810,27 +800,25 @@ class ThreePATransitionDriver(NonlinearSolver):
 
             Nf = LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
 
-
             if self.rank != mpi_master():
                 continue
 
             vec_pack = vec_pack.T.copy().reshape(-1, norb, norb)
 
+            # Fix Fock matrices
 
-            # Fix Fock matrices 
-
-            (fx, 
-             fy, 
+            (fx,
+             fy,
              fz,
              ff,
-             Fbfx, 
-             Fbfy, 
-             Fbfz, 
-             Fbc_xx, 
-             Fbc_yy, 
-             Fbc_zz, 
-             Fbc_xy, 
-             Fbc_xz, 
+             Fbfx,
+             Fbfy,
+             Fbfz,
+             Fbc_xx,
+             Fbc_yy,
+             Fbc_zz,
+             Fbc_xy,
+             Fbc_xz,
              Fbc_yz) = vec_pack
 
             fx = np.conjugate(fx).T
@@ -869,7 +857,7 @@ class ThreePATransitionDriver(NonlinearSolver):
             BC[('fy', - 2 * w)] = E3NbNf_y - Y2Nf
             BC[('fz', - 2 * w)] = E3NbNf_z - Z2Nf
 
-            # E3 contractions 
+            # E3 contractions
             xi_xx = self._xi(kx, kx, fx, fx, F0_a)
             xi_yy = self._xi(ky, ky, fy, fy, F0_a)
             xi_zz = self._xi(kz, kz, fz, fz, F0_a)
@@ -891,23 +879,22 @@ class ThreePATransitionDriver(NonlinearSolver):
             E3NbNf_xz = self.anti_sym(-LinearSolver.lrmat2vec(e3fock_xz, nocc, norb))
             E3NbNf_yz = self.anti_sym(-LinearSolver.lrmat2vec(e3fock_yz, nocc, norb))
 
-            # X2 contractions 
-            B2Nc_xx =  0.5 * self._x2_contract(kx.T, X['x'], d_a_mo, nocc, norb) +  0.5 * self._x2_contract(kx.T, X['x'], d_a_mo, nocc, norb)
-            B2Nc_yy =  0.5 * self._x2_contract(ky.T, X['y'], d_a_mo, nocc, norb) + 0.5 * self._x2_contract(ky.T, X['y'], d_a_mo, nocc, norb)
-            B2Nc_zz =  0.5 * self._x2_contract(kz.T, X['z'], d_a_mo, nocc, norb) + 0.5 * self._x2_contract(kz.T, X['z'], d_a_mo, nocc, norb)
-            B2Nc_xy = 0.5 * self._x2_contract(kx.T, X['y'], d_a_mo, nocc, norb) + 0.5 * self._x2_contract(ky.T, X['x'], d_a_mo, nocc, norb) 
+            # X2 contractions
+            B2Nc_xx = 0.5 * self._x2_contract(kx.T, X['x'], d_a_mo, nocc, norb) + 0.5 * self._x2_contract(kx.T, X['x'], d_a_mo, nocc, norb)
+            B2Nc_yy = 0.5 * self._x2_contract(ky.T, X['y'], d_a_mo, nocc, norb) + 0.5 * self._x2_contract(ky.T, X['y'], d_a_mo, nocc, norb)
+            B2Nc_zz = 0.5 * self._x2_contract(kz.T, X['z'], d_a_mo, nocc, norb) + 0.5 * self._x2_contract(kz.T, X['z'], d_a_mo, nocc, norb)
+            B2Nc_xy = 0.5 * self._x2_contract(kx.T, X['y'], d_a_mo, nocc, norb) + 0.5 * self._x2_contract(ky.T, X['x'], d_a_mo, nocc, norb)
             B2Nc_xz = 0.5 * self._x2_contract(kx.T, X['z'], d_a_mo, nocc, norb) + 0.5 * self._x2_contract(kz.T, X['x'], d_a_mo, nocc, norb)
             B2Nc_yz = 0.5 * self._x2_contract(ky.T, X['z'], d_a_mo, nocc, norb) + 0.5 * self._x2_contract(kz.T, X['y'], d_a_mo, nocc, norb)
 
-            BC[('xx', 2 * w)] = E3NbNf_xx - B2Nc_xx 
-            BC[('yy', 2 * w)] = E3NbNf_yy - B2Nc_yy 
-            BC[('zz', 2 * w)] = E3NbNf_zz - B2Nc_zz 
+            BC[('xx', 2 * w)] = E3NbNf_xx - B2Nc_xx
+            BC[('yy', 2 * w)] = E3NbNf_yy - B2Nc_yy
+            BC[('zz', 2 * w)] = E3NbNf_zz - B2Nc_zz
             BC[('xy', 2 * w)] = E3NbNf_xy - B2Nc_xy
             BC[('xz', 2 * w)] = E3NbNf_xz - B2Nc_xz
             BC[('yz', 2 * w)] = E3NbNf_yz - B2Nc_yz
 
             XY.update(BC)
-
 
         Nxy_drv = ComplexResponseSolver(self.comm, self.ostream)
 
@@ -936,7 +923,6 @@ class ThreePATransitionDriver(NonlinearSolver):
 
         return Nxy, Focks
 
-
     def get_densities_II(self, freq, N, N2, mo, nocc, norb,Xf):
         """
         Computes the  densities needed for the Fock matrices.
@@ -949,7 +935,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         :param Nxy:
             A dict of the two index response vectors in distributed form
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param nocc:
             Number of occupied orbitals
         :param norb:
@@ -979,7 +965,6 @@ class ThreePATransitionDriver(NonlinearSolver):
             Nxy = ComplexResponseSolver.get_full_solution_vector(N2[('xy', 2 * w)])
             Nxz = ComplexResponseSolver.get_full_solution_vector(N2[('xz', 2 * w)])
             Nyz = ComplexResponseSolver.get_full_solution_vector(N2[('yz', 2 * w)])
-            
 
             if self.rank == mpi_master():
 
@@ -998,7 +983,7 @@ class ThreePATransitionDriver(NonlinearSolver):
                 kxy = self.complex_lrvec2mat(Nxy, nocc, norb)
                 kxz = self.complex_lrvec2mat(Nxz, nocc, norb)
                 kyz = self.complex_lrvec2mat(Nyz, nocc, norb)
-            
+
                 # create the first order single indexed densiteies #
 
                 Dx = self.commut_mo_density(kx, nocc)
@@ -1069,33 +1054,32 @@ class ThreePATransitionDriver(NonlinearSolver):
 
                 Df_yz = self.commut(kf, Dyz)
                 Dyz_f = self.commut(kyz, Df)
-                
+
                 # density transformation from MO to AO basis
 
                 # xx
-                # 0.5 * fxfx.T +  0.5 * fxfx.T  +   0.5 * ffxx.T
+                # 0.5 * fxfx.T + 0.5 * fxfx.T + 0.5 * ffxx.T
                 Dfxx = np.linalg.multi_dot([mo, (2.0 * (Dx_fx + Dfx_x) + Df_xx + Dxx_f), mo.T])
 
-                # yy 
-                # 0.5 * fyfy.T +  0.5 * fyfy.T  +   0.5 * ffyy.T
+                # yy
+                # 0.5 * fyfy.T + 0.5 * fyfy.T + 0.5 * ffyy.T
                 Dfyy = np.linalg.multi_dot([mo, (2.0 * (Dy_fy + Dfy_y) + Df_yy + Dyy_f), mo.T])
 
                 # zz
-                # 0.5 * fzfz.T +  0.5 * fzfz.T  +   0.5 * ffzz.T
+                # 0.5 * fzfz.T + 0.5 * fzfz.T + 0.5 * ffzz.T
                 Dfzz = np.linalg.multi_dot([mo, (2.0 * (Dz_fz + Dfz_z) + Df_zz + Dzz_f), mo.T])
 
-                #xy
-                # 0.5 * fxfy.T +  0.5 * fyfx.T  +   0.5 * ffxy.T
+                # xy
+                # 0.5 * fxfy.T + 0.5 * fyfx.T + 0.5 * ffxy.T
                 Dfxy = np.linalg.multi_dot([mo, (Dx_fy + Dfy_x) + (Dy_fx + Dfx_y) + (Df_xy + Dxy_f), mo.T])
 
-                #xz
-                # 0.5 * fxfz.T +  0.5 * fzfx.T  +   0.5 * ffxz.T
+                # xz
+                # 0.5 * fxfz.T + 0.5 * fzfx.T + 0.5 * ffxz.T
                 Dfxz = np.linalg.multi_dot([mo, (Dx_fz + Dfz_x) + (Dz_fx + Dfx_z) + (Df_xz + Dxz_f), mo.T])
 
-                #yz
-                # 0.5 * fyfz.T +  0.5 * fzyf.T  +   0.5 * ffyz.T
+                # yz
+                # 0.5 * fyfz.T + 0.5 * fzyf.T + 0.5 * ffyz.T
                 Dfyz = np.linalg.multi_dot([mo, (Dy_fz + Dfz_y) + (Dz_fy + Dfy_z) + (Df_yz + Dyz_f), mo.T])
-                
 
                 Dx = np.linalg.multi_dot([mo, Dx, mo.T])
                 Dy = np.linalg.multi_dot([mo, Dy, mo.T])
@@ -1112,7 +1096,6 @@ class ThreePATransitionDriver(NonlinearSolver):
                 Dxy = np.linalg.multi_dot([mo, Dxy, mo.T])
                 Dxz = np.linalg.multi_dot([mo, Dxz, mo.T])
                 Dyz = np.linalg.multi_dot([mo, Dyz, mo.T])
-
 
                 dist_den_1_freq = np.hstack((
                     Dx.real.reshape(-1, 1),
@@ -1163,7 +1146,6 @@ class ThreePATransitionDriver(NonlinearSolver):
 
         return distributed_density_1, distributed_density_2
 
-
     def get_densities(self, freqs, Nx, mo, nocc, norb, Xf):
         """
         Computes the densities needed for the perturbed Fock matrices.
@@ -1173,7 +1155,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         :param kX:
             A dictonary with all the first-order response matrices
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param nocc:
             Number of occupied orbitals
 
@@ -1187,7 +1169,6 @@ class ThreePATransitionDriver(NonlinearSolver):
         distributed_density_1 = None
         distributed_density_2 = None
         distributed_density_3 = None
-
 
         for w_ind, w in enumerate(freqs):
 
@@ -1225,36 +1206,36 @@ class ThreePATransitionDriver(NonlinearSolver):
                 Dbc_yz = self.commut(ky, Dz) + self.commut(kz, Dy)
 
                 # create the first order three indexed densities #
-                
-                # xx 
-                Dbcf_xx = self.commut(kx, Dbfx) # bcd + bdc
-                Dbcf_xx += self.commut(kx, Dbfx) # cbd + cdb
-                Dbcf_xx += self.commut(kf, Dbc_xx) # dbc + dcb
+
+                # xx
+                Dbcf_xx = self.commut(kx, Dbfx)  # bcd + bdc
+                Dbcf_xx += self.commut(kx, Dbfx)  # cbd + cdb
+                Dbcf_xx += self.commut(kf, Dbc_xx)  # dbc + dcb
 
                 # yy
-                Dbcf_yy = self.commut(ky, Dbfy) # bcd + bdc
-                Dbcf_yy += self.commut(ky, Dbfy) # cbd + cdb
-                Dbcf_yy += self.commut(kf, Dbc_yy) # dbc + dcb
+                Dbcf_yy = self.commut(ky, Dbfy)  # bcd + bdc
+                Dbcf_yy += self.commut(ky, Dbfy)  # cbd + cdb
+                Dbcf_yy += self.commut(kf, Dbc_yy)  # dbc + dcb
 
                 # zz
-                Dbcf_zz = self.commut(kz, Dbfz) # bcd + bdc
-                Dbcf_zz += self.commut(kz, Dbfz) # cbd + cdb
-                Dbcf_zz += self.commut(kf, Dbc_zz) # dbc + dcb
+                Dbcf_zz = self.commut(kz, Dbfz)  # bcd + bdc
+                Dbcf_zz += self.commut(kz, Dbfz)  # cbd + cdb
+                Dbcf_zz += self.commut(kf, Dbc_zz)  # dbc + dcb
 
                 #  xy
-                Dbcf_xy = self.commut(kx, Dbfy) # bcd + bdc
-                Dbcf_xy += self.commut(ky, Dbfx) # cbd + cdb
-                Dbcf_xy += self.commut(kf, Dbc_xy) # dbc + dcb
+                Dbcf_xy = self.commut(kx, Dbfy)  # bcd + bdc
+                Dbcf_xy += self.commut(ky, Dbfx)  # cbd + cdb
+                Dbcf_xy += self.commut(kf, Dbc_xy)  # dbc + dcb
 
                 #  xz
-                Dbcf_xz = self.commut(kx, Dbfz) # bcd + bdc
-                Dbcf_xz += self.commut(kz, Dbfx) # cbd + cdb
-                Dbcf_xz += self.commut(kf, Dbc_xz) # dbc + dcb
+                Dbcf_xz = self.commut(kx, Dbfz)  # bcd + bdc
+                Dbcf_xz += self.commut(kz, Dbfx)  # cbd + cdb
+                Dbcf_xz += self.commut(kf, Dbc_xz)  # dbc + dcb
 
                 #  yz
-                Dbcf_yz = self.commut(ky, Dbfz) # bcd + bdc
-                Dbcf_yz += self.commut(kz, Dbfy) # cbd + cdb
-                Dbcf_yz += self.commut(kf, Dbc_yz) # dbc + dcb
+                Dbcf_yz = self.commut(ky, Dbfz)  # bcd + bdc
+                Dbcf_yz += self.commut(kz, Dbfy)  # cbd + cdb
+                Dbcf_yz += self.commut(kf, Dbc_yz)  # dbc + dcb
 
                 # Density transformation from MO to AO basis
 
@@ -1275,7 +1256,6 @@ class ThreePATransitionDriver(NonlinearSolver):
                 Dbc_xz = np.linalg.multi_dot([mo, Dbc_xz, mo.T])
                 Dbc_yz = np.linalg.multi_dot([mo, Dbc_yz, mo.T])
 
-
                 # first-order three-index
                 Dbcf_yz = np.linalg.multi_dot([mo, Dbcf_yz, mo.T])
                 Dbcf_xz = np.linalg.multi_dot([mo, Dbcf_xz, mo.T])
@@ -1284,7 +1264,6 @@ class ThreePATransitionDriver(NonlinearSolver):
                 Dbcf_yy = np.linalg.multi_dot([mo, Dbcf_yy, mo.T])
                 Dbcf_zz = np.linalg.multi_dot([mo, Dbcf_zz, mo.T])
 
-           
                 dist_den_1_freq = np.hstack((
                     Dx.real.reshape(-1, 1),
                     Dy.real.reshape(-1, 1),
@@ -1318,11 +1297,10 @@ class ThreePATransitionDriver(NonlinearSolver):
                 dist_den_2_freq = None
                 dist_den_3_freq = None
 
-
             dist_den_1_freq = DistributedArray(dist_den_1_freq, self.comm)
             dist_den_2_freq = DistributedArray(dist_den_2_freq, self.comm)
             dist_den_3_freq = DistributedArray(dist_den_3_freq, self.comm)
-            
+
             if distributed_density_1 is None:
                 distributed_density_1 = DistributedArray(dist_den_1_freq.data,
                                                          self.comm,
@@ -1346,7 +1324,6 @@ class ThreePATransitionDriver(NonlinearSolver):
 
         return distributed_density_1, distributed_density_2, distributed_density_3
 
-
     def get_fock_dict_II(self, wi, density_list1, density_list2, F0, mo,molecule, ao_basis, eri_dict, dft_dict):
         """
         Computes the Fock matrices for a cubic response function
@@ -1358,7 +1335,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         :param F0:
             The Fock matrix in MO basis
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param molecule:
             The molecule
         :param ao_basis:
@@ -1380,7 +1357,8 @@ class ThreePATransitionDriver(NonlinearSolver):
         key_freq_pairs = []
 
         for w in wi:
-            for key in ['Ffxx', 'Ffyy', 'Ffzz', 'Ffxy', 'Ffxz', 'Ffyz']: key_freq_pairs.append((key, w))
+            for key in ['Ffxx', 'Ffyy', 'Ffzz', 'Ffxy', 'Ffxz', 'Ffyz']:
+                key_freq_pairs.append((key, w))
 
         # examine checkpoint file for distributed Focks
 
@@ -1454,7 +1432,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         :param F0:
             The Fock matrix in MO basis
         :param mo:
-            A matrix containing the MO coefficents
+            A matrix containing the MO coefficients
         :param molecule:
             The molecule
         :param ao_basis:
@@ -1476,8 +1454,8 @@ class ThreePATransitionDriver(NonlinearSolver):
         key_freq_pairs = []
 
         for wb in wi:
-            for key in ['Fbfx', 
-                        'Fbfy', 
+            for key in ['Fbfx',
+                        'Fbfy',
                         'Fbfz',
                         'Fbc_xx',
                         'Fbc_yy',
@@ -1486,9 +1464,8 @@ class ThreePATransitionDriver(NonlinearSolver):
                         'Fbc_xz',
                         'Fbc_yz',
                         ]:
-                
-                key_freq_pairs.append((key, wb))
 
+                key_freq_pairs.append((key, wb))
 
         for wb in wi:
             for key in ['Fbcf_xx',
@@ -1498,7 +1475,7 @@ class ThreePATransitionDriver(NonlinearSolver):
                         'Fbcf_xz',
                         'Fbcf_yz',
                         ]:
-                
+
                 key_freq_pairs.append((key, wb))
 
         # examine checkpoint for distributed Focks
@@ -1528,13 +1505,13 @@ class ThreePATransitionDriver(NonlinearSolver):
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real', eri_dict,
                                                  dft_dict, first_order_dens,
-                                             second_order_dens, third_order_dens,
-                                             '3pa',profiler)
+                                                 second_order_dens, third_order_dens,
+                                                 '3pa',profiler)
             else:
                 density_list_23 = DistributedArray(second_order_dens.data,
                                                    self.comm,
                                                    distribute=False)
-                
+
                 density_list_23.append(third_order_dens, axis=1)
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real', eri_dict,
@@ -1545,7 +1522,6 @@ class ThreePATransitionDriver(NonlinearSolver):
 
             write_distributed_focks(fock_file, dist_focks, key_freq_pairs,
                                     self.comm, self.ostream)
-
 
         focks = {'F0': F0}
 
@@ -1596,12 +1572,12 @@ class ThreePATransitionDriver(NonlinearSolver):
                 fo3[('fx', - 2 * w)].data,
                 fo3[('fy', - 2 * w)].data,
                 fo3[('fz', - 2 * w)].data,
-                fo3[('xx',  2 * w)].data,
-                fo3[('yy',  2 * w)].data,
-                fo3[('zz',  2 * w)].data,
-                fo3[('xy',  2 * w)].data,
-                fo3[('xz',  2 * w)].data,
-                fo3[('yz',  2 * w)].data,
+                fo3[('xx', 2 * w)].data,
+                fo3[('yy', 2 * w)].data,
+                fo3[('zz', 2 * w)].data,
+                fo3[('xy', 2 * w)].data,
+                fo3[('xz', 2 * w)].data,
+                fo3[('yz', 2 * w)].data,
                 fo[w_ind].data,
             ]).T.copy()
 
@@ -1627,20 +1603,20 @@ class ThreePATransitionDriver(NonlinearSolver):
 
             if self.rank != mpi_master():
                 continue
-            
+
             # Fock matrices
             vec_pack = vec_pack.T.copy().reshape(-1, norb, norb)
 
-            (ffxx, ffyy, ffzz, ffxy, ffxz, ffyz,  fx, fy, fz, ffx, ffy, ffz, fxx,fyy,fzz,fxy,fxz,fyz, ff) = vec_pack
+            (ffxx, ffyy, ffzz, ffxy, ffxz, ffyz, fx, fy, fz, ffx, ffy, ffz, fxx, fyy, fzz, fxy, fxz, fyz, ff) = vec_pack
 
             fx = np.conjugate(fx).T
             fy = np.conjugate(fy).T
             fz = np.conjugate(fz).T
 
             # check these terms for factor of -1 / np.sqrt(2)
-            ffx = np.conjugate(ffx).T 
-            ffy = np.conjugate(ffy).T 
-            ffz = np.conjugate(ffz).T 
+            ffx = np.conjugate(ffx).T
+            ffy = np.conjugate(ffy).T
+            ffz = np.conjugate(ffz).T
 
             fxx = np.conjugate(fxx).T
             fyy = np.conjugate(fyy).T
@@ -1659,13 +1635,13 @@ class ThreePATransitionDriver(NonlinearSolver):
             ky = (LinearSolver.lrvec2mat(Nby, nocc, norb)).T
             kz = (LinearSolver.lrvec2mat(Nbz, nocc, norb)).T
             kf = (LinearSolver.lrvec2mat(Nf, nocc, norb)).T
-            
+
             # Second-order response matrices
-            kfx = (LinearSolver.lrvec2mat(Nfx, nocc, norb)).T 
+            kfx = (LinearSolver.lrvec2mat(Nfx, nocc, norb)).T
             kfy = (LinearSolver.lrvec2mat(Nfy, nocc, norb)).T
             kfz = (LinearSolver.lrvec2mat(Nfz, nocc, norb)).T
 
-            kxx = (LinearSolver.lrvec2mat(Nxx, nocc, norb)).T  
+            kxx = (LinearSolver.lrvec2mat(Nxx, nocc, norb)).T
             kyy = (LinearSolver.lrvec2mat(Nyy, nocc, norb)).T
             kzz = (LinearSolver.lrvec2mat(Nzz, nocc, norb)).T
             kxy = (LinearSolver.lrvec2mat(Nxy, nocc, norb)).T
@@ -1691,30 +1667,30 @@ class ThreePATransitionDriver(NonlinearSolver):
             xi_fxz = self._xi(kf, kxz, ff, fxz, F0_a)
             xi_fyz = self._xi(kf, kyz, ff, fyz, F0_a)
 
-            # xx 
-            e3fock = xi_xfx.T  + xi_xfx.T + xi_fxx.T   +   0.5 * ffxx.T
+            # xx
+            e3fock = xi_xfx.T + xi_xfx.T + xi_fxx.T + 0.5 * ffxx.T
             e3vec[('xx', w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
 
-            # yy 
-            e3fock = xi_yfy.T  + xi_yfy.T + xi_fyy.T  +   0.5 * ffyy.T
+            # yy
+            e3fock = xi_yfy.T + xi_yfy.T + xi_fyy.T + 0.5 * ffyy.T
             e3vec[('yy', w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
 
             # zz
-            e3fock = xi_zfz.T  + xi_zfz.T + xi_fzz.T  +   0.5 * ffzz.T
+            e3fock = xi_zfz.T + xi_zfz.T + xi_fzz.T + 0.5 * ffzz.T
             e3vec[('zz', w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
 
             # xy
-            e3fock = xi_xfy.T  + xi_yfx.T + xi_fxy.T  +   0.5 * ffxy.T
+            e3fock = xi_xfy.T + xi_yfx.T + xi_fxy.T + 0.5 * ffxy.T
             e3vec[('xy', w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
             e3vec[('yx', w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
 
             # xz
-            e3fock = xi_xfz.T  + xi_zfx.T + xi_fxz.T  +   0.5 * ffxz.T
+            e3fock = xi_xfz.T + xi_zfx.T + xi_fxz.T + 0.5 * ffxz.T
             e3vec[('xz', w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
             e3vec[('zx', w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
 
             # yz
-            e3fock = xi_yfz.T  + xi_zfy.T + xi_fyz.T  +   0.5 * ffyz.T
+            e3fock = xi_yfz.T + xi_zfy.T + xi_fyz.T + 0.5 * ffyz.T
             e3vec[('yz', w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
             e3vec[('zy', w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
 
@@ -1782,7 +1758,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         T_tensors = rsp_results['transition_moments']
 
         self.ostream.print_header('Three-Photon Absorption (3PA) Transition Moments (a.u.)')
-        
+
         # Extract unique frequency values directly from stored tensor keys
         unique_freqs = sorted(set(w for _, w in T_tensors.keys()), reverse=True)
 
@@ -1820,12 +1796,12 @@ class ThreePATransitionDriver(NonlinearSolver):
                 self.ostream.print_header(' '.join(row_values))  # Print row data
 
         tpa_strengths = rsp_results['3pa_strengths']
-        #tpa_cross_sections = rsp_results['cross_sections']
+        # tpa_cross_sections = rsp_results['cross_sections']
 
         self.ostream.print_blank()
         self.ostream.print_blank()
 
-        #title = '3PA Strength and Cross-Section (Linear Polarization)'
+        # title = '3PA Strength and Cross-Section (Linear Polarization)'
         title = '3PA Strength (Linear Polarization)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
@@ -1839,13 +1815,13 @@ class ThreePATransitionDriver(NonlinearSolver):
             exec_str = '  {:<4d}'.format(w_ind + 1)
             exec_str += '{:15.6f} eV'.format(3 * w * hartree_in_ev())
             exec_str += '{:20.6f} a.u.'.format(tpa_strengths['linear'][-w])
-            #exec_str += '{:20.6f} GM'.format(tpa_cross_sections['linear'][-w])
+            # exec_str += '{:20.6f} GM'.format(tpa_cross_sections['linear'][-w])
             self.ostream.print_header(exec_str)
 
         self.ostream.print_blank()
         self.ostream.print_blank()
 
-        #title = '3PA Strength and Cross-Section (Circular Polarization)'
+        # title = '3PA Strength and Cross-Section (Circular Polarization)'
         title = '3PA Strength (Circular Polarization)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
@@ -1859,7 +1835,7 @@ class ThreePATransitionDriver(NonlinearSolver):
             exec_str = '  {:<4d}'.format(w_ind + 1)
             exec_str += '{:15.6f} eV'.format(3 * w * hartree_in_ev())
             exec_str += '{:20.6f} a.u.'.format(tpa_strengths['circular'][-w])
-            #exec_str += '{:20.6f} GM'.format(tpa_cross_sections['circular'][-w])
+            # exec_str += '{:20.6f} GM'.format(tpa_cross_sections['circular'][-w])
             self.ostream.print_header(exec_str)
         self.ostream.print_blank()
 

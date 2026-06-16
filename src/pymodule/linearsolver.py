@@ -491,15 +491,19 @@ class LinearSolver:
         if not valid_checkpoint:
             return False
 
-        # Avoid comparing restart state or checkpoint/output targets
-        # Also avoid comparing nstates or frequencies such that restarting with
-        # more states or frequencies is possible
+        # Avoid comparing:
+        # 1) restart state or checkpoint/output targets
+        # 2) nstates or frequencies (to allow restarting with more states/frequencies)
+        # 3) print_level (can differ between input-file and python script)
+        # 4) tamm_dancoff (not needed since rsp_vector_labels are different)
         excluded_rsp_keys = {
             'restart',
             'filename',
             'checkpoint_file',
             'nstates',
             'frequencies',
+            'print_level',
+            'tamm_dancoff',
         }
 
         # for backward compatibility
@@ -3759,7 +3763,7 @@ class LinearSolver:
 
         return ediag, sdiag
 
-    def get_nto(self, t_mat, mo_occ, mo_vir):
+    def _compute_nto(self, t_mat, mo_occ, mo_vir):
         """
         Gets the natural transition orbitals.
 
@@ -3797,7 +3801,7 @@ class LinearSolver:
 
         return nto_mo
 
-    def get_nto_unrestricted(self, t_mat, mo_occ, mo_vir):
+    def _compute_nto_unrestricted(self, t_mat, mo_occ, mo_vir):
         """
         Gets the natural transition orbitals.
 

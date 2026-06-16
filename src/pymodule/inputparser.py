@@ -181,6 +181,9 @@ class InputParser:
                     if key is not None:
                         # multi-line input
                         # key is followed by multiple lines
+                        assert_msg_critical(
+                            hasattr(self.input_dict[group][key], 'append'),
+                            errmsg)
                         self.input_dict[group][key].append(line)
                     else:
                         # multi-line input without key

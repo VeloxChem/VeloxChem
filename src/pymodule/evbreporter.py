@@ -31,12 +31,10 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from importlib.metadata import version
-
-import sys
 import numpy as np
-import copy
+from pathlib import Path
 
-from .errorhandler import assert_msg_critical
+from .errorhandler import print_exception_if_debug
 from .evbsystembuilder import EvbForceGroup, EvbSystemBuilder
 
 try:
@@ -46,7 +44,7 @@ except ImportError:
     pass
 
 
-class EvbReporter():
+class EvbReporter:
 
     def __init__(
         self,
@@ -124,10 +122,13 @@ class EvbReporter():
             self.report_forcegroups = False
         else:
             self.report_forcegroups = True
-            no_ext = '.'.join(forcegroup_file.split('.')[:-1])
-            ext = forcegroup_file.split('.')[-1]
-            rea_fg = no_ext + '_rea.' + ext
-            pro_fg = no_ext + '_pro.' + ext
+            forcegroup_path = Path(forcegroup_file)
+            rea_fg = str(
+                forcegroup_path.with_name(
+                    forcegroup_path.stem + '_rea' + forcegroup_path.suffix))
+            pro_fg = str(
+                forcegroup_path.with_name(
+                    forcegroup_path.stem + '_pro' + forcegroup_path.suffix))
 
             self.FG_out = open(forcegroup_file, 'a' if append else 'w')
             self.rea_FG_out = open(rea_fg, 'a' if append else 'w')
@@ -143,17 +144,17 @@ class EvbReporter():
 
         self.decomp_names = [s for s in systems if 'decomp' in str(s)]
         self.report_nb_decomp = False
-        if len(self.decomp_names)>0:
+        if len(self.decomp_names) > 0:
             self.report_nb_decomp = True
-            dir = '/'.join(energy_file.split('/')[:-1])
-            filename = dir + '/NB_decompositions.csv'
+            output_dir = Path(energy_file).parent
+            filename = str(output_dir / 'NB_decompositions.csv')
             self.decomp_out = open(filename,'a' if append else 'w')
             self.out_streams.append(self.decomp_out)
             if not append:
                 header = ", ".join(self.decomp_names)
-                header+='\n'
+                header += '\n'
                 self.decomp_out.write(header)
-        
+
         self.report_bonded_decomp = False
         if 'reactant_bonded_decomp' in systems.keys():
             if forming_bonds is None or breaking_bonds is None:
@@ -178,12 +179,12 @@ class EvbReporter():
                     self.measure_params.add(params[0])
             # self.measure_params = sorted(self.measure_params)
             self.measure_params = sorted(self.measure_params, key=lambda x: (len(x), x))
-            dir = '/'.join(energy_file.split('/')[:-1])
-            filename = dir + '/bonded_E1_decomp.csv'
+            output_dir = Path(energy_file).parent
+            filename = str(output_dir / 'bonded_E1_decomp.csv')
             self.bonded_E1_decomp_out = open(filename, 'a' if append else 'w')
-            filename = dir + '/bonded_E2_decomp.csv'
+            filename = str(output_dir / 'bonded_E2_decomp.csv')
             self.bonded_E2_decomp_out = open(filename, 'a' if append else 'w')
-            filename = dir + '/bonded_params.csv'
+            filename = str(output_dir / 'bonded_params.csv')
             self.bonded_params_out = open(filename, 'a' if append else 'w')
             self.out_streams.append(self.bonded_E1_decomp_out)
             self.out_streams.append(self.bonded_E2_decomp_out)
@@ -237,7 +238,7 @@ class EvbReporter():
                     if p1 in active_atoms or p2 in active_atoms or p3 in active_atoms:
                         angle_params[i] = ((p1, p2, p3), (theta, k))
                 params.update({force.getName(): angle_params})
-            
+
             if force.getForceGroup() == EvbForceGroup.REA_TORSION.value or force.getForceGroup() == EvbForceGroup.REA_IMP.value:
                 torsion_params = {}
                 for i in range(force.getNumTorsions()):
@@ -258,7 +259,7 @@ class EvbReporter():
         if self.use_tuple:
             return (steps, True, self.report_velocities, self.report_forces,
                     True, True
-                    )  #steps, positions, velocities, forces, energy, pbc
+                    )  # steps, positions, velocities, forces, energy, pbc
         else:
             include = ['energy']
             if self.report_velocities:
@@ -285,7 +286,6 @@ class EvbReporter():
         E2_pes = E['product']
         E1_int = E[0]
         E2_int = E[1]
-
 
         Em = E1_pes * (1 - self.lambda_val) + E2_pes * self.lambda_val
         line = f"{self.lambda_val}, {E1_pes:.10e}, {E2_pes:.10e}, {E1_int:.10e}, {E2_int:.10e}, {Em:.10e} \n"
@@ -344,7 +344,7 @@ class EvbReporter():
             E2 = self._get_bonded_decomp_energy(pro_sim, state,self.product_params)
             line = ", ".join([f"{e:.10e}" for e in E2]) + '\n'
             self.bonded_E2_decomp_out.write(line)
-            
+
             positions = state.getPositions(asNumpy=True)
             line = ""
             for i, param in enumerate(self.measure_params):
@@ -360,7 +360,6 @@ class EvbReporter():
                 line += f"{val:.10e}, "
             line = line[:-2] + '\n'
             self.bonded_params_out.write(line)
-                
 
         if self.report_forces:
             forces = state.getForces(asNumpy=True)
@@ -380,15 +379,15 @@ class EvbReporter():
                 line += f", {velocities[i][0].value_in_unit(nmperps):.5e}, {velocities[i][1].value_in_unit(nmperps):.5e}, {velocities[i][2].value_in_unit(nmperps):.5e}"
             line += '\n'
             self.v_out.write(line)
-        
+
         if self.report_nb_decomp:
             line = ""
             for name in self.decomp_names:
                 line += f"{E[name]:.10e}, "
-            line= line[:-2]
-            line+= '\n'
+            line = line[:-2]
+            line += '\n'
             self.decomp_out.write(line)
-        
+
         for stream in self.out_streams:
             stream.flush()
 
@@ -486,7 +485,8 @@ class EvbReporter():
         if state is not None:
             try:
                 simulation.context.setState(state)
-            except:
+            except Exception:
+                print_exception_if_debug()
                 # Decomposition systems which have the barostat removed will throw an error on the above case
                 simulation.context.setPositions(state.getPositions())
 
@@ -496,7 +496,7 @@ class EvbReporter():
                     mm.unit.kilojoules_per_mole)
         else:
             if isinstance(forcegroups, EvbForceGroup):
-                forcegroups = set([forcegroups.value] )
+                forcegroups = set([forcegroups.value])
 
             return simulation.context.getState(
                 getEnergy=True,

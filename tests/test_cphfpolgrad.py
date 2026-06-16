@@ -13,10 +13,34 @@ from veloxchem.cppsolver import ComplexResponseSolver
 from veloxchem.polorbitalresponse import PolOrbitalResponse
 
 
+class FullDimensionPolOrbitalResponse(PolOrbitalResponse):
+
+    def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict,
+                    pe_dict, lr_results):
+        if self.is_complex:
+            return self.compute_rhs_complex(molecule, basis, scf_tensors,
+                                            eri_dict, dft_dict, pe_dict,
+                                            lr_results)
+        return self.compute_rhs_real(molecule, basis, scf_tensors, eri_dict,
+                                     dft_dict, pe_dict, lr_results)
+
+    def compute_omega(self, molecule, basis, scf_tensors, lr_results):
+        if self.is_complex:
+            return self.compute_omega_complex(molecule, basis, scf_tensors,
+                                              lr_results)
+        return self.compute_omega_real(molecule, basis, scf_tensors, lr_results)
+
+
 @pytest.mark.solvers
 class TestCphfPolgrad:
 
-    def run_cphfpolgrad_real(self, molecule, basis, xcfun=None, label1=None, label2=None):
+    def run_cphfpolgrad_real(self,
+                             molecule,
+                             basis,
+                             xcfun=None,
+                             label1=None,
+                             label2=None,
+                             solver_cls=PolOrbitalResponse):
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun
@@ -33,7 +57,7 @@ class TestCphfPolgrad:
         lr_results = lr_drv.compute(molecule, basis, scf_results)
 
         # test real analytical gradient
-        cphfpolgrad_solver = PolOrbitalResponse()
+        cphfpolgrad_solver = solver_cls()
         cphfpolgrad_settings = {'conv_thresh':2e-7, 'frequencies': (0.0, 0.4)}
         cphfpolgrad_solver.update_settings(cphfpolgrad_settings)
         cphfpolgrad_solver.ostream.mute()
@@ -82,7 +106,13 @@ class TestCphfPolgrad:
                                    - np.abs(cphfpolgrad_omega_reference)) < 1.0e-6
 
 
-    def run_cphfpolgrad_complex(self, molecule, basis, xcfun=None, label1=None, label2=None):
+    def run_cphfpolgrad_complex(self,
+                                molecule,
+                                basis,
+                                xcfun=None,
+                                label1=None,
+                                label2=None,
+                                solver_cls=PolOrbitalResponse):
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun
@@ -100,7 +130,7 @@ class TestCphfPolgrad:
         lr_results = lr_drv.compute(molecule, basis, scf_results)
 
         # test complex analytical gradient
-        cphfpolgrad_solver = PolOrbitalResponse()
+        cphfpolgrad_solver = solver_cls()
         cphfpolgrad_settings = {'conv_thresh':2e-7, 'frequencies': (0.0, 0.4),
                                 'is_complex': 'yes', 'damping': 0.5}
         cphfpolgrad_solver.update_settings(cphfpolgrad_settings)
@@ -149,7 +179,11 @@ class TestCphfPolgrad:
             assert np.max(np.abs(cphfpolgrad_omega_coefficients)
                                    - np.abs(cphfpolgrad_omega_reference)) < 1.0e-6 
 
-    def test_cphfpolgrad_coefficients_real(self):
+    @pytest.mark.parametrize(
+        'solver_cls',
+        [PolOrbitalResponse, FullDimensionPolOrbitalResponse],
+        ids=['reduced', 'full'])
+    def test_cphfpolgrad_coefficients_real(self, solver_cls):
         h2o_xyz = """3
 
         O     0.000000    0.000000    0.000000
@@ -162,9 +196,14 @@ class TestCphfPolgrad:
         basis = MolecularBasis.read(molecule, basis_set_label)
 
         self.run_cphfpolgrad_real(molecule, basis, None, "cphfpolgrad_coefficients_red_real",
-                                  "cphfpolgrad_omega_coefficients_red_real")
+                                  "cphfpolgrad_omega_coefficients_red_real",
+                                  solver_cls)
 
-    def test_cphfpolgrad_coefficients_complex(self):
+    @pytest.mark.parametrize(
+        'solver_cls',
+        [PolOrbitalResponse, FullDimensionPolOrbitalResponse],
+        ids=['reduced', 'full'])
+    def test_cphfpolgrad_coefficients_complex(self, solver_cls):
         h2o_xyz = """3
 
         O     0.000000    0.000000    0.000000
@@ -177,9 +216,14 @@ class TestCphfPolgrad:
         basis = MolecularBasis.read(molecule, basis_set_label)
 
         self.run_cphfpolgrad_complex(molecule, basis, None, "cphfpolgrad_coefficients_red_complex",
-                                     "cphfpolgrad_omega_coefficients_red_complex")
+                                     "cphfpolgrad_omega_coefficients_red_complex",
+                                     solver_cls)
 
-    def test_cpkspolgrad_coefficients_real(self):
+    @pytest.mark.parametrize(
+        'solver_cls',
+        [PolOrbitalResponse, FullDimensionPolOrbitalResponse],
+        ids=['reduced', 'full'])
+    def test_cpkspolgrad_coefficients_real(self, solver_cls):
         h2o_xyz = """3
 
         O     0.000000    0.000000    0.000000
@@ -193,9 +237,14 @@ class TestCphfPolgrad:
 
 
         self.run_cphfpolgrad_real(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_red_b3lyp_real",
-                                  "cpkspolgrad_omega_coefficients_red_b3lyp_real")
+                                  "cpkspolgrad_omega_coefficients_red_b3lyp_real",
+                                  solver_cls)
 
-    def test_cpkspolgrad_coefficients_complex(self):
+    @pytest.mark.parametrize(
+        'solver_cls',
+        [PolOrbitalResponse, FullDimensionPolOrbitalResponse],
+        ids=['reduced', 'full'])
+    def test_cpkspolgrad_coefficients_complex(self, solver_cls):
         h2o_xyz = """3
 
         O     0.000000    0.000000    0.000000
@@ -208,4 +257,5 @@ class TestCphfPolgrad:
         basis = MolecularBasis.read(molecule, basis_set_label)
 
         self.run_cphfpolgrad_complex(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_red_b3lyp_complex",
-                                     "cpkspolgrad_omega_coefficients_red_b3lyp_complex")
+                                     "cpkspolgrad_omega_coefficients_red_b3lyp_complex",
+                                     solver_cls)

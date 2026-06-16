@@ -183,9 +183,9 @@ class TestSubMatrix:
     def test_is_square(self):
 
         mat = SubMatrix([1, 5, 3, 6])
-        assert mat.is_square() == False
+        assert mat.is_square() is False
         mat = SubMatrix([1, 5, 3, 3])
-        assert mat.is_square() == True
+        assert mat.is_square() is True
 
     def test_mpi_bcast(self):
 

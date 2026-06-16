@@ -468,7 +468,7 @@ class TddftGradientDriver(GradientDriver):
                 for s in range(dof):
                     # Sum of alpha + beta already in relaxed_density_ao
                     self.gradient[s, iatom, i] += np.sum(
-                            (gmat + gmat.T) * relaxed_density_ao[s])
+                        (gmat + gmat.T) * relaxed_density_ao[s])
 
             gmats = Matrices()
 
@@ -494,7 +494,7 @@ class TddftGradientDriver(GradientDriver):
                     # summation of alpha and beta already included
                     # in relaxed_density_ao
                     self.gradient[s, iatom, i] -= np.sum(
-                            (gmat_100 + gmat_100.T) * relaxed_density_ao[s])
+                        (gmat_100 + gmat_100.T) * relaxed_density_ao[s])
                     self.gradient[s, iatom,
                                   i] -= np.sum(gmat_010 * relaxed_density_ao[s])
 
@@ -593,7 +593,7 @@ class TddftGradientDriver(GradientDriver):
             for idx in range(dof):
 
                 sym_den_mat_for_fock_rel.set_values(
-                        self.get_sym_mat(relaxed_density_ao[idx]))
+                    self.get_sym_mat(relaxed_density_ao[idx]))
 
                 sym_den_mat_for_fock_xmy.set_values(
                     self.get_sym_mat(x_minus_y_ao[idx]))

@@ -133,7 +133,7 @@ class TestOptimizeMiscellaneous:
                                                          basis,
                                                          'hf',
                                                          filename=filename,
-                                                         first_hessian=True,
+                                                         first_hessian=False,
                                                          last_hessian=True)
 
         final_h5_file = f'{filename}.h5'
@@ -144,9 +144,9 @@ class TestOptimizeMiscellaneous:
             assert 'vib_frequencies' in hf['vib']
             assert 'ir_intensities' in hf['vib']
             ref_vib_freqs = np.array(
-                [862.98, 1752.54, 1752.54, 3368.44, 3536.17, 3536.18])
+                [584.46, 1690.07, 1690.07, 3552.39, 3827.10, 3827.10])
             ref_ir_intens = np.array(
-                [163.2794, 0.0232, 0.0232, 2.6263, 0.6178, 0.6178])
+                [16.8701, 0.3816, 0.3816, 0.0144, 0.0357, 0.0357])
             assert np.max(
                 np.abs(np.array(hf['vib/vib_frequencies']) -
                        ref_vib_freqs)) < 0.1

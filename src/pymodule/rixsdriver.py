@@ -43,7 +43,6 @@ from .linearsolver import LinearSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .tdaeigensolver import TdaEigenSolver
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
 
 
 class RixsDriver(LinearSolver):
@@ -99,14 +98,14 @@ class RixsDriver(LinearSolver):
         self.num_core_states = 5
 
         # Restricted subspace
-        self.restricted_subspace = True
+        self.restricted_subspace = False
 
         self.num_core_orbitals = 0
         self.num_virtual_orbitals = 0
         self.num_valence_orbitals = 0
 
         self._orb_and_state_dict = None
-        
+
         # Set the energy range of the final states
         self.final_state_cutoff = None
 
@@ -142,7 +141,7 @@ class RixsDriver(LinearSolver):
 
         if method_dict is None:
             method_dict = {}
-        
+
         key = 'photon_energy'
         if key in rsp_dict:
             val = rsp_dict[key]
@@ -213,11 +212,11 @@ class RixsDriver(LinearSolver):
         :rsp_results:
             The linear-response results dictionary.
         :cvs_rsp_results:
-            The core-valence-separated (CVS) linear-response 
+            The core-valence-separated (CVS) linear-response
             results dictionary.
 
         NOTE: To run full diagonalization, do a restricted
-              subspace calculation with the full space, 
+              subspace calculation with the full space,
               indicating which orbitals define the core.
 
         :return:
@@ -328,16 +327,16 @@ class RixsDriver(LinearSolver):
             num_intermediate_states, num_final_states = self.comm.bcast(
                 (num_intermediate_states, num_final_states), root=mpi_master())
 
-            occupied_core           = num_core_orbitals
-            core_states             = list(range(num_intermediate_states))
-            val_states              = list(range(num_final_states))
+            occupied_core = num_core_orbitals
+            core_states = list(range(num_intermediate_states))
+            val_states = list(range(num_final_states))
 
         else:
             self._approach_string = 'Running RIXS calculation in the restricted-subspace approach'
 
             if self.rank == mpi_master():
                 num_valence_orbitals = rsp_results['num_valence']
-                num_core_orbitals    = rsp_results['num_core']
+                num_core_orbitals = rsp_results['num_core']
                 assert_msg_critical(num_core_orbitals > 0,
                                     'No core orbitals indicated in the response results.')
 
@@ -355,7 +354,7 @@ class RixsDriver(LinearSolver):
                 num_final_states = len(val_states)
             else:
                 num_valence_orbitals = None
-                num_core_orbitals    = None
+                num_core_orbitals = None
                 num_intermediate_states = None
                 num_final_states = None
                 core_states = None
@@ -372,11 +371,11 @@ class RixsDriver(LinearSolver):
 
             # For compatibility with the two-shot approach
             cvs_rsp_results = rsp_results
-            occupied_core   = num_core_orbitals + num_valence_orbitals
+            occupied_core = num_core_orbitals + num_valence_orbitals
 
         mo_core_indices = list(range(num_core_orbitals))
-        mo_val_indices  = list(range(nocc - num_valence_orbitals, nocc))
-        mo_vir_indices  = list(range(nocc, nocc + num_vir_orbitals))
+        mo_val_indices = list(range(nocc - num_valence_orbitals, nocc))
+        mo_vir_indices = list(range(nocc, nocc + num_vir_orbitals))
 
         if self.rank == mpi_master():
             mo_occ = scf_results['C_alpha'][:, mo_core_indices + mo_val_indices].copy()
@@ -397,12 +396,12 @@ class RixsDriver(LinearSolver):
         core_eigvals = self.comm.bcast(core_eigvals, root=mpi_master())
         valence_eigvals = self.comm.bcast(valence_eigvals, root=mpi_master())
 
-        core_eigvecs    = self._get_eigvecs(cvs_rsp_results, core_states, "core")
+        core_eigvecs = self._get_eigvecs(cvs_rsp_results, core_states, "core")
         valence_eigvecs = self._get_eigvecs(rsp_results, val_states, "valence")
 
         core_mats = self._preprocess_core_eigvecs(core_eigvecs, occupied_core,
                                                   num_valence_orbitals, num_vir_orbitals)
-        
+
         if self.rank == mpi_master():
             dipole_integrals = compute_electric_dipole_integrals(molecule, basis, [0.0,0.0,0.0])
         else:
@@ -419,7 +418,7 @@ class RixsDriver(LinearSolver):
             'core_states': core_states,
             'valence_states': val_states,
         }
-        
+
         # If incoming photon energy is not set, set it to match the
         # first core-excited state with osc_strength > 1e-3
         if self.photon_energy is None:
@@ -463,11 +462,11 @@ class RixsDriver(LinearSolver):
         self.photon_energy = photon_energy_arr.tolist()
 
         # Define the return objects
-        self.ene_losses             = np.zeros((num_final_states, len(self.photon_energy)))
-        self.emission_enes          = np.zeros((num_final_states, len(self.photon_energy)))
-        self.cross_sections         = np.zeros((num_final_states, len(self.photon_energy)))
+        self.ene_losses = np.zeros((num_final_states, len(self.photon_energy)))
+        self.emission_enes = np.zeros((num_final_states, len(self.photon_energy)))
+        self.cross_sections = np.zeros((num_final_states, len(self.photon_energy)))
         self.elastic_cross_sections = np.zeros((len(self.photon_energy)))
-        self.scattering_amplitudes  = np.zeros((num_final_states, len(self.photon_energy),
+        self.scattering_amplitudes = np.zeros((num_final_states, len(self.photon_energy),
                                                3, 3), dtype=complex)
 
         if self.rank == mpi_master():
@@ -476,15 +475,15 @@ class RixsDriver(LinearSolver):
         ave, rem = divmod(num_final_states, self.nodes)
         counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
         f_start = sum(counts[:self.rank])
-        f_end   = sum(counts[:self.rank + 1])
+        f_end = sum(counts[:self.rank + 1])
         n_local = f_end - f_start
 
         for w_ind, omega in enumerate(self.photon_energy):
             F_elastic_local = np.zeros((3, 3), dtype=complex)
-            local_cross_sections    = np.empty(n_local)
+            local_cross_sections = np.empty(n_local)
             local_amplitude_tensors = np.empty((n_local, 3, 3), dtype=complex)
             local_emission_energies = np.empty(n_local)
-            local_energy_losses     = np.empty(n_local)
+            local_energy_losses = np.empty(n_local)
 
             for local_i, f in enumerate(range(f_start, f_end)):
                 F_inelastic = np.zeros((3, 3), dtype=complex)
@@ -504,13 +503,13 @@ class RixsDriver(LinearSolver):
                         )
 
                 emission_energy = omega - valence_eigvals[f]
-                energy_loss     = valence_eigvals[f]
-                prefactor       = emission_energy / omega
+                energy_loss = valence_eigvals[f]
+                prefactor = emission_energy / omega
 
                 # Fill local result slices
                 local_emission_energies[local_i] = emission_energy
-                local_energy_losses[local_i]     = energy_loss
-                local_cross_sections[local_i]    = self.cross_section(F_inelastic, prefactor).real
+                local_energy_losses[local_i] = energy_loss
+                local_cross_sections[local_i] = self.cross_section(F_inelastic, prefactor).real
                 local_amplitude_tensors[local_i] = F_inelastic
 
             # Reduce per omega
@@ -527,9 +526,9 @@ class RixsDriver(LinearSolver):
             if self.rank == mpi_master():
                 self.elastic_cross_sections[w_ind] = self.cross_section(F_elastic).real
                 for start, end, em_en_part, loss_part, cs_part, amp_part in parts:
-                    self.emission_enes[start:end, w_ind]         = em_en_part
-                    self.ene_losses[start:end, w_ind]            = loss_part
-                    self.cross_sections[start:end, w_ind]        = cs_part
+                    self.emission_enes[start:end, w_ind] = em_en_part
+                    self.ene_losses[start:end, w_ind] = loss_part
+                    self.cross_sections[start:end, w_ind] = cs_part
                     self.scattering_amplitudes[start:end, w_ind] = amp_part
 
                 self.ostream.print_info(
@@ -567,7 +566,7 @@ class RixsDriver(LinearSolver):
             self.ostream.flush()
 
         return results_dict
-    
+
     def _first_core_energy(self, rsp_results):
         """
         Return energy of the first core-excited state (by label order).
@@ -601,7 +600,7 @@ class RixsDriver(LinearSolver):
         :param tol:
             Numerical tolerance used for detuning cutoff.
 
-        :return: 
+        :return:
             List of core-excited states and array of detuning.
         """
 
@@ -622,17 +621,17 @@ class RixsDriver(LinearSolver):
 
     def _valence_state_indices(self, detuning, eigenvalues, tol=1e-6):
         """
-        Final/valence states: detuning < 0, 
+        Final/valence states: detuning < 0,
         possibly windowed by self.final_state_cutoff.
-        
+
         :param detuning:
             Array of detuning values relative
             to the first core-excited state.
         :param tol:
             Numerical tolerance used for detuning cutoff.
-        
-        :return: 
-            Array containing the indices of 
+
+        :return:
+            Array containing the indices of
             final (valence) states.
         """
 
@@ -648,23 +647,23 @@ class RixsDriver(LinearSolver):
                                     intermediate_tdens, final_tdens, dipole_integrals):
         """
         The RIXS scattering amplitude.
-        
+
         :param omega:
             Energy of incoming photon.
-        :param f: 
+        :param f:
             The final (valence) state index.
-        :param eigenvalue: 
+        :param eigenvalue:
             Energy of intermediate (core) excited state.
         :param intermediate_tdens:
             Transition density from ground to
             intermediate (core) excited state (AO).
         :param final_tdens:
-            Transition density matrix from 
+            Transition density matrix from
             intermediate to final excited state (AO).
         :param dipole_integrals:
             Electric dipole integrals (length gauge) in AO-basis.
 
-        :return: 
+        :return:
             The scattering amplitude tensor: shape = (3,3)
 
         """
@@ -695,22 +694,22 @@ class RixsDriver(LinearSolver):
     def cross_section(self, F, omegaprime_omega=1):
         """
         Computes the RIXS cross-section.
-        
+
         Journal of Chemical Theory and Computation 2021 17 (5), 3031-3038
         DOI: 10.1021/acs.jctc.1c00144
 
         Journal of Chemical Theory and Computation 2017 13 (11), 5552-5559
         DOI: 10.1021/acs.jctc.7b00636
-        
+
         :param F:
             The scattering amplitude tensor.
         :param omegaprime_omega:
             The ratio between outgoing- and incoming frequencies, w'/w.
-            
+
         :return:
             The scattering cross-section.
         """
-        
+
         # F_xy (F^(xy))^*
         F2 = np.vdot(F, F).real
         # F_xy (F^(yx))^*
@@ -721,9 +720,9 @@ class RixsDriver(LinearSolver):
         sigma_f = omegaprime_omega * (1.0/15.0) * (
             (2.0 - 0.5*np.sin(self.theta)**2) * F2 +
             (0.75*np.sin(self.theta)**2 - 0.5) * (FF_T_conj + tr_F2))
-        
+
         return sigma_f
-    
+
     def _get_eigvecs(self, rsp_results, states, label):
         """
         Gets eigenvectors.
@@ -790,13 +789,13 @@ class RixsDriver(LinearSolver):
             return x_ger_full + x_ung_full
         else:
             return None
-    
+
     @staticmethod
     def split_eigvec(eigvec, nocc, nvir, tda=False):
         """
-        Gets the excitation and deexcitation matrices 
-        from the eigenvectors. 
-        
+        Gets the excitation and deexcitation matrices
+        from the eigenvectors.
+
         :param eigvec:
             The eigenvector from a response calculation,
             either from TDA or RPA.
@@ -806,7 +805,7 @@ class RixsDriver(LinearSolver):
             Number of virtual orbitals.
         :param tda:
             Flag for if the Tamm-Dancoff approximation is used.
-        
+
         :return:
             The excitation and deexcitation vectors
             as matrices, in shape: (nocc, nvir).
@@ -819,7 +818,7 @@ class RixsDriver(LinearSolver):
             z = eigvec[:half].reshape(nocc, nvir)
             y = eigvec[half:].reshape(nocc, nvir)
         return z, y
-    
+
     @staticmethod
     def pad_matrices(z_mat, y_mat, pad_occ):
         """
@@ -838,11 +837,11 @@ class RixsDriver(LinearSolver):
         """
         padding = ((0, pad_occ), (0, 0))
         return np.pad(z_mat, padding), np.pad(y_mat, padding)
-    
+
     def _preprocess_core_eigvecs(self, core_eigvecs, occ_core,
                                  num_val_orbs, num_vir_orbs):
         """
-        Split, pad with zeros (if twoshot) and 
+        Split, pad with zeros (if twoshot) and
         possibly transform core eigenvectors if needed.
         """
         pp_core_eigvecs = []
@@ -850,14 +849,14 @@ class RixsDriver(LinearSolver):
         for vec in core_eigvecs:
             z, y = self.split_eigvec(vec, occ_core,
                                      num_vir_orbs, self.tamm_dancoff)
-            
+
             if self.twoshot:
                 z, y = self.pad_matrices(z, y, num_val_orbs)
 
             pp_core_eigvecs.append((z, y))
 
         return pp_core_eigvecs
-    
+
     @staticmethod
     def get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core):
         """
@@ -941,7 +940,7 @@ class RixsDriver(LinearSolver):
         """
         Prints RIXS calculation setup details to output stream.
         """
-        
+
         def _format_indices(lst, max_show=3):
             """
             Shrink list of indices if too long.
@@ -949,7 +948,7 @@ class RixsDriver(LinearSolver):
             arr = np.asarray(lst)
             if arr.size == 0:
                 return "[]"
-            
+
             items = [str(x) for x in arr.tolist()]
             if len(items) > max_show:
                 return f"[{items[0]} ... {items[-1]}]"
@@ -962,7 +961,7 @@ class RixsDriver(LinearSolver):
             # TODO: double check
             sep = ", " if n <= 3 else " "
             return sep.join(parts)
-        
+
         def _format_orbital_names(indices, orb_type, nocc):
             """
             Convert orbital indices to orbital labels.
@@ -994,11 +993,11 @@ class RixsDriver(LinearSolver):
                 for idx in indices:
                     diff = idx - nocc
                     labels.append("LUMO" if diff == 0 else f"LUMO+{diff}")
-            
+
             return labels
 
-        str_width   = 60
-        nocc        = molecule.number_of_alpha_occupied_orbitals(basis)
+        str_width = 60
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
         self.ostream.print_blank()
         title = 'Resonant Inelastic X-ray Scattering (RIXS) Setup'
@@ -1035,7 +1034,7 @@ class RixsDriver(LinearSolver):
                 f'Number of intermediate states    : {od["num_intermediate_states"]}'.ljust(str_width))
             self.ostream.print_header(
                 f'Number of final states           : {od["num_final_states"]}'.ljust(str_width))
-            
+
             if self.final_state_cutoff is not None:
                 self.ostream.print_header(
                     f'Final state energy cutoff [eV]   : {hartree_in_ev() * self.final_state_cutoff:.2f}'.ljust(str_width))
@@ -1056,19 +1055,19 @@ class RixsDriver(LinearSolver):
 
             self.ostream.print_header('Orbital sets'.center(str_width))
             orbital_labels = _format_orbital_names(od["mo_core_indices"], "core", nocc)
-            orbital_str    = _format_indices(orbital_labels)
+            orbital_str = _format_indices(orbital_labels)
             self.ostream.print_header(
                 f'Core orbitals                    : {orbital_str}'.ljust(str_width)
             )
 
             orbital_labels = _format_orbital_names(od["mo_valence_indices"], "valence", nocc)
-            orbital_str    = _format_indices(orbital_labels)
+            orbital_str = _format_indices(orbital_labels)
             self.ostream.print_header(
                 f'Valence orbitals                 : {orbital_str}'.ljust(str_width)
             )
-            
+
             orbital_labels = _format_orbital_names(od["mo_virtual_indices"], "virtual", nocc)
-            orbital_str    = _format_indices(orbital_labels)
+            orbital_str = _format_indices(orbital_labels)
             self.ostream.print_header(
                 f'Virtual orbitals                 : {orbital_str}'.ljust(str_width)
             )
@@ -1077,7 +1076,7 @@ class RixsDriver(LinearSolver):
         if getattr(self, "_approach_string", None):
             self.ostream.print_info(self._approach_string)
             self.ostream.print_blank()
-        
+
         self.ostream.flush()
 
     def _print_rixs_data(self, title, ene_losses,
@@ -1101,7 +1100,7 @@ class RixsDriver(LinearSolver):
         valstr += '{:12.5f} eV'.format(0)
         valstr += '    Cross-section   {:9.2e}'.format(elastic_cross_section)
         self.ostream.print_header(valstr.ljust(92))
-    
+
         for s, e in enumerate(ene_losses):
             valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
             valstr += '{:15.8f} a.u. '.format(e)

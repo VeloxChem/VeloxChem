@@ -37,7 +37,6 @@ import math
 import sys
 
 from .veloxchemlib import mpi_master, boltzmann_in_hartreeperkelvin
-from .veloxchemlib import XCFunctional, MolecularGrid
 from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver

@@ -15,6 +15,7 @@ target_sources(vlxobjs
     GtoValues.cpp
     GtoValuesRecD.cpp
     GtoValuesRecF.cpp
+    GtoValuesRecG.cpp
     GtoValuesRecP.cpp
     GtoValuesRecS.cpp
     LebedevLaikovQuadrature.cpp

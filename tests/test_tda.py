@@ -11,6 +11,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.inputparser import (unparse_input, read_unparsed_input_from_hdf5)
+from veloxchem.errorhandler import VeloxChemError
 
 
 @pytest.mark.solvers
@@ -365,7 +366,7 @@ class TestTDA:
 
         driver = TdaEigenSolver()
 
-        with pytest.raises(AssertionError, match=message):
+        with pytest.raises(VeloxChemError, match=message):
             driver.update_settings(rsp_dict)
 
     def test_driver_deepcopy(self):
@@ -496,7 +497,7 @@ class TestTDA:
         lr_drv.restricted_subspace = True
 
         with pytest.raises(
-                AssertionError,
+                VeloxChemError,
                 match='Plotting spectrum for restricted_subspace is not implemented.'
         ):
             lr_drv.plot_uv_vis({})
@@ -509,7 +510,7 @@ class TestTDA:
 
         lr_drv = TdaEigenSolver()
 
-        with pytest.raises(AssertionError, match='Invalid plot type'):
+        with pytest.raises(VeloxChemError, match='Invalid plot type'):
             lr_drv.plot({}, plot_type='invalid')
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
@@ -534,6 +535,6 @@ class TestTDA:
         lr_drv.ostream.mute()
 
         with pytest.raises(
-                AssertionError,
+                VeloxChemError,
                 match="TdaEigenSolver: not implemented for unrestricted case"):
             lr_results_not_used = lr_drv.compute(mol, bas, scf_results)

@@ -6,6 +6,7 @@ from veloxchem.veloxchemlib import (fine_structure_constant,
                                     extinction_coefficient_from_beta,
                                     hartree_in_ev, hartree_in_inverse_nm)
 from veloxchem.tdacppsolver import ComplexResponseTdaSolver
+from veloxchem.errorhandler import VeloxChemError
 
 
 class RecordingOutput:
@@ -59,12 +60,12 @@ class TestComplexResponseTdaSolverMisc:
         assert driver.a_components == 'xyz'
         assert driver.b_components == 'xyz'
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='ComplexResponseTdaSolver: invalid CPP property'):
             driver.set_cpp_property('raman')
 
         with pytest.raises(
-                AssertionError,
+                VeloxChemError,
                 match='ComplexResponseTdaSolver.get_spectrum: x_unit should be au, ev or nm'
         ):
             driver.get_spectrum(_build_cpp_results([0.4]), 'cm-1')
@@ -236,7 +237,7 @@ class TestComplexResponseTdaSolverMisc:
 
         driver = ComplexResponseTdaSolver()
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='get_cpp_property_densities: Invalid CPP property'):
             driver.get_cpp_property_densities(None, None, None,
                                               {'solutions': {}}, 0.4)
@@ -244,7 +245,7 @@ class TestComplexResponseTdaSolverMisc:
         driver.property = 'absorption'
 
         with pytest.raises(
-                AssertionError,
+                VeloxChemError,
                 match='get_cpp_property_densities: Could not find frequency 0.4 in CPP results'
         ):
             driver.get_cpp_property_densities(None, None, None,

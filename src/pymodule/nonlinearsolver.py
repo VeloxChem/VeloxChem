@@ -578,7 +578,6 @@ class NonlinearSolver:
                     # 6 second-order densities per frequency
                     size_1, size_2 = 36, 6
 
-
                 elif mode.lower() == 'thg_ii':
                     # 36 first-order densities per frequency
                     # 6 second-order densities per frequency
@@ -1238,7 +1237,7 @@ class NonlinearSolver:
         Transform a matrix to molecular basis
 
         :param mo:
-            molecular orbital coefficent matrix
+            molecular orbital coefficients matrix
         :param A:
             The matrix in AO basis that is the converted to MO basis
 

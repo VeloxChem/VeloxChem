@@ -8,6 +8,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.distributedarray import DistributedArray
+from veloxchem.errorhandler import VeloxChemError
 
 
 @pytest.mark.solvers
@@ -47,18 +48,18 @@ class TestRPABase:
         assert lr_drv.detach_attach is True
 
         lr_drv.cube_origin = [0.0, 0.0]
-        with pytest.raises(AssertionError, match='cube origin needs 3 numbers'):
+        with pytest.raises(VeloxChemError, match='cube origin needs 3 numbers'):
             lr_drv.update_settings({})
         lr_drv.cube_origin = None
 
         lr_drv.cube_stepsize = [0.2, 0.2]
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='cube stepsize needs 3 numbers'):
             lr_drv.update_settings({})
         lr_drv.cube_stepsize = None
 
         lr_drv.cube_points = [80, 80]
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='cube points needs 3 integers'):
             lr_drv.update_settings({})
 
@@ -160,7 +161,7 @@ class TestRPABase:
         lr_drv = LinearResponseEigenSolver()
         lr_drv.restricted_subspace = True
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Plotting spectrum for restricted_subspace ' +
                            'is not implemented.'):
             lr_drv.plot_uv_vis({})
@@ -173,5 +174,5 @@ class TestRPABase:
 
         lr_drv = LinearResponseEigenSolver()
 
-        with pytest.raises(AssertionError, match='Invalid plot type'):
+        with pytest.raises(VeloxChemError, match='Invalid plot type'):
             lr_drv.plot({}, plot_type='invalid')
