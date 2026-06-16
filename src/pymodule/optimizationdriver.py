@@ -504,10 +504,15 @@ class OptimizationDriver:
                     final_mol.get_string(title='Final Geometry'))
 
                 is_scan_job = False
+
                 if self.constraints:
+                    # save constraints
+                    opt_results['constraints'] = deepcopy(self.constraints)
+                    # check for scan
                     for line in self.constraints:
                         key = line.strip().split()[0]
-                        is_scan_job = (key == 'scan')
+                        if key == 'scan':
+                            is_scan_job = True
 
                 if is_scan_job:
                     self.print_scan_result(m)
