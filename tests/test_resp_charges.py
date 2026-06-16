@@ -41,21 +41,17 @@ class TestRespCharges:
 
         if task.mpi_rank == mpi_master():
             assert np.max(np.abs(q_fit - ref_charges)) < 1.0e-5
-            np.testing.assert_allclose(
-                read_results(f'{chg_drv.filename}.h5', 'resp')['resp_charges'],
-                q_fit)
+            resp_h5_results = read_results(f'{chg_drv.filename}.h5', 'resp')
+            np.testing.assert_allclose(resp_h5_results['resp_charges'], q_fit)
 
             pdb_file = Path(chg_drv.filename).with_suffix('.pdb')
-            if pdb_file.is_file():
-                pdb_file.unlink()
+            pdb_file.unlink(missing_ok=True)
 
             final_h5_file = Path(chg_drv.filename).with_suffix('.h5')
-            if final_h5_file.is_file():
-                final_h5_file.unlink()
+            final_h5_file.unlink(missing_ok=True)
 
             scf_h5_file = Path(chg_drv.filename + '_scf.h5')
-            if scf_h5_file.is_file():
-                scf_h5_file.unlink()
+            scf_h5_file.unlink(missing_ok=True)
 
     def test_resp_methanol(self):
 
@@ -104,13 +100,14 @@ class TestRespCharges:
             resp_h5_results = read_results(f'{chg_drv.filename}.h5', 'resp')
             np.testing.assert_allclose(resp_h5_results['resp_charges'], q_fit)
 
+            pdb_file = Path(chg_drv.filename).with_suffix('.pdb')
+            pdb_file.unlink(missing_ok=True)
+
             final_h5_file = Path(chg_drv.filename).with_suffix('.h5')
-            if final_h5_file.is_file():
-                final_h5_file.unlink()
+            final_h5_file.unlink(missing_ok=True)
 
             scf_h5_file = Path(chg_drv.filename + '_scf.h5')
-            if scf_h5_file.is_file():
-                scf_h5_file.unlink()
+            scf_h5_file.unlink(missing_ok=True)
 
     def test_get_dipole_moment(self):
 

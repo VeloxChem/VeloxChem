@@ -244,12 +244,14 @@ class EspChargesDriver:
             # single molecule esp charges
             return self._compute_single_molecule(molecule, basis, scf_results)
 
-    def _write_hdf5_results(self, key, charges):
+    def _write_esp_results_to_hdf5(self, label, key, charges):
         """
         Writes charge-fitting results to the final HDF5 file when available.
 
+        :param label:
+            The results group label.
         :param key:
-            The results key.
+            The results dataset key.
         :param charges:
             The fitted charges.
         """
@@ -262,9 +264,10 @@ class EspChargesDriver:
             return
 
         write_results_to_hdf5(str(h5_fname),
-                              key,
-                              {f'{key}_charges': charges},
-                              value_label=f'{key.upper()} charge result')
+                              label,
+                              {key: charges},
+                              value_label=f'{label.upper()} charge result',
+                              replace_group=True)
 
     def _get_grid_esp_for_single_mol(self,
                                      molecule,
@@ -391,11 +394,12 @@ class EspChargesDriver:
                 q = self.compute_esp_charges_on_fitting_points([molecule],
                                                                [grid_m],
                                                                [esp_m])
+                # Fitting-point charges are not atomic properties.
+                self._write_esp_results_to_hdf5('esp', 'esp_on_points', q)
             else:
                 q = self.compute_esp_charges([molecule], [grid_m], [esp_m],
                                              [1.0])
-
-            self._write_hdf5_results('esp', q)
+                self._write_esp_results_to_hdf5('esp', 'esp_charges', q)
         else:
             q = None
 

@@ -463,11 +463,17 @@ def test_atomic_property_metadata_for_charge_result_datasets(tmp_path):
 
     write_results_to_hdf5(str(h5file), 'esp',
                           {'esp_charges': np.array([-0.4, 0.2, 0.2])})
-    write_results_to_hdf5(str(h5file), 'resp',
-                          {'resp_charges': np.array([-0.5, 0.25, 0.25])})
-
     with h5py.File(h5file, 'r') as h5f:
         assert h5f['esp/esp_charges'].attrs['atomic_property'] == 'ESP Charges'
+
+    write_results_to_hdf5(str(h5file), 'esp',
+                          {'esp_on_points': np.array([-0.6, 0.6])})
+    with h5py.File(h5file, 'r') as h5f:
+        assert 'atomic_property' not in h5f['esp/esp_on_points'].attrs
+
+    write_results_to_hdf5(str(h5file), 'resp',
+                          {'resp_charges': np.array([-0.5, 0.25, 0.25])})
+    with h5py.File(h5file, 'r') as h5f:
         assert h5f['resp/resp_charges'].attrs['atomic_property'] == 'RESP Charges'
 
 
