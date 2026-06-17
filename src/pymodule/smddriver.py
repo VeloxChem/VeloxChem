@@ -111,7 +111,8 @@ class SmdDriver:
             'Br': 3.06
         }
 
-        alpha = self.smd_solvent_parameters['alpha']
+        solvent_params = self.smd_solvent_parameters[self.solvent]
+        alpha = solvent_params['alpha']
         atom_radii = []
 
         for atom, vdw_r in zip(atom_labels, vdw_radii):
@@ -136,10 +137,10 @@ class SmdDriver:
 
         assert_msg_critical(
             self.solvent in self.smd_solvent_parameters,
-            'Solvent {self.solvent} not available')
+            f'Solvent {self.solvent} not available')
 
-        self.smd_solvent_parameters = self.smd_solvent_parameters[self.solvent]
-        self.epsilon = self.smd_solvent_parameters['epsilon']
+        solvent_params = self.smd_solvent_parameters[self.solvent]
+        self.epsilon = solvent_params['epsilon']
 
         CDS_energy = 0.0
         cal_per_mol_to_hartree = 1/627509.5
@@ -161,7 +162,7 @@ class SmdDriver:
 
     def _calculate_sigma_k(self):
         # Table 4 (cal/molÅ^2):  Any possible surface tension parameter that is not in this table is set equal to zero in SMD.
-        param = self.smd_solvent_parameters
+        param = self.smd_solvent_parameters[self.solvent]
 
         # Extract all sigma_i for the solvent
         if self.solvent == 'water':
@@ -350,7 +351,7 @@ class SmdDriver:
 
         # Table 5: solute-indep. param cal/molÅ^2
         sigma_gamma, sigma_phi2, sigma_psi2 = [0.35, -4.19, -6.68]
-        param = self.smd_solvent_parameters
+        param = self.smd_solvent_parameters[self.solvent]
 
         self.sigma_M = (
             sigma_gamma * param['gamma']
