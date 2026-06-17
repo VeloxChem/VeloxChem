@@ -383,7 +383,7 @@ class IMForceFieldGenerator:
 
         return zmat
 
-    def set_up_the_system(self, molecule, imforcefieldfiles=None):
+    def set_up_the_system(self, molecule, imforcefieldfiles=None, exclude_rot_bonds=None):
 
         """
         Assign the neccessary variables with respected values.
@@ -396,12 +396,10 @@ class IMForceFieldGenerator:
 
         """
         
-        def filter_rotatable_bonds_by_atom_type(ff_gen, rotatable_bonds):
+        def filter_rotatable_bonds(rotatable_bonds, exclude_rot_bonds=[]):
             """
-            Filters rotatable bonds by the atom types of the central bond.
+            Removes user-defined bonds from the rotatable bond list.
 
-            :param ff_gen:
-                The MM force-field generator after create_topology.
             :param rotatable_bonds:
                 The 1-based rotatable bond list from MMForceFieldGenerator.
 
@@ -409,34 +407,43 @@ class IMForceFieldGenerator:
                 The filtered 1-based rotatable bond list.
             """
 
-            non_rotatable_bond_types = {
-                # Add atom-type pairs here. Types are compared after strip().
-                # Examples:
-                ('cd', 'c '),
-                ('c ', 'cd'),
-                ('c ', 'os'),
-                ('os', 'c '),
-            }
+            if not exclude_rot_bonds:
+                return rotatable_bonds
 
-            non_rotatable_bond_types = {
-                tuple(sorted(bond_type))
-                for bond_type in non_rotatable_bond_types
-            }
+            excluded_bonds = set()
+            for bond in exclude_rot_bonds:
+                assert_msg_critical(
+                    len(bond) == 2,
+                    'IMForceFieldGenerator.filter_user_excluded_rotatable_bonds: '
+                    'excluded_rotatable_bonds must contain atom-index pairs.')
+
+                atom_i, atom_j = int(bond[0]), int(bond[1])
+
+                assert_msg_critical(
+                    atom_i > 0 and atom_j > 0 and atom_i != atom_j,
+                    'IMForceFieldGenerator.filter_user_excluded_rotatable_bonds: '
+                    'excluded_rotatable_bonds expects 1-based atom indices.')
+
+                excluded_bonds.add(tuple(sorted((atom_i, atom_j))))
 
             filtered_rotatable_bonds = []
+            excluded_found = set()
 
             for atom_i, atom_j in rotatable_bonds:
-                atom_i_zero = atom_i - 1
-                atom_j_zero = atom_j - 1
+                bond = tuple(sorted((int(atom_i), int(atom_j))))
 
-                atom_i_type = ff_gen.atom_types[atom_i_zero]
-                atom_j_type = ff_gen.atom_types[atom_j_zero]
-                bond_type = tuple(sorted((atom_i_type, atom_j_type)))
-
-                if bond_type in non_rotatable_bond_types:
+                if bond in excluded_bonds:
+                    excluded_found.add(bond)
                     continue
 
-                filtered_rotatable_bonds.append([atom_i, atom_j])
+                filtered_rotatable_bonds.append([int(atom_i), int(atom_j)])
+
+            missing_bonds = excluded_bonds - excluded_found
+            if missing_bonds:
+                self.ostream.print_warning(
+                    'Some user-excluded rotatable bonds were not present in the '
+                    f'MM rotatable bond list: {sorted(missing_bonds)}')
+                self.ostream.flush()
 
             return filtered_rotatable_bonds
 
@@ -634,7 +641,8 @@ class IMForceFieldGenerator:
         symmetry_groups = (list(range(len(molecule.get_labels()))), [], [])
         rotatable_bonds = deepcopy(ff_gen.rotatable_bonds)
         # add an additional filter to remove rotatable bonds around high energy paths
-        rotatable_bonds = filter_rotatable_bonds_by_atom_type(ff_gen, rotatable_bonds)
+        if exclude_rot_bonds is not None:
+            rotatable_bonds = filter_rotatable_bonds(rotatable_bonds, exclude_rot_bonds)
         # Work in zero-based indexing (same convention as z-matrix dihedrals)
         # and remove all symmetry-related rotatable bonds from the scan list.
         rotatable_bonds_zero_based = [tuple(sorted((i - 1, j - 1))) for (i, j) in rotatable_bonds]
