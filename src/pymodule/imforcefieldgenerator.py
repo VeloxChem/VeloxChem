@@ -430,8 +430,7 @@ class IMForceFieldGenerator:
                 atom_i_type = ff_gen.atom_types[atom_i_zero]
                 atom_j_type = ff_gen.atom_types[atom_j_zero]
                 bond_type = tuple(sorted((atom_i_type, atom_j_type)))
-
-                print(bond_type)
+                
                 if bond_type in non_rotatable_bond_types:
                     continue
 
