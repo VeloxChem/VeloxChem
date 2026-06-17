@@ -31,6 +31,7 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import copy
 import sys
@@ -39,6 +40,8 @@ from .veloxchemlib import hartree_in_ev, mpi_master
 from .outputstream import OutputStream
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .errorhandler import assert_msg_critical
+from .inputparser import parse_seq_fixed
+from .resultsio import write_results_to_hdf5
 from .spectrumplot import plot_xps_spectrum
 from .sanitychecks import scf_results_sanity_check
 
@@ -80,13 +83,13 @@ class XPSDriver:
 
         # TODO: can HF and DFT be combined in the same range?
         # Core orbital energy ranges (in Hartree) for different elements and methods
-        # Based on typical Hartree-Fock calculations
+        # Based on typical Hartree-Fock calculations, not heavily tested for HF. Ranges may need adjustment for different basis sets or methods and basis sets.
         self.energy_ranges_hf = {
-            'C': (-11.5, -11.0),
-            'N': (-15.7, -15.6),
-            'O': (-20.7, -20.5),
-            'F': (-26.4, -26.3),
-            'S': (-92.0, -91.0),
+            'C': (-11.8, -10.8),
+            'N': (-15.9, -15.2),
+            'O': (-21.2, -20.2),
+            'F': (-26.9, -26.1),
+            'S': (-92.0, -89.0),
         }
 
         # Based on typical DFT (B3LYP/PBE) calculations
@@ -100,6 +103,8 @@ class XPSDriver:
 
         # Default to DFT ranges for backward compatibility
         self.energy_ranges = self.energy_ranges_dft
+        self.localization_threshold = 0.75
+        self.filename = None
 
     def update_settings(self, xps_dict, method_dict=None):
         """
@@ -114,11 +119,76 @@ class XPSDriver:
         if method_dict is None:
             method_dict = {}
 
-        xps_keywords = {}
+        xps_keywords = {
+            'filename': str,
+        }
 
         for key in xps_dict:
             if key in xps_keywords:
                 setattr(self, key, xps_dict[key])
+
+    @staticmethod
+    def _normalize_element_input(element):
+        """
+        Normalizes XPS element input to a list of element symbols.
+
+        :param element:
+            A single element string, a comma-separated string, or a sequence of
+            element strings.
+
+        :return:
+            A list of element symbols.
+        """
+
+        assert_msg_critical(element is not None,
+                            'XPSDriver.compute: Must specify element parameter.')
+
+        if isinstance(element, str):
+            elements_list = list(parse_seq_fixed(element, flag='str'))
+        elif isinstance(element, (list, tuple)):
+            elements_list = list(element)
+        else:
+            assert_msg_critical(
+                False,
+                'XPSDriver.compute: Invalid element input.')
+
+        assert_msg_critical(
+            len(elements_list) > 0 and all(isinstance(elem, str)
+                                           for elem in elements_list),
+            'XPSDriver.compute: Invalid element input.')
+
+        elements_list = [elem.strip() for elem in elements_list]
+
+        assert_msg_critical(all(elem for elem in elements_list),
+                            'XPSDriver.compute: Invalid element input.')
+
+        return elements_list
+
+    def _write_final_hdf5(self, fname, results):
+        """
+        Writes XPS results to the specified HDF5 file.
+
+        :param fname:
+            Name of the HDF5 file.
+        :param results:
+            The results dictionary returned by compute().
+        """
+
+        if not fname:
+            return
+
+        fpath = Path(fname).with_suffix('.h5')
+
+        if not fpath.is_file():
+            return
+
+        write_results_to_hdf5(str(fpath),
+                              'xps',
+                              results,
+                              value_label='XPS result')
+
+        self.ostream.print_blank()
+        self.ostream.print_info('XPS results written to file: ' + str(fpath))
 
     @staticmethod
     def _get_xcfun_label(xcfun):
@@ -373,7 +443,7 @@ class XPSDriver:
 
         return assignments
 
-    def compute(self, molecule, basis, scf_driver, element=None, elements=None):
+    def compute(self, molecule, basis, scf_driver, element=None):
         """
         Computes core ionization energies for specified element(s) using
         the full core-hole (FCH) approximation.
@@ -385,36 +455,16 @@ class XPSDriver:
         :param scf_driver:
             The converged SCF driver object (e.g., ScfRestrictedDriver).
         :param element:
-            Single element as string (e.g., 'C', 'O', 'N', 'S').
-        :param elements:
-            List of element symbols (e.g., ['C', 'O']).
+            Element selection as a single symbol (e.g., 'O'), a comma-separated
+            string (e.g., 'C,O'), or a sequence of symbols
+            (e.g., ['C', 'O']).
 
         :return:
-            Dictionary with element as key and list of (orbital_index, ionization_energy)
-            tuples as value. Ionization energies are in eV.
+            Dictionary with element as key and a list of per-orbital result
+            dictionaries as value. Ionization energies are in eV.
         """
 
-        # Handle both element (single string) and elements (list)
-        if element is not None and elements is not None:
-            assert_msg_critical(
-                False,
-                'XPSDriver.compute: Specify either element or elements, not both.')
-
-        if element is None and elements is None:
-            assert_msg_critical(
-                False,
-                'XPSDriver.compute: Must specify either element or elements parameter.')
-
-        if element is not None:
-            assert_msg_critical(
-                isinstance(element, str),
-                'XPSDriver.compute: Invalid element input.')
-            elements_list = [element]
-        elif elements is not None:
-            assert_msg_critical(
-                isinstance(elements, (list, tuple)),
-                'XPSDriver.compute: Invalid elements input.')
-            elements_list = list(elements)
+        elements_list = self._normalize_element_input(element)
 
         # Detect method type (HF or DFT)
         method_type = self._detect_method_type(scf_driver.xcfun)
@@ -487,7 +537,7 @@ class XPSDriver:
                     for mo_idx, atom_idx, contrib in core_orbital_assignments:
                         self.ostream.print_info(
                             f'  MO {mo_idx} -> Atom {atom_idx+1} ({elem}) with {contrib:.1%} contribution')
-                        if contrib < 0.75:
+                        if contrib < self.localization_threshold:
                             delocalized.append(mo_idx)
                     if delocalized:
                         # TODO: Localize orbitals. If multiple edges, core orbitals must be
@@ -546,7 +596,13 @@ class XPSDriver:
                 # Calculate core ionization energy (in eV)
                 ie = (fch_energy - gs_energy) * hartree_in_ev()
 
-                ionization_energies.append((mo_index, atom_index, ie, contribution))
+                ionization_energies.append({
+                    'mo_index': mo_index,
+                    'atom_index': atom_index,
+                    'ionization_energy_ev': ie,
+                    'contribution': contribution,
+                    'is_delocalized': bool(contribution < self.localization_threshold),
+                })
 
                 if self.rank == mpi_master():
                     self.ostream.print_info(
@@ -560,6 +616,8 @@ class XPSDriver:
             self.ostream.print_blank()
             self.ostream.print_header('*** XPS Calculation Completed.'.ljust(92))
             self.ostream.print_blank()
+            if self.filename is not None:
+                self._write_final_hdf5(self.filename, results)
             self.ostream.flush()
 
         return results
@@ -575,28 +633,36 @@ class XPSDriver:
         if self.rank != mpi_master():
             return
 
+        width = 80
+
         self.ostream.print_blank()
         self.ostream.print_header('XPS Core Ionization Energies')
-        self.ostream.print_header('=' * 80)
+        self.ostream.print_header('=' * width)
         self.ostream.print_blank()
 
         for element, ionization_data in results.items():
-            self.ostream.print_info(f'Element: {element}')
-            self.ostream.print_info('-' * 80)
-            self.ostream.print_info(
-                f'{"Atom":<8} {"MO Index":<12} {"IE (eV)":<15} {"Localization":<15}')
-            self.ostream.print_info('-' * 80)
+            self.ostream.print_header(f'Element: {element}'.ljust(width))
+            self.ostream.print_header(('-' * width).ljust(width))
+            header = (f'{"Atom":<8} {"MO Index":<12} '
+                      f'{"IE (eV)":<15} {"Localization":<15}')
+            self.ostream.print_header(header.ljust(width))
+            self.ostream.print_header(('-' * width).ljust(width))
 
             # Sort by atom index for better readability
-            sorted_data = sorted(ionization_data, key=lambda x: x[1])
+            sorted_data = sorted(ionization_data, key=lambda x: x['atom_index'])
 
-            for mo_idx, atom_idx, ie, contribution in sorted_data:
-                self.ostream.print_info(
-                    f'{atom_idx+1:<8} {mo_idx:<12} {ie:>12.2f}   {contribution:>13.1%}')
+            for record in sorted_data:
+                mo_idx = record['mo_index']
+                atom_idx = record['atom_index']
+                ie = record['ionization_energy_ev']
+                contribution = record['contribution']
+                line = (f'{atom_idx+1:<8} {mo_idx:<12} '
+                        f'{ie:>12.2f}   {contribution:>13.1%}')
+                self.ostream.print_header(line.ljust(width))
 
             self.ostream.print_blank()
 
-        self.ostream.print_header('=' * 80)
+        self.ostream.print_header('=' * width)
         self.ostream.print_blank()
         self.ostream.flush()
 

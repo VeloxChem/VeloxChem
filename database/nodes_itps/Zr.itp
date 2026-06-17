@@ -1,0 +1,12 @@
+[ atomtypes ]
+; name    at.num    mass    charge ptype  sigma      epsilon
+ZA           ZA  91.224000  0.00000000  A     0.16463808      220.72608 ;ZR1
+
+
+[ moleculetype ]
+; Name            nrexcl
+MET          3
+
+[ atoms ]
+;   nr       type  resnr residue  atom   cgnr    charge       mass  typeB    chargeB      massB
+    1         ZA      1    MET     Zr1     1  4.0000000  91.224000   ; qtot 

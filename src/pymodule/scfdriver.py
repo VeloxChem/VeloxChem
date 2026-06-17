@@ -2016,7 +2016,6 @@ class ScfDriver:
                     'scf_energy': self.scf_energy,
                     'restart': self.restart,
                     'filename': self.filename,
-                    'scf_history': self.history,
                     # scf tensors
                     'S': S,
                     'C_alpha': C_alpha,
@@ -2033,6 +2032,12 @@ class ScfDriver:
 
                 # for backward compatibility only
                 self._scf_results['F'] = (F_alpha, F_beta)
+
+                # save SCF history
+                if self.history:
+                    for key in self.history[0]:
+                        self._scf_results[f'scf_history_{key}'] = np.array(
+                            [step[key] for step in self.history])
 
                 if self.ri_coulomb or self.ri_jk:
                     # RI info
