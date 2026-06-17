@@ -298,7 +298,7 @@ class SolvationBuilder:
         if equilibrate:
             run_steps = (self.steps if equilibration_steps is None else
                          equilibration_steps)
-            self.ostream.print_info("Equilibrating the system")
+            self.ostream.print_info("Attempting equilibration of the system")
             self.ostream.print_blank()
             self.ostream.print_info(f"Duration: {run_steps/1000} ps")
             self.ostream.print_info(f"Temperature: {self.temperature} K")
@@ -1008,7 +1008,7 @@ class SolvationBuilder:
             # If counterions are added when neutralize=True
             if self.added_counterions > 0:
                 ff_files.append('amber14-all.xml')
-            forcefield = app.ForceField(*ff_files)     
+            forcefield = app.ForceField(*ff_files)
 
         topology = pdb.topology
         positions = pdb.positions

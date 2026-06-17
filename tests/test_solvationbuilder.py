@@ -343,8 +343,8 @@ class TestSolvationBuilder:
                         box=box)
 
         assert builder.equilibration_flag is False
+        assert 'Attempting equilibration of the system' in builder.ostream.infos
         assert 'Equilibration skipped due to missing files' in builder.ostream.infos
-        assert 'Equilibrating the system' not in builder.ostream.infos
 
     def test_unlink_if_exists_handles_present_and_missing_files(self, tmp_path):
 
@@ -800,7 +800,7 @@ class TestSolvationBuilder:
 
         assert builder.equilibration_flag is True
         assert (tmp_path / 'equilibrated_system.pdb').exists()
-        assert 'Equilibrating the system' in builder.ostream.infos
+        assert 'Attempting equilibration of the system' in builder.ostream.infos
         assert 'Duration: 0.001 ps' in builder.ostream.infos
 
     def test_perform_equilibration_supports_itself_for_non_water_system(
