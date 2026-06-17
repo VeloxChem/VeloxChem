@@ -938,6 +938,8 @@ class IMForceFieldGenerator:
             self.ostream.print_blank()
             self.ostream.flush()
 
+            imforcefieldfile = self.imforcefieldfiles[self.roots_to_follow[0]]
+
             self.dynamics_settings = {
                 'drivers': self.drivers,
                 'basis_set_label': states_basis,
