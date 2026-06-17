@@ -52,7 +52,7 @@ try:
     import openmm
     from openmm import LangevinIntegrator, Platform
     from openmm.app import NoCutoff, Simulation, PDBFile, ForceField, GromacsTopFile
-    from openmm.unit import nanometer, md_unit_system, kelvin, picoseconds, picosecond,dalton
+    from openmm.unit import nanometer, md_unit_system, kelvin, picoseconds, picosecond, dalton
 except ImportError:
     pass
 
@@ -103,6 +103,78 @@ class ConformerGenerator:
         self.solvent_dielectric = 78.39
 
         self.use_gromacs_files = False
+
+        # Optional user-supplied MMForceFieldGenerator.
+        # When provided, ConformerGenerator uses this object instead of
+        # constructing a fresh MMForceFieldGenerator internally.
+        self.force_field_generator = None
+        self.force_field_generator_topology_ready = False
+        self.force_field_files_ready = False
+
+    def set_force_field_generator(self, ff_gen, topology_ready=False,
+                                  files_ready=False):
+        """Set a user-supplied MMForceFieldGenerator.
+
+        Parameters
+        ----------
+        ff_gen : MMForceFieldGenerator
+            A preconfigured force-field generator to use for topology,
+            rotatable-bond, dihedral, and OpenMM/Gromacs file generation.
+        topology_ready : bool
+            Set to True if ff_gen.create_topology(molecule) has already been
+            called for the same molecule.
+        files_ready : bool
+            Set to True if the topology files matching self.top_file_name have
+            already been written. For OpenMM this means <top_file_name>.pdb and
+            <top_file_name>.xml; for Gromacs this means <top_file_name>.top.
+        """
+
+        self.force_field_generator = ff_gen
+        self.force_field_generator_topology_ready = topology_ready
+        self.force_field_files_ready = files_ready
+
+    def _prepare_force_field_generator(self, molecule, top_file_name,
+                                       partial_charges):
+        """Create or prepare the force-field generator used internally."""
+
+        user_supplied_ff = self.force_field_generator is not None
+
+        if user_supplied_ff:
+            mmff_gen = self.force_field_generator
+        else:
+            mmff_gen = MMForceFieldGenerator(self._comm)
+
+        mmff_gen.ostream.mute()
+
+        # Prefer charges explicitly supplied to ConformerGenerator.
+        # Otherwise keep charges already present on a user-supplied ff_gen.
+        if partial_charges is None:
+            if getattr(mmff_gen, "partial_charges", None) is None:
+                warn_text = "ConformerGenerator: Partial charges not provided. "
+                warn_text += "Will use a quick (and likely inaccurate) estimation of partial charges."
+                self.ostream.print_warning(warn_text)
+                mmff_gen.partial_charges = molecule.get_partial_charges(
+                    molecule.get_charge())
+        else:
+            mmff_gen.partial_charges = partial_charges
+
+        if not (user_supplied_ff and self.force_field_generator_topology_ready):
+            mmff_gen.create_topology(molecule)
+            if user_supplied_ff:
+                self.force_field_generator_topology_ready = True
+
+        if not (user_supplied_ff and self.force_field_files_ready):
+            if self.use_gromacs_files:
+                mmff_gen.write_gromacs_files(filename=top_file_name)
+            else:
+                mmff_gen.write_openmm_files(filename=top_file_name)
+            if user_supplied_ff:
+                self.force_field_files_ready = True
+
+        # make sure to sync the ranks after the top file is written
+        self._comm.barrier()
+
+        return mmff_gen
 
     def count_conformer_combinations(self, molecule):
         top_file_name = self.top_file_name
@@ -208,23 +280,8 @@ class ConformerGenerator:
     def _get_dihedral_candidates(self, molecule, top_file_name,
                                  partial_charges):
 
-        mmff_gen = MMForceFieldGenerator(self._comm)
-        mmff_gen.ostream.mute()
-        if partial_charges is None:
-            warn_text = "ConformerGenerator: Partial charges not provided. "
-            warn_text += "Will use a quick (and likely inaccurate) estimation of partial charges."
-            self.ostream.print_warning(warn_text)
-            mmff_gen.partial_charges = molecule.get_partial_charges(
-                molecule.get_charge())
-        else:
-            mmff_gen.partial_charges = partial_charges
-        mmff_gen.create_topology(molecule)
-        if self.use_gromacs_files:
-            mmff_gen.write_gromacs_files(filename=top_file_name)
-        else:
-            mmff_gen.write_openmm_files(filename=top_file_name)
-        # make sure to sync the ranks after the top file is written
-        self._comm.barrier()
+        mmff_gen = self._prepare_force_field_generator(
+            molecule, top_file_name, partial_charges)
 
         atom_info_dict = deepcopy(mmff_gen.atom_info_dict)
         rotatable_bonds = deepcopy(mmff_gen.rotatable_bonds)
@@ -460,23 +517,8 @@ class ConformerGenerator:
     def _optimize_molecule(self, molecule, top_file_name, em_tolerance,
                            partial_charges, implicit_solvent_model):
 
-        mmff_gen = MMForceFieldGenerator(self._comm)
-        mmff_gen.ostream.mute()
-        if partial_charges is None:
-            warn_text = "ConformerGenerator: Partial charges not provided. "
-            warn_text += "Will use a quick (and likely inaccurate) estimation of partial charges."
-            self.ostream.print_warning(warn_text)
-            mmff_gen.partial_charges = molecule.get_partial_charges(
-                molecule.get_charge())
-        else:
-            mmff_gen.partial_charges = partial_charges
-        mmff_gen.create_topology(molecule)
-        if self.use_gromacs_files:
-            mmff_gen.write_gromacs_files(filename=top_file_name)
-        else:
-            mmff_gen.write_openmm_files(filename=top_file_name)
-        # make sure to sync the ranks after the top file is written
-        self._comm.barrier()
+        mmff_gen = self._prepare_force_field_generator(
+            molecule, top_file_name, partial_charges)
 
         if self._rank == mpi_master():
             simulation = self._init_openmm_system(top_file_name,
