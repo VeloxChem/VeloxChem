@@ -90,6 +90,16 @@ class TpaReducedDriver(TpaDriverBase):
 
         super().update_settings(rsp_dict, method_dict)
 
+    def _get_tpa_type(self):
+        """
+        Gets the type of TPA calculation.
+
+        :return:
+            The TPA calculation type.
+        """
+
+        return 'reduced'
+
     def get_densities(self, wi, Nx, mo, nocc, norb):
         """
         Computes the compounded densities needed for the compounded Fock
@@ -974,22 +984,20 @@ class TpaReducedDriver(TpaDriverBase):
 
         return None
 
-    def _print_results(self, rsp_results):
+    def _get_summary_title(self):
         """
-        Prints the results from the reduced TPA calculation.
+        Gets the summary-table title for reduced TPA results.
 
-        :param rsp_results:
-            A dictonary containing the results of response calculation.
+        :return:
+            The title for summary output.
         """
 
-        gamma = rsp_results['gamma']
+        return 'TPA Summary (Reduced Expression)'
 
-        self.ostream.print_blank()
-
-        w_str = 'Isotropic Average gamma Tensor at Given Frequencies'
-        self.ostream.print_header(w_str)
-        self.ostream.print_header('=' * (len(w_str) + 2))
-        self.ostream.print_blank()
+    def _print_note(self):
+        """
+        Prints the reduced TPA approximation note.
+        """
 
         w_str = '*** Note: The reduced expression is an approximation to the  '
         self.ostream.print_header(w_str)
@@ -998,30 +1006,3 @@ class TpaReducedDriver(TpaDriverBase):
         w_str = '    intended for use in one-photon off-resonance regions.    '
         self.ostream.print_header(w_str)
         self.ostream.print_blank()
-
-        freqs = rsp_results['frequencies']
-
-        title = '{:<8s}{:>14s}{:>21s}{:>22s}'.format('', 'Photon Energy', 'Real',
-                                                     'Imaginary')
-        width = len(title)
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header(('-' * len(title)).ljust(width))
-
-        for w in freqs:
-            self._print_component('gamma', w, gamma[(w, -w, w)], width)
-
-        self.ostream.print_blank()
-
-        title = 'Reference: '
-        title += 'K. Ahmadzadeh, M. Scott, M. Brand, O. Vahtras, X. Li, '
-        self.ostream.print_header(title.ljust(width))
-        title = 'Z. Rinkevicius, and P. Norman, '
-        title += 'J. Chem. Phys. 154, 024111 (2021)'
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_blank()
-
-        spectrum = self.get_spectrum(rsp_results, x_unit='au')
-        self._print_spectrum(spectrum, width)
-
-        self.ostream.print_blank()
-        self.ostream.flush()

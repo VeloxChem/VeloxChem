@@ -44,6 +44,7 @@ getAvailableFunctionals()
 {
     return std::vector<std::string>({"SLATER", "SLDA",   "B88X",    "BLYP",  "B3LYP",   "B3PW91", "BHANDH", "BHANDHLYP", "PBE",   "PBE0",   "REVPBE",
                                      "BP86",   "PW91",   "MPW1K",   "OLYP",  "O3LYP",   "X3LYP",  "B97",       "B97-1", "B97-2",  "B97-3",
+                                     "B97M-D4",
                                      "LRC-WPBEH", "CAM-B3LYP","RCAM-B3LYP", "CAM-B3LYP-100",  "WB97X-D4", "WB97M-D4",
                                      "TPSS",   "TPSSH",  "REVTPSS", "PKZB",  "SCAN",    "RSCAN",  "R2SCAN",    "M05",   "M05-2X", "M06",
                                      "M06-2X", "M06-HF", "M06-L",   "M11-L",
@@ -104,9 +105,11 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
 
         if (format::upper_case(xcLabel) == "B97-3") return CXCFunctional("B97-3", {"HYB_GGA_XC_B97_3"}, {1.0});
 
-        if (format::upper_case(xcLabel) == "WB97X-D4") return CXCFunctional("WB97X-D4", {"HYB_GGA_XC_WB97X_V"}, {1.0});
+        if (format::upper_case(xcLabel) == "B97M-D4") return CXCFunctional("B97M-D4", {"MGGA_XC_B97M_V"}, {1.0});
 
         // range-separated GGA
+
+        if (format::upper_case(xcLabel) == "WB97X-D4") return CXCFunctional("WB97X-D4", {"HYB_GGA_XC_WB97X_V"}, {1.0});
 
         if (format::upper_case(xcLabel) == "WB97M-D4") return CXCFunctional("WB97M-D4", {"HYB_MGGA_XC_WB97M_V"}, {1.0});
 

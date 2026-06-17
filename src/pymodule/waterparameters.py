@@ -118,13 +118,13 @@ def get_water_parameters():
             'type': 'harmonic',
             'force_constant': 502416.0,
             'equilibrium': 0.09572,
-            'comment': 'TIP-3P water'
+            'comment': 'TIP3P water'
         },
         'angles': {
             'type': 'harmonic',
             'force_constant': 628.02,
             'equilibrium': 104.52,
-            'comment': 'TIP-3P water'
+            'comment': 'TIP3P water'
         },
         'ow': {
             'type': 'ow',
@@ -134,7 +134,7 @@ def get_water_parameters():
             'sigma': 3.1507e-01,
             'epsilon': 0.635968,
             'equivalent_atom': 'ow_00',
-            'comment': 'TIP-3P water'
+            'comment': 'TIP3P water'
         },
         'hw': {
             'type': 'hw',
@@ -144,7 +144,7 @@ def get_water_parameters():
             'sigma': 1.0,
             'epsilon': 0.0,
             'equivalent_atom': 'hw_00',
-            'comment': 'TIP-3P water'
+            'comment': 'TIP3P water'
         },
         'ref': 'Jorgensen W, Chandrasekhar J, Madura J, Impey R, Klein M. J Chem Phys. 1983;79:926–935.'
     }
@@ -154,13 +154,13 @@ def get_water_parameters():
             'type': 'harmonic',
             'force_constant': 502416.0,
             'equilibrium': 0.09572,
-            'comment': 'cTIP-3P water'
+            'comment': 'cTIP3P water'
         },
         'angles': {
             'type': 'harmonic',
             'force_constant': 628.02,
             'equilibrium': 104.52,
-            'comment': 'cTIP-3P water'
+            'comment': 'cTIP3P water'
         },
         'ow': {
             'type': 'ow',
@@ -170,7 +170,7 @@ def get_water_parameters():
             'sigma': 3.1507e-01,
             'epsilon': 0.635968,
             'equivalent_atom': 'ow_00',
-            'comment': 'cTIP-3P water'
+            'comment': 'cTIP3P water'
         },
         'hw': {
             'type': 'hw',
@@ -180,7 +180,7 @@ def get_water_parameters():
             'sigma': 1.2363e-01,
             'epsilon': 0.63536e-01,
             'equivalent_atom': 'hw_00',
-            'comment': 'cTIP-3P water'
+            'comment': 'cTIP3P water'
         },
         'ref': 'T. Luchko, S. Gusarov, D. R. Roe, C. Simmerling, D. A. Case, J. Tuszynski, A. Kovalenko. J. Chem. Theory Comput. 2010 6 (3), 607-624.'
     }
