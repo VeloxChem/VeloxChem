@@ -116,6 +116,21 @@ def _run_construction_once(monkeypatch, workdir: Path) -> ConstructionContext:
     )
 
 
+def _make_setup_only_generator(mute_output=True) -> IMForceFieldGenerator:
+    qm_driver = ScfRestrictedDriver()
+    qm_driver.ostream.mute()
+
+    ffg = IMForceFieldGenerator(
+        ground_state_driver=qm_driver,
+        roots_to_follow=[0],
+    )
+    if mute_output:
+        ffg.ostream.mute()
+    ffg.add_conformal_structures = False
+
+    return ffg
+
+
 def _label_key(label):
     parts = label.split("_")
     point = int(parts[1]) if len(parts) > 1 and parts[0] == "point" else 10**9
@@ -295,6 +310,70 @@ def _assert_nve_total_energy_conserved(ffg: IMForceFieldGenerator):
         f"NVE total energy is not conserved: max drift={drift:.6f} kJ/mol, "
         f"allowed={allowed:.6f} kJ/mol"
     )
+
+
+def test_setup_excludes_user_rotatable_bonds(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+
+    mol = Molecule.from_xyz_string(get_xyz_structure())
+    mol.set_charge(0)
+    mol.set_multiplicity(1)
+
+    baseline = _make_setup_only_generator()
+    baseline.set_up_the_system(mol)
+
+    baseline_bonds = {
+        tuple(sorted(bond)) for bond in baseline.all_rotatable_bonds
+    }
+    assert baseline_bonds
+
+    excluded_bond_zero_based = sorted(next(iter(baseline_bonds)))
+    excluded_bond_one_based = [idx + 1 for idx in excluded_bond_zero_based]
+
+    filtered = _make_setup_only_generator()
+    filtered.set_up_the_system(
+        mol,
+        exclude_rot_bonds=[excluded_bond_one_based],
+    )
+
+    filtered_bonds = {
+        tuple(sorted(bond)) for bond in filtered.all_rotatable_bonds
+    }
+
+    assert tuple(excluded_bond_zero_based) not in filtered_bonds
+    assert filtered_bonds == baseline_bonds - {tuple(excluded_bond_zero_based)}
+
+    empty_exclude = _make_setup_only_generator()
+    empty_exclude.set_up_the_system(mol, exclude_rot_bonds=[])
+    empty_exclude_bonds = {
+        tuple(sorted(bond)) for bond in empty_exclude.all_rotatable_bonds
+    }
+
+    assert empty_exclude_bonds == baseline_bonds
+
+    reversed_exclude = _make_setup_only_generator()
+    reversed_exclude.set_up_the_system(
+        mol,
+        exclude_rot_bonds=[list(reversed(excluded_bond_one_based))],
+    )
+    reversed_exclude_bonds = {
+        tuple(sorted(bond)) for bond in reversed_exclude.all_rotatable_bonds
+    }
+
+    assert reversed_exclude_bonds == filtered_bonds
+
+    missing_bond = [mol.number_of_atoms() + 1, mol.number_of_atoms() + 2]
+    missing_exclude = _make_setup_only_generator(mute_output=False)
+    missing_exclude.set_up_the_system(
+        mol,
+        exclude_rot_bonds=[missing_bond],
+    )
+    missing_exclude_bonds = {
+        tuple(sorted(bond)) for bond in missing_exclude.all_rotatable_bonds
+    }
+
+    assert missing_exclude_bonds == baseline_bonds
+    assert 'Some user-excluded rotatable bonds were not present' in capsys.readouterr().out
 
 
 @pytest.mark.timeconsuming

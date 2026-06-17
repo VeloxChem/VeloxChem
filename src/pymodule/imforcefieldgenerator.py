@@ -387,14 +387,9 @@ class IMForceFieldGenerator:
         Assign the neccessary variables with respected values.
 
         :param molecule: original molecule
-
-        :param target_dihedrals: is a list of dihedrals that should be scanned during the dynamics
-
-        :param sampling_structures: devides the searchspace around given rotatbale dihedrals
-
         """
-        
-        def filter_rotatable_bonds(rotatable_bonds, exclude_rot_bonds=[]):
+
+        def filter_rotatable_bonds(rotatable_bonds, exclude_rot_bonds):
             """
             Removes user-defined bonds from the rotatable bond list.
 
@@ -412,14 +407,14 @@ class IMForceFieldGenerator:
             for bond in exclude_rot_bonds:
                 assert_msg_critical(
                     len(bond) == 2,
-                    'IMForceFieldGenerator.filter_user_excluded_rotatable_bonds: '
+                    'IMForceFieldGenerator.filter_rotatable_bonds: '
                     'excluded_rotatable_bonds must contain atom-index pairs.')
 
                 atom_i, atom_j = int(bond[0]), int(bond[1])
 
                 assert_msg_critical(
                     atom_i > 0 and atom_j > 0 and atom_i != atom_j,
-                    'IMForceFieldGenerator.filter_user_excluded_rotatable_bonds: '
+                    'IMForceFieldGenerator.filter_rotatable_bonds: '
                     'excluded_rotatable_bonds expects 1-based atom indices.')
 
                 excluded_bonds.add(tuple(sorted((atom_i, atom_j))))
@@ -721,7 +716,7 @@ class IMForceFieldGenerator:
             }
             self.sampling_states_interpolation_settings[self.roots_to_follow[0]] = self.states_interpolation_settings[self.roots_to_follow[0]].copy()
             self.sampling_states_interpolation_settings[self.roots_to_follow[0]]['imforcefield_file'] = self.sampling_imforcefieldfiles[self.roots_to_follow[0]]
-        
+
         if self.exclude_non_core:
             new_exclusion = {}
             new_inclusion = {}
