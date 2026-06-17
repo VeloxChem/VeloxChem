@@ -290,17 +290,22 @@ class EnsembleParser:
                    start: float | None = None,
                    end: float | None = None,
                    last_snapshot_only: bool = False,
-                   pdb_file: str | None = None):
+                   pdb_file: str | None = None,
+                   gro_file: str | None = None):
         """
         Parse a set of structures and extract QM and MM region data.
 
         :param trajectory_file:
             Path to the trajectory file:
                 - .xtc with a corresponding topology (.tpr) via topology_file
-                - .pdb (several configurations, or a single configuration; bonds are guessed
+                - .pdb (several configurations, or a single configuration; bonds are guessed)
         :param pdb_file:
             Path to a PDB file. This is a convenience alternative to
             trajectory_file and cannot be used together with trajectory_file.
+        :param gro_file:
+            Path to a GRO file. This is a convenience alternative to
+            trajectory_file and cannot be used together with trajectory_file or
+            pdb_file.
         :param topology_file:
             Path to the topology file (e.g., .tpr).
         :param num_snapshots:
@@ -382,9 +387,12 @@ class EnsembleParser:
                 Number of residues in the NPE region.
         """
 
-        if pdb_file is not None and trajectory_file is not None:
+        input_files = [
+            item is not None for item in (trajectory_file, pdb_file, gro_file)
+        ]
+        if sum(input_files) > 1:
             raise ValueError(
-                "Provide either pdb_file or trajectory_file, not both"
+                "Provide only one of trajectory_file, pdb_file, or gro_file"
             )
 
         if pdb_file is not None:
@@ -393,8 +401,16 @@ class EnsembleParser:
                 raise ValueError("pdb_file must be a .pdb file")
             trajectory_file = pdb_file
 
+        if gro_file is not None:
+            gro_file = str(gro_file)
+            if not gro_file.lower().endswith(".gro"):
+                raise ValueError("gro_file must be a .gro file")
+            trajectory_file = gro_file
+
         if trajectory_file is None:
-            raise ValueError("Either pdb_file or trajectory_file must be provided")
+            raise ValueError(
+                "One of trajectory_file, pdb_file, or gro_file must be provided"
+            )
 
         trajectory_file = str(trajectory_file)
 
@@ -412,7 +428,7 @@ class EnsembleParser:
         if qm_multiplicity <= 0:
             raise ValueError("qm_multiplicity must be a positive integer")
 
-        if trajectory_file.lower().endswith(".pdb"):
+        if trajectory_file.lower().endswith((".pdb", ".gro")):
             raw_mda_version = version("MDAnalysis")
             match = re.match(r"^(\d+)\.(\d+)", raw_mda_version)
             if not match:
@@ -437,7 +453,7 @@ class EnsembleParser:
                 )
         else:
             if topology_file is None:
-                raise ValueError("topology_file is required unless trajectory_file is a .pdb")
+                raise ValueError("topology_file is required unless trajectory_file is a .pdb or .gro")
             # Refresh XDR offsets to avid stale .xtc_offsets cache warinings
             # when trajectory metadata changes between runs/environments:
             mda_universe = mda.Universe(
@@ -455,10 +471,10 @@ class EnsembleParser:
             frame_indices = np.array([total_frames - 1], dtype=int)
         else:
             use_time_window = (start is not None or end is not None)
-            if use_time_window and trajectory_file.lower().endswith('.pdb'):
+            if use_time_window and trajectory_file.lower().endswith((".pdb", ".gro")):
                 raise ValueError(
                     "Start/end time window selection is only supported for"
-                    "time-resilved trajectories (e.g. .ztc), not .pdb input."
+                    "time-resolved trajectories (e.g. .ztc), not .pdb or .gro input."
                 )
             if use_time_window:
                 traj_start = float(seek_trajectory_frame(0).time)
