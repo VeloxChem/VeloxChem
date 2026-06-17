@@ -1759,7 +1759,7 @@ class RedoxCalculator:
 
         if n_combinations < 10000:
             conf = vlx.ConformerGenerator()
-            conf.implicit_solvent_model = "gbn2"
+            conf.implicit_solvent_model = "gbn"
             conf.partial_charges = input_data.get_partial_charges(input_data.get_charge())
             conf.top_file_name = f"conf_{uuid.uuid4().hex[:8]}"
             conf.solvent_dielectric = self.conformer_cpcm_epsilon
