@@ -393,6 +393,51 @@ class IMForceFieldGenerator:
         :param sampling_structures: devides the searchspace around given rotatbale dihedrals
 
         """
+        
+        def filter_rotatable_bonds_by_atom_type(ff_gen, rotatable_bonds):
+            """
+            Filters rotatable bonds by the atom types of the central bond.
+
+            :param ff_gen:
+                The MM force-field generator after create_topology.
+            :param rotatable_bonds:
+                The 1-based rotatable bond list from MMForceFieldGenerator.
+
+            :return:
+                The filtered 1-based rotatable bond list.
+            """
+
+            non_rotatable_bond_types = {
+                # Add atom-type pairs here. Types are compared after strip().
+                # Examples:
+                ('cd', 'c '),
+                ('c ', 'cd'),
+                ('c ', 'os'),
+                ('os', 'c '),
+            }
+
+            non_rotatable_bond_types = {
+                tuple(sorted(bond_type))
+                for bond_type in non_rotatable_bond_types
+            }
+
+            filtered_rotatable_bonds = []
+
+            for atom_i, atom_j in rotatable_bonds:
+                atom_i_zero = atom_i - 1
+                atom_j_zero = atom_j - 1
+
+                atom_i_type = ff_gen.atom_types[atom_i_zero]
+                atom_j_type = ff_gen.atom_types[atom_j_zero]
+                bond_type = tuple(sorted((atom_i_type, atom_j_type)))
+
+                print(bond_type)
+                if bond_type in non_rotatable_bond_types:
+                    continue
+
+                filtered_rotatable_bonds.append([atom_i, atom_j])
+
+            return filtered_rotatable_bonds
 
         def regroup_by_rotatable_connection(molecule, groups, rotatable_bonds, conn):
             new_groups = {'gs': [], 'es': [], 'non_rotatable': []}
@@ -587,6 +632,8 @@ class IMForceFieldGenerator:
         # determine equivalent atoms within a molecular structure
         symmetry_groups = (list(range(len(molecule.get_labels()))), [], [])
         rotatable_bonds = deepcopy(ff_gen.rotatable_bonds)
+        # add an additional filter to remove rotatable bonds around high energy paths
+        rotatable_bonds = filter_rotatable_bonds_by_atom_type(ff_gen, rotatable_bonds)
         # Work in zero-based indexing (same convention as z-matrix dihedrals)
         # and remove all symmetry-related rotatable bonds from the scan list.
         rotatable_bonds_zero_based = [tuple(sorted((i - 1, j - 1))) for (i, j) in rotatable_bonds]
@@ -651,6 +698,23 @@ class IMForceFieldGenerator:
                 #             indices_list.append(i)
                 self.symmetry_information['gs'] = [symmetry_groups[0], rot_groups['gs'], regrouped['gs'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, [], [dihedral_start, dihedral_end]]
 
+            imforcefieldfile = self.imforcefieldfiles[self.roots_to_follow[0]]
+            self.states_interpolation_settings[self.roots_to_follow[0]] = {
+                'interpolation_type':self.interpolation_type,
+                'weightfunction_type':self.weightfunction_type,
+                'exponent_p':self.exponent_p,
+                'exponent_q':self.exponent_q,
+                'confidence_radius':self.confidence_radius,
+                'imforcefield_file':imforcefieldfile,
+                'use_inverse_bond_length':self.use_inverse_bond_length,
+                'use_eq_bond_length': self.use_eq_bond_length,
+                'use_tc_weights': self.use_tc_weights,
+                'tc_weight_mode': self.tc_weight_mode,
+                'use_mass_weight': self.use_mass_weight,
+            }
+            self.sampling_states_interpolation_settings[self.roots_to_follow[0]] = self.states_interpolation_settings[self.roots_to_follow[0]].copy()
+            self.sampling_states_interpolation_settings[self.roots_to_follow[0]]['imforcefield_file'] = self.sampling_imforcefieldfiles[self.roots_to_follow[0]]
+        
         if self.exclude_non_core:
             new_exclusion = {}
             new_inclusion = {}
@@ -873,23 +937,6 @@ class IMForceFieldGenerator:
 
             self.ostream.print_blank()
             self.ostream.flush()
-
-            imforcefieldfile = self.imforcefieldfiles[self.roots_to_follow[0]]
-            self.states_interpolation_settings[self.roots_to_follow[0]] = {
-                'interpolation_type':self.interpolation_type,
-                'weightfunction_type':self.weightfunction_type,
-                'exponent_p':self.exponent_p,
-                'exponent_q':self.exponent_q,
-                'confidence_radius':self.confidence_radius,
-                'imforcefield_file':imforcefieldfile,
-                'use_inverse_bond_length':self.use_inverse_bond_length,
-                'use_eq_bond_length': self.use_eq_bond_length,
-                'use_tc_weights': self.use_tc_weights,
-                'tc_weight_mode': self.tc_weight_mode,
-                'use_mass_weight': self.use_mass_weight,
-            }
-            self.sampling_states_interpolation_settings[self.roots_to_follow[0]] = self.states_interpolation_settings[self.roots_to_follow[0]].copy()
-            self.sampling_states_interpolation_settings[self.roots_to_follow[0]]['imforcefield_file'] = self.sampling_imforcefieldfiles[self.roots_to_follow[0]]
 
             self.dynamics_settings = {
                 'drivers': self.drivers,
