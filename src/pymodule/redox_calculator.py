@@ -1749,7 +1749,7 @@ class RedoxCalculator:
         basis_label = self.conformer_basis
 
         conf_probe = vlx.ConformerGenerator()
-        dihedrals_candidates, _, _ = conf_probe._get_dihedral_candidates(input_data,"MOL",None)
+        dihedrals_candidates, _, _ = conf_probe._get_dihedral_candidates(input_data, f"mol_{label}",None)
 
         dih_angles = [item[1] for item in dihedrals_candidates]
 
@@ -1759,7 +1759,7 @@ class RedoxCalculator:
 
         if n_combinations < 10000:
             conf = vlx.ConformerGenerator()
-            conf.implicit_solvation_model = "gbn2"
+            conf.implicit_solvent_model = "gbn2"
             conf.partial_charges = input_data.get_partial_charges(input_data.get_charge())
             conf.top_file_name = f"conf_{uuid.uuid4().hex[:8]}"
             conf.solvent_dielectric = self.conformer_cpcm_epsilon
@@ -1804,9 +1804,10 @@ class RedoxCalculator:
                     else vlx.ScfRestrictedDriver()
                 )
 
-                scf_drv.xcfun = "blyp"
-                if hasattr(scf_drv, "ri_coulomb"):
-                    scf_drv.ri_coulomb = True
+                scf_drv.xcfun = "b3lyp"
+                scf_drv.ri_jk = True
+                #if hasattr(scf_drv, "ri_coulomb"):
+                #    scf_drv.ri_coulomb = True
                 scf_drv.dispersion = True
                 scf_drv.solvation_model = "smd"
                 scf_drv.smd_solvent = self.smd_solvent
