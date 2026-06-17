@@ -441,7 +441,6 @@ class IMForceFieldGenerator:
 
             return filtered_rotatable_bonds
 
-
         def regroup_by_rotatable_connection(molecule, groups, rotatable_bonds, conn):
             new_groups = {'gs': [], 'es': [], 'non_rotatable': []}
             rot_groups = {'gs': [], 'es': []}
@@ -635,6 +634,7 @@ class IMForceFieldGenerator:
         # determine equivalent atoms within a molecular structure
         symmetry_groups = (list(range(len(molecule.get_labels()))), [], [])
         rotatable_bonds = deepcopy(ff_gen.rotatable_bonds)
+        # add an additional filter to remove rotatable bonds around high energy paths
         rotatable_bonds = filter_rotatable_bonds_by_atom_type(ff_gen, rotatable_bonds)
         # Work in zero-based indexing (same convention as z-matrix dihedrals)
         # and remove all symmetry-related rotatable bonds from the scan list.
@@ -701,7 +701,6 @@ class IMForceFieldGenerator:
                 #             indices_list.append(i)
                 self.symmetry_information['gs'] = [symmetry_groups[0], rot_groups['gs'], regrouped['gs'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, [], [dihedral_start, dihedral_end]]
 
-            
             imforcefieldfile = self.imforcefieldfiles[self.roots_to_follow[0]]
             self.states_interpolation_settings[self.roots_to_follow[0]] = {
                 'interpolation_type':self.interpolation_type,
@@ -718,7 +717,7 @@ class IMForceFieldGenerator:
             }
             self.sampling_states_interpolation_settings[self.roots_to_follow[0]] = self.states_interpolation_settings[self.roots_to_follow[0]].copy()
             self.sampling_states_interpolation_settings[self.roots_to_follow[0]]['imforcefield_file'] = self.sampling_imforcefieldfiles[self.roots_to_follow[0]]
-            
+        
         if self.exclude_non_core:
             new_exclusion = {}
             new_inclusion = {}
@@ -941,7 +940,9 @@ class IMForceFieldGenerator:
 
             self.ostream.print_blank()
             self.ostream.flush()
-            
+
+            imforcefieldfile = self.imforcefieldfiles[self.roots_to_follow[0]]
+
             self.dynamics_settings = {
                 'drivers': self.drivers,
                 'basis_set_label': states_basis,
