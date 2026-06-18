@@ -322,16 +322,16 @@ class TestEnsembleDriverOptions:
         """
         Regression test for acetone + amyloid environment, a
         .gro system with residue numbers reused across chains.
- 
+
         The generated PE/NPE pot file uses unique residue indices in the
         @environment residue-id column.
         """
         data_dir = Path(__file__).parent / "data"
         gro_file = str(data_dir / "amyloid_acetone.gro")
- 
+
         ens_parser = EnsembleParser()
         ens_parser.ostream.mute()
- 
+
         ensemble = ens_parser.structures(
             gro_file=gro_file,
             qm_region="resname LIG",
@@ -339,15 +339,15 @@ class TestEnsembleDriverOptions:
             pe_cutoff=3.0,
             npe_cutoff=5.0,
         )
- 
+
         ens_drv = EnsembleDriver()
         ens_drv.ostream.mute()
- 
+
         ens_drv.set_env_models(
             pe_model=["CP3", "SEP"],
             npe_model=["ff19sb", "tip3p"],
         )
- 
+
         scf_options = {
             "scf_type": "restricted",
             "conv_thresh": 1.0e-6,
@@ -355,13 +355,13 @@ class TestEnsembleDriverOptions:
             "xcfun": "cam-b3lyp",
             "grid_level": 4,
         }
- 
+
         property_options = {
             "property": "absorption",
             "nstates": 6,
             "nto": True,
         }
- 
+
         results = ens_drv.compute(
             ensemble,
             basis_set="def2-svp",
@@ -369,12 +369,12 @@ class TestEnsembleDriverOptions:
             property_options=property_options,
             potdir=tmp_path,
         )
- 
+
         assert "scf_all" in results
         assert "rsp_all" in results
         assert len(results["scf_all"]) == 1
         assert len(results["rsp_all"]) == 1
-  
+
         ref_frames = [0]
         ref_scf = np.array([
             -192.9195271855,
@@ -382,33 +382,33 @@ class TestEnsembleDriverOptions:
         ref_eigs = {
             0: np.array([0.15279238, 0.28854473, 0.31221435, 0.31985609, 0.32778013, 0.33746268]),
         }
- 
+
         got_frames = [int(frame) for frame, _ in results["scf_all"]]
         assert got_frames == ref_frames
 
         if ens_drv.rank == mpi_master():
             got_scf = np.array([float(scf_res["scf_energy"]) for _, scf_res in results["scf_all"]])
             np.testing.assert_allclose(got_scf, ref_scf, rtol=0.0, atol=2.0e-6)
- 
+
             for frame, scf_res in results["scf_all"]:
                 expected_name = f"pe_frame_{int(frame):06d}.pot"
                 expected_path = tmp_path / expected_name
- 
+
                 # Each snapshot must use its own PE file
                 assert expected_path.is_file()
                 assert str(scf_res.get("potfile", "")).endswith(expected_name)
- 
+
                 # Reference .pot regression for mixed PE+NPE writer stability
                 reference_name = f"ensemble_amyloid_acetone_reference_{expected_name}"
                 reference_path = data_dir / reference_name
                 assert reference_path.is_file(), f"Missing reference file: {reference_path}"
- 
+
                 generated_lines = expected_path.read_text().splitlines()
                 reference_lines = reference_path.read_text().splitlines()
                 assert generated_lines == reference_lines, (
                     f"PE+NPE pot mismatch for frame {frame}: {expected_name}"
                 )
- 
+
             for frame, rsp_res in results["rsp_all"]:
                 frame = int(frame)
                 eig = np.array(rsp_res.get("eigenvalues", []), dtype=float)
