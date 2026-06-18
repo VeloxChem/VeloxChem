@@ -1452,7 +1452,8 @@ def _Molecule_show(self,
                    breaking_width=0.15,
                    label_font_size=16,
                    focus=None,
-                   focus_radius=0.1):
+                   focus_radius=0.1,
+                   overlay=None):
     """
     Creates a 3D view with py3dmol.
 
@@ -1483,7 +1484,6 @@ def _Molecule_show(self,
     :param label_font_size:
         The font size for atom labels and indices.
     """
-
     try:
         import py3Dmol
     except ImportError:
@@ -1501,7 +1501,19 @@ def _Molecule_show(self,
         dashed_bonds = None
 
     if bonds is None:
-        viewer.addModel(self.get_xyz_string())
+        if overlay is not None:
+            # total_mol_lines = self.get_xyz_string().splitlines()[2:]
+            # for mol in overlay:
+            #     total_mol_lines += mol.get_xyz_string().splitlines()[2:]
+            # print(total_mol_lines)
+            # total_mol = Molecule.read_str('\n'.join(total_mol_lines))
+            # total_xyz = total_mol.get_xyz_string()
+            # viewer.addModel(total_xyz)
+            viewer.addModel(self.get_xyz_string())
+            for mol in overlay:
+                viewer.addModel(mol.get_xyz_string())
+        else:
+            viewer.addModel(self.get_xyz_string())
 
         if gradient is not None:
             coords = self.get_coordinates_in_bohr()
@@ -1596,55 +1608,55 @@ def _Molecule_show(self,
                 "gapLength": 0.35 + radius
             })
 
-        if atom_indices or atom_labels:
-            coords = self.get_coordinates_in_angstrom()
-            if isinstance(atom_labels, list):
-                labels = atom_labels
-                assert_msg_critical(
-                    len(labels) == coords.shape[0],
-                    'Molecule.show: Inconsistent number of atom_labels')
-            else:
-                labels = self.get_labels()
-            for i in range(coords.shape[0]):
-                text = ''
-                if atom_labels:
-                    text += f'{labels[i]}'
-                if atom_indices:
-                    text += f'{i + starting_index}'
-                viewer.addLabel(
-                    text, {
-                        'position': {
-                            'x': coords[i, 0],
-                            'y': coords[i, 1],
-                            'z': coords[i, 2],
-                        },
-                        'alignment': 'center',
-                        'fontColor': 0x000000,
-                        'backgroundColor': 0xffffff,
-                        'backgroundOpacity': 0.0,
-                        'fontSize': label_font_size,
-                    })
-        viewer.setViewStyle({"style": "outline", "width": 0.05})
-        if focus:
-            focused_serials = [i - starting_index for i in focus]
-            viewer.setStyle({}, {
-                "stick": {
-                    "radius": focus_radius
-                },
-                "sphere": {
-                    "radius": focus_radius
-                }
-            })
-            viewer.setStyle({"serial": focused_serials}, {
-                "stick": {},
-                "sphere": {
-                    "scale": 0.25
-                }
-            })
+    if atom_indices or atom_labels:
+        coords = self.get_coordinates_in_angstrom()
+        if isinstance(atom_labels, list):
+            labels = atom_labels
+            assert_msg_critical(
+                len(labels) == coords.shape[0],
+                'Molecule.show: Inconsistent number of atom_labels')
         else:
-            viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
-        viewer.zoomTo()
-        viewer.show()
+            labels = self.get_labels()
+        for i in range(coords.shape[0]):
+            text = ''
+            if atom_labels:
+                text += f'{labels[i]}'
+            if atom_indices:
+                text += f'{i + starting_index}'
+            viewer.addLabel(
+                text, {
+                    'position': {
+                        'x': coords[i, 0],
+                        'y': coords[i, 1],
+                        'z': coords[i, 2],
+                    },
+                    'alignment': 'center',
+                    'fontColor': 0x000000,
+                    'backgroundColor': 0xffffff,
+                    'backgroundOpacity': 0.0,
+                    'fontSize': label_font_size,
+                })
+    viewer.setViewStyle({"style": "outline", "width": 0.05})
+    if focus:
+        focused_serials = [i - starting_index for i in focus]
+        viewer.setStyle({}, {
+            "stick": {
+                "radius": focus_radius
+            },
+            "sphere": {
+                "radius": focus_radius
+            }
+        })
+        viewer.setStyle({"serial": focused_serials}, {
+            "stick": {},
+            "sphere": {
+                "scale": 0.25
+            }
+        })
+    else:
+        viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
+    viewer.zoomTo()
+    viewer.show()
 
 
 @staticmethod

@@ -265,7 +265,7 @@ class ReactionForceFieldBuilder:
             molecule_sanity_check(molecule)
             if partial_charge is not None:
                 # Casting to float is necessary for json serialization
-                assert isinstance(partial_charge, list)
+                assert isinstance(partial_charge, list) or isinstance(partial_charge, np.ndarray)
                 partial_charge = [float(x) for x in partial_charge]
                 cond = len(partial_charge) == molecule.number_of_atoms()
                 msg = f"Number of partial charges {len(partial_charge)} must match the number of atoms {molecule.number_of_atoms()} in the molecule."

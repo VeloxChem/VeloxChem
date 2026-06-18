@@ -152,6 +152,9 @@ class TransitionStateGuesser:
         self.do_qm_scan = False
         self.max_qm_conformers = 5
         self.mute_scf = True
+        
+        self.mol_multiplicity = 1
+        self.mol_charge = 0
 
         self.sys_builder_configuration = {
             "name": "vacuum",

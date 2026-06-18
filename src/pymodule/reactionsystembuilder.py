@@ -223,6 +223,7 @@ class ReactionSystemBuilder():
             "conformer_phi_reactant": float,
             "conformer_phi_product": float,
             "conformer_k": float,
+            "frozen_atoms": list,
         }
 
     def build_systems(
@@ -836,6 +837,7 @@ class ReactionSystemBuilder():
     def _add_frozen(self, system, lam):
         if not self.frozen_atoms:
             return
+
         rea_pos = self.reactant.molecule.get_coordinates_in_angstrom()
         pro_pos = self.product.molecule.get_coordinates_in_angstrom()
         frozen_force = mm.CustomExternalForce(
