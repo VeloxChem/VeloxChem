@@ -1058,18 +1058,18 @@ class EnsembleDriver:
                 fh.write("@environment\n")
                 fh.write("units: angstrom\n")
                 fh.write("xyz:\n")
-                for (x, y, z), elem, resn, resid, atom_name in zip(
-                        pe_coords, pe_elements, pe_resnames, pe_resids,
-                        pe_atom_names):
+                for (x, y, z), elem, resn, resindex, atom_name in zip(
+                        pe_coords, pe_elements, pe_resnames, 
+                        pe_resindices, pe_atom_names):
                     fh.write(
                         f"{str(elem):<2} {x:12.6f} {y:12.6f} {z:12.6f}  "
-                        f"{str(resn)}_pe  {int(resid)}  {str(atom_name)}\n")
-                for (x, y, z), elem, resn, resid, atom_name in zip(
-                        npe_coords, npe_elements, npe_resnames, npe_resids,
-                        npe_atom_names):
+                        f"{str(resn)}_pe  {int(resindex)}  {str(atom_name)}\n")
+                for (x, y, z), elem, resn, resindex, atom_name in zip(
+                        npe_coords, npe_elements, npe_resnames, 
+                        npe_resindices, npe_atom_names):
                     fh.write(
                         f"{str(elem):<2} {x:12.6f} {y:12.6f} {z:12.6f}  "
-                        f"{str(resn)}_npe  {int(resid)}  {str(atom_name)}\n")
+                        f"{str(resn)}_npe  {int(resindex)}  {str(atom_name)}\n")
                 fh.write("@end\n\n")
 
                 fh.write("@charges\n")
