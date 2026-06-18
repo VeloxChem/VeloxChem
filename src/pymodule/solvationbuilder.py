@@ -1005,9 +1005,6 @@ class SolvationBuilder:
             pdb = app.PDBFile(str(self._path('system.pdb')))
             ff_files = [str(self._path('solute.xml'))]
             ff_files.extend([str(self._path(f'solvent_{i+1}.xml')) for i in range(len(self.solvent_ffs))])
-            # If counterions are added when neutralize=True
-            if self.added_counterions > 0:
-                ff_files.append('amber14-all.xml')
             forcefield = app.ForceField(*ff_files)
 
         topology = pdb.topology
