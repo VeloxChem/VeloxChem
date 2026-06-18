@@ -152,6 +152,9 @@ class TransitionStateGuesser:
         self.max_qm_conformers = 5
         self.mute_scf = True
 
+        self.mol_multiplicity = 1
+        self.mol_charge = 0
+
         self.sys_builder_configuration = {
             "name": "vacuum",
             "bonded_integration": True,
@@ -186,7 +189,10 @@ class TransitionStateGuesser:
         """
         self.results = {}
         # Build forcefields and systems
-        self.ffbuilder.calculate_resp = self.implicit_solvent_model is not None
+        if self.implicit_solvent_model is not None:
+            self.ostream.print_info(
+                "Forcing RESP charge calculation for implicit solvent model.")
+            self.ffbuilder.calculate_resp = True
         self.build_forcefields(reactant, product, **build_forcefields_kwargs)
         self.build_systems(constraints)
 
@@ -206,9 +212,6 @@ class TransitionStateGuesser:
             )
             self.ostream.flush()
             self.ostream.mute()
-
-        if self._reaction_matcher_assist_min_depth is not None:
-            self.ffbuilder._reaction_matcher_assist_min_depth = int(self._reaction_matcher_assist_min_depth)
 
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_forcefields(
             reactant=reactant,
@@ -830,7 +833,10 @@ class TransitionStateGuesser:
         self.molecule.set_multiplicity(self.mol_multiplicity)
         self.molecule.set_charge(self.mol_charge)
         if self.scf_drv is None:
-            scf_drv = ScfRestrictedDriver()
+            if self.mol_multiplicity != 1:
+                scf_drv = ScfUnrestrictedDriver()
+            else:
+                scf_drv = ScfRestrictedDriver()
             scf_drv.xcfun = self.qm_xcfun
             self.scf_drv = scf_drv
 
@@ -838,15 +844,10 @@ class TransitionStateGuesser:
             # SMD.  Duck-type on solvation_model: SCF drivers expose it, XTB does
             # not.  If the attribute is absent we warn and skip rather than error.
             if self.implicit_solvent_model is not None:
-                if hasattr(self.scf_drv, 'solvation_model'):
-                    self.scf_drv.solvation_model = 'smd'
-                    self.scf_drv.smd_solvent = self.smd_solvent
-                else:
-                    self.ostream.print_warning(
-                        'QM driver does not support SMD solvation. '
-                        'Implicit solvation will not be applied to the QM scan. '
-                        'Use an SCF driver instead of XTB to enable SMD.')
-                    self.ostream.flush()
+
+                self.scf_drv.solvation_model = 'smd'
+                self.scf_drv.smd_solvent = self.smd_solvent
+
         if self.implicit_solvent_model is not None:
             if hasattr(
                     self.scf_drv,
@@ -1179,7 +1180,7 @@ class TransitionStateGuesser:
             marker='_',
             color='darkcyan',
             alpha=0.4,
-            s=30 / math.log(min(2, total_steps), 10),
+            s=100,
             linewidths=2.0,
             zorder=0.5,
         )
@@ -1188,7 +1189,7 @@ class TransitionStateGuesser:
             rel_mm_energies,
             color='black',
             alpha=0.7,
-            s=50 / math.log(min(2, total_steps), 10),
+            s=120,
             facecolors="none",
             edgecolor="darkcyan",
             zorder=1,
@@ -1200,7 +1201,7 @@ class TransitionStateGuesser:
             marker='o',
             color='darkcyan',
             alpha=1.0,
-            s=50 / math.log(min(2, total_steps), 10),
+            s=120,
             zorder=2,
         )
         ax1.set_xlabel(r'$\lambda$')
@@ -1223,7 +1224,7 @@ class TransitionStateGuesser:
                 marker='_',
                 color='darkorange',
                 alpha=0.4,
-                s=30 / math.log(min(2, total_steps), 10),
+                s=100,
                 linewidths=2.0,
                 zorder=0.5,
             )
@@ -1231,7 +1232,7 @@ class TransitionStateGuesser:
                 lambda_vec,
                 rel_qm_energies,
                 alpha=0.7,
-                s=50 / math.log(min(2, total_steps), 10),
+                s=120,
                 facecolors="none",
                 edgecolor="darkorange",
                 zorder=1,
@@ -1249,7 +1250,7 @@ class TransitionStateGuesser:
                 marker='o',
                 color='darkorange',
                 alpha=1.0,
-                s=120 / math.log(min(2, total_steps), 10),
+                s=120 / math.log(max(2, total_steps), 10),
                 zorder=2,
             )
             ax1.set_ylabel('Relative QM energy [kJ/mol]')
