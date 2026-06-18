@@ -465,7 +465,7 @@ class OpenMMDynamics:
                 )
             forcefield_files = [f'{filename}.xml', implicit_model_fname]
 
-        elif solvent != 'gas':
+        else:
             # Solvate the molecule using the SolvationBuilder
             phase = 'periodic'
             sol_builder = SolvationBuilder()
@@ -2249,7 +2249,8 @@ class OpenMMDynamics:
         :param ff_gen:
             MMForceFieldGenerator object from VeloxChem.
         """
-
+        if phase == 'implicit':
+            raise ValueError("QM/MM calculations are not supported with implicit solvent models.")
         from openmm import NonbondedForce
 
         # Set the QM/MM Interaction Groups
