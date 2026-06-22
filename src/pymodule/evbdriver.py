@@ -482,7 +482,7 @@ class EvbDriver:
                 platform_properties=platform_properties,
             )
 
-    def update_options_json(self, dict, conf):
+    def update_options_json(self, entries, conf):
         """
         Merges a dictionary into a configuration's options.json file.
 
@@ -490,7 +490,7 @@ class EvbDriver:
         it does not yet exist or merging the given entries into the existing
         file otherwise.
 
-        :param dict:
+        :param entries:
             The key/value entries to write or merge in.
         :param conf:
             The configuration whose data_folder holds the options.json file.
@@ -499,11 +499,11 @@ class EvbDriver:
         path = cwd / conf["data_folder"] / "options.json"
         if not path.exists():
             with path.open("w") as file:
-                json.dump(dict, file, indent=4)
+                json.dump(entries, file, indent=4)
         else:
             with path.open("r") as file:
                 options = json.load(file)
-            options.update(dict)
+            options.update(entries)
             with path.open("w") as file:
                 json.dump(options, file, indent=4)
 

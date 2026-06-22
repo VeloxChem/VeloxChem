@@ -197,8 +197,6 @@ class TransitionStateGuesser:
             "soft_core_lj_int": False,
         }
 
-        self._reaction_matcher_assist_min_depth = None
-
         self.ffbuilder = ReactionForceFieldBuilder(ostream=self.ostream)
         self.ffbuilder.calculate_resp = False
 
@@ -981,9 +979,7 @@ class TransitionStateGuesser:
             scf_drv.xcfun = self.qm_xcfun
             self.scf_drv = scf_drv
 
-            # When MM implicit solvation is active, mirror it on the QM driver via
-            # SMD.  Duck-type on solvation_model: SCF drivers expose it, XTB does
-            # not.  If the attribute is absent we warn and skip rather than error.
+            # When MM implicit solvation is active, mirror it on the QM driver via SMD.
             if self.implicit_solvent_model is not None:
 
                 self.scf_drv.solvation_model = 'smd'
