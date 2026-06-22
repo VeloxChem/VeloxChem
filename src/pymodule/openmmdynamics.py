@@ -1427,6 +1427,8 @@ class OpenMMDynamics:
         self.ostream.print_info(f'Simulation output saved as {output_file}')
         self.ostream.flush()
 
+        self.simulation.reporters.clear()
+
     def run_qmmm(self,
                  qm_driver,
                  grad_driver,
@@ -1648,6 +1650,8 @@ class OpenMMDynamics:
         self._save_output(output_file)
         self.ostream.print_info(f'Simulation report saved as {output_file}.out')
         self.ostream.flush()
+
+        self.simulation.reporters.clear()
 
     # Post-simulation analysis methods
     def plot_energy(self,
