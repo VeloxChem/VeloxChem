@@ -444,13 +444,13 @@ class SolvationFepDriver:
         self.snapshots = []
         self.N_k = []
 
-        for l, lam in enumerate(lambdas):
+        for lam_idx, lam in enumerate(lambdas):
             lam = round(lam, 2)
             self.ostream.print_info(f"Running lambda = {lam}, stage = {stage}...")
             self.ostream.flush()
 
             # Run the simulation for the current lambda, perform equilibration and subsampling
-            ns_simulated, sim_time = self._run_simulation(systems[l], topology, positions, lam)
+            ns_simulated, sim_time = self._run_simulation(systems[lam_idx], topology, positions, lam)
             # Performance calculation in ns/hour
             total_ns_simulated += ns_simulated
             total_sim_time += sim_time
