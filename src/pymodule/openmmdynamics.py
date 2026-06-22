@@ -2254,8 +2254,9 @@ class OpenMMDynamics:
         :param ff_gen:
             MMForceFieldGenerator object from VeloxChem.
         """
-        if phase == 'implicit':
-            raise ValueError("QM/MM calculations are not supported with implicit solvent models.")
+        assert_msg_critical(
+            phase != 'implicit',
+            f"{type(self).__name__}: QM/MM calculations are not supported with implicit solvent models.")
         from openmm import NonbondedForce
 
         # Set the QM/MM Interaction Groups
