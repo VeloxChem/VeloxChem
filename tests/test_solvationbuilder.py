@@ -849,6 +849,29 @@ class TestSolvationBuilder:
         assert not (tmp_path / 'system.gro').exists()
         assert not (tmp_path / 'system.top').exists()
 
+    def test_perform_equilibration_supports_counterions(self, tmp_path):
+
+        pytest.importorskip("openmm")
+
+        np.random.seed(0)
+        solute = _make_fluoride_solute()
+        solvent = _make_water()
+        box = [25.0, 25.0, 25.0]
+        target_density = _target_density_for_count(solute, solvent, 2, box)
+        builder = SolvationBuilder(ostream=RecordingOutput())
+        builder.workdir = tmp_path
+
+        builder.solvate(solute,
+                        solvent='other',
+                        solvent_molecule=solvent,
+                        target_density=target_density,
+                        neutralize=True,
+                        box=box)
+        builder.perform_equilibration(steps=1)
+
+        assert (tmp_path / 'equilibrated_system.pdb').exists()
+        assert builder.added_counterions == 1
+
     def test_perform_equilibration_requires_water_model_for_pure_water_itself(
             self):
 

@@ -1004,6 +1004,8 @@ class SolvationBuilder:
         else:
             pdb = app.PDBFile(str(self._path('system.pdb')))
             ff_files = [str(self._path('solute.xml'))]
+            if self.counterion is not None and self.added_counterions > 0:
+                ff_files.append(f'{self.parent_forcefield}.xml')
             ff_files.extend([str(self._path(f'solvent_{i+1}.xml')) for i in range(len(self.solvent_ffs))])
             forcefield = app.ForceField(*ff_files)
 
