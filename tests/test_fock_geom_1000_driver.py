@@ -5,8 +5,6 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.molecule import Molecule
 from veloxchem.veloxchemlib import FockGeom1000Driver
 from veloxchem.submatrix import SubMatrix
-from veloxchem.matrix import Matrix
-from veloxchem.matrices import Matrices
 from veloxchem.veloxchemlib import make_matrix
 from veloxchem.veloxchemlib import mat_t
 
@@ -1330,7 +1328,7 @@ class TestFockGeom1000Driver:
         fref.set_values(np.ascontiguousarray(ref_mat[2]))
         assert fmat == fref
 
-    def test_h2o_fock_k_grad_h2_sto3g(self):
+    def test_h2o_fock_kx_grad_h2_sto3g(self):
 
         mol_h2o, bas_sto3g = self.get_data_h2o()
 

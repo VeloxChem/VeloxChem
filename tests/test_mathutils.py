@@ -88,9 +88,7 @@ class TestMathUtils:
 
         np.testing.assert_allclose(overlap_pinv, ref_pinv, atol=1.0e-12)
         np.testing.assert_allclose(np.linalg.multi_dot(
-            [overlap, overlap_pinv, overlap]),
-                                   overlap,
-                                   atol=1.0e-12)
+            [overlap, overlap_pinv, overlap]), overlap, atol=1.0e-12)
 
     def test_screened_eigh_keeps_square_eigensystem_when_no_screening_is_needed(
             self):
@@ -129,9 +127,7 @@ class TestMathUtils:
                                    np.eye(3),
                                    atol=1.0e-12)
         np.testing.assert_allclose(np.linalg.multi_dot(
-            [eigvecs, np.diag(eigvals), eigvecs.T]),
-                                   mat,
-                                   atol=1.0e-12)
+            [eigvecs, np.diag(eigvals), eigvecs.T]), mat, atol=1.0e-12)
 
     def test_screened_eigh_allows_disabling_screening(self):
 
@@ -176,9 +172,7 @@ class TestMathUtils:
 
         np.testing.assert_allclose(overlap_pinv, ref_pinv, atol=1.0e-12)
         np.testing.assert_allclose(np.linalg.multi_dot(
-            [overlap, overlap_pinv, overlap]),
-                                   overlap,
-                                   atol=1.0e-12)
+            [overlap, overlap_pinv, overlap]), overlap, atol=1.0e-12)
 
     def test_solve_in_orthogonal_basis_matches_direct_solution(self):
 
@@ -204,9 +198,7 @@ class TestMathUtils:
 
         np.testing.assert_allclose(eigvals, ref_eigvals, atol=1.0e-12)
         np.testing.assert_allclose(np.linalg.multi_dot(
-            [coeffs.T, overlap, coeffs]),
-                                   np.eye(3),
-                                   atol=1.0e-12)
+            [coeffs.T, overlap, coeffs]), np.eye(3), atol=1.0e-12)
         np.testing.assert_allclose(
             np.linalg.multi_dot([coeffs, np.diag(eigvals), coeffs.T]),
             np.linalg.multi_dot(
@@ -227,6 +219,4 @@ class TestMathUtils:
                                    np.eye(3),
                                    atol=1.0e-12)
         np.testing.assert_allclose(np.linalg.multi_dot(
-            [coeffs, np.diag(eigvals), coeffs.T]),
-                                   mat,
-                                   atol=1.0e-12)
+            [coeffs, np.diag(eigvals), coeffs.T]), mat, atol=1.0e-12)

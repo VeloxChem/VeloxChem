@@ -22,7 +22,6 @@ class TestInputOptVib:
 
         MPI.COMM_WORLD.barrier()
 
-
     def test_input_opt_vib(self, capsys, tmp_path):
 
         # Note: bad geometry for testing purposes

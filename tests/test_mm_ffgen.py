@@ -1,6 +1,5 @@
 from mpi4py import MPI
 from pathlib import Path
-import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import mpi_master
@@ -747,8 +746,7 @@ class TestMMForceFieldGenerator:
         top_file = tmp_path / 'molecule.top'
         top_file.write_text('#include "molecule.itp"\n[ system ]\nTest\n')
 
-        assert ff_gen.get_included_file(str(top_file)) == str(tmp_path /
-                                                               'molecule.itp')
+        assert ff_gen.get_included_file(str(top_file)) == str(tmp_path / 'molecule.itp')
 
         missing_include_top = tmp_path / 'missing.top'
         missing_include_top.write_text('[ system ]\nTest\n')

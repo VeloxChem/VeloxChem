@@ -1,4 +1,3 @@
-from mpi4py import MPI
 import numpy as np
 import pytest
 
@@ -183,13 +182,13 @@ class TestRestrictedSubspace:
         ref_osc_str = np.array([0.0180, 0.0000, 0.0854, 0.0695, 0.3006])
 
         self.run_rsa('b3lyp', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-5, tda=True)
-    
+
     def test_b3lyp_svp_rsa_rpa(self):
 
         ref_exc_enes = np.array(
             [0.28013457, 0.35056008, 0.3692739 , 0.44042579, 0.77320255])
 
-        ref_osc_str = np.array([0.0175, 0.    , 0.1071, 0.0965, 0.    ])
+        ref_osc_str = np.array([0.0175, 0.    , 0.1071, 0.0965, 0.])
 
         self.run_rsa('b3lyp', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-5,
                      ncore=1, nvir=15, nval=2)
@@ -199,7 +198,7 @@ class TestRestrictedSubspace:
         ref_exc_enes = np.array(
             [0.28099976, 0.35063639, 0.37179368, 0.44191394, 0.77325388])
 
-        ref_osc_str = np.array([0.0175, 0.    , 0.1166, 0.1079, 0.    ])
+        ref_osc_str = np.array([0.0175, 0.    , 0.1166, 0.1079, 0.])
 
         self.run_rsa('b3lyp', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-5,
                      ncore=1, nvir=15, nval=2, tda=True)
