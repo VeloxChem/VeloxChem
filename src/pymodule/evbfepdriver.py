@@ -390,14 +390,15 @@ class EvbFepDriver:
                 self.ostream.print_info(
                     "Constraining all bonds involving H atoms")
                 system = self._constrain_H_bonds(system)
-            if l == 0 and not self.skip_initial_equil:
-                state = self._initial_equilibrate(system, positions)
-                positions = state.getPositions()
-                velocities = state.getVelocities()
-            elif self.sample_steps:
-                self.ostream.print_info(
-                    "Skipping initial equilibration because skip_initial_equil is set to True."
-                )
+            if l == 0:
+                if not self.skip_initial_equil:
+                    state = self._initial_equilibrate(system, positions)
+                    positions = state.getPositions()
+                    velocities = state.getVelocities()
+                else:
+                    self.ostream.print_info(
+                        "Skipping initial equilibration because skip_initial_equil is set to True."
+                    )
             equil_state = self._equilibrate(system, l, positions, velocities)
 
             if self.constrain_H:

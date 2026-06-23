@@ -94,7 +94,7 @@ class TransitionStateGuesser:
         # system XML files to disk — useful for debugging but off by default
         # to avoid unnecessary file I/O on HPC shared filesystems.
         self.save_intermediates = False
-        self.frozen_atoms = []
+        self.frozen_atoms = [] # 0-indexed
         # Set save_results_file=True (default) to write the HDF5 results file
         # after each scan. This enables crash recovery and load_results().
         self.save_results_file = True
@@ -341,7 +341,7 @@ class TransitionStateGuesser:
 
         # Convert 1-indexed user input to 0-indexed internal representation
 
-        configuration['frozen_atoms'] = [i - 1 for i in self.frozen_atoms]
+        # configuration['frozen_atoms'] = [i - 1 for i in self.frozen_atoms]
 
         if len(self.frozen_atoms) > 0:
             rea_pos = self.reactant.molecule.get_coordinates_in_angstrom()
