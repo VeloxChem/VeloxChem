@@ -308,17 +308,23 @@ class EnsembleParser:
         for res in env_atoms.residues:
             resname = str(res.resname)
             atom_names = {str(name) for name in res.atoms.names}
+            prefix = ""
+            core_resname = resname
+
+            if len(resname) == 4 and resname[0] in ("N", "C"):
+                prefix = resname[0]
+                core_resname = resname[1:]
 
             histidine_resname = self._histidine_resname_from_atoms(resname, atom_names)
             if histidine_resname is not None:
                 prot_map[res.resindex] = histidine_resname
-            elif resname == "GLU" and ({"HE1", "HE2"} & atom_names):
-                prot_map[res.resindex] = "GLH"
-            elif resname == "ASP" and ({"HD1", "HD2"} & atom_names):
-                prot_map[res.resindex] = "ASH"
-            elif resname == "CYS" and not ({"HG", "HG1"} & atom_names):
+            elif core_resname == "GLU" and ({"HE1", "HE2"} & atom_names):
+                prot_map[res.resindex] = f"{prefix}GLH"
+            elif core_resname == "ASP" and ({"HD1", "HD2"} & atom_names):
+                prot_map[res.resindex] = f"{prefix}ASH"
+            elif core_resname == "CYS" and not ({"HG", "HG1"} & atom_names):
                 # Distinguish thiol-less/disulfide cysteine from protonated CYS.
-                prot_map[res.resindex] = "CYX"
+                prot_map[res.resindex] = f"{prefix}CYX"
 
         return prot_map
 
@@ -661,7 +667,10 @@ class EnsembleParser:
                     for ridx, newname in term_map.items():
                         term_newname = newname
                         prot_newname = str(prot_map.get(ridx, ""))
-                        if prot_newname in {"HSD", "HSE", "HSP"}:
+                        core_prot_newname = prot_newname
+                        if len(prot_newname) == 4 and prot_newname[0] in ("N", "C"):
+                            core_prot_newname = prot_newname[1:]
+                        if core_prot_newname in {"HSD", "HSE", "HSP"}:
                             term_newname = self._prefixed_resname(
                                 prot_newname,
                                 str(newname)[0],
@@ -710,7 +719,10 @@ class EnsembleParser:
                     for ridx, newname in term_map.items():
                         term_newname = newname
                         prot_newname = str(prot_map.get(ridx, ""))
-                        if prot_newname in {"HSD", "HSE", "HSP"}:
+                        core_prot_newname = prot_newname
+                        if len(prot_newname) == 4 and prot_newname[0] in ("N", "C"):
+                            core_prot_newname = prot_newname[1:]
+                        if core_prot_newname in {"HSD", "HSE", "HSP"}:
                             term_newname = self._prefixed_resname(
                                 prot_newname,
                                 str(newname)[0],
