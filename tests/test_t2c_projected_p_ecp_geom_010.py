@@ -21,18 +21,18 @@ class TestProjectedPECPGeom010Driver:
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         return mol, bas
-        
+
     def test_projected_ecp_auh2_svp_for_au1(self):
 
         mol_auh2, bas_svp = self.get_svp_data()
-        
-        lpot = BaseCorePotential([ 10.45202000, 5.22601000, 4.78982000, 2.39491000],
+
+        lpot = BaseCorePotential([10.45202000, 5.22601000, 4.78982000, 2.39491000],
                                  [261.19958038, 26.96249604, -30.49008890, -5.17107381],
                                  [2, 2, 2, 2])
-                                 
+
         ecp_drv = ProjectedECPGeom010Driver()
         ecp_mats = ecp_drv.compute(mol_auh2, bas_svp, lpot, 1)
-        
+
         # load reference overlap data
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'auh2.def2svp.au.ecp.only.p.geom.010.au1.npy')
@@ -41,7 +41,7 @@ class TestProjectedPECPGeom010Driver:
         # dimension of molecular basis
         indexes = np.triu_indices(4)
         basdims = [0, 10, 25, 35, 42]
-        
+
         # indices map
         labels = ['X', 'Y', 'Z']
 
@@ -61,12 +61,12 @@ class TestProjectedPECPGeom010Driver:
                 rmat.set_values(
                     np.ascontiguousarray(ref_mat[k, sbra:ebra, sket:eket]))
                 # compare submatrices
-                #print("(k,i,j) = ", k, " ", i, " ", j)
-                #print(np.max(np.abs(cmat.to_numpy()-rmat.to_numpy())))
-                #assert cmat == rmat
+                # print("(k,i,j) = ", k, " ", i, " ", j)
+                # print(np.max(np.abs(cmat.to_numpy()-rmat.to_numpy())))
+                # assert cmat == rmat
             smat = fmat.full_matrix()
             fref = SubMatrix([0, 0, 42, 42])
             fref.set_values(np.ascontiguousarray(ref_mat[k]))
-            #assert smat == fref
+            # assert smat == fref
 
-        #assert False
+        # assert False

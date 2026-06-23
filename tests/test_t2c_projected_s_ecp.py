@@ -21,7 +21,7 @@ class TestProjectedSECPDriver:
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         return mol, bas
-        
+
     def get_tzvpp_data(self):
 
         costr = """
@@ -33,18 +33,18 @@ class TestProjectedSECPDriver:
         bas = MolecularBasis.read(mol, 'def2-tzvpp')
 
         return mol, bas
-    
+
     def test_projected_ecp_auh2_svp(self):
 
         mol_auh2, bas_svp = self.get_svp_data()
-        
-        lpot = BaseCorePotential([ 13.20510000,  6.60255000,   4.78982000,  2.39491000],
+
+        lpot = BaseCorePotential([13.20510000, 6.60255000, 4.78982000, 2.39491000],
                                  [426.84667920, 37.00708285, -30.49008890, -5.17107381],
                                  [2, 2, 2, 2])
-                                 
+
         ecp_drv = ProjectedECPDriver()
         ecp_mat = ecp_drv.compute(mol_auh2, bas_svp, lpot, 0, 0)
-        
+
         # load reference overlap data
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'auh2.def2svp.au.ecp.only.s.npy')
@@ -53,7 +53,7 @@ class TestProjectedSECPDriver:
         # dimension of molecular basis
         indexes = np.triu_indices(4)
         basdims = [0, 10, 25, 35, 42]
-        
+
         # check individual overlap submatrices
         for i, j in zip(indexes[0], indexes[1]):
             # bra side
@@ -80,14 +80,14 @@ class TestProjectedSECPDriver:
     def test_projected_ecp_auh2_tzvpp(self):
 
         mol_auh2, bas_tzvpp = self.get_tzvpp_data()
-        
-        lpot = BaseCorePotential([ 13.20510000,  6.60255000,   4.78982000,  2.39491000],
+
+        lpot = BaseCorePotential([13.20510000, 6.60255000, 4.78982000, 2.39491000],
                                  [426.84667920, 37.00708285, -30.49008890, -5.17107381],
                                  [2, 2, 2, 2])
-                                 
+
         ecp_drv = ProjectedECPDriver()
         ecp_mat = ecp_drv.compute(mol_auh2, bas_tzvpp, lpot, 0, 0)
-        
+
         # load reference overlap data
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'auh2.def2tzvpp.au.ecp.only.s.npy')
@@ -96,7 +96,7 @@ class TestProjectedSECPDriver:
         # dimension of molecular basis
         indexes = np.triu_indices(5)
         basdims = [0, 12, 36, 61, 75, 84]
-        
+
         # check individual overlap submatrices
         for i, j in zip(indexes[0], indexes[1]):
             # bra side
