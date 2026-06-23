@@ -172,10 +172,10 @@ class TestBlockedGtoPairBlock:
         fcoords = t1_pairs.ket_coordinates()
         assert len(fcoords) == 1
         assert fcoords[0] == Point([0.300, 1.400, -2.100])
-        
+
     def test_unique_terms(self):
 
-        tol = 1.0e-12
+        # tol = 1.0e-12
 
         mol_co, bas_svp = self.get_data()
 
@@ -184,10 +184,10 @@ class TestBlockedGtoPairBlock:
         p3x3_pairs = GtoPairBlock(p3_gtos)
 
         # GTO norms and exponents
-        p3norms = p3_gtos.normalization_factors()
+        # p3norms = p3_gtos.normalization_factors()
 
         # GTO exponents
-        p3exps = p3_gtos.exponents()
+        # p3exps = p3_gtos.exponents()
 
         # Blocked GTO pairs
         bp3x3_pairs = BlockedGtoPairBlock(p3x3_pairs, [1.1, 0.01, 1.2])
@@ -214,4 +214,4 @@ class TestBlockedGtoPairBlock:
             bp3x3_pairs_a = BlockedGtoPairBlock(p3x3_pairs, [1.1, 0.01, 1.2])
         bp3x3_pairs_a = comm.bcast(bp3x3_pairs_a)
         bp3x3_pairs_b = BlockedGtoPairBlock(p3x3_pairs, [1.1, 0.01, 1.2])
-        assert bp3x3_pairs_a == bp3x3_pairs_a
+        assert bp3x3_pairs_a == bp3x3_pairs_b
