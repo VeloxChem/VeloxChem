@@ -297,6 +297,11 @@ class IMDatabasePointCollecter:
         self.inv_sqrt_masses = None
         self.use_mass_weight = False
 
+        self.local_group_family_builder = None
+        self.local_group_primitive_models = {}
+        self.relax_local_group_rotors_during_optimization = True
+        self.relax_alkyl_local_group_states = False
+
         # toggle + optional fixed list for important internal-coordinate constraints
         self.identfy_relevant_int_coordinates = (True, [])
         # master switch for generating/using symmetry-equivalent datapoints
@@ -1108,6 +1113,10 @@ class IMDatabasePointCollecter:
 
             im_labels, _ = drv.read_labels()
             sorted_im_labels = sorted(im_labels, key=lambda x: int(x.split('_')[1]))
+            drv.qm_local_factor_banks = drv._load_local_factor_banks(
+                self.root_z_matrix[root], root=root)
+
+            kept_sampling_labels = []
             for label in sorted_im_labels[:]:
                 dp = InterpolationDatapoint(self.root_z_matrix[root])
                 dp.update_settings(self.sampling_interpolation_settings[root])
@@ -1115,9 +1124,14 @@ class IMDatabasePointCollecter:
 
                 dp.inv_sqrt_masses = inv_sqrt_masses
 
+                if drv._is_local_factor_cluster_datapoint(dp):
+                    continue
                 self.sampling_qm_data_point_dict[root].append(dp)
+                kept_sampling_labels.append(label)
 
             drv.qm_data_points = self.sampling_qm_data_point_dict[root]
+            drv.labels = kept_sampling_labels
+            drv._set_local_factor_inv_sqrt_masses(inv_sqrt_masses)
 
             drv.mark_runtime_data_cache_dirty()
             if len(self.sampling_qm_data_point_dict[root]) > 0:
@@ -1130,6 +1144,8 @@ class IMDatabasePointCollecter:
 
         im_labels, _ = driver_object.read_labels()
         sorted_im_labels = sorted(im_labels, key=lambda x: int(x.split('_')[1]))
+        driver_object.qm_local_factor_banks = driver_object._load_local_factor_banks(
+            self.root_z_matrix[root], root=root)
         self.qm_data_point_dict[root] = []
         self.qm_symmetry_datapoint_dict[root] = {}
         self.qm_energies_dict[root] = []
@@ -1141,12 +1157,16 @@ class IMDatabasePointCollecter:
             qm_data_point.read_hdf5(self.interpolation_settings[root]['imforcefield_file'], label)
             qm_data_point.inv_sqrt_masses = inv_sqrt_masses
 
+            if driver_object._is_local_factor_cluster_datapoint(qm_data_point):
+                continue
+
             self.qm_data_point_dict[root].append(qm_data_point)
             self.qm_energies_dict[root].append(qm_data_point.energy)
             self.sorted_state_spec_im_labels[root].append(label)
 
         driver_object.qm_data_points = self.qm_data_point_dict[root]
         driver_object.labels = self.sorted_state_spec_im_labels[root]
+        driver_object._set_local_factor_inv_sqrt_masses(inv_sqrt_masses)
 
         if len(self.qm_data_point_dict[root]) > 0:
             driver_object.impes_coordinate.eq_bond_lengths = self.qm_data_point_dict[root][0].eq_bond_lengths
@@ -2460,6 +2480,7 @@ class IMDatabasePointCollecter:
         self.coordinates_xyz.append(qm_positions * 10)
         ############################################################
         self.state_specific_molecules[self.current_state].append(new_molecule)
+       
         for i, atom_idx in enumerate(self.qm_atoms):
 
             qm_force.setParticleParameters(i, atom_idx, force[i])
@@ -2699,7 +2720,8 @@ class IMDatabasePointCollecter:
                         self.interpolation_settings[self.current_state],
                         sym_dict,
                         self.root_z_matrix[self.current_state],
-                        exponent_p_q=(self.impes_drivers[self.current_state].exponent_p, self.impes_drivers[self.current_state].exponent_q))
+                        exponent_p_q=(self.impes_drivers[self.current_state].exponent_p, self.impes_drivers[self.current_state].exponent_q),
+                        local_factor_banks=self.impes_drivers[self.current_state].qm_local_factor_banks)
 
                 for idx, trust_radius in enumerate(trust_radius):
 
@@ -2785,6 +2807,10 @@ class IMDatabasePointCollecter:
                     selected = list(candidate_constraints)
                     selected = [tuple(int(x) for x in c) for c in selected]
                     selected = list(dict.fromkeys(selected))  # preserve order, remove duplicates
+                    selected = self._filter_local_group_rotor_constraints(
+                        selected, state_to_optim)
+                    fallback_constraints = self._filter_local_group_rotor_constraints(
+                        fallback_constraints, state_to_optim)
                     main_constraint_list = selected
 
                     imp_coord_constraint = main_constraint_list.copy()
@@ -2793,6 +2819,12 @@ class IMDatabasePointCollecter:
                     selected_atoms = {a for coord in selected for a in coord}
 
                     for dih in self.root_z_matrix[state_to_optim]['dihedrals']:
+                        if (
+                            self.relax_local_group_rotors_during_optimization
+                            and self._is_local_group_rotor_dihedral(
+                                dih, state_to_optim)
+                        ):
+                            continue
                         mid_bond = tuple(sorted((dih[1], dih[2])))
 
                         if mid_bond not in self.impes_drivers[state_to_optim].symmetry_information[5]:
@@ -2909,6 +2941,8 @@ class IMDatabasePointCollecter:
                                 break
 
                             guarded_constraints = list(dict.fromkeys(main_constraint_list + fallback_constraints[:increasing_DOFs]))
+                            guarded_constraints = self._filter_local_group_rotor_constraints(
+                                guarded_constraints, state_to_optim)
                             # determine constraint coupling:
                             masks = []
 
@@ -2993,6 +3027,12 @@ class IMDatabasePointCollecter:
                             prev_fall_const_size = len(fallback_constraints)
                             for key, coord_type_entries in self.root_z_matrix[state_to_optim].items():
                                 for coord in coord_type_entries:
+                                    if (
+                                        self.relax_local_group_rotors_during_optimization
+                                        and self._is_local_group_rotor_dihedral(
+                                            coord, state_to_optim)
+                                    ):
+                                        continue
                                     if coord not in fallback_constraints:
                                         fallback_constraints.append(coord)
                                         break
@@ -3152,6 +3192,33 @@ class IMDatabasePointCollecter:
 
         return opt_constraint_list
 
+    def _local_group_rotor_axes(self, root):
+        model = self.local_group_primitive_models.get(root)
+        if model is None or not getattr(model, 'enabled', False):
+            return set()
+        return {
+            tuple(sorted(int(atom) for atom in rotor.axis))
+            for rotor in model.rotors.values()
+        }
+
+    def _is_local_group_rotor_dihedral(self, coordinate, root):
+        if isinstance(coordinate, str) or len(coordinate) != 4:
+            return False
+        axis = tuple(sorted((int(coordinate[1]), int(coordinate[2]))))
+        return axis in self._local_group_rotor_axes(root)
+
+    def _filter_local_group_rotor_constraints(self, constraints, root):
+        """Keeps scanned local torsions free during core optimization."""
+
+        if not self.relax_local_group_rotors_during_optimization:
+            return list(constraints)
+        return [
+            coordinate if isinstance(coordinate, str) else tuple(
+                int(x) for x in coordinate)
+            for coordinate in constraints
+            if not self._is_local_group_rotor_dihedral(coordinate, root)
+        ]
+
     def _run_optimization(self, optimization_driver, molecule, constraints=None, transition=False, index_offset=1, compute_args=None):
 
         opt_drv = OptimizationDriver(optimization_driver)
@@ -3174,6 +3241,56 @@ class IMDatabasePointCollecter:
         dt = h5py.string_dtype(encoding="utf-8")
         h5f.create_dataset(name, data=np.array(value, dtype=object), dtype=dt)
 
+    def add_point_local_groups(
+            self, state_specific_molecules, symmetry_information):
+        """Builds complete local-factor families and refreshes runtime data."""
+
+        if self.local_group_family_builder is None:
+            raise RuntimeError(
+                "Local-group database expansion requires a family builder.")
+
+        builder_owner = getattr(self.local_group_family_builder, "__self__", None)
+        if (
+            builder_owner is not None
+            and hasattr(builder_owner, "relax_alkyl_local_group_states")
+        ):
+            builder_owner.relax_alkyl_local_group_states = (
+                self.relax_alkyl_local_group_states
+            )
+
+        self.local_group_family_builder(
+            state_specific_molecules,
+            self.interpolation_settings,
+            symmetry_information=symmetry_information,
+        )
+
+        affected_roots = sorted({
+            int(root)
+            for entry in state_specific_molecules
+            for root in entry[2]
+        })
+
+        for root in affected_roots:
+            self._reload_interpolation_root_from_hdf5(
+                root, self.inv_sqrt_masses)
+            self.density_around_data_point[root] += 1
+
+            if self.allowed_molecules is not None:
+                self.write_qm_energy_determined_points_h5(
+                    self.allowed_molecules[root]['molecules'][self.last_added:],
+                    self.allowed_molecules[root]['qm_energies'][self.last_added:],
+                    self.allowed_molecules[root]['qm_gradients'][self.last_added:],
+                    self.allowed_molecules[root]['im_energies'][self.last_added:],
+                    root,
+                )
+
+        if affected_roots and self.allowed_molecules is not None:
+            self.last_added = len(
+                self.allowed_molecules[affected_roots[-1]]['molecules'])
+
+        if self.simulation is not None:
+            self.simulation.saveCheckpoint('checkpoint')
+
     def add_point(self, state_specific_molecules, symmetry_information):
         """ Adds a new point to the database.
 
@@ -3188,6 +3305,10 @@ class IMDatabasePointCollecter:
             :scf_results:
                 the scf_results of previous QM calculation (if required).
         """
+
+        if self.local_group_family_builder is not None:
+            return self.add_point_local_groups(
+                state_specific_molecules, symmetry_information)
 
         self.ostream.print_blank()
         self.ostream.print_header("Adding a new point to the database! --> Starting to compute the necessary information for interpolation.")
@@ -3361,7 +3482,10 @@ class IMDatabasePointCollecter:
 
         im_labels, _ = driver_object.read_labels()
 
+        driver_object.qm_local_factor_banks = driver_object._load_local_factor_banks(
+            self.root_z_matrix[root], root=root)
         self.sampling_qm_data_point_dict[root] = []
+        kept_sampling_labels = []
 
         for label in im_labels:
             dp = InterpolationDatapoint(self.root_z_matrix[root])
@@ -3369,10 +3493,15 @@ class IMDatabasePointCollecter:
             dp.read_hdf5(self.sampling_interpolation_settings[root]['imforcefield_file'], label)
             dp.inv_sqrt_masses = inv_sqrt_masses
 
+            if driver_object._is_local_factor_cluster_datapoint(dp):
+                continue
+
             self.sampling_qm_data_point_dict[root].append(dp)
+            kept_sampling_labels.append(label)
 
         driver_object.qm_data_points = self.sampling_qm_data_point_dict[root]
-        driver_object.labels = self.sorted_state_spec_im_labels[root]
+        driver_object.labels = kept_sampling_labels
+        driver_object._set_local_factor_inv_sqrt_masses(inv_sqrt_masses)
 
         if len(self.sampling_qm_data_point_dict[root]) > 0:
             driver_object.impes_coordinate.eq_bond_lengths = self.sampling_qm_data_point_dict[root][0].eq_bond_lengths
@@ -3402,6 +3531,7 @@ class IMDatabasePointCollecter:
         sym_dict,
         exponent_p_q,
         datapoints_eval,
+        local_factor_banks=None,
     ):
         drv = InterpolationDriver(z_matrix, ostream=self.ostream)
         drv.update_settings(interpolation_setting)
@@ -3418,6 +3548,7 @@ class IMDatabasePointCollecter:
             drv.impes_coordinate.inv_sqrt_masses = self.inv_sqrt_masses
 
         drv.qm_data_points = datapoints_eval
+        drv.install_local_factor_banks(local_factor_banks)
 
         return drv
 
@@ -3433,6 +3564,7 @@ class IMDatabasePointCollecter:
         interpolation_setting,
         sym_dict,
         exponent_p_q,
+        local_factor_banks=None,
     ):
 
         drv = self._build_interp_driver_for_trust_radius_eval(
@@ -3441,6 +3573,7 @@ class IMDatabasePointCollecter:
             sym_dict=sym_dict,
             exponent_p_q=exponent_p_q,
             datapoints_eval=datapoints_eval,
+            local_factor_banks=local_factor_banks,
         )
 
         e_conv = hartree_in_kcalpermol()
@@ -3570,7 +3703,7 @@ class IMDatabasePointCollecter:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def determine_trust_radius_gradient(self, molecules, qm_energies, qm_gradients, im_energies, datapoints, interpolation_setting, sym_dict, z_matrix, exponent_p_q):
+    def determine_trust_radius_gradient(self, molecules, qm_energies, qm_gradients, im_energies, datapoints, interpolation_setting, sym_dict, z_matrix, exponent_p_q, local_factor_banks=None):
         try:
             from scipy.optimize import minimize
             from scipy.optimize import basinhopping
@@ -3633,7 +3766,8 @@ class IMDatabasePointCollecter:
                 z_matrix, impes_dict, sym_dict, dps,
                 geom_list, E_ref_list, G_ref_list, exponent_p_q,
                 e_x=energy_weight,
-                beta=0.8)
+                beta=0.8,
+                local_factor_banks=local_factor_banks)
 
             history = []
             progress_header_printed = {"value": False}
@@ -3823,6 +3957,7 @@ class IMDatabasePointCollecter:
                 interpolation_setting=interpolation_setting,
                 sym_dict=sym_dict,
                 exponent_p_q=exponent_p_q,
+                local_factor_banks=local_factor_banks,
             )
         )
 
@@ -3840,6 +3975,7 @@ class IMDatabasePointCollecter:
                 interpolation_setting=interpolation_setting,
                 sym_dict=sym_dict,
                 exponent_p_q=exponent_p_q,
+                local_factor_banks=local_factor_banks,
             )
         )
 
@@ -4008,6 +4144,7 @@ class IMDatabasePointCollecter:
                 interpolation_setting=interpolation_setting,
                 sym_dict=sym_dict,
                 exponent_p_q=exponent_p_q,
+                local_factor_banks=local_factor_banks,
             )
         )
 

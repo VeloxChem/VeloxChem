@@ -39,7 +39,7 @@ from .interpolationdriver import InterpolationDriver
 
 
 class IMTrustRadiusOptimizer:
-    def __init__(self, z_matrix, impes_dict, sym_dict, dps, structure_list, qm_e, qm_g, exponent_p_q, e_x, beta=0.8, verbose=False):
+    def __init__(self, z_matrix, impes_dict, sym_dict, dps, structure_list, qm_e, qm_g, exponent_p_q, e_x, beta=0.8, verbose=False, local_factor_banks=None):
 
         p, q = exponent_p_q
 
@@ -68,6 +68,7 @@ class IMTrustRadiusOptimizer:
         self.S = len(structure_list)
         self.idx = np.asarray([o*3 + i for o in sym_dict[3] for i in range(3)], dtype=int)
         self.verbose = bool(verbose)
+        self.local_factor_banks = local_factor_banks or {}
 
         self._init_worker_state(exponent_p_q)
 
@@ -92,6 +93,7 @@ class IMTrustRadiusOptimizer:
 
         # Keep this if datapoints are mutated during evaluation
         driver.qm_data_points = self.dps
+        driver.install_local_factor_banks(self.local_factor_banks)
 
         self._worker_state = {
             "driver": driver,

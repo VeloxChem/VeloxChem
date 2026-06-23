@@ -39,6 +39,11 @@ from contextlib import redirect_stderr
 from io import StringIO
 
 from .interpolationdatapoint import InterpolationDatapoint
+from .imlocalfactorregistry import (
+    evaluate_signed_local_factor_model,
+    iter_signed_factor_datapoints,
+    load_signed_factor_banks_for_root,
+)
 from .outputstream import OutputStream
 from .veloxchemlib import mpi_master, bohr_in_angstrom
 from .errorhandler import assert_msg_critical
@@ -129,6 +134,8 @@ class InterpolationDriver:
         # kpoint file with QM data
         self.imforcefield_file = None
         self.qm_data_points = None
+        self.qm_local_factor_banks = {}
+        self.local_factor_root = None
 
         # Confidence radii optimization information
         self.dw_dalpha_list = []
@@ -143,6 +150,7 @@ class InterpolationDriver:
         self.labels = None
         self.use_inverse_bond_length = True
         self.use_eq_bond_length = False
+        self.eq_bond_symmetry_mode = "masked_exact"
         # self.use_cos_angle = False
         self.use_mass_weight = False
 
@@ -164,6 +172,7 @@ class InterpolationDriver:
 
         # core-label keyed cache of (datapoint, mask0, mask) symmetry tasks
         self._symmetry_task_cache = {}
+        self._eq_candidate_base_cache = None
 
         self._input_keywords = {
             'im_settings': {
@@ -178,6 +187,7 @@ class InterpolationDriver:
                     ('str', 'the name of the chk file with QM data'),
                     'use_inverse_bond_length': ('bool', 'whether to use inverse bond lengths in the Z-matrix'),
                     'use_eq_bond_length': ('bool', 'whether to use eq bond lengths in the Z-matrix'),
+                    'eq_bond_symmetry_mode': ('str', 'eq-bond symmetry mode: masked_exact or symmetrized'),
                     # 'use_cos_angle': ('bool', 'wether to use cosine description for angles in Z-matrix'),
                     'use_tc_weights':('bool', 'weither to use target coustomized weights'),
                     'tc_weight_mode':('str', 'the mode for the target customized weights (multiplicative/additive)'),
@@ -185,6 +195,21 @@ class InterpolationDriver:
                 'labels': ('seq_fixed_str', 'the list of QM data point labels'),
             }
         }
+
+    def _get_eq_symmetry_mode(self):
+        mode = getattr(
+            self.impes_coordinate,
+            'eq_bond_symmetry_mode',
+            self.eq_bond_symmetry_mode,
+        )
+        if mode is None:
+            mode = self.eq_bond_symmetry_mode
+        mode = str(mode).strip().lower()
+        if mode not in ('masked_exact', 'symmetrized'):
+            raise ValueError(
+                f"InterpolationDriver: invalid eq_bond_symmetry_mode='{mode}'. "
+                "Use 'masked_exact' or 'symmetrized'.")
+        return mode
 
     def update_settings(self, impes_dict=None):
         """
@@ -246,6 +271,81 @@ class InterpolationDriver:
                 return dp
         raise KeyError(
             f"InterpolationDriver: datapoint label '{dp_label}' was not found in qm_data_points.")
+
+    def _load_local_factor_banks(self, z_matrix, root=None):
+        if self.imforcefield_file is None:
+            return {}
+
+        local_root = self.local_factor_root if root is None else root
+        return load_signed_factor_banks_for_root(
+            self.imforcefield_file,
+            local_root,
+            z_matrix,
+            self.impes_dict or {},
+        )
+
+    def _is_local_factor_cluster_datapoint(self, data_point):
+        if getattr(data_point, "bank_role", "global") != "cluster":
+            return False
+        family_label = getattr(data_point, "family_label", None)
+        return family_label in (self.qm_local_factor_banks or {})
+
+    def _set_local_factor_inv_sqrt_masses(self, inv_sqrt_masses):
+        for family_bank in (self.qm_local_factor_banks or {}).values():
+            for data_point in iter_signed_factor_datapoints(family_bank):
+                data_point.inv_sqrt_masses = inv_sqrt_masses
+
+    def install_local_factor_banks(self, family_banks):
+        """Installs factor banks and binds their cores to outer datapoints."""
+
+        outer_cores = {
+            str(getattr(data_point, "family_label")): data_point
+            for data_point in (self.qm_data_points or [])
+            if getattr(data_point, "bank_role", "global") == "core"
+            and getattr(data_point, "family_label", None) is not None
+        }
+
+        installed = {}
+        for family_label, family_bank in (family_banks or {}).items():
+            if not isinstance(family_bank, dict):
+                continue
+            family_key = str(family_label)
+            installed_bank = dict(family_bank)
+            if family_key in outer_cores:
+                installed_bank["core"] = outer_cores[family_key]
+            installed[family_key] = installed_bank
+
+        self.qm_local_factor_banks = installed
+
+        if self.qm_data_points:
+            inv_sqrt_masses = getattr(
+                self.qm_data_points[0], "inv_sqrt_masses", None)
+            if inv_sqrt_masses is not None:
+                self._set_local_factor_inv_sqrt_masses(inv_sqrt_masses)
+
+        self.mark_runtime_data_cache_dirty()
+
+    def _compute_local_factor_potential(self, data_point, org_int_coords):
+        if getattr(data_point, "bank_role", "global") != "core":
+            return None
+
+        family_label = getattr(data_point, "family_label", None)
+        if family_label is None:
+            return None
+
+        family_bank = (self.qm_local_factor_banks or {}).get(family_label)
+        if not isinstance(family_bank, dict):
+            return None
+        if family_bank.get("topology") != "signed_local_factors":
+            return None
+
+        pes, gradient = evaluate_signed_local_factor_model(
+            self,
+            family_bank,
+            org_int_coords,
+        )
+        return pes, gradient, np.zeros_like(
+            np.asarray(org_int_coords, dtype=np.float64))
 
     def _get_internal_coordinate_partitions(self):
         """
@@ -403,6 +503,7 @@ class InterpolationDriver:
         self.molecule = molecule
 
         self.define_impes_coordinate(molecule.get_coordinates_in_bohr())
+        self._eq_candidate_base_cache = None
 
         if self.qm_data_points is None:
             self.qm_data_points = self.read_qm_data_points()
@@ -618,12 +719,18 @@ class InterpolationDriver:
             labels, z_matrix = self.read_labels()
             self.labels = labels
             self.z_matrix = z_matrix
-        z_matrix = self.impes_coordinate.z_matrix
+        z_matrix = getattr(self.impes_coordinate, 'z_matrix_dict', None)
+        if z_matrix is None:
+            z_matrix = self.z_matrix
+
+        self.qm_local_factor_banks = self._load_local_factor_banks(z_matrix)
 
         for label in self.labels:
             data_point = InterpolationDatapoint(z_matrix)  # , self.comm, self.ostream
             data_point.update_settings(self.impes_dict)
             data_point.read_hdf5(self.imforcefield_file, label)
+            if self._is_local_factor_cluster_datapoint(data_point):
+                continue
             qm_data_points.append(data_point)
 
         self.qm_data_points = qm_data_points
@@ -637,6 +744,11 @@ class InterpolationDriver:
            :param data_point:
                 InterpolationDatapoint object.
         """
+
+        local_factor_result = self._compute_local_factor_potential(
+            data_point, org_int_coords)
+        if local_factor_result is not None:
+            return local_factor_result
 
         pes = 0.0
         natm = data_point.cartesian_coordinates.shape[0]
@@ -1269,6 +1381,31 @@ class InterpolationDriver:
 
         return translated_coordinates
 
+    def _cartesian_weight_active_atoms(self, natoms):
+        """Returns atoms included in the outer Shepard distance metric."""
+
+        symmetry_information = self.symmetry_information
+        if (
+            symmetry_information is None
+            or len(symmetry_information) <= 4
+            or symmetry_information[4] is None
+        ):
+            return np.arange(int(natoms), dtype=np.int64)
+
+        excluded = np.asarray(
+            symmetry_information[4], dtype=np.int64).reshape(-1)
+        excluded = excluded[(excluded >= 0) & (excluded < int(natoms))]
+        active_atoms = np.delete(
+            np.arange(int(natoms), dtype=np.int64),
+            np.unique(excluded),
+        )
+        if active_atoms.size == 0:
+            raise ValueError(
+                "InterpolationDriver: Cartesian Shepard distance has no "
+                "active atoms."
+            )
+        return active_atoms
+
     def internal_distance(self, data_point, store_alpha_gradients=True):
         """Computes a Shepard weight denominator using internal-coordinate distance.
 
@@ -1280,7 +1417,7 @@ class InterpolationDriver:
         reference_coordinates = self.impes_coordinate.cartesian_coordinates.copy()
         natms = reference_coordinates.shape[0]
 
-        active_atoms = np.delete(np.arange(natms), self.symmetry_information[4])
+        active_atoms = self._cartesian_weight_active_atoms(natms)
         active_dofs = np.array([3 * a + i for a in active_atoms for i in range(3)], dtype=np.int64)
 
         q_current = np.asarray(self.impes_coordinate.internal_coordinates_values, dtype=np.float64)
@@ -1389,7 +1526,7 @@ class InterpolationDriver:
 
         weight_gradient_sub = weight_grad_sub.reshape(active_atoms.shape[0], 3)
         weight_gradient = np.zeros_like(reference_coordinates)
-        weight_gradient[self.symmetry_information[3]] = weight_gradient_sub
+        weight_gradient[active_atoms] = weight_gradient_sub
 
         dw_dalpha_i = 0.0
         dw_dX_dalpha_i = np.zeros_like(weight_gradient_sub)
@@ -1421,7 +1558,7 @@ class InterpolationDriver:
             if store_alpha_gradients:
                 self.dw_dalpha_list.append(dw_dalpha_i)
                 dw_dX_dalpha_i_full = np.zeros_like(reference_coordinates)
-                dw_dX_dalpha_i_full[self.symmetry_information[3]] = dw_dX_dalpha_i
+                dw_dX_dalpha_i_full[active_atoms] = dw_dX_dalpha_i
                 self.dw_dX_dalpha_list.append(dw_dX_dalpha_i_full)
 
         return (
@@ -1449,7 +1586,9 @@ class InterpolationDriver:
         target_coordinates = data_point.cartesian_coordinates.copy()
         reference_coordinates = self.impes_coordinate.cartesian_coordinates.copy()
 
-        active_atoms = np.delete(np.arange(reference_coordinates.shape[0]), self.symmetry_information[4])
+        active_atoms = self._cartesian_weight_active_atoms(
+            reference_coordinates.shape[0]
+        )
         active_dofs = np.array([3*a + i for a in active_atoms for i in range(3)])
 
         target_coordinates_core = target_coordinates[active_atoms]
@@ -1704,7 +1843,7 @@ class InterpolationDriver:
             raise ValueError(errtxt)
 
         weight_gradient = np.zeros_like(reference_coordinates)   # (natms,3)
-        weight_gradient[self.symmetry_information[3]] = weight_gradient_sub_imp_coord
+        weight_gradient[active_atoms] = weight_gradient_sub_imp_coord
 
         return distance, dihedral_dist, denominator_imp_coord, weight_gradient, distance_vector_sub, grad_s, dw_dalhpa_i, dw_dX_dalpha_i
 

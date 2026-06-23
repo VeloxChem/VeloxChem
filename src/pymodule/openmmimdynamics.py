@@ -369,6 +369,9 @@ class OpenMMIMDynamics:
 
         im_labels, _ = driver_object.read_labels()
 
+        driver_object.qm_local_factor_banks = driver_object._load_local_factor_banks(
+            self.roots_z_matrix[root], root=root)
+
         self.qm_data_point_dict[root] = []
         self.qm_symmetry_datapoint_dict[root] = {}
         self.sorted_state_spec_im_labels[root] = []
@@ -378,12 +381,15 @@ class OpenMMIMDynamics:
             qm_data_point.update_settings(self.interpolation_settings[root])
             qm_data_point.read_hdf5(self.interpolation_settings[root]['imforcefield_file'], label)
             qm_data_point.inv_sqrt_masses = inv_sqrt_masses
+            if driver_object._is_local_factor_cluster_datapoint(qm_data_point):
+                continue
 
             self.qm_data_point_dict[root].append(qm_data_point)
             self.sorted_state_spec_im_labels[root].append(label)
 
         driver_object.qm_data_points = self.qm_data_point_dict[root]
         driver_object.labels = self.sorted_state_spec_im_labels[root]
+        driver_object._set_local_factor_inv_sqrt_masses(inv_sqrt_masses)
 
         if len(self.qm_data_point_dict[root]) > 0:
             driver_object.impes_coordinate.eq_bond_lengths = self.qm_data_point_dict[root][0].eq_bond_lengths
