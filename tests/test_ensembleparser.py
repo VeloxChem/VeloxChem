@@ -5,36 +5,35 @@ import veloxchem.ensembleparser as ensembleparser_module
 from veloxchem.ensembleparser import EnsembleParser
 
 pytest.importorskip("MDAnalysis")
-pytest.importorskip("pyframe")
 
 
 def make_simple_tip3_pdb(tmp_path):
     """Writes a simple PDB containing one QM atom and one TIP3 water."""
 
-    def pdb_record(serial, atom_name, residue_name, resid, x, y, z, element):
-        return (
-            f'{"HETATM":<6s}{serial:5d} '
-            f'{atom_name:^4s} '
-            f'{residue_name:>4s}'
-            f'A'
-            f'{resid:4d}'
-            f'    '
-            f'{x:8.3f}{y:8.3f}{z:8.3f}'
-            f'{1.00:6.2f}{0.00:6.2f}'
-            f'          '
-            f'{element:>2s}'
-        )
-
     pdb_path = tmp_path / "simple_tip3.pdb"
     pdb_lines = [
-        pdb_record(1, "C1", "LIG", 1, 0.0, 0.0, 0.0, "C"),
-        pdb_record(2, "OH2", "TIP3", 2, 2.0, 0.0, 0.0, "O"),
-        pdb_record(3, "H1", "TIP3", 2, 2.7, 0.0, 0.0, "H"),
-        pdb_record(4, "H2", "TIP3", 2, 1.7, 0.7, 0.0, "H"),
+        _make_pdb_record(1, "C1", "LIG", "A", 1, 0.0, 0.0, 0.0, "C", record_name="HETATM"),
+        _make_pdb_record(2, "OH2", "TIP3", "A", 2, 2.0, 0.0, 0.0, "O", record_name="HETATM"),
+        _make_pdb_record(3, "H1", "TIP3", "A", 2, 2.7, 0.0, 0.0, "H", record_name="HETATM"),
+        _make_pdb_record(4, "H2", "TIP3", "A", 2, 1.7, 0.7, 0.0, "H", record_name="HETATM"),
         "END",
     ]
     pdb_path.write_text("\n".join(pdb_lines) + "\n")
     return pdb_path
+
+
+def _make_pdb_record(serial, atom_name, residue_name, chain, resid, x, y, z, element,
+                     record_name="ATOM"):
+    """Format a single ATOM/HETATM record for a PDB file."""
+    return (
+        f"{record_name:<6s}{serial:5d} "
+        f"{atom_name:^4s} "
+        f"{residue_name:>4s}"
+        f"{chain:1s}{resid:4d}    "
+        f"{x:8.3f}{y:8.3f}{z:8.3f}"
+        f"{1.00:6.2f}{0.00:6.2f}          "
+        f"{element:>2s}"
+    )
 
 
 class TestEnsembleParser:
@@ -222,28 +221,21 @@ class TestEnsembleParser:
     # _protonation_resname_map with a multi-residue PDB
 
     @staticmethod
-    def _make_histidine_protonation_pdb(tmp_path):
-        """Write a PDB with HIS variants and other protonatable residues."""
-
-        def pdb_record(serial, atom_name, residue_name, chain, resid, x, y, z, element):
-            return (
-                f"{'ATOM':<6s}{serial:5d} "
-                f"{atom_name:^4s}"
-                f"{residue_name:>4s} "
-                f"{chain:1s}{resid:4d}    "
-                f"{x:8.3f}{y:8.3f}{z:8.3f}"
-                f"{1.00:6.2f}{0.00:6.2f}          "
-                f"{element:>2s}"
-            )
+    def _make_protonation_pdb(tmp_path):
+        """Write a PDB covering protonation-state residue renaming."""
 
         records = []
         serial = 0
+        residue_atom_counts = {}
 
         def atom(name, resname, resid, element="C"):
             nonlocal serial
             serial += 1
-            x = float(serial) * 1.5
-            records.append(pdb_record(serial, name, resname, "A", resid, x, 0.0, 0.0, element))
+            atom_index = residue_atom_counts.get(resid, 0)
+            residue_atom_counts[resid] = atom_index + 1
+            # Use residue-separated offsets to keep generated atoms distinct.
+            x = float(resid) * 20.0 + float(atom_index) * 1.2
+            records.append(_make_pdb_record(serial, name, resname, "A", resid, x, 0.0, 0.0, element))
 
         # Residue 1: HIS with HD1 -> HSD
         atom("N", "HIS", 1, "N")
@@ -287,7 +279,7 @@ class TestEnsembleParser:
         atom("HG", "CYS", 9, "H")
 
         records.append("END")
-        pdb_path = tmp_path / "histidine_protonation.pdb"
+        pdb_path = tmp_path / "protonation.pdb"
         pdb_path.write_text("\n".join(records) + "\n")
         return pdb_path
 
@@ -295,7 +287,7 @@ class TestEnsembleParser:
         """Full _protonation_resname_map integration covering HIS/GLU/ASP/CYS."""
         import MDAnalysis as mda
 
-        pdb_path = self._make_histidine_protonation_pdb(tmp_path)
+        pdb_path = self._make_protonation_pdb(tmp_path)
         u = mda.Universe(str(pdb_path))
         env_atoms = u.select_atoms("all")
 
@@ -344,31 +336,24 @@ class TestEnsembleParser:
         assert ens_parser._prefixed_resname("ASH", "C") == "CASH"
         assert ens_parser._prefixed_resname("CYX", "N") == "NCYX"
 
-    # Terminal + protonation on HIS residues via PDB
+    # Terminal + protonation composition via PDB
 
     @staticmethod
-    def _make_terminal_histidine_pdb(tmp_path):
-        """Write a PDB with terminal-looking HIS residues in separate chains."""
-
-        def pdb_record(serial, atom_name, residue_name, chain, resid, x, y, z, element):
-            return (
-                f"{'ATOM':<6s}{serial:5d} "
-                f"{atom_name:^4s}"
-                f"{residue_name:>4s} "
-                f"{chain:1s}{resid:4d}    "
-                f"{x:8.3f}{y:8.3f}{z:8.3f}"
-                f"{1.00:6.2f}{0.00:6.2f}          "
-                f"{element:>2s}"
-            )
+    def _make_terminal_protonation_pdb(tmp_path):
+        """Write a PDB covering combined terminal and protonation renaming."""
 
         records = []
         serial = 0
+        chain_atom_counts = {}
 
         def atom(name, resname, chain, resid, element="C"):
             nonlocal serial
             serial += 1
-            x = float(serial) * 1.5
-            records.append(pdb_record(serial, name, resname, chain, resid, x, 0.0, 0.0, element))
+            atom_index = chain_atom_counts.get(chain, 0)
+            chain_atom_counts[chain] = atom_index + 1
+            # Use floating-point offsets to keep generated atoms distinct by chain.
+            x = float(ord(chain) - ord("A")) * 20.0 + float(atom_index) * 1.2
+            records.append(_make_pdb_record(serial, name, resname, chain, resid, x, 0.0, 0.0, element))
 
         # Chain A: N-terminal HIS (H1,H2,H3) + HD1  and  ALA spacer
         atom("N", "HIS", "A", 1, "N")
@@ -441,8 +426,18 @@ class TestEnsembleParser:
         atom("N", "ALA", "G", 2, "N")
         atom("CA", "ALA", "G", 2, "C")
 
+        for name, x, y, z, element in (
+            ("OH2", 0.0, 5.0, 0.0, "O"),
+            ("H1", 0.7, 5.0, 0.0, "H"),
+            ("H2", -0.3, 5.7, 0.0, "H"),
+        ):
+            serial += 1
+            records.append(_make_pdb_record(
+                serial, name, "TIP3", "Z", 999, x, y, z, element,
+                record_name="HETATM"))
+
         records.append("END")
-        pdb_path = tmp_path / "terminal_histidine.pdb"
+        pdb_path = tmp_path / "terminal_protonation.pdb"
         pdb_path.write_text("\n".join(records) + "\n")
         return pdb_path
 
@@ -450,7 +445,7 @@ class TestEnsembleParser:
         """Terminal prefix and protonation-state renaming compose correctly."""
         import MDAnalysis as mda
 
-        pdb_path = self._make_terminal_histidine_pdb(tmp_path)
+        pdb_path = self._make_terminal_protonation_pdb(tmp_path)
         u = mda.Universe(str(pdb_path))
         env_atoms = u.select_atoms("all")
 
@@ -499,3 +494,51 @@ class TestEnsembleParser:
         assert prot_map[12] == "CYX"
         composed = ens_parser._prefixed_resname(prot_map[12], str(term_map[12])[0])
         assert composed == "NCYX"
+
+        # The TIP3 water residue is present in the PDB but is neither terminal
+        # protein nor a supported protonation-state residue.
+        assert 14 not in term_map
+        assert 14 not in prot_map
+
+    def test_structures_applies_terminal_protonation_to_pe_resnames(self,
+                                                                    tmp_path):
+        """structures() emits composed terminal/protonation residue names."""
+
+        pdb_path = self._make_terminal_protonation_pdb(tmp_path)
+        ens_parser = EnsembleParser()
+        ens_parser.ostream.mute()
+
+        snapshots = ens_parser.structures(
+            pdb_file=pdb_path,
+            qm_region="resname TIP3",
+            pe_cutoff=150.0,
+        )
+
+        assert len(snapshots) == 1
+        assert snapshots[0]["qm_atom_names"].tolist() == ["OH2", "H1", "H2"]
+        pe_resnames = np.asarray(snapshots[0]["pe_resnames"], dtype=object)
+        pe_resindices = np.asarray(snapshots[0]["pe_resindices"], dtype=int)
+        resnames_by_resindex = {
+            int(resindex): {
+                str(resname)
+                for resname in pe_resnames[pe_resindices == resindex]
+            }
+            for resindex in np.unique(pe_resindices)
+        }
+
+        assert resnames_by_resindex == {
+            0: {"NHSD"},
+            1: {"CALA"},
+            2: {"NALA"},
+            3: {"CHSE"},
+            4: {"NHSP"},
+            5: {"CALA"},
+            6: {"NHIS"},
+            7: {"CALA"},
+            8: {"NGLH"},
+            9: {"CALA"},
+            10: {"NALA"},
+            11: {"CASH"},
+            12: {"NCYX"},
+            13: {"CALA"},
+        }
