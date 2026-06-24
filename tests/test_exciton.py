@@ -397,8 +397,6 @@ class TestExciton:
                 oscillator_strengths.append(f)
                 rotatory_strengths.append(R)
 
-            # TODO: get e, f and R from exmod_results
-
             excitation_energies = np.array(excitation_energies)
             oscillator_strengths = np.array(oscillator_strengths)
             rotatory_strengths = np.array(rotatory_strengths)
