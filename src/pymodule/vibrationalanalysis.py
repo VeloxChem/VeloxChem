@@ -296,7 +296,7 @@ class VibrationalAnalysis:
         self.rsp_dict = dict(rsp_dict)
         self.polgrad_dict = dict(polgrad_dict)
 
-    def compute(self, molecule, ao_basis=None):
+    def compute(self, molecule, ao_basis=None, hessian=None):
         """
         Drives the computation of the vibrational analysis and
         associated properties.
@@ -319,7 +319,10 @@ class VibrationalAnalysis:
             self.print_header()
 
         # compute the Hessian
-        self.compute_hessian(molecule, ao_basis)
+        if hessian is not None:
+            self.hessian = hessian
+        else:
+            self.compute_hessian(molecule, ao_basis)
 
         # compute the polarizability gradient for Raman activities
         if (self.do_raman or self.do_resonance_raman) and self.is_scf:

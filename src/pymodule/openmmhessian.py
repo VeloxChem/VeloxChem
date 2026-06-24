@@ -258,7 +258,8 @@ class MMHessianDriver:
 
         return self.hessian
 
-    def compute_ts(self, molecule, ff_gen, reaction_bonds):
+    def compute_ts(self, molecule, ff_gen, reaction_bonds=None,
+                   breaking_bonds=None, forming_bonds=None):
         """
         Compute a TS MM Hessian by assigning ``ts_negative_fc`` to the
         reaction bonds before building the Hessian.
@@ -268,17 +269,33 @@ class MMHessianDriver:
         molecule       : Molecule
         ff_gen         : MMForceFieldGenerator
             **Not modified in place.**
-        reaction_bonds : list of (int, int)
-            **1-based** atom index pairs for the forming/breaking bonds.
+        reaction_bonds : list of (int, int), optional
+            **1-based** atom index pairs for the forming/breaking bonds.  Use
+            this when the break/form direction does not matter or to let the
+            shared-atom heuristic infer it (see below).
+        breaking_bonds : list of (int, int), optional
+            **1-based** pairs for bonds that *lengthen* along the reaction
+            coordinate.
+        forming_bonds  : list of (int, int), optional
+            **1-based** pairs for bonds that *shorten* along the reaction
+            coordinate.
+
+        At least one of the three must be given.  The reaction-coordinate
+        direction used to pick/combine the TS mode is built with a sign per
+        bond (+1 breaking, -1 forming); for bonds supplied only via
+        ``reaction_bonds`` the relative signs are inferred by anti-correlating
+        bonds that share an atom (e.g. the transferring proton).  The soft
+        negative force constant (``ts_negative_fc``) is applied to *all*
+        reaction bonds regardless of sign.
 
         Returns
         -------
         ndarray (3N, 3N)  Cartesian Hessian in Hartree/Bohr².
         """
-        bonds_0 = set(
-            (min(a - 1, b - 1), max(a - 1, b - 1))
-            for (a, b) in reaction_bonds
-        )
+        signed_bonds = self._signed_reaction_bonds(
+            reaction_bonds, breaking_bonds, forming_bonds)
+        # Union of all reaction bonds (sign-independent) for fc patching.
+        bonds_0 = set((a, b) for (a, b, _) in signed_bonds)
 
         self.ostream.print_info(
             f"MMHessianDriver: computing MM TS Hessian "
@@ -286,6 +303,10 @@ class MMHessianDriver:
             f"ts_fc={self.ts_negative_fc:.0f} kJ/mol/nm², "
             f"platform={self.openmm_platform})..."
         )
+        self.ostream.print_info(
+            "  Reaction coordinate: " + ", ".join(
+                f"({a+1},{b+1}){'+' if s > 0 else '-'}"
+                for (a, b, s) in signed_bonds))
         self.ostream.flush()
 
         # Shallow-copy bonds dict — original ff_gen is never modified
@@ -369,7 +390,7 @@ class MMHessianDriver:
             ff_gen.dihedrals = original_dihedrals
 
         self._run(molecule, sim)
-        self._identify_ts_mode()
+        self._identify_ts_mode(molecule, signed_bonds)
 
         return self.hessian
 
@@ -711,18 +732,172 @@ class MMHessianDriver:
     # TS mode identification
     # ════════════════════════════════════════════════════════════════════════
 
-    def _identify_ts_mode(self):
+    def _signed_reaction_bonds(self, reaction_bonds=None, breaking_bonds=None,
+                               forming_bonds=None):
         """
-        After compute_ts:
+        Build the signed reaction-coordinate bond list ``[(a, b, sign), ...]``
+        with 0-based atom indices.
 
-        1. Diagonalise the mass-weighted Hessian to find frequencies.
-        2. If ``hessian_massage`` is True and more than one negative internal
-           eigenvalue is found, diagonalise the *Cartesian* Hessian, replace
-           all negative eigenvalues except the most negative one with
-           ``massage_positive_value``, and reconstruct the Cartesian Hessian.
-           The mass-weighted Hessian and frequencies are then recomputed from
-           the massaged Cartesian Hessian.
-        3. Store the TS eigenvector in ``self.ts_mode``.
+        Sign convention (only the *relative* sign between bonds matters; the
+        global sign of a normal mode is arbitrary):
+            +1  bond lengthens  (breaking)
+            -1  bond shortens   (forming)
+
+        ``breaking_bonds`` / ``forming_bonds`` are honoured explicitly.  Bonds
+        given only via ``reaction_bonds`` (unlabelled) are signed by a
+        shared-atom heuristic: bonds that share an atom are anti-correlated (a
+        transferring atom cannot simultaneously lengthen both of its bonds),
+        implemented as a 2-colouring of the bond graph seeded from any
+        explicit labels.  If the colouring is inconsistent (an odd cycle, or a
+        clash with explicit labels) the unlabelled bonds fall back to +1 and a
+        warning is printed.
+
+        Returns a list of ``(a, b, sign)`` in input order; all 1-based input
+        indices are converted to 0-based.
+        """
+        from collections import deque
+
+        def to0(pairs):
+            return [(min(a - 1, b - 1), max(a - 1, b - 1))
+                    for (a, b) in (pairs or [])]
+
+        breaking = to0(breaking_bonds)
+        forming  = to0(forming_bonds)
+        plain    = to0(reaction_bonds)
+
+        sign  = {}     # bond -> +1 / -1 (explicit) or None (to be inferred)
+        order = []
+        for b in breaking:
+            if b not in sign:
+                order.append(b)
+            sign[b] = +1
+        for b in forming:
+            if b in sign and sign[b] == +1:
+                self.ostream.print_warning(
+                    f"  Bond ({b[0]+1},{b[1]+1}) listed as both breaking and "
+                    f"forming — treating as breaking.")
+                continue
+            if b not in sign:
+                order.append(b)
+            sign[b] = -1
+        for b in plain:
+            if b not in sign:
+                sign[b] = None
+                order.append(b)
+
+        if not order:
+            raise ValueError(
+                "compute_ts: no reaction bonds given — provide reaction_bonds "
+                "and/or breaking_bonds/forming_bonds.")
+
+        # Bonds sharing an atom should be anti-correlated.
+        adj = {b: [] for b in order}
+        for i, b1 in enumerate(order):
+            for b2 in order[i + 1:]:
+                if set(b1) & set(b2):
+                    adj[b1].append(b2)
+                    adj[b2].append(b1)
+
+        # Connected components of the bond graph.
+        seen, components = set(), []
+        for start in order:
+            if start in seen:
+                continue
+            comp, dq = [], deque([start])
+            seen.add(start)
+            while dq:
+                cur = dq.popleft()
+                comp.append(cur)
+                for nb in adj[cur]:
+                    if nb not in seen:
+                        seen.add(nb)
+                        dq.append(nb)
+            components.append(comp)
+
+        # 2-colour each component, seeding from an explicit label if present.
+        final, conflict = {}, False
+        for comp in components:
+            explicit = [b for b in comp if sign[b] is not None]
+            seed = explicit[0] if explicit else comp[0]
+            col = {seed: (sign[seed] if sign[seed] is not None else +1)}
+            dq = deque([seed])
+            while dq:
+                cur = dq.popleft()
+                for nb in adj[cur]:
+                    want = -col[cur]
+                    if nb not in col:
+                        col[nb] = want
+                        dq.append(nb)
+                    elif col[nb] != want:
+                        conflict = True
+            for b in comp:
+                if sign[b] is not None and col[b] != sign[b]:
+                    conflict = True
+            final.update(col)
+
+        if conflict:
+            self.ostream.print_warning(
+                "  Reaction-bond sign heuristic inconsistent (odd cycle or "
+                "conflicting breaking/forming labels) — using explicit labels "
+                "where given and +1 otherwise.")
+            for b in order:
+                final[b] = sign[b] if sign[b] is not None else +1
+
+        return [(a, b, final[(a, b)]) for (a, b) in order]
+
+    def _reaction_coordinate_vector(self, molecule, signed_bonds,
+                                    mass_weight=True):
+        """
+        Normalized (3N,) vector along the reaction coordinate: the combined,
+        signed bond-stretch direction of the reaction bonds.
+
+        ``signed_bonds`` is a list of ``(a, b, sign)`` with 0-based atom
+        indices.  For each bond the unit vector e_ab along the bond is scaled
+        by ``sign`` (+1 = lengthening/breaking, -1 = shortening/forming) and
+        added to atom a / subtracted from atom b.  The relative signs are what
+        distinguish a concerted transfer (one bond breaking while another
+        forms — antisymmetric) from all bonds stretching together
+        (symmetric).  With ``mass_weight=True`` the vector is expressed in
+        mass-weighted coordinates (q_i = sqrt(m_i) x_i) so it can be compared
+        directly with eigenvectors of the mass-weighted Hessian; with
+        ``mass_weight=False`` it stays in plain Cartesian space for comparison
+        with eigenvectors of the Cartesian Hessian.
+        """
+        coords  = molecule.get_coordinates_in_angstrom()
+        n_atoms = molecule.number_of_atoms()
+        v = np.zeros(3 * n_atoms)
+        for (a, b, sign) in signed_bonds:
+            d = coords[a] - coords[b]
+            norm = np.linalg.norm(d)
+            if norm < 1e-12:
+                continue
+            e = sign * (d / norm)
+            v[3 * a:3 * a + 3] += e
+            v[3 * b:3 * b + 3] -= e
+        if mass_weight:
+            sqm = np.repeat(np.sqrt(self._get_masses(molecule)), 3)
+            v = v * sqm
+        nrm = np.linalg.norm(v)
+        if nrm > 1e-12:
+            v /= nrm
+        return v
+
+    def _identify_ts_mode(self, molecule, signed_bonds):
+        """
+        After compute_ts, identify the TS normal mode and (optionally) massage
+        the Hessian so that exactly one imaginary frequency remains.
+
+        The TS mode is chosen as the imaginary mode whose eigenvector best
+        overlaps the reaction coordinate (the signed bond-stretch direction of
+        ``signed_bonds``), NOT simply the most negative eigenvalue — the most
+        negative mode is frequently not the chemically relevant one even when
+        the correct reaction bonds are supplied.
+
+        Imaginary modes are detected by an eigenvalue cutoff (``neg_tol``)
+        rather than by positional slicing.  ``eigh`` returns eigenvalues in
+        ascending order, and a genuine TS mode is more negative than the ~0
+        translation/rotation modes, so it sorts *before* them; selecting by
+        threshold avoids accidentally skipping it.
 
         Massaging the Cartesian Hessian directly (rather than the
         mass-weighted one) avoids any fragile mass-recovery algebra.
@@ -730,11 +905,23 @@ class MMHessianDriver:
         internal coordinate transformation, so the Cartesian matrix is what
         matters for the TS optimisation.
         """
+        assert self.mw_hessian is not None and self.frequencies is not None, \
+            "MMHessianDriver: _run() must populate the Hessian before " \
+            "_identify_ts_mode()."
+
+        # Modes below this (mass-weighted) cutoff count as imaginary.  Trans/rot
+        # sit at ~0 after projection; a real TS mode is clearly negative, so a
+        # small negative cutoff cleanly separates them.
+        neg_tol = -1e-6
+
         eigenvalues, eigenvectors = np.linalg.eigh(self.mw_hessian)
 
-        # The 6 lowest modes are translations/rotations (≈0); skip them
-        internal_evals = eigenvalues[6:]
-        n_imag = int(np.sum(internal_evals < 0))
+        # Reference direction = reaction coordinate (mass-weighted, normalized).
+        ref      = self._reaction_coordinate_vector(molecule, signed_bonds)
+        overlaps = np.abs(eigenvectors.T @ ref)   # |<mode, reaction coord>|
+
+        imag   = np.where(eigenvalues < neg_tol)[0]
+        n_imag = len(imag)
 
         if n_imag == 0:
             self.ts_mode = None
@@ -746,59 +933,87 @@ class MMHessianDriver:
             self.ostream.flush()
             return
 
+        # The imaginary mode that best matches the reaction coordinate —
+        # NOT simply the most negative one.
+        best = imag[int(np.argmax(overlaps[imag]))]
+
         if n_imag == 1:
-            self.ts_mode = eigenvectors[:, 6]
+            self.ts_mode = eigenvectors[:, best]
             self.ostream.print_info(
                 f"  TS mode confirmed: 1 imaginary frequency "
-                f"({self.frequencies[6]:.1f} cm⁻¹) — good TS Hessian guess."
+                f"({self.frequencies[best]:.1f} cm⁻¹, reaction-coordinate "
+                f"overlap {overlaps[best]:.2f}) — good TS Hessian guess."
             )
             self.ostream.flush()
             return
 
         # ── Multiple negative eigenvalues ────────────────────────────────────
         self.ostream.print_info(
-            f"  {n_imag} imaginary internal frequencies found — expected 1."
+            f"  {n_imag} imaginary frequencies found — expected 1.  Selecting "
+            f"the one aligned with the reaction bonds "
+            f"({self.frequencies[best]:.1f} cm⁻¹, overlap {overlaps[best]:.2f})."
         )
 
         if not self.hessian_massage:
-            most_neg_idx = int(np.argmin(eigenvalues))
-            self.ts_mode = eigenvectors[:, most_neg_idx]
+            self.ts_mode = eigenvectors[:, best]
             self.ostream.print_warning(
                 f"  hessian_massage=False: keeping all {n_imag} negative modes.  "
-                f"Lowest: {self.frequencies[most_neg_idx]:.1f} cm⁻¹.  "
                 f"Set hessian_massage=True to fix automatically."
             )
             self.ostream.flush()
             return
 
-        # ── Hessian massage on the Cartesian Hessian ─────────────────────────
-        # Diagonalise the Cartesian Hessian directly.  Eigenvalues here are in
-        # Hartree/Bohr² without mass-weighting, so they are not frequencies —
-        # but the sign structure tells us which modes are negative, and the
-        # most negative Cartesian eigenvalue corresponds to the TS mode.
+        # ── Hessian massage: combine the reactive negative modes ─────────────
+        # Diagonalise the Cartesian Hessian (eigenvalues in Hartree/Bohr², not
+        # frequencies). The reaction coordinate generally has components in
+        # several negative modes; rather than discarding all but one, project it
+        # onto the whole negative subspace and collapse that into a single
+        # combined reactive direction u, weighting each negative mode by its
+        # overlap with the reaction coordinate. Only directions orthogonal to
+        # the reaction coordinate are lifted to massage_positive_value.
+        cart_neg_tol = -1e-6   # Hartree/Bohr²; separates real negatives from ~0 trans/rot
+
         cart_evals, cart_evecs = np.linalg.eigh(self.hessian)
+        ref_cart = self._reaction_coordinate_vector(molecule, signed_bonds,
+                                                    mass_weight=False)
 
-        # Find the most negative Cartesian eigenvalue (TS mode)
-        ts_cart_idx = int(np.argmin(cart_evals))
+        neg    = np.where(cart_evals < cart_neg_tol)[0]
+        V_neg  = cart_evecs[:, neg]                 # (3N, m)
+        c      = V_neg.T @ ref_cart                 # signed overlaps c_k
+        norm_c = np.linalg.norm(c)
 
-        # Replace all other negative eigenvalues with massage_positive_value
-        massaged_cart_evals = cart_evals.copy()
-        n_replaced = 0
-        for k in range(len(massaged_cart_evals)):
-            if k == ts_cart_idx:
-                continue
-            if massaged_cart_evals[k] < 0:
-                massaged_cart_evals[k] = self.massage_positive_value
-                n_replaced += 1
+        if norm_c < 1e-8:
+            # Reaction coordinate has no component in the negative subspace —
+            # cannot combine meaningfully; fall back to keeping the most
+            # negative mode and flattening the rest.
+            ts_idx = neg[int(np.argmin(cart_evals[neg]))]
+            massaged = cart_evals.copy()
+            massaged[neg] = self.massage_positive_value
+            massaged[ts_idx] = cart_evals[ts_idx]
+            self.hessian = cart_evecs @ np.diag(massaged) @ cart_evecs.T
+            self.ostream.print_warning(
+                f"  Hessian massage: reaction coordinate not present in the "
+                f"negative subspace — kept the most negative of {len(neg)} mode(s)."
+            )
+        else:
+            p   = V_neg @ c
+            u   = p / np.linalg.norm(p)
+            lam_ts = float((c**2 @ cart_evals[neg]) / (norm_c**2))   # Rayleigh blend
 
-        self.ostream.print_info(
-            f"  Hessian massage: replaced {n_replaced} spurious negative "
-            f"Cartesian eigenvalue(s) with "
-            f"{self.massage_positive_value:.1e} Eh/Bohr²."
-        )
-
-        # Reconstruct the Cartesian Hessian
-        self.hessian = cart_evecs @ np.diag(massaged_cart_evals) @ cart_evecs.T
+            P_neg       = V_neg @ V_neg.T
+            neg_contrib = V_neg @ np.diag(cart_evals[neg]) @ V_neg.T
+            uuT         = np.outer(u, u)
+            self.hessian = (self.hessian - neg_contrib
+                            + lam_ts * uuT
+                            + self.massage_positive_value * (P_neg - uuT))
+            self.hessian = 0.5 * (self.hessian + self.hessian.T)
+            self.ostream.print_info(
+                f"  Hessian massage: combined {len(neg)} negative mode(s) into one "
+                f"reactive direction (Rayleigh curvature {lam_ts:.2e} Eh/Bohr², "
+                f"captured {norm_c:.2f} of the reaction coordinate); lifted "
+                f"{len(neg) - 1} orthogonal direction(s) to "
+                f"{self.massage_positive_value:.1e} Eh/Bohr²."
+            )
 
         # Recompute the mass-weighted Hessian and frequencies from the
         # massaged Cartesian Hessian so everything stays consistent.
@@ -807,9 +1022,16 @@ class MMHessianDriver:
         self.mw_hessian = self._mass_weight(self.hessian, masses)
         self.frequencies = self._hessian_to_frequencies(self.mw_hessian)
 
-        # Store the TS mode from the mass-weighted eigenvectors after massage
+        # Store the TS mode from the mass-weighted eigenvectors after massage,
+        # again selecting by reaction-coordinate overlap.
         mw_evals_new, mw_evecs_new = np.linalg.eigh(self.mw_hessian)
-        ts_mw_idx = int(np.argmin(mw_evals_new))
+        overl2 = np.abs(
+            mw_evecs_new.T @ self._reaction_coordinate_vector(molecule,
+                                                              signed_bonds)
+        )
+        neg2 = np.where(mw_evals_new < neg_tol)[0]
+        ts_mw_idx = (neg2[int(np.argmax(overl2[neg2]))] if len(neg2)
+                     else int(np.argmin(mw_evals_new)))
         self.ts_mode = mw_evecs_new[:, ts_mw_idx]
 
         self.ostream.print_info(
