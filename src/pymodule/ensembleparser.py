@@ -666,11 +666,8 @@ class EnsembleParser:
                 if term_map and len(pe_resnames) > 0:
                     for ridx, newname in term_map.items():
                         term_newname = newname
-                        prot_newname = str(prot_map.get(ridx, ""))
-                        core_prot_newname = prot_newname
-                        if len(prot_newname) == 4 and prot_newname[0] in ("N", "C"):
-                            core_prot_newname = prot_newname[1:]
-                        if core_prot_newname in {"HSD", "HSE", "HSP"}:
+                        if ridx in prot_map:
+                            prot_newname = str(prot_map[ridx])
                             term_newname = self._prefixed_resname(
                                 prot_newname,
                                 str(newname)[0],
@@ -718,11 +715,8 @@ class EnsembleParser:
                 if term_map and len(npe_resnames) > 0:
                     for ridx, newname in term_map.items():
                         term_newname = newname
-                        prot_newname = str(prot_map.get(ridx, ""))
-                        core_prot_newname = prot_newname
-                        if len(prot_newname) == 4 and prot_newname[0] in ("N", "C"):
-                            core_prot_newname = prot_newname[1:]
-                        if core_prot_newname in {"HSD", "HSE", "HSP"}:
+                        if ridx in prot_map:
+                            prot_newname = str(prot_map[ridx])
                             term_newname = self._prefixed_resname(
                                 prot_newname,
                                 str(newname)[0],
