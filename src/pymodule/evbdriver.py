@@ -93,6 +93,7 @@ class EvbDriver:
 
         self.t_label = int(time.time())
         self.water_model = 'cspce'
+        self.data_folder_override = None
 
         self.ffbuilder = ReactionForceFieldBuilder(ostream=self.ostream)
 
@@ -162,7 +163,7 @@ class EvbDriver:
         Lambda: list[float] | np.ndarray = None,
         constraints: dict | list[dict] | None = None,
     ):
-        """Build OpenMM systems for the given configurations with interpolated forcefields for each lambda value. Saves the systems as xml files, the topology as a pdb file and the options as a json file to the disk.
+        """Build OpenMM systems for the given configurations with interpolated forcefields for each lambda value. Saves the systems as xml files, the topology as a cif file and the options as a json file to the disk.
 
         Args:
             configurations (list[str] | list[dict]): The given configurations for which to perform an FEP. The first configuration will be regarded as the reference configuration.
@@ -211,10 +212,13 @@ class EvbDriver:
         # Per configuration
         for conf in self.configurations:
             # create folders,
-            data_folder = f"{conf['name']}_{self.t_label}"
-            while Path(data_folder).exists():
-                self.t_label += 1
+            if self.data_folder_override is not None:
+                data_folder = self.data_folder_override
+            else:
                 data_folder = f"{conf['name']}_{self.t_label}"
+                while Path(data_folder).exists():
+                    self.t_label += 1
+                    data_folder = f"{conf['name']}_{self.t_label}"
 
             run_folder = str(Path(data_folder) / "run")
             conf["data_folder"] = data_folder
@@ -268,9 +272,9 @@ class EvbDriver:
             self.ostream.flush()
             system_builder.save_systems_as_xml(systems, conf["run_folder"])
 
-            top_path = cwd / data_folder / "topology.pdb"
+            top_path = cwd / data_folder / "topology.cif"
 
-            mmapp.PDBFile.writeFile(
+            mmapp.PDBxFile.writeFile(
                 topology,
                 initial_positions,  # positions are handled in nanometers, but pdb's should be in angstroms
                 open(top_path, "w"),
@@ -296,7 +300,7 @@ class EvbDriver:
                             data_folder: str,
                             name: str,
                             load_systems=False,
-                            load_pdb=False,
+                            load_top=False,
                             restart: str | None = None):
         """Load a configuration from a data folder for which the systems have already been generated, such that an FEP can be performed.
         The topology, initial positions, temperature and Lambda vector will be loaded from the data folder.
@@ -305,7 +309,7 @@ class EvbDriver:
             data_folder (str): The folder to load the data from
             name (str): The name of the configuration. Can be arbitrary, but should be unique.
             load_systems (bool, optional): If set to true, the systems will be loaded from the xml files. Used for debugging. Defaults to False.
-            load_pdb (bool, optional): If set to true, the topology will be loaded from the pdb file. Used for debugging. Defaults to False.
+            load_top (bool, optional): If set to true, the topology will be loaded from the cif file. Used for debugging. Defaults to False.
         """
 
         assert_msg_critical('openmm' in sys.modules,
@@ -334,7 +338,7 @@ class EvbDriver:
 
         if restart is not None:
             try:
-                pdb = mmapp.PDBFile(str(Path(data_folder) / restart))
+                pdb = mmapp.PDBxFile(str(Path(data_folder) / restart))
             except Exception as e:
                 raise ValueError(
                     f"Could not load restart pdb file {restart} from {data_folder}. Error: {e}"
@@ -350,8 +354,8 @@ class EvbDriver:
             conf["initial_positions"] = pdb.getPositions(
                 asNumpy=True).value_in_unit(mmunit.nanometers)
             conf['skip_initial_equil'] = True
-        elif load_pdb:
-            pdb = mmapp.PDBFile(str(Path(data_folder) / "topology.pdb"))
+        elif load_top:
+            pdb = mmapp.PDBxFile(str(Path(data_folder) / "topology.cif"))
             conf["topology"] = pdb.getTopology()
             conf["initial_positions"] = pdb.getPositions(
                 asNumpy=True).value_in_unit(mmunit.nanometers)

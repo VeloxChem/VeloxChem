@@ -472,7 +472,7 @@ class EvbFepDriver:
                         f"warmup_equil_state_{T:.1f}K",
                         xml=False,
                         chk=False,
-                        pdb=True,
+                        cif=True,
                     )
 
         equil_state = simulation.context.getState(
@@ -489,7 +489,7 @@ class EvbFepDriver:
             "equil_state_initial",
             xml=False,
             chk=True,
-            pdb=False,
+            cif=False,
         )
         return equil_state
 
@@ -568,7 +568,7 @@ class EvbFepDriver:
                 f"equil_state_{l:.3f}",
                 chk=False,
                 xml=False,
-                pdb=True,
+                cif=True,
             )
 
         return equil_state
@@ -580,10 +580,10 @@ class EvbFepDriver:
         positions = simulation.context.getState(
             getPositions=True, enforcePeriodicBox=True).getPositions()
         if filename is not None:
-            mmapp.PDBFile.writeFile(
+            mmapp.PDBxFile.writeFile(
                 self.topology,
                 np.array(positions.value_in_unit(mm.unit.angstrom)),
-                open(self.run_folder / f"minim_{filename}.pdb", "w"),
+                open(self.run_folder / f"minim_{filename}.cif", "w"),
             )
 
     @staticmethod
@@ -751,23 +751,36 @@ class EvbFepDriver:
         self.ostream.print_info(f"Constrained {count} bonds involving H atoms")
         return system
 
-    def _save_state(self, simulation, name, xml=True, chk=True, pdb=True):
+    def _save_state(self,
+                    simulation,
+                    name,
+                    xml=True,
+                    chk=True,
+                    cif=True,
+                    pdb=False):
         if xml:
             chk_file = str(self.run_folder / f"{name}.chk")
             simulation.saveCheckpoint(chk_file)
         if chk:
             xml_file = str(self.run_folder / f"{name}.xml")
             simulation.saveState(xml_file)
-        if pdb:
+        if cif or pdb:
             state = simulation.context.getState(getPositions=True,
                                                 enforcePeriodicBox=True)
             positions = np.array(state.getPositions().value_in_unit(
                 mm.unit.angstrom))
-            mmapp.PDBFile.writeFile(
-                self.topology,
-                positions,
-                open(self.run_folder / f"{name}.pdb", "w"),
-            )
+            if pdb:
+                mmapp.PDBFile.writeFile(
+                    self.topology,
+                    positions,
+                    open(self.run_folder / f"{name}.pdb", "w"),
+                )
+            if cif:
+                mmapp.PDBxFile.writeFile(
+                    self.topology,
+                    positions,
+                    open(self.run_folder / f"{name}.cif", "w"),
+                )
 
     def _safe_step(self, simulation, steps, name=""):
         if not self.safe_step:
