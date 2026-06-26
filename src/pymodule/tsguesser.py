@@ -342,6 +342,7 @@ class TransitionStateGuesser:
         # Convert 1-indexed user input to 0-indexed internal representation
 
         # configuration['frozen_atoms'] = [i - 1 for i in self.frozen_atoms]
+        configuration['frozen_atoms'] = self.frozen_atoms
 
         if len(self.frozen_atoms) > 0:
             rea_pos = self.reactant.molecule.get_coordinates_in_angstrom()
@@ -724,10 +725,8 @@ class TransitionStateGuesser:
         # platform settings for small molecule
         opm_dyn.openmm_platform = "CPU"
         # opm_dyn.create_system_from_molecule(mol, ff_gen)
-        if self.save_intermediates:
-            pdb_name = str(Path(self.folder_name) / f'conf_top_{l}.pdb')
-        else:
-            pdb_name = f'topology_{getrandbits(32):08x}.pdb'
+        
+        pdb_name = f'topology_{getrandbits(32):08x}.pdb'
 
         rea_pos = self.reactant.molecule.get_coordinates_in_angstrom()
         pro_pos = self.product.molecule.get_coordinates_in_angstrom()
@@ -741,6 +740,8 @@ class TransitionStateGuesser:
         )
         opm_dyn.pdb = mmapp.PDBFile(pdb_name)
         opm_dyn.system = system
+        opm_dyn.molecule = self.molecule
+        opm_dyn.labels = self.molecule.get_labels()
 
         if conformer_search:
             snapshots = self.conformer_snapshots
@@ -755,8 +756,18 @@ class TransitionStateGuesser:
             temperature=self.mm_temperature,
             minimize=minimize,
         )
-        if not self.save_intermediates:
-            Path(pdb_name).unlink()
+        Path(pdb_name).unlink()
+        if self.save_intermediates:
+            conformers_dir_path = Path(self.folder_name) / "conformers"
+            conformers_dir_path.mkdir(parents=True, exist_ok=True)
+            conformers_dir = str(conformers_dir_path)
+            self.ostream.print_info(
+                f"Saving conformer snapshots as xyz to {conformers_dir}")
+            self.ostream.flush()
+            for i, temp_mol in enumerate(conformers_dict['molecules']):
+                temp_mol.write_xyz_file(
+                    str(Path(conformers_dir) / f"lambda_{l:.3f}_conf_{i}.xyz")
+                )
 
         result = []
         for e_int, temp_mol in zip(conformers_dict['energies'],

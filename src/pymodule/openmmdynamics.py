@@ -1095,6 +1095,7 @@ class OpenMMDynamics:
             self.labels = [
                 atom.element.symbol for atom in self.pdb.topology.atoms()
             ]
+            
 
         # Determine the frequency of saving depending on the number of snapshots.
         save_freq = max(nsteps // snapshots, 1)
@@ -1213,6 +1214,8 @@ class OpenMMDynamics:
                 self.ostream.print_info(f'Conformation {conf}')
                 self.ostream.flush()
                 molecule = Molecule.from_xyz_string(coords)
+                molecule.set_charge(self.molecule.get_charge())
+                molecule.set_multiplicity(self.molecule.get_multiplicity())
                 qm_energy, qm_coords = self.qm_minimization(
                     molecule, basis, qm_driver, constraints)
                 qm_energies.append(qm_energy)
@@ -1225,11 +1228,18 @@ class OpenMMDynamics:
             opt_coordinates = qm_opt_coordinates
 
         # Save final molecules, coordinates and corresponding energies to a dictionary
+        molecules = []
+        for coords in opt_coordinates:
+            mol = Molecule.from_xyz_string(coords)
+            mol.set_charge(self.molecule.get_charge())
+            mol.set_multiplicity(self.molecule.get_multiplicity())
+            molecules.append(mol)
+            
         conformers_dict = {
             'energies':
             energies,
             'molecules':
-            [Molecule.from_xyz_string(coords) for coords in opt_coordinates],
+            molecules,
             'geometries':
             opt_coordinates
         }
