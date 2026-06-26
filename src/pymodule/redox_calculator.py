@@ -1583,6 +1583,172 @@ class RedoxCalculator:
         suffix = f"_{file_tag}" if file_tag else ""
         file_name_base = f"{formula}_q{charge}_m{mult}_{label}{suffix}"
         return os.path.join(self.output_folder, f"{file_name_base}.h5")
+
+    def _file_tag_from_filename(self, fname: str, label: str) -> str:
+        """
+        Extract the trailing run tag from an HDF5 filename using the stored
+        state label.
+
+        Examples
+        --------
+        C15H14N2O3S_q0_m1_M_row1.h5           -> row1
+        C15H14N2O3S_q0_m1_M_iso0.h5           -> iso0
+        C15H14N2O3S_q0_m1_M.h5                -> ""
+        C15H15N2O3S_q1_m1_MH+_site3_iso0.h5   -> iso0
+        """
+        stem = fname[:-3] if fname.endswith(".h5") else fname
+        bare = f"_{label}"
+        tagged = f"_{label}_"
+
+        if stem.endswith(bare):
+            return ""
+
+        idx = stem.rfind(tagged)
+        if idx == -1:
+            return ""
+
+        return stem[idx + len(tagged):]
+
+    def _result_graph_and_formula(
+        self,
+        result: GibbsResult,
+    ) -> tuple[Optional[nx.Graph], Optional[str]]:
+        """Rebuild an all-atom graph + formula from a saved GibbsResult."""
+        try:
+            if result.atom_symbols and result.bond_edges:
+                return _graph_from_atom_symbols_and_bond_edges(
+                    str(result.atom_symbols),
+                    str(result.bond_edges),
+                )
+            if result.geometry_xyz:
+                mol = vlx.Molecule.read_xyz_string(str(result.geometry_xyz))
+                return _all_atom_graph(mol), _mol_formula(mol)
+        except Exception as exc:
+            log.debug(
+                "Could not rebuild graph for saved state %s: %s",
+                result.label,
+                exc,
+            )
+        return None, None
+
+    def _find_existing_state_by_structure(
+        self,
+        mol_obj,
+        *,
+        exact_label: Optional[str] = None,
+        label_prefixes: Optional[tuple[str, ...]] = None,
+    ) -> tuple[Optional[GibbsResult], Optional[str], Optional[str]]:
+        """
+        Find an existing saved state by structural identity rather than by
+        exact filename.
+
+        Matching criteria
+        -----------------
+        - charge
+        - multiplicity
+        - full molecular formula
+        - all-atom graph isomorphism (including hydrogens)
+
+        Optionally restrict by an exact label or by label prefix(es). This is
+        used to recover the correct existing iso-tag for a molecule even when
+        filenames are not based on row indices.
+        """
+        if not os.path.isdir(self.output_folder):
+            return None, None, None
+
+        charge = int(mol_obj.get_charge())
+        mult = _valid_multiplicity(mol_obj, charge)
+        mol_obj.set_multiplicity(mult)
+
+        query_formula = _mol_formula(mol_obj)
+        query_graph = _all_atom_graph(mol_obj)
+        nm = isomorphism.categorical_node_match("element", None)
+
+        matches: list[tuple[GibbsResult, str, str]] = []
+
+        for fname in os.listdir(self.output_folder):
+            if not fname.endswith('.h5'):
+                continue
+
+            path = os.path.join(self.output_folder, fname)
+            try:
+                result = _load_gibbs_from_h5(path)
+            except Exception as exc:
+                log.debug("Could not load existing state %s: %s", path, exc)
+                continue
+
+            if exact_label is not None and str(result.label) != exact_label:
+                continue
+            if label_prefixes is not None and not any(
+                str(result.label).startswith(prefix) for prefix in label_prefixes
+            ):
+                continue
+            if int(result.charge) != charge:
+                continue
+            if int(result.multiplicity) != mult:
+                continue
+
+            result_graph, result_formula = self._result_graph_and_formula(result)
+            if result_graph is None or result_formula is None:
+                continue
+            if result_formula != query_formula:
+                continue
+            if len(result_graph) != len(query_graph):
+                continue
+            if not isomorphism.GraphMatcher(
+                result_graph,
+                query_graph,
+                node_match=nm,
+            ).is_isomorphic():
+                continue
+
+            tag = self._file_tag_from_filename(fname, str(result.label))
+            matches.append((result, path, tag))
+
+        if not matches:
+            return None, None, None
+
+        best_res, best_path, best_tag = min(matches, key=lambda item: item[0].g_total)
+        return best_res, best_path, best_tag
+
+    def _resolve_run_tag_for_molecule(
+        self,
+        mol_obj,
+        file_tag: str = "",
+        row_index: Optional[int] = None,
+    ) -> str:
+        """
+        Choose the run tag for this molecule.
+
+        Priority
+        --------
+        1. explicit ``file_tag``
+        2. existing anchor state (label == 'M') found by structure
+        3. ``row_index`` tag
+        4. next available iso-tag for this formula
+
+        This lets reruns continue inside the correct existing iso-tagged result
+        set instead of creating a new iso-tag every time.
+        """
+        if file_tag:
+            return str(file_tag)
+
+        existing_anchor, existing_path, existing_tag = self._find_existing_state_by_structure(
+            mol_obj,
+            exact_label='M',
+        )
+        if existing_anchor is not None:
+            log.info(
+                "Resolved run tag '%s' from existing anchor state %s",
+                existing_tag if existing_tag else '<empty>',
+                existing_path,
+            )
+            return existing_tag or ''
+
+        if row_index is not None:
+            return f"row{int(row_index)}"
+
+        return _next_formula_iso_tag(self.output_folder, _mol_formula(mol_obj))
     
     def _get_or_compute_et_state(
         self,
@@ -1591,8 +1757,8 @@ class RedoxCalculator:
         file_tag: str = "",
     ) -> Optional[GibbsResult]:
         """
-        Reuse an existing ET state (M / M+ / M-) if its HDF5 file exists.
-        Otherwise run conformer search and then compute it.
+        Reuse an ET state by exact filename first, then by structure-based
+        matching, otherwise compute it.
         """
         charge = int(mol_obj.get_charge())
         mult = _valid_multiplicity(mol_obj, charge)
@@ -1606,20 +1772,33 @@ class RedoxCalculator:
                 return _load_gibbs_from_h5(h5_path)
             except Exception as exc:
                 log.warning(
-                    "Could not load existing ET state %s (%s). Recomputing.",
+                    "Could not load existing ET state %s (%s). Will try structure-based reuse.",
                     h5_path,
                     exc,
                 )
+
+        existing, existing_path, existing_tag = self._find_existing_state_by_structure(
+            mol_obj,
+            exact_label=label,
+        )
+        if existing is not None:
+            log.info(
+                "Reusing ET state by structure from %s (tag=%s)",
+                existing_path,
+                existing_tag if existing_tag else '<empty>',
+            )
+            return existing
 
         seed = self._conformer_search(mol_obj, label)
         return self.compute_gibbs(seed, label, file_tag=file_tag)
 
     def _get_or_compute_state(self, mol_obj, label: str, file_tag: str = "") -> Optional[GibbsResult]:
         """
-        Reuse a saved GibbsResult if it exists, otherwise compute it.
+        Reuse a saved GibbsResult by exact filename first, then by structural
+        identity, otherwise compute it.
 
-        This is the state-level restart logic that lets the calculator resume
-        incomplete runs instead of recomputing every state.
+        This allows restarts to recover states even when the folder uses iso
+        tags instead of the exact tag requested by the current run.
         """
         charge = int(mol_obj.get_charge())
         mult = _valid_multiplicity(mol_obj, charge)
@@ -1633,12 +1812,195 @@ class RedoxCalculator:
                 return _load_gibbs_from_h5(h5_path)
             except Exception as exc:
                 log.warning(
-                    "Could not load existing state %s (%s). Recomputing.",
+                    "Could not load existing state %s (%s). Will try structure-based reuse.",
                     h5_path,
                     exc,
                 )
 
+        existing, existing_path, existing_tag = self._find_existing_state_by_structure(mol_obj)
+        if existing is not None:
+            log.info(
+                "Reusing state by structure from %s (saved label=%s, tag=%s)",
+                existing_path,
+                existing.label,
+                existing_tag if existing_tag else '<empty>',
+            )
+            return existing
+
         return self.compute_gibbs(mol_obj, label, file_tag=file_tag)
+
+    def _load_existing_run_results(self, file_tag: str = "") -> list[GibbsResult]:
+        """
+        Load all previously saved GibbsResult files for the current run tag.
+
+        This lets ``run()`` reconstruct an incomplete profile from disk and
+        then only calculate the states that are still missing.
+        """
+        results: list[GibbsResult] = []
+
+        if not os.path.isdir(self.output_folder):
+            return results
+
+        suffix = f"_{file_tag}.h5" if file_tag else ".h5"
+
+        for fname in os.listdir(self.output_folder):
+            if not fname.endswith(".h5"):
+                continue
+            if file_tag and not fname.endswith(suffix):
+                continue
+
+            path = os.path.join(self.output_folder, fname)
+            try:
+                results.append(_load_gibbs_from_h5(path))
+            except Exception as exc:
+                log.debug("Could not load existing run result %s: %s", path, exc)
+
+        return results
+
+    def _best_existing_state(
+        self,
+        file_tag: str,
+        prefixes: tuple[str, ...],
+    ) -> Optional[GibbsResult]:
+        """
+        Return the lowest-G existing state whose label starts with one of the
+        requested prefixes, restricted to the current run tag.
+        """
+        matches = [
+            res
+            for res in self._load_existing_run_results(file_tag=file_tag)
+            if any(str(res.label).startswith(prefix) for prefix in prefixes)
+        ]
+
+        if not matches:
+            return None
+
+        best = min(matches, key=lambda r: r.g_total)
+        log.info(
+            "Recovered existing state %s for prefixes %s from run tag %s",
+            best.label,
+            prefixes,
+            file_tag,
+        )
+        return best
+
+    def _scan_missing_protonation_states(
+        self,
+        profile: RedoxProfile,
+        mol_obj,
+        init_charge: int,
+        basic_atoms: list[int],
+        run_tag: str,
+    ) -> None:
+        """
+        Ensure MH_plus and MH_rad are present. Reuse any existing state files
+        first, then compute only the states that are still missing.
+        """
+        if profile.MH_plus is not None and profile.MH_rad is not None:
+            log.info("Protonation branch already complete from existing files.")
+            return
+
+        if not basic_atoms:
+            log.warning(
+                "No basic site(s) found. MH_plus/MH_rad cannot be generated, so "
+                "PCET reduction and protonation pKa values may be incomplete."
+            )
+            return
+
+        log.info("Scanning %d basic site(s) for protonation.", len(basic_atoms))
+
+        best_plus = profile.MH_plus
+        best_rad = profile.MH_rad
+        min_gp = best_plus.g_total if best_plus is not None else float("inf")
+        min_gr = best_rad.g_total if best_rad is not None else float("inf")
+
+        for idx in basic_atoms:
+            if profile.MH_plus is None:
+                res_p = self._get_or_compute_state(
+                    self.protonate(mol_obj, idx, init_charge + 1),
+                    f"MH+_site{idx}",
+                    file_tag=run_tag,
+                )
+                if res_p and res_p.g_total < min_gp:
+                    min_gp, best_plus = res_p.g_total, res_p
+
+            if profile.MH_rad is None:
+                res_r = self._get_or_compute_state(
+                    self.protonate(mol_obj, idx, init_charge),
+                    f"MH_rad_site{idx}",
+                    file_tag=run_tag,
+                )
+                if res_r and res_r.g_total < min_gr:
+                    min_gr, best_rad = res_r.g_total, res_r
+
+        if profile.MH_plus is None:
+            profile.MH_plus = best_plus
+        if profile.MH_rad is None:
+            profile.MH_rad = best_rad
+
+        if profile.MH_plus is None:
+            log.warning("No MH_plus state available after protonation scan.")
+        if profile.MH_rad is None:
+            log.warning("No MH_rad state available after protonation scan.")
+
+    def _scan_missing_deprotonation_states(
+        self,
+        profile: RedoxProfile,
+        mol_obj,
+        init_charge: int,
+        acidic_H: list[int],
+        run_tag: str,
+    ) -> None:
+        """
+        Ensure M_deprot and M_deprot_rad are present. Reuse any existing state
+        files first, then compute only the states that are still missing.
+        """
+        if profile.M_deprot is not None and profile.M_deprot_rad is not None:
+            log.info("Deprotonation branch already complete from existing files.")
+            return
+
+        if not acidic_H:
+            log.warning(
+                "No acidic H site(s) found. M_deprot/M_deprot_rad cannot be generated, "
+                "so PCET oxidation and deprotonation pKa values may be incomplete."
+            )
+            return
+
+        log.info("Scanning %d acidic site(s) for deprotonation.", len(acidic_H))
+
+        best_dep = profile.M_deprot
+        best_dep_rad = profile.M_deprot_rad
+        min_gd = best_dep.g_total if best_dep is not None else float("inf")
+        min_gdr = best_dep_rad.g_total if best_dep_rad is not None else float("inf")
+
+        for h_idx in acidic_H:
+            if profile.M_deprot is None:
+                res_d = self._get_or_compute_state(
+                    self.deprotonate(mol_obj, h_idx, init_charge - 1),
+                    f"M_deprot_site{h_idx}",
+                    file_tag=run_tag,
+                )
+                if res_d and res_d.g_total < min_gd:
+                    min_gd, best_dep = res_d.g_total, res_d
+
+            if profile.M_deprot_rad is None:
+                res_dr = self._get_or_compute_state(
+                    self.deprotonate(mol_obj, h_idx, init_charge),
+                    f"M_deprot_rad_site{h_idx}",
+                    file_tag=run_tag,
+                )
+                if res_dr and res_dr.g_total < min_gdr:
+                    min_gdr, best_dep_rad = res_dr.g_total, res_dr
+
+        if profile.M_deprot is None:
+            profile.M_deprot = best_dep
+        if profile.M_deprot_rad is None:
+            profile.M_deprot_rad = best_dep_rad
+
+        if profile.M_deprot is None:
+            log.warning("No M_deprot state available after deprotonation scan.")
+        if profile.M_deprot_rad is None:
+            log.warning("No M_deprot_rad state available after deprotonation scan.")
 
     
     # ------------------------------------------------------------------
@@ -1790,6 +2152,7 @@ class RedoxCalculator:
         n_to_rank = min(max_conformers, len(molecules))
 
         for i, molecule in enumerate(molecules[:n_to_rank], start=1):
+            
             _status("[%s] SMD SCF-ranking conformer %d/%d", label, i, n_to_rank)
 
             molecule.set_charge(input_data.get_charge())
@@ -2499,9 +2862,8 @@ class RedoxCalculator:
         profile = RedoxProfile()
 
         run_formula = _mol_formula(mol_obj)
-        run_tag = _resolve_run_tag(
-            self.output_folder,
-            run_formula,
+        run_tag = self._resolve_run_tag_for_molecule(
+            mol_obj,
             file_tag=file_tag,
             row_index=row_index,
         )
@@ -2521,62 +2883,27 @@ class RedoxCalculator:
             setattr(profile, attr, res)
 
         acidic_H, basic_atoms = self.find_protic_sites(mol_obj)
+        log.info("Basic atoms found: %s", basic_atoms)
+        log.info("Acidic H found: %s", acidic_H)
 
-        # ---- protonation scan (basic sites) ----------------------------
-        if basic_atoms:
-            log.info("Scanning %d basic site(s) for protonation.", len(basic_atoms))
-            best_plus = best_rad = None
-            min_gp = min_gr = float("inf")
-
-            for idx in basic_atoms:
-                res_p = self._get_or_compute_state(
-                    self.protonate(mol_obj, idx, init_charge + 1),
-                    f"MH+_site{idx}",
-                    file_tag=run_tag,
-                )
-                if res_p and res_p.g_total < min_gp:
-                    min_gp, best_plus = res_p.g_total, res_p
-
-                res_r = self._get_or_compute_state(
-                    self.protonate(mol_obj, idx, init_charge),
-                    f"MH_rad_site{idx}",
-                    file_tag=run_tag,
-                )
-                if res_r and res_r.g_total < min_gr:
-                    min_gr, best_rad = res_r.g_total, res_r
-
-            if best_plus:
-                profile.MH_plus = best_plus
-            if best_rad:
-                profile.MH_rad = best_rad
-
-        # ---- deprotonation scan (acidic sites) -------------------------
-        if acidic_H:
-            log.info("Scanning %d acidic site(s) for deprotonation.", len(acidic_H))
-            best_dep = best_dep_rad = None
-            min_gd = min_gdr = float("inf")
-
-            for h_idx in acidic_H:
-                res_d = self._get_or_compute_state(
-                    self.deprotonate(mol_obj, h_idx, init_charge - 1),
-                    f"M_deprot_site{h_idx}",
-                    file_tag=run_tag,
-                )
-                if res_d and res_d.g_total < min_gd:
-                    min_gd, best_dep = res_d.g_total, res_d
-
-                res_dr = self._get_or_compute_state(
-                    self.deprotonate(mol_obj, h_idx, init_charge),
-                    f"M_deprot_rad_site{h_idx}",
-                    file_tag=run_tag,
-                )
-                if res_dr and res_dr.g_total < min_gdr:
-                    min_gdr, best_dep_rad = res_dr.g_total, res_dr
-
-            if best_dep:
-                profile.M_deprot = best_dep
-            if best_dep_rad:
-                profile.M_deprot_rad = best_dep_rad
+        # Reconstruct any previously completed protonation/deprotonation
+        # branches from disk, then compute only the branches that are still
+        # missing. This makes reruns fill in missing PCET/pKa states instead
+        # of silently stopping after loading only the ET states.
+        self._scan_missing_protonation_states(
+            profile,
+            mol_obj,
+            init_charge,
+            basic_atoms,
+            run_tag,
+        )
+        self._scan_missing_deprotonation_states(
+            profile,
+            mol_obj,
+            init_charge,
+            acidic_H,
+            run_tag,
+        )
 
         # ---- thermal correction normalisation --------------------------
         def _normalise_pair(
