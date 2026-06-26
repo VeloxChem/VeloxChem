@@ -362,6 +362,47 @@ computeExchangeFockPPPP(double*         mat_K,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeFockPPPP_FP64(double*         mat_K,
+                        const uint32_t* pair_inds_i_for_K_pp,
+                        const uint32_t* pair_inds_k_for_K_pp,
+                        const uint32_t  pair_inds_count_for_K_pp,
+                        const double*   p_prim_info,
+                        const uint32_t* p_prim_aoinds,
+                        const uint32_t  p_prim_count,
+                        const double*   mat_D_full_AO,
+                        const uint32_t  naos,
+                        const uint32_t* D_inds_K_pp,
+                        const uint32_t* pair_displs_K_pp,
+                        const uint32_t* pair_counts_K_pp,
+                        const double*   pair_data_K_pp,
+                        const double*   boys_func_table,
+                        const double*   boys_func_ft,
+                        const double    omega,
+                        const uint32_t* prec_cut_flat,
+                        const uint32_t* displ_cuts);
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeFockPPPP_FP32(double*         mat_K,
+                        const uint32_t* pair_inds_i_for_K_pp,
+                        const uint32_t* pair_inds_k_for_K_pp,
+                        const uint32_t  pair_inds_count_for_K_pp,
+                        const float*    p_prim_info_f,
+                        const uint32_t* p_prim_aoinds,
+                        const uint32_t  p_prim_count,
+                        const double*   mat_D_full_AO,
+                        const uint32_t  naos,
+                        const uint32_t* D_inds_K_pp,
+                        const uint32_t* pair_displs_K_pp,
+                        const uint32_t* pair_counts_K_pp,
+                        const float*    pair_data_K_pp_f,
+                        const float*    boys_func_table_f,
+                        const float*    boys_func_ft_f,
+                        const double    omega,
+                        const uint32_t* prec_cut_flat,
+                        const uint32_t* screen_cut_flat,
+                        const uint32_t* displ_cuts);
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSSD(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_ss,
                         const uint32_t* pair_inds_k_for_K_ss,

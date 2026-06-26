@@ -340,7 +340,8 @@ export_gpu(py::module& m)
            const std::string&          flag_K,
            const double                eri_threshold,
            const double                prelink_threshold,
-           const double                mixed_prec_threshold,
+           const double                mixed_precision_threshold_j,
+           const double                mixed_precision_threshold_k,
            const py::array_t<int32_t>& Q_prime_row_indices,
            const py::array_t<int32_t>& Q_prime_col_indices,
            CScreeningData&             screening) -> CDenseMatrix {
@@ -360,7 +361,7 @@ export_gpu(py::module& m)
             return gpu::computeFockOnGPU(molecule, basis, densityMatrix, prefac_coulomb,
                                          frac_exact_exchange_values, omega_values, flag_K,
                                          eri_threshold, prelink_threshold,
-                                         mixed_prec_threshold, Q_prime_row_ptr,
+                                         mixed_precision_threshold_j, mixed_precision_threshold_k, Q_prime_row_ptr,
                                          Q_prime_col_ptr, Q_prime_ind_count, screening);
         },
         "Computes Fock matrix using GPU.");

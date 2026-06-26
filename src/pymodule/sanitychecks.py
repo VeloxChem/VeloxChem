@@ -64,8 +64,15 @@ def scf_results_sanity_check(obj, scf_results):
         if scf_results.get('eri_thresh', None) is not None:
             updated_scf_info['eri_thresh'] = scf_results['eri_thresh']
 
-        if scf_results.get('mixed_prec_thresh', None) is not None:
-            updated_scf_info['mixed_prec_thresh'] = scf_results['mixed_prec_thresh']
+        if scf_results.get('mixed_precision_threshold_j', None) is not None:
+            updated_scf_info['mixed_precision_threshold_j'] = scf_results[
+                'mixed_precision_threshold_j'
+            ]
+
+        if scf_results.get('mixed_precision_threshold_k', None) is not None:
+            updated_scf_info['mixed_precision_threshold_k'] = scf_results[
+                'mixed_precision_threshold_k'
+            ]
 
         if scf_results.get('restart', None) is not None:
             # do not restart if scf is not restarted from checkpoint

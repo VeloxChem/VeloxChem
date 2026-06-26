@@ -121,7 +121,9 @@ class LinearSolver:
         self.density_thresh = 1.0e-10
         self.prelink_thresh = 5.0e-6
 
-        self.mixed_prec_thresh = 1.0e-6
+        self.mixed_precision_threshold_j = 1.0e-6
+
+        self.mixed_precision_threshold_k = 1.0e-6
 
         # dft
         self.xcfun = None
@@ -194,7 +196,8 @@ class LinearSolver:
         self._input_keywords = {
             'response': {
                 'eri_thresh': ('float', 'ERI screening threshold'),
-                'mixed_prec_thresh': ('float', 'mixed-precision ERI threshold'),
+                'mixed_precision_threshold_j': ('float', 'mixed-precision ERI threshold for Coulomb'),
+                'mixed_precision_threshold_k': ('float', 'mixed-precision ERI threshold for Exchange'),
                 'batch_size': ('int', 'batch size for Fock build'),
                 'conv_thresh': ('float', 'convergence threshold'),
                 'max_iter': ('int', 'maximum number of iterations'),
@@ -1186,7 +1189,8 @@ class LinearSolver:
                         molecule, basis, dens, prefac_coulomb,
                         [full_k_coef, erf_k_coef], [0.0, omega],
                         flag_exchange, self.eri_thresh, self.prelink_thresh,
-                        self.mixed_prec_thresh,
+                        self.mixed_precision_threshold_j,
+                        self.mixed_precision_threshold_k,
                         q_prime_row_inds, q_prime_col_inds,
                         eri_dict['screening'])
 
@@ -1196,7 +1200,8 @@ class LinearSolver:
                         molecule, basis, dens, prefac_coulomb,
                         [self.xcfun.get_frac_exact_exchange()], [0.0],
                         flag_exchange, self.eri_thresh, self.prelink_thresh,
-                        self.mixed_prec_thresh,
+                        self.mixed_precision_threshold_j,
+                        self.mixed_precision_threshold_k,
                         q_prime_row_inds, q_prime_col_inds,
                         eri_dict['screening'])
 
@@ -1205,7 +1210,8 @@ class LinearSolver:
                 fock_mat = compute_fock_gpu(
                     molecule, basis, dens, prefac_coulomb, [0.0], [0.0],
                     flag_exchange, self.eri_thresh, self.prelink_thresh,
-                    self.mixed_prec_thresh,
+                    self.mixed_precision_threshold_j,
+                    self.mixed_precision_threshold_k,
                     q_prime_row_inds, q_prime_col_inds,
                     eri_dict['screening'])
 
@@ -1214,7 +1220,8 @@ class LinearSolver:
             fock_mat = compute_fock_gpu(
                 molecule, basis, dens, prefac_coulomb, [1.0], [0.0],
                 flag_exchange, self.eri_thresh, self.prelink_thresh,
-                self.mixed_prec_thresh,
+                self.mixed_precision_threshold_j,
+                self.mixed_precision_threshold_k,
                 q_prime_row_inds, q_prime_col_inds,
                 eri_dict['screening'])
 
