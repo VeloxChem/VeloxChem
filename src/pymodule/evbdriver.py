@@ -406,7 +406,7 @@ class EvbDriver:
             self.ostream.print_header(f"Running FEP for {conf['name']}")
             self.ostream.flush()
             FEP = EvbFepDriver(ostream=self.ostream)
-            FEP.run_FEP(
+            FEP.run_replicas(
                 Lambda=self.lambda_vec,
                 configuration=conf,
                 platform=platform,

@@ -66,16 +66,42 @@ class OptimizationEngine(geometric.engine.Engine):
         - rank: The rank of MPI process.
     """
 
-    def __init__(self, grad_drv, molecule, *args):
+    def __init__(self, grad_drv, molecule, *args, frozen_idx=None,
+                 frozen_method='zero'):
         """
         Initializes optimization engine for geomeTRIC.
+
+        Frozen atoms are hidden from geomeTRIC. With the 'reduce' method only
+        the active (non-frozen) atoms are exposed; with the 'zero' method the
+        full molecule is exposed but the frozen-atom gradient is zeroed.
         """
 
+        labels = molecule.get_labels()
+        natoms = len(labels)
+
+        if frozen_idx is None:
+            frozen_idx = np.array([], dtype=int)
+        self.frozen_idx = np.asarray(frozen_idx, dtype=int)
+        frozen_set = set(self.frozen_idx.tolist())
+        self.active_idx = np.array(
+            [i for i in range(natoms) if i not in frozen_set], dtype=int)
+        self.frozen_method = frozen_method
+
+        # fixed positions of the frozen atoms (Bohr), held constant throughout
+        coords_in_bohr = molecule.get_coordinates_in_bohr()
+        self.frozen_coords = coords_in_bohr[self.frozen_idx]
+
         g_molecule = geometric.molecule.Molecule()
-        g_molecule.elem = molecule.get_labels()
-        g_molecule.xyzs = [
-            molecule.get_coordinates_in_bohr() * geometric.nifty.bohr2ang
-        ]
+        if self.frozen_idx.size > 0 and frozen_method == 'reduce':
+            # expose only the active atoms to geomeTRIC
+            g_molecule.elem = [labels[i] for i in self.active_idx]
+            g_molecule.xyzs = [
+                coords_in_bohr[self.active_idx] * geometric.nifty.bohr2ang
+            ]
+        else:
+            # full molecule ('zero' method, or no frozen atoms)
+            g_molecule.elem = labels
+            g_molecule.xyzs = [coords_in_bohr * geometric.nifty.bohr2ang]
         g_molecule.build_topology()
 
         super().__init__(g_molecule)
@@ -143,9 +169,24 @@ class OptimizationEngine(geometric.engine.Engine):
         labels = self.molecule.get_labels()
         atom_basis_labels = self.molecule.get_atom_basis_labels()
 
+        # geomeTRIC passes only the active atoms with the 'reduce' method;
+        # splice them back into the full geometry with the frozen atoms held
+        # at their fixed positions
+        if self.frozen_idx.size > 0 and self.frozen_method == 'reduce':
+            full_coords = self.molecule.get_coordinates_in_bohr()
+            full_coords[self.active_idx] = coords.reshape(-1, 3)
+            full_coords[self.frozen_idx] = self.frozen_coords
+        else:
+            full_coords = coords.reshape(-1, 3)
+            # 'zero' method: geomeTRIC sees the full molecule and may drift the
+            # frozen atoms (their gradient is zeroed); always evaluate energy
+            # and gradient with the frozen atoms pinned to their fixed positions
+            if self.frozen_idx.size > 0:
+                full_coords = full_coords.copy()
+                full_coords[self.frozen_idx] = self.frozen_coords
+
         if self.rank == mpi_master():
-            new_mol = Molecule(labels, coords.reshape(-1, 3), 'au',
-                               atom_basis_labels)
+            new_mol = Molecule(labels, full_coords, 'au', atom_basis_labels)
             new_mol.set_charge(self.molecule.get_charge())
             new_mol.set_multiplicity(self.molecule.get_multiplicity())
         else:
@@ -179,8 +220,18 @@ class OptimizationEngine(geometric.engine.Engine):
 
         self.opt_current_step += 1
 
+        # build the gradient seen by geomeTRIC: active rows only for 'reduce',
+        # full gradient with zeroed frozen rows for 'zero'
+        if self.frozen_idx.size > 0 and self.frozen_method == 'reduce':
+            eff_gradient = gradient[self.active_idx]
+        elif self.frozen_idx.size > 0:
+            eff_gradient = gradient.copy()
+            eff_gradient[self.frozen_idx] = 0.0
+        else:
+            eff_gradient = gradient
+
         if self.rank == mpi_master():
-            grad2 = np.sum(gradient**2, axis=1)
+            grad2 = np.sum(eff_gradient**2, axis=1)
             rms_grad = np.sqrt(np.mean(grad2))
             max_grad = np.max(np.sqrt(grad2))
             valstr = '  Energy   : {:.10f} a.u.'.format(energy)
@@ -196,7 +247,7 @@ class OptimizationEngine(geometric.engine.Engine):
 
         return {
             'energy': energy,
-            'gradient': gradient.flatten(),
+            'gradient': eff_gradient.flatten(),
         }
 
     def copy_scratch(self, src, dest):
@@ -224,7 +275,9 @@ class OptimizationEngine(geometric.engine.Engine):
 
         new_engine = OptimizationEngine(deepcopy(self.grad_drv),
                                         deepcopy(self.molecule),
-                                        *deepcopy(self.args))
+                                        *deepcopy(self.args),
+                                        frozen_idx=deepcopy(self.frozen_idx),
+                                        frozen_method=self.frozen_method)
 
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):

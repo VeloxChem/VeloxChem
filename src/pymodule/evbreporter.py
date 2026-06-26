@@ -63,9 +63,16 @@ class EvbReporter:
         velocity_file=None,
         append=False,
         debug=False,
+        replica=0,
+        direction=0,
     ):
         self.ostream = outputstream
         self.debug = debug
+        # Replica index and sweep direction (0 = forward l: 0->1, 1 = backward
+        # l: 1->0) are stamped onto every reported row so that all replicas and
+        # both directions can share a single output file.
+        self.replica = replica
+        self.direction = direction
         # OpenMM HIP version is slighly older and uses a different format for reporters
         raw_openmm_version = version('openmm')
         match = re.match(r"^(\d+)\.(\d+)", raw_openmm_version)
@@ -104,7 +111,7 @@ class EvbReporter:
             self.simulations.update({name: sim})
 
         if not append:
-            header = "Lambda, reactant PES, product PES, reactant integration, product integration, Em \n"
+            header = "Lambda, reactant PES, product PES, reactant integration, product integration, Em, replica, direction \n"
             self.E_out.write(header)
 
         if force_file is None:
@@ -114,7 +121,7 @@ class EvbReporter:
             self.F_out = open(force_file, 'a' if append else 'w')
             self.out_streams.append(self.F_out)
             if not append:
-                header = "Lambda, "
+                header = "Lambda, replica, direction, "
                 for j in range(topology.getNumAtoms()):
                     header += f"F(x, {j}), F(y, {j}), F(z, {j}), norm({j}), "
                 header = header[:-2] + '\n'
@@ -127,7 +134,7 @@ class EvbReporter:
             self.v_out = open(velocity_file, 'a' if append else 'w')
             self.out_streams.append(self.v_out)
             if not append:
-                header = "Lambda, "
+                header = "Lambda, replica, direction, "
                 for j in range(topology.getNumAtoms()):
                     header += f"V(x, {j}), V(y, {j}), V(z, {j}), "
                 header = header[:-2] + '\n'
@@ -311,7 +318,7 @@ class EvbReporter:
         E2_int = E[1]
 
         Em = E1_pes * (1 - self.lambda_val) + E2_pes * self.lambda_val
-        line = f"{self.lambda_val}, {E1_pes:.10e}, {E2_pes:.10e}, {E1_int:.10e}, {E2_int:.10e}, {Em:.10e} \n"
+        line = f"{self.lambda_val}, {E1_pes:.10e}, {E2_pes:.10e}, {E1_int:.10e}, {E2_int:.10e}, {Em:.10e}, {self.replica}, {self.direction} \n"
         self.E_out.write(line)
 
         # Em_dif = abs(Em_int - E1_int * (1 - self.lambda_val) +
@@ -399,7 +406,7 @@ class EvbReporter:
         if self.report_forces:
             forces = state.getForces(asNumpy=True)
             norms = np.linalg.norm(forces, axis=1)
-            line = f"{self.lambda_val}"
+            line = f"{self.lambda_val}, {self.replica}, {self.direction}"
             kjpermolenm = mm.unit.kilojoules_per_mole / mm.unit.nanometer
             for i in range(forces.shape[0]):
                 line += f", {forces[i][0].value_in_unit(kjpermolenm):.5e}, {forces[i][1].value_in_unit(kjpermolenm):.5e}, {forces[i][2].value_in_unit(kjpermolenm):.5e}, {norms[i]:.5e}"
@@ -408,7 +415,7 @@ class EvbReporter:
 
         if self.report_velocities:
             velocities = state.getVelocities(asNumpy=True)
-            line = f"{self.lambda_val}"
+            line = f"{self.lambda_val}, {self.replica}, {self.direction}"
             nmperps = mm.unit.nanometer / mm.unit.picosecond
             for i in range(velocities.shape[0]):
                 line += f", {velocities[i][0].value_in_unit(nmperps):.5e}, {velocities[i][1].value_in_unit(nmperps):.5e}, {velocities[i][2].value_in_unit(nmperps):.5e}"

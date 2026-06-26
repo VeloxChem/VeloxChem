@@ -119,6 +119,10 @@ class OptimizationDriver:
         self.irc = False
         self.hessian = 'never'
 
+        # frozen atoms (hidden from geomeTRIC); see compute() for details
+        self.frozen_atoms = None
+        self.frozen_atoms_method = 'zero'
+
         self.ref_xyz = None
 
         self.keep_files = False
@@ -135,18 +139,22 @@ class OptimizationDriver:
                 'coordsys': ('str_lower', 'coordinate system'),
                 'constraints': ('list', 'constraints'),
                 'check_interval':
-                    ('int', 'interval for checking coordinate system'),
+                ('int', 'interval for checking coordinate system'),
                 'trust': ('float', 'trust radius to begin with'),
                 'tmax': ('float', 'maximum value of trust radius'),
                 'max_iter': ('int', 'maximum number of optimization steps'),
                 'transition': ('bool', 'transition state search'),
                 'irc': ('bool', 'flag for intrinsic reaction coordinate'),
                 'hessian': ('str_lower', 'hessian flag'),
+                'frozen_atoms':
+                ('seq_fixed_int', 'atoms (1-based) hidden from geomeTRIC'),
+                'frozen_atoms_method':
+                ('str_lower', 'frozen-atom method (zero or reduce)'),
                 'ref_xyz': ('str', 'reference geometry'),
                 'keep_files': ('bool', 'flag to keep output files'),
                 'restart': ('bool', 'flag to restart from checkpoint'),
                 'conv_maxiter':
-                    ('bool', 'consider converged if max_iter is reached'),
+                ('bool', 'consider converged if max_iter is reached'),
                 'conv_energy': ('float', ''),
                 'conv_grms': ('float', ''),
                 'conv_gmax': ('float', ''),
@@ -186,7 +194,8 @@ class OptimizationDriver:
         """
 
         opt_keywords = {
-            key: val[0] for key, val in self.input_keywords['optimize'].items()
+            key: val[0]
+            for key, val in self.input_keywords['optimize'].items()
         }
 
         parse_input(self, opt_keywords, opt_dict)
@@ -240,11 +249,11 @@ class OptimizationDriver:
         elif isinstance(drv, MMDriver):
             grad_drv = MMGradientDriver(drv)
 
-        elif (isinstance(drv, ScfGradientDriver) or
-              isinstance(drv, XtbGradientDriver) or
-              isinstance(drv, OpenMMGradientDriver) or
-              isinstance(drv, TddftGradientDriver) or
-              isinstance(drv, MMGradientDriver)):
+        elif (isinstance(drv, ScfGradientDriver)
+              or isinstance(drv, XtbGradientDriver)
+              or isinstance(drv, OpenMMGradientDriver)
+              or isinstance(drv, TddftGradientDriver)
+              or isinstance(drv, MMGradientDriver)):
             grad_drv = drv
 
         else:
@@ -253,6 +262,86 @@ class OptimizationDriver:
                 'OptimizationDriver: Invalid argument for initialization')
 
         return grad_drv
+
+    def _get_frozen_indices(self, natoms):
+        """
+        Converts the (1-based) frozen_atoms input into sorted 0-based frozen and
+        active atom index arrays.
+
+        :param natoms:
+            The total number of atoms in the molecule.
+
+        :return:
+            A tuple (frozen_idx, active_idx) of numpy integer arrays. The frozen
+            array is empty when no frozen atoms are requested.
+        """
+
+        if not self.frozen_atoms:
+            return (np.array([], dtype=int), np.arange(natoms, dtype=int))
+
+        assert_msg_critical(
+            self.frozen_atoms_method in ['zero', 'reduce'],
+            'OptimizationDriver: frozen_atoms_method must be \'zero\' or '
+            '\'reduce\'')
+
+        frozen_idx = np.array(sorted(set(int(i) - 1
+                                         for i in self.frozen_atoms)),
+                              dtype=int)
+        assert_msg_critical(
+            frozen_idx.size == len(self.frozen_atoms),
+            'OptimizationDriver: duplicate indices in frozen_atoms')
+        assert_msg_critical(
+            frozen_idx.size > 0 and frozen_idx[0] >= 0
+            and frozen_idx[-1] < natoms,
+            'OptimizationDriver: frozen_atoms index out of range (note that '
+            'frozen_atoms is 1-based)')
+
+        frozen_set = set(frozen_idx.tolist())
+        active_idx = np.array([i for i in range(natoms) if i not in frozen_set],
+                              dtype=int)
+        assert_msg_critical(
+            active_idx.size >= 2,
+            'OptimizationDriver: fewer than 2 non-frozen atoms remain')
+
+        return (frozen_idx, active_idx)
+
+    def _condition_frozen_hessian(self, hess_data, frozen_idx, active_idx):
+        """
+        Conditions a full 3N x 3N Cartesian Hessian for the frozen-atom
+        optimization, returning the matrix that is handed to geomeTRIC.
+
+        For the 'reduce' method the active-active block is sliced out
+        (3*n_active square). For the 'zero' method the frozen coupling rows and
+        columns are zeroed and the frozen diagonal is stiffened so the RFO
+        solver stays well-posed (full 3N square).
+
+        :param hess_data:
+            The full Cartesian Hessian, shape (3N, 3N), in atomic units.
+        :param frozen_idx:
+            The 0-based frozen atom indices.
+        :param active_idx:
+            The 0-based active atom indices.
+
+        :return:
+            The conditioned Hessian.
+        """
+
+        # stiff diagonal value (a.u.) for frozen degrees of freedom; only needs
+        # to be large enough that frozen modes are never the lowest eigenvector
+        frozen_diagonal = 1.0e5
+
+        if self.frozen_atoms_method == 'reduce':
+            active_dof = np.array(
+                [3 * i + k for i in active_idx for k in range(3)], dtype=int)
+            return hess_data[np.ix_(active_dof, active_dof)]
+
+        frozen_dof = np.array([3 * i + k for i in frozen_idx for k in range(3)],
+                              dtype=int)
+        cond_hess = np.array(hess_data, dtype=float, copy=True)
+        cond_hess[frozen_dof, :] = 0.0
+        cond_hess[:, frozen_dof] = 0.0
+        cond_hess[frozen_dof, frozen_dof] = frozen_diagonal
+        return cond_hess
 
     def compute(self, molecule, *args):
         """
@@ -307,11 +396,42 @@ class OptimizationDriver:
                     self.ostream.print_blank()
                     self.ostream.flush()
 
-        opt_engine = OptimizationEngine(self.grad_drv, molecule, *args)
+        # frozen atoms are hidden from geomeTRIC; build the index mapping here
+        # so it can drive the engine, Hessian conditioning, and the final
+        # geometry reconstruction below
+        frozen_idx, active_idx = self._get_frozen_indices(
+            molecule.number_of_atoms())
+        has_frozen = frozen_idx.size > 0
+
+        if has_frozen and self.constraints:
+            constr_keys = [
+                line.strip().split()[0] for line in self.constraints
+                if line.strip()
+            ]
+            # 'reduce' renumbers atoms for geomeTRIC, so set/scan constraint
+            # indices (which refer to the full molecule) would mis-map
+            if self.frozen_atoms_method == 'reduce':
+                assert_msg_critical(
+                    all(k not in ('set', 'scan') for k in constr_keys),
+                    'OptimizationDriver: frozen_atoms_method=\'reduce\' cannot '
+                    'be combined with set/scan constraints; use '
+                    'frozen_atoms_method=\'zero\' instead')
+            if 'freeze' in constr_keys:
+                self.ostream.print_warning(
+                    'Both frozen_atoms and freeze constraints are set; make '
+                    'sure they do not refer to the same atoms.')
+                self.ostream.flush()
+
+        opt_engine = OptimizationEngine(self.grad_drv,
+                                        molecule,
+                                        *args,
+                                        frozen_idx=frozen_idx,
+                                        frozen_method=self.frozen_atoms_method)
 
         # save unparsed opt_dict in opt_engine for later writing to checkpoint
         opt_keywords = {
-            key: val[0] for key, val in self.input_keywords['optimize'].items()
+            key: val[0]
+            for key, val in self.input_keywords['optimize'].items()
         }
         opt_engine.opt_unparsed_input = unparse_input(self, opt_keywords)
 
@@ -325,8 +445,8 @@ class OptimizationDriver:
 
         # check that the args contain molecular basis and scf_results
         # note that we only check the type of scf_results on the master rank
-        if (isinstance(self.grad_drv, ScfGradientDriver) and
-                isinstance(args[0], MolecularBasis) and (len(args) >= 2)):
+        if (isinstance(self.grad_drv, ScfGradientDriver)
+                and isinstance(args[0], MolecularBasis) and (len(args) >= 2)):
             args_filename = None
             if self.rank == mpi_master():
                 # read filename from scf_results
@@ -401,7 +521,8 @@ class OptimizationDriver:
             constr_filename = None
 
         optinp_filename = Path(filename + '.optinp').as_posix()
-        basis = args[0] if args and isinstance(args[0], MolecularBasis) else None
+        basis = args[0] if args and isinstance(args[0],
+                                               MolecularBasis) else None
 
         # prepare for post-opt Hessian
 
@@ -432,6 +553,30 @@ class OptimizationDriver:
             hessian_filename = (hessian_dir / 'hessian.txt').as_posix()
             np.savetxt(hessian_filename, hess_data)
             self.hessian = f'file:{hessian_filename}'
+
+        # condition the Hessian for frozen atoms: slice the active block for
+        # 'reduce', or zero the frozen coupling and stiffen the frozen diagonal
+        # for 'zero' (a plain numerical Hessian would be singular for 'zero')
+
+        if has_frozen:
+            assert_msg_critical(
+                not (self.transition and self.frozen_atoms_method == 'zero'
+                     and not self.hessian.startswith('file')),
+                'OptimizationDriver: frozen_atoms_method=\'zero\' with a '
+                'transition state search requires an explicit Hessian (provide '
+                'a precomputed Hessian via the hessian keyword, or use an SCF '
+                'driver); alternatively use frozen_atoms_method=\'reduce\'')
+
+            if self.hessian.startswith('file'):
+                prefix, _, hess_path = self.hessian.partition(':')
+                full_hess = np.loadtxt(hess_path)
+                cond_hess = self._condition_frozen_hessian(
+                    full_hess, frozen_idx, active_idx)
+                cond_dir = temp_path / f'rank_{self.rank}'
+                cond_dir.mkdir(parents=True, exist_ok=True)
+                cond_path = (cond_dir / 'hessian_frozen.txt').as_posix()
+                np.savetxt(cond_path, cond_hess)
+                self.hessian = f'{prefix}:{cond_path}'
 
         # determine trust radius
 
@@ -479,9 +624,23 @@ class OptimizationDriver:
             opt_results = {'final_geometry': final_mol.get_xyz_string()}
 
         else:
-            coords = m.xyzs[-1] / geometric.nifty.bohr2ang
+            opt_coords = m.xyzs[-1] / geometric.nifty.bohr2ang
             labels = molecule.get_labels()
             atom_basis_labels = molecule.get_atom_basis_labels()
+
+            if has_frozen and self.frozen_atoms_method == 'reduce':
+                # geomeTRIC only optimized the active atoms; splice them back
+                # into the full geometry, keeping frozen atoms fixed
+                coords = molecule.get_coordinates_in_bohr()
+                coords[active_idx] = opt_coords.reshape(-1, 3)
+            elif has_frozen:
+                # 'zero': full geometry already, but pin frozen atoms to their
+                # exact fixed positions to remove any optimizer drift
+                coords = opt_coords.reshape(-1, 3)
+                coords[frozen_idx] = molecule.get_coordinates_in_bohr(
+                )[frozen_idx]
+            else:
+                coords = opt_coords
 
             if self.rank == mpi_master():
                 final_mol = Molecule(labels, coords.reshape(-1, 3), 'au',
@@ -899,8 +1058,7 @@ class OptimizationDriver:
 
             line = ('{:>5d}   {:22.12f}{:22.12f}   {:13.3f}'
                     '     {:15.3e}{:15.3e}{:>7s}').format(
-                        i, energies[i], delta_e, rel_e_ts, rmsd, maxd,
-                        status)
+                        i, energies[i], delta_e, rel_e_ts, rmsd, maxd, status)
             self.ostream.print_header(line)
 
         self.ostream.print_blank()
@@ -918,16 +1076,12 @@ class OptimizationDriver:
 
         summary_items = [
             ('Transition State Point', f'{ts_index:12d}'),
-            ('Forward Barrier (TS - Reactant)',
-             f'{barrier_fwd:12.3f} kJ/mol'),
-            ('Backward Barrier (TS - Product)',
-             f'{barrier_bwd:12.3f} kJ/mol'),
+            ('Forward Barrier (TS - Reactant)', f'{barrier_fwd:12.3f} kJ/mol'),
+            ('Backward Barrier (TS - Product)', f'{barrier_bwd:12.3f} kJ/mol'),
             ('Reaction Energy (Product - Reactant)',
              f'{reaction_energy:12.3f} kJ/mol'),
         ]
-        lines = [
-            f'{label:<38s} :    {value}' for label, value in summary_items
-        ]
+        lines = [f'{label:<38s} :    {value}' for label, value in summary_items]
         maxlen = max(len(line) for line in lines)
         for line in lines:
             self.ostream.print_header(line.ljust(maxlen))
@@ -1057,6 +1211,11 @@ class OptimizationDriver:
         lines.append('IRC                     :    ' +
                      ('Yes' if self.irc else 'No'))
         lines.append('Hessian                 :    ' + self.hessian)
+        if self.frozen_atoms:
+            lines.append('Frozen Atoms            :    ' +
+                         str(self.frozen_atoms))
+            lines.append('Frozen Atoms Method     :    ' +
+                         self.frozen_atoms_method)
 
         maxlen = max([len(line.split(':')[0]) * 2 for line in lines])
         for line in lines:
@@ -1210,7 +1369,8 @@ class OptimizationDriver:
             import matplotlib.pyplot as plt
             from scipy.interpolate import CubicSpline
         except ImportError:
-            raise ImportError('matplotlib and scipy are required for this functionality.')
+            raise ImportError(
+                'matplotlib and scipy are required for this functionality.')
 
         energies = opt_results['scan_energies']
         total_points = len(energies)
@@ -1226,9 +1386,21 @@ class OptimizationDriver:
             cs = CubicSpline(scan_points, rel_energies_kJ)
             x = np.linspace(0, total_points - 1, 300)
             y = cs(x)
-            plt.plot(x, y, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
+            plt.plot(x,
+                     y,
+                     color='black',
+                     alpha=0.9,
+                     linewidth=2.5,
+                     ls='-',
+                     zorder=0)
         else:
-            plt.plot(scan_points, rel_energies_kJ, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
+            plt.plot(scan_points,
+                     rel_energies_kJ,
+                     color='black',
+                     alpha=0.9,
+                     linewidth=2.5,
+                     ls='-',
+                     zorder=0)
         plt.scatter(scan_points,
                     rel_energies_kJ,
                     color='black',
@@ -1272,7 +1444,11 @@ class OptimizationDriver:
                                                        value=0),
                             atom_indices=ipywidgets.fixed(atom_indices))
 
-    def show_scan_point(self, energies, geometries, point=0, atom_indices=False):
+    def show_scan_point(self,
+                        energies,
+                        geometries,
+                        point=0,
+                        atom_indices=False):
         """
         Show the geometry at a specific scan point.
 
@@ -1290,7 +1466,8 @@ class OptimizationDriver:
             import matplotlib.pyplot as plt
             from scipy.interpolate import CubicSpline
         except ImportError:
-            raise ImportError('matplotlib and scipy are required for this functionality.')
+            raise ImportError(
+                'matplotlib and scipy are required for this functionality.')
 
         min_energy = np.min(energies)
         rel_energies = energies - min_energy
@@ -1305,9 +1482,21 @@ class OptimizationDriver:
             cs = CubicSpline(scan_points, rel_energies_kJ)
             x = np.linspace(0, total_points - 1, 300)
             y = cs(x)
-            plt.plot(x, y, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
+            plt.plot(x,
+                     y,
+                     color='black',
+                     alpha=0.9,
+                     linewidth=2.5,
+                     ls='-',
+                     zorder=0)
         else:
-            plt.plot(scan_points, rel_energies_kJ, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
+            plt.plot(scan_points,
+                     rel_energies_kJ,
+                     color='black',
+                     alpha=0.9,
+                     linewidth=2.5,
+                     ls='-',
+                     zorder=0)
         plt.scatter(scan_points,
                     rel_energies_kJ,
                     color='black',
@@ -1346,7 +1535,8 @@ class OptimizationDriver:
             import matplotlib.pyplot as plt
             from scipy.interpolate import CubicSpline
         except ImportError:
-            raise ImportError('matplotlib and scipy are required for this functionality.')
+            raise ImportError(
+                'matplotlib and scipy are required for this functionality.')
 
         energies = opt_results['irc_energies']
         ts_index = opt_results['ts_index']
@@ -1363,9 +1553,21 @@ class OptimizationDriver:
             cs = CubicSpline(irc_points, rel_energies_kJ)
             x = np.linspace(0, total_points - 1, 300)
             y = cs(x)
-            plt.plot(x, y, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
+            plt.plot(x,
+                     y,
+                     color='black',
+                     alpha=0.9,
+                     linewidth=2.5,
+                     ls='-',
+                     zorder=0)
         else:
-            plt.plot(irc_points, rel_energies_kJ, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
+            plt.plot(irc_points,
+                     rel_energies_kJ,
+                     color='black',
+                     alpha=0.9,
+                     linewidth=2.5,
+                     ls='-',
+                     zorder=0)
 
         # Plot all IRC points
         plt.scatter(irc_points,
@@ -1427,7 +1629,12 @@ class OptimizationDriver:
                                                        value=ts_index),
                             atom_indices=ipywidgets.fixed(atom_indices))
 
-    def show_irc_point(self, energies, geometries, ts_index, point=0, atom_indices=False):
+    def show_irc_point(self,
+                       energies,
+                       geometries,
+                       ts_index,
+                       point=0,
+                       atom_indices=False):
         """
         Show the geometry at a specific IRC point.
 
@@ -1447,7 +1654,8 @@ class OptimizationDriver:
             import matplotlib.pyplot as plt
             from scipy.interpolate import CubicSpline
         except ImportError:
-            raise ImportError('matplotlib and scipy are required for this functionality.')
+            raise ImportError(
+                'matplotlib and scipy are required for this functionality.')
 
         e_ts = energies[ts_index]
         rel_energies = np.array(energies) - e_ts
@@ -1462,9 +1670,21 @@ class OptimizationDriver:
             cs = CubicSpline(irc_points, rel_energies_kJ)
             x = np.linspace(0, total_points - 1, 300)
             y = cs(x)
-            plt.plot(x, y, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
+            plt.plot(x,
+                     y,
+                     color='black',
+                     alpha=0.9,
+                     linewidth=2.5,
+                     ls='-',
+                     zorder=0)
         else:
-            plt.plot(irc_points, rel_energies_kJ, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
+            plt.plot(irc_points,
+                     rel_energies_kJ,
+                     color='black',
+                     alpha=0.9,
+                     linewidth=2.5,
+                     ls='-',
+                     zorder=0)
 
         # Plot all IRC points
         plt.scatter(irc_points,
