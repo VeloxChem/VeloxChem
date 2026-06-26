@@ -7636,26 +7636,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDPD6_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
-                               d_mat_J, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDPD7_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
-                               d_mat_J, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDPD8_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
-                               d_mat_J, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
-            gpu::computeCoulombFockDDPD9_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
-                               d_mat_J, d_p_prim_info, static_cast<uint32_t>(p_prim_count), d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);
 
             gpu::computeCoulombFockDDPD0_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
@@ -7683,26 +7663,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_pd_first_inds, d_pd_second_inds, d_pd_pair_data_f, static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
             gpu::computeCoulombFockDDPD5_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
-                               d_mat_J, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data_f, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDPD6_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
-                               d_mat_J, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data_f, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDPD7_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
-                               d_mat_J, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data_f, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDPD8_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
-                               d_mat_J, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
-                               d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
-                               d_pd_first_inds, d_pd_second_inds, d_pd_pair_data_f, static_cast<uint32_t>(pd_prim_pair_count),
-                               d_boys_func_table_f, d_boys_func_ft_f, d_prec_cut_ij_tile, d_screen_cut_ij_tile);
-            gpu::computeCoulombFockDDPD9_FP32<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
                                d_mat_J, d_p_prim_info_f, static_cast<uint32_t>(p_prim_count), d_d_prim_info_f, static_cast<uint32_t>(d_prim_count), d_pd_mat_D_f,
                                d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local_f, static_cast<uint32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds, d_pd_second_inds, d_pd_pair_data_f, static_cast<uint32_t>(pd_prim_pair_count),
