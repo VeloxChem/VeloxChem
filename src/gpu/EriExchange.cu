@@ -9225,7 +9225,8 @@ computeExchangeFockPPPP_FP32(double*         mat_K,
             r_j_f[1]  = p_prim_info_f[j_prim / 3 + p_prim_count * 3];
             r_j_f[2]  = p_prim_info_f[j_prim / 3 + p_prim_count * 4];
             S1_f      = a_i_f + a_j_f;
-            inv_S1_f  = (float)(1.0 / (double)S1_f);
+            // inv_S1_f  = (float)(1.0 / (double)S1_f); //看一下变单精度后数值和速度
+            inv_S1_f  = 1.0 / S1_f;
             S_ij_00_f = pair_data_K_pp_f[displ_i + j];
         }
 

@@ -36,7 +36,9 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <sstream>
 #include <fstream>
 #include <string>
@@ -80,8 +82,38 @@ to_float_vec(const std::vector<double>& src)
     return dst;
 }
 
-// Shared output file for mixed-precision validation reports.
-const std::string REPORT_FILE = "ablation_results.log";
+// Allow per-run benchmark log naming via environment variable.
+const std::string& report_file_path()
+{
+    static const std::string path = []() {
+        if (const char* env = std::getenv("VLX_ABLATION_LOG"); env && *env)
+        {
+            return std::string(env);
+        }
+        return std::string("ablation_results.log");
+    }();
+
+    return path;
+}
+
+// Truncate the report exactly once per process launch, then append under a mutex.
+static std::once_flag s_ablation_init;
+static std::mutex     s_ablation_mutex;
+
+static void write_to_ablation_file(const std::string& text)
+{
+    std::call_once(s_ablation_init, []() {
+        std::ofstream(report_file_path(), std::ios_base::trunc);
+    });
+
+    std::lock_guard<std::mutex> lock(s_ablation_mutex);
+    std::ofstream outfile(report_file_path(), std::ios_base::app);
+    if (outfile.is_open()) {
+        outfile << text;
+    } else {
+        std::cout << text;
+    }
+}
 
 // ====== Helper 1: Error Checking ======
 void check_J_against_ref(const std::string& tag,
@@ -145,15 +177,7 @@ void check_J_against_ref(const std::string& tag,
            << " (first idx = " << nan_idx << ")\n";
     }
     ss << "============================\n";
-    
-    // write results to file (overwrite each time)
-    std::ofstream outfile(REPORT_FILE);
-    if (outfile.is_open()) {
-        outfile << ss.str();
-        outfile.close();
-    } else {
-        std::cout << ss.str(); 
-    }
+    write_to_ablation_file(ss.str());
 }
 
 // ====== Helper 2: Cut Status Printing ======
@@ -218,29 +242,77 @@ void print_cut_status(const std::string& tag,
        << "  prec cut==0 tiles     = " << n_prec_cut0 << "\n"
        << "  prec cut>=m_tiles     = " << n_prec_cutfull << "\n"
        << "===============================\n";
-       
-    // Write validation cut statistics.
-    std::ofstream outfile(REPORT_FILE);
-    if (outfile.is_open()) {
-        outfile << ss.str();
-        outfile.close();
-    } else {
-        std::cout << ss.str();
-    }
+    write_to_ablation_file(ss.str());
 }
+
+// Legacy ungrouped exchange cut statistics kept disabled while the PPPP
+// validation path uses grouped m-tile statistics below.
+// void print_exchange_cut_status(const std::string& tag,
+//                                const std::vector<uint32_t>& prec_cut_flat,
+//                                const std::vector<uint32_t>& screen_cut_flat,
+//                                const std::vector<uint32_t>& cut_weights = {})
+// {
+//     const size_t n = prec_cut_flat.size();
+// 
+//     uint32_t prec_min   = UINT_MAX, prec_max   = 0;
+//     uint32_t screen_min = UINT_MAX, screen_max = 0;
+//     uint64_t prec_sum   = 0, screen_sum = 0, fp32_sum = 0;
+//     uint64_t eff_entries = 0;
+//     uint32_t n_prec0    = 0, n_eq = 0;
+// 
+//     for (size_t idx = 0; idx < n; idx++) {
+//         const uint32_t prec   = prec_cut_flat[idx];
+//         const uint32_t screen = screen_cut_flat[idx];
+//         const uint32_t weight = (idx < cut_weights.size()) ? cut_weights[idx] : 1;
+// 
+//         prec_min   = std::min(prec_min,   prec);
+//         prec_max   = std::max(prec_max,   prec);
+//         screen_min = std::min(screen_min, screen);
+//         screen_max = std::max(screen_max, screen);
+//         prec_sum   += static_cast<uint64_t>(prec) * weight;
+//         screen_sum += static_cast<uint64_t>(screen) * weight;
+//         fp32_sum   += static_cast<uint64_t>((screen >= prec) ? (screen - prec) : 0) * weight;
+//         eff_entries += weight;
+//         if (prec == 0)      n_prec0++;
+//         if (prec == screen) n_eq++;
+//     }
+// 
+//     const double fp64_frac = (screen_sum > 0) ? (double)prec_sum / (double)screen_sum : 0.0;
+//     const double fp32_frac = (screen_sum > 0) ? (double)fp32_sum / (double)screen_sum : 0.0;
+// 
+//     std::stringstream ss;
+//     ss << "=== " << tag << " exchange cut stats ===\n"
+//        << "  cut entries         = " << n << "\n"
+//        << "  effective (ik,m) entries = " << eff_entries << "\n"
+//        << "  prec  cut min/max   = " << prec_min   << " / " << prec_max   << "\n"
+//        << "  prec  cut avg       = " << (eff_entries > 0 ? (double)prec_sum   / (double)eff_entries : 0.0) << "\n"
+//        << "  screen cut min/max  = " << screen_min << " / " << screen_max << "\n"
+//        << "  screen cut avg      = " << (eff_entries > 0 ? (double)screen_sum / (double)eff_entries : 0.0) << "\n"
+//        << "  FP64 fraction       = " << fp64_frac * 100.0 << " %\n"
+//        << "  FP32 fraction       = " << fp32_frac * 100.0 << " %\n"
+//        << "  prec==0 entries     = " << n_prec0 << "\n"
+//        << "  prec==screen entries= " << n_eq << "\n"
+//        << "===============================\n";
+// 
+//     std::ofstream outfile = open_report_file();
+//     if (outfile.is_open()) {
+//         outfile << ss.str();
+//         outfile.close();
+//     } else {
+//         std::cout << ss.str();
+//     }
+// }
 
 void print_exchange_cut_status(const std::string& tag,
                                const std::vector<uint32_t>& prec_cut_flat,
                                const std::vector<uint32_t>& screen_cut_flat)
 {
-    const size_t n = prec_cut_flat.size();
-
     uint32_t prec_min   = UINT_MAX, prec_max   = 0;
     uint32_t screen_min = UINT_MAX, screen_max = 0;
     uint64_t prec_sum   = 0, screen_sum = 0, fp32_sum = 0;
     uint32_t n_prec0    = 0, n_eq = 0;
 
-    for (size_t idx = 0; idx < n; idx++) {
+    for (size_t idx = 0; idx < prec_cut_flat.size(); ++idx) {
         const uint32_t prec   = prec_cut_flat[idx];
         const uint32_t screen = screen_cut_flat[idx];
 
@@ -255,29 +327,52 @@ void print_exchange_cut_status(const std::string& tag,
         if (prec == screen) n_eq++;
     }
 
+    const uint64_t n_entries = prec_cut_flat.size();
     const double fp64_frac = (screen_sum > 0) ? (double)prec_sum / (double)screen_sum : 0.0;
     const double fp32_frac = (screen_sum > 0) ? (double)fp32_sum / (double)screen_sum : 0.0;
 
     std::stringstream ss;
     ss << "=== " << tag << " exchange cut stats ===\n"
-       << "  (ik,m) entries      = " << n << "\n"
+       << "  cut entries         = " << n_entries << "\n"
        << "  prec  cut min/max   = " << prec_min   << " / " << prec_max   << "\n"
-       << "  prec  cut avg       = " << (n > 0 ? (double)prec_sum   / (double)n : 0.0) << "\n"
+       << "  prec  cut avg       = " << (n_entries > 0 ? (double)prec_sum   / (double)n_entries : 0.0) << "\n"
        << "  screen cut min/max  = " << screen_min << " / " << screen_max << "\n"
-       << "  screen cut avg      = " << (n > 0 ? (double)screen_sum / (double)n : 0.0) << "\n"
+       << "  screen cut avg      = " << (n_entries > 0 ? (double)screen_sum / (double)n_entries : 0.0) << "\n"
        << "  FP64 fraction       = " << fp64_frac * 100.0 << " %\n"
        << "  FP32 fraction       = " << fp32_frac * 100.0 << " %\n"
        << "  prec==0 entries     = " << n_prec0 << "\n"
        << "  prec==screen entries= " << n_eq << "\n"
        << "===============================\n";
 
-    std::ofstream outfile(REPORT_FILE, std::ios_base::app);
-    if (outfile.is_open()) {
-        outfile << ss.str();
-        outfile.close();
-    } else {
-        std::cout << ss.str();
-    }
+    write_to_ablation_file(ss.str());
+}
+
+void print_exchange_k_reuse_status(const std::string& tag,
+                                   const std::vector<uint32_t>& pair_inds_k)
+{
+    std::vector<uint32_t> unique_k = pair_inds_k;
+    std::sort(unique_k.begin(), unique_k.end());
+    const auto last = std::unique(unique_k.begin(), unique_k.end());
+    unique_k.erase(last, unique_k.end());
+
+    const auto total_ik = pair_inds_k.size();
+    const auto n_unique_k = unique_k.size();
+    const double avg_reuse = (n_unique_k > 0)
+        ? static_cast<double>(total_ik) / static_cast<double>(n_unique_k)
+        : 0.0;
+    const double duplicate_fraction = (total_ik > 0)
+        ? 100.0 * static_cast<double>(total_ik - n_unique_k) / static_cast<double>(total_ik)
+        : 0.0;
+
+    std::stringstream ss;
+    ss << "=== " << tag << " exchange k reuse stats ===\n"
+       << "  total ik entries  = " << total_ik << "\n"
+       << "  unique k entries  = " << n_unique_k << "\n"
+       << "  avg reuse per k   = " << avg_reuse << "\n"
+       << "  duplicate frac    = " << duplicate_fraction << " %\n"
+       << "===============================\n";
+
+    write_to_ablation_file(ss.str());
 }
 
 } // namespace
@@ -5826,6 +5921,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             const uint32_t nij_tiles = (pp_prim_pair_count_local + TILE_DIM - 1) / TILE_DIM;
 
+
             auto prec_cut_ij_tile_h = build_cut_ij_tile(pp_mat_Q_local, ss_mat_Q, ss_mat_D, (uint32_t)pp_prim_pair_count_local, (uint32_t)ss_prim_pair_count, TILE_DIM, tau_precision);
 
             gpuSafe(gpuMemcpyAsync(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
@@ -5979,6 +6075,8 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             const uint32_t nij_tiles = (pp_prim_pair_count_local + TILE_DIM - 1) / TILE_DIM;
 
+            omptimers[thread_id].start("    J PPPP MP cuts build");
+
             auto prec_cut_ij_tile_h = build_cut_ij_tile(
                 pp_mat_Q_local,
                 pp_mat_Q,
@@ -6000,6 +6098,9 @@ computeFockOnGPU(const              CMolecule& molecule,
                 eri_threshold);
 
             gpuSafe(gpuMemcpyAsync(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+
+            omptimers[thread_id].stop("    J PPPP MP cuts build");
+            print_cut_status("PPPP Coulomb", prec_cut_ij_tile_h, screen_cut_ij_tile_h, static_cast<uint32_t>(pp_prim_pair_count), TILE_DIM);
 
             
             gpu::computeCoulombFockPPPP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
@@ -9651,18 +9752,17 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (PP|PP) MP validation - extra block, does not affect main workload
         if (pair_inds_count_for_K_pp > 0)
         {
+            // print_exchange_k_reuse_status("PPPP", pair_inds_k_for_K_pp);
 
-            using hrc = std::chrono::high_resolution_clock;
+            gpuSafe(gpuStreamSynchronize(stream));
+            omptimers[thread_id].start("    K PPPP MP total");
 
-            auto t0 = hrc::now();
-            auto pp_cuts = build_exchange_cuts(
-                pair_inds_i_for_K_pp, pair_inds_k_for_K_pp,
-                Q_K_pp, Q_K_pp,
-                pair_displs_K_pp, pair_displs_K_pp,
-                pair_counts_K_pp, pair_counts_K_pp,
-                TILE_DIM_Y_K, TILE_DIM_X_K,
-                pp_max_D, mixed_precision_threshold_k, eri_threshold);
-            auto t1 = hrc::now();
+            // omptimers[thread_id].start("    K PPPP MP cuts layout");
+            auto pp_cuts = build_exchange_cut_layout(
+                pair_inds_i_for_K_pp,
+                pair_counts_K_pp,
+                TILE_DIM_Y_K);
+            // omptimers[thread_id].stop("    K PPPP MP cuts layout");
 
             double*   d_mat_K_mp           = nullptr;
             double*   d_mat_K_ref          = nullptr;
@@ -9674,39 +9774,54 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             gpuSafe(gpuMalloc(&d_mat_K_mp,           sizeof(double)   * pair_inds_count_for_K_pp));
             gpuSafe(gpuMalloc(&d_mat_K_ref,           sizeof(double)   * pair_inds_count_for_K_pp));
-            gpuSafe(gpuMalloc(&d_pp_prec_cut_flat,   sizeof(uint32_t) * pp_cuts.prec_cut_flat.size()));
-            gpuSafe(gpuMalloc(&d_pp_screen_cut_flat, sizeof(uint32_t) * pp_cuts.screen_cut_flat.size()));
+            gpuSafe(gpuMalloc(&d_pp_prec_cut_flat,   sizeof(uint32_t) * pp_cuts.total_cut_entries));
+            gpuSafe(gpuMalloc(&d_pp_screen_cut_flat, sizeof(uint32_t) * pp_cuts.total_cut_entries));
             gpuSafe(gpuMalloc(&d_pp_displ_cuts,      sizeof(uint32_t) * pp_cuts.displ_cuts.size()));
 
-            auto t2 = hrc::now();
+            // omptimers[thread_id].start("    K PPPP MP float prep");
             const auto p_prim_info_f_h    = to_float_vec(p_prim_info);
             const auto pair_data_K_pp_f_h = to_float_vec(pair_data_K_pp);
-            auto t3 = hrc::now();
+            // omptimers[thread_id].stop("    K PPPP MP float prep");
 
             gpuSafe(gpuMalloc(&d_p_prim_info_f_K,  sizeof(float) * p_prim_info_f_h.size()));
             gpuSafe(gpuMalloc(&d_pair_data_K_pp_f, sizeof(float) * pair_data_K_pp_f_h.size()));
 
-            gpu::zeroData<<<dim3((pair_inds_count_for_K_pp + 255) / 256), dim3(256), 0, stream>>>(d_mat_K_mp, pair_inds_count_for_K_pp);
-            gpu::zeroData<<<dim3((pair_inds_count_for_K_pp + 255) / 256), dim3(256), 0, stream>>>(d_mat_K_ref, pair_inds_count_for_K_pp);
+            constexpr uint32_t zero_threads = 256;
+            const dim3 zero_blocks((pair_inds_count_for_K_pp + zero_threads - 1) / zero_threads);
+            gpu::zeroData<<<zero_blocks, dim3(zero_threads), 0, stream>>>(d_mat_K_mp, pair_inds_count_for_K_pp);
+            gpu::zeroData<<<zero_blocks, dim3(zero_threads), 0, stream>>>(d_mat_K_ref, pair_inds_count_for_K_pp);
 
-            // sync first to drain stream (main PPPP kernel), then time H2D alone
-            gpuSafe(gpuStreamSynchronize(stream));
-            auto t4 = hrc::now();
-            gpuSafe(gpuMemcpyAsync(d_pp_prec_cut_flat,   pp_cuts.prec_cut_flat.data(),   pp_cuts.prec_cut_flat.size()   * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuMemcpyAsync(d_pp_screen_cut_flat, pp_cuts.screen_cut_flat.data(), pp_cuts.screen_cut_flat.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+            // Sync first to drain the stream, then time H2D alone.
+            // gpuSafe(gpuStreamSynchronize(stream));
+            // omptimers[thread_id].start("    K PPPP MP H2D displ+fp32");
             gpuSafe(gpuMemcpyAsync(d_pp_displ_cuts,      pp_cuts.displ_cuts.data(),      pp_cuts.displ_cuts.size()      * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             gpuSafe(gpuMemcpyAsync(d_p_prim_info_f_K,    p_prim_info_f_h.data(),          p_prim_info_f_h.size()          * sizeof(float),    gpuMemcpyHostToDevice, stream));
             gpuSafe(gpuMemcpyAsync(d_pair_data_K_pp_f,   pair_data_K_pp_f_h.data(),       pair_data_K_pp_f_h.size()       * sizeof(float),    gpuMemcpyHostToDevice, stream));
-            gpuSafe(gpuStreamSynchronize(stream));
-            auto t5 = hrc::now();
+            // gpuSafe(gpuStreamSynchronize(stream));
+            // omptimers[thread_id].stop("    K PPPP MP H2D displ+fp32");
 
-            auto ms = [](auto a, auto b) {
-                return std::chrono::duration<double, std::milli>(b - a).count();
-            };
-            std::cerr << "[PPPP MP timing]\n"
-                      << "  build_exchange_cuts : " << ms(t0, t1) << " ms\n"
-                      << "  float prep (host)   : " << ms(t2, t3) << " ms\n"
-                      << "  H2D upload (cuts+f) : " << ms(t4, t5) << " ms\n";
+            // omptimers[thread_id].start("    K PPPP MP cuts compute");
+            build_exchange_cuts_device(
+                d_pp_prec_cut_flat,
+                d_pp_screen_cut_flat,
+                d_pp_displ_cuts,
+                d_pair_inds_i_for_K_pp,
+                d_pair_inds_k_for_K_pp,
+                d_Q_K_pp,
+                d_Q_K_pp,
+                d_pair_displs_K_pp,
+                d_pair_displs_K_pp,
+                d_pair_counts_K_pp,
+                d_pair_counts_K_pp,
+                static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                TILE_DIM_Y_K,
+                TILE_DIM_X_K,
+                pp_max_D,
+                mixed_precision_threshold_k,
+                eri_threshold,
+                stream);
+            // gpuSafe(gpuStreamSynchronize(stream));
+            // omptimers[thread_id].stop("    K PPPP MP cuts compute");
 
             gpu::computeExchangeFockPPPP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_K_mp,
@@ -9748,6 +9863,8 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_pp_prec_cut_flat,
                                d_pp_screen_cut_flat,
                                d_pp_displ_cuts);
+            gpuSafe(gpuStreamSynchronize(stream));
+            omptimers[thread_id].stop("    K PPPP MP total");
 
             gpu::computeExchangeFockPPPP<<<num_blocks, threads_per_block, 0, stream>>>(
                            d_mat_K_ref,
@@ -9773,8 +9890,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             // compare MP result against original double result
             std::vector<double> h_mat_K_mp (pair_inds_count_for_K_pp);
             std::vector<double> h_mat_K_ref(pair_inds_count_for_K_pp);
+            std::vector<uint32_t> h_pp_prec_cut_flat(pp_cuts.total_cut_entries);
+            std::vector<uint32_t> h_pp_screen_cut_flat(pp_cuts.total_cut_entries);
             gpuSafe(gpuMemcpyAsync(h_mat_K_mp.data(),  d_mat_K_mp, pair_inds_count_for_K_pp * sizeof(double), gpuMemcpyDeviceToHost, stream));
             gpuSafe(gpuMemcpyAsync(h_mat_K_ref.data(), d_mat_K_ref,    pair_inds_count_for_K_pp * sizeof(double), gpuMemcpyDeviceToHost, stream));
+            gpuSafe(gpuMemcpyAsync(h_pp_prec_cut_flat.data(),   d_pp_prec_cut_flat,   pp_cuts.total_cut_entries * sizeof(uint32_t), gpuMemcpyDeviceToHost, stream));
+            gpuSafe(gpuMemcpyAsync(h_pp_screen_cut_flat.data(), d_pp_screen_cut_flat, pp_cuts.total_cut_entries * sizeof(uint32_t), gpuMemcpyDeviceToHost, stream));
 
             gpuSafe(gpuStreamSynchronize(stream));
 
@@ -9787,7 +9908,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuFree(d_pair_data_K_pp_f));
 
             check_J_against_ref("PPPP Exchange MP (FP64+FP32) vs ref", h_mat_K_mp, h_mat_K_ref, pair_inds_count_for_K_pp);
-            print_exchange_cut_status("PPPP", pp_cuts.prec_cut_flat, pp_cuts.screen_cut_flat);
+            print_exchange_cut_status(
+                "PPPP",
+                h_pp_prec_cut_flat,
+                h_pp_screen_cut_flat);
         }
 
         // K: (PS|PD)
