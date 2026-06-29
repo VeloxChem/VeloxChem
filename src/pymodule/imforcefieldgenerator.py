@@ -3681,10 +3681,15 @@ class IMForceFieldGenerator:
                 seen.add(coordinate)
                 constraints.append(coordinate)
 
+        all_atoms = set()
         for coordinate in InterpolationDatapoint.flatten_z_matrix(z_matrix):
-            coordinate_atoms = set(int(atom) for atom in coordinate)
-            if not coordinate_atoms <= alkyl_atoms:
-                add_constraint(coordinate)
+            all_atoms.update(int(atom) for atom in coordinate)
+
+        frozen_atoms = sorted(all_atoms - alkyl_atoms)
+        if frozen_atoms:
+            frozen_atoms_one_based = ','.join(
+                str(int(atom) + 1) for atom in frozen_atoms)
+            constraints.append(f'freeze xyz {frozen_atoms_one_based}')
 
         for rotor_id in getattr(cluster, 'rotor_ids', ()):
             rotor = local_group_model.rotors.get(str(rotor_id))
@@ -3729,7 +3734,7 @@ class IMForceFieldGenerator:
                 drivers[0],
                 molecule,
                 constraints=constraints,
-                index_offset=0,
+                index_offset=1,
             )
             optimized_molecule = opt_results['final_molecule']
             return optimized_molecule, basis
@@ -3739,7 +3744,7 @@ class IMForceFieldGenerator:
             drivers[0],
             molecule,
             constraints=constraints,
-            index_offset=0,
+            index_offset=1,
             compute_args=(basis, scf_results),
         )
         optimized_molecule = opt_results['final_molecule']
@@ -4242,6 +4247,7 @@ class IMForceFieldGenerator:
                                     cluster_basis.get_main_basis_label(),
                                 )
 
+                            print("Relax the alkyl chain")
                             cluster_molecule, cluster_basis = (
                                 self._relax_alkyl_local_group_state(
                                     drivers,
@@ -4253,7 +4259,7 @@ class IMForceFieldGenerator:
                                     dihedrals_to_rotate,
                                 )
                             )
-
+                            print("After the relaxiation")
                             cluster_energies, cluster_scf, cluster_rsp = (
                                 self._compute_energy(
                                     drivers[0], cluster_molecule, cluster_basis)
@@ -4307,7 +4313,14 @@ class IMForceFieldGenerator:
                                     float(phase) for phase in phase_signature),
                                 'is_anchor': bool(job['is_anchor']),
                             }
-
+                        
+                        self.ostream.print_blank()
+                        self.ostream.print_header(
+                            "Local-group database expansion: Added cluster point "
+                            f"{label} for root {target_root}."
+                        ) 
+                        self.ostream.flush()
+                        
                     write_signed_factor_registry_for_family(
                         target_file,
                         target_root,
