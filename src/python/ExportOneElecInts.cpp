@@ -48,6 +48,8 @@
 #include "ErrorHandler.hpp"
 #include "LinearMomentumIntegrals.hpp"
 #include "NuclearPotentialErfGradient.hpp"
+#include "NuclearPotentialErfHessian200.hpp"
+#include "NuclearPotentialErfHessian101.hpp"
 #include "NuclearPotentialErfValues.hpp"
 #include "NuclearPotentialHessian110.hpp"
 #include "NuclearPotentialHessian101.hpp"
@@ -429,6 +431,72 @@ export_oneeints(py::module& m)
              "point_coords"_a,
              "point_charges"_a,
              "density"_a);
+
+    m.def("compute_nuclear_potential_erf_hessian_200",
+            [](const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const py::array_t<double>& point_coords,
+               const py::array_t<double>& point_charges,
+               const py::array_t<double>& D,
+               const py::array_t<double>& omega) -> py::array_t<double> {
+                std::string errstyle("compute_nuclear_potential_erf_hessian_200: Expecting contiguous numpy arrays");
+                auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(point_charges.ptr(), py::array::c_style);
+                auto        c_style_3 = py::detail::check_flags(D.ptr(), py::array::c_style);
+                auto        c_style_4 = py::detail::check_flags(omega.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4), errstyle);
+                std::string errsize("compute_nuclear_potential_erf_hessian_200: Inconsistent sizes");
+                errors::assertMsgCritical(omega.shape(0) == point_coords.shape(0), errsize);
+                errors::assertMsgCritical(point_charges.shape(0) == point_coords.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
+                std::string errshape("compute_nuclear_potential_erf_hessian_200: Expecting square matrix D");
+                errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
+                auto npoints = static_cast<int>(point_coords.shape(0));
+                auto naos = static_cast<int>(D.shape(0));
+                auto hess = onee::computeNuclearPotentialErfHessian200(
+                    molecule, basis, point_coords.data(), point_charges.data(), npoints, D.data(), naos, omega.data());
+                return vlx_general::pointer_to_numpy(hess.values(), {hess.getNumberOfRows(), hess.getNumberOfColumns()});
+            },
+            "Computes nuclear potential ERF Hessian (200) contribution.",
+             "molecule"_a,
+             "basis"_a,
+             "point_coords"_a,
+             "point_charges"_a,
+             "density"_a,
+             "omega"_a);
+
+    m.def("compute_nuclear_potential_erf_hessian_101",
+            [](const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const py::array_t<double>& point_coords,
+               const py::array_t<double>& point_charges,
+               const py::array_t<double>& D,
+               const py::array_t<double>& omega) -> py::array_t<double> {
+                std::string errstyle("compute_nuclear_potential_erf_hessian_101: Expecting contiguous numpy arrays");
+                auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(point_charges.ptr(), py::array::c_style);
+                auto        c_style_3 = py::detail::check_flags(D.ptr(), py::array::c_style);
+                auto        c_style_4 = py::detail::check_flags(omega.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4), errstyle);
+                std::string errsize("compute_nuclear_potential_erf_hessian_101: Inconsistent sizes");
+                errors::assertMsgCritical(omega.shape(0) == point_coords.shape(0), errsize);
+                errors::assertMsgCritical(point_charges.shape(0) == point_coords.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
+                std::string errshape("compute_nuclear_potential_erf_hessian_101: Expecting square matrix D");
+                errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
+                auto npoints = static_cast<int>(point_coords.shape(0));
+                auto naos = static_cast<int>(D.shape(0));
+                auto hess = onee::computeNuclearPotentialErfHessian101(
+                    molecule, basis, point_coords.data(), point_charges.data(), npoints, D.data(), naos, omega.data());
+                return vlx_general::pointer_to_numpy(hess.values(), {hess.getNumberOfRows(), hess.getNumberOfColumns()});
+            },
+            "Computes nuclear potential ERF Hessian (101) contribution.",
+             "molecule"_a,
+             "basis"_a,
+             "point_coords"_a,
+             "point_charges"_a,
+             "density"_a,
+             "omega"_a);
 
     m.def("compute_nuclear_potential_hessian_101",
             [](const CMolecule&           molecule,
