@@ -1767,6 +1767,20 @@ class IMForceFieldGenerator:
 
             self.local_group_model[root] = self.local_group_primitive_model[root]
             self.local_groups[root] = self.local_group_model[root].clusters
+            
+            excluded_local_atoms = set()
+            for cluster in self.local_group_model[root].clusters.values():
+                cluster_owned = set(int(atom) for atom in cluster.owned_atoms)
+
+                axis_atoms = set()
+                for rotor_id in cluster.rotor_ids:
+                    rotor = self.local_group_model[root].rotors[str(rotor_id)]
+                    axis_atoms.update(int(atom) for atom in rotor.axis)
+
+                excluded_local_atoms.update(cluster_owned - axis_atoms)
+
+            excluded_local_atoms = sorted(excluded_local_atoms)
+                        
             all_exclision = [element for rot_bond in rotatable_bonds_zero_based for element in rot_bond]
 
             symmetry_groups_ref = [groups for groups in symmetry_groups[1] if not any(item in all_exclision for item in groups)]
@@ -1776,7 +1790,7 @@ class IMForceFieldGenerator:
 
             if root == 0:
                 non_core_atoms = [element for group in regrouped['gs'] for element in group]
-                core_atoms = [element for element in symmetry_groups[0] if element not in non_core_atoms]
+                core_atoms = [element for element in symmetry_groups[0] if element not in excluded_local_atoms]
                 # angles_to_set, _, _, self.symmetry_dihedral_lists, dih_list = self._adjust_symmetry_dihedrals(molecule, rot_groups['gs'], rotatable_bonds_zero_based, self.roots_z_matrix[root])
                 # dihedrals_to_set = {key: [] for key in angles_to_set.keys()}
                 indices_list = []
@@ -1785,7 +1799,7 @@ class IMForceFieldGenerator:
                 #     for i, element in enumerate(self.roots_z_matrix[root]['dihedrals']):
                 #         if tuple(sorted(element)) in dihedral_list:
                 #             indices_list.append(i)
-                self.symmetry_information['gs'] = [symmetry_groups[0], rot_groups['gs'], regrouped['gs'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, [], [dihedral_start, dihedral_end]]
+                self.symmetry_information['gs'] = [symmetry_groups[0], rot_groups['gs'], regrouped['gs'], core_atoms, excluded_local_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, [], [dihedral_start, dihedral_end]]
 
             imforcefieldfile = self.imforcefieldfiles[self.roots_to_follow[0]]
             self.states_interpolation_settings[self.roots_to_follow[0]] = {
@@ -1876,7 +1890,7 @@ class IMForceFieldGenerator:
             if len(selected_dihedrals) > 0:
                 for dih_key in selected_dihedrals:
                     conformers_plus_ts[0][dih_key] = []
-
+                    
                     for conf_mol in conformal_molecules:
                         mol_i = Molecule.from_xyz_string(conf_mol.get_xyz_string())
                         mol_i.set_charge(molecule.get_charge())
@@ -4303,6 +4317,7 @@ class IMForceFieldGenerator:
                             reference_molecule=cluster_molecule,
                         )
                         cluster_dp.write_hdf5(target_file, label)
+                        cluster_dp.write_hdf5(f'im_database_{target_root}_org.h5', label)
                         point_labels.append(label)
                         point_labels_by_cluster.setdefault(
                             str(cluster.cluster_id), {})[int(state_id)] = {

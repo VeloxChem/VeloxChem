@@ -539,9 +539,9 @@ class IMDatabasePointCollecter:
         Call this after any datapoint/symmetry update.
         """
         driver = self.impes_drivers[root]
-        sampling_driver = self.sampling_impes_drivers[root]
         driver.mark_runtime_data_cache_dirty()
         if self.sampling_enabled:
+            sampling_driver = self.sampling_impes_drivers[root]
             sampling_driver = self.sampling_impes_drivers[root]
             sampling_driver.mark_runtime_data_cache_dirty()
 
