@@ -1885,13 +1885,14 @@ class IMForceFieldGenerator:
                 if tuple(sorted((dih_key[1], dih_key[2]))) not in rot_bond_set:
                     continue
 
-                selected_dihedrals.append(dih_key)
+                selected_dihedrals.append((dih_key, len(_angle_grid)))
 
             if len(selected_dihedrals) > 0:
-                for dih_key in selected_dihedrals:
+                counter = 0
+                for dih_key, nconf in selected_dihedrals:
                     conformers_plus_ts[0][dih_key] = []
                     
-                    for conf_mol in conformal_molecules:
+                    for conf_mol in conformal_molecules[counter:counter + nconf]:
                         mol_i = Molecule.from_xyz_string(conf_mol.get_xyz_string())
                         mol_i.set_charge(molecule.get_charge())
                         mol_i.set_multiplicity(molecule.get_multiplicity())
@@ -1905,7 +1906,7 @@ class IMForceFieldGenerator:
                                 verbose=False,
                             )
                         conformers_plus_ts[0][dih_key].append((mol_i, 'normal'))
-
+                    counter+=nconf
             else:
                 mol_i = Molecule.from_xyz_string(conformal_molecules[0].get_xyz_string())
                 mol_i.set_charge(molecule.get_charge())
