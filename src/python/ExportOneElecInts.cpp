@@ -48,6 +48,7 @@
 #include "ErrorHandler.hpp"
 #include "LinearMomentumIntegrals.hpp"
 #include "NuclearPotentialErfGradient.hpp"
+#include "NuclearPotentialErfMatrixGradient.hpp"
 #include "NuclearPotentialErfHessian020.hpp"
 #include "NuclearPotentialErfHessian110.hpp"
 #include "NuclearPotentialErfHessian200.hpp"
@@ -404,6 +405,43 @@ export_oneeints(py::module& m)
              "density"_a,
              "omega"_a,
              "atom_indices"_a);
+
+    m.def("compute_nuclear_potential_erf_matrix_gradient",
+            [](const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const py::array_t<double>& point_coords,
+               const py::array_t<double>& point_charges,
+               const py::array_t<double>& omega,
+               const py::array_t<int>&    atom_indices,
+               const int                  target_atomidx) -> py::list {
+                std::string errstyle("compute_nuclear_potential_erf_matrix_gradient: Expecting contiguous numpy arrays");
+                auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(point_charges.ptr(), py::array::c_style);
+                auto        c_style_3 = py::detail::check_flags(omega.ptr(), py::array::c_style);
+                auto        c_style_4 = py::detail::check_flags(atom_indices.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4), errstyle);
+                std::string errsize("compute_nuclear_potential_erf_matrix_gradient: Inconsistent sizes");
+                errors::assertMsgCritical(omega.shape(0) == point_coords.shape(0), errsize);
+                errors::assertMsgCritical(point_charges.shape(0) == point_coords.shape(0), errsize);
+                errors::assertMsgCritical(point_charges.shape(0) == atom_indices.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
+                auto npoints = static_cast<int>(point_coords.shape(0));
+                auto npot_mat_grad = onee::computeNuclearPotentialErfMatrixGradient(
+                    molecule, basis, point_coords.data(), point_charges.data(), npoints, omega.data(), atom_indices.data(), target_atomidx);
+                py::list ret;
+                ret.append(vlx_general::pointer_to_numpy(npot_mat_grad[0].values(), {npot_mat_grad[0].getNumberOfRows(), npot_mat_grad[0].getNumberOfColumns()}));
+                ret.append(vlx_general::pointer_to_numpy(npot_mat_grad[1].values(), {npot_mat_grad[1].getNumberOfRows(), npot_mat_grad[1].getNumberOfColumns()}));
+                ret.append(vlx_general::pointer_to_numpy(npot_mat_grad[2].values(), {npot_mat_grad[2].getNumberOfRows(), npot_mat_grad[2].getNumberOfColumns()}));
+                return ret;
+            },
+            "Computes nuclear potential erf gradient matrix (without density contraction) for a target atom.",
+             "molecule"_a,
+             "basis"_a,
+             "point_coords"_a,
+             "point_charges"_a,
+             "omega"_a,
+             "atom_indices"_a,
+             "target_atomidx"_a);
 
     m.def("compute_nuclear_potential_hessian_110",
             [](const CMolecule&           molecule,

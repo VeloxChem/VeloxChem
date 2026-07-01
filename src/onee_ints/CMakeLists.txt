@@ -13,6 +13,7 @@ target_sources(vlxobjs
     GtoInfo.cpp
     LinearMomentumIntegrals.cpp
     NuclearPotentialErfGradient.cpp
+    NuclearPotentialErfMatrixGradient.cpp
     NuclearPotentialErfHessian020.cpp
     NuclearPotentialErfHessian110.cpp
     NuclearPotentialErfHessian200.cpp
