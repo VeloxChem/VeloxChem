@@ -663,10 +663,15 @@ class OptimizationDriver:
                     final_mol.get_string(title='Final Geometry'))
 
                 is_scan_job = False
+
                 if self.constraints:
+                    # save constraints
+                    opt_results['constraints'] = deepcopy(self.constraints)
+                    # check for scan
                     for line in self.constraints:
                         key = line.strip().split()[0]
-                        is_scan_job = (key == 'scan')
+                        if key == 'scan':
+                            is_scan_job = True
 
                 if is_scan_job:
                     self.print_scan_result(m)
@@ -704,6 +709,8 @@ class OptimizationDriver:
                         self._get_xyz_string(labels, coords_au)
                         for coords_au in opt_coordinates_au
                     ]
+                    opt_results['irc_coordinates_au'] = np.array(
+                        opt_coordinates_au)
 
                 else:
                     self.print_opt_result(m)

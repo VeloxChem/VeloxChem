@@ -308,8 +308,8 @@ class InterpolationDatapoint:
                 row_scale[bond_rows] = -1.0 / np.square(bond_values)
             elif self.use_eq_bond_length:
                 eq_values = self._get_eq_bond_lengths_array(bond_rows.size)
-                _, dq_dr, _ = self._switched_bond_transform(
-                    bond_values, eq_values, eps_inner=0.005, eps_outer=0.01)
+                _, dq_dr, _ = self._bond_transform(
+                    bond_values, eq_values)
                 row_scale[bond_rows] = dq_dr
 
         self.b_matrix = derivatives * row_scale[:, np.newaxis]
@@ -364,8 +364,8 @@ class InterpolationDatapoint:
 
                 elif self.use_eq_bond_length:
                     r = q.value(coords)
-                    _, r_deriv_2, r_deriv_3 = self._switched_bond_transform(
-                        r, eq_bond_values[bond_counter], eps_inner=0.005, eps_outer=0.01)
+                    _, r_deriv_2, r_deriv_3 = self._bond_transform(
+                        r, eq_bond_values[bond_counter])
                     self.b2_matrix[i] = r_deriv_2 * second_derivative
                     for m in range(n_atoms):
                         for n in range(n_atoms):
@@ -645,25 +645,14 @@ class InterpolationDatapoint:
             elif self.use_eq_bond_length:
 
                 eq_values = self._get_eq_bond_lengths_array(bond_rows.size)
-                q_values, _, _ = self._switched_bond_transform(
+                q_values, _, _ = self._bond_transform(
                     base_values[bond_rows],
-                    eq_values,
-                    eps_inner=0.005,
-                    eps_outer=0.01)
+                    eq_values)
                 int_coords[bond_rows] = q_values
 
         self.internal_coordinates_values = int_coords
 
-    def smoothstep5(self, t):
-        return 1.0 - 10.0*t**3 + 15.0*t**4 - 6.0*t**5
-
-    def dsmoothstep5_dt(self, t):
-        return -30.0*t**2 + 60.0*t**3 - 30.0*t**4
-
-    def d2smoothstep5_dt2(self, t):
-        return -60.0*t + 180.0*t**2 - 120.0*t**3
-
-    def _switched_bond_transform(self, r, r_eq, eps_inner=0.05, eps_outer=0.15):
+    def _bond_transform(self, r, r_eq):
         """
         Returns q(r), dq/dr, d2q/dr2 for a bond coordinate that is
         smoothly switched from local r behavior near equilibrium to 1/r outside.
@@ -677,60 +666,13 @@ class InterpolationDatapoint:
         r_arr = r_arr.astype(np.float64, copy=False)
         r_eq_arr = r_eq_arr.astype(np.float64, copy=False)
 
-        L = r_arr - r_eq_arr
-        dL = np.ones_like(r_arr)
-        d2L = np.zeros_like(r_arr)
-
-        # R = - np.square(r_eq_arr) * (1.0 / r_arr - 1.0 / r_eq_arr)
-        # dR = np.square(r_eq_arr) / np.square(r_arr)
-        # d2R = -np.square(r_eq_arr) * 2.0 / np.power(r_arr, 3)
-
         R = - np.square(r_eq_arr) * (1.0 / r_arr - 1.0 / r_eq_arr)
         dR = np.square(r_eq_arr) / np.square(r_arr)
         d2R = -np.square(r_eq_arr) * 2.0 / np.power(r_arr, 3)
 
-        x = np.log(r_arr / r_eq_arr)
-        y = np.square(x)
-
-        y1 = np.log(1.0 + eps_inner)**2
-        y2 = np.log(1.0 + eps_outer)**2
-        denom = y2 - y1
-
-        s = np.ones_like(y)
-        ds = np.zeros_like(y)
-        d2s = np.zeros_like(y)
-
-        mask_inner = (y <= y1)
-        mask_outer = (y >= y2)
-        mask_transition = (~mask_inner) & (~mask_outer)
-
-        if np.any(mask_transition):
-            t = (y[mask_transition] - y1) / denom
-            P = self.smoothstep5(t)
-            dP = self.dsmoothstep5_dt(t)
-            d2P = self.d2smoothstep5_dt2(t)
-
-            dy_dr = 2.0 * x[mask_transition] / r_arr[mask_transition]
-            d2y_dr2 = 2.0 * (1.0 - x[mask_transition]) / np.square(r_arr[mask_transition])
-            dt_dr = dy_dr / denom
-            d2t_dr2 = d2y_dr2 / denom
-
-            s[mask_transition] = P
-            ds[mask_transition] = dP * dt_dr
-            d2s[mask_transition] = d2P * np.square(dt_dr) + dP * d2t_dr2
-
-        s[mask_outer] = 0.0
-        ds[mask_outer] = 0.0
-        d2s[mask_outer] = 0.0
-
-        q = s * L + (1.0 - s) * R
-
-        # q = R
-        # dq_dr = dR
-        # d2q_dr2 = d2R
-        # here the switch derivativve is being assembled
-        dq_dr = ds * (L - R) + s * dL + (1.0 - s) * dR
-        d2q_dr2 = d2s * (L - R) + 2.0 * ds * (dL - dR) + s * d2L + (1.0 - s) * d2R
+        q = R
+        dq_dr = dR
+        d2q_dr2 = d2R
 
         if scalar_input:
             return float(q[0]), float(dq_dr[0]), float(d2q_dr2[0])

@@ -20,6 +20,7 @@ from veloxchem.resultsio import (create_hdf5, read_results,
                                  write_rsp_full_solution_to_hdf5,
                                  write_rsp_results_to_hdf5,
                                  write_scf_results_to_hdf5)
+from veloxchem.rixsdriver import RixsDriver
 from veloxchem.tdacppsolver import ComplexResponseTdaSolver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.vibrationalanalysis import VibrationalAnalysis
@@ -452,6 +453,31 @@ def test_read_results_roundtrips_only_requested_group(tmp_path):
     np.testing.assert_allclose(recovered['F'][1], scf_results['F'][1])
 
 
+def test_atomic_property_metadata_for_charge_result_datasets(tmp_path):
+
+    if MPI.COMM_WORLD.Get_rank() != mpi_master():
+        return
+
+    h5file = Path(tmp_path) / 'charge_results.h5'
+    with h5py.File(h5file, 'w') as h5f:
+        h5f.create_dataset('basis_set', data=np.bytes_(['def2-svp']))
+
+    write_results_to_hdf5(str(h5file), 'esp',
+                          {'esp_charges': np.array([-0.4, 0.2, 0.2])})
+    with h5py.File(h5file, 'r') as h5f:
+        assert h5f['esp/esp_charges'].attrs['atomic_property'] == 'ESP Charges'
+
+    write_results_to_hdf5(str(h5file), 'esp',
+                          {'esp_on_points': np.array([-0.6, 0.6])})
+    with h5py.File(h5file, 'r') as h5f:
+        assert 'atomic_property' not in h5f['esp/esp_on_points'].attrs
+
+    write_results_to_hdf5(str(h5file), 'resp',
+                          {'resp_charges': np.array([-0.5, 0.25, 0.25])})
+    with h5py.File(h5file, 'r') as h5f:
+        assert h5f['resp/resp_charges'].attrs['atomic_property'] == 'RESP Charges'
+
+
 def test_read_results_roundtrips_tda_rsp_and_preserves_legacy_solution_vectors(
         tmp_path):
 
@@ -834,5 +860,37 @@ def test_vib_results_hdf5_roundtrip_with_water_calculation(tmp_path):
     if task.mpi_rank == mpi_master():
         recovered = read_results(f'{filename}.h5', 'vib')
         _assert_roundtrip_equal(vib_results, recovered)
+        assert 'basis_set' not in recovered
+        assert 'nuclear_charges' not in recovered
+
+
+def test_rixs_results_hdf5_roundtrip_with_water_calculation(tmp_path):
+    here = Path(__file__).parent
+    inpfile = str(here / 'data' / 'water_rixs_scf.inp')
+
+    task = MpiTask([inpfile, None])
+    filename = str(tmp_path / 'water_rixs_results')
+    filename = task.mpi_comm.bcast(filename, root=mpi_master())
+
+    scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+    scf_drv.filename = filename
+    scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+    rixs_drv = RixsDriver()
+    rixs_drv.update_settings({
+        'num_core_orbitals': 1,
+        'num_core_states': 5,
+        'photon_energy': '20.17505501',
+        'nstates': 15,
+        'gamma': 0.00587,
+        'theta': 0,
+        'filename': filename,
+    }, {})
+    rixs_drv.ostream.mute()
+    rixs_results = rixs_drv.compute(task.molecule, task.ao_basis, scf_results)
+
+    if task.mpi_rank == mpi_master():
+        recovered = read_results(f'{filename}.h5', 'rsp')
+        _assert_roundtrip_equal(rixs_results, recovered)
         assert 'basis_set' not in recovered
         assert 'nuclear_charges' not in recovered

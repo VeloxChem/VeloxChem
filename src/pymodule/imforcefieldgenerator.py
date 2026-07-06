@@ -165,6 +165,10 @@ class IMForceFieldGenerator:
         - dynamics_method: Determines the method to generate molecular structures for the database quality conformation.
 
         - nstruc_to_confirm_database_quality: Number of randomly selected strucutures for the database quality check.
+
+        - consider_locality: False -->  This key_word allows the constraint optimization part to allow more constraints to be considered to keep the optimized
+                                        molecule closer to the current molecule. This might lead to more contamination of the interpolation database, should be
+                                        used when system is not improving without stricter locality constraints!
     """
 
     def __init__(self, ground_state_driver, roots_to_follow=None, comm=None, ostream=None):
@@ -259,7 +263,8 @@ class IMForceFieldGenerator:
         self.use_eq_bond_length = False
         self.use_tc_weights = True
         self.tc_weight_mode = "multiplicative"  # "additive_rhee"
-        self.use_mass_weight = False
+        self.use_mass_weight = True  # set True as it is standard in the YM scheme --> small differences
+        self.consider_locality = False
 
         self.eq_bond_length = None
         self.eq_bond_length_irc_bonds = None
@@ -1182,6 +1187,7 @@ class IMForceFieldGenerator:
             im_database_driver.non_core_symmetry_groups = self.symmetry_information
             im_database_driver.platform = self.open_mm_platform
             im_database_driver.all_rot_bonds = self.all_rotatable_bonds
+            im_database_driver.consider_locality = self.consider_locality
 
             # set optimization features in the construction run
             im_database_driver.identfy_relevant_int_coordinates = (self.identfy_relevant_int_coordinates, self.use_minimized_structures[1])

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from veloxchem.veloxchemlib import mpi_master, hartree_in_ev
+from veloxchem.veloxchemlib import mpi_master, hartree_in_ev, fine_structure_constant
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -53,6 +53,7 @@ class TestRIXS:
         rixs_res = rixs_drv.compute(mol, bas, scf_results)
 
         if scf_drv.rank == mpi_master():
+            ref_xsection = np.array(ref_xsection) * fine_structure_constant()**4
             assert np.allclose(ref_xsection, rixs_res['cross_sections'][:,0], 
                                rtol=1e-5, atol=1e-8)
 
