@@ -45,6 +45,9 @@ class LocalRotor:
     torsion_rows: tuple[int, ...]
     phase_coordinate: tuple[int, int, int, int] | None = None
     phase_values: tuple[float, ...] | None = None
+    signature_rows: tuple[int, ...] = ()
+    signature_row_types: tuple[str, ...] = ()
+    signature_row_scales: tuple[float, ...] = ()
 
 @dataclass(frozen=True)
 class LocalCluster:
@@ -54,6 +57,8 @@ class LocalCluster:
     owned_atoms: tuple[int, ...]
     active_atoms: tuple[int, ...]
     active_rows: tuple[int, ...]
+    anchor_atoms: tuple[int, ...] = ()
+    relaxation_atoms: tuple[int, ...] = ()
 
 @dataclass
 class LocalGroupModel:

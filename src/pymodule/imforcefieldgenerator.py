@@ -371,12 +371,21 @@ class IMForceFieldGenerator:
 
         self.local_group_specs = None
         self.auto_local_group_kinds = {
+            "anchored_linker",
             "alkyl_chain",
             "alcohol",
+            "methoxy",
             "primary_amine",
             "ammonium",
         }
         self.alkyl_chain_phase_values_degrees = (0, 60, 120, 180, 240, 300)
+        self.anchored_linker_phase_values_degrees = (0, 60, 120, 180, 240, 300)
+        self.anchored_linker_signature_angle_scale = 0.35
+        self.anchored_linker_state_opt_max_iter = 220
+        self.anchored_linker_relax_amide = True
+        self.anchored_linker_freeze_boundary_angles = False
+        self.local_group_allow_anchored_linker_methyl_coupling = False
+        self.methoxy_phase_values_degrees = (0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340)
 
     def define_z_matrix_dict(self, molecule, add_coordinates=None):
         g_molecule = geometric.molecule.Molecule()
@@ -931,6 +940,1089 @@ class IMForceFieldGenerator:
             local_group_model.rotors[rotor_id] = rotor
             local_group_model.clusters[rotor_id] = cluster
             registered_axes.add(axis_key)
+
+        return local_group_model
+
+    def _detect_methoxy_local_groups(
+            self,
+            molecule,
+            ff_gen,
+            z_matrix,
+            local_group_model,
+            rotatable_bonds_zero_based=None):
+
+        enabled_kinds = set(getattr(self, "auto_local_group_kinds", ()))
+        if not ({"methoxy", "aryl_ether"} & enabled_kinds):
+            return local_group_model
+
+        labels = tuple(str(x).strip() for x in molecule.get_labels())
+        natoms = len(labels)
+        conn = np.asarray(ff_gen.connectivity_matrix, dtype=int)
+        flat_z_matrix = InterpolationDatapoint.flatten_z_matrix(z_matrix)
+        phase_values = tuple(
+            np.deg2rad(float(x))
+            for x in getattr(
+                self,
+                "methoxy_phase_values_degrees",
+                getattr(
+                    self,
+                    "alkyl_chain_phase_values_degrees",
+                    (0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340),
+                ),
+            )
+        )
+
+        def element(atom):
+            letters = "".join(x for x in labels[int(atom)] if x.isalpha())
+            return letters.capitalize()
+
+        def neighbors(atom):
+            return tuple(int(x) for x in np.flatnonzero(conn[int(atom)]))
+
+        def canonical_axis(axis):
+            return tuple(sorted(int(x) for x in axis))
+
+        def component_on_side(start, blocked_axis):
+            blocked = frozenset(int(x) for x in blocked_axis)
+            visited = set()
+            stack = [int(start)]
+
+            while stack:
+                atom = stack.pop()
+                if atom in visited:
+                    continue
+                visited.add(atom)
+
+                for neighbor in neighbors(atom):
+                    if frozenset((atom, neighbor)) == blocked:
+                        continue
+                    if neighbor not in visited:
+                        stack.append(neighbor)
+
+            return tuple(sorted(visited))
+
+        def torsion_rows_for_axis(axis):
+            axis_set = set(int(x) for x in axis)
+            return tuple(
+                row_idx
+                for row_idx, coordinate in enumerate(flat_z_matrix)
+                if (
+                    len(coordinate) == 4
+                    and set(int(x) for x in coordinate[1:3]) == axis_set
+                )
+            )
+
+        def oriented_coordinate(coordinate, axis):
+            coordinate = tuple(int(x) for x in coordinate)
+            axis = tuple(int(x) for x in axis)
+
+            if tuple(coordinate[1:3]) == axis:
+                return coordinate
+            if tuple(coordinate[2:0:-1]) == axis:
+                return tuple(reversed(coordinate))
+            return None
+
+        def select_phase_coordinate(axis, torsion_rows, moving_atoms):
+            moving_atoms = set(int(x) for x in moving_atoms)
+            fallback = None
+
+            for row in torsion_rows:
+                coordinate = oriented_coordinate(flat_z_matrix[row], axis)
+                if coordinate is None:
+                    continue
+                if fallback is None:
+                    fallback = coordinate
+                if coordinate[3] in moving_atoms:
+                    return coordinate
+
+            return fallback
+
+        def rows_for_local_atoms(local_atoms, active_atoms):
+            local_set = set(int(x) for x in local_atoms)
+            active_set = set(int(x) for x in active_atoms)
+            rows = []
+            for row_idx, coordinate in enumerate(flat_z_matrix):
+                coord_atoms = set(int(x) for x in coordinate)
+                if coord_atoms <= active_set and coord_atoms & local_set:
+                    rows.append(int(row_idx))
+            return tuple(rows)
+
+        def is_methyl_carbon(atom):
+            if element(atom) != "C":
+                return False
+            neigh = neighbors(atom)
+            hydrogens = tuple(n for n in neigh if element(n) == "H")
+            heavy = tuple(n for n in neigh if element(n) != "H")
+            return len(hydrogens) == 3 and len(heavy) == 1
+
+        if rotatable_bonds_zero_based is None:
+            rotatable_bonds_zero_based = tuple(
+                canonical_axis((int(a) - 1, int(b) - 1))
+                for a, b in getattr(ff_gen, "rotatable_bonds", ())
+            )
+
+        rotatable_axes = {
+            canonical_axis(axis) for axis in rotatable_bonds_zero_based
+        }
+        registered_axes = {
+            canonical_axis(rotor.axis)
+            for rotor in local_group_model.rotors.values()
+        }
+
+        for oxygen in range(natoms):
+            if element(oxygen) != "O":
+                continue
+
+            oxygen_neighbors = neighbors(oxygen)
+            hydrogens = tuple(
+                atom for atom in oxygen_neighbors if element(atom) == "H"
+            )
+            heavy_neighbors = tuple(
+                atom for atom in oxygen_neighbors if element(atom) != "H"
+            )
+            if hydrogens or len(heavy_neighbors) != 2:
+                continue
+
+            methyl_neighbors = tuple(
+                atom for atom in heavy_neighbors if is_methyl_carbon(atom)
+            )
+            if not methyl_neighbors:
+                continue
+
+            for methyl_carbon in methyl_neighbors:
+                anchors = tuple(
+                    atom for atom in heavy_neighbors if atom != methyl_carbon
+                )
+                if len(anchors) != 1:
+                    continue
+
+                anchor = int(anchors[0])
+                axis = (anchor, int(oxygen))
+                axis_key = canonical_axis(axis)
+                if axis_key not in rotatable_axes:
+                    continue
+                if axis_key in registered_axes:
+                    continue
+
+                owned_atoms = component_on_side(oxygen, axis)
+                if anchor in owned_atoms:
+                    continue
+                if oxygen not in owned_atoms or methyl_carbon not in owned_atoms:
+                    continue
+
+                methyl_hydrogens = tuple(
+                    atom for atom in neighbors(methyl_carbon)
+                    if element(atom) == "H"
+                )
+                if not set(methyl_hydrogens).issubset(set(owned_atoms)):
+                    continue
+
+                torsion_rows = torsion_rows_for_axis(axis)
+                if not torsion_rows:
+                    continue
+
+                phase_coordinate = select_phase_coordinate(
+                    axis, torsion_rows, owned_atoms)
+                if phase_coordinate is None:
+                    continue
+
+                rotor_id = f"methoxy_{oxygen}_{methyl_carbon}"
+                rotor = LocalRotor(
+                    rotor_id=rotor_id,
+                    kind="methoxy",
+                    axis=tuple(int(x) for x in axis),
+                    symmetry_order=1,
+                    owned_atoms=tuple(sorted(int(x) for x in owned_atoms)),
+                    unit_atom_sets=(),
+                    torsion_rows=torsion_rows,
+                    phase_coordinate=phase_coordinate,
+                    phase_values=phase_values,
+                )
+
+                active_seed = set(owned_atoms) | {anchor}
+                active_rows = set(rows_for_local_atoms(owned_atoms, active_seed))
+                active_rows.update(int(row) for row in torsion_rows)
+
+                active_atoms = set(active_seed)
+                for row_idx in active_rows:
+                    active_atoms.update(
+                        int(atom) for atom in flat_z_matrix[row_idx]
+                    )
+
+                cluster = LocalCluster(
+                    cluster_id=rotor_id,
+                    family_label="methoxy",
+                    rotor_ids=(rotor_id,),
+                    owned_atoms=tuple(sorted(int(x) for x in owned_atoms)),
+                    active_atoms=tuple(sorted(active_atoms)),
+                    active_rows=tuple(sorted(active_rows)),
+                )
+
+                local_group_model.rotors[rotor_id] = rotor
+                local_group_model.clusters[rotor_id] = cluster
+                registered_axes.add(axis_key)
+
+        return local_group_model
+
+    def _detect_amide_side_chain_local_groups(
+            self,
+            molecule,
+            ff_gen,
+            z_matrix,
+            local_group_model,
+            rotatable_bonds_zero_based=None):
+
+        enabled_kinds = set(getattr(self, "auto_local_group_kinds", ()))
+        if "amide_side_chain" not in enabled_kinds:
+            return local_group_model
+
+        labels = tuple(str(x).strip() for x in molecule.get_labels())
+        natoms = len(labels)
+        conn = np.asarray(ff_gen.connectivity_matrix, dtype=int)
+        atom_types = tuple(str(x).strip().lower() for x in ff_gen.atom_types)
+        flat_z_matrix = InterpolationDatapoint.flatten_z_matrix(z_matrix)
+        phase_values = tuple(
+            np.deg2rad(float(x))
+            for x in getattr(
+                self,
+                "alkyl_chain_phase_values_degrees",
+                (0, 60, 120, 180, 240, 300),
+            )
+        )
+
+        def element(atom):
+            letters = "".join(x for x in labels[int(atom)] if x.isalpha())
+            return letters.capitalize()
+
+        def neighbors(atom):
+            return tuple(int(x) for x in np.flatnonzero(conn[int(atom)]))
+
+        def canonical_axis(axis):
+            return tuple(sorted(int(x) for x in axis))
+
+        def is_sp3_carbon(atom):
+            return (
+                element(atom) == "C"
+                and len(atom_types) == natoms
+                and atom_types[int(atom)] == "c3"
+            )
+
+        def component_on_side(start, blocked_axis):
+            blocked = frozenset(int(x) for x in blocked_axis)
+            visited = set()
+            stack = [int(start)]
+
+            while stack:
+                atom = stack.pop()
+                if atom in visited:
+                    continue
+                visited.add(atom)
+
+                for neighbor in neighbors(atom):
+                    if frozenset((atom, neighbor)) == blocked:
+                        continue
+                    if neighbor not in visited:
+                        stack.append(neighbor)
+
+            return tuple(sorted(visited))
+
+        def torsion_rows_for_axis(axis):
+            axis_set = set(int(x) for x in axis)
+            return tuple(
+                row_idx
+                for row_idx, coordinate in enumerate(flat_z_matrix)
+                if (
+                    len(coordinate) == 4
+                    and set(int(x) for x in coordinate[1:3]) == axis_set
+                )
+            )
+
+        def oriented_coordinate(coordinate, axis):
+            coordinate = tuple(int(x) for x in coordinate)
+            axis = tuple(int(x) for x in axis)
+
+            if tuple(coordinate[1:3]) == axis:
+                return coordinate
+            if tuple(coordinate[2:0:-1]) == axis:
+                return tuple(reversed(coordinate))
+            return None
+
+        def select_phase_coordinate(axis, torsion_rows, moving_atoms):
+            moving_atoms = set(int(x) for x in moving_atoms)
+            fallback = None
+
+            for row in torsion_rows:
+                coordinate = oriented_coordinate(flat_z_matrix[row], axis)
+                if coordinate is None:
+                    continue
+                if fallback is None:
+                    fallback = coordinate
+                if coordinate[3] in moving_atoms:
+                    return coordinate
+
+            return fallback
+
+        def rows_for_local_atoms(local_atoms, active_atoms):
+            local_set = set(int(x) for x in local_atoms)
+            active_set = set(int(x) for x in active_atoms)
+            rows = []
+            for row_idx, coordinate in enumerate(flat_z_matrix):
+                coord_atoms = set(int(x) for x in coordinate)
+                if coord_atoms <= active_set and coord_atoms & local_set:
+                    rows.append(int(row_idx))
+            return tuple(rows)
+
+        def sp3_chain_from_amide_n(first_atom, amide_n):
+            chain = set()
+            stack = [int(first_atom)]
+            while stack:
+                atom = stack.pop()
+                if atom in chain:
+                    continue
+                if not is_sp3_carbon(atom):
+                    continue
+                chain.add(atom)
+
+                for neighbor in neighbors(atom):
+                    if neighbor == int(amide_n):
+                        continue
+                    if neighbor in chain:
+                        continue
+                    if is_sp3_carbon(neighbor):
+                        stack.append(neighbor)
+
+            return tuple(sorted(chain))
+
+        def hydrogens_attached_to_atoms(atoms):
+            hydrogens = set()
+            for atom in atoms:
+                hydrogens.update(
+                    int(neighbor)
+                    for neighbor in neighbors(atom)
+                    if element(neighbor) == "H"
+                )
+            return hydrogens
+
+        if rotatable_bonds_zero_based is None:
+            rotatable_bonds_zero_based = tuple(
+                canonical_axis((int(a) - 1, int(b) - 1))
+                for a, b in getattr(ff_gen, "rotatable_bonds", ())
+            )
+
+        rotatable_axes = {
+            canonical_axis(axis) for axis in rotatable_bonds_zero_based
+        }
+        registered_axes = {
+            canonical_axis(rotor.axis)
+            for rotor in local_group_model.rotors.values()
+        }
+
+        amide_records = []
+        for carbonyl_c in range(natoms):
+            if element(carbonyl_c) != "C":
+                continue
+
+            c_neighbors = neighbors(carbonyl_c)
+            oxygen_neighbors = tuple(
+                atom for atom in c_neighbors
+                if element(atom) == "O"
+            )
+            nitrogen_neighbors = tuple(
+                atom for atom in c_neighbors
+                if element(atom) == "N"
+            )
+            if not oxygen_neighbors or not nitrogen_neighbors:
+                continue
+
+            for amide_n in nitrogen_neighbors:
+                n_substituents = tuple(
+                    atom for atom in neighbors(amide_n)
+                    if atom != carbonyl_c and element(atom) != "H"
+                )
+                if not n_substituents:
+                    continue
+
+                for first_atom in n_substituents:
+                    if not is_sp3_carbon(first_atom):
+                        continue
+
+                    chain_atoms = sp3_chain_from_amide_n(first_atom, amide_n)
+                    if not chain_atoms:
+                        continue
+
+                    chain_set = set(chain_atoms)
+                    boundary_axes = []
+                    for chain_atom in chain_atoms:
+                        for neighbor in neighbors(chain_atom):
+                            if neighbor == amide_n:
+                                continue
+                            if neighbor in chain_set:
+                                continue
+                            if element(neighbor) == "H":
+                                continue
+                            boundary_axes.append((int(neighbor), int(chain_atom)))
+
+                    if boundary_axes:
+                        boundary_axis = sorted(
+                            boundary_axes,
+                            key=lambda axis: (
+                                canonical_axis(axis) not in rotatable_axes,
+                                axis,
+                            ),
+                        )[0]
+                        owned_atoms = component_on_side(
+                            boundary_axis[1], boundary_axis)
+                    else:
+                        boundary_axis = (int(amide_n), int(first_atom))
+                        owned_atoms = component_on_side(first_atom, boundary_axis)
+
+                    raw_owned_atoms = set(int(x) for x in owned_atoms)
+                    if int(first_atom) not in raw_owned_atoms:
+                        continue
+
+                    amide_core_atoms = {
+                        int(carbonyl_c),
+                        int(amide_n),
+                        *(int(atom) for atom in oxygen_neighbors),
+                        *(
+                            int(atom)
+                            for atom in neighbors(amide_n)
+                            if element(atom) == "H"
+                        ),
+                    }
+                    tail_owned_atoms = set(int(atom) for atom in chain_atoms)
+                    tail_owned_atoms.update(
+                        hydrogens_attached_to_atoms(tail_owned_atoms)
+                    )
+                    tail_owned_atoms &= raw_owned_atoms
+                    tail_owned_atoms -= amide_core_atoms
+                    if not tail_owned_atoms:
+                        continue
+
+                    amide_records.append({
+                        "carbonyl_c": int(carbonyl_c),
+                        "amide_n": int(amide_n),
+                        "first_atom": int(first_atom),
+                        "chain_atoms": chain_atoms,
+                        "boundary_axis": tuple(int(x) for x in boundary_axis),
+                        "amide_core_atoms": tuple(sorted(amide_core_atoms)),
+                        "owned_atoms": tuple(sorted(tail_owned_atoms)),
+                    })
+
+        for record in sorted(
+                amide_records,
+                key=lambda item: (-len(item["owned_atoms"]),
+                                  item["carbonyl_c"],
+                                  item["amide_n"],
+                                  item["first_atom"])):
+            cluster_id = (
+                f"amide_side_chain_{record['carbonyl_c']}_"
+                f"{record['amide_n']}_{record['first_atom']}"
+            )
+            if cluster_id in local_group_model.clusters:
+                continue
+
+            owned_atoms = tuple(int(x) for x in record["owned_atoms"])
+            owned_set = set(owned_atoms)
+            amide_core_atoms = set(
+                int(x) for x in record.get("amide_core_atoms", ())
+            )
+            active_seed = (
+                set(owned_atoms)
+                | set(record["boundary_axis"])
+                | amide_core_atoms
+            )
+            amide_axis = canonical_axis(
+                (record["carbonyl_c"], record["amide_n"]))
+            chain_set = set(int(x) for x in record["chain_atoms"]) & owned_set
+            if not chain_set:
+                continue
+
+            rotor_ids = []
+            torsion_rows = set()
+            candidate_axes = set()
+
+            n_axis = canonical_axis((record["amide_n"], record["first_atom"]))
+            if n_axis in rotatable_axes:
+                candidate_axes.add(tuple(record["boundary_axis"]))
+                candidate_axes.add((record["amide_n"], record["first_atom"]))
+
+            for axis_key in rotatable_axes:
+                if axis_key == amide_axis:
+                    continue
+                axis_set = set(axis_key)
+                if not axis_set <= active_seed:
+                    continue
+                if not (axis_set & chain_set):
+                    continue
+                if axis_key in registered_axes:
+                    continue
+                candidate_axes.add(tuple(axis_key))
+
+            for axis_key in sorted(canonical_axis(axis) for axis in candidate_axes):
+                if axis_key == amide_axis:
+                    continue
+                if axis_key in registered_axes:
+                    continue
+
+                atom_a, atom_b = axis_key
+                if atom_a in chain_set and atom_b not in chain_set:
+                    oriented_axis = (atom_b, atom_a)
+                elif atom_b in chain_set and atom_a not in chain_set:
+                    oriented_axis = (atom_a, atom_b)
+                elif atom_a == record["amide_n"] and atom_b in chain_set:
+                    oriented_axis = (atom_a, atom_b)
+                elif atom_b == record["amide_n"] and atom_a in chain_set:
+                    oriented_axis = (atom_b, atom_a)
+                else:
+                    oriented_axis = axis_key
+
+                axis_torsion_rows = torsion_rows_for_axis(oriented_axis)
+                if not axis_torsion_rows:
+                    continue
+
+                moving_atoms = component_on_side(oriented_axis[1], oriented_axis)
+                if not set(int(x) for x in moving_atoms) <= owned_set:
+                    continue
+                phase_coordinate = select_phase_coordinate(
+                    oriented_axis, axis_torsion_rows, moving_atoms)
+                if phase_coordinate is None:
+                    continue
+
+                rotor_id = (
+                    f"{cluster_id}_axis_{oriented_axis[0]}_"
+                    f"{oriented_axis[1]}"
+                )
+                rotor = LocalRotor(
+                    rotor_id=rotor_id,
+                    kind="amide_side_chain",
+                    axis=tuple(int(x) for x in oriented_axis),
+                    symmetry_order=1,
+                    owned_atoms=tuple(sorted(int(x) for x in moving_atoms)),
+                    unit_atom_sets=(),
+                    torsion_rows=axis_torsion_rows,
+                    phase_coordinate=phase_coordinate,
+                    phase_values=phase_values,
+                )
+
+                local_group_model.rotors[rotor_id] = rotor
+                registered_axes.add(canonical_axis(oriented_axis))
+                rotor_ids.append(rotor_id)
+                torsion_rows.update(int(row) for row in axis_torsion_rows)
+
+            if not rotor_ids:
+                continue
+
+            active_rows = set(rows_for_local_atoms(owned_atoms, active_seed))
+            active_rows.update(torsion_rows)
+
+            active_atoms = set(active_seed)
+            for row_idx in active_rows:
+                active_atoms.update(
+                    int(atom) for atom in flat_z_matrix[row_idx]
+                )
+
+            local_group_model.clusters[cluster_id] = LocalCluster(
+                cluster_id=cluster_id,
+                family_label="amide_side_chain",
+                rotor_ids=tuple(rotor_ids),
+                owned_atoms=owned_atoms,
+                active_atoms=tuple(sorted(active_atoms)),
+                active_rows=tuple(sorted(active_rows)),
+            )
+
+        return local_group_model
+
+    def _detect_anchored_linker_local_groups(
+            self,
+            molecule,
+            ff_gen,
+            z_matrix,
+            local_group_model,
+            rotatable_bonds_zero_based=None):
+
+        enabled_kinds = set(getattr(self, "auto_local_group_kinds", ()))
+        if "anchored_linker" not in enabled_kinds:
+            return local_group_model
+
+        labels = tuple(str(x).strip() for x in molecule.get_labels())
+        natoms = len(labels)
+        conn = np.asarray(ff_gen.connectivity_matrix, dtype=int)
+        atom_types = tuple(str(x).strip().lower() for x in ff_gen.atom_types)
+        flat_z_matrix = InterpolationDatapoint.flatten_z_matrix(z_matrix)
+        phase_values = tuple(
+            np.deg2rad(float(x))
+            for x in getattr(
+                self,
+                "anchored_linker_phase_values_degrees",
+                getattr(
+                    self,
+                    "alkyl_chain_phase_values_degrees",
+                    (0, 60, 120, 180, 240, 300),
+                ),
+            )
+        )
+        angle_scale = float(
+            getattr(self, "anchored_linker_signature_angle_scale", 0.35)
+        )
+
+        def element(atom):
+            letters = "".join(x for x in labels[int(atom)] if x.isalpha())
+            return letters.capitalize()
+
+        def neighbors(atom):
+            return tuple(int(x) for x in np.flatnonzero(conn[int(atom)]))
+
+        def canonical_axis(axis):
+            return tuple(sorted(int(x) for x in axis))
+
+        def is_sp3_carbon(atom):
+            return (
+                element(atom) == "C"
+                and len(atom_types) == natoms
+                and atom_types[int(atom)] == "c3"
+            )
+
+        def hydrogens_attached_to_atoms(atoms):
+            hydrogens = set()
+            for atom in atoms:
+                hydrogens.update(
+                    int(neighbor)
+                    for neighbor in neighbors(atom)
+                    if element(neighbor) == "H"
+                )
+            return hydrogens
+
+        def component_on_side(start_atom, blocked_axis):
+            blocked = frozenset(int(atom) for atom in blocked_axis)
+            visited = set()
+            stack = [int(start_atom)]
+
+            while stack:
+                atom = stack.pop()
+                if atom in visited:
+                    continue
+                visited.add(atom)
+
+                for neighbor in neighbors(atom):
+                    if frozenset((atom, neighbor)) == blocked:
+                        continue
+                    if neighbor not in visited:
+                        stack.append(neighbor)
+
+            return tuple(sorted(visited))
+
+        def sp3_component_from(first_atom, blocked_atom):
+            component = set()
+            stack = [int(first_atom)]
+            while stack:
+                atom = stack.pop()
+                if atom in component:
+                    continue
+                if not is_sp3_carbon(atom):
+                    continue
+                component.add(atom)
+
+                for neighbor in neighbors(atom):
+                    if neighbor == int(blocked_atom):
+                        continue
+                    if neighbor in component:
+                        continue
+                    if is_sp3_carbon(neighbor):
+                        stack.append(neighbor)
+
+            return tuple(sorted(component))
+
+        def shortest_path_within(start, target, allowed_atoms):
+            allowed = set(int(atom) for atom in allowed_atoms)
+            start = int(start)
+            target = int(target)
+            queue = [(start, (start,))]
+            seen = {start}
+
+            while queue:
+                atom, path = queue.pop(0)
+                if atom == target:
+                    return path
+
+                for neighbor in neighbors(atom):
+                    if neighbor not in allowed or neighbor in seen:
+                        continue
+                    seen.add(neighbor)
+                    queue.append((neighbor, path + (neighbor,)))
+
+            return ()
+
+        def torsion_rows_for_axis(axis):
+            axis_set = set(int(x) for x in axis)
+            return tuple(
+                row_idx
+                for row_idx, coordinate in enumerate(flat_z_matrix)
+                if (
+                    len(coordinate) == 4
+                    and set(int(x) for x in coordinate[1:3]) == axis_set
+                )
+            )
+
+        def angle_rows_for_angle(angle):
+            angle = tuple(int(x) for x in angle)
+            rev_angle = tuple(reversed(angle))
+            return tuple(
+                row_idx
+                for row_idx, coordinate in enumerate(flat_z_matrix)
+                if (
+                    len(coordinate) == 3
+                    and (
+                        tuple(int(x) for x in coordinate) == angle
+                        or tuple(int(x) for x in coordinate) == rev_angle
+                    )
+                )
+            )
+
+        def oriented_coordinate(coordinate, axis):
+            coordinate = tuple(int(x) for x in coordinate)
+            axis = tuple(int(x) for x in axis)
+
+            if tuple(coordinate[1:3]) == axis:
+                return coordinate
+            if tuple(coordinate[2:0:-1]) == axis:
+                return tuple(reversed(coordinate))
+            return None
+
+        def select_phase_coordinate(axis, torsion_rows, left_atoms, right_atoms):
+            left_atoms = set(int(x) for x in left_atoms)
+            right_atoms = set(int(x) for x in right_atoms)
+            fallback = None
+
+            for row in torsion_rows:
+                coordinate = oriented_coordinate(flat_z_matrix[row], axis)
+                if coordinate is None:
+                    continue
+                if fallback is None:
+                    fallback = coordinate
+                if coordinate[0] in left_atoms and coordinate[3] in right_atoms:
+                    return coordinate
+
+            return fallback
+
+        def rows_for_local_atoms(local_atoms, active_atoms):
+            local_set = set(int(x) for x in local_atoms)
+            active_set = set(int(x) for x in active_atoms)
+            rows = []
+            for row_idx, coordinate in enumerate(flat_z_matrix):
+                coord_atoms = set(int(x) for x in coordinate)
+                if coord_atoms <= active_set and coord_atoms & local_set:
+                    rows.append(int(row_idx))
+            return tuple(rows)
+
+        def add_signature_rows(rows, row_types, row_scales, new_rows,
+                               row_type, row_scale):
+            seen = set(rows)
+            for row in new_rows:
+                row = int(row)
+                if row in seen:
+                    continue
+                seen.add(row)
+                rows.append(row)
+                row_types.append(str(row_type))
+                row_scales.append(float(row_scale))
+
+        if rotatable_bonds_zero_based is None:
+            rotatable_bonds_zero_based = tuple(
+                canonical_axis((int(a) - 1, int(b) - 1))
+                for a, b in getattr(ff_gen, "rotatable_bonds", ())
+            )
+
+        rotatable_axes = {
+            canonical_axis(axis) for axis in rotatable_bonds_zero_based
+        }
+        registered_axes = {
+            canonical_axis(rotor.axis)
+            for rotor in local_group_model.rotors.values()
+        }
+
+        records = []
+        for carbonyl_c in range(natoms):
+            if element(carbonyl_c) != "C":
+                continue
+
+            c_neighbors = neighbors(carbonyl_c)
+            oxygen_neighbors = tuple(
+                atom for atom in c_neighbors
+                if element(atom) == "O"
+            )
+            nitrogen_neighbors = tuple(
+                atom for atom in c_neighbors
+                if element(atom) == "N"
+            )
+            if not oxygen_neighbors or not nitrogen_neighbors:
+                continue
+
+            for amide_n in nitrogen_neighbors:
+                n_substituents = tuple(
+                    atom for atom in neighbors(amide_n)
+                    if atom != carbonyl_c and element(atom) != "H"
+                )
+                for first_atom in n_substituents:
+                    if not is_sp3_carbon(first_atom):
+                        continue
+
+                    chain_atoms = sp3_component_from(first_atom, amide_n)
+                    if len(chain_atoms) < 2:
+                        continue
+
+                    chain_set = set(chain_atoms)
+                    boundary_axes = []
+                    for chain_atom in chain_atoms:
+                        for neighbor in neighbors(chain_atom):
+                            if neighbor == amide_n:
+                                continue
+                            if neighbor in chain_set:
+                                continue
+                            if element(neighbor) == "H":
+                                continue
+                            if is_sp3_carbon(neighbor):
+                                continue
+                            boundary_axes.append((int(neighbor), int(chain_atom)))
+
+                    for ring_anchor, boundary_chain_atom in boundary_axes:
+                        path = shortest_path_within(
+                            first_atom, boundary_chain_atom, chain_atoms)
+                        if len(path) < 2:
+                            continue
+
+                        owned_atoms = set(int(atom) for atom in path)
+                        owned_atoms.update(hydrogens_attached_to_atoms(owned_atoms))
+
+                        amide_anchor_atoms = {
+                            int(carbonyl_c),
+                            int(amide_n),
+                            *(int(atom) for atom in oxygen_neighbors),
+                            *(
+                                int(atom)
+                                for atom in neighbors(amide_n)
+                                if element(atom) == "H"
+                            ),
+                        }
+                        amide_relaxation_atoms = set(amide_anchor_atoms)
+                        for carbonyl_neighbor in c_neighbors:
+                            if carbonyl_neighbor == int(amide_n):
+                                continue
+                            if int(carbonyl_neighbor) in oxygen_neighbors:
+                                continue
+                            amide_relaxation_atoms.update(
+                                component_on_side(
+                                    carbonyl_neighbor,
+                                    (carbonyl_c, carbonyl_neighbor),
+                                )
+                            )
+                        amide_relaxation_atoms -= owned_atoms
+                        ring_anchor_atoms = {int(ring_anchor)}
+                        ring_anchor_atoms.update(
+                            int(atom)
+                            for atom in neighbors(ring_anchor)
+                            if atom != int(boundary_chain_atom)
+                            and element(atom) != "H"
+                        )
+                        anchor_atoms = tuple(
+                            sorted(amide_anchor_atoms | ring_anchor_atoms)
+                        )
+
+                        records.append({
+                            "carbonyl_c": int(carbonyl_c),
+                            "oxygen_neighbors": tuple(
+                                int(atom) for atom in oxygen_neighbors),
+                            "amide_n": int(amide_n),
+                            "first_atom": int(first_atom),
+                            "ring_anchor": int(ring_anchor),
+                            "path": tuple(int(atom) for atom in path),
+                            "owned_atoms": tuple(sorted(owned_atoms)),
+                            "anchor_atoms": anchor_atoms,
+                            "relaxation_atoms": tuple(
+                                sorted(amide_relaxation_atoms)
+                            ),
+                        })
+
+        records = sorted(
+            records,
+            key=lambda item: (
+                len(item["path"]),
+                item["carbonyl_c"],
+                item["amide_n"],
+                item["ring_anchor"],
+            ),
+            reverse=True,
+        )
+
+        claimed_owned_atoms = set(
+            int(atom)
+            for cluster in local_group_model.clusters.values()
+            for atom in cluster.owned_atoms
+        )
+
+        for record in records:
+            owned_atoms = tuple(int(atom) for atom in record["owned_atoms"])
+            owned_set = set(owned_atoms)
+            if owned_set & claimed_owned_atoms:
+                continue
+
+            path = tuple(int(atom) for atom in record["path"])
+            cluster_id = (
+                f"anchored_linker_{record['amide_n']}_"
+                f"{path[0]}_{path[-1]}_{record['ring_anchor']}"
+            )
+            if cluster_id in local_group_model.clusters:
+                continue
+
+            anchor_atoms = tuple(int(atom) for atom in record["anchor_atoms"])
+            anchor_set = set(anchor_atoms)
+            relaxation_atoms = tuple(
+                int(atom) for atom in record.get("relaxation_atoms", ())
+            )
+            active_seed = owned_set | anchor_set | set(relaxation_atoms)
+            rotor_ids = []
+            active_signature_rows = set()
+
+            candidate_axes = [(record["amide_n"], path[0])]
+            candidate_axes.extend(
+                (path[idx], path[idx + 1])
+                for idx in range(len(path) - 1)
+            )
+
+            for axis_index, axis in enumerate(candidate_axes):
+                axis = tuple(int(atom) for atom in axis)
+                axis_key = canonical_axis(axis)
+                if axis_key not in rotatable_axes:
+                    continue
+                if axis_key in registered_axes:
+                    continue
+
+                axis_torsion_rows = torsion_rows_for_axis(axis)
+                if not axis_torsion_rows:
+                    continue
+
+                if axis_index == 0:
+                    left_atoms = (
+                        record["carbonyl_c"],
+                        *record["oxygen_neighbors"],
+                    )
+                    right_atoms = path[1:] or (record["ring_anchor"],)
+                else:
+                    left_atoms = (record["amide_n"], *path[:axis_index])
+                    right_atoms = (
+                        *path[axis_index + 1:],
+                        record["ring_anchor"],
+                    )
+
+                phase_coordinate = select_phase_coordinate(
+                    axis, axis_torsion_rows, left_atoms, right_atoms)
+                if phase_coordinate is None:
+                    continue
+
+                signature_rows = []
+                signature_row_types = []
+                signature_row_scales = []
+                add_signature_rows(
+                    signature_rows,
+                    signature_row_types,
+                    signature_row_scales,
+                    axis_torsion_rows,
+                    "torsion",
+                    1.0,
+                )
+
+                if axis_index == 0:
+                    angle_candidates = [
+                        (record["carbonyl_c"], record["amide_n"], path[0]),
+                    ]
+                    if len(path) > 1:
+                        angle_candidates.append(
+                            (record["amide_n"], path[0], path[1]))
+                else:
+                    path_axis_idx = axis_index - 1
+                    left_angle_atom = (
+                        record["amide_n"]
+                        if path_axis_idx == 0 else path[path_axis_idx - 1]
+                    )
+                    right_angle_atom = (
+                        path[path_axis_idx + 2]
+                        if path_axis_idx + 2 < len(path)
+                        else record["ring_anchor"]
+                    )
+                    angle_candidates = [
+                        (left_angle_atom, path[path_axis_idx],
+                         path[path_axis_idx + 1]),
+                        (path[path_axis_idx], path[path_axis_idx + 1],
+                         right_angle_atom),
+                    ]
+
+                for angle in angle_candidates:
+                    add_signature_rows(
+                        signature_rows,
+                        signature_row_types,
+                        signature_row_scales,
+                        angle_rows_for_angle(angle),
+                        "angle",
+                        angle_scale,
+                    )
+
+                if axis_index == len(candidate_axes) - 1:
+                    boundary_axis = (path[-1], record["ring_anchor"])
+                    add_signature_rows(
+                        signature_rows,
+                        signature_row_types,
+                        signature_row_scales,
+                        torsion_rows_for_axis(boundary_axis),
+                        "torsion",
+                        1.0,
+                    )
+
+                rotor_id = (
+                    f"{cluster_id}_axis_{axis[0]}_{axis[1]}"
+                )
+                rotor = LocalRotor(
+                    rotor_id=rotor_id,
+                    kind="anchored_linker",
+                    axis=axis,
+                    symmetry_order=1,
+                    owned_atoms=owned_atoms,
+                    unit_atom_sets=(),
+                    torsion_rows=axis_torsion_rows,
+                    phase_coordinate=phase_coordinate,
+                    phase_values=phase_values,
+                    signature_rows=tuple(int(row) for row in signature_rows),
+                    signature_row_types=tuple(signature_row_types),
+                    signature_row_scales=tuple(signature_row_scales),
+                )
+
+                local_group_model.rotors[rotor_id] = rotor
+                registered_axes.add(axis_key)
+                rotor_ids.append(rotor_id)
+                active_signature_rows.update(signature_rows)
+
+            if not rotor_ids:
+                continue
+
+            active_rows = set(rows_for_local_atoms(owned_atoms, active_seed))
+            active_rows.update(active_signature_rows)
+
+            active_atoms = set(active_seed)
+            for row_idx in active_rows:
+                active_atoms.update(
+                    int(atom) for atom in flat_z_matrix[row_idx]
+                )
+
+            local_group_model.clusters[cluster_id] = LocalCluster(
+                cluster_id=cluster_id,
+                family_label="anchored_linker",
+                rotor_ids=tuple(rotor_ids),
+                owned_atoms=owned_atoms,
+                active_atoms=tuple(sorted(active_atoms)),
+                active_rows=tuple(sorted(active_rows)),
+                anchor_atoms=anchor_atoms,
+                relaxation_atoms=relaxation_atoms,
+            )
+            claimed_owned_atoms.update(owned_set)
 
         return local_group_model
 
@@ -1712,8 +2804,6 @@ class IMForceFieldGenerator:
                 rotatable_bonds_zero_based=rotatable_bonds_zero_based,
             )
 
-            print("\n 1 \n", self.local_group_primitive_model)
-
             self.local_group_primitive_model[root] = (
                 self._detect_heteroatom_local_groups(
                     molecule=molecule,
@@ -1723,7 +2813,36 @@ class IMForceFieldGenerator:
                     rotatable_bonds_zero_based=rotatable_bonds_zero_based,
                 )
             )
-            print("\n 2 \n", self.local_group_primitive_model)
+
+            self.local_group_primitive_model[root] = (
+                self._detect_methoxy_local_groups(
+                    molecule=molecule,
+                    ff_gen=ff_gen,
+                    z_matrix=self.roots_z_matrix[root],
+                    local_group_model=self.local_group_primitive_model[root],
+                    rotatable_bonds_zero_based=rotatable_bonds_zero_based,
+                )
+            )
+
+            self.local_group_primitive_model[root] = (
+                self._detect_amide_side_chain_local_groups(
+                    molecule=molecule,
+                    ff_gen=ff_gen,
+                    z_matrix=self.roots_z_matrix[root],
+                    local_group_model=self.local_group_primitive_model[root],
+                    rotatable_bonds_zero_based=rotatable_bonds_zero_based,
+                )
+            )
+
+            self.local_group_primitive_model[root] = (
+                self._detect_anchored_linker_local_groups(
+                    molecule=molecule,
+                    ff_gen=ff_gen,
+                    z_matrix=self.roots_z_matrix[root],
+                    local_group_model=self.local_group_primitive_model[root],
+                    rotatable_bonds_zero_based=rotatable_bonds_zero_based,
+                )
+            )
 
             self.local_group_primitive_model[root] = (
                 self._detect_alkyl_chain_local_groups(
@@ -1734,6 +2853,8 @@ class IMForceFieldGenerator:
                     rotatable_bonds_zero_based=rotatable_bonds_zero_based,
                 )
             )
+
+            print("\n 2 \n", self.local_group_primitive_model)
 
             manual_specs = self.local_group_specs or ()
             if isinstance(manual_specs, dict):
@@ -3435,6 +4556,28 @@ class IMForceFieldGenerator:
 
         return False
 
+    def _local_group_clusters_coupling_is_suppressed(
+            self,
+            local_group_model,
+            cluster_a,
+            cluster_b):
+        if getattr(
+                self,
+                "local_group_allow_anchored_linker_methyl_coupling",
+                False):
+            return False
+
+        a_is_linker = self._local_group_cluster_contains_rotor_kind(
+            local_group_model, cluster_a, 'anchored_linker')
+        b_is_linker = self._local_group_cluster_contains_rotor_kind(
+            local_group_model, cluster_b, 'anchored_linker')
+        a_is_methyl = self._local_group_cluster_contains_rotor_kind(
+            local_group_model, cluster_a, 'methyl')
+        b_is_methyl = self._local_group_cluster_contains_rotor_kind(
+            local_group_model, cluster_b, 'methyl')
+
+        return (a_is_linker and b_is_methyl) or (b_is_linker and a_is_methyl)
+
     def _build_coupled_local_group_model(
             self,
             local_group_model,
@@ -3483,8 +4626,15 @@ class IMForceFieldGenerator:
         for i in range(n_clusters):
             for j in range(i + 1, n_clusters):
                 is_direct_edge = (
-                    forced_merge_matrix[i, j]
-                    or coupling_matrix[i, j] >= threshold
+                    (
+                        forced_merge_matrix[i, j]
+                        or coupling_matrix[i, j] >= threshold
+                    )
+                    and not self._local_group_clusters_coupling_is_suppressed(
+                        local_group_model,
+                        cluster_items[i][1],
+                        cluster_items[j][1],
+                    )
                 )
                 if not is_direct_edge:
                     continue
@@ -3516,10 +4666,20 @@ class IMForceFieldGenerator:
             rotor_id_set = set()
             owned_atoms = set()
             active_atoms = set()
+            anchor_atoms = set()
+            relaxation_atoms = set()
 
             for cluster in component_clusters:
                 owned_atoms.update(int(atom) for atom in cluster.owned_atoms)
                 active_atoms.update(int(atom) for atom in cluster.active_atoms)
+                anchor_atoms.update(
+                    int(atom)
+                    for atom in getattr(cluster, "anchor_atoms", ())
+                )
+                relaxation_atoms.update(
+                    int(atom)
+                    for atom in getattr(cluster, "relaxation_atoms", ())
+                )
                 for rotor_id in cluster.rotor_ids:
                     rotor_id = str(rotor_id)
                     if rotor_id not in rotor_id_set:
@@ -3541,6 +4701,8 @@ class IMForceFieldGenerator:
                 owned_atoms=tuple(sorted(owned_atoms)),
                 active_atoms=tuple(sorted(active_atoms)),
                 active_rows=active_rows,
+                anchor_atoms=tuple(sorted(anchor_atoms)),
+                relaxation_atoms=tuple(sorted(relaxation_atoms)),
             )
 
         coupled_model = LocalGroupModel(
@@ -3618,8 +4780,15 @@ class IMForceFieldGenerator:
         cloned.set_multiplicity(molecule.get_multiplicity())
         return cloned
 
-    def _apply_local_group_state(self, molecule, local_group_model, rotor_ids, phase_signature):
+    def _apply_local_group_state(
+            self,
+            molecule,
+            local_group_model,
+            rotor_ids,
+            phase_signature,
+            skip_kinds=None):
         rotated = self._clone_molecule_for_local_group(molecule)
+        skip_kinds = set(str(kind) for kind in (skip_kinds or ()))
 
         for rotor_id, phase in zip(rotor_ids, phase_signature):
             phase = float(phase)
@@ -3627,6 +4796,9 @@ class IMForceFieldGenerator:
                 continue
 
             rotor = local_group_model.rotors[str(rotor_id)]
+            if str(rotor.kind) in skip_kinds:
+                continue
+
             dihedral = self._oriented_local_rotor_dihedral(rotor)
             if dihedral is None:
                 continue
@@ -3750,6 +4922,8 @@ class IMForceFieldGenerator:
                 molecule,
                 constraints=constraints,
                 index_offset=1,
+                max_iter=getattr(
+                    self, "anchored_linker_state_opt_max_iter", 60),
             )
             optimized_molecule = opt_results['final_molecule']
             return optimized_molecule, basis
@@ -3761,6 +4935,172 @@ class IMForceFieldGenerator:
             constraints=constraints,
             index_offset=1,
             compute_args=(basis, scf_results),
+            max_iter=getattr(
+                self, "anchored_linker_state_opt_max_iter", 60),
+        )
+        optimized_molecule = opt_results['final_molecule']
+
+        if (
+            basis is not None
+            and hasattr(basis, 'get_main_basis_label')
+        ):
+            basis = MolecularBasis.read(
+                optimized_molecule,
+                basis.get_main_basis_label(),
+            )
+
+        return optimized_molecule, basis
+
+    def _anchored_linker_local_group_state_constraints(
+            self,
+            molecule,
+            z_matrix,
+            local_group_model,
+            cluster,
+            rotor_ids,
+            phase_signature):
+        owned_atoms = set(int(atom) for atom in cluster.owned_atoms)
+        if not owned_atoms:
+            return []
+        relaxation_atoms = set()
+        if getattr(self, "anchored_linker_relax_amide", True):
+            relaxation_atoms.update(
+                int(atom)
+                for atom in getattr(cluster, "relaxation_atoms", ())
+            )
+        movable_atoms = owned_atoms | relaxation_atoms
+
+        constraints = []
+        all_atoms = set(range(len(molecule.get_labels())))
+        frozen_atoms = sorted(all_atoms - movable_atoms)
+        if frozen_atoms:
+            frozen_atoms_one_based = ','.join(
+                str(int(atom) + 1) for atom in frozen_atoms)
+            constraints.append(f'freeze xyz {frozen_atoms_one_based}')
+
+        if getattr(self, "anchored_linker_freeze_boundary_angles", False):
+            def element(atom):
+                letters = "".join(
+                    x for x in molecule.get_labels()[int(atom)]
+                    if x.isalpha())
+                return letters.capitalize()
+
+            flat_z_matrix = InterpolationDatapoint.flatten_z_matrix(z_matrix)
+            anchor_atoms = set(
+                int(atom) for atom in getattr(cluster, "anchor_atoms", ()))
+            frozen_angle_constraints = set()
+            for rotor_id in rotor_ids:
+                rotor = local_group_model.rotors.get(str(rotor_id))
+                if rotor is None or str(rotor.kind) != 'anchored_linker':
+                    continue
+                for row_idx, row_type in zip(
+                        getattr(rotor, "signature_rows", ()),
+                        getattr(rotor, "signature_row_types", ())):
+                    if str(row_type).strip().lower() != "angle":
+                        continue
+                    row_idx = int(row_idx)
+                    if row_idx < 0 or row_idx >= len(flat_z_matrix):
+                        continue
+                    coordinate = tuple(
+                        int(atom) for atom in flat_z_matrix[row_idx])
+                    if len(coordinate) != 3:
+                        continue
+                    coord_set = set(coordinate)
+                    local_in_angle = coord_set & owned_atoms
+                    anchor_in_angle = coord_set & anchor_atoms
+                    if len(local_in_angle) != 2 or len(anchor_in_angle) != 1:
+                        continue
+                    anchor_atom = next(iter(anchor_in_angle))
+                    if element(anchor_atom) != "C":
+                        continue
+                    key = (
+                        coordinate
+                        if coordinate <= tuple(reversed(coordinate))
+                        else tuple(reversed(coordinate))
+                    )
+                    if key in frozen_angle_constraints:
+                        continue
+                    frozen_angle_constraints.add(key)
+                    constraints.append(
+                        "freeze angle "
+                        + " ".join(str(int(atom) + 1) for atom in coordinate)
+                    )
+
+        for rotor_id, phase in zip(rotor_ids, phase_signature):
+            rotor = local_group_model.rotors.get(str(rotor_id))
+            if rotor is None:
+                continue
+
+            dihedral = self._oriented_local_rotor_dihedral(rotor)
+            if dihedral is None:
+                continue
+
+            dihedral_one_based = [int(atom) + 1 for atom in dihedral]
+            if str(rotor.kind) != 'anchored_linker':
+                if abs(float(phase)) > 1.0e-14:
+                    constraints.append(
+                        "freeze dihedral "
+                        + " ".join(str(atom) for atom in dihedral_one_based)
+                    )
+                continue
+
+            current_angle = molecule.get_dihedral(
+                dihedral_one_based, 'degree')
+            target_angle = current_angle + np.rad2deg(float(phase))
+            constraints.append(
+                "set dihedral "
+                + " ".join(str(atom) for atom in dihedral_one_based)
+                + f" {target_angle:.12f}"
+            )
+
+        return constraints
+
+    def _relax_anchored_linker_local_group_state(
+            self,
+            drivers,
+            molecule,
+            basis,
+            z_matrix,
+            local_group_model,
+            cluster,
+            rotor_ids,
+            phase_signature):
+        if not self._local_group_cluster_contains_rotor_kind(
+                local_group_model, cluster, 'anchored_linker'):
+            return molecule, basis
+
+        constraints = self._anchored_linker_local_group_state_constraints(
+            molecule,
+            z_matrix,
+            local_group_model,
+            cluster,
+            rotor_ids,
+            phase_signature,
+        )
+        if not constraints:
+            return molecule, basis
+
+        if isinstance(drivers[0], XtbDriver):
+            opt_results = self._run_optimization(
+                drivers[0],
+                molecule,
+                constraints=constraints,
+                index_offset=1,
+                max_iter=getattr(
+                    self, "anchored_linker_state_opt_max_iter", 60),
+            )
+            optimized_molecule = opt_results['final_molecule']
+            return optimized_molecule, basis
+
+        _, scf_results, _ = self._compute_energy(drivers[0], molecule, basis)
+        opt_results = self._run_optimization(
+            drivers[0],
+            molecule,
+            constraints=constraints,
+            index_offset=1,
+            compute_args=(basis, scf_results),
+            max_iter=getattr(
+                self, "anchored_linker_state_opt_max_iter", 60),
         )
         optimized_molecule = opt_results['final_molecule']
 
@@ -4030,7 +5370,8 @@ class IMForceFieldGenerator:
             self,
             molecule_specific_information,
             interpolation_settings,
-            symmetry_information=None):
+            symmetry_information=None,
+            write_org_database=True):
         """
         Adds local-group database points.
 
@@ -4205,10 +5546,14 @@ class IMForceFieldGenerator:
                         reference_molecule=mol_basis[0],
                     )
                     core_dp.write_hdf5(target_file, core_label)
-                    core_dp.write_hdf5(f'im_database_{target_root}_org.h5', core_label)
+                    if write_org_database:
+                        core_dp.write_hdf5(
+                            f'im_database_{target_root}_org.h5', core_label)
 
                     point_labels = [core_label]
                     point_labels_by_cluster = {}
+                    anchored_linker_state_cache = {}
+                    anchored_linker_failed_states = set()
 
                     for job in self._local_group_state_jobs(local_group_model):
                         cluster = job['cluster']
@@ -4244,11 +5589,22 @@ class IMForceFieldGenerator:
                             )
                             cluster_molecule = mol_basis[0]
                         else:
+                            has_anchored_linker = (
+                                self._local_group_cluster_contains_rotor_kind(
+                                    local_group_model,
+                                    cluster,
+                                    'anchored_linker',
+                                )
+                            )
                             cluster_molecule = self._apply_local_group_state(
                                 mol_basis[0],
                                 local_group_model,
                                 rotor_ids,
                                 phase_signature,
+                                skip_kinds=(
+                                    {'anchored_linker'}
+                                    if has_anchored_linker else None
+                                ),
                             )
 
                             cluster_basis = mol_basis[1]
@@ -4262,18 +5618,154 @@ class IMForceFieldGenerator:
                                     cluster_basis.get_main_basis_label(),
                                 )
 
-                            print("Relax the alkyl chain")
-                            cluster_molecule, cluster_basis = (
-                                self._relax_alkyl_local_group_state(
-                                    drivers,
-                                    cluster_molecule,
-                                    cluster_basis,
-                                    z_matrix,
-                                    local_group_model,
-                                    cluster,
-                                    dihedrals_to_rotate,
+                            if has_anchored_linker:
+                                anchored_phase_signature = tuple(
+                                    float(phase)
+                                    if (
+                                        local_group_model.rotors[
+                                            str(rotor_id)].kind
+                                        == 'anchored_linker'
+                                    ) else 0.0
+                                    for rotor_id, phase in zip(
+                                        rotor_ids, phase_signature)
                                 )
-                            )
+                                anchored_cache_key = (
+                                    str(cluster.cluster_id),
+                                    tuple(
+                                        round(float(phase), 12)
+                                        for phase in anchored_phase_signature
+                                    ),
+                                )
+                                if anchored_cache_key in anchored_linker_failed_states:
+                                    continue
+
+                                if anchored_cache_key in anchored_linker_state_cache:
+                                    cached_molecule, cached_basis = (
+                                        anchored_linker_state_cache[
+                                            anchored_cache_key]
+                                    )
+                                    cluster_molecule = (
+                                        self._clone_molecule_for_local_group(
+                                            cached_molecule)
+                                    )
+                                    cluster_basis = cached_basis
+                                else:
+                                    target_signature = anchored_cache_key[1]
+                                    predecessor_key = None
+                                    predecessor_score = -1
+                                    target_nonzero = sum(
+                                        abs(float(phase)) > 1.0e-12
+                                        for phase in target_signature
+                                    )
+                                    if target_nonzero > 1:
+                                        for cache_key in anchored_linker_state_cache:
+                                            if cache_key[0] != anchored_cache_key[0]:
+                                                continue
+                                            seed_signature = cache_key[1]
+                                            if len(seed_signature) != len(
+                                                    target_signature):
+                                                continue
+                                            score = 0
+                                            compatible = True
+                                            for seed_phase, target_phase in zip(
+                                                    seed_signature,
+                                                    target_signature):
+                                                seed_phase = float(seed_phase)
+                                                target_phase = float(
+                                                    target_phase)
+                                                if abs(target_phase) <= 1.0e-12:
+                                                    if abs(seed_phase) > 1.0e-12:
+                                                        compatible = False
+                                                        break
+                                                    continue
+                                                if abs(seed_phase - target_phase) <= 1.0e-12:
+                                                    score += 1
+                                                elif abs(seed_phase) > 1.0e-12:
+                                                    compatible = False
+                                                    break
+                                            if (
+                                                compatible
+                                                and 0 < score < target_nonzero
+                                                and score > predecessor_score
+                                            ):
+                                                predecessor_key = cache_key
+                                                predecessor_score = score
+
+                                    relaxation_phase_signature = (
+                                        anchored_phase_signature
+                                    )
+                                    if predecessor_key is not None:
+                                        cached_molecule, cached_basis = (
+                                            anchored_linker_state_cache[
+                                                predecessor_key]
+                                        )
+                                        cluster_molecule = (
+                                            self._clone_molecule_for_local_group(
+                                                cached_molecule)
+                                        )
+                                        cluster_basis = cached_basis
+                                        relaxation_phase_signature = tuple(
+                                            float(target) - float(seed)
+                                            for target, seed in zip(
+                                                target_signature,
+                                                predecessor_key[1])
+                                        )
+                                    else:
+                                        cluster_molecule = (
+                                            self._clone_molecule_for_local_group(
+                                                mol_basis[0])
+                                        )
+                                        cluster_basis = mol_basis[1]
+                                    print("Relax the anchored linker")
+                                    try:
+                                        cluster_molecule, cluster_basis = (
+                                            self._relax_anchored_linker_local_group_state(
+                                                drivers,
+                                                cluster_molecule,
+                                                cluster_basis,
+                                                z_matrix,
+                                                local_group_model,
+                                                cluster,
+                                                rotor_ids,
+                                                relaxation_phase_signature,
+                                            )
+                                        )
+                                    except Exception as exc:
+                                        anchored_linker_failed_states.add(
+                                            anchored_cache_key)
+                                        self.ostream.print_warning(
+                                            "Skipping anchored-linker local state "
+                                            f"{label}: {exc}"
+                                        )
+                                        self.ostream.flush()
+                                        continue
+                                    anchored_linker_state_cache[
+                                        anchored_cache_key] = (
+                                            self._clone_molecule_for_local_group(
+                                                cluster_molecule),
+                                            cluster_basis,
+                                        )
+
+                                cluster_molecule = self._apply_local_group_state(
+                                    cluster_molecule,
+                                    local_group_model,
+                                    rotor_ids,
+                                    phase_signature,
+                                    skip_kinds={'anchored_linker'},
+                                )
+                            else:
+                                print("Relax the alkyl chain")
+                                cluster_molecule, cluster_basis = (
+                                    self._relax_alkyl_local_group_state(
+                                        drivers,
+                                        cluster_molecule,
+                                        cluster_basis,
+                                        z_matrix,
+                                        local_group_model,
+                                        cluster,
+                                        dihedrals_to_rotate,
+                                    )
+                                )
                             print("After the relaxiation")
                             cluster_energies, cluster_scf, cluster_rsp = (
                                 self._compute_energy(
@@ -4318,7 +5810,9 @@ class IMForceFieldGenerator:
                             reference_molecule=cluster_molecule,
                         )
                         cluster_dp.write_hdf5(target_file, label)
-                        cluster_dp.write_hdf5(f'im_database_{target_root}_org.h5', label)
+                        if write_org_database:
+                            cluster_dp.write_hdf5(
+                                f'im_database_{target_root}_org.h5', label)
                         point_labels.append(label)
                         point_labels_by_cluster.setdefault(
                             str(cluster.cluster_id), {})[int(state_id)] = {
@@ -4371,7 +5865,7 @@ class IMForceFieldGenerator:
                         f"Database expansion with {', '.join(labels)}")
                     self.ostream.flush()
 
-    def add_point(self, molecule_specific_information, interpolation_settings, symmetry_information={}):
+    def add_point(self, molecule_specific_information, interpolation_settings, symmetry_information={}, write_org_database=True):
         """ Adds a new point to the database.
 
             :param molecule:
@@ -4397,6 +5891,7 @@ class IMForceFieldGenerator:
                 molecule_specific_information,
                 interpolation_settings,
                 symmetry_information=symmetry_information,
+                write_org_database=write_org_database,
             )
 
         # define impesdriver to determine if stucture should be added:
@@ -4509,7 +6004,9 @@ class IMForceFieldGenerator:
 
                     impes_coordinate.write_hdf5(target_file, label)
 
-                    impes_coordinate.write_hdf5(f'im_database_{target_root}_org.h5', label)
+                    if write_org_database:
+                        impes_coordinate.write_hdf5(
+                            f'im_database_{target_root}_org.h5', label)
                     interpolation_driver.imforcefield_file = target_file
 
                     labels, z_matrix = interpolation_driver.read_labels()
@@ -4547,11 +6044,22 @@ class IMForceFieldGenerator:
 
         return opt_constraint_list
 
-    def _run_optimization(self, optimization_driver, molecule, constraints=None, transition=False, index_offset=1, compute_args=None, source_molecule=None):
+    def _run_optimization(
+            self,
+            optimization_driver,
+            molecule,
+            constraints=None,
+            transition=False,
+            index_offset=1,
+            compute_args=None,
+            source_molecule=None,
+            max_iter=None):
 
         opt_drv = OptimizationDriver(optimization_driver)
         opt_drv.ostream.mute()
         opt_drv.transition = transition
+        if max_iter is not None:
+            opt_drv.max_iter = int(max_iter)
 
         if constraints is not None:
             opt_drv.constraints = self._build_opt_constraint_list(constraints, index_offset=index_offset)

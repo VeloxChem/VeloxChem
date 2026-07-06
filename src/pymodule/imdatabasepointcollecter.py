@@ -3262,6 +3262,7 @@ class IMDatabasePointCollecter:
             state_specific_molecules,
             self.interpolation_settings,
             symmetry_information=symmetry_information,
+            write_org_database=False,
         )
 
         affected_roots = sorted({

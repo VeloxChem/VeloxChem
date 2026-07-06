@@ -1585,7 +1585,7 @@ class InterpolationDriver:
         # First, translate the cartesian coordinates to zero
         target_coordinates = data_point.cartesian_coordinates.copy()
         reference_coordinates = self.impes_coordinate.cartesian_coordinates.copy()
-
+    
         active_atoms = self._cartesian_weight_active_atoms(
             reference_coordinates.shape[0]
         )
@@ -2250,6 +2250,28 @@ class InterpolationDriver:
             global_pair=global_pair,
             global_displacement=global_displacement,
         )
+
+        if float(np.max(global_source_blame)) <= eps:
+            displacement_constraints = self._select_source_zero_displacement_constraints(
+                candidate_constraints=candidate_constraints,
+                primary_constraint=primary_constraint,
+                fallback_constraints=fallback_constraints,
+                coords_flat=coords_flat,
+                kinds_flat=kinds_flat,
+                constraints_to_exclude=constraints_to_exclude,
+                global_coord_score=regularized_coord_score,
+                global_displacement=global_displacement,
+            )
+
+            if displacement_constraints:
+                candidate_constraints = self._merge_unique_constraints(
+                    candidate_constraints,
+                    displacement_constraints,
+                )
+                fallback_constraints = self._merge_unique_constraints(
+                    displacement_constraints,
+                    fallback_constraints,
+                )
 
         self.print_best_repair_block(
             best_block=best_block,
@@ -3015,6 +3037,20 @@ class InterpolationDriver:
 
         return selected, primary_constraint
 
+    def _merge_unique_constraints(self, *constraint_lists):
+        merged = []
+        seen = set()
+
+        for constraint_list in constraint_lists:
+            for coord_raw in constraint_list or []:
+                coord = tuple(int(x) for x in coord_raw)
+                if coord in seen:
+                    continue
+                seen.add(coord)
+                merged.append(coord)
+
+        return merged
+
     def _section_from_kind(self, kind):
         return {
             "bond": "bonds",
@@ -3104,6 +3140,99 @@ class InterpolationDriver:
 
         ranked = sorted(ranked, key=lambda x: x[1], reverse=True)
         return [tuple(int(x) for x in coords_flat[i]) for i, _ in ranked[:]]
+
+    def _select_source_zero_displacement_constraints(
+        self,
+        *,
+        candidate_constraints,
+        primary_constraint,
+        fallback_constraints,
+        coords_flat,
+        kinds_flat,
+        constraints_to_exclude,
+        global_coord_score,
+        global_displacement,
+        max_extra_constraints=6,
+        min_fallback_displacement_sigma=0.5,
+        min_global_displacement_sigma=1.0,
+        min_score_frac=0.05,
+    ):
+        eps = 1.0e-12
+
+        if len(coords_flat) == 0 or float(np.max(global_displacement)) <= eps:
+            return []
+
+        selected = {
+            tuple(int(x) for x in c)
+            for c in list(candidate_constraints or []) + list(primary_constraint or [])
+        }
+        excluded = {tuple(int(x) for x in c) for c in constraints_to_exclude}
+        coord_to_idx = {
+            tuple(int(x) for x in coord): idx
+            for idx, coord in enumerate(coords_flat)
+        }
+
+        displacement_score = self._normalize_nonnegative(global_displacement)
+        max_coord_score = float(np.max(global_coord_score))
+        added = []
+        added_set = set()
+
+        def add_idx(idx, min_displacement_sigma):
+            coord = tuple(int(x) for x in coords_flat[idx])
+
+            if coord in selected or coord in added_set or coord in excluded:
+                return False
+            if self._is_coord_excluded_for_constraint(
+                idx, coords_flat, kinds_flat, constraints_to_exclude
+            ):
+                return False
+
+            displacement_ok = (
+                float(global_displacement[idx]) >= min_displacement_sigma
+            )
+            score_ok = (
+                float(global_coord_score[idx])
+                >= min_score_frac * max(max_coord_score, eps)
+            )
+
+            if not (displacement_ok or score_ok):
+                return False
+
+            added.append(coord)
+            added_set.add(coord)
+            return True
+
+        # Prefer the existing locality-ranked fallbacks first.  These are tied
+        # to the response block, but in a source-zero case they need enough
+        # displacement to keep the optimizer from relaxing away the failure.
+        for coord_raw in fallback_constraints or []:
+            if len(added) >= max_extra_constraints:
+                break
+
+            coord = tuple(int(x) for x in coord_raw)
+            idx = coord_to_idx.get(coord)
+            if idx is None:
+                continue
+            add_idx(idx, min_fallback_displacement_sigma)
+
+        if len(added) >= max_extra_constraints:
+            return added[:max_extra_constraints]
+
+        ranked_by_displacement = sorted(
+            range(len(coords_flat)),
+            key=lambda i: (
+                float(displacement_score[i]),
+                float(global_coord_score[i]),
+            ),
+            reverse=True,
+        )
+
+        for idx in ranked_by_displacement:
+            if len(added) >= max_extra_constraints:
+                break
+            add_idx(int(idx), min_global_displacement_sigma)
+
+        return added[:max_extra_constraints]
 
     def transform_gradient_to_internal_coordinates(self, molecule, gradient, b_matrix, tol=1e-6):
         grad = np.asarray(gradient, dtype=np.float64).reshape(-1)

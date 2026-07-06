@@ -74,12 +74,66 @@ def _rotor_rows(local_group_model, rotor_id):
     rotor = local_group_model.rotors.get(str(rotor_id))
     if rotor is None:
         return ()
+    signature_rows = getattr(rotor, "signature_rows", ())
+    if signature_rows:
+        return tuple(int(row) for row in signature_rows)
     return tuple(int(row) for row in rotor.torsion_rows)
+
+
+def _rotor_row_types(local_group_model, rotor_id):
+    rotor = local_group_model.rotors.get(str(rotor_id))
+    if rotor is None:
+        return ()
+
+    rows = _rotor_rows(local_group_model, rotor_id)
+    row_types = tuple(
+        str(row_type).strip().lower()
+        for row_type in getattr(rotor, "signature_row_types", ())
+    )
+    if len(row_types) == len(rows):
+        return row_types
+
+    return tuple("torsion" for _ in rows)
+
+
+def _rotor_row_scales(local_group_model, rotor_id):
+    rotor = local_group_model.rotors.get(str(rotor_id))
+    if rotor is None:
+        return ()
+
+    rows = _rotor_rows(local_group_model, rotor_id)
+    row_scales = tuple(
+        float(scale)
+        for scale in getattr(rotor, "signature_row_scales", ())
+    )
+    if len(row_scales) == len(rows):
+        return row_scales
+
+    return tuple(
+        0.35 if row_type == "angle" else 1.0
+        for row_type in _rotor_row_types(local_group_model, rotor_id)
+    )
 
 
 def _signature_rows(local_group_model, rotor_ids):
     return tuple(
         tuple(int(row) for row in _rotor_rows(local_group_model, rotor_id))
+        for rotor_id in rotor_ids
+    )
+
+
+def _signature_row_types(local_group_model, rotor_ids):
+    return tuple(
+        tuple(str(row_type) for row_type in _rotor_row_types(
+            local_group_model, rotor_id))
+        for rotor_id in rotor_ids
+    )
+
+
+def _signature_row_scales(local_group_model, rotor_ids):
+    return tuple(
+        tuple(float(scale) for scale in _rotor_row_scales(
+            local_group_model, rotor_id))
         for rotor_id in rotor_ids
     )
 
@@ -357,6 +411,16 @@ def build_signed_factor_registry_payload(
                 [int(row) for row in rows]
                 for rows in _signature_rows(local_group_model, term_rotor_ids)
             ],
+            "grouped_signature_row_types": [
+                [str(row_type) for row_type in row_types]
+                for row_types in _signature_row_types(
+                    local_group_model, term_rotor_ids)
+            ],
+            "grouped_signature_row_scales": [
+                [float(scale) for scale in row_scales]
+                for row_scales in _signature_row_scales(
+                    local_group_model, term_rotor_ids)
+            ],
         }
         term_state_labels[term_key] = {
             str(int(state_id)): str(label)
@@ -375,6 +439,20 @@ def build_signed_factor_registry_payload(
         "primitive_signature_rows": {
             _json_key(rotor_id): [int(row) for row in rows]
             for rotor_id, rows in primitive_signature_rows.items()
+        },
+        "primitive_signature_row_types": {
+            _json_key(rotor_id): [
+                str(row_type)
+                for row_type in _rotor_row_types(local_group_model, rotor_id)
+            ]
+            for rotor_id in primitive_signature_rows
+        },
+        "primitive_signature_row_scales": {
+            _json_key(rotor_id): [
+                float(scale)
+                for scale in _rotor_row_scales(local_group_model, rotor_id)
+            ]
+            for rotor_id in primitive_signature_rows
         },
         "terms": terms,
     }
@@ -674,6 +752,14 @@ def _build_inferred_factor_bank(family_label, core_dp, cluster_infos, flat_z_mat
                 tuple(int(row) for row in rows_by_rotor.get(str(rotor_id), ()))
                 for rotor_id in term_rotor_ids
             ),
+            "grouped_signature_row_types": tuple(
+                tuple("torsion" for _ in rows_by_rotor.get(str(rotor_id), ()))
+                for rotor_id in term_rotor_ids
+            ),
+            "grouped_signature_row_scales": tuple(
+                tuple(1.0 for _ in rows_by_rotor.get(str(rotor_id), ()))
+                for rotor_id in term_rotor_ids
+            ),
             "expected_states": expected_states,
             "angle_library": [],
         }
@@ -788,6 +874,30 @@ def load_signed_factor_banks_for_root(imff_file, root, z_matrix, im_settings):
                 tuple(int(row) for row in rows)
                 for rows in term_payload.get("grouped_signature_rows", ())
             )
+            grouped_signature_row_types = tuple(
+                tuple(str(row_type).strip().lower() for row_type in row_types)
+                for row_types in term_payload.get(
+                    "grouped_signature_row_types", ())
+            )
+            if len(grouped_signature_row_types) != len(grouped_signature_rows):
+                grouped_signature_row_types = tuple(
+                    tuple("torsion" for _ in rows)
+                    for rows in grouped_signature_rows
+                )
+
+            grouped_signature_row_scales = tuple(
+                tuple(float(scale) for scale in row_scales)
+                for row_scales in term_payload.get(
+                    "grouped_signature_row_scales", ())
+            )
+            if len(grouped_signature_row_scales) != len(grouped_signature_rows):
+                grouped_signature_row_scales = tuple(
+                    tuple(
+                        0.35 if row_type == "angle" else 1.0
+                        for row_type in row_types
+                    )
+                    for row_types in grouped_signature_row_types
+                )
             active_rows = set(
                 int(row) for row in term_payload.get("active_rows", ())
             )
@@ -807,6 +917,8 @@ def load_signed_factor_banks_for_root(imff_file, root, z_matrix, im_settings):
                     int(atom) for atom in term_payload.get("active_atoms", ())
                 ),
                 "grouped_signature_rows": grouped_signature_rows,
+                "grouped_signature_row_types": grouped_signature_row_types,
+                "grouped_signature_row_scales": grouped_signature_row_scales,
                 "expected_states": expected_states,
                 "angle_library": factor_angle_library.get(term_key, []),
             }
@@ -824,6 +936,18 @@ def load_signed_factor_banks_for_root(imff_file, root, z_matrix, im_settings):
                 _restore_id(rotor_id): tuple(int(row) for row in rows)
                 for rotor_id, rows in factor_info.get(
                     "primitive_signature_rows", {}).items()
+            },
+            "primitive_signature_row_types": {
+                _restore_id(rotor_id): tuple(
+                    str(row_type).strip().lower() for row_type in row_types
+                )
+                for rotor_id, row_types in factor_info.get(
+                    "primitive_signature_row_types", {}).items()
+            },
+            "primitive_signature_row_scales": {
+                _restore_id(rotor_id): tuple(float(scale) for scale in row_scales)
+                for rotor_id, row_scales in factor_info.get(
+                    "primitive_signature_row_scales", {}).items()
             },
             "terms": terms,
         }
@@ -1124,6 +1248,8 @@ def _factor_signature_distance_and_gradient(
         reference_signature,
         b_matrix):
     rows_by_rotor = term_bank.get("grouped_signature_rows", ())
+    row_types_by_rotor = term_bank.get("grouped_signature_row_types", ())
+    row_scales_by_rotor = term_bank.get("grouped_signature_row_scales", ())
     b_matrix = np.asarray(b_matrix, dtype=np.float64)
 
     ncart = b_matrix.shape[1]
@@ -1139,9 +1265,41 @@ def _factor_signature_distance_and_gradient(
             np.asarray(current_signature[rotor_index], dtype=np.float64)
             - np.asarray(reference_signature[rotor_index], dtype=np.float64)
         )
-        d2_total += float(np.mean(2.0 * (1.0 - np.cos(delta))))
+
+        row_types = ()
+        if rotor_index < len(row_types_by_rotor):
+            row_types = tuple(
+                str(row_type).strip().lower()
+                for row_type in row_types_by_rotor[rotor_index]
+            )
+        if len(row_types) != len(rows):
+            row_types = tuple("torsion" for _ in rows)
+
+        row_scales = ()
+        if rotor_index < len(row_scales_by_rotor):
+            row_scales = tuple(
+                max(float(scale), 1.0e-12)
+                for scale in row_scales_by_rotor[rotor_index]
+            )
+        if len(row_scales) != len(rows):
+            row_scales = tuple(
+                0.35 if row_type == "angle" else 1.0
+                for row_type in row_types
+            )
+
+        row_metric = np.zeros(len(rows), dtype=np.float64)
+        row_grad_coeff = np.zeros(len(rows), dtype=np.float64)
+        for idx, (row_type, scale) in enumerate(zip(row_types, row_scales)):
+            if row_type in ("torsion", "dihedral", "periodic"):
+                row_metric[idx] = 2.0 * (1.0 - np.cos(delta[idx])) / (scale**2)
+                row_grad_coeff[idx] = 2.0 * np.sin(delta[idx]) / (scale**2)
+            else:
+                row_metric[idx] = (delta[idx] / scale)**2
+                row_grad_coeff[idx] = 2.0 * delta[idx] / (scale**2)
+
+        d2_total += float(np.mean(row_metric))
         grad_total += np.mean(
-            2.0 * np.sin(delta)[:, None] * b_matrix[rows_arr, :],
+            row_grad_coeff[:, None] * b_matrix[rows_arr, :],
             axis=0,
         )
 
