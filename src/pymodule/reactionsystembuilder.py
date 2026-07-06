@@ -317,8 +317,8 @@ class ReactionSystemBuilder():
                                     nb_force, self.neutralize, self.padding,
                                     box)
 
-        if self.pressure > 0:
-            barostat = self._add_barostat(system)
+        # if self.pressure > 0:
+        barostat = self._add_barostat(system)
 
         if self.implicit_solvent_model is not None:
             assert_msg_critical(
@@ -372,6 +372,10 @@ class ReactionSystemBuilder():
             )
             self.ostream.flush()
 
+        # Guard against residues that might have standard names
+        for i in range(len(templates)):
+            templates[i].name = f"{templates[i].name}_evb"
+            
         for t, template in enumerate(templates):
             for i, atom in enumerate(template.atoms):
                 forcefield.registerAtomType({
@@ -530,20 +534,21 @@ class ReactionSystemBuilder():
             self.ostream.flush()
             GM = GraphMatcher(vlx_graph, res_graph,
                               categorical_node_match('elem', ''))
-            mol.write_xyz_file('residue.xyz')
-            np.savetxt('residue_bonds.txt', np.array(list(residue_bonds_save)))
-
-            self.reactant.molecule.write_xyz_file('reactant.xyz')
-            np.savetxt('reactant_bonds.txt', np.array(list(vlx_bonds)))
 
             if GM.subgraph_is_isomorphic():
                 return GM.subgraph_isomorphisms_iter()
             if connectivity_range > 1.25:
+
                 self.ostream.print_info(
                     f"Could not find subgraph isomorphismfrom residue to reactant, reducing connectivity range to {connectivity_range-0.01:.2f} and trying again"
                 )
                 self.ostream.flush()
 
+        mol.write_xyz_file('residue.xyz')
+        np.savetxt('residue_bonds.txt', np.array(list(residue_bonds_save)))
+
+        self.reactant.molecule.write_xyz_file('reactant.xyz')
+        np.savetxt('reactant_bonds.txt', np.array(list(vlx_bonds)))
         raise ValueError(
             "The detected residue structure must be subgraph isomorphic to the reactant molecule, but it is not. "
             "You can inspect the automatically detected bonds and geometry with the following code: \n"
@@ -1394,6 +1399,9 @@ class ReactionSystemBuilder():
         return box
 
     def _add_barostat(self, system):
+        if self.pressure ==-1:
+            self.ostream.print_info("Setting default equilibration pressure to 1 bar")
+            self.pressure = 1.0
         if not (self.CNT or self.graphene):
             barostat = mm.MonteCarloBarostat(
                 self.pressure * mmunit.bar,  # type: ignore

@@ -32,9 +32,11 @@
 
 from importlib.metadata import version
 import re
+import time
 
 import numpy as np
 from pathlib import Path
+from mpi4py import MPI
 
 from .errorhandler import assert_msg_critical
 from .reactionsystembuilder import EvbForceGroup, ReactionSystemBuilder
@@ -65,7 +67,23 @@ class EvbReporter:
         debug=False,
         replica=0,
         direction=0,
+        cpu_threads=None,
+        enable_bonded_decomp=True,
+        defer_open=False,
+        core_outputs=True,
     ):
+        # core_outputs: when False, the energy / force / velocity / NB-decomp
+        #   files are neither opened nor written (only force-group / bonded
+        #   decomposition are). Used by the master-side reporter in async mode
+        #   so it does not collide with the worker's Energies.csv.
+        # cpu_threads: number of OpenMM CPU-platform threads for the energy
+        #   simulations (None = OpenMM default). Used by the async reporter
+        #   worker to saturate the CPU on a single node.
+        # enable_bonded_decomp: allow the (expensive, GPU-system-dependent)
+        #   bonded decomposition. The async worker disables it; the master-side
+        #   synchronous reporter keeps it.
+        # defer_open: if True, do not open the output files in __init__; the
+        #   caller (worker) opens them per window via _open_outputs(append).
         self.ostream = outputstream
         self.debug = debug
         # Replica index and sweep direction (0 = forward l: 0->1, 1 = backward
@@ -91,70 +109,129 @@ class EvbReporter:
             self.use_tuple = False
 
         self.out_streams = []
-
-        self.E_out = open(energy_file, 'a' if append else 'w')
-        self.out_streams.append(self.E_out)
         self.report_interval = report_interval
-
         self.lambda_val = lambda_val
+        self.topology = topology
+        self.num_atoms = topology.getNumAtoms()
+
+        # Store output paths / flags; actual file opening is deferred to
+        # _open_outputs so the worker can (re)open per window with an append
+        # flag while the CPU simulations below are built only once.
+        self.core_outputs = core_outputs
+        self._energy_file = energy_file
+        self._force_file = force_file
+        self._velocity_file = velocity_file
+        self._forcegroup_file = forcegroup_file
+        self.report_forces = force_file is not None and core_outputs
+        self.report_velocities = velocity_file is not None and core_outputs
+        self.report_forcegroups = forcegroup_file is not None
 
         # These auxiliary simulations only evaluate potential energies; run
         # them on the CPU platform so they don't each reserve a separate CUDA
         # context. Building them on the GPU can crash the GPU.
         cpu_platform = mm.Platform.getPlatformByName('CPU')
+        if cpu_threads is not None:
+            cpu_platform.setPropertyDefaultValue('Threads', str(cpu_threads))
+        # Only the reactant/product PES and the two integration endpoints
+        # (lambda 0 / 1) feed the energy output; the intermediate lambda-window
+        # systems would be evaluated every frame and discarded, so skip building
+        # them. Decomposition systems (nb / bonded) are kept because the
+        # decomposition reporters below reference them by name.
         self.simulations = {}
+        core_names = ['reactant', 'product', 0, 1]
         for name, system in systems.items():
+            if name not in core_names and 'decomp' not in str(name):
+                continue
             sim = mmapp.Simulation(topology,
                                    system,
                                    mm.LangevinIntegrator(1, 1, 1),
                                    platform=cpu_platform)
             self.simulations.update({name: sim})
 
-        if not append:
-            header = "Lambda, reactant PES, product PES, reactant integration, product integration, Em, replica, direction \n"
-            self.E_out.write(header)
+        self.decomp_names = [s for s in systems if 'decomp' in str(s)]
+        self.report_nb_decomp = len(self.decomp_names) > 0 and core_outputs
 
-        if force_file is None:
-            self.report_forces = False
-        else:
-            self.report_forces = True
-            self.F_out = open(force_file, 'a' if append else 'w')
+        # Bonded-decomposition parameters depend only on the systems, so they
+        # are computed once here; the per-window file handling lives in
+        # _open_outputs.
+        self.report_bonded_decomp = False
+        if enable_bonded_decomp and 'reactant_bonded_decomp' in systems.keys():
+            if forming_bonds is None or breaking_bonds is None:
+                self.ostream.print_warning(
+                    "Formed and broken bonds need to be supplied to do bonded decomposition"
+                )
+                self.ostream.flush()
+            else:
+                self.report_bonded_decomp = True
+                active_atoms = []
+                for bond in forming_bonds + breaking_bonds:
+                    if bond[0] not in active_atoms:
+                        active_atoms.append(bond[0])
+                    if bond[1] not in active_atoms:
+                        active_atoms.append(bond[1])
+
+                self.reactant_params = self._get_bonded_decomp_params(
+                    systems['reactant'], active_atoms)
+                self.product_params = self._get_bonded_decomp_params(
+                    systems['product'], active_atoms)
+                self.measure_params = set()
+                for force in list(self.reactant_params.values()) + list(
+                        self.product_params.values()):
+                    for params in force.values():
+                        self.measure_params.add(params[0])
+                self.measure_params = sorted(self.measure_params,
+                                             key=lambda x: (len(x), x))
+
+        if not defer_open:
+            self._open_outputs(append)
+
+    def _open_outputs(self, append):
+        """Open (truncate + write headers, or append) all enabled output files.
+
+        Called once by __init__ in synchronous mode, and once by the async
+        worker on the first window (append=False truncates and writes headers;
+        the worker keeps the streams open and appends for subsequent windows).
+        """
+        mode = 'a' if append else 'w'
+        self.out_streams = []
+
+        if self.core_outputs:
+            self.E_out = open(self._energy_file, mode)
+            self.out_streams.append(self.E_out)
+            if not append:
+                self.E_out.write(
+                    "Lambda, reactant PES, product PES, reactant integration, product integration, Em, replica, direction \n"
+                )
+
+        if self.report_forces:
+            self.F_out = open(self._force_file, mode)
             self.out_streams.append(self.F_out)
             if not append:
                 header = "Lambda, replica, direction, "
-                for j in range(topology.getNumAtoms()):
+                for j in range(self.num_atoms):
                     header += f"F(x, {j}), F(y, {j}), F(z, {j}), norm({j}), "
-                header = header[:-2] + '\n'
-                self.F_out.write(header)
+                self.F_out.write(header[:-2] + '\n')
 
-        if velocity_file is None:
-            self.report_velocities = False
-        else:
-            self.report_velocities = True
-            self.v_out = open(velocity_file, 'a' if append else 'w')
+        if self.report_velocities:
+            self.v_out = open(self._velocity_file, mode)
             self.out_streams.append(self.v_out)
             if not append:
                 header = "Lambda, replica, direction, "
-                for j in range(topology.getNumAtoms()):
+                for j in range(self.num_atoms):
                     header += f"V(x, {j}), V(y, {j}), V(z, {j}), "
-                header = header[:-2] + '\n'
-                self.v_out.write(header)
+                self.v_out.write(header[:-2] + '\n')
 
-        if forcegroup_file is None:
-            self.report_forcegroups = False
-        else:
-            self.report_forcegroups = True
-            forcegroup_path = Path(forcegroup_file)
+        if self.report_forcegroups:
+            forcegroup_path = Path(self._forcegroup_file)
             rea_fg = str(
                 forcegroup_path.with_name(forcegroup_path.stem + '_rea' +
                                           forcegroup_path.suffix))
             pro_fg = str(
                 forcegroup_path.with_name(forcegroup_path.stem + '_pro' +
                                           forcegroup_path.suffix))
-
-            self.FG_out = open(forcegroup_file, 'a' if append else 'w')
-            self.rea_FG_out = open(rea_fg, 'a' if append else 'w')
-            self.pro_FG_out = open(pro_fg, 'a' if append else 'w')
+            self.FG_out = open(self._forcegroup_file, mode)
+            self.rea_FG_out = open(rea_fg, mode)
+            self.pro_FG_out = open(pro_fg, mode)
             self.out_streams.append(self.FG_out)
             self.out_streams.append(self.rea_FG_out)
             self.out_streams.append(self.pro_FG_out)
@@ -164,52 +241,20 @@ class EvbReporter:
                 self.rea_FG_out.write(fg_header)
                 self.pro_FG_out.write(fg_header)
 
-        self.decomp_names = [s for s in systems if 'decomp' in str(s)]
-        self.report_nb_decomp = False
-        if len(self.decomp_names) > 0:
-            self.report_nb_decomp = True
-            output_dir = Path(energy_file).parent
+        if self.report_nb_decomp:
+            output_dir = Path(self._energy_file).parent
             filename = str(output_dir / 'NB_decompositions.csv')
-            self.decomp_out = open(filename, 'a' if append else 'w')
+            self.decomp_out = open(filename, mode)
             self.out_streams.append(self.decomp_out)
             if not append:
-                header = ", ".join(self.decomp_names)
-                header += '\n'
-                self.decomp_out.write(header)
+                self.decomp_out.write(", ".join(self.decomp_names) + '\n')
 
-        self.report_bonded_decomp = False
-        if 'reactant_bonded_decomp' in systems.keys():
-            if forming_bonds is None or breaking_bonds is None:
-                self.ostream.print_warning(
-                    "Formed and broken bonds need to be supplied to do bonded decomposition"
-                )
-                self.ostream.flush()
-                return
-            self.report_bonded_decomp = True
-            active_atoms = []
-            for bond in forming_bonds + breaking_bonds:
-                if bond[0] not in active_atoms:
-                    active_atoms.append(bond[0])
-                if bond[1] not in active_atoms:
-                    active_atoms.append(bond[1])
-
-            self.reactant_params = self._get_bonded_decomp_params(
-                systems['reactant'], active_atoms)
-            self.product_params = self._get_bonded_decomp_params(
-                systems['product'], active_atoms)
-            self.measure_params = set()
-            for force in list(self.reactant_params.values()) + list(
-                    self.product_params.values()):
-                for params in force.values():
-                    self.measure_params.add(params[0])
-            # self.measure_params = sorted(self.measure_params)
-            self.measure_params = sorted(self.measure_params,
-                                         key=lambda x: (len(x), x))
-            output_dir = Path(energy_file).parent
+        if self.report_bonded_decomp:
+            output_dir = Path(self._energy_file).parent
             filename = str(output_dir / 'bonded_E1_decomp.csv')
-            self.bonded_E1_decomp_out = open(filename, 'a' if append else 'w')
-            self.bonded_E2_decomp_out = open(filename, 'a' if append else 'w')
-            self.bonded_params_out = open(filename, 'a' if append else 'w')
+            self.bonded_E1_decomp_out = open(filename, mode)
+            self.bonded_E2_decomp_out = open(filename, mode)
+            self.bonded_params_out = open(filename, mode)
             self.out_streams.append(self.bonded_E1_decomp_out)
             self.out_streams.append(self.bonded_E2_decomp_out)
             self.out_streams.append(self.bonded_params_out)
@@ -291,44 +336,94 @@ class EvbReporter:
                     True, True
                     )  # steps, positions, velocities, forces, energy, pbc
         else:
-            include = ['energy']
+            include = ['energy', 'positions']
             if self.report_velocities:
                 include.append('velocities')
             if self.report_forces:
                 include.append('forces')
-            if self.report_bonded_decomp:
-                include.append('positions')
 
             return {'steps': steps, 'periodic': True, 'include': include}
 
-    def report(self, simulation, state):
+    @staticmethod
+    def _apply_positions(simulation, positions, box):
+        """Set positions (nm) and periodic box (nm) on a CPU sim from numpy."""
+        nm = mm.unit.nanometer
+        a, b, c = box
+        simulation.context.setPeriodicBoxVectors(
+            mm.Vec3(*a) * nm,
+            mm.Vec3(*b) * nm,
+            mm.Vec3(*c) * nm,
+        )
+        simulation.context.setPositions(positions * nm)
+
+    def _write_core(self, positions, box, velocities=None, forces=None):
+        """Write the per-frame core outputs (Energies / Forces / Velocities /
+        NB-decomposition) from raw numpy arrays. This is the part that is
+        offloaded to the async reporter worker; it needs no live GPU simulation.
+
+        positions: (N,3) nm, box: (3,3) nm, velocities: (N,3) nm/ps,
+        forces: (N,3) kJ/mol/nm.
+        """
         E = {}
         for name, sim in self.simulations.items():
-            # if name == 'reactant_bonded_decomp' or name == 'product_bonded_decomp':
-            #     # Skip bonded decomposition systems
-            #     continue
-            e = self._get_potential_energy(
-                sim,
-                state=state,
-            )
-            E.update({name: e})
+            self._apply_positions(sim, positions, box)
+            E[name] = sim.context.getState(
+                getEnergy=True).getPotentialEnergy().value_in_unit(
+                    mm.unit.kilojoules_per_mole)
+        # When core outputs are disabled (master-side force-group-only reporter)
+        # we still apply positions above so the force-group block can read the
+        # CPU sims, but skip writing the core CSV rows.
+        if not self.core_outputs:
+            return
+
         E1_pes = E['reactant']
         E2_pes = E['product']
         E1_int = E[0]
         E2_int = E[1]
 
         Em = E1_pes * (1 - self.lambda_val) + E2_pes * self.lambda_val
-        line = f"{self.lambda_val}, {E1_pes:.10e}, {E2_pes:.10e}, {E1_int:.10e}, {E2_int:.10e}, {Em:.10e}, {self.replica}, {self.direction} \n"
-        self.E_out.write(line)
+        self.E_out.write(
+            f"{self.lambda_val}, {E1_pes:.10e}, {E2_pes:.10e}, {E1_int:.10e}, {E2_int:.10e}, {Em:.10e}, {self.replica}, {self.direction} \n"
+        )
 
-        # Em_dif = abs(Em_int - E1_int * (1 - self.lambda_val) +
-        #              E2_int * self.lambda_val)
+        if self.report_forces and forces is not None:
+            norms = np.linalg.norm(forces, axis=1)
+            line = f"{self.lambda_val}, {self.replica}, {self.direction}"
+            for i in range(forces.shape[0]):
+                line += f", {forces[i][0]:.5e}, {forces[i][1]:.5e}, {forces[i][2]:.5e}, {norms[i]:.5e}"
+            self.F_out.write(line + '\n')
 
-        # if Em_dif > 1e-2:
-        #     self.ostream.print_info(str(Em_dif))
-        #     self.ostream.flush()
-        # assert  <1e-2
+        if self.report_velocities and velocities is not None:
+            line = f"{self.lambda_val}, {self.replica}, {self.direction}"
+            for i in range(velocities.shape[0]):
+                line += f", {velocities[i][0]:.5e}, {velocities[i][1]:.5e}, {velocities[i][2]:.5e}"
+            self.v_out.write(line + '\n')
 
+        if self.report_nb_decomp:
+            line = ""
+            for name in self.decomp_names:
+                line += f"{E[name]:.10e}, "
+            self.decomp_out.write(line[:-2] + '\n')
+
+    def report(self, simulation, state):
+        positions = state.getPositions(asNumpy=True).value_in_unit(
+            mm.unit.nanometer)
+        box = state.getPeriodicBoxVectors(asNumpy=True).value_in_unit(
+            mm.unit.nanometer)
+        velocities = None
+        forces = None
+        if self.report_velocities:
+            velocities = state.getVelocities(asNumpy=True).value_in_unit(
+                mm.unit.nanometer / mm.unit.picosecond)
+        if self.report_forces:
+            forces = state.getForces(asNumpy=True).value_in_unit(
+                mm.unit.kilojoules_per_mole / mm.unit.nanometer)
+        # Core outputs; this also applies the current positions to every CPU
+        # simulation, which the force-group block below relies on.
+        self._write_core(positions, box, velocities, forces)
+
+        # Force-group and bonded-decomposition outputs depend on the live GPU
+        # simulation / full state and stay synchronous.
         Em_fg = []
         E1_fg = []
         E2_fg = []
@@ -402,33 +497,6 @@ class EvbReporter:
                 line += f"{val:.10e}, "
             line = line[:-2] + '\n'
             self.bonded_params_out.write(line)
-
-        if self.report_forces:
-            forces = state.getForces(asNumpy=True)
-            norms = np.linalg.norm(forces, axis=1)
-            line = f"{self.lambda_val}, {self.replica}, {self.direction}"
-            kjpermolenm = mm.unit.kilojoules_per_mole / mm.unit.nanometer
-            for i in range(forces.shape[0]):
-                line += f", {forces[i][0].value_in_unit(kjpermolenm):.5e}, {forces[i][1].value_in_unit(kjpermolenm):.5e}, {forces[i][2].value_in_unit(kjpermolenm):.5e}, {norms[i]:.5e}"
-            line += '\n'
-            self.F_out.write(line)
-
-        if self.report_velocities:
-            velocities = state.getVelocities(asNumpy=True)
-            line = f"{self.lambda_val}, {self.replica}, {self.direction}"
-            nmperps = mm.unit.nanometer / mm.unit.picosecond
-            for i in range(velocities.shape[0]):
-                line += f", {velocities[i][0].value_in_unit(nmperps):.5e}, {velocities[i][1].value_in_unit(nmperps):.5e}, {velocities[i][2].value_in_unit(nmperps):.5e}"
-            line += '\n'
-            self.v_out.write(line)
-
-        if self.report_nb_decomp:
-            line = ""
-            for name in self.decomp_names:
-                line += f"{E[name]:.10e}, "
-            line = line[:-2]
-            line += '\n'
-            self.decomp_out.write(line)
 
         for stream in self.out_streams:
             stream.flush()
@@ -559,3 +627,349 @@ class EvbReporter:
                 getEnergy=True,
                 groups=forcegroups,
             ).getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)
+
+
+class _EvbReporterMPI:
+    """Shared MPI protocol for the async EVB reporter client/server.
+
+    Every message is a single float64 buffer whose word [0] is the message
+    type. These are class constants rather than module globals so the protocol
+    is self-contained on the two classes that use it.
+    """
+
+    _TAG = 7788
+    _MSG_DATA = 0.0
+    _MSG_BEGIN = 1.0
+    _MSG_END = 2.0
+    _MSG_TERMINATE = 3.0
+    # Slot-free acknowledgement sent by the worker back to the master once it
+    # has consumed a shared-memory ring slot (backpressure release).
+    _MSG_FREE = 4.0
+
+    @staticmethod
+    def _openmm_uses_tuple():
+        """Older OpenMM (HIP, < 8.2) uses the tuple describeNextReport format."""
+        raw_openmm_version = version('openmm')
+        match = re.match(r"^(\d+)\.(\d+)", raw_openmm_version)
+        if not match:
+            raise RuntimeError("Cannot parse required major.minor version from "
+                               f"OpenMM: {raw_openmm_version!r}")
+        return (int(match.group(1)), int(match.group(2))) < (8, 2)
+
+    @classmethod
+    def send_terminate(cls, comm, dest):
+        """Tell the reporter worker to close its files and stop serving."""
+        buf = np.array([cls._MSG_TERMINATE], dtype=np.float64)
+        comm.Send([buf, MPI.DOUBLE], dest=dest, tag=cls._TAG)
+
+
+class EvbReporterClient(_EvbReporterMPI):
+    """Producer-side OpenMM reporter for asynchronous EVB energy reporting.
+
+    Attached to the GPU sampling simulation on the master rank. Both ranks live
+    on the same node, so each frame's positions/box (and velocities/forces if
+    requested) are written directly into a shared-memory ring buffer
+    (``MPI.Win.Allocate_shared``); only a tiny ``[_MSG_DATA, step, slot]`` control
+    message is sent to wake the worker. The GPU integrator keeps stepping and the
+    producer blocks only when the ring is full because the worker has fallen
+    behind (backpressure), signalled by the worker's ``_MSG_FREE`` acks.
+    """
+
+    def __init__(self, comm, dest, report_interval, num_atoms, lambda_val,
+                 replica, direction, append, report_forces, report_velocities,
+                 shm_ring, shm_win):
+        self.comm = comm
+        self.dest = dest
+        self.report_interval = report_interval
+        self.num_atoms = num_atoms
+        self.lambda_val = lambda_val
+        self.replica = replica
+        self.direction = direction
+        self.report_forces = report_forces
+        self.report_velocities = report_velocities
+        self.use_tuple = self._openmm_uses_tuple()
+
+        # Shared-memory ring buffer (queue_depth, max_len) mapped into both the
+        # master and the worker; each row holds one packed frame. The slot-free
+        # acks give bounded-queue backpressure (a slot may not be overwritten
+        # until the worker has consumed its previous contents).
+        self._ring = shm_ring
+        self._win = shm_win
+        self._queue_depth = shm_ring.shape[0]
+        self._pending = [False] * self._queue_depth
+        self._slot = 0
+        self._free_buf = np.empty(3, dtype=np.float64)
+        self._ctrl_buf = np.empty(3, dtype=np.float64)
+
+        # Crude profiling: wall time this client spends handling the reporter
+        # (buffer packing + MPI sends + any backpressure stalls). Accumulated
+        # per window; the master reads it to separate GPU sampling from the
+        # master->reporter communication overhead. comm_time is the whole-body
+        # total; stall_time / send_time break it down so the derived
+        # extract+pack = comm_time - stall_time - send_time is visible:
+        #   stall_time  - blocked waiting for the worker to free a ring slot
+        #                 (i.e. the reporter is the bottleneck, not transfer),
+        #   send_time   - the shared-memory fence + tiny control Send,
+        #   stall_count - number of report() calls that had to wait.
+        self.comm_time = 0.0
+        self.stall_time = 0.0
+        self.send_time = 0.0
+        self.stall_count = 0
+
+        # Tell the worker to (re)configure its output files for this window.
+        self._send_control(self._MSG_BEGIN, [
+            lambda_val,
+            float(replica),
+            float(direction),
+            1.0 if append else 0.0,
+            1.0 if report_forces else 0.0,
+            1.0 if report_velocities else 0.0,
+        ])
+
+    def _recv_free(self):
+        """Block for one slot-free ack and mark that slot writable again."""
+        self.comm.Recv([self._free_buf, MPI.DOUBLE],
+                       source=self.dest,
+                       tag=self._TAG)
+        self._pending[int(self._free_buf[2])] = False
+
+    def _drain_pending(self):
+        """Wait for all outstanding slot-free acks (in-order consumption)."""
+        for _ in range(sum(self._pending)):
+            self._recv_free()
+
+    def _send_control(self, msgtype, payload):
+        t0 = time.perf_counter()
+        # Control messages must not overtake outstanding data frames, so drain
+        # the slot-free acks first (also releases all ring slots).
+        self._drain_pending()
+        buf = np.empty(1 + len(payload), dtype=np.float64)
+        buf[0] = msgtype
+        if payload:
+            buf[1:] = payload
+        self.comm.Send([buf, MPI.DOUBLE], dest=self.dest, tag=self._TAG)
+        self.comm_time += time.perf_counter() - t0
+
+    def describeNextReport(self, simulation):
+        steps = self.report_interval - simulation.currentStep % self.report_interval
+        if self.use_tuple:
+            return (steps, True, self.report_velocities, self.report_forces,
+                    False, True)
+        include = ['positions']
+        if self.report_velocities:
+            include.append('velocities')
+        if self.report_forces:
+            include.append('forces')
+        return {'steps': steps, 'periodic': True, 'include': include}
+
+    def report(self, simulation, state):
+        t0 = time.perf_counter()
+        positions = state.getPositions(asNumpy=True).value_in_unit(
+            mm.unit.nanometer)
+        box = state.getPeriodicBoxVectors(asNumpy=True).value_in_unit(
+            mm.unit.nanometer)
+
+        slot = self._slot
+        if self._pending[slot]:
+            # Backpressure: stall until the worker frees this slot. In-order
+            # consumption means the next free ack that unblocks us may name an
+            # earlier slot, so keep receiving until this one is released.
+            self.stall_count += 1
+            t_stall = time.perf_counter()
+            while self._pending[slot]:
+                self._recv_free()
+            self.stall_time += time.perf_counter() - t_stall
+        buf = self._ring[slot]
+
+        n = self.num_atoms
+        buf[0] = self._MSG_DATA
+        buf[1] = float(simulation.currentStep)
+        buf[2] = float(n)
+        off = 3
+        buf[off:off + 9] = np.asarray(box).reshape(9)
+        off += 9
+        buf[off:off + 3 * n] = np.asarray(positions).reshape(-1)
+        off += 3 * n
+        if self.report_velocities:
+            vel = state.getVelocities(asNumpy=True).value_in_unit(
+                mm.unit.nanometer / mm.unit.picosecond)
+            buf[off:off + 3 * n] = np.asarray(vel).reshape(-1)
+            off += 3 * n
+        if self.report_forces:
+            frc = state.getForces(asNumpy=True).value_in_unit(
+                mm.unit.kilojoules_per_mole / mm.unit.nanometer)
+            buf[off:off + 3 * n] = np.asarray(frc).reshape(-1)
+            off += 3 * n
+
+        # Release fence: make the writes above visible before the worker is told
+        # (via the control message) that this slot is ready to read.
+        t_send = time.perf_counter()
+        self._win.Sync()
+        self._ctrl_buf[0] = self._MSG_DATA
+        self._ctrl_buf[1] = float(simulation.currentStep)
+        self._ctrl_buf[2] = float(slot)
+        self.comm.Send([self._ctrl_buf, MPI.DOUBLE],
+                       dest=self.dest,
+                       tag=self._TAG)
+        self.send_time += time.perf_counter() - t_send
+        self._pending[slot] = True
+        self._slot = (slot + 1) % self._queue_depth
+        self.comm_time += time.perf_counter() - t0
+
+    def finalize(self):
+        """Flush this window: drain outstanding frames, then signal END."""
+        self._send_control(self._MSG_END, [])
+
+
+class EvbReporterServer(_EvbReporterMPI):
+    """Consumer-side worker for asynchronous EVB energy reporting.
+
+    Builds the CPU energy-evaluation simulations once (multithreaded so it
+    saturates the CPU while the GPU rank samples), owns the Energies / Forces /
+    Velocities / NB-decomposition output files, and serves snapshots from the
+    master in order until it receives TERMINATE. Force-group / bonded
+    decomposition outputs are handled synchronously on the master and are not
+    produced here.
+    """
+
+    def __init__(self,
+                 comm,
+                 source,
+                 energy_file,
+                 report_interval,
+                 systems,
+                 topology,
+                 outputstream,
+                 shm_ring,
+                 shm_win,
+                 forming_bonds=None,
+                 breaking_bonds=None,
+                 force_file=None,
+                 velocity_file=None,
+                 cpu_threads=None):
+        self.comm = comm
+        self.source = source
+        self.num_atoms = topology.getNumAtoms()
+        # Shared-memory ring buffer mapped from the master; frames are read in
+        # place (no MPI transfer of the bulk payload).
+        self._ring = shm_ring
+        self._win = shm_win
+        self.engine = EvbReporter(
+            energy_file,
+            report_interval,
+            systems,
+            topology,
+            lambda_val=0.0,
+            outputstream=outputstream,
+            forming_bonds=forming_bonds,
+            breaking_bonds=breaking_bonds,
+            forcegroup_file=None,
+            force_file=force_file,
+            velocity_file=velocity_file,
+            append=False,
+            cpu_threads=cpu_threads,
+            enable_bonded_decomp=False,
+            defer_open=True,
+        )
+        self._opened = False
+        self._has_vel = False
+        self._has_forces = False
+
+        # Crude profiling accumulators (wall seconds). recv_time is time blocked
+        # in MPI Recv (idle waiting for the master, i.e. reporter head-room;
+        # ~0 means the reporter is saturated and gating the pipeline);
+        # energy_time is time spent evaluating energies in _write_core;
+        # energy_time_max is the slowest single frame; n_frames counts processed
+        # data frames; n_sims is the number of CPU energy sims evaluated per
+        # frame (explains the per-frame cost).
+        self.recv_time = 0.0
+        self.energy_time = 0.0
+        self.energy_time_max = 0.0
+        self.n_frames = 0
+        self.n_sims = len(self.engine.simulations)
+
+    def serve(self):
+        eng = self.engine
+        # Control messages are tiny now (bulk data lives in shared memory); the
+        # largest is the BEGIN payload (7 words). DATA carries [_MSG_DATA, step,
+        # slot]; the frame itself is read in place from the shared ring.
+        ctrlbuf = np.empty(7, dtype=np.float64)
+        freebuf = np.empty(3, dtype=np.float64)
+        freebuf[0] = self._MSG_FREE
+        freebuf[1] = 0.0
+        while True:
+            t_recv = time.perf_counter()
+            self.comm.Recv([ctrlbuf, MPI.DOUBLE],
+                           source=self.source,
+                           tag=self._TAG)
+            self.recv_time += time.perf_counter() - t_recv
+            msgtype = ctrlbuf[0]
+
+            if msgtype == self._MSG_TERMINATE:
+                for s in eng.out_streams:
+                    if not s.closed:
+                        s.close()
+                # Hand the accumulated reporter-side timing back to the master
+                # so it can print a single consolidated profile (this rank's
+                # ostream is muted).
+                timing = np.array([
+                    self.energy_time, self.recv_time,
+                    float(self.n_frames),
+                    float(self.n_sims), self.energy_time_max
+                ],
+                                  dtype=np.float64)
+                self.comm.Send([timing, MPI.DOUBLE],
+                               dest=self.source,
+                               tag=self._TAG)
+                break
+
+            if msgtype == self._MSG_BEGIN:
+                lam, rep, direction, append, rforces, rvel = ctrlbuf[1:7]
+                eng.lambda_val = lam
+                eng.replica = int(rep)
+                eng.direction = int(direction)
+                self._has_forces = rforces > 0.5
+                self._has_vel = rvel > 0.5
+                if not self._opened:
+                    eng._open_outputs(append=append > 0.5)
+                    self._opened = True
+                continue
+
+            if msgtype == self._MSG_END:
+                for s in eng.out_streams:
+                    s.flush()
+                continue
+
+            # _MSG_DATA: read the frame in place from the shared ring slot.
+            slot = int(ctrlbuf[2])
+            # Acquire fence: ensure the master's writes to this slot are visible.
+            self._win.Sync()
+            row = self._ring[slot]
+            n = int(row[2])
+            off = 3
+            box = row[off:off + 9].reshape(3, 3)
+            off += 9
+            positions = row[off:off + 3 * n].reshape(n, 3)
+            off += 3 * n
+            velocities = None
+            forces = None
+            if self._has_vel:
+                velocities = row[off:off + 3 * n].reshape(n, 3)
+                off += 3 * n
+            if self._has_forces:
+                forces = row[off:off + 3 * n].reshape(n, 3)
+                off += 3 * n
+            t_energy = time.perf_counter()
+            eng._write_core(positions, box, velocities, forces)
+            dt_energy = time.perf_counter() - t_energy
+            self.energy_time += dt_energy
+            if dt_energy > self.energy_time_max:
+                self.energy_time_max = dt_energy
+            self.n_frames += 1
+            for s in eng.out_streams:
+                s.flush()
+            # Release the slot back to the master (backpressure ack).
+            freebuf[2] = float(slot)
+            self.comm.Send([freebuf, MPI.DOUBLE],
+                           dest=self.source,
+                           tag=self._TAG)

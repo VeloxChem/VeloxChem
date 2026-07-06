@@ -38,7 +38,7 @@ import sys
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
-from .evbreporter import EvbReporter
+from .evbreporter import (EvbReporter, EvbReporterClient, EvbReporterServer)
 from .errorhandler import assert_msg_critical, print_exception_if_debug
 from .reactionsystembuilder import EvbForceGroup
 
@@ -124,7 +124,7 @@ class EvbFepDriver:
         self.save_crash_pdb: bool = True
         self.save_crash_xml: bool = True
         self.save_equil_traj: bool = False
-        self.save_equil_pdb: bool = True
+        self.save_equil_pdb: bool = False
         self.xml_crash_save_interval: int = 50
         self.pdb_crash_save_interval: int = 1
         self.pdb_equil_start_temp = 10  # kelvin
@@ -293,16 +293,16 @@ class EvbFepDriver:
         self.ostream.flush()
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbFepDriver.')
-        systems = configuration["systems"]
-        topology = configuration["topology"]
-        initial_positions = configuration["initial_positions"]
-
         cwd = Path.cwd()
         self.run_folder = cwd / configuration["run_folder"]
         self.data_folder = cwd / configuration["data_folder"]
         self.Lambda = Lambda
-        self.systems = systems
-        self.topology = topology
+        # systems / topology are present on the master (built in-process) and on
+        # the async reporter worker (loaded from disk in EvbDriver.run_FEP).
+        # Ranks that only synchronise never touch them. initial_positions is
+        # read later, on the master path only.
+        self.systems = configuration.get("systems")
+        self.topology = configuration.get("topology")
 
         if self.temperature > 0:
             self.isothermal = True
@@ -335,16 +335,41 @@ class EvbFepDriver:
         # sweep, hence the factor 2 * n_replicas.
         self.passes_per_replica = 2
         n_passes = self.passes_per_replica * self.n_replicas
-        self.total_snapshots = self.sample_steps / self.write_step * len(
-            self.Lambda) * n_passes
+        n_lambda = len(self.Lambda)
+        snapshots_per_lambda = self.sample_steps / self.write_step
+        self.total_snapshots = snapshots_per_lambda * n_lambda * n_passes
+
+        # Simulated system time (ps) at various granularities.
+        time_per_snapshot = self.step_size * self.write_step
+        time_per_lambda = self.step_size * self.sample_steps
+        time_per_sweep = time_per_lambda * n_lambda
+        total_time = time_per_sweep * n_passes
+
         self.ostream.print_info(f"Lambda: {np.array(self.Lambda)}")
-        info = f"Replicas: {self.n_replicas} (forward + backward each), total lambda sweeps: {n_passes}\n"
-        info += f"Total lambda points: {len(self.Lambda)}, NVT equilibration steps: {self.equil_NVT_steps}, NPT equilibration steps: {self.equil_NPT_steps}, total sample steps: {self.sample_steps}, write step: {self.write_step}, step size: {self.step_size}\n"
-        info += f"Snapshots per lambda: {self.sample_steps / self.write_step}, snapshots to be recorded: {self.total_snapshots}\n"
-        info += f"System time per snapshot: {self.step_size * self.write_step} ps, system time per frame: {self.step_size * self.sample_steps} ps, total system time: {self.step_size * self.sample_steps * len(self.Lambda) * n_passes} ps"
+        info = "\n".join([
+            f"Replicas: {self.n_replicas} (forward + backward each)",
+            f"Total lambda sweeps: {n_passes}",
+            f"Total lambda points: {n_lambda}",
+            f"NVT equilibration steps: {self.equil_NVT_steps}",
+            f"NPT equilibration steps: {self.equil_NPT_steps}",
+            f"Total sample steps: {self.sample_steps}",
+            f"Write step: {self.write_step}",
+            f"Step size: {self.step_size} ps",
+            f"Snapshots per lambda-frame: {snapshots_per_lambda}",
+            f"Snapshots to be recorded: {self.total_snapshots}",
+            f"System time per snapshot: {time_per_snapshot} ps",
+            f"System time per lambda-frame: {time_per_lambda} ps",
+            f"System time per lambda sweep: {time_per_sweep} ps",
+            f"total system time: {total_time} ps",
+        ])
+
+        self.ostream.print_info(info)
+        self.ostream.flush()
+
         self.ostream.print_info(
             f"Ensemble info: Isobaric {self.isobaric}, Isothermal {self.isothermal}"
         )
+
         self.total_steps = 0
         self.run_steps = 0
         # Per-lambda equilibration + sampling, summed over every lambda window in
@@ -378,8 +403,41 @@ class EvbFepDriver:
                                                  self.warmup_NPT_steps > 0 else
                                                  self.initial_equil_NPT_steps)
 
-        self.ostream.print_info(info)
-        self.ostream.flush()
+        # Asynchronous reporting: with >=2 MPI ranks on the node, rank
+        # (master+1) becomes a dedicated CPU reporter worker that owns the
+        # Energies/Forces/Velocities files, while the master drives the GPU and
+        # offloads each frame to it. With a single rank the reporting stays
+        # synchronous and in-process (unchanged behaviour).
+        self._async = self.nodes > 1
+        if self._async and self.rank == mpi_master():
+            self.ostream.print_info(
+                f"Running in asynchronous mode with {self.nodes} MPI ranks.")
+            if self.nodes > 2:
+                self.ostream.print_warning(
+                    "More than 2 MPI ranks are present. Only the master and one reporter worker are used; the rest will idle."
+                )
+        if not self._async:
+            self.ostream.print_info(
+                "Running in synchronous mode (single rank or no MPI).")
+
+        self._reporter_worker = mpi_master() + 1
+        # Allocate the shared-memory ring buffer (collective over COMM_WORLD via
+        # the Split below) before the master and reporter worker diverge. The
+        # bulk per-frame payload travels through this window; only tiny control
+        # messages stay on the point-to-point channel.
+        if self._async:
+            self._setup_shared_ring()
+        if self._async and self.rank != mpi_master():
+            if self.rank == self._reporter_worker:
+                self._serve_reporter()
+                self._free_shared_ring()
+            # The master signals completion with a matching Barrier.
+            self.comm.Barrier()
+            return
+
+        # Master path only: the initial positions are needed to seed the GPU
+        # sampling (the reporter worker returned above and never uses them).
+        initial_positions = configuration["initial_positions"]
 
         # Global timer spanning all replicas / sweeps for total-progress ETA.
         self.timer = Timer(self.total_steps)
@@ -401,7 +459,7 @@ class EvbFepDriver:
         # Initial equilibration, performed once on the l == 0 system. The
         # resulting positions / velocities seed the first forward sweep.
         if not self.skip_initial_equil and 0 in self.Lambda:
-            system = systems[0]
+            system = self.systems[0]
             if self.constrain_H:
                 self.ostream.print_info(
                     "Constraining all bonds involving H atoms")
@@ -419,6 +477,17 @@ class EvbFepDriver:
                 "Skipping initial equilibration because skip_initial_equil is set to True."
             )
 
+        # Crude profiling accumulators over all sampled lambda windows. Each
+        # sampling window's wall time is split into pure GPU sampling and the
+        # master->reporter communication that happens inside the sampling loop,
+        # so that gpu + communication == window (checked below).
+        self._t_window_total = 0.0
+        self._t_gpu_total = 0.0
+        self._t_comm_total = 0.0
+        self._t_stall_total = 0.0
+        self._t_send_total = 0.0
+        self._n_windows = 0
+
         forward_order = list(self.Lambda)
         backward_order = list(reversed(self.Lambda))
         for replica in range(self.n_replicas):
@@ -429,7 +498,105 @@ class EvbFepDriver:
             # state of the forward sweep.
             positions, velocities = self.run_FEP(backward_order, replica, 1,
                                                  positions, velocities)
+
+        # Tear down the reporter worker and synchronise all ranks.
+        reporter_timing = None
+        if self._async:
+            EvbReporterClient.send_terminate(self.comm, self._reporter_worker)
+            # Collect the reporter-side timing sent back after TERMINATE.
+            reporter_timing = np.empty(5, dtype=np.float64)
+            self.comm.Recv([reporter_timing, MPI.DOUBLE],
+                           source=self._reporter_worker,
+                           tag=EvbReporterClient._TAG)
+            self._free_shared_ring()
+            self.comm.Barrier()
+
+        self._print_timing_summary(reporter_timing)
         self.ostream.flush()
+
+    def _setup_shared_ring(self, queue_depth=3):
+        """Allocate the master<->reporter shared-memory ring buffer.
+
+        Collective over COMM_WORLD (all ranks call the Split). Only the master
+        and the reporter worker actually map the window; any extra idle ranks
+        get COMM_NULL and skip it. The two participants are assumed to be on the
+        same node (single-node async reporting), so MPI.Win.Allocate_shared maps
+        one physical buffer into both processes.
+        """
+        self._shm_win = None
+        self._shm_comm = None
+        self._pair_comm = None
+        color = (0 if self.rank in (mpi_master(),
+                                    self._reporter_worker) else MPI.UNDEFINED)
+        pair_comm = self.comm.Split(color, self.rank)
+        if pair_comm == MPI.COMM_NULL:
+            return
+        shm_comm = pair_comm.Split_type(MPI.COMM_TYPE_SHARED)
+        # Map each shm member's world rank to its shm-local rank so we can query
+        # the master's (the producer's) segment.
+        world_ranks = shm_comm.allgather(self.rank)
+        assert_msg_critical(
+            mpi_master() in world_ranks,
+            "EVB async reporter requires the master and reporter worker to share "
+            "a node for shared-memory reporting.")
+        producer_shm = world_ranks.index(mpi_master())
+
+        num_atoms = self.topology.getNumAtoms()
+        # header(3) + box(9) + positions/velocities/forces (9N), fixed layout.
+        max_len = 3 + 9 + 9 * num_atoms
+        itemsize = MPI.DOUBLE.Get_size()
+        nbytes = (queue_depth * max_len *
+                  itemsize) if self.rank == mpi_master() else 0
+        win = MPI.Win.Allocate_shared(nbytes, itemsize, comm=shm_comm)
+        buf, _ = win.Shared_query(producer_shm)
+        ring = np.frombuffer(buf,
+                             dtype=np.float64).reshape(queue_depth, max_len)
+        win.Lock_all()
+
+        self._pair_comm = pair_comm
+        self._shm_comm = shm_comm
+        self._shm_win = win
+        self._shm_ring = ring
+        self._queue_depth = queue_depth
+
+    def _free_shared_ring(self):
+        """Tear down the shared-memory window (participants only)."""
+        if getattr(self, "_shm_win", None) is None:
+            return
+        self._shm_win.Unlock_all()
+        self._shm_win.Free()
+        self._shm_comm.Free()
+        self._pair_comm.Free()
+        self._shm_win = None
+
+    def _serve_reporter(self):
+        """Reporter-worker entry point (non-master rank, async mode).
+
+        Builds the CPU energy sims once and serves frames from the master until
+        TERMINATE. Mirrors the file selection of _get_evb_reporter so the worker
+        writes exactly the files the synchronous path would.
+        """
+        force_file = (str(self.data_folder / "Forces.csv")
+                      if self.report_forces or self.debug else None)
+        velocity_file = (str(self.data_folder / "Velocities.csv")
+                         if self.report_velocities or self.debug else None)
+
+        server = EvbReporterServer(
+            self.comm,
+            mpi_master(),
+            str(self.data_folder / "Energies.csv"),
+            self.write_step,
+            self.systems,
+            self.topology,
+            self.ostream,
+            self._shm_ring,
+            self._shm_win,
+            forming_bonds=self.forming_bonds,
+            breaking_bonds=self.breaking_bonds,
+            force_file=force_file,
+            velocity_file=velocity_file,
+        )
+        server.serve()
 
     def run_FEP(self, lambda_order, replica, direction, positions, velocities):
         """Run a single lambda sweep (one replica, one direction).
@@ -460,7 +627,9 @@ class EvbFepDriver:
                     "Constraining all bonds involving H atoms")
                 system = self._constrain_H_bonds(system)
 
-            equil_state = self._equilibrate(system, l, positions, velocities)
+            equil_state = self._equilibrate(system,
+                                            f"r{replica}_d{direction}_l{l:.3}",
+                                            positions, velocities)
 
             if self.constrain_H:
                 self.ostream.print_info(
@@ -510,17 +679,15 @@ class EvbFepDriver:
             )
             simulation.reporters.append(equil_traj_reporter)
         if self.pdb is None:
-            if self.isobaric:
-                barostat = self._get_barostat(simulation)
-                barostat.setFrequency(0)
-                self._safe_step(simulation, self.initial_equil_NVT_steps,
-                                "initial NVT equilibration")
-                barostat.setFrequency(25)
-                self._safe_step(simulation, self.initial_equil_NPT_steps,
-                                "initial NPT equilibration")
-            else:
-                self._safe_step(simulation, self.initial_equil_NVT_steps,
-                                "initial equilibration")
+            barostat = self._get_barostat(simulation)
+            barostat.setFrequency(0)
+            self._safe_step(simulation, self.initial_equil_NVT_steps,
+                            "initial NVT equilibration")
+            barostat.setFrequency(25)
+            self._safe_step(simulation, self.initial_equil_NPT_steps,
+                            "initial NPT equilibration")
+            barostat.setFrequency(0)
+
         else:
             self.ostream.print_info(
                 f"Perfoming PDB warmup with T-vector {np.array(self.pdb_temperatures)}"
@@ -530,31 +697,14 @@ class EvbFepDriver:
                 simulation.integrator.setTemperature(T)
                 if T == self.temperature:
                     NVT_steps = self.initial_equil_NVT_steps
-                    NPT_steps = self.initial_equil_NPT_steps
                 else:
-                    NVT_steps = self.warmup_NVT_steps if self.warmup_NVT_steps > 0 else self.initial_equil_NVT_steps
-                    NPT_steps = self.warmup_NPT_steps if self.warmup_NPT_steps > 0 else self.initial_equil_NPT_steps
+                    if self.warmup_NVT_steps > 0:
+                        NVT_steps = self.warmup_NVT_steps
+                    else:
+                        NVT_steps = self.initial_equil_NVT_steps
 
-                if self.isobaric:
-                    barostat = self._get_barostat(simulation)
-                    barostat.setFrequency(0)
-                    self.ostream.print_info(
-                        f"Running PDB warmup NVT equilibration T = {T}")
-                    self.ostream.flush()
-                    self._safe_step(simulation, NVT_steps,
-                                    f"PDB warmup NVT equilibration T = {T}")
-                    barostat.setFrequency(25)
-                    self.ostream.print_info(
-                        f"Running PDB warmup NPT equilibration T = {T}")
-                    self.ostream.flush()
-                    self._safe_step(simulation, NPT_steps,
-                                    f"PDB warmup NPT equilibration T = {T}")
-                else:
-                    self.ostream.print_info(
-                        f"Running PDB warmup NVT equilibration T = {T}")
-                    self.ostream.flush()
-                    self._safe_step(simulation, NVT_steps,
-                                    f"PDB warmup NVT equilibration T = {T}")
+                self._safe_step(simulation, NVT_steps,
+                                f"PDB warmup NVT equilibration T = {T}")
                 if self.debug:
                     self._save_state(
                         simulation,
@@ -563,6 +713,13 @@ class EvbFepDriver:
                         chk=False,
                         cif=True,
                     )
+            barostat = self._get_barostat(simulation)
+            barostat.setFrequency(25)
+            self._safe_step(
+                simulation, self.initial_equil_NPT_steps,
+                f"NPT equilibration at target temperature T = {self.temperature}"
+            )
+            barostat.setFrequency(0)
 
         equil_state = simulation.context.getState(
             getPositions=True,
@@ -582,7 +739,7 @@ class EvbFepDriver:
         )
         return equil_state
 
-    def _equilibrate(self, system, l, positions, velocities=None):
+    def _equilibrate(self, system, name, positions, velocities=None):
         simulation = self._get_simulation(system, self.equil_step_size)
         simulation.context.setPositions(positions)
         if velocities is not None:
@@ -591,23 +748,23 @@ class EvbFepDriver:
             self._minimize(simulation)
 
         if self.debug:
-            self._save_state(simulation, f"pre_equil_{l:.3f}")
+            self._save_state(simulation, f"pre_equil_{name}")
             simulation.reporters.append(
                 mmapp.PDBReporter(
-                    str(self.run_folder / f"traj_equil_{l:.3f}.pdb"),
+                    str(self.run_folder / f"traj_equil_{name}.pdb"),
                     self.write_step,
                     enforcePeriodicBox=True,
                 ))
-            f_file = str(self.run_folder / f"forces_equil_{l:.3f}.csv")
-            v_file = str(self.run_folder / f"velocities_equil_{l:.3f}.csv")
-            g_file = str(self.run_folder / f"forcegroups_equil_{l:.3f}.csv")
+            f_file = str(self.run_folder / f"forces_equil_{name}.csv")
+            v_file = str(self.run_folder / f"velocities_equil_{name}.csv")
+            g_file = str(self.run_folder / f"forcegroups_equil_{name}.csv")
             simulation.reporters.append(
                 EvbReporter(
-                    str(self.run_folder / f"energies_equil_{l:.3f}.csv"),
+                    str(self.run_folder / f"energies_equil_{name}.csv"),
                     self.write_step,
                     self.systems,
                     self.topology,
-                    l,
+                    name,
                     self.ostream,
                     forming_bonds=self.forming_bonds,
                     breaking_bonds=self.breaking_bonds,
@@ -623,7 +780,7 @@ class EvbFepDriver:
 
         if self.save_equil_traj:
             equil_traj_reporter = mmapp.XTCReporter(
-                str(self.run_folder / f"equil_traj_{l:.3f}.xtc"),
+                str(self.run_folder / f"equil_traj_{name}.xtc"),
                 self.write_step,
                 enforcePeriodicBox=True,
             )
@@ -654,7 +811,7 @@ class EvbFepDriver:
 
             self._save_state(
                 simulation,
-                f"equil_state_{l:.3f}",
+                f"equil_state_{name}",
                 chk=False,
                 xml=False,
                 cif=True,
@@ -700,18 +857,179 @@ class EvbFepDriver:
             append,
         )
 
-        evb_reporter = self._get_evb_reporter(
-            self.data_folder,
-            l,
-            append=append,
-            replica=replica,
-            direction=direction,
-        )
+        evb_reporters = self._make_evb_reporters(l, append, replica, direction)
         simulation.reporters.append(state_reporter)
-        simulation.reporters.append(evb_reporter)
+        for reporter in evb_reporters:
+            simulation.reporters.append(reporter)
         self.ostream.flush()
+
+        # Snapshot the client's communication clock before sampling; the BEGIN
+        # control message it already sent should not count against this window's
+        # in-loop communication.
+        client = next(
+            (r for r in evb_reporters if isinstance(r, EvbReporterClient)),
+            None)
+        comm_before = client.comm_time if client is not None else 0.0
+        stall_before = client.stall_time if client is not None else 0.0
+        send_before = client.send_time if client is not None else 0.0
+
+        # Time the sampling window. The communication done inside the sampling
+        # loop (client.report -> MPI send) is a subset of this wall time, so
+        # gpu_time = window - comm_during and gpu + comm == window exactly.
+        t_window_start = time.perf_counter()
         states = self._safe_step(simulation, self.sample_steps, "sampling")
+        t_window = time.perf_counter() - t_window_start
+
+        # Break communication into: stall (blocked on the reporter freeing a
+        # slot), transfer (shared-memory fence + control Send), and the derived
+        # remainder extract+pack (pulling the state and filling the ring).
+        comm_during = (client.comm_time -
+                       comm_before) if client is not None else 0.0
+        stall_during = (client.stall_time -
+                        stall_before) if client is not None else 0.0
+        send_during = (client.send_time -
+                       send_before) if client is not None else 0.0
+
+        # Close out the async window (wait for in-flight sends, signal END).
+        for reporter in evb_reporters:
+            if isinstance(reporter, EvbReporterClient):
+                reporter.finalize()
+
+        self._accumulate_window_timing(l, replica, direction, t_window,
+                                       comm_during, stall_during, send_during)
         return states[-1]
+
+    def _accumulate_window_timing(self, l, replica, direction, t_window,
+                                  comm_during, stall_during, send_during):
+        """Record and print the timing breakdown for one sampling window."""
+        gpu_time = t_window - comm_during
+        extract_during = comm_during - stall_during - send_during
+        self._t_window_total += t_window
+        self._t_gpu_total += gpu_time
+        self._t_comm_total += comm_during
+        self._t_stall_total += stall_during
+        self._t_send_total += send_during
+        self._n_windows += 1
+        mode = "async" if self._async else "sync"
+        self.ostream.print_info(
+            f"[timing] window l={l} rep={replica} dir={direction} ({mode}): "
+            f"total={t_window:.3f}s = sampling(GPU) {gpu_time:.3f}s "
+            f"+ communication {comm_during:.3f}s "
+            f"(stall {stall_during:.3f}s + transfer {send_during:.3f}s "
+            f"+ extract {extract_during:.3f}s) "
+            f"(check gpu+comm={gpu_time + comm_during:.3f}s)")
+        self.ostream.flush()
+
+    def _print_timing_summary(self, reporter_timing):
+        """Print the aggregate profiling summary and consistency checks."""
+        n = self._n_windows
+        if n == 0:
+            return
+        summed = self._t_gpu_total + self._t_comm_total
+        extract_total = (self._t_comm_total - self._t_stall_total -
+                         self._t_send_total)
+        self.ostream.print_info(f"[timing] Totals over {n} sampling windows: "
+                                f"window={self._t_window_total:.3f}s, "
+                                f"sampling(GPU)={self._t_gpu_total:.3f}s, "
+                                f"communication={self._t_comm_total:.3f}s")
+        self.ostream.print_info(
+            f"[timing] Communication breakdown: "
+            f"stall(reporter backpressure)={self._t_stall_total:.3f}s + "
+            f"transfer(fence+send)={self._t_send_total:.3f}s + "
+            f"extract+pack={extract_total:.3f}s")
+        self.ostream.print_info(
+            f"[timing] Consistency: sampling+communication={summed:.3f}s vs "
+            f"summed window total={self._t_window_total:.3f}s "
+            f"(diff {summed - self._t_window_total:+.3e}s)")
+        if reporter_timing is not None:
+            (energy_time, recv_time, n_frames, n_sims,
+             energy_time_max) = reporter_timing
+            per_frame = energy_time / n_frames if n_frames > 0 else 0.0
+            self.ostream.print_info(
+                f"[timing] Reporter rank: energy calculation={energy_time:.3f}s "
+                f"over {int(n_frames)} frames "
+                f"({per_frame * 1e3:.1f} ms/frame avg, "
+                f"{energy_time_max * 1e3:.1f} ms/frame max, "
+                f"{int(n_sims)} CPU sims/frame), "
+                f"idle in Recv={recv_time:.3f}s")
+            self.ostream.print_info(
+                "[timing] MPI benefit: the "
+                f"{energy_time:.3f}s of energy evaluation ran in parallel with "
+                f"the {self._t_gpu_total:.3f}s of GPU sampling at a cost of "
+                f"{self._t_comm_total:.3f}s communication; synchronous "
+                "reporting would have added the energy time to every window.")
+            # Verdict: what actually gates the pipeline. Stall dominating the
+            # communication total means the reporter (CPU energy eval) cannot
+            # keep up with GPU sampling; transfer dominating would mean the data
+            # movement itself is the cost.
+            if self._t_comm_total > 0:
+                if self._t_stall_total >= self._t_send_total + extract_total:
+                    verdict = (
+                        "reporter-bound: the CPU energy evaluation is the "
+                        "bottleneck (backpressure stall dominates); "
+                        "communication/transfer is not the problem")
+                else:
+                    verdict = ("transfer-bound: data movement dominates the "
+                               "communication cost")
+                self.ostream.print_info(f"[timing] Verdict: {verdict}.")
+        if self.report_forcegroups or self.debug:
+            self.ostream.print_warning(
+                "[timing] A master-side synchronous reporter is active "
+                "(report_forcegroups/debug): its CPU energy work runs inside the "
+                "sampling step and inflates the reported sampling(GPU) figure.")
+        self.ostream.flush()
+
+    def _make_evb_reporters(self, l, append, replica, direction):
+        """Build the EVB reporters for one sampling window.
+
+        Synchronous mode returns a single in-process EvbReporter. Async mode
+        returns an EvbReporterClient that offloads the core energies to the
+        worker, plus (only when force-groups / bonded decomposition are
+        requested) a master-side EvbReporter that writes just those files.
+        """
+        if not self._async:
+            return [
+                self._get_evb_reporter(self.data_folder,
+                                       l,
+                                       append=append,
+                                       replica=replica,
+                                       direction=direction)
+            ]
+
+        client = EvbReporterClient(
+            self.comm,
+            self._reporter_worker,
+            self.write_step,
+            self.topology.getNumAtoms(),
+            l,
+            replica,
+            direction,
+            append,
+            self.report_forces or self.debug,
+            self.report_velocities or self.debug,
+            self._shm_ring,
+            self._shm_win,
+        )
+        reporters = [client]
+
+        if self.report_forcegroups or self.debug:
+            fg_reporter = EvbReporter(
+                str(self.data_folder / "Energies.csv"),
+                self.write_step,
+                self.systems,
+                self.topology,
+                l,
+                self.ostream,
+                forming_bonds=self.forming_bonds,
+                breaking_bonds=self.breaking_bonds,
+                forcegroup_file=str(self.data_folder / "ForceGroups.csv"),
+                append=append,
+                replica=replica,
+                direction=direction,
+                core_outputs=False,
+            )
+            reporters.append(fg_reporter)
+        return reporters
 
     def _get_simulation(self, system, step_size):
         if self.isothermal:
@@ -878,6 +1196,11 @@ class EvbFepDriver:
                 )
 
     def _safe_step(self, simulation, steps, name=""):
+        self.ostream.print_info(
+            f"Running {name} for {steps} steps for total time: {steps*self.step_size} ps with step size {self.step_size} ps"
+        )
+
+        self.ostream.flush()
         if not self.safe_step:
             self.run_steps += steps
             simulation.step(steps)
@@ -890,10 +1213,6 @@ class EvbFepDriver:
             )
             return [state]
 
-        self.ostream.print_info(
-            f"Running {name} for {steps} steps for total time: {steps*self.step_size} ps with step size {self.step_size} ps"
-        )
-        self.ostream.flush()
         states = []
         # potwarning = False
         if steps % self._safe_step_batch != 0:

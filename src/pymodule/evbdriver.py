@@ -176,6 +176,13 @@ class EvbDriver:
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbDriver.')
 
+        # System building and the associated folder / file creation happen only
+        # on the master rank. In async-reporter mode (nodes > 1) the reporter
+        # worker reconstructs the systems from the master's folder in run_FEP,
+        # so only one output folder is ever created and all ranks agree on it.
+        if self.rank != mpi_master():
+            return
+
         if all(isinstance(conf, str) for conf in configurations):
             configurations = [
                 self.default_system_configurations(conf)
@@ -315,6 +322,12 @@ class EvbDriver:
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbDriver.')
 
+        # Loading / folder preparation happens only on the master rank; in
+        # async-reporter mode the reporter worker reconstructs what it needs
+        # from the shared folder in run_FEP.
+        if self.rank != mpi_master():
+            return
+
         options_path = Path(data_folder) / "options.json"
         with options_path.open("r") as file:
             conf = json.load(file)
@@ -401,10 +414,41 @@ class EvbDriver:
             initial_equil_step_size (float, optional): The step size during initial equilibration in picoseconds. Defaults to 0.002.
         """
 
+        # In async-reporter mode only the master built the systems and owns the
+        # output folder. Broadcast the lightweight per-configuration metadata
+        # (everything except the non-picklable OpenMM systems / topology /
+        # positions) plus the lambda vector so every rank iterates the same
+        # configurations and agrees on the folder the reporter worker writes to.
+        if self.nodes > 1:
+            if self.rank == mpi_master():
+                meta = [{
+                    key: value
+                    for key, value in conf.items()
+                    if key not in ("systems", "topology", "initial_positions")
+                } for conf in self.system_confs]
+            else:
+                meta = None
+            meta = self.comm.bcast(meta, root=mpi_master())
+            self.lambda_vec = self.comm.bcast(self.lambda_vec,
+                                              root=mpi_master())
+            if self.rank != mpi_master():
+                self.system_confs = meta
+
         for conf in self.system_confs:
             self.ostream.print_blank()
             self.ostream.print_header(f"Running FEP for {conf['name']}")
             self.ostream.flush()
+            # The reporter worker (rank master + 1) did not build the systems;
+            # reconstruct the systems and topology it needs to evaluate energies
+            # from the shared folder the master wrote.
+            if self.nodes > 1 and self.rank == mpi_master() + 1:
+                sysbuilder = ReactionSystemBuilder(ostream=self.ostream)
+                conf["systems"] = sysbuilder.load_systems_from_xml(
+                    conf["run_folder"])
+                pdb = mmapp.PDBxFile(
+                    str(Path(conf["data_folder"]) / "topology.cif"))
+                conf["topology"] = pdb.getTopology()
+
             FEP = EvbFepDriver(ostream=self.ostream)
             FEP.run_replicas(
                 Lambda=self.lambda_vec,
@@ -449,6 +493,11 @@ class EvbDriver:
             lambda_sub_sample_ends (bool, optional): If set to False, the lambda frames up to 0.1 and from 0.9 will not be subsampled. Defaults to False.
             time_sub_sample (int, optional): Factor with which the time vector will be subsampled. Setting this to two will discard every other snapshot. Defaults to 1.
         """
+        # Post-processing reads the FEP output files that only the master rank
+        # produced; the reporter / helper ranks have no data to analyse.
+        if self.rank != mpi_master():
+            return
+
         dp = EvbDataProcessing(ostream=self.ostream)
         results = self._load_output_from_folders(lambda_sub_sample,
                                                  lambda_sub_sample_ends,
