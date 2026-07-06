@@ -317,8 +317,8 @@ class ReactionSystemBuilder():
                                     nb_force, self.neutralize, self.padding,
                                     box)
 
-        # if self.pressure > 0:
-        barostat = self._add_barostat(system)
+        if self.pressure > 0:
+            barostat = self._add_barostat(system)
 
         if self.implicit_solvent_model is not None:
             assert_msg_critical(
@@ -375,7 +375,7 @@ class ReactionSystemBuilder():
         # Guard against residues that might have standard names
         for i in range(len(templates)):
             templates[i].name = f"{templates[i].name}_evb"
-            
+
         for t, template in enumerate(templates):
             for i, atom in enumerate(template.atoms):
                 forcefield.registerAtomType({
@@ -1399,8 +1399,9 @@ class ReactionSystemBuilder():
         return box
 
     def _add_barostat(self, system):
-        if self.pressure ==-1:
-            self.ostream.print_info("Setting default equilibration pressure to 1 bar")
+        if self.pressure == -1:
+            self.ostream.print_info(
+                "Setting default equilibration pressure to 1 bar")
             self.pressure = 1.0
         if not (self.CNT or self.graphene):
             barostat = mm.MonteCarloBarostat(
