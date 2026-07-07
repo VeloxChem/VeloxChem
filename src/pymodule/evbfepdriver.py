@@ -530,14 +530,16 @@ class EvbFepDriver:
 
         # Single trajectory file, appended across all sweeps. Frames stay
         # row-aligned with Energies.csv (each row tagged with replica/direction).
-        # In deferred mode the trajectory reporter is recreated per window (so
-        # the file is flushed before it is read back), so skip the shared one.
-        self.traj_roporter = None
-        if not self._deferred:
-            self.traj_roporter = mmapp.XTCReporter(
-                str(self.data_folder / "trajectory.xtc"),
-                self.write_step,
-            )
+        # Created once and reused for every window, deferred and non-deferred
+        # alike: XTCReporter lazily builds its XTCFile on the first report()
+        # call, and opening in append mode pays an O(existing frame count) scan
+        # (openmm/app/xtcfile.py) exactly once per XTCFile. Recreating the
+        # reporter every window would pay that scan again each time against an
+        # ever-growing file.
+        self.traj_roporter = mmapp.XTCReporter(
+            str(self.data_folder / "trajectory.xtc"),
+            self.write_step,
+        )
         # Only the very first written window truncates the output files and
         # writes their headers; everything afterwards appends.
         self._first_write = True
@@ -1065,16 +1067,10 @@ class EvbFepDriver:
         append = not self._first_write
         self._first_write = False
 
-        # Per-window trajectory reporter appended into the single trajectory.xtc.
-        # Recreated (and dropped) each window so the file is flushed to disk
-        # before the recalculation reads it back. The first written window
-        # truncates the file; the rest append.
-        traj_reporter = mmapp.XTCReporter(
-            str(self.data_folder / "trajectory.xtc"),
-            self.write_step,
-            append=append,
-        )
-        simulation.reporters.append(traj_reporter)
+        # Trajectory frames go to the single shared reporter created once in
+        # run_replicas (self.traj_roporter) and reused across every window; see
+        # the comment there for why per-window recreation must be avoided.
+        simulation.reporters.append(self.traj_roporter)
 
         sz = self.step_size * mmunit.picoseconds
         simulation.integrator.setStepSize(sz)
@@ -1095,9 +1091,10 @@ class EvbFepDriver:
         # Detached snapshot to seed the next window; survives context teardown.
         final_state = states[-1]
 
-        # Release the sampling GPU context (and flush/close the trajectory).
+        # Release the sampling GPU context. The trajectory reporter is shared
+        # across windows and outlives this call, so it is not torn down here.
         simulation.reporters.clear()
-        del simulation, states, state_reporter, traj_reporter
+        del simulation, states, state_reporter
         gc.collect()
 
         # Record this window's frames for the per-replica batched recalculation.
