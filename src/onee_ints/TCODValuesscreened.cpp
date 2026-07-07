@@ -22,11 +22,12 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include "TCODValues.hpp"
+#include "TCODValuesscreened.hpp"
 
 #include <omp.h>
 
 #include <algorithm>
+#include <iostream>
 #include <unordered_map>
 #include <vector>
 
@@ -42,20 +43,22 @@
 namespace onee {  // onee namespace
 
 auto
-computeTCODValues(const             CMolecule& molecule, 
-                  const             CMolecularBasis& basis, 
-                  const double*     point_coords, 
-                  const int         npoints, 
-                  const double*     point_exp, 
-                  const double*     point_amp,
-                  const double*     D, 
-                  const int         naos) -> std::vector<double>
+computescreenedTCODValues(const             CMolecule& molecule, 
+                          const             CMolecularBasis& basis, 
+                          const double*     point_coords, 
+                          const int         npoints, 
+                          const double*     point_exp, 
+                          const double*     point_amp,
+                          const double*     point_norm_const,
+                          const double*     D,
+                          const int         naos,
+                          const double      tco_tol) -> std::vector<double>
 {
     const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
 
     errors::assertMsgCritical(
             naos == gtofunc::getNumberOfAtomicOrbitals(gto_blocks),
-            std::string("computeTCODValues: Inconsistent number of AOs"));
+            std::string("computescreenedTCODValues: Inconsistent number of AOs"));
 
     auto nthreads = omp_get_max_threads();
 
@@ -68,7 +71,7 @@ computeTCODValues(const             CMolecule& molecule,
 
     // points info
 
-    std::vector<double> points_info(npoints * 5);
+    std::vector<double> points_info(npoints * 6);
 
     for (int c = 0; c < npoints; c++)
     {
@@ -77,7 +80,13 @@ computeTCODValues(const             CMolecule& molecule,
         points_info[c + npoints * 2] = point_coords[c * 3 + 2];
         points_info[c + npoints * 3] = point_exp[c];
         points_info[c + npoints * 4] = point_amp[c];
+        points_info[c + npoints * 5] = point_norm_const[c];
     }
+
+    double N_max = *std::max_element(points_info.begin() + npoints * 5, points_info.end());
+
+    std::cout << "Max norm: " << N_max << "\n";
+    std::cout << "TCO tol: " << tco_tol << "\n";
 
     // gto blocks
 
@@ -115,7 +124,7 @@ computeTCODValues(const             CMolecule& molecule,
         }
         else
         {
-            std::string errangmom("computeTCODValues: Only implemented up to f-orbitals");
+            std::string errangmom("computescreenedTCODValues: Only implemented up to f-orbitals");
 
             errors::assertMsgCritical(false, errangmom);
         }
@@ -358,6 +367,12 @@ computeTCODValues(const             CMolecule& molecule,
             ff_prim_pair_count
     });
 
+    // screened pair counters per angular momentum block
+    int screened_ss = 0, screened_sp = 0, screened_sd = 0, screened_sf = 0,
+        screened_pp = 0, screened_pd = 0, screened_pf = 0,
+        screened_dd = 0, screened_df = 0, screened_ff = 0;
+
+
     const double delta[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
 
     const int d_cart_inds[6][2] = {
@@ -409,6 +424,8 @@ computeTCODValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij); 
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -434,6 +451,12 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_ss++;
+            continue;
+        }
+
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -441,6 +464,7 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto N_c = points_info[c + npoints * 5];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -469,7 +493,7 @@ computeTCODValues(const             CMolecule& molecule,
             auto m = idx;
             auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
+            s_type_tco_d_val -= S_ij_00 * N_c * p_c * (
 
                     (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
 
@@ -525,6 +549,8 @@ computeTCODValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij); 
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -551,6 +577,12 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_sp++;
+            continue;
+        }
+
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -558,6 +590,7 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto N_c = points_info[c + npoints * 5];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -587,7 +620,7 @@ computeTCODValues(const             CMolecule& molecule,
             auto m = idx;
             auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
+            s_type_tco_d_val -= S_ij_00 * N_c * p_c * (
 
                     (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
 
@@ -660,6 +693,8 @@ computeTCODValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij); 
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -686,6 +721,12 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_sd++;
+            continue;
+        }
+
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -693,6 +734,7 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto N_c = points_info[c + npoints * 5];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -723,7 +765,7 @@ computeTCODValues(const             CMolecule& molecule,
             auto m = idx;
             auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
+            s_type_tco_d_val -= S_ij_00 * N_c * p_c * (
 
                     (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
 
@@ -811,6 +853,8 @@ computeTCODValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij); 
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -837,6 +881,12 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_sf++;
+            continue;
+        }
+
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -844,6 +894,7 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto N_c = points_info[c + npoints * 5];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -875,7 +926,7 @@ computeTCODValues(const             CMolecule& molecule,
             auto m = idx;
             auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
+            s_type_tco_d_val -= S_ij_00 * N_c * p_c * (
 
                     (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
 
@@ -976,6 +1027,8 @@ computeTCODValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij); 
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -1003,6 +1056,12 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_pp++;
+            continue;
+        }
+
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -1010,6 +1069,7 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto N_c = points_info[c + npoints * 5];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1040,7 +1100,7 @@ computeTCODValues(const             CMolecule& molecule,
             auto m = idx;
             auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
+            s_type_tco_d_val -= S_ij_00 * N_c * p_c * (
 
                     (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
 
@@ -1128,6 +1188,8 @@ computeTCODValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij); 
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -1155,6 +1217,12 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_pd++;
+            continue;
+        }
+
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -1162,6 +1230,7 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto N_c = points_info[c + npoints * 5];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1193,7 +1262,7 @@ computeTCODValues(const             CMolecule& molecule,
             auto m = idx;
             auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
+            s_type_tco_d_val -= S_ij_00 * N_c * p_c * (
 
                     (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
 
@@ -1296,6 +1365,8 @@ computeTCODValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij); 
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -1323,6 +1394,12 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_pf++;
+            continue;
+        }
+
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -1330,6 +1407,7 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto N_c = points_info[c + npoints * 5];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1362,7 +1440,7 @@ computeTCODValues(const             CMolecule& molecule,
             auto m = idx;
             auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
+            s_type_tco_d_val -= S_ij_00 * N_c * p_c * (
 
                     (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
 
@@ -1487,6 +1565,8 @@ computeTCODValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij); 
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -1514,6 +1594,12 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_dd++;
+            continue;
+        }
+
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -1521,6 +1607,7 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto N_c = points_info[c + npoints * 5];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1553,7 +1640,7 @@ computeTCODValues(const             CMolecule& molecule,
             auto m = idx;
             auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
+            s_type_tco_d_val -= S_ij_00 * N_c * p_c * (
 
                     (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
 
@@ -1679,6 +1766,8 @@ computeTCODValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij); 
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -1706,6 +1795,12 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_df++;
+            continue;
+        }
+
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -1713,6 +1808,7 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto N_c = points_info[c + npoints * 5];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1746,7 +1842,7 @@ computeTCODValues(const             CMolecule& molecule,
             auto m = idx;
             auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
+            s_type_tco_d_val -= S_ij_00 * N_c * p_c * (
 
                     (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
 
@@ -1911,6 +2007,8 @@ computeTCODValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij); 
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -1938,6 +2036,12 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_ff++;
+            continue;
+        }
+
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -1945,6 +2049,7 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto N_c = points_info[c + npoints * 5];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1979,7 +2084,7 @@ computeTCODValues(const             CMolecule& molecule,
             auto m = idx;
             auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
+            s_type_tco_d_val -= S_ij_00 * N_c * p_c * (
 
                     (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
 
@@ -2183,6 +2288,20 @@ computeTCODValues(const             CMolecule& molecule,
             d_tilde_values[c] += d_tilde_values_omp[thread_id][c];
         }
     }
+
+
+    // print screening statistics
+    std::cout << "computescreenedTCODValues: screening statistics (screened / total pairs)\n";
+    std::cout << "  S-S: " << screened_ss << " / " << ss_prim_pair_count << "\n";
+    std::cout << "  S-P: " << screened_sp << " / " << sp_prim_pair_count << "\n";
+    std::cout << "  S-D: " << screened_sd << " / " << sd_prim_pair_count << "\n";
+    std::cout << "  S-F: " << screened_sf << " / " << sf_prim_pair_count << "\n";
+    std::cout << "  P-P: " << screened_pp << " / " << pp_prim_pair_count << "\n";
+    std::cout << "  P-D: " << screened_pd << " / " << pd_prim_pair_count << "\n";
+    std::cout << "  P-F: " << screened_pf << " / " << pf_prim_pair_count << "\n";
+    std::cout << "  D-D: " << screened_dd << " / " << dd_prim_pair_count << "\n";
+    std::cout << "  D-F: " << screened_df << " / " << df_prim_pair_count << "\n";
+    std::cout << "  F-F: " << screened_ff << " / " << ff_prim_pair_count << "\n";
 
     return d_tilde_values;
 }

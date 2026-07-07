@@ -178,6 +178,7 @@ class LinearSolver:
         self.discretization = 'fixed'
         self.switching_thresh = 1.0e-8
         self.r_ext = 0.0
+        #self.tco_tol = self.conv_thresh * 1.0e8
 
         # solver setup
         self.conv_thresh = 1.0e-4
@@ -732,19 +733,22 @@ class LinearSolver:
 
         if self._gostshyp:
 
+            tco_tol = scf_results['conv_thresh'] * 1.0e8
+
             self.gostshyp_drv = GostshypDriver(molecule,
                                                basis,
                                                self.pressure,
                                                self.pressure_units,
+                                               tco_tol,
                                                self.comm,
                                                self.ostream)
             
-            tessellation_settings = {'num_leb_points': self.num_leb_points,
-                                     'tssf': self.tssf,
-                                     'discretization': self.discretization,
-                                     'switching_thresh': self.switching_thresh,
-                                     'filename': self.filename,
-                                     'r_ext': self.r_ext}
+            tessellation_settings = {'num_leb_points'   : self.num_leb_points,
+                                     'tssf'             : self.tssf,
+                                     'discretization'   : self.discretization,
+                                     'switching_thresh' : self.switching_thresh,
+                                     'filename'         : self.filename,
+                                     'r_ext'            : self.r_ext}
             
             if self.rank == mpi_master():
                 # Note: make gs_density a tuple
@@ -2183,9 +2187,9 @@ class LinearSolver:
                 dm = dens[idx]
                 
                 # Note: only closed shell density for now
-                fock_gost = self.gostshyp_drv.gostshyp_resp_contrib(gs_dm * 2.0,
-                                                                    dm * 2.0,
-                                                                    tessellation_settings)
+                fock_gost = self.gostshyp_drv.screened_gostshyp_resp_contrib(gs_dm * 2.0,
+                                                                             dm * 2.0,
+                                                                             tessellation_settings)
 
                 if comm_rank == mpi_master():
                     fock_arrays[idx] += fock_gost

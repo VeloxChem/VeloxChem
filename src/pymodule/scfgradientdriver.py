@@ -423,23 +423,22 @@ class ScfGradientDriver(GradientDriver):
         if self.scf_driver._gostshyp:
             from .gostshyp import GostshypDriver
 
-            self._gostshyp_drv = GostshypDriver(molecule = molecule,
-                                                basis = basis,
-                                                pressure = self.scf_driver.pressure,
-                                                pressure_units = self.scf_driver.pressure_units,
-                                                comm = self.comm,
-                                                ostream = self.ostream)
+            self._gostshyp_drv = GostshypDriver(molecule,
+                                                basis,
+                                                self.scf_driver.pressure,
+                                                self.scf_driver.pressure_units,
+                                                self.scf_driver.tco_tol,
+                                                self.comm,
+                                                self.ostream)
 
-            tessellation_settings = {
-                'num_leb_points': self.scf_driver.num_leb_points,
-                'tssf': self.scf_driver.tssf,
-                'discretization': self.scf_driver.discretization,
-                'switching_thresh': self.scf_driver.switching_thresh,
-                'filename': self.scf_driver.filename,
-                'r_ext': self.scf_driver.r_ext
-            }
+            tessellation_settings = {'num_leb_points'   : self.scf_driver.num_leb_points,
+                                     'tssf'             : self.scf_driver.tssf,
+                                     'discretization'   : self.scf_driver.discretization,
+                                     'switching_thresh' : self.scf_driver.switching_thresh,
+                                     'filename'         : self.scf_driver.filename,
+                                     'r_ext'            : self.scf_driver.r_ext}
 
-            gostshyp_grad = self._gostshyp_drv.gostshyp_grad_contrib(density_matrix, tessellation_settings)
+            gostshyp_grad = self._gostshyp_drv.screened_gostshyp_grad_contrib(density_matrix, tessellation_settings)
 
             self.gradient += gostshyp_grad
 

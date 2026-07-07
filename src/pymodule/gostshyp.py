@@ -40,13 +40,21 @@ from .veloxchemlib import mpi_master
 # from .veloxchemlib import ThreeCenterR2Driver
 # from .veloxchemlib import ThreeCenterRR2Driver
 from .veloxchemlib import compute_tco_s_fock
+from .veloxchemlib import compute_screened_tco_s_fock
 from .veloxchemlib import compute_tco_s_values
+from .veloxchemlib import compute_screened_tco_s_values
 from .veloxchemlib import compute_tco_p_fock
+from .veloxchemlib import compute_screened_tco_p_fock
 from .veloxchemlib import compute_tco_p_values
+from .veloxchemlib import compute_screened_tco_p_values
 from .veloxchemlib import compute_tco_d_values
+from .veloxchemlib import compute_screened_tco_d_values
 from .veloxchemlib import compute_tco_f_values
+from .veloxchemlib import compute_screened_tco_f_values
 from .veloxchemlib import compute_tco_s_gradient
+from .veloxchemlib import compute_screened_tco_s_gradient
 from .veloxchemlib import compute_tco_p_gradient
+from .veloxchemlib import compute_screened_tco_p_gradient
 from .outputstream import OutputStream
 from .tessellation import TessellationDriver
 from .inputparser import (parse_input, print_keywords)
@@ -81,8 +89,8 @@ class GostshypDriver:
         - ostream: The output stream.
     """
 
-    def __init__(self, molecule, basis, pressure, pressure_units, comm=None,
-            ostream=None):
+    def __init__(self, molecule, basis, pressure, pressure_units, 
+        tco_tol, comm=None, ostream=None):
         """
         Initializes the GOSTSHYP method for applying hydrostatic pressure.
         """
@@ -105,6 +113,7 @@ class GostshypDriver:
         self.num_tes_points = 0
         self.tessellation = None
         self._neg_p_amp = 0
+        self.tco_tol = tco_tol
 
         # mpi information
         self.comm = comm
@@ -119,8 +128,99 @@ class GostshypDriver:
             'method_settings': {
                 'pressure': ('float', 'applied pressure (default in  MPa)'),
                 'pressure_units': ('str', 'the units of the given pressure'),
+                'tco_tol': ('float', 'screening threshold for three-center overlap integrals')
             }
         }
+
+    def screened_gostshyp_contrib(self, den_mat, tessellation_settings=None):
+        """
+        Computes contributions to the total energy and Fock matrix from
+        GOSTSHYP method.
+
+        :param den_mat:
+            The density matrix.
+        :param tessellation_settings:
+            The dictionary of tessellation settings
+
+        :return:
+            The GOSTSHYP contribution to energy and Fock matrix.
+        """
+
+        if self.num_tes_points == 0:
+            self.generate_tessellation(tessellation_settings)
+
+        # set up needed components:
+
+        # width parameters w_j, gaussian centers r_j, surface normals n_j,
+        # normalization constants, N_j
+        initial_exponents = np.pi * np.log(2.0) / self.tessellation[3]
+        initial_centers = (self.tessellation[:3].T).copy()
+        initial_norms = (self.tessellation[8:11].T).copy()
+        initial_norm_consts = (initial_exponents / np.pi) ** (1.5)
+
+        #compute f_tilde vector
+        f_tilde = compute_screened_tco_p_values(self.molecule,
+                                                self.basis,
+                                                initial_centers,
+                                                initial_exponents,
+                                                np.full((self.num_tes_points), 1.0),
+                                                initial_norms,
+                                                initial_norm_consts,
+                                                den_mat,
+                                                self.tco_tol)
+                    
+        # compute amplitudes
+        initial_amplitudes = self.pressure * self.tessellation[3] / f_tilde
+
+        amplitudes_mask = initial_amplitudes >= 0.0
+        np.savetxt('amps_mask.txt', amplitudes_mask, fmt="%5i") #shouldn't go into main
+        
+        # compute number of grid points associated with negative amplitudes
+        self._neg_p_amp = self.num_tes_points - np.sum(amplitudes_mask)
+
+        # update gaussian parameters by removing grid points associated 
+        # with negative amplitudes
+        centers = (initial_centers[amplitudes_mask]).copy()
+        exponents = (initial_exponents[amplitudes_mask]).copy()
+        amplitudes = (initial_amplitudes[amplitudes_mask]).copy()
+        norms = (initial_norms[amplitudes_mask]).copy()
+        norm_consts = (initial_norm_consts[amplitudes_mask]).copy()
+        
+        # compute energy contribution
+        p_times_g_tilde = compute_screened_tco_s_values(self.molecule,
+                                                        self.basis,
+                                                        centers,
+                                                        exponents,
+                                                        amplitudes,
+                                                        norm_consts,
+                                                        den_mat,
+                                                        self.tco_tol)
+        
+        e_pr = np.sum(p_times_g_tilde)
+
+        # compute Fock matrix contribution
+        V1_pr = compute_screened_tco_s_fock(self.molecule,
+                                            self.basis,
+                                            centers,
+                                            exponents,
+                                            amplitudes,
+                                            norm_consts,
+                                            self.tco_tol)
+        
+        pre_fac_V2_pr = (p_times_g_tilde / f_tilde[amplitudes_mask])
+        
+        V2_pr = compute_screened_tco_p_fock(self.molecule,
+                                            self.basis,
+                                            centers,
+                                            exponents,
+                                            pre_fac_V2_pr,
+                                            norms,
+                                            norm_consts,
+                                            self.tco_tol)
+        
+        V_pr = V1_pr - V2_pr
+        
+        return e_pr, V_pr
 
     def gostshyp_contrib(self, den_mat, tessellation_settings=None):
         """
@@ -201,6 +301,124 @@ class GostshypDriver:
         
         return e_pr, V_pr
     
+    def screened_gostshyp_resp_contrib(self, gs_den_mat, trans_den_mat, tessellation_settings=None):
+        """
+        Computes linear response contributions as second energy derivative
+        wrt to density matrix elements. Can also be considered as first 
+        derivative of Fock matrix wrt to density matrix element.
+
+        :param gs_den_mat:
+            The ground state density matrix.
+        :param trans_den_mat:
+            The transition (perturbed) density matrix.
+        :param tessellation_settings:
+            The dictionary of tessellation settings
+
+        :return:
+            The GOSTSHYP response contribution.
+        """
+
+        if self.num_tes_points == 0:
+            self.generate_tessellation(tessellation_settings)
+
+        # set up needed components:
+
+        # width parameters w_j, gaussian centers r_j, surface normals n_j
+        # normalization constants, N_j
+        initial_exponents = np.pi * np.log(2.0) / self.tessellation[3]
+        initial_centers = (self.tessellation[:3].T).copy()
+        initial_norms = (self.tessellation[8:11].T).copy()
+        initial_norm_consts = (initial_exponents / np.pi) ** (1.5)
+
+        # compute f_tilde vector
+        f_tilde = compute_screened_tco_p_values(self.molecule,
+                                                self.basis,
+                                                initial_centers,
+                                                initial_exponents,
+                                                np.full((self.num_tes_points), 1.0),
+                                                initial_norms,
+                                                initial_norm_consts,
+                                                gs_den_mat,
+                                                self.tco_tol)
+        
+        # compute amplitudes and remove grid points associated with
+        # negative amplitudes
+        initial_amplitudes = self.pressure * self.tessellation[3] / f_tilde
+
+        amplitudes_mask = initial_amplitudes >= 0.0
+        
+        self._neg_p_amp = self.num_tes_points - np.sum(amplitudes_mask)
+        num_points = np.sum(amplitudes_mask)
+
+        # save grid information and auxiliary f_tilde vector 
+        # for kept grid points
+
+        centers = (initial_centers[amplitudes_mask]).copy()
+        exponents = (initial_exponents[amplitudes_mask]).copy()
+        amplitudes = (initial_amplitudes[amplitudes_mask]).copy()
+        norms = (initial_norms[amplitudes_mask]).copy()
+        norm_consts = (initial_norm_consts[amplitudes_mask]).copy()
+        f_tilde = (f_tilde[amplitudes_mask]).copy()
+
+        # compute f_tilde at perturbed density (hence prime)
+        f_tilde_prime = compute_screened_tco_p_values(self.molecule,
+                                                      self.basis,
+                                                      centers,
+                                                      exponents,
+                                                      np.full((num_points), 1.0),
+                                                      norms,
+                                                      norm_consts,
+                                                      trans_den_mat,
+                                                      self.tco_tol)
+        
+        # compute g_tilde at gs density
+        g_tilde = compute_screened_tco_s_values(self.molecule,
+                                                self.basis,
+                                                centers,
+                                                exponents,
+                                                np.full((num_points), 1.0),
+                                                norm_consts,
+                                                gs_den_mat,
+                                                self.tco_tol)
+
+        # compute g_tilde at perturbed density (hence prime)
+        g_tilde_prime = compute_screened_tco_s_values(self.molecule,
+                                                      self.basis,
+                                                      centers,
+                                                      exponents,
+                                                      np.full((num_points), 1.0),
+                                                      norm_consts,
+                                                      trans_den_mat,
+                                                      self.tco_tol)
+        
+        # compute s-type TCO contribution with prefactor
+        prefac_g_mat = - amplitudes * f_tilde_prime / f_tilde
+
+        g_mat_contrib = compute_screened_tco_s_fock(self.molecule,
+                                                    self.basis,
+                                                    centers,
+                                                    exponents,
+                                                    prefac_g_mat,
+                                                    norm_consts,
+                                                    self.tco_tol)
+        
+        # compute p-type TCO contribution with prefactor
+        prefac_f_mat = (amplitudes / f_tilde * 
+                        (2 * g_tilde * f_tilde_prime / f_tilde - g_tilde_prime))
+        
+        f_mat_contrib = compute_screened_tco_p_fock(self.molecule,
+                                                    self.basis,
+                                                    centers,
+                                                    exponents,
+                                                    prefac_f_mat,
+                                                    norms,
+                                                    norm_consts,
+                                                    self.tco_tol)
+        
+        resp_contrib = g_mat_contrib + f_mat_contrib
+        
+        return resp_contrib
+
     def gostshyp_resp_contrib(self, gs_den_mat, trans_den_mat, tessellation_settings=None):
         """
         Computes linear response contributions as second energy derivative
@@ -223,34 +441,37 @@ class GostshypDriver:
 
         # set up needed components:
 
-        # width parameters w_j
-        width_params = np.pi * np.log(2.0) / self.tessellation[3]
+        # width parameters w_j, gaussian centers r_j, surface normals n_j
+        initial_exponents = np.pi * np.log(2.0) / self.tessellation[3]
+        initial_centers = (self.tessellation[:3].T).copy()
+        initial_norms = (self.tessellation[8:11].T).copy()
 
         # compute f_tilde vector
         f_tilde = compute_tco_p_values(self.molecule, 
                                        self.basis, 
-                                       (self.tessellation[:3].T).copy(), 
-                                       width_params, 
+                                       initial_centers, 
+                                       initial_exponents, 
                                        np.full((self.num_tes_points), 1.0), 
-                                       (self.tessellation[8:11].T).copy(), 
+                                       initial_norms, 
                                        gs_den_mat)
         
         # compute amplitudes and remove grid points associated with
         # negative amplitudes
-        amplitudes = self.pressure * self.tessellation[3] / f_tilde
+        initial_amplitudes = self.pressure * self.tessellation[3] / f_tilde
 
-        amplitudes_mask = amplitudes >= 0.0
+        amplitudes_mask = initial_amplitudes >= 0.0
         
         self._neg_p_amp = self.num_tes_points - np.sum(amplitudes_mask)
         num_points = np.sum(amplitudes_mask)
 
-        # save grid information and auxiliary f_tilde vector 
+        # save grid information and auxiliary f_tilde vector
         # for kept grid points
-        centers = (self.tessellation[:3].T[amplitudes_mask]).copy()
-        exponents = width_params[amplitudes_mask]
-        amps = amplitudes[amplitudes_mask]
-        norms = (self.tessellation[8:11].T[amplitudes_mask]).copy()
-        f_tilde = f_tilde[amplitudes_mask]
+
+        centers = (initial_centers[amplitudes_mask]).copy()
+        exponents = (initial_exponents[amplitudes_mask]).copy()
+        amplitudes = (initial_amplitudes[amplitudes_mask]).copy()
+        norms = (initial_norms[amplitudes_mask]).copy()
+        f_tilde = (f_tilde[amplitudes_mask]).copy()
 
         # compute f_tilde at perturbed density (hence prime)
         f_tilde_prime = compute_tco_p_values(self.molecule, 
@@ -278,7 +499,7 @@ class GostshypDriver:
                                              trans_den_mat)
         
         # compute s-type TCO contribution with prefactor
-        prefac_g_mat = - amps * f_tilde_prime / f_tilde
+        prefac_g_mat = - amplitudes * f_tilde_prime / f_tilde
 
         g_mat_contrib = compute_tco_s_fock(self.molecule,
                                            self.basis,
@@ -287,7 +508,7 @@ class GostshypDriver:
                                            prefac_g_mat)
         
         # compute p-type TCO contribution with prefactor
-        prefac_f_mat = (amps / f_tilde * 
+        prefac_f_mat = (amplitudes / f_tilde * 
                         (2 * g_tilde * f_tilde_prime / f_tilde - g_tilde_prime))
         
         f_mat_contrib = compute_tco_p_fock(self.molecule,
@@ -300,6 +521,139 @@ class GostshypDriver:
         resp_contrib = g_mat_contrib + f_mat_contrib
         
         return resp_contrib
+
+    def screened_gostshyp_grad_contrib(self, den_mat, tessellation_settings=None):
+        """
+        Computes GOSTSHYP contribution to the molecular gradient
+
+        Pausch, Zeller, Neudecker: J. Chem. Theory Comput. 2025, 21, 747-761. Eq. (30)
+        
+        :param den_mat:
+            The density matrix
+        :param tessellation_settings:
+            The dictionary of tessellation settings
+            
+        :return:
+            The GOSTSHYP molecular gradient contribution 
+        """
+
+        # tessellation driver needed for area gradients
+        tessellation_drv = TessellationDriver(self.comm, self.ostream)
+        tessellation_drv.update_settings(tessellation_settings)
+
+        # tessellation data is generated
+        if self.num_tes_points == 0:
+            self.generate_tessellation(tessellation_settings)
+
+        #tesserae areas are extracted
+        initial_areas = self.tessellation[3].copy()
+        initial_centers = (self.tessellation[:3].T).copy()
+        initial_exponents = (np.pi * np.log(2.0) / initial_areas)
+        initial_norms = (self.tessellation[8:11].T).copy()
+        initial_norm_consts = (initial_exponents / np.pi) ** (1.5)
+
+        # f_tilde is computed for all tesserae
+        f_tilde = compute_screened_tco_p_values(self.molecule,
+                                                self.basis,
+                                                initial_centers,
+                                                initial_exponents,
+                                                np.full((self.num_tes_points), 1.0),
+                                                initial_norms,
+                                                initial_norm_consts,
+                                                den_mat,
+                                                self.tco_tol)
+        
+        # amplitudes are computed
+        initial_amplitudes = self.pressure * initial_areas / f_tilde
+        amps_mask = initial_amplitudes >= 0.0
+        num_pos_amps = np.sum(amps_mask)
+        self._neg_p_amp = self.num_tes_points - num_pos_amps
+
+        # gaussian information is extracted
+        areas = (initial_areas[amps_mask]).copy()
+        centers = (initial_centers[amps_mask]).copy()
+        exponents = (initial_exponents[amps_mask]).copy()
+        amplitudes = (initial_amplitudes[amps_mask]).copy()
+        norms = (initial_norms[amps_mask]).copy()
+        norm_consts = (initial_norm_consts[amps_mask]).copy()
+
+        # amplitudes divided by areas to be used as prefactor
+        amps_areas_ratio = amplitudes / areas
+
+        # terms proportional to the area derivative
+        g_tilde_term = compute_screened_tco_s_values(self.molecule,
+                                                     self.basis,
+                                                     centers,
+                                                     exponents,
+                                                     amps_areas_ratio,
+                                                     norm_consts,
+                                                     den_mat,
+                                                     self.tco_tol)
+
+        d_tilde_term = compute_screened_tco_d_values(self.molecule,
+                                                     self.basis,
+                                                     centers,
+                                                     exponents,
+                                                     (amps_areas_ratio * exponents),
+                                                     norm_consts,
+                                                     den_mat,
+                                                     self.tco_tol)
+
+        e_tilde_term = compute_screened_tco_f_values(self.molecule,
+                                                     self.basis,
+                                                     centers,
+                                                     exponents,
+                                                     (g_tilde_term * exponents / f_tilde[amps_mask]),
+                                                     norms,
+                                                     norm_consts,
+                                                     den_mat,
+                                                     self.tco_tol)
+        
+        # terms of constant gaussian exponents
+        # sum of bra and ket side gradients
+        g_tilde_grad = np.array(compute_screened_tco_s_gradient(self.molecule,
+                                                                self.basis,
+                                                                centers,
+                                                                exponents,
+                                                                amplitudes,
+                                                                norm_consts,
+                                                                den_mat,
+                                                                self.tco_tol))
+
+        # sum of bra and ket side gradients
+        f_tilde_grad = np.array(compute_screened_tco_p_gradient(self.molecule,
+                                                                self.basis,
+                                                                centers,
+                                                                exponents,
+                                                                (g_tilde_term * areas / f_tilde[amps_mask]),
+                                                                norms,
+                                                                norm_consts,
+                                                                den_mat,
+                                                                self.tco_tol))
+        
+        natoms = self.molecule.number_of_atoms()
+        a_grads = np.zeros((num_pos_amps, natoms, 3))
+        
+        for atom in range(natoms):
+            
+            # area gradients
+            a_grads[:, atom] = tessellation_drv.comp_area_grad(self.molecule,
+                                                               self.tessellation[:, amps_mask],
+                                                               atom).T
+            
+            # gaussian center gradient is added using translational invariance
+            tess_ids = (self.tessellation[11, amps_mask] == atom)
+            
+            g_tilde_grad[tess_ids, atom] -= np.sum(g_tilde_grad, axis = 1)[tess_ids]
+            f_tilde_grad[tess_ids, atom] -= np.sum(f_tilde_grad, axis = 1)[tess_ids]
+        
+        # terms proportional to area gradient multiplied by the area gradient
+        area_grad_term = np.sum((2 * g_tilde_term - d_tilde_term + e_tilde_term)[:, np.newaxis, np.newaxis] * a_grads, axis = 0)
+        
+        # collecting terms for the gradient
+        grad = area_grad_term + np.sum(g_tilde_grad - f_tilde_grad, axis = 0)
+        
+        return grad
     
     def gostshyp_grad_contrib(self, den_mat, tessellation_settings=None): 
         """
@@ -402,9 +756,9 @@ class GostshypDriver:
         for atom in range(natoms):
             
             # area gradients
-            a_grads[:, atom] = tessellation_drv.comp_area_grad_occ(self.molecule,
-                                                                   self.tessellation[:, amps_mask],
-                                                                   atom).T
+            a_grads[:, atom] = tessellation_drv.comp_area_grad(self.molecule,
+                                                               self.tessellation[:, amps_mask],
+                                                               atom).T
             
             # gaussian center gradient is added using translational invariance
             tess_ids = (self.tessellation[11, amps_mask] == atom)

@@ -22,11 +22,12 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include "TCODValues.hpp"
+#include "TCOPValuesscreened.hpp"
 
 #include <omp.h>
 
 #include <algorithm>
+#include <iostream>
 #include <unordered_map>
 #include <vector>
 
@@ -42,33 +43,36 @@
 namespace onee {  // onee namespace
 
 auto
-computeTCODValues(const             CMolecule& molecule, 
-                  const             CMolecularBasis& basis, 
-                  const double*     point_coords, 
-                  const int         npoints, 
-                  const double*     point_exp, 
-                  const double*     point_amp,
-                  const double*     D, 
-                  const int         naos) -> std::vector<double>
+computescreenedTCOPValues(const             CMolecule& molecule, 
+                          const             CMolecularBasis& basis, 
+                          const double*     point_coords, 
+                          const int         npoints, 
+                          const double*     point_exp, 
+                          const double*     point_amp, 
+                          const double*     point_norms,
+                          const double*     point_norm_const,
+                          const double*     D,
+                          const int         naos,
+                          const double      tco_tol) -> std::vector<double>
 {
     const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
 
     errors::assertMsgCritical(
             naos == gtofunc::getNumberOfAtomicOrbitals(gto_blocks),
-            std::string("computeTCODValues: Inconsistent number of AOs"));
+            std::string("computeTCOPValues: Inconsistent number of AOs"));
 
     auto nthreads = omp_get_max_threads();
 
-    std::vector<std::vector<double>> d_tilde_values_omp(nthreads);
+    std::vector<std::vector<double>> f_tilde_values_omp(nthreads);
 
     for (int thread_id = 0; thread_id < nthreads; thread_id++)
     {
-        d_tilde_values_omp[thread_id] = std::vector<double>(npoints, 0.0);
+        f_tilde_values_omp[thread_id] = std::vector<double>(npoints, 0.0);
     }
 
     // points info
 
-    std::vector<double> points_info(npoints * 5);
+    std::vector<double> points_info(npoints * 9);
 
     for (int c = 0; c < npoints; c++)
     {
@@ -77,7 +81,17 @@ computeTCODValues(const             CMolecule& molecule,
         points_info[c + npoints * 2] = point_coords[c * 3 + 2];
         points_info[c + npoints * 3] = point_exp[c];
         points_info[c + npoints * 4] = point_amp[c];
+        points_info[c + npoints * 5] = point_norms[c * 3 + 0];
+        points_info[c + npoints * 6] = point_norms[c * 3 + 1];
+        points_info[c + npoints * 7] = point_norms[c * 3 + 2];
+        points_info[c + npoints * 8] = point_norm_const[c];
     }
+
+    double N_max = *std::max_element(points_info.begin() + npoints * 8, points_info.end());
+
+    std::cout << "Max norm: " << N_max << "\n";
+    std::cout << "TCO tol: " << tco_tol << "\n";
+
 
     // gto blocks
 
@@ -115,7 +129,7 @@ computeTCODValues(const             CMolecule& molecule,
         }
         else
         {
-            std::string errangmom("computeTCODValues: Only implemented up to f-orbitals");
+            std::string errangmom("computeTCOPValues: Only implemented up to f-orbitals");
 
             errors::assertMsgCritical(false, errangmom);
         }
@@ -358,6 +372,12 @@ computeTCODValues(const             CMolecule& molecule,
             ff_prim_pair_count
     });
 
+    // screened pair counters per angular momentum block
+    int screened_ss = 0, screened_sp = 0, screened_sd = 0, screened_sf = 0,
+        screened_pp = 0, screened_pd = 0, screened_pf = 0,
+        screened_dd = 0, screened_df = 0, screened_ff = 0;
+
+
     const double delta[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
 
     const int d_cart_inds[6][2] = {
@@ -376,8 +396,10 @@ computeTCODValues(const             CMolecule& molecule,
 
     // S-S block
 
-    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
+    int zero_count = 0;
 
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
+        
     for (int ij = 0; ij < ss_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -398,6 +420,7 @@ computeTCODValues(const             CMolecule& molecule,
         const auto z_j = s_prim_info[j + s_prim_count * 4];
 
 
+
         const auto i_cgto = s_prim_aoinds[i];
         const auto j_cgto = s_prim_aoinds[j];
 
@@ -408,6 +431,8 @@ computeTCODValues(const             CMolecule& molecule,
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
         const auto zeta = a_i + a_j;
+
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
         // product of density and cart-sph transformation coefficients
 
@@ -434,6 +459,25 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        // if (S_ij_00_norm == 0.0 && zero_count < 10)
+        // {
+        //     #pragma omp critical
+        //     {
+        //         std::cout << "S_ij_00_norm = 0: a_i=" << a_i 
+        //                 << " a_j=" << a_j 
+        //                 << " r2_ij=" << r2_ij 
+        //                 << " exp_arg=" << -a_i * a_j / (a_i + a_j) * r2_ij
+        //                 << std::endl;
+        //         zero_count++;
+        //     }
+        // }
+
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_ss++;
+            continue;
+        }
+        
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -441,6 +485,12 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
+            const auto N_c = points_info[c + npoints * 8];
+
+            const double n_c[3] = {nx_c, ny_c, nz_c};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -460,18 +510,14 @@ computeTCODValues(const             CMolecule& molecule,
 
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double tco_p_m_val = 0.0;
 
-        double s_type_tco_d_val = 0.0;
+            for (int m = 0; m < 3; m++)
+                    {
+                        tco_p_m_val -= 2 * zeta_c * n_c[m] * N_c * p_c * S_ij_00 * (
 
-        for (int idx = 0; idx < 3; idx++)
-        {
-            auto m = idx;
-            auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
-
-                    (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
+                    GC[m] * G_ij_00 * (
 
                         1.0 * (
                             1.0
@@ -483,8 +529,7 @@ computeTCODValues(const             CMolecule& molecule,
 
             }
 
-            d_tilde_values_omp[thread_id][c] += s_type_tco_d_val * dens_coef_prod;
-
+            f_tilde_values_omp[thread_id][c] += tco_p_m_val * dens_coef_prod;
         }
     }
 
@@ -492,7 +537,7 @@ computeTCODValues(const             CMolecule& molecule,
     // S-P block
 
     #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
-
+        
     for (int ij = 0; ij < sp_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -512,6 +557,7 @@ computeTCODValues(const             CMolecule& molecule,
         const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
         const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
 
+
         const auto b0 = j % 3;
 
         const auto i_cgto = s_prim_aoinds[i];
@@ -524,6 +570,8 @@ computeTCODValues(const             CMolecule& molecule,
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
         const auto zeta = a_i + a_j;
+
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
         // product of density and cart-sph transformation coefficients
 
@@ -551,6 +599,12 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_sp++;
+            continue;
+        }
+        
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -558,6 +612,12 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
+            const auto N_c = points_info[c + npoints * 8];
+
+            const double n_c[3] = {nx_c, ny_c, nz_c};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -578,18 +638,14 @@ computeTCODValues(const             CMolecule& molecule,
             const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double tco_p_m_val = 0.0;
 
-        double s_type_tco_d_val = 0.0;
+            for (int m = 0; m < 3; m++)
+                    {
+                        tco_p_m_val -= 2 * zeta_c * n_c[m] * N_c * p_c * S_ij_00 * (
 
-        for (int idx = 0; idx < 3; idx++)
-        {
-            auto m = idx;
-            auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
-
-                    (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
+                    GC[m] * G_ij_00 * (
 
                         (
                             GB_0
@@ -597,15 +653,7 @@ computeTCODValues(const             CMolecule& molecule,
 
                     )
 
-                    + GC[m] * G_ij_00 * (
-
-                        0.5 / (zeta + zeta_c) * (
-                            delta[b0][n]
-                        )
-
-                    )
-
-                    + GC[n] * G_ij_00 * (
+                    + G_ij_00 * (
 
                         0.5 / (zeta + zeta_c) * (
                             delta[b0][m]
@@ -617,8 +665,7 @@ computeTCODValues(const             CMolecule& molecule,
 
             }
 
-            d_tilde_values_omp[thread_id][c] += s_type_tco_d_val * dens_coef_prod;
-
+            f_tilde_values_omp[thread_id][c] += tco_p_m_val * dens_coef_prod;
         }
     }
 
@@ -626,7 +673,7 @@ computeTCODValues(const             CMolecule& molecule,
     // S-D block
 
     #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
-
+        
     for (int ij = 0; ij < sd_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -646,6 +693,7 @@ computeTCODValues(const             CMolecule& molecule,
         const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
         const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
 
+
         const auto b0 = d_cart_inds[j % 6][0];
         const auto b1 = d_cart_inds[j % 6][1];
 
@@ -659,6 +707,8 @@ computeTCODValues(const             CMolecule& molecule,
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
         const auto zeta = a_i + a_j;
+
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
         // product of density and cart-sph transformation coefficients
 
@@ -686,6 +736,12 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_sd++;
+            continue;
+        }
+        
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -693,6 +749,12 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
+            const auto N_c = points_info[c + npoints * 8];
+
+            const double n_c[3] = {nx_c, ny_c, nz_c};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -714,18 +776,14 @@ computeTCODValues(const             CMolecule& molecule,
             const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double tco_p_m_val = 0.0;
 
-        double s_type_tco_d_val = 0.0;
+            for (int m = 0; m < 3; m++)
+                    {
+                        tco_p_m_val -= 2 * zeta_c * n_c[m] * N_c * p_c * S_ij_00 * (
 
-        for (int idx = 0; idx < 3; idx++)
-        {
-            auto m = idx;
-            auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
-
-                    (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
+                    GC[m] * G_ij_00 * (
 
                         0.5 / (zeta + zeta_c) * (
                             delta[b0][b1]
@@ -737,16 +795,7 @@ computeTCODValues(const             CMolecule& molecule,
 
                     )
 
-                    + GC[m] * G_ij_00 * (
-
-                        0.5 / (zeta + zeta_c) * (
-                            delta[b1][n] * (GB_0)
-                            + delta[b0][n] * (GB_1)
-                        )
-
-                    )
-
-                    + GC[n] * G_ij_00 * (
+                    + G_ij_00 * (
 
                         0.5 / (zeta + zeta_c) * (
                             delta[b1][m] * (GB_0)
@@ -755,20 +804,11 @@ computeTCODValues(const             CMolecule& molecule,
 
                     )
 
-                    + G_ij_00 * (
-
-                        0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[b0][m] * delta[b1][n] + delta[b0][n] * delta[b1][m])
-                        )
-
-                    )
-
             );
 
             }
 
-            d_tilde_values_omp[thread_id][c] += s_type_tco_d_val * dens_coef_prod;
-
+            f_tilde_values_omp[thread_id][c] += tco_p_m_val * dens_coef_prod;
         }
     }
 
@@ -776,7 +816,7 @@ computeTCODValues(const             CMolecule& molecule,
     // S-F block
 
     #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
-
+        
     for (int ij = 0; ij < sf_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -796,6 +836,7 @@ computeTCODValues(const             CMolecule& molecule,
         const auto y_j = f_prim_info[j / 10 + f_prim_count * 3];
         const auto z_j = f_prim_info[j / 10 + f_prim_count * 4];
 
+
         const auto b0 = f_cart_inds[j % 10][0];
         const auto b1 = f_cart_inds[j % 10][1];
         const auto b2 = f_cart_inds[j % 10][2];
@@ -810,6 +851,8 @@ computeTCODValues(const             CMolecule& molecule,
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
         const auto zeta = a_i + a_j;
+
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
         // product of density and cart-sph transformation coefficients
 
@@ -837,6 +880,12 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_sf++;
+            continue;
+        }
+        
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -844,6 +893,12 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
+            const auto N_c = points_info[c + npoints * 8];
+
+            const double n_c[3] = {nx_c, ny_c, nz_c};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -866,18 +921,14 @@ computeTCODValues(const             CMolecule& molecule,
             const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double tco_p_m_val = 0.0;
 
-        double s_type_tco_d_val = 0.0;
+            for (int m = 0; m < 3; m++)
+                    {
+                        tco_p_m_val -= 2 * zeta_c * n_c[m] * N_c * p_c * S_ij_00 * (
 
-        for (int idx = 0; idx < 3; idx++)
-        {
-            auto m = idx;
-            auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
-
-                    (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
+                    GC[m] * G_ij_00 * (
 
                         0.5 / (zeta + zeta_c) * (
                             delta[b1][b2] * (GB_0)
@@ -891,21 +942,7 @@ computeTCODValues(const             CMolecule& molecule,
 
                     )
 
-                    + GC[m] * G_ij_00 * (
-
-                        0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[b0][b1] * delta[b2][n] + delta[b0][b2] * delta[b1][n] + delta[b0][n] * delta[b1][b2])
-                        )
-
-                        + 0.5 / (zeta + zeta_c) * (
-                            delta[b2][n] * (GB_0 * GB_1)
-                            + delta[b1][n] * (GB_0 * GB_2)
-                            + delta[b0][n] * (GB_1 * GB_2)
-                        )
-
-                    )
-
-                    + GC[n] * G_ij_00 * (
+                    + G_ij_00 * (
 
                         0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
                             (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2])
@@ -919,22 +956,11 @@ computeTCODValues(const             CMolecule& molecule,
 
                     )
 
-                    + G_ij_00 * (
-
-                        0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[b1][m] * delta[b2][n] + delta[b1][n] * delta[b2][m]) * (GB_0)
-                            + (delta[b0][m] * delta[b2][n] + delta[b0][n] * delta[b2][m]) * (GB_1)
-                            + (delta[b0][m] * delta[b1][n] + delta[b0][n] * delta[b1][m]) * (GB_2)
-                        )
-
-                    )
-
             );
 
             }
 
-            d_tilde_values_omp[thread_id][c] += s_type_tco_d_val * dens_coef_prod;
-
+            f_tilde_values_omp[thread_id][c] += tco_p_m_val * dens_coef_prod;
         }
     }
 
@@ -942,7 +968,7 @@ computeTCODValues(const             CMolecule& molecule,
     // P-P block
 
     #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
-
+        
     for (int ij = 0; ij < pp_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -961,6 +987,7 @@ computeTCODValues(const             CMolecule& molecule,
         const auto x_j = p_prim_info[j / 3 + p_prim_count * 2];
         const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
         const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
+
         const auto a0 = i % 3;
 
         const auto b0 = j % 3;
@@ -975,6 +1002,8 @@ computeTCODValues(const             CMolecule& molecule,
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
         const auto zeta = a_i + a_j;
+
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
         // product of density and cart-sph transformation coefficients
 
@@ -1003,6 +1032,12 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_pp++;
+            continue;
+        }
+        
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -1010,6 +1045,12 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
+            const auto N_c = points_info[c + npoints * 8];
+
+            const double n_c[3] = {nx_c, ny_c, nz_c};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1031,18 +1072,14 @@ computeTCODValues(const             CMolecule& molecule,
             const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double tco_p_m_val = 0.0;
 
-        double s_type_tco_d_val = 0.0;
+            for (int m = 0; m < 3; m++)
+                    {
+                        tco_p_m_val -= 2 * zeta_c * n_c[m] * N_c * p_c * S_ij_00 * (
 
-        for (int idx = 0; idx < 3; idx++)
-        {
-            auto m = idx;
-            auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
-
-                    (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
+                    GC[m] * G_ij_00 * (
 
                         0.5 / (zeta + zeta_c) * (
                             delta[a0][b0]
@@ -1054,16 +1091,7 @@ computeTCODValues(const             CMolecule& molecule,
 
                     )
 
-                    + GC[m] * G_ij_00 * (
-
-                        0.5 / (zeta + zeta_c) * (
-                            delta[b0][n] * (GA_0)
-                            + delta[a0][n] * (GB_0)
-                        )
-
-                    )
-
-                    + GC[n] * G_ij_00 * (
+                    + G_ij_00 * (
 
                         0.5 / (zeta + zeta_c) * (
                             delta[b0][m] * (GA_0)
@@ -1072,20 +1100,11 @@ computeTCODValues(const             CMolecule& molecule,
 
                     )
 
-                    + G_ij_00 * (
-
-                        0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[a0][m] * delta[b0][n] + delta[a0][n] * delta[b0][m])
-                        )
-
-                    )
-
             );
 
             }
 
-            d_tilde_values_omp[thread_id][c] += s_type_tco_d_val * dens_coef_prod;
-
+            f_tilde_values_omp[thread_id][c] += tco_p_m_val * dens_coef_prod;
         }
     }
 
@@ -1093,7 +1112,7 @@ computeTCODValues(const             CMolecule& molecule,
     // P-D block
 
     #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
-
+        
     for (int ij = 0; ij < pd_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -1112,6 +1131,7 @@ computeTCODValues(const             CMolecule& molecule,
         const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
         const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
         const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
+
         const auto a0 = i % 3;
 
         const auto b0 = d_cart_inds[j % 6][0];
@@ -1127,6 +1147,8 @@ computeTCODValues(const             CMolecule& molecule,
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
         const auto zeta = a_i + a_j;
+
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
         // product of density and cart-sph transformation coefficients
 
@@ -1155,6 +1177,12 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_pd++;
+            continue;
+        }
+        
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -1162,6 +1190,12 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
+            const auto N_c = points_info[c + npoints * 8];
+
+            const double n_c[3] = {nx_c, ny_c, nz_c};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1184,18 +1218,14 @@ computeTCODValues(const             CMolecule& molecule,
             const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double tco_p_m_val = 0.0;
 
-        double s_type_tco_d_val = 0.0;
+            for (int m = 0; m < 3; m++)
+                    {
+                        tco_p_m_val -= 2 * zeta_c * n_c[m] * N_c * p_c * S_ij_00 * (
 
-        for (int idx = 0; idx < 3; idx++)
-        {
-            auto m = idx;
-            auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
-
-                    (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
+                    GC[m] * G_ij_00 * (
 
                         0.5 / (zeta + zeta_c) * (
                             delta[b0][b1] * (GA_0)
@@ -1209,21 +1239,7 @@ computeTCODValues(const             CMolecule& molecule,
 
                     )
 
-                    + GC[m] * G_ij_00 * (
-
-                        0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[a0][b0] * delta[b1][n] + delta[a0][b1] * delta[b0][n] + delta[a0][n] * delta[b0][b1])
-                        )
-
-                        + 0.5 / (zeta + zeta_c) * (
-                            delta[b1][n] * (GA_0 * GB_0)
-                            + delta[b0][n] * (GA_0 * GB_1)
-                            + delta[a0][n] * (GB_0 * GB_1)
-                        )
-
-                    )
-
-                    + GC[n] * G_ij_00 * (
+                    + G_ij_00 * (
 
                         0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
                             (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1])
@@ -1237,22 +1253,11 @@ computeTCODValues(const             CMolecule& molecule,
 
                     )
 
-                    + G_ij_00 * (
-
-                        0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[b0][m] * delta[b1][n] + delta[b0][n] * delta[b1][m]) * (GA_0)
-                            + (delta[a0][m] * delta[b1][n] + delta[a0][n] * delta[b1][m]) * (GB_0)
-                            + (delta[a0][m] * delta[b0][n] + delta[a0][n] * delta[b0][m]) * (GB_1)
-                        )
-
-                    )
-
             );
 
             }
 
-            d_tilde_values_omp[thread_id][c] += s_type_tco_d_val * dens_coef_prod;
-
+            f_tilde_values_omp[thread_id][c] += tco_p_m_val * dens_coef_prod;
         }
     }
 
@@ -1260,7 +1265,7 @@ computeTCODValues(const             CMolecule& molecule,
     // P-F block
 
     #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
-
+        
     for (int ij = 0; ij < pf_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -1279,6 +1284,7 @@ computeTCODValues(const             CMolecule& molecule,
         const auto x_j = f_prim_info[j / 10 + f_prim_count * 2];
         const auto y_j = f_prim_info[j / 10 + f_prim_count * 3];
         const auto z_j = f_prim_info[j / 10 + f_prim_count * 4];
+
         const auto a0 = i % 3;
 
         const auto b0 = f_cart_inds[j % 10][0];
@@ -1295,6 +1301,8 @@ computeTCODValues(const             CMolecule& molecule,
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
         const auto zeta = a_i + a_j;
+
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
         // product of density and cart-sph transformation coefficients
 
@@ -1323,6 +1331,12 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_pf++;
+            continue;
+        }
+        
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -1330,6 +1344,12 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
+            const auto N_c = points_info[c + npoints * 8];
+
+            const double n_c[3] = {nx_c, ny_c, nz_c};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1353,18 +1373,14 @@ computeTCODValues(const             CMolecule& molecule,
             const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double tco_p_m_val = 0.0;
 
-        double s_type_tco_d_val = 0.0;
+            for (int m = 0; m < 3; m++)
+                    {
+                        tco_p_m_val -= 2 * zeta_c * n_c[m] * N_c * p_c * S_ij_00 * (
 
-        for (int idx = 0; idx < 3; idx++)
-        {
-            auto m = idx;
-            auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
-
-                    (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
+                    GC[m] * G_ij_00 * (
 
                         0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
                             (delta[a0][b0] * delta[b1][b2] + delta[a0][b1] * delta[b0][b2] + delta[a0][b2] * delta[b0][b1])
@@ -1385,25 +1401,7 @@ computeTCODValues(const             CMolecule& molecule,
 
                     )
 
-                    + GC[m] * G_ij_00 * (
-
-                        0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[b0][b1] * delta[b2][n] + delta[b0][b2] * delta[b1][n] + delta[b0][n] * delta[b1][b2]) * (GA_0)
-                            + (delta[a0][b1] * delta[b2][n] + delta[a0][b2] * delta[b1][n] + delta[a0][n] * delta[b1][b2]) * (GB_0)
-                            + (delta[a0][b0] * delta[b2][n] + delta[a0][b2] * delta[b0][n] + delta[a0][n] * delta[b0][b2]) * (GB_1)
-                            + (delta[a0][b0] * delta[b1][n] + delta[a0][b1] * delta[b0][n] + delta[a0][n] * delta[b0][b1]) * (GB_2)
-                        )
-
-                        + 0.5 / (zeta + zeta_c) * (
-                            delta[b2][n] * (GA_0 * GB_0 * GB_1)
-                            + delta[b1][n] * (GA_0 * GB_0 * GB_2)
-                            + delta[b0][n] * (GA_0 * GB_1 * GB_2)
-                            + delta[a0][n] * (GB_0 * GB_1 * GB_2)
-                        )
-
-                    )
-
-                    + GC[n] * G_ij_00 * (
+                    + G_ij_00 * (
 
                         0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
                             (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2]) * (GA_0)
@@ -1421,29 +1419,11 @@ computeTCODValues(const             CMolecule& molecule,
 
                     )
 
-                    + G_ij_00 * (
-
-                        0.125 / ( (zeta + zeta_c) * (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[a0][b0] * delta[b1][m] * delta[b2][n] + delta[a0][b0] * delta[b1][n] * delta[b2][m] + delta[a0][b1] * delta[b0][m] * delta[b2][n] + delta[a0][b1] * delta[b0][n] * delta[b2][m] + delta[a0][b2] * delta[b0][m] * delta[b1][n] + delta[a0][b2] * delta[b0][n] * delta[b1][m] + delta[a0][m] * delta[b0][b1] * delta[b2][n] + delta[a0][m] * delta[b0][b2] * delta[b1][n] + delta[a0][m] * delta[b0][n] * delta[b1][b2] + delta[a0][n] * delta[b0][b1] * delta[b2][m] + delta[a0][n] * delta[b0][b2] * delta[b1][m] + delta[a0][n] * delta[b0][m] * delta[b1][b2])
-                        )
-
-                        + 0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[b1][m] * delta[b2][n] + delta[b1][n] * delta[b2][m]) * (GA_0 * GB_0)
-                            + (delta[b0][m] * delta[b2][n] + delta[b0][n] * delta[b2][m]) * (GA_0 * GB_1)
-                            + (delta[b0][m] * delta[b1][n] + delta[b0][n] * delta[b1][m]) * (GA_0 * GB_2)
-                            + (delta[a0][m] * delta[b2][n] + delta[a0][n] * delta[b2][m]) * (GB_0 * GB_1)
-                            + (delta[a0][m] * delta[b1][n] + delta[a0][n] * delta[b1][m]) * (GB_0 * GB_2)
-                            + (delta[a0][m] * delta[b0][n] + delta[a0][n] * delta[b0][m]) * (GB_1 * GB_2)
-                        )
-
-                    )
-
             );
 
             }
 
-            d_tilde_values_omp[thread_id][c] += s_type_tco_d_val * dens_coef_prod;
-
+            f_tilde_values_omp[thread_id][c] += tco_p_m_val * dens_coef_prod;
         }
     }
 
@@ -1451,7 +1431,7 @@ computeTCODValues(const             CMolecule& molecule,
     // D-D block
 
     #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
-
+        
     for (int ij = 0; ij < dd_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -1470,6 +1450,7 @@ computeTCODValues(const             CMolecule& molecule,
         const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
         const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
         const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
+
         const auto a0 = d_cart_inds[i % 6][0];
         const auto a1 = d_cart_inds[i % 6][1];
 
@@ -1486,6 +1467,8 @@ computeTCODValues(const             CMolecule& molecule,
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
         const auto zeta = a_i + a_j;
+
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
         // product of density and cart-sph transformation coefficients
 
@@ -1514,6 +1497,12 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_dd++;
+            continue;
+        }
+        
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -1521,6 +1510,12 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
+            const auto N_c = points_info[c + npoints * 8];
+
+            const double n_c[3] = {nx_c, ny_c, nz_c};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1544,18 +1539,14 @@ computeTCODValues(const             CMolecule& molecule,
             const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double tco_p_m_val = 0.0;
 
-        double s_type_tco_d_val = 0.0;
+            for (int m = 0; m < 3; m++)
+                    {
+                        tco_p_m_val -= 2 * zeta_c * n_c[m] * N_c * p_c * S_ij_00 * (
 
-        for (int idx = 0; idx < 3; idx++)
-        {
-            auto m = idx;
-            auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
-
-                    (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
+                    GC[m] * G_ij_00 * (
 
                         0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
                             (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0])
@@ -1576,25 +1567,7 @@ computeTCODValues(const             CMolecule& molecule,
 
                     )
 
-                    + GC[m] * G_ij_00 * (
-
-                        0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[a1][b0] * delta[b1][n] + delta[a1][b1] * delta[b0][n] + delta[a1][n] * delta[b0][b1]) * (GA_0)
-                            + (delta[a0][b0] * delta[b1][n] + delta[a0][b1] * delta[b0][n] + delta[a0][n] * delta[b0][b1]) * (GA_1)
-                            + (delta[a0][a1] * delta[b1][n] + delta[a0][b1] * delta[a1][n] + delta[a0][n] * delta[a1][b1]) * (GB_0)
-                            + (delta[a0][a1] * delta[b0][n] + delta[a0][b0] * delta[a1][n] + delta[a0][n] * delta[a1][b0]) * (GB_1)
-                        )
-
-                        + 0.5 / (zeta + zeta_c) * (
-                            delta[b1][n] * (GA_0 * GA_1 * GB_0)
-                            + delta[b0][n] * (GA_0 * GA_1 * GB_1)
-                            + delta[a1][n] * (GA_0 * GB_0 * GB_1)
-                            + delta[a0][n] * (GA_1 * GB_0 * GB_1)
-                        )
-
-                    )
-
-                    + GC[n] * G_ij_00 * (
+                    + G_ij_00 * (
 
                         0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
                             (delta[a1][b0] * delta[b1][m] + delta[a1][b1] * delta[b0][m] + delta[a1][m] * delta[b0][b1]) * (GA_0)
@@ -1612,29 +1585,11 @@ computeTCODValues(const             CMolecule& molecule,
 
                     )
 
-                    + G_ij_00 * (
-
-                        0.125 / ( (zeta + zeta_c) * (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[a0][a1] * delta[b0][m] * delta[b1][n] + delta[a0][a1] * delta[b0][n] * delta[b1][m] + delta[a0][b0] * delta[a1][m] * delta[b1][n] + delta[a0][b0] * delta[a1][n] * delta[b1][m] + delta[a0][b1] * delta[a1][m] * delta[b0][n] + delta[a0][b1] * delta[a1][n] * delta[b0][m] + delta[a0][m] * delta[a1][b0] * delta[b1][n] + delta[a0][m] * delta[a1][b1] * delta[b0][n] + delta[a0][m] * delta[a1][n] * delta[b0][b1] + delta[a0][n] * delta[a1][b0] * delta[b1][m] + delta[a0][n] * delta[a1][b1] * delta[b0][m] + delta[a0][n] * delta[a1][m] * delta[b0][b1])
-                        )
-
-                        + 0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[b0][m] * delta[b1][n] + delta[b0][n] * delta[b1][m]) * (GA_0 * GA_1)
-                            + (delta[a1][m] * delta[b1][n] + delta[a1][n] * delta[b1][m]) * (GA_0 * GB_0)
-                            + (delta[a1][m] * delta[b0][n] + delta[a1][n] * delta[b0][m]) * (GA_0 * GB_1)
-                            + (delta[a0][m] * delta[b1][n] + delta[a0][n] * delta[b1][m]) * (GA_1 * GB_0)
-                            + (delta[a0][m] * delta[b0][n] + delta[a0][n] * delta[b0][m]) * (GA_1 * GB_1)
-                            + (delta[a0][m] * delta[a1][n] + delta[a0][n] * delta[a1][m]) * (GB_0 * GB_1)
-                        )
-
-                    )
-
             );
 
             }
 
-            d_tilde_values_omp[thread_id][c] += s_type_tco_d_val * dens_coef_prod;
-
+            f_tilde_values_omp[thread_id][c] += tco_p_m_val * dens_coef_prod;
         }
     }
 
@@ -1642,7 +1597,7 @@ computeTCODValues(const             CMolecule& molecule,
     // D-F block
 
     #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
-
+        
     for (int ij = 0; ij < df_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -1661,6 +1616,7 @@ computeTCODValues(const             CMolecule& molecule,
         const auto x_j = f_prim_info[j / 10 + f_prim_count * 2];
         const auto y_j = f_prim_info[j / 10 + f_prim_count * 3];
         const auto z_j = f_prim_info[j / 10 + f_prim_count * 4];
+
         const auto a0 = d_cart_inds[i % 6][0];
         const auto a1 = d_cart_inds[i % 6][1];
 
@@ -1678,6 +1634,8 @@ computeTCODValues(const             CMolecule& molecule,
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
         const auto zeta = a_i + a_j;
+
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
         // product of density and cart-sph transformation coefficients
 
@@ -1706,6 +1664,12 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_df++;
+            continue;
+        }
+        
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -1713,6 +1677,12 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
+            const auto N_c = points_info[c + npoints * 8];
+
+            const double n_c[3] = {nx_c, ny_c, nz_c};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1737,18 +1707,14 @@ computeTCODValues(const             CMolecule& molecule,
             const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double tco_p_m_val = 0.0;
 
-        double s_type_tco_d_val = 0.0;
+            for (int m = 0; m < 3; m++)
+                    {
+                        tco_p_m_val -= 2 * zeta_c * n_c[m] * N_c * p_c * S_ij_00 * (
 
-        for (int idx = 0; idx < 3; idx++)
-        {
-            auto m = idx;
-            auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
-
-                    (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
+                    GC[m] * G_ij_00 * (
 
                         0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
                             (delta[a1][b0] * delta[b1][b2] + delta[a1][b1] * delta[b0][b2] + delta[a1][b2] * delta[b0][b1]) * (GA_0)
@@ -1777,36 +1743,7 @@ computeTCODValues(const             CMolecule& molecule,
 
                     )
 
-                    + GC[m] * G_ij_00 * (
-
-                        0.125 / ( (zeta + zeta_c) * (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[a0][a1] * delta[b0][b1] * delta[b2][n] + delta[a0][a1] * delta[b0][b2] * delta[b1][n] + delta[a0][a1] * delta[b0][n] * delta[b1][b2] + delta[a0][b0] * delta[a1][b1] * delta[b2][n] + delta[a0][b0] * delta[a1][b2] * delta[b1][n] + delta[a0][b0] * delta[a1][n] * delta[b1][b2] + delta[a0][b1] * delta[a1][b0] * delta[b2][n] + delta[a0][b1] * delta[a1][b2] * delta[b0][n] + delta[a0][b1] * delta[a1][n] * delta[b0][b2] + delta[a0][b2] * delta[a1][b0] * delta[b1][n] + delta[a0][b2] * delta[a1][b1] * delta[b0][n] + delta[a0][b2] * delta[a1][n] * delta[b0][b1] + delta[a0][n] * delta[a1][b0] * delta[b1][b2] + delta[a0][n] * delta[a1][b1] * delta[b0][b2] + delta[a0][n] * delta[a1][b2] * delta[b0][b1])
-                        )
-
-                        + 0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[b0][b1] * delta[b2][n] + delta[b0][b2] * delta[b1][n] + delta[b0][n] * delta[b1][b2]) * (GA_0 * GA_1)
-                            + (delta[a1][b1] * delta[b2][n] + delta[a1][b2] * delta[b1][n] + delta[a1][n] * delta[b1][b2]) * (GA_0 * GB_0)
-                            + (delta[a1][b0] * delta[b2][n] + delta[a1][b2] * delta[b0][n] + delta[a1][n] * delta[b0][b2]) * (GA_0 * GB_1)
-                            + (delta[a1][b0] * delta[b1][n] + delta[a1][b1] * delta[b0][n] + delta[a1][n] * delta[b0][b1]) * (GA_0 * GB_2)
-                            + (delta[a0][b1] * delta[b2][n] + delta[a0][b2] * delta[b1][n] + delta[a0][n] * delta[b1][b2]) * (GA_1 * GB_0)
-                            + (delta[a0][b0] * delta[b2][n] + delta[a0][b2] * delta[b0][n] + delta[a0][n] * delta[b0][b2]) * (GA_1 * GB_1)
-                            + (delta[a0][b0] * delta[b1][n] + delta[a0][b1] * delta[b0][n] + delta[a0][n] * delta[b0][b1]) * (GA_1 * GB_2)
-                            + (delta[a0][a1] * delta[b2][n] + delta[a0][b2] * delta[a1][n] + delta[a0][n] * delta[a1][b2]) * (GB_0 * GB_1)
-                            + (delta[a0][a1] * delta[b1][n] + delta[a0][b1] * delta[a1][n] + delta[a0][n] * delta[a1][b1]) * (GB_0 * GB_2)
-                            + (delta[a0][a1] * delta[b0][n] + delta[a0][b0] * delta[a1][n] + delta[a0][n] * delta[a1][b0]) * (GB_1 * GB_2)
-                        )
-
-                        + 0.5 / (zeta + zeta_c) * (
-                            delta[b2][n] * (GA_0 * GA_1 * GB_0 * GB_1)
-                            + delta[b1][n] * (GA_0 * GA_1 * GB_0 * GB_2)
-                            + delta[b0][n] * (GA_0 * GA_1 * GB_1 * GB_2)
-                            + delta[a1][n] * (GA_0 * GB_0 * GB_1 * GB_2)
-                            + delta[a0][n] * (GA_1 * GB_0 * GB_1 * GB_2)
-                        )
-
-                    )
-
-                    + GC[n] * G_ij_00 * (
+                    + G_ij_00 * (
 
                         0.125 / ( (zeta + zeta_c) * (zeta + zeta_c) * (zeta + zeta_c) ) * (
                             (delta[a0][a1] * delta[b0][b1] * delta[b2][m] + delta[a0][a1] * delta[b0][b2] * delta[b1][m] + delta[a0][a1] * delta[b0][m] * delta[b1][b2] + delta[a0][b0] * delta[a1][b1] * delta[b2][m] + delta[a0][b0] * delta[a1][b2] * delta[b1][m] + delta[a0][b0] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][b0] * delta[b2][m] + delta[a0][b1] * delta[a1][b2] * delta[b0][m] + delta[a0][b1] * delta[a1][m] * delta[b0][b2] + delta[a0][b2] * delta[a1][b0] * delta[b1][m] + delta[a0][b2] * delta[a1][b1] * delta[b0][m] + delta[a0][b2] * delta[a1][m] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[b0][b2] + delta[a0][m] * delta[a1][b2] * delta[b0][b1])
@@ -1835,37 +1772,11 @@ computeTCODValues(const             CMolecule& molecule,
 
                     )
 
-                    + G_ij_00 * (
-
-                        0.125 / ( (zeta + zeta_c) * (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[a1][b0] * delta[b1][m] * delta[b2][n] + delta[a1][b0] * delta[b1][n] * delta[b2][m] + delta[a1][b1] * delta[b0][m] * delta[b2][n] + delta[a1][b1] * delta[b0][n] * delta[b2][m] + delta[a1][b2] * delta[b0][m] * delta[b1][n] + delta[a1][b2] * delta[b0][n] * delta[b1][m] + delta[a1][m] * delta[b0][b1] * delta[b2][n] + delta[a1][m] * delta[b0][b2] * delta[b1][n] + delta[a1][m] * delta[b0][n] * delta[b1][b2] + delta[a1][n] * delta[b0][b1] * delta[b2][m] + delta[a1][n] * delta[b0][b2] * delta[b1][m] + delta[a1][n] * delta[b0][m] * delta[b1][b2]) * (GA_0)
-                            + (delta[a0][b0] * delta[b1][m] * delta[b2][n] + delta[a0][b0] * delta[b1][n] * delta[b2][m] + delta[a0][b1] * delta[b0][m] * delta[b2][n] + delta[a0][b1] * delta[b0][n] * delta[b2][m] + delta[a0][b2] * delta[b0][m] * delta[b1][n] + delta[a0][b2] * delta[b0][n] * delta[b1][m] + delta[a0][m] * delta[b0][b1] * delta[b2][n] + delta[a0][m] * delta[b0][b2] * delta[b1][n] + delta[a0][m] * delta[b0][n] * delta[b1][b2] + delta[a0][n] * delta[b0][b1] * delta[b2][m] + delta[a0][n] * delta[b0][b2] * delta[b1][m] + delta[a0][n] * delta[b0][m] * delta[b1][b2]) * (GA_1)
-                            + (delta[a0][a1] * delta[b1][m] * delta[b2][n] + delta[a0][a1] * delta[b1][n] * delta[b2][m] + delta[a0][b1] * delta[a1][m] * delta[b2][n] + delta[a0][b1] * delta[a1][n] * delta[b2][m] + delta[a0][b2] * delta[a1][m] * delta[b1][n] + delta[a0][b2] * delta[a1][n] * delta[b1][m] + delta[a0][m] * delta[a1][b1] * delta[b2][n] + delta[a0][m] * delta[a1][b2] * delta[b1][n] + delta[a0][m] * delta[a1][n] * delta[b1][b2] + delta[a0][n] * delta[a1][b1] * delta[b2][m] + delta[a0][n] * delta[a1][b2] * delta[b1][m] + delta[a0][n] * delta[a1][m] * delta[b1][b2]) * (GB_0)
-                            + (delta[a0][a1] * delta[b0][m] * delta[b2][n] + delta[a0][a1] * delta[b0][n] * delta[b2][m] + delta[a0][b0] * delta[a1][m] * delta[b2][n] + delta[a0][b0] * delta[a1][n] * delta[b2][m] + delta[a0][b2] * delta[a1][m] * delta[b0][n] + delta[a0][b2] * delta[a1][n] * delta[b0][m] + delta[a0][m] * delta[a1][b0] * delta[b2][n] + delta[a0][m] * delta[a1][b2] * delta[b0][n] + delta[a0][m] * delta[a1][n] * delta[b0][b2] + delta[a0][n] * delta[a1][b0] * delta[b2][m] + delta[a0][n] * delta[a1][b2] * delta[b0][m] + delta[a0][n] * delta[a1][m] * delta[b0][b2]) * (GB_1)
-                            + (delta[a0][a1] * delta[b0][m] * delta[b1][n] + delta[a0][a1] * delta[b0][n] * delta[b1][m] + delta[a0][b0] * delta[a1][m] * delta[b1][n] + delta[a0][b0] * delta[a1][n] * delta[b1][m] + delta[a0][b1] * delta[a1][m] * delta[b0][n] + delta[a0][b1] * delta[a1][n] * delta[b0][m] + delta[a0][m] * delta[a1][b0] * delta[b1][n] + delta[a0][m] * delta[a1][b1] * delta[b0][n] + delta[a0][m] * delta[a1][n] * delta[b0][b1] + delta[a0][n] * delta[a1][b0] * delta[b1][m] + delta[a0][n] * delta[a1][b1] * delta[b0][m] + delta[a0][n] * delta[a1][m] * delta[b0][b1]) * (GB_2)
-                        )
-
-                        + 0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[b1][m] * delta[b2][n] + delta[b1][n] * delta[b2][m]) * (GA_0 * GA_1 * GB_0)
-                            + (delta[b0][m] * delta[b2][n] + delta[b0][n] * delta[b2][m]) * (GA_0 * GA_1 * GB_1)
-                            + (delta[b0][m] * delta[b1][n] + delta[b0][n] * delta[b1][m]) * (GA_0 * GA_1 * GB_2)
-                            + (delta[a1][m] * delta[b2][n] + delta[a1][n] * delta[b2][m]) * (GA_0 * GB_0 * GB_1)
-                            + (delta[a1][m] * delta[b1][n] + delta[a1][n] * delta[b1][m]) * (GA_0 * GB_0 * GB_2)
-                            + (delta[a1][m] * delta[b0][n] + delta[a1][n] * delta[b0][m]) * (GA_0 * GB_1 * GB_2)
-                            + (delta[a0][m] * delta[b2][n] + delta[a0][n] * delta[b2][m]) * (GA_1 * GB_0 * GB_1)
-                            + (delta[a0][m] * delta[b1][n] + delta[a0][n] * delta[b1][m]) * (GA_1 * GB_0 * GB_2)
-                            + (delta[a0][m] * delta[b0][n] + delta[a0][n] * delta[b0][m]) * (GA_1 * GB_1 * GB_2)
-                            + (delta[a0][m] * delta[a1][n] + delta[a0][n] * delta[a1][m]) * (GB_0 * GB_1 * GB_2)
-                        )
-
-                    )
-
             );
 
             }
 
-            d_tilde_values_omp[thread_id][c] += s_type_tco_d_val * dens_coef_prod;
-
+            f_tilde_values_omp[thread_id][c] += tco_p_m_val * dens_coef_prod;
         }
     }
 
@@ -1873,7 +1784,7 @@ computeTCODValues(const             CMolecule& molecule,
     // F-F block
 
     #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
-
+        
     for (int ij = 0; ij < ff_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -1892,6 +1803,7 @@ computeTCODValues(const             CMolecule& molecule,
         const auto x_j = f_prim_info[j / 10 + f_prim_count * 2];
         const auto y_j = f_prim_info[j / 10 + f_prim_count * 3];
         const auto z_j = f_prim_info[j / 10 + f_prim_count * 4];
+
         const auto a0 = f_cart_inds[i % 10][0];
         const auto a1 = f_cart_inds[i % 10][1];
         const auto a2 = f_cart_inds[i % 10][2];
@@ -1910,6 +1822,8 @@ computeTCODValues(const             CMolecule& molecule,
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
         const auto zeta = a_i + a_j;
+
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
         // product of density and cart-sph transformation coefficients
 
@@ -1938,6 +1852,12 @@ computeTCODValues(const             CMolecule& molecule,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        if (N_max * S_ij_00_norm < tco_tol) {
+            #pragma omp atomic
+            screened_ff++;
+            continue;
+        }
+        
         for (int c = 0; c < npoints; c++)
         {  
             const auto x_c = points_info[c + npoints * 0];
@@ -1945,6 +1865,12 @@ computeTCODValues(const             CMolecule& molecule,
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
+            const auto N_c = points_info[c + npoints * 8];
+
+            const double n_c[3] = {nx_c, ny_c, nz_c};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                 (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1970,18 +1896,14 @@ computeTCODValues(const             CMolecule& molecule,
             const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double tco_p_m_val = 0.0;
 
-        double s_type_tco_d_val = 0.0;
+            for (int m = 0; m < 3; m++)
+                    {
+                        tco_p_m_val -= 2 * zeta_c * n_c[m] * N_c * p_c * S_ij_00 * (
 
-        for (int idx = 0; idx < 3; idx++)
-        {
-            auto m = idx;
-            auto n = idx;
 
-            s_type_tco_d_val -= S_ij_00 * p_c * (
-
-                    (GC[n] * GC[m] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[n][m] * G_ij_00) * (
+                    GC[m] * G_ij_00 * (
 
                         0.125 / ( (zeta + zeta_c) * (zeta + zeta_c) * (zeta + zeta_c) ) * (
                             (delta[a0][a1] * delta[a2][b0] * delta[b1][b2] + delta[a0][a1] * delta[a2][b1] * delta[b0][b2] + delta[a0][a1] * delta[a2][b2] * delta[b0][b1] + delta[a0][a2] * delta[a1][b0] * delta[b1][b2] + delta[a0][a2] * delta[a1][b1] * delta[b0][b2] + delta[a0][a2] * delta[a1][b2] * delta[b0][b1] + delta[a0][b0] * delta[a1][a2] * delta[b1][b2] + delta[a0][b0] * delta[a1][b1] * delta[a2][b2] + delta[a0][b0] * delta[a1][b2] * delta[a2][b1] + delta[a0][b1] * delta[a1][a2] * delta[b0][b2] + delta[a0][b1] * delta[a1][b0] * delta[a2][b2] + delta[a0][b1] * delta[a1][b2] * delta[a2][b0] + delta[a0][b2] * delta[a1][a2] * delta[b0][b1] + delta[a0][b2] * delta[a1][b0] * delta[a2][b1] + delta[a0][b2] * delta[a1][b1] * delta[a2][b0])
@@ -2029,52 +1951,7 @@ computeTCODValues(const             CMolecule& molecule,
 
                     )
 
-                    + GC[m] * G_ij_00 * (
-
-                        0.125 / ( (zeta + zeta_c) * (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[a1][a2] * delta[b0][b1] * delta[b2][n] + delta[a1][a2] * delta[b0][b2] * delta[b1][n] + delta[a1][a2] * delta[b0][n] * delta[b1][b2] + delta[a1][b0] * delta[a2][b1] * delta[b2][n] + delta[a1][b0] * delta[a2][b2] * delta[b1][n] + delta[a1][b0] * delta[a2][n] * delta[b1][b2] + delta[a1][b1] * delta[a2][b0] * delta[b2][n] + delta[a1][b1] * delta[a2][b2] * delta[b0][n] + delta[a1][b1] * delta[a2][n] * delta[b0][b2] + delta[a1][b2] * delta[a2][b0] * delta[b1][n] + delta[a1][b2] * delta[a2][b1] * delta[b0][n] + delta[a1][b2] * delta[a2][n] * delta[b0][b1] + delta[a1][n] * delta[a2][b0] * delta[b1][b2] + delta[a1][n] * delta[a2][b1] * delta[b0][b2] + delta[a1][n] * delta[a2][b2] * delta[b0][b1]) * (GA_0)
-                            + (delta[a0][a2] * delta[b0][b1] * delta[b2][n] + delta[a0][a2] * delta[b0][b2] * delta[b1][n] + delta[a0][a2] * delta[b0][n] * delta[b1][b2] + delta[a0][b0] * delta[a2][b1] * delta[b2][n] + delta[a0][b0] * delta[a2][b2] * delta[b1][n] + delta[a0][b0] * delta[a2][n] * delta[b1][b2] + delta[a0][b1] * delta[a2][b0] * delta[b2][n] + delta[a0][b1] * delta[a2][b2] * delta[b0][n] + delta[a0][b1] * delta[a2][n] * delta[b0][b2] + delta[a0][b2] * delta[a2][b0] * delta[b1][n] + delta[a0][b2] * delta[a2][b1] * delta[b0][n] + delta[a0][b2] * delta[a2][n] * delta[b0][b1] + delta[a0][n] * delta[a2][b0] * delta[b1][b2] + delta[a0][n] * delta[a2][b1] * delta[b0][b2] + delta[a0][n] * delta[a2][b2] * delta[b0][b1]) * (GA_1)
-                            + (delta[a0][a1] * delta[b0][b1] * delta[b2][n] + delta[a0][a1] * delta[b0][b2] * delta[b1][n] + delta[a0][a1] * delta[b0][n] * delta[b1][b2] + delta[a0][b0] * delta[a1][b1] * delta[b2][n] + delta[a0][b0] * delta[a1][b2] * delta[b1][n] + delta[a0][b0] * delta[a1][n] * delta[b1][b2] + delta[a0][b1] * delta[a1][b0] * delta[b2][n] + delta[a0][b1] * delta[a1][b2] * delta[b0][n] + delta[a0][b1] * delta[a1][n] * delta[b0][b2] + delta[a0][b2] * delta[a1][b0] * delta[b1][n] + delta[a0][b2] * delta[a1][b1] * delta[b0][n] + delta[a0][b2] * delta[a1][n] * delta[b0][b1] + delta[a0][n] * delta[a1][b0] * delta[b1][b2] + delta[a0][n] * delta[a1][b1] * delta[b0][b2] + delta[a0][n] * delta[a1][b2] * delta[b0][b1]) * (GA_2)
-                            + (delta[a0][a1] * delta[a2][b1] * delta[b2][n] + delta[a0][a1] * delta[a2][b2] * delta[b1][n] + delta[a0][a1] * delta[a2][n] * delta[b1][b2] + delta[a0][a2] * delta[a1][b1] * delta[b2][n] + delta[a0][a2] * delta[a1][b2] * delta[b1][n] + delta[a0][a2] * delta[a1][n] * delta[b1][b2] + delta[a0][b1] * delta[a1][a2] * delta[b2][n] + delta[a0][b1] * delta[a1][b2] * delta[a2][n] + delta[a0][b1] * delta[a1][n] * delta[a2][b2] + delta[a0][b2] * delta[a1][a2] * delta[b1][n] + delta[a0][b2] * delta[a1][b1] * delta[a2][n] + delta[a0][b2] * delta[a1][n] * delta[a2][b1] + delta[a0][n] * delta[a1][a2] * delta[b1][b2] + delta[a0][n] * delta[a1][b1] * delta[a2][b2] + delta[a0][n] * delta[a1][b2] * delta[a2][b1]) * (GB_0)
-                            + (delta[a0][a1] * delta[a2][b0] * delta[b2][n] + delta[a0][a1] * delta[a2][b2] * delta[b0][n] + delta[a0][a1] * delta[a2][n] * delta[b0][b2] + delta[a0][a2] * delta[a1][b0] * delta[b2][n] + delta[a0][a2] * delta[a1][b2] * delta[b0][n] + delta[a0][a2] * delta[a1][n] * delta[b0][b2] + delta[a0][b0] * delta[a1][a2] * delta[b2][n] + delta[a0][b0] * delta[a1][b2] * delta[a2][n] + delta[a0][b0] * delta[a1][n] * delta[a2][b2] + delta[a0][b2] * delta[a1][a2] * delta[b0][n] + delta[a0][b2] * delta[a1][b0] * delta[a2][n] + delta[a0][b2] * delta[a1][n] * delta[a2][b0] + delta[a0][n] * delta[a1][a2] * delta[b0][b2] + delta[a0][n] * delta[a1][b0] * delta[a2][b2] + delta[a0][n] * delta[a1][b2] * delta[a2][b0]) * (GB_1)
-                            + (delta[a0][a1] * delta[a2][b0] * delta[b1][n] + delta[a0][a1] * delta[a2][b1] * delta[b0][n] + delta[a0][a1] * delta[a2][n] * delta[b0][b1] + delta[a0][a2] * delta[a1][b0] * delta[b1][n] + delta[a0][a2] * delta[a1][b1] * delta[b0][n] + delta[a0][a2] * delta[a1][n] * delta[b0][b1] + delta[a0][b0] * delta[a1][a2] * delta[b1][n] + delta[a0][b0] * delta[a1][b1] * delta[a2][n] + delta[a0][b0] * delta[a1][n] * delta[a2][b1] + delta[a0][b1] * delta[a1][a2] * delta[b0][n] + delta[a0][b1] * delta[a1][b0] * delta[a2][n] + delta[a0][b1] * delta[a1][n] * delta[a2][b0] + delta[a0][n] * delta[a1][a2] * delta[b0][b1] + delta[a0][n] * delta[a1][b0] * delta[a2][b1] + delta[a0][n] * delta[a1][b1] * delta[a2][b0]) * (GB_2)
-                        )
-
-                        + 0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[b0][b1] * delta[b2][n] + delta[b0][b2] * delta[b1][n] + delta[b0][n] * delta[b1][b2]) * (GA_0 * GA_1 * GA_2)
-                            + (delta[a2][b1] * delta[b2][n] + delta[a2][b2] * delta[b1][n] + delta[a2][n] * delta[b1][b2]) * (GA_0 * GA_1 * GB_0)
-                            + (delta[a2][b0] * delta[b2][n] + delta[a2][b2] * delta[b0][n] + delta[a2][n] * delta[b0][b2]) * (GA_0 * GA_1 * GB_1)
-                            + (delta[a2][b0] * delta[b1][n] + delta[a2][b1] * delta[b0][n] + delta[a2][n] * delta[b0][b1]) * (GA_0 * GA_1 * GB_2)
-                            + (delta[a1][b1] * delta[b2][n] + delta[a1][b2] * delta[b1][n] + delta[a1][n] * delta[b1][b2]) * (GA_0 * GA_2 * GB_0)
-                            + (delta[a1][b0] * delta[b2][n] + delta[a1][b2] * delta[b0][n] + delta[a1][n] * delta[b0][b2]) * (GA_0 * GA_2 * GB_1)
-                            + (delta[a1][b0] * delta[b1][n] + delta[a1][b1] * delta[b0][n] + delta[a1][n] * delta[b0][b1]) * (GA_0 * GA_2 * GB_2)
-                            + (delta[a1][a2] * delta[b2][n] + delta[a1][b2] * delta[a2][n] + delta[a1][n] * delta[a2][b2]) * (GA_0 * GB_0 * GB_1)
-                            + (delta[a1][a2] * delta[b1][n] + delta[a1][b1] * delta[a2][n] + delta[a1][n] * delta[a2][b1]) * (GA_0 * GB_0 * GB_2)
-                            + (delta[a1][a2] * delta[b0][n] + delta[a1][b0] * delta[a2][n] + delta[a1][n] * delta[a2][b0]) * (GA_0 * GB_1 * GB_2)
-                            + (delta[a0][b1] * delta[b2][n] + delta[a0][b2] * delta[b1][n] + delta[a0][n] * delta[b1][b2]) * (GA_1 * GA_2 * GB_0)
-                            + (delta[a0][b0] * delta[b2][n] + delta[a0][b2] * delta[b0][n] + delta[a0][n] * delta[b0][b2]) * (GA_1 * GA_2 * GB_1)
-                            + (delta[a0][b0] * delta[b1][n] + delta[a0][b1] * delta[b0][n] + delta[a0][n] * delta[b0][b1]) * (GA_1 * GA_2 * GB_2)
-                            + (delta[a0][a2] * delta[b2][n] + delta[a0][b2] * delta[a2][n] + delta[a0][n] * delta[a2][b2]) * (GA_1 * GB_0 * GB_1)
-                            + (delta[a0][a2] * delta[b1][n] + delta[a0][b1] * delta[a2][n] + delta[a0][n] * delta[a2][b1]) * (GA_1 * GB_0 * GB_2)
-                            + (delta[a0][a2] * delta[b0][n] + delta[a0][b0] * delta[a2][n] + delta[a0][n] * delta[a2][b0]) * (GA_1 * GB_1 * GB_2)
-                            + (delta[a0][a1] * delta[b2][n] + delta[a0][b2] * delta[a1][n] + delta[a0][n] * delta[a1][b2]) * (GA_2 * GB_0 * GB_1)
-                            + (delta[a0][a1] * delta[b1][n] + delta[a0][b1] * delta[a1][n] + delta[a0][n] * delta[a1][b1]) * (GA_2 * GB_0 * GB_2)
-                            + (delta[a0][a1] * delta[b0][n] + delta[a0][b0] * delta[a1][n] + delta[a0][n] * delta[a1][b0]) * (GA_2 * GB_1 * GB_2)
-                            + (delta[a0][a1] * delta[a2][n] + delta[a0][a2] * delta[a1][n] + delta[a0][n] * delta[a1][a2]) * (GB_0 * GB_1 * GB_2)
-                        )
-
-                        + 0.5 / (zeta + zeta_c) * (
-                            delta[b2][n] * (GA_0 * GA_1 * GA_2 * GB_0 * GB_1)
-                            + delta[b1][n] * (GA_0 * GA_1 * GA_2 * GB_0 * GB_2)
-                            + delta[b0][n] * (GA_0 * GA_1 * GA_2 * GB_1 * GB_2)
-                            + delta[a2][n] * (GA_0 * GA_1 * GB_0 * GB_1 * GB_2)
-                            + delta[a1][n] * (GA_0 * GA_2 * GB_0 * GB_1 * GB_2)
-                            + delta[a0][n] * (GA_1 * GA_2 * GB_0 * GB_1 * GB_2)
-                        )
-
-                    )
-
-                    + GC[n] * G_ij_00 * (
+                    + G_ij_00 * (
 
                         0.125 / ( (zeta + zeta_c) * (zeta + zeta_c) * (zeta + zeta_c) ) * (
                             (delta[a1][a2] * delta[b0][b1] * delta[b2][m] + delta[a1][a2] * delta[b0][b2] * delta[b1][m] + delta[a1][a2] * delta[b0][m] * delta[b1][b2] + delta[a1][b0] * delta[a2][b1] * delta[b2][m] + delta[a1][b0] * delta[a2][b2] * delta[b1][m] + delta[a1][b0] * delta[a2][m] * delta[b1][b2] + delta[a1][b1] * delta[a2][b0] * delta[b2][m] + delta[a1][b1] * delta[a2][b2] * delta[b0][m] + delta[a1][b1] * delta[a2][m] * delta[b0][b2] + delta[a1][b2] * delta[a2][b0] * delta[b1][m] + delta[a1][b2] * delta[a2][b1] * delta[b0][m] + delta[a1][b2] * delta[a2][m] * delta[b0][b1] + delta[a1][m] * delta[a2][b0] * delta[b1][b2] + delta[a1][m] * delta[a2][b1] * delta[b0][b2] + delta[a1][m] * delta[a2][b2] * delta[b0][b1]) * (GA_0)
@@ -2119,72 +1996,41 @@ computeTCODValues(const             CMolecule& molecule,
 
                     )
 
-                    + G_ij_00 * (
-
-                        0.0625 / ( (zeta + zeta_c) * (zeta + zeta_c) * (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[a0][a1] * delta[a2][b0] * delta[b1][m] * delta[b2][n] + delta[a0][a1] * delta[a2][b0] * delta[b1][n] * delta[b2][m] + delta[a0][a1] * delta[a2][b1] * delta[b0][m] * delta[b2][n] + delta[a0][a1] * delta[a2][b1] * delta[b0][n] * delta[b2][m] + delta[a0][a1] * delta[a2][b2] * delta[b0][m] * delta[b1][n] + delta[a0][a1] * delta[a2][b2] * delta[b0][n] * delta[b1][m] + delta[a0][a1] * delta[a2][m] * delta[b0][b1] * delta[b2][n] + delta[a0][a1] * delta[a2][m] * delta[b0][b2] * delta[b1][n] + delta[a0][a1] * delta[a2][m] * delta[b0][n] * delta[b1][b2] + delta[a0][a1] * delta[a2][n] * delta[b0][b1] * delta[b2][m] + delta[a0][a1] * delta[a2][n] * delta[b0][b2] * delta[b1][m] + delta[a0][a1] * delta[a2][n] * delta[b0][m] * delta[b1][b2] + delta[a0][a2] * delta[a1][b0] * delta[b1][m] * delta[b2][n] + delta[a0][a2] * delta[a1][b0] * delta[b1][n] * delta[b2][m] + delta[a0][a2] * delta[a1][b1] * delta[b0][m] * delta[b2][n] + delta[a0][a2] * delta[a1][b1] * delta[b0][n] * delta[b2][m] + delta[a0][a2] * delta[a1][b2] * delta[b0][m] * delta[b1][n] + delta[a0][a2] * delta[a1][b2] * delta[b0][n] * delta[b1][m] + delta[a0][a2] * delta[a1][m] * delta[b0][b1] * delta[b2][n] + delta[a0][a2] * delta[a1][m] * delta[b0][b2] * delta[b1][n] + delta[a0][a2] * delta[a1][m] * delta[b0][n] * delta[b1][b2] + delta[a0][a2] * delta[a1][n] * delta[b0][b1] * delta[b2][m] + delta[a0][a2] * delta[a1][n] * delta[b0][b2] * delta[b1][m] + delta[a0][a2] * delta[a1][n] * delta[b0][m] * delta[b1][b2] + delta[a0][b0] * delta[a1][a2] * delta[b1][m] * delta[b2][n] + delta[a0][b0] * delta[a1][a2] * delta[b1][n] * delta[b2][m] + delta[a0][b0] * delta[a1][b1] * delta[a2][m] * delta[b2][n] + delta[a0][b0] * delta[a1][b1] * delta[a2][n] * delta[b2][m] + delta[a0][b0] * delta[a1][b2] * delta[a2][m] * delta[b1][n] + delta[a0][b0] * delta[a1][b2] * delta[a2][n] * delta[b1][m] + delta[a0][b0] * delta[a1][m] * delta[a2][b1] * delta[b2][n] + delta[a0][b0] * delta[a1][m] * delta[a2][b2] * delta[b1][n] + delta[a0][b0] * delta[a1][m] * delta[a2][n] * delta[b1][b2] + delta[a0][b0] * delta[a1][n] * delta[a2][b1] * delta[b2][m] + delta[a0][b0] * delta[a1][n] * delta[a2][b2] * delta[b1][m] + delta[a0][b0] * delta[a1][n] * delta[a2][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][a2] * delta[b0][m] * delta[b2][n] + delta[a0][b1] * delta[a1][a2] * delta[b0][n] * delta[b2][m] + delta[a0][b1] * delta[a1][b0] * delta[a2][m] * delta[b2][n] + delta[a0][b1] * delta[a1][b0] * delta[a2][n] * delta[b2][m] + delta[a0][b1] * delta[a1][b2] * delta[a2][m] * delta[b0][n] + delta[a0][b1] * delta[a1][b2] * delta[a2][n] * delta[b0][m] + delta[a0][b1] * delta[a1][m] * delta[a2][b0] * delta[b2][n] + delta[a0][b1] * delta[a1][m] * delta[a2][b2] * delta[b0][n] + delta[a0][b1] * delta[a1][m] * delta[a2][n] * delta[b0][b2] + delta[a0][b1] * delta[a1][n] * delta[a2][b0] * delta[b2][m] + delta[a0][b1] * delta[a1][n] * delta[a2][b2] * delta[b0][m] + delta[a0][b1] * delta[a1][n] * delta[a2][m] * delta[b0][b2] + delta[a0][b2] * delta[a1][a2] * delta[b0][m] * delta[b1][n] + delta[a0][b2] * delta[a1][a2] * delta[b0][n] * delta[b1][m] + delta[a0][b2] * delta[a1][b0] * delta[a2][m] * delta[b1][n] + delta[a0][b2] * delta[a1][b0] * delta[a2][n] * delta[b1][m] + delta[a0][b2] * delta[a1][b1] * delta[a2][m] * delta[b0][n] + delta[a0][b2] * delta[a1][b1] * delta[a2][n] * delta[b0][m] + delta[a0][b2] * delta[a1][m] * delta[a2][b0] * delta[b1][n] + delta[a0][b2] * delta[a1][m] * delta[a2][b1] * delta[b0][n] + delta[a0][b2] * delta[a1][m] * delta[a2][n] * delta[b0][b1] + delta[a0][b2] * delta[a1][n] * delta[a2][b0] * delta[b1][m] + delta[a0][b2] * delta[a1][n] * delta[a2][b1] * delta[b0][m] + delta[a0][b2] * delta[a1][n] * delta[a2][m] * delta[b0][b1] + delta[a0][m] * delta[a1][a2] * delta[b0][b1] * delta[b2][n] + delta[a0][m] * delta[a1][a2] * delta[b0][b2] * delta[b1][n] + delta[a0][m] * delta[a1][a2] * delta[b0][n] * delta[b1][b2] + delta[a0][m] * delta[a1][b0] * delta[a2][b1] * delta[b2][n] + delta[a0][m] * delta[a1][b0] * delta[a2][b2] * delta[b1][n] + delta[a0][m] * delta[a1][b0] * delta[a2][n] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[a2][b0] * delta[b2][n] + delta[a0][m] * delta[a1][b1] * delta[a2][b2] * delta[b0][n] + delta[a0][m] * delta[a1][b1] * delta[a2][n] * delta[b0][b2] + delta[a0][m] * delta[a1][b2] * delta[a2][b0] * delta[b1][n] + delta[a0][m] * delta[a1][b2] * delta[a2][b1] * delta[b0][n] + delta[a0][m] * delta[a1][b2] * delta[a2][n] * delta[b0][b1] + delta[a0][m] * delta[a1][n] * delta[a2][b0] * delta[b1][b2] + delta[a0][m] * delta[a1][n] * delta[a2][b1] * delta[b0][b2] + delta[a0][m] * delta[a1][n] * delta[a2][b2] * delta[b0][b1] + delta[a0][n] * delta[a1][a2] * delta[b0][b1] * delta[b2][m] + delta[a0][n] * delta[a1][a2] * delta[b0][b2] * delta[b1][m] + delta[a0][n] * delta[a1][a2] * delta[b0][m] * delta[b1][b2] + delta[a0][n] * delta[a1][b0] * delta[a2][b1] * delta[b2][m] + delta[a0][n] * delta[a1][b0] * delta[a2][b2] * delta[b1][m] + delta[a0][n] * delta[a1][b0] * delta[a2][m] * delta[b1][b2] + delta[a0][n] * delta[a1][b1] * delta[a2][b0] * delta[b2][m] + delta[a0][n] * delta[a1][b1] * delta[a2][b2] * delta[b0][m] + delta[a0][n] * delta[a1][b1] * delta[a2][m] * delta[b0][b2] + delta[a0][n] * delta[a1][b2] * delta[a2][b0] * delta[b1][m] + delta[a0][n] * delta[a1][b2] * delta[a2][b1] * delta[b0][m] + delta[a0][n] * delta[a1][b2] * delta[a2][m] * delta[b0][b1] + delta[a0][n] * delta[a1][m] * delta[a2][b0] * delta[b1][b2] + delta[a0][n] * delta[a1][m] * delta[a2][b1] * delta[b0][b2] + delta[a0][n] * delta[a1][m] * delta[a2][b2] * delta[b0][b1])
-                        )
-
-                        + 0.125 / ( (zeta + zeta_c) * (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[a2][b0] * delta[b1][m] * delta[b2][n] + delta[a2][b0] * delta[b1][n] * delta[b2][m] + delta[a2][b1] * delta[b0][m] * delta[b2][n] + delta[a2][b1] * delta[b0][n] * delta[b2][m] + delta[a2][b2] * delta[b0][m] * delta[b1][n] + delta[a2][b2] * delta[b0][n] * delta[b1][m] + delta[a2][m] * delta[b0][b1] * delta[b2][n] + delta[a2][m] * delta[b0][b2] * delta[b1][n] + delta[a2][m] * delta[b0][n] * delta[b1][b2] + delta[a2][n] * delta[b0][b1] * delta[b2][m] + delta[a2][n] * delta[b0][b2] * delta[b1][m] + delta[a2][n] * delta[b0][m] * delta[b1][b2]) * (GA_0 * GA_1)
-                            + (delta[a1][b0] * delta[b1][m] * delta[b2][n] + delta[a1][b0] * delta[b1][n] * delta[b2][m] + delta[a1][b1] * delta[b0][m] * delta[b2][n] + delta[a1][b1] * delta[b0][n] * delta[b2][m] + delta[a1][b2] * delta[b0][m] * delta[b1][n] + delta[a1][b2] * delta[b0][n] * delta[b1][m] + delta[a1][m] * delta[b0][b1] * delta[b2][n] + delta[a1][m] * delta[b0][b2] * delta[b1][n] + delta[a1][m] * delta[b0][n] * delta[b1][b2] + delta[a1][n] * delta[b0][b1] * delta[b2][m] + delta[a1][n] * delta[b0][b2] * delta[b1][m] + delta[a1][n] * delta[b0][m] * delta[b1][b2]) * (GA_0 * GA_2)
-                            + (delta[a1][a2] * delta[b1][m] * delta[b2][n] + delta[a1][a2] * delta[b1][n] * delta[b2][m] + delta[a1][b1] * delta[a2][m] * delta[b2][n] + delta[a1][b1] * delta[a2][n] * delta[b2][m] + delta[a1][b2] * delta[a2][m] * delta[b1][n] + delta[a1][b2] * delta[a2][n] * delta[b1][m] + delta[a1][m] * delta[a2][b1] * delta[b2][n] + delta[a1][m] * delta[a2][b2] * delta[b1][n] + delta[a1][m] * delta[a2][n] * delta[b1][b2] + delta[a1][n] * delta[a2][b1] * delta[b2][m] + delta[a1][n] * delta[a2][b2] * delta[b1][m] + delta[a1][n] * delta[a2][m] * delta[b1][b2]) * (GA_0 * GB_0)
-                            + (delta[a1][a2] * delta[b0][m] * delta[b2][n] + delta[a1][a2] * delta[b0][n] * delta[b2][m] + delta[a1][b0] * delta[a2][m] * delta[b2][n] + delta[a1][b0] * delta[a2][n] * delta[b2][m] + delta[a1][b2] * delta[a2][m] * delta[b0][n] + delta[a1][b2] * delta[a2][n] * delta[b0][m] + delta[a1][m] * delta[a2][b0] * delta[b2][n] + delta[a1][m] * delta[a2][b2] * delta[b0][n] + delta[a1][m] * delta[a2][n] * delta[b0][b2] + delta[a1][n] * delta[a2][b0] * delta[b2][m] + delta[a1][n] * delta[a2][b2] * delta[b0][m] + delta[a1][n] * delta[a2][m] * delta[b0][b2]) * (GA_0 * GB_1)
-                            + (delta[a1][a2] * delta[b0][m] * delta[b1][n] + delta[a1][a2] * delta[b0][n] * delta[b1][m] + delta[a1][b0] * delta[a2][m] * delta[b1][n] + delta[a1][b0] * delta[a2][n] * delta[b1][m] + delta[a1][b1] * delta[a2][m] * delta[b0][n] + delta[a1][b1] * delta[a2][n] * delta[b0][m] + delta[a1][m] * delta[a2][b0] * delta[b1][n] + delta[a1][m] * delta[a2][b1] * delta[b0][n] + delta[a1][m] * delta[a2][n] * delta[b0][b1] + delta[a1][n] * delta[a2][b0] * delta[b1][m] + delta[a1][n] * delta[a2][b1] * delta[b0][m] + delta[a1][n] * delta[a2][m] * delta[b0][b1]) * (GA_0 * GB_2)
-                            + (delta[a0][b0] * delta[b1][m] * delta[b2][n] + delta[a0][b0] * delta[b1][n] * delta[b2][m] + delta[a0][b1] * delta[b0][m] * delta[b2][n] + delta[a0][b1] * delta[b0][n] * delta[b2][m] + delta[a0][b2] * delta[b0][m] * delta[b1][n] + delta[a0][b2] * delta[b0][n] * delta[b1][m] + delta[a0][m] * delta[b0][b1] * delta[b2][n] + delta[a0][m] * delta[b0][b2] * delta[b1][n] + delta[a0][m] * delta[b0][n] * delta[b1][b2] + delta[a0][n] * delta[b0][b1] * delta[b2][m] + delta[a0][n] * delta[b0][b2] * delta[b1][m] + delta[a0][n] * delta[b0][m] * delta[b1][b2]) * (GA_1 * GA_2)
-                            + (delta[a0][a2] * delta[b1][m] * delta[b2][n] + delta[a0][a2] * delta[b1][n] * delta[b2][m] + delta[a0][b1] * delta[a2][m] * delta[b2][n] + delta[a0][b1] * delta[a2][n] * delta[b2][m] + delta[a0][b2] * delta[a2][m] * delta[b1][n] + delta[a0][b2] * delta[a2][n] * delta[b1][m] + delta[a0][m] * delta[a2][b1] * delta[b2][n] + delta[a0][m] * delta[a2][b2] * delta[b1][n] + delta[a0][m] * delta[a2][n] * delta[b1][b2] + delta[a0][n] * delta[a2][b1] * delta[b2][m] + delta[a0][n] * delta[a2][b2] * delta[b1][m] + delta[a0][n] * delta[a2][m] * delta[b1][b2]) * (GA_1 * GB_0)
-                            + (delta[a0][a2] * delta[b0][m] * delta[b2][n] + delta[a0][a2] * delta[b0][n] * delta[b2][m] + delta[a0][b0] * delta[a2][m] * delta[b2][n] + delta[a0][b0] * delta[a2][n] * delta[b2][m] + delta[a0][b2] * delta[a2][m] * delta[b0][n] + delta[a0][b2] * delta[a2][n] * delta[b0][m] + delta[a0][m] * delta[a2][b0] * delta[b2][n] + delta[a0][m] * delta[a2][b2] * delta[b0][n] + delta[a0][m] * delta[a2][n] * delta[b0][b2] + delta[a0][n] * delta[a2][b0] * delta[b2][m] + delta[a0][n] * delta[a2][b2] * delta[b0][m] + delta[a0][n] * delta[a2][m] * delta[b0][b2]) * (GA_1 * GB_1)
-                            + (delta[a0][a2] * delta[b0][m] * delta[b1][n] + delta[a0][a2] * delta[b0][n] * delta[b1][m] + delta[a0][b0] * delta[a2][m] * delta[b1][n] + delta[a0][b0] * delta[a2][n] * delta[b1][m] + delta[a0][b1] * delta[a2][m] * delta[b0][n] + delta[a0][b1] * delta[a2][n] * delta[b0][m] + delta[a0][m] * delta[a2][b0] * delta[b1][n] + delta[a0][m] * delta[a2][b1] * delta[b0][n] + delta[a0][m] * delta[a2][n] * delta[b0][b1] + delta[a0][n] * delta[a2][b0] * delta[b1][m] + delta[a0][n] * delta[a2][b1] * delta[b0][m] + delta[a0][n] * delta[a2][m] * delta[b0][b1]) * (GA_1 * GB_2)
-                            + (delta[a0][a1] * delta[b1][m] * delta[b2][n] + delta[a0][a1] * delta[b1][n] * delta[b2][m] + delta[a0][b1] * delta[a1][m] * delta[b2][n] + delta[a0][b1] * delta[a1][n] * delta[b2][m] + delta[a0][b2] * delta[a1][m] * delta[b1][n] + delta[a0][b2] * delta[a1][n] * delta[b1][m] + delta[a0][m] * delta[a1][b1] * delta[b2][n] + delta[a0][m] * delta[a1][b2] * delta[b1][n] + delta[a0][m] * delta[a1][n] * delta[b1][b2] + delta[a0][n] * delta[a1][b1] * delta[b2][m] + delta[a0][n] * delta[a1][b2] * delta[b1][m] + delta[a0][n] * delta[a1][m] * delta[b1][b2]) * (GA_2 * GB_0)
-                            + (delta[a0][a1] * delta[b0][m] * delta[b2][n] + delta[a0][a1] * delta[b0][n] * delta[b2][m] + delta[a0][b0] * delta[a1][m] * delta[b2][n] + delta[a0][b0] * delta[a1][n] * delta[b2][m] + delta[a0][b2] * delta[a1][m] * delta[b0][n] + delta[a0][b2] * delta[a1][n] * delta[b0][m] + delta[a0][m] * delta[a1][b0] * delta[b2][n] + delta[a0][m] * delta[a1][b2] * delta[b0][n] + delta[a0][m] * delta[a1][n] * delta[b0][b2] + delta[a0][n] * delta[a1][b0] * delta[b2][m] + delta[a0][n] * delta[a1][b2] * delta[b0][m] + delta[a0][n] * delta[a1][m] * delta[b0][b2]) * (GA_2 * GB_1)
-                            + (delta[a0][a1] * delta[b0][m] * delta[b1][n] + delta[a0][a1] * delta[b0][n] * delta[b1][m] + delta[a0][b0] * delta[a1][m] * delta[b1][n] + delta[a0][b0] * delta[a1][n] * delta[b1][m] + delta[a0][b1] * delta[a1][m] * delta[b0][n] + delta[a0][b1] * delta[a1][n] * delta[b0][m] + delta[a0][m] * delta[a1][b0] * delta[b1][n] + delta[a0][m] * delta[a1][b1] * delta[b0][n] + delta[a0][m] * delta[a1][n] * delta[b0][b1] + delta[a0][n] * delta[a1][b0] * delta[b1][m] + delta[a0][n] * delta[a1][b1] * delta[b0][m] + delta[a0][n] * delta[a1][m] * delta[b0][b1]) * (GA_2 * GB_2)
-                            + (delta[a0][a1] * delta[a2][m] * delta[b2][n] + delta[a0][a1] * delta[a2][n] * delta[b2][m] + delta[a0][a2] * delta[a1][m] * delta[b2][n] + delta[a0][a2] * delta[a1][n] * delta[b2][m] + delta[a0][b2] * delta[a1][m] * delta[a2][n] + delta[a0][b2] * delta[a1][n] * delta[a2][m] + delta[a0][m] * delta[a1][a2] * delta[b2][n] + delta[a0][m] * delta[a1][b2] * delta[a2][n] + delta[a0][m] * delta[a1][n] * delta[a2][b2] + delta[a0][n] * delta[a1][a2] * delta[b2][m] + delta[a0][n] * delta[a1][b2] * delta[a2][m] + delta[a0][n] * delta[a1][m] * delta[a2][b2]) * (GB_0 * GB_1)
-                            + (delta[a0][a1] * delta[a2][m] * delta[b1][n] + delta[a0][a1] * delta[a2][n] * delta[b1][m] + delta[a0][a2] * delta[a1][m] * delta[b1][n] + delta[a0][a2] * delta[a1][n] * delta[b1][m] + delta[a0][b1] * delta[a1][m] * delta[a2][n] + delta[a0][b1] * delta[a1][n] * delta[a2][m] + delta[a0][m] * delta[a1][a2] * delta[b1][n] + delta[a0][m] * delta[a1][b1] * delta[a2][n] + delta[a0][m] * delta[a1][n] * delta[a2][b1] + delta[a0][n] * delta[a1][a2] * delta[b1][m] + delta[a0][n] * delta[a1][b1] * delta[a2][m] + delta[a0][n] * delta[a1][m] * delta[a2][b1]) * (GB_0 * GB_2)
-                            + (delta[a0][a1] * delta[a2][m] * delta[b0][n] + delta[a0][a1] * delta[a2][n] * delta[b0][m] + delta[a0][a2] * delta[a1][m] * delta[b0][n] + delta[a0][a2] * delta[a1][n] * delta[b0][m] + delta[a0][b0] * delta[a1][m] * delta[a2][n] + delta[a0][b0] * delta[a1][n] * delta[a2][m] + delta[a0][m] * delta[a1][a2] * delta[b0][n] + delta[a0][m] * delta[a1][b0] * delta[a2][n] + delta[a0][m] * delta[a1][n] * delta[a2][b0] + delta[a0][n] * delta[a1][a2] * delta[b0][m] + delta[a0][n] * delta[a1][b0] * delta[a2][m] + delta[a0][n] * delta[a1][m] * delta[a2][b0]) * (GB_1 * GB_2)
-                        )
-
-                        + 0.25 / ( (zeta + zeta_c) * (zeta + zeta_c) ) * (
-                            (delta[b1][m] * delta[b2][n] + delta[b1][n] * delta[b2][m]) * (GA_0 * GA_1 * GA_2 * GB_0)
-                            + (delta[b0][m] * delta[b2][n] + delta[b0][n] * delta[b2][m]) * (GA_0 * GA_1 * GA_2 * GB_1)
-                            + (delta[b0][m] * delta[b1][n] + delta[b0][n] * delta[b1][m]) * (GA_0 * GA_1 * GA_2 * GB_2)
-                            + (delta[a2][m] * delta[b2][n] + delta[a2][n] * delta[b2][m]) * (GA_0 * GA_1 * GB_0 * GB_1)
-                            + (delta[a2][m] * delta[b1][n] + delta[a2][n] * delta[b1][m]) * (GA_0 * GA_1 * GB_0 * GB_2)
-                            + (delta[a2][m] * delta[b0][n] + delta[a2][n] * delta[b0][m]) * (GA_0 * GA_1 * GB_1 * GB_2)
-                            + (delta[a1][m] * delta[b2][n] + delta[a1][n] * delta[b2][m]) * (GA_0 * GA_2 * GB_0 * GB_1)
-                            + (delta[a1][m] * delta[b1][n] + delta[a1][n] * delta[b1][m]) * (GA_0 * GA_2 * GB_0 * GB_2)
-                            + (delta[a1][m] * delta[b0][n] + delta[a1][n] * delta[b0][m]) * (GA_0 * GA_2 * GB_1 * GB_2)
-                            + (delta[a1][m] * delta[a2][n] + delta[a1][n] * delta[a2][m]) * (GA_0 * GB_0 * GB_1 * GB_2)
-                            + (delta[a0][m] * delta[b2][n] + delta[a0][n] * delta[b2][m]) * (GA_1 * GA_2 * GB_0 * GB_1)
-                            + (delta[a0][m] * delta[b1][n] + delta[a0][n] * delta[b1][m]) * (GA_1 * GA_2 * GB_0 * GB_2)
-                            + (delta[a0][m] * delta[b0][n] + delta[a0][n] * delta[b0][m]) * (GA_1 * GA_2 * GB_1 * GB_2)
-                            + (delta[a0][m] * delta[a2][n] + delta[a0][n] * delta[a2][m]) * (GA_1 * GB_0 * GB_1 * GB_2)
-                            + (delta[a0][m] * delta[a1][n] + delta[a0][n] * delta[a1][m]) * (GA_2 * GB_0 * GB_1 * GB_2)
-                        )
-
-                    )
-
             );
 
             }
 
-            d_tilde_values_omp[thread_id][c] += s_type_tco_d_val * dens_coef_prod;
-
+            f_tilde_values_omp[thread_id][c] += tco_p_m_val * dens_coef_prod;
         }
     }
 
     // auto-generated code ends here
 
-    std::vector<double> d_tilde_values(npoints, 0.0);
+    std::vector<double> f_tilde_values(npoints, 0.0);
 
     for (int thread_id = 0; thread_id < nthreads; thread_id++)
     {
         for (int c = 0; c < npoints; c++)
         {
-            d_tilde_values[c] += d_tilde_values_omp[thread_id][c];
+            f_tilde_values[c] += f_tilde_values_omp[thread_id][c];
         }
     }
 
-    return d_tilde_values;
+
+    // print screening statistics
+    std::cout << "computescreenedTCOPValues: screening statistics (screened / total pairs)\n";
+    std::cout << "  S-S: " << screened_ss << " / " << ss_prim_pair_count << "\n";
+    std::cout << "  S-P: " << screened_sp << " / " << sp_prim_pair_count << "\n";
+    std::cout << "  S-D: " << screened_sd << " / " << sd_prim_pair_count << "\n";
+    std::cout << "  S-F: " << screened_sf << " / " << sf_prim_pair_count << "\n";
+    std::cout << "  P-P: " << screened_pp << " / " << pp_prim_pair_count << "\n";
+    std::cout << "  P-D: " << screened_pd << " / " << pd_prim_pair_count << "\n";
+    std::cout << "  P-F: " << screened_pf << " / " << pf_prim_pair_count << "\n";
+    std::cout << "  D-D: " << screened_dd << " / " << dd_prim_pair_count << "\n";
+    std::cout << "  D-F: " << screened_df << " / " << df_prim_pair_count << "\n";
+    std::cout << "  F-F: " << screened_ff << " / " << ff_prim_pair_count << "\n";
+
+    return f_tilde_values;
 }
 
 }  // namespace onee

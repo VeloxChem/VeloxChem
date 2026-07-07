@@ -102,13 +102,21 @@ from .veloxchemlib import make_matrix
 from .veloxchemlib import make_matrices
 from .veloxchemlib import partition_atoms
 from .veloxchemlib import compute_tco_s_fock
+from .veloxchemlib import compute_screened_tco_s_fock
 from .veloxchemlib import compute_tco_s_values
+from .veloxchemlib import compute_screened_tco_s_values
 from .veloxchemlib import compute_tco_p_fock
+from .veloxchemlib import compute_screened_tco_p_fock
 from .veloxchemlib import compute_tco_p_values
+from .veloxchemlib import compute_screened_tco_p_values
 from .veloxchemlib import compute_tco_d_values
+from .veloxchemlib import compute_screened_tco_d_values
 from .veloxchemlib import compute_tco_f_values
+from .veloxchemlib import compute_screened_tco_f_values
 from .veloxchemlib import compute_tco_s_gradient
+from .veloxchemlib import compute_screened_tco_s_gradient
 from .veloxchemlib import compute_tco_p_gradient
+from .veloxchemlib import compute_screened_tco_p_gradient
 
 # C++ enums
 from .veloxchemlib import mat_t

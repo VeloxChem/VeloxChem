@@ -140,6 +140,7 @@ class ScfDriver:
         - discretization: The surface discretization method.
         - switching_thresh: The (I)SWIG switching function threshold.
         - r_ext: The extension radius for the outer cavity correction in angstrom.
+        - tco_tol: The screening tolerance for three-center overlap integrals.
         - dispersion: The flag for calculating D4 dispersion correction.
         - d4_energy: The D4 dispersion correction to energy.
         - electric_field: The static electric field.
@@ -268,6 +269,7 @@ class ScfDriver:
         self.discretization = 'fixed'
         self.switching_thresh = 1.0e-8
         self.r_ext = 0.0
+        self.tco_tol = self.conv_thresh * 1.0e8
 
         # solvation model
         self.solvation_model = None
@@ -378,6 +380,8 @@ class ScfDriver:
                 'switching_thresh': ('float', 'switching function threshold'),
                 'r_ext': 
                     ('float', 'extension radius for outer cavity correction in angstrom'),
+                'tco_tol':
+                    ('float', 'screening threshold for three-center overlap integrals'),
                 'solvation_model': ('str', 'solvation model'),
                 'cpcm_grid_per_sphere':
                     ('seq_fixed_int', 'number of C-PCM grid points per sphere'),
@@ -991,17 +995,20 @@ class ScfDriver:
         # set up gostshyp method by creating a surface tessellation
         if self._gostshyp:
             from .gostshyp import GostshypDriver
-            self._gostshyp_drv = GostshypDriver(molecule, basis,
-                    self.pressure, self.pressure_units, self.comm, self.ostream)
+            self._gostshyp_drv = GostshypDriver(molecule, 
+                                                basis,
+                                                self.pressure,
+                                                self.pressure_units,
+                                                self.tco_tol,
+                                                self.comm,
+                                                self.ostream)
 
-            tessellation_settings = {
-                'num_leb_points': self.num_leb_points,
-                'tssf': self.tssf,
-                'discretization': self.discretization,
-                'switching_thresh' : self.switching_thresh,
-                'filename': self.filename,
-                'r_ext': self.r_ext
-            }
+            tessellation_settings = {'num_leb_points'   : self.num_leb_points,
+                                     'tssf'             : self.tssf,
+                                     'discretization'   : self.discretization,
+                                     'switching_thresh' : self.switching_thresh,
+                                     'filename'         : self.filename,
+                                     'r_ext'            : self.r_ext}
 
             tess_t0 = tm.time()
             tessellation = self._gostshyp_drv.generate_tessellation(
@@ -2013,6 +2020,7 @@ class ScfDriver:
                     'eri_thresh': self.eri_thresh,
                     # scf info
                     'scf_type': self.scf_type,
+                    'conv_thresh': self.conv_thresh,
                     'scf_energy': self.scf_energy,
                     'restart': self.restart,
                     'filename': self.filename,
@@ -2813,7 +2821,7 @@ class ScfDriver:
                 density_matrix = 2.0 * den_mat[0]
             else:
                 density_matrix = den_mat[0] + den_mat[1]
-            e_pr, V_pr = self._gostshyp_drv.gostshyp_contrib(density_matrix)
+            e_pr, V_pr = self._gostshyp_drv.screened_gostshyp_contrib(density_matrix)
 
         else:
             e_pr, V_pr = 0.0, None

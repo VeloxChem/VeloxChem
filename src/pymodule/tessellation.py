@@ -198,7 +198,7 @@ class TessellationDriver:
 
         return vdw_surface
     
-    def comp_area_grad_occ(self, molecule, tessellation, M):
+    def comp_area_grad(self, molecule, tessellation, M):
         
         """Calculate the cavity (area/switching function) gradient wrt atom
         
