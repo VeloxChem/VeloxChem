@@ -110,7 +110,7 @@ class ReactionSystemBuilder():
         self.lj14_scale: float = 0.5
         self.nb_cutoff: float = 1.  # nm, minimal cutoff for the nonbonded force
 
-        self.pressure: float = -1.
+        self.pressure: float = 1.
         self.solvent: str = None  #type: ignore
         self.padding: float = 1.5
         self.no_reactant: bool = False
@@ -313,12 +313,17 @@ class ReactionSystemBuilder():
 
         if self.CNT or self.graphene or self.solvent:
             box = self._configure_pbc(system, topology, nb_force, box)  # A
-            box = self._add_solvent(system, vlx_mol, self.solvent, topology,
-                                    nb_force, self.neutralize, self.padding,
-                                    box)
+            if self.solvent:
+                box = self._add_solvent(system, vlx_mol, self.solvent, topology,
+                                        nb_force, self.neutralize, self.padding,
+                                        box)
 
-        if self.pressure > 0:
+        if self.solvent:
             barostat = self._add_barostat(system)
+        else:
+            assert_msg_critical(
+                not configuration.get("isobaric", False),
+                "Cannot use isobaric ensemble without solvent.")
 
         if self.implicit_solvent_model is not None:
             assert_msg_critical(
@@ -1220,11 +1225,12 @@ class ReactionSystemBuilder():
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
 
-        vlxsysbuilder = SolvationBuilder(ostream=self.ostream)
+        solv_builder = SolvationBuilder(ostream=self.ostream)
 
-        mols_per_nm3, density, smiles_code = vlxsysbuilder._solvent_properties(
+        mols_per_nm3, density, smiles_code = solv_builder._solvent_properties(
             solvent)
-        vlxsysbuilder.solvate(
+        solv_builder.pressure = self.pressure
+        solv_builder.solvate(
             solute=system_mol,
             solvent=solvent,
             padding=padding,
@@ -1233,19 +1239,19 @@ class ReactionSystemBuilder():
             box=box  # A
         )
 
-        self.positions = vlxsysbuilder.system_molecule.get_coordinates_in_angstrom(
+        self.positions = solv_builder.system_molecule.get_coordinates_in_angstrom(
         )
-        box = [side * 0.1 for side in vlxsysbuilder.box]
+        box = [side * 0.1 for side in solv_builder.box]
 
-        solvents = vlxsysbuilder.solvents
-        solvent_counts = vlxsysbuilder.added_solvent_counts
-        resnames = ["SOL"] * len(vlxsysbuilder.added_solvent_counts)
-        if hasattr(vlxsysbuilder, "added_counterions"):
-            if vlxsysbuilder.added_counterions > 0:
-                solvents = solvents + [vlxsysbuilder._counterion_molecules()
-                                       ] * vlxsysbuilder.added_counterions
+        solvents = solv_builder.solvents
+        solvent_counts = solv_builder.added_solvent_counts
+        resnames = ["SOL"] * len(solv_builder.added_solvent_counts)
+        if hasattr(solv_builder, "added_counterions"):
+            if solv_builder.added_counterions > 0:
+                solvents = solvents + [solv_builder._counterion_molecules()
+                                       ] * solv_builder.added_counterions
                 solvent_counts = solvent_counts + [
-                    vlxsysbuilder.added_counterions
+                    solv_builder.added_counterions
                 ]
                 resnames = resnames + ["ION"]
 
@@ -1399,10 +1405,7 @@ class ReactionSystemBuilder():
         return box
 
     def _add_barostat(self, system):
-        if self.pressure == -1:
-            self.ostream.print_info(
-                "Setting default equilibration pressure to 1 bar")
-            self.pressure = 1.0
+
         if not (self.CNT or self.graphene):
             barostat = mm.MonteCarloBarostat(
                 self.pressure * mmunit.bar,  # type: ignore

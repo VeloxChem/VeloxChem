@@ -440,8 +440,10 @@ class EvbDriver:
             self.ostream.flush()
             # The reporter worker (rank master + 1) did not build the systems;
             # reconstruct the systems and topology it needs to evaluate energies
-            # from the shared folder the master wrote.
-            if self.nodes > 1 and self.rank == mpi_master() + 1:
+            # from the shared folder the master wrote. Deferred mode has no
+            # reporter worker (it runs entirely on the master), so skip this.
+            if (self.nodes > 1 and self.rank == mpi_master() + 1
+                    and conf.get("recalc_mode", "auto") != "deferred"):
                 sysbuilder = ReactionSystemBuilder(ostream=self.ostream)
                 conf["systems"] = sysbuilder.load_systems_from_xml(
                     conf["run_folder"])
@@ -831,9 +833,9 @@ class EvbDriver:
                 "initial_equil_NVT_steps": 0,
                 "initial_equil_NPT_steps": 0,
             }
-        elif name == "water" or name == "water_NPT":
+        elif name == "water" or name == "water_NVT":
             conf = {
-                "name": f"water_{self.water_model}_NPT",
+                "name": f"water_{self.water_model}_NVT",
                 "solvent": self.water_model,
                 "temperature": self.temperature,
                 "pressure": 1,
@@ -841,11 +843,13 @@ class EvbDriver:
                 "ion_count": 0,
                 "neutralize": False
             }
-        elif name == "water_NVT":
+        elif name == "water_NPT":
             conf = {
-                "name": f"water_{self.water_model}_NVT",
+                "name": f"water_{self.water_model}_NPT",
                 "solvent": self.water_model,
                 "temperature": self.temperature,
+                "pressure": 1,
+                "isobaric": True,
                 "padding": 1.5,
                 "ion_count": 0,
                 "neutralize": False

@@ -33,6 +33,7 @@
 from importlib.metadata import version
 import re
 import time
+import gc
 
 import numpy as np
 from pathlib import Path
@@ -185,6 +186,38 @@ class EvbReporter:
         if not defer_open:
             self._open_outputs(append)
 
+    @staticmethod
+    def energies_header():
+        """Header line for Energies.csv (shared by every recalculation mode)."""
+        return ("Lambda, reactant PES, product PES, reactant integration, "
+                "product integration, Em, replica, direction \n")
+
+    @staticmethod
+    def format_energies_row(lambda_val, E1_pes, E2_pes, E1_int, E2_int, replica,
+                            direction):
+        """Format one Energies.csv row. Em is the EVB-mixed diabatic energy."""
+        Em = E1_pes * (1 - lambda_val) + E2_pes * lambda_val
+        return (f"{lambda_val}, {E1_pes:.10e}, {E2_pes:.10e}, {E1_int:.10e}, "
+                f"{E2_int:.10e}, {Em:.10e}, {replica}, {direction} \n")
+
+    @staticmethod
+    def forces_header(num_atoms):
+        """Header line for Forces.csv (shared by every recalculation mode)."""
+        header = "Lambda, replica, direction, "
+        for j in range(num_atoms):
+            header += f"F(x, {j}), F(y, {j}), F(z, {j}), norm({j}), "
+        return header[:-2] + '\n'
+
+    @staticmethod
+    def format_forces_row(lambda_val, replica, direction, forces):
+        """Format one Forces.csv row from an (N,3) force array (kJ/mol/nm)."""
+        norms = np.linalg.norm(forces, axis=1)
+        line = f"{lambda_val}, {replica}, {direction}"
+        for i in range(forces.shape[0]):
+            line += (f", {forces[i][0]:.5e}, {forces[i][1]:.5e}, "
+                     f"{forces[i][2]:.5e}, {norms[i]:.5e}")
+        return line + '\n'
+
     def _open_outputs(self, append):
         """Open (truncate + write headers, or append) all enabled output files.
 
@@ -199,18 +232,13 @@ class EvbReporter:
             self.E_out = open(self._energy_file, mode)
             self.out_streams.append(self.E_out)
             if not append:
-                self.E_out.write(
-                    "Lambda, reactant PES, product PES, reactant integration, product integration, Em, replica, direction \n"
-                )
+                self.E_out.write(self.energies_header())
 
         if self.report_forces:
             self.F_out = open(self._force_file, mode)
             self.out_streams.append(self.F_out)
             if not append:
-                header = "Lambda, replica, direction, "
-                for j in range(self.num_atoms):
-                    header += f"F(x, {j}), F(y, {j}), F(z, {j}), norm({j}), "
-                self.F_out.write(header[:-2] + '\n')
+                self.F_out.write(self.forces_header(self.num_atoms))
 
         if self.report_velocities:
             self.v_out = open(self._velocity_file, mode)
@@ -346,14 +374,19 @@ class EvbReporter:
 
     @staticmethod
     def _apply_positions(simulation, positions, box):
-        """Set positions (nm) and periodic box (nm) on a CPU sim from numpy."""
+        """Set positions (nm) and periodic box (nm) on a sim from numpy.
+
+        box may be None for a non-periodic system (e.g. vacuum), in which case
+        the context keeps its default box (irrelevant to a NoCutoff energy).
+        """
         nm = mm.unit.nanometer
-        a, b, c = box
-        simulation.context.setPeriodicBoxVectors(
-            mm.Vec3(*a) * nm,
-            mm.Vec3(*b) * nm,
-            mm.Vec3(*c) * nm,
-        )
+        if box is not None:
+            a, b, c = box
+            simulation.context.setPeriodicBoxVectors(
+                mm.Vec3(*a) * nm,
+                mm.Vec3(*b) * nm,
+                mm.Vec3(*c) * nm,
+            )
         simulation.context.setPositions(positions * nm)
 
     def _write_core(self, positions, box, velocities=None, forces=None):
@@ -381,17 +414,14 @@ class EvbReporter:
         E1_int = E[0]
         E2_int = E[1]
 
-        Em = E1_pes * (1 - self.lambda_val) + E2_pes * self.lambda_val
         self.E_out.write(
-            f"{self.lambda_val}, {E1_pes:.10e}, {E2_pes:.10e}, {E1_int:.10e}, {E2_int:.10e}, {Em:.10e}, {self.replica}, {self.direction} \n"
-        )
+            self.format_energies_row(self.lambda_val, E1_pes, E2_pes, E1_int,
+                                     E2_int, self.replica, self.direction))
 
         if self.report_forces and forces is not None:
-            norms = np.linalg.norm(forces, axis=1)
-            line = f"{self.lambda_val}, {self.replica}, {self.direction}"
-            for i in range(forces.shape[0]):
-                line += f", {forces[i][0]:.5e}, {forces[i][1]:.5e}, {forces[i][2]:.5e}, {norms[i]:.5e}"
-            self.F_out.write(line + '\n')
+            self.F_out.write(
+                self.format_forces_row(self.lambda_val, self.replica,
+                                       self.direction, forces))
 
         if self.report_velocities and velocities is not None:
             line = f"{self.lambda_val}, {self.replica}, {self.direction}"
@@ -627,6 +657,135 @@ class EvbReporter:
                 getEnergy=True,
                 groups=forcegroups,
             ).getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)
+
+
+class EvbGpuRecalculator:
+    """Batched GPU recalculation of EVB energies for deferred mode.
+
+    Instead of re-scoring each sampled frame inline (blocking the GPU) or on a
+    dedicated CPU worker rank, deferred mode samples a whole lambda window first
+    and then hands the window's frames here. Because only one OpenMM context
+    should live on the GPU at a time, each system is built, evaluated over every
+    frame, and torn down before the next system is built - so the GPU holds a
+    single context at any moment. The output files (Energies / optional Forces /
+    NB decomposition) match those the synchronous ``EvbReporter`` writes.
+    """
+
+    def __init__(self,
+                 data_folder,
+                 systems,
+                 topology,
+                 simulation_factory,
+                 report_forces=False):
+        # simulation_factory(system) -> a live mmapp.Simulation on the desired
+        # (GPU) platform. The factory owns platform selection; this class only
+        # ever builds one context at a time and tears it down before the next.
+        self.data_folder = Path(data_folder)
+        self.systems = systems
+        self.num_atoms = topology.getNumAtoms()
+        self._make_sim = simulation_factory
+        self.report_forces = report_forces
+
+        # Same system selection as EvbReporter.simulations: the reactant/product
+        # PES and the two integration endpoints (0/1), plus any nb/bonded
+        # decomposition systems.
+        core_names = ['reactant', 'product', 0, 1]
+        self.core_names = [n for n in core_names if n in systems]
+        self.decomp_names = [s for s in systems if 'decomp' in str(s)]
+
+        self._opened = False
+        self.E_out = None
+        self.F_out = None
+        self.decomp_out = None
+        self.out_streams = []
+
+    def _open_outputs(self, append):
+        mode = 'a' if append else 'w'
+        self.E_out = open(self.data_folder / "Energies.csv", mode)
+        self.out_streams.append(self.E_out)
+        if not append:
+            self.E_out.write(EvbReporter.energies_header())
+        if self.report_forces:
+            self.F_out = open(self.data_folder / "Forces.csv", mode)
+            self.out_streams.append(self.F_out)
+            if not append:
+                self.F_out.write(EvbReporter.forces_header(self.num_atoms))
+        if self.decomp_names:
+            self.decomp_out = open(self.data_folder / "NB_decompositions.csv",
+                                   mode)
+            self.out_streams.append(self.decomp_out)
+            if not append:
+                self.decomp_out.write(
+                    ", ".join([str(n) for n in self.decomp_names]) + '\n')
+        self._opened = True
+
+    def _evaluate_system(self, system, frames, want_forces=False):
+        """Evaluate one system over all frames using a single GPU context."""
+        sim = self._make_sim(system)
+        energies = []
+        forces = []
+        try:
+            for pos, box in frames:
+                EvbReporter._apply_positions(sim, pos, box)
+                state = sim.context.getState(getEnergy=True,
+                                             getForces=want_forces)
+                energies.append(state.getPotentialEnergy().value_in_unit(
+                    mm.unit.kilojoules_per_mole))
+                if want_forces:
+                    forces.append(
+                        state.getForces(asNumpy=True).value_in_unit(
+                            mm.unit.kilojoules_per_mole / mm.unit.nanometer))
+        finally:
+            # Release this GPU context before the next system is built.
+            del sim
+            gc.collect()
+        return energies, forces
+
+    def recalc_window(self, lambda_val, replica, direction, frames, append):
+        """Re-score one lambda window's frames and append the output rows.
+
+        frames: list of (positions_nm (N,3), box_nm (3,3)) in nanometers.
+        """
+        if not self._opened:
+            self._open_outputs(append)
+
+        # Evaluate every needed system once over all frames (one GPU context at
+        # a time). Forces come from the sampled lambda-window system so they
+        # match the synchronous path's sampling-state forces.
+        E = {}
+        for name in self.core_names:
+            E[name], _ = self._evaluate_system(self.systems[name], frames)
+        decomp_E = {}
+        for name in self.decomp_names:
+            decomp_E[name], _ = self._evaluate_system(self.systems[name],
+                                                      frames)
+        forces_per_frame = None
+        if self.report_forces:
+            _, forces_per_frame = self._evaluate_system(
+                self.systems[lambda_val], frames, want_forces=True)
+
+        for i in range(len(frames)):
+            self.E_out.write(
+                EvbReporter.format_energies_row(lambda_val, E['reactant'][i],
+                                                E['product'][i], E[0][i],
+                                                E[1][i], replica, direction))
+            if self.report_forces:
+                self.F_out.write(
+                    EvbReporter.format_forces_row(lambda_val, replica,
+                                                  direction,
+                                                  forces_per_frame[i]))
+            if self.decomp_names:
+                line = ", ".join(
+                    [f"{decomp_E[name][i]:.10e}" for name in self.decomp_names])
+                self.decomp_out.write(line + '\n')
+
+        for s in self.out_streams:
+            s.flush()
+
+    def close(self):
+        for s in self.out_streams:
+            if not s.closed:
+                s.close()
 
 
 class _EvbReporterMPI:

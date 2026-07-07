@@ -35,10 +35,12 @@ from pathlib import Path
 import numpy as np
 import time
 import sys
+import gc
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
-from .evbreporter import (EvbReporter, EvbReporterClient, EvbReporterServer)
+from .evbreporter import (EvbReporter, EvbReporterClient, EvbReporterServer,
+                          EvbGpuRecalculator)
 from .errorhandler import assert_msg_critical, print_exception_if_debug
 from .reactionsystembuilder import EvbForceGroup
 
@@ -119,6 +121,14 @@ class EvbFepDriver:
         self.report_velocities: bool = False
         self.report_forcegroups: bool = False
 
+        # Recalculation mode selects how per-frame EVB energies are produced:
+        #   "auto"     - offload to a reporter worker if >1 rank, else in-process
+        #   "inline"   - always in-process on the CPU (blocks GPU sampling)
+        #   "offload"  - always use the 2-rank async CPU reporter worker
+        #   "deferred" - sample without recalculation, then re-score each window's
+        #                frames in one batched GPU pass read back from the trajectory
+        self.recalc_mode: str = "auto"
+
         self.debug: bool = False
         self.save_frames: int = 1000
         self.save_crash_pdb: bool = True
@@ -130,6 +140,7 @@ class EvbFepDriver:
         self.pdb_equil_start_temp = 10  # kelvin
         self.pdb_equil_temp_step = 50  # kelvin
         self.pdb_temperatures = []
+        self.isobaric: bool = False
 
         self.pdb = None
         self.safe_step: bool = False
@@ -211,6 +222,9 @@ class EvbFepDriver:
             "report_forcegroups": {
                 "type": bool
             },
+            "recalc_mode": {
+                "type": str
+            },
             "debug": {
                 "type": bool
             },
@@ -243,6 +257,9 @@ class EvbFepDriver:
             },
             "pdb_temperatures": {
                 "type": list
+            },
+            "isobaric": {
+                "type": bool
             },
             "pdb_equil_temp_step": {
                 "type": int
@@ -304,12 +321,6 @@ class EvbFepDriver:
         self.systems = configuration.get("systems")
         self.topology = configuration.get("topology")
 
-        if self.temperature > 0:
-            self.isothermal = True
-
-        if self.pressure > 0:
-            self.isobaric = True
-
         if self.pdb is not None:
             if len(self.pdb_temperatures) == 0:
                 self.pdb_temperatures = list(
@@ -366,10 +377,6 @@ class EvbFepDriver:
         self.ostream.print_info(info)
         self.ostream.flush()
 
-        self.ostream.print_info(
-            f"Ensemble info: Isobaric {self.isobaric}, Isothermal {self.isothermal}"
-        )
-
         self.total_steps = 0
         self.run_steps = 0
         # Per-lambda equilibration + sampling, summed over every lambda window in
@@ -403,20 +410,56 @@ class EvbFepDriver:
                                                  self.warmup_NPT_steps > 0 else
                                                  self.initial_equil_NPT_steps)
 
+        # Resolve the recalculation mode. "deferred" is orthogonal to rank count:
+        # it samples each window without recalculation and then re-scores that
+        # window's frames in one batched GPU pass, so it forces the synchronous
+        # single-master control flow (no reporter worker).
+        assert_msg_critical(
+            self.recalc_mode in ("auto", "inline", "offload", "deferred"),
+            f"Unknown recalc_mode '{self.recalc_mode}'. Expected one of "
+            "'auto', 'inline', 'offload', 'deferred'.")
+        self._deferred = self.recalc_mode == "deferred"
+        if self.recalc_mode == "offload" and self.nodes <= 1:
+            self.ostream.print_warning(
+                "recalc_mode='offload' requires >1 MPI rank; falling back to "
+                "in-process synchronous reporting.")
+
         # Asynchronous reporting: with >=2 MPI ranks on the node, rank
         # (master+1) becomes a dedicated CPU reporter worker that owns the
         # Energies/Forces/Velocities files, while the master drives the GPU and
         # offloads each frame to it. With a single rank the reporting stays
         # synchronous and in-process (unchanged behaviour).
-        self._async = self.nodes > 1
-        if self._async and self.rank == mpi_master():
+        self._async = (self.nodes > 1 and not self._deferred
+                       and self.recalc_mode in ("auto", "offload"))
+
+        if self._deferred:
+            # Guard combinations that a positions-only trajectory cannot serve.
+            assert_msg_critical(
+                not (self.report_velocities or self.debug),
+                "recalc_mode='deferred' cannot report velocities: they are not "
+                "stored in the XTC trajectory. Use recalc_mode 'inline'/'offload'."
+            )
+            assert_msg_critical(
+                not (self.report_forcegroups or self.debug),
+                "recalc_mode='deferred' does not support force-group / bonded "
+                "decomposition. Use recalc_mode 'inline'/'offload'.")
+            if self.rank == mpi_master():
+                self.ostream.print_info(
+                    "Running in deferred mode: sampling without recalculation, "
+                    "then re-scoring each window on the GPU from the trajectory."
+                )
+                if self.nodes > 1:
+                    self.ostream.print_warning(
+                        f"{self.nodes} MPI ranks present but recalc_mode="
+                        "'deferred' uses only the master; the rest will idle.")
+        elif self._async and self.rank == mpi_master():
             self.ostream.print_info(
                 f"Running in asynchronous mode with {self.nodes} MPI ranks.")
             if self.nodes > 2:
                 self.ostream.print_warning(
                     "More than 2 MPI ranks are present. Only the master and one reporter worker are used; the rest will idle."
                 )
-        if not self._async:
+        if not self._async and not self._deferred:
             self.ostream.print_info(
                 "Running in synchronous mode (single rank or no MPI).")
 
@@ -434,6 +477,11 @@ class EvbFepDriver:
             # The master signals completion with a matching Barrier.
             self.comm.Barrier()
             return
+        # Deferred mode runs entirely on the master; any extra ranks idle here
+        # and rejoin at the closing Barrier below.
+        if self._deferred and self.rank != mpi_master():
+            self.comm.Barrier()
+            return
 
         # Master path only: the initial positions are needed to seed the GPU
         # sampling (the reporter worker returned above and never uses them).
@@ -444,13 +492,30 @@ class EvbFepDriver:
 
         # Single trajectory file, appended across all sweeps. Frames stay
         # row-aligned with Energies.csv (each row tagged with replica/direction).
-        self.traj_roporter = mmapp.XTCReporter(
-            str(self.data_folder / "trajectory.xtc"),
-            self.write_step,
-        )
+        # In deferred mode the trajectory reporter is recreated per window (so
+        # the file is flushed before it is read back), so skip the shared one.
+        self.traj_roporter = None
+        if not self._deferred:
+            self.traj_roporter = mmapp.XTCReporter(
+                str(self.data_folder / "trajectory.xtc"),
+                self.write_step,
+            )
         # Only the very first written window truncates the output files and
         # writes their headers; everything afterwards appends.
         self._first_write = True
+
+        # Deferred mode: a single recalculator owns the Energies/Forces/NB
+        # outputs across all windows and re-scores each window on the GPU after
+        # its sampling context has been released.
+        self._gpu_recalc = None
+        if self._deferred:
+            self._gpu_recalc = EvbGpuRecalculator(
+                self.data_folder,
+                self.systems,
+                self.topology,
+                lambda system: self._get_simulation(system, self.step_size),
+                report_forces=self.report_forces,
+            )
         self.timer.start()
 
         positions = initial_positions * 0.1
@@ -487,6 +552,9 @@ class EvbFepDriver:
         self._t_stall_total = 0.0
         self._t_send_total = 0.0
         self._n_windows = 0
+        # Deferred mode: separate accumulator for the post-sampling GPU
+        # recalculation (runs after each window, not overlapped with sampling).
+        self._t_recalc_total = 0.0
 
         forward_order = list(self.Lambda)
         backward_order = list(reversed(self.Lambda))
@@ -510,6 +578,12 @@ class EvbFepDriver:
                            tag=EvbReporterClient._TAG)
             self._free_shared_ring()
             self.comm.Barrier()
+        elif self._deferred and self.nodes > 1:
+            # Release the idle ranks that returned early in deferred mode.
+            self.comm.Barrier()
+
+        if self._gpu_recalc is not None:
+            self._gpu_recalc.close()
 
         self._print_timing_summary(reporter_timing)
         self.ostream.flush()
@@ -680,13 +754,17 @@ class EvbFepDriver:
             simulation.reporters.append(equil_traj_reporter)
         if self.pdb is None:
             barostat = self._get_barostat(simulation)
-            barostat.setFrequency(0)
-            self._safe_step(simulation, self.initial_equil_NVT_steps,
-                            "initial NVT equilibration")
-            barostat.setFrequency(25)
-            self._safe_step(simulation, self.initial_equil_NPT_steps,
-                            "initial NPT equilibration")
-            barostat.setFrequency(0)
+            if barostat:
+                barostat.setFrequency(0)
+                self._safe_step(simulation, self.initial_equil_NVT_steps,
+                                "initial NVT equilibration")
+                barostat.setFrequency(25)
+                self._safe_step(simulation, self.initial_equil_NPT_steps,
+                                "initial NPT equilibration")
+                barostat.setFrequency(0)
+            else:
+                self._safe_step(simulation, self.initial_equil_NVT_steps,
+                                "initial NVT equilibration")
 
         else:
             self.ostream.print_info(
@@ -713,13 +791,15 @@ class EvbFepDriver:
                         chk=False,
                         cif=True,
                     )
+
             barostat = self._get_barostat(simulation)
-            barostat.setFrequency(25)
-            self._safe_step(
-                simulation, self.initial_equil_NPT_steps,
-                f"NPT equilibration at target temperature T = {self.temperature}"
-            )
-            barostat.setFrequency(0)
+            if barostat:
+                barostat.setFrequency(25)
+                self._safe_step(
+                    simulation, self.initial_equil_NPT_steps,
+                    f"NPT equilibration at target temperature T = {self.temperature}"
+                )
+                barostat.setFrequency(0)
 
         equil_state = simulation.context.getState(
             getPositions=True,
@@ -788,9 +868,7 @@ class EvbFepDriver:
 
         if self.isobaric:
             barostat = self._get_barostat(simulation)
-            barostat.setFrequency(0)
-            self._safe_step(simulation, self.equil_NVT_steps,
-                            "NVT equilibration")
+
             barostat.setFrequency(25)
             self._safe_step(simulation, self.equil_NPT_steps,
                             "NPT equilibration")
@@ -834,13 +912,20 @@ class EvbFepDriver:
 
     @staticmethod
     def _get_barostat(simulation):
-        return [
+        barostats = [
             force for force in simulation.system.getForces()
             if isinstance(force, mm.MonteCarloBarostat)
             or isinstance(force, mm.MonteCarloFlexibleBarostat)
-        ][0]
+        ]
+        if len(barostats) == 0:
+            return None
+        else:
+            return barostats[0]
 
     def _sample(self, system, l, initial_state, replica=0, direction=0):
+        if self._deferred:
+            return self._sample_deferred(system, l, initial_state, replica,
+                                         direction)
         simulation = self._get_simulation(system, self.equil_step_size)
         simulation.reporters.append(self.traj_roporter)
 
@@ -899,6 +984,116 @@ class EvbFepDriver:
                                        comm_during, stall_during, send_during)
         return states[-1]
 
+    def _sample_deferred(self,
+                         system,
+                         l,
+                         initial_state,
+                         replica=0,
+                         direction=0):
+        """Sample one window without recalculation, then re-score its frames on
+        the GPU from the trajectory once the sampling context is released.
+
+        Only the trajectory and StateData reporters are attached during
+        sampling (no EVB energy evaluation), so the GPU is never stalled. After
+        sampling, the sampling context is torn down and the window's frames are
+        read back from ``trajectory.xtc`` and re-scored in one batched GPU pass.
+        """
+        simulation = self._get_simulation(system, self.equil_step_size)
+
+        append = not self._first_write
+        self._first_write = False
+
+        # Per-window trajectory reporter appended into the single trajectory.xtc.
+        # Recreated (and dropped) each window so the file is flushed to disk
+        # before the recalculation reads it back. The first written window
+        # truncates the file; the rest append.
+        traj_reporter = mmapp.XTCReporter(
+            str(self.data_folder / "trajectory.xtc"),
+            self.write_step,
+            append=append,
+        )
+        simulation.reporters.append(traj_reporter)
+
+        sz = self.step_size * mmunit.picoseconds
+        simulation.integrator.setStepSize(sz)
+        simulation.context.setState(initial_state)
+
+        state_reporter = self._get_data_reporter(
+            self.data_folder,
+            "Data_combined.csv",
+            append,
+        )
+        simulation.reporters.append(state_reporter)
+        self.ostream.flush()
+
+        t_window_start = time.perf_counter()
+        states = self._safe_step(simulation, self.sample_steps, "sampling")
+        t_window = time.perf_counter() - t_window_start
+
+        # Detached snapshot to seed the next window; survives context teardown.
+        final_state = states[-1]
+
+        # Release the sampling GPU context (and flush/close the trajectory) so
+        # the recalculation can build its own context: only one OpenMM context
+        # should live on the GPU at a time.
+        simulation.reporters.clear()
+        del simulation, states, state_reporter, traj_reporter
+        gc.collect()
+
+        t_recalc_start = time.perf_counter()
+        self._recalc_window_gpu(l, replica, direction, append)
+        t_recalc = time.perf_counter() - t_recalc_start
+
+        self._accumulate_deferred_timing(l, replica, direction, t_window,
+                                         t_recalc)
+        return final_state
+
+    def _recalc_window_gpu(self, l, replica, direction, append):
+        """Read this window's frames back from the trajectory and re-score them
+        on the GPU via the batched EvbGpuRecalculator."""
+        import MDAnalysis as mda
+
+        snapshots = int(self.sample_steps // self.write_step)
+        # Use the in-memory OpenMM topology directly (no dependency on a parsed
+        # topology file); the XTC supplies the per-frame coordinates.
+        universe = mda.Universe(
+            self.topology,
+            str(self.data_folder / "trajectory.xtc"),
+            topology_format='OPENMMTOPOLOGY',
+        )
+        # Positions/box arrive from MDAnalysis in angstrom; _apply_positions
+        # expects nanometers.
+        frames = []
+        for ts in universe.trajectory[-snapshots:]:
+            pos_nm = np.array(ts.positions, dtype=np.float64) * 0.1
+            # None for a non-periodic (vacuum) trajectory; a (3,3) box for a
+            # periodic (solvated) one.
+            box = ts.triclinic_dimensions
+            box_nm = None if box is None else np.array(box,
+                                                       dtype=np.float64) * 0.1
+            frames.append((pos_nm, box_nm))
+
+        assert_msg_critical(
+            len(frames) == snapshots,
+            f"Deferred recalculation expected {snapshots} trajectory frames for "
+            f"window l={l} but read {len(frames)}.")
+
+        self._gpu_recalc.recalc_window(l, replica, direction, frames, append)
+
+    def _accumulate_deferred_timing(self, l, replica, direction, t_window,
+                                    t_recalc):
+        """Record and print the sampling vs recalculation split for one window
+        in deferred mode."""
+        self._t_window_total += t_window
+        self._t_gpu_total += t_window
+        self._t_recalc_total += t_recalc
+        self._n_windows += 1
+        self.ostream.print_info(
+            f"[timing] window l={l} rep={replica} dir={direction} (deferred): "
+            f"sampling(GPU) {t_window:.3f}s + recalculation(GPU) "
+            f"{t_recalc:.3f}s = {t_window + t_recalc:.3f}s")
+        self.ostream.flush()
+
     def _accumulate_window_timing(self, l, replica, direction, t_window,
                                   comm_during, stall_during, send_during):
         """Record and print the timing breakdown for one sampling window."""
@@ -924,6 +1119,20 @@ class EvbFepDriver:
         """Print the aggregate profiling summary and consistency checks."""
         n = self._n_windows
         if n == 0:
+            return
+        if self._deferred:
+            recalc = self._t_recalc_total
+            sampling = self._t_gpu_total
+            total = sampling + recalc
+            per_win = recalc / n if n > 0 else 0.0
+            self.ostream.print_info(
+                f"[timing] Totals over {n} windows (deferred): "
+                f"sampling(GPU)={sampling:.3f}s + recalculation(GPU)="
+                f"{recalc:.3f}s = {total:.3f}s "
+                f"({per_win:.3f}s recalc/window). Sampling ran without any "
+                "in-loop recalculation; the GPU re-scored each window in a "
+                "single batched pass afterwards.")
+            self.ostream.flush()
             return
         summed = self._t_gpu_total + self._t_comm_total
         extract_total = (self._t_comm_total - self._t_stall_total -
