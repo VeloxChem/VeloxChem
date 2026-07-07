@@ -487,6 +487,7 @@ class EvbFepDriver:
         if not self._async and not self._deferred:
             self.ostream.print_info(
                 "Running in synchronous mode (single rank or no MPI).")
+        self.ostream.flush()
 
         self._reporter_worker = mpi_master() + 1
         # Allocate the shared-memory ring buffer (collective over COMM_WORLD via
@@ -862,6 +863,13 @@ class EvbFepDriver:
             chk=True,
             cif=False,
         )
+
+        # Release the initial-equilibration GPU context deterministically so it
+        # does not linger for the whole run (same rationale as _equilibrate).
+        simulation.reporters.clear()
+        del simulation
+        gc.collect()
+
         return equil_state
 
     def _equilibrate(self, system, name, positions, velocities=None):
@@ -939,6 +947,15 @@ class EvbFepDriver:
                 xml=False,
                 cif=True,
             )
+
+        # Release the equilibration GPU context deterministically. equil_state
+        # is a detached snapshot from context.getState(...) and survives this
+        # teardown; leaving the Simulation/Context to fall out of scope leaks the
+        # CUDA context (reference cycles defer collection), so GPU memory grows
+        # window-over-window and slows sampling. Mirror _sample_deferred.
+        simulation.reporters.clear()
+        del simulation
+        gc.collect()
 
         return equil_state
 
