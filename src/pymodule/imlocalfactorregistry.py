@@ -1242,6 +1242,198 @@ def _build_factor_signature(term_bank, int_coords):
     ]
 
 
+def _factor_state_weight_mode(driver):
+    mode = getattr(driver, "local_factor_state_weight_mode", "signature")
+    mode = "signature" if mode is None else str(mode).strip().lower()
+    mode = mode.replace("-", "_")
+
+    aliases = {
+        "": "signature",
+        "signature": "signature",
+        "torsion": "signature",
+        "torsion_signature": "signature",
+        "rotor_signature": "signature",
+        "active": "active_internal",
+        "active_rows": "active_internal",
+        "active_internal": "active_internal",
+        "active_atoms": "active_atoms_internal",
+        "active_atom_rows": "active_atoms_internal",
+        "active_atoms_internal": "active_atoms_internal",
+        "local_internal": "active_atoms_internal",
+        "signature_active": "signature_active_internal",
+        "signature_active_internal": "signature_active_internal",
+        "hybrid_active": "signature_active_internal",
+        "hybrid_active_internal": "signature_active_internal",
+        "signature_active_atoms": "signature_active_atoms_internal",
+        "signature_active_atom_rows": "signature_active_atoms_internal",
+        "signature_active_atoms_internal": "signature_active_atoms_internal",
+        "hybrid_active_atoms": "signature_active_atoms_internal",
+        "hybrid_active_atoms_internal": "signature_active_atoms_internal",
+        "all": "all_internal",
+        "all_rows": "all_internal",
+        "all_internal": "all_internal",
+        "cartesian": "cartesian_active",
+        "cartesian_active": "cartesian_active",
+        "active_cartesian": "cartesian_active",
+    }
+    if mode not in aliases:
+        raise ValueError(
+            "Unsupported local_factor_state_weight_mode="
+            f"'{getattr(driver, 'local_factor_state_weight_mode', mode)}'."
+        )
+    return aliases[mode]
+
+
+def _factor_signature_row_set(term_bank):
+    rows = set()
+    for group_rows in term_bank.get("grouped_signature_rows", ()):
+        rows.update(int(row) for row in group_rows)
+    return rows
+
+
+def _factor_internal_metric_rows(driver, term_bank, mode, n_ic):
+    signature_rows = _factor_signature_row_set(term_bank)
+
+    if mode == "active_internal":
+        rows = set(int(row) for row in term_bank.get("active_rows", ()))
+        rows.update(signature_rows)
+
+    elif mode == "active_atoms_internal":
+        z_matrix = getattr(driver.impes_coordinate, "z_matrix", None)
+        active_atoms = set(int(atom) for atom in term_bank.get("active_atoms", ()))
+        if z_matrix is None or not active_atoms:
+            rows = set(int(row) for row in term_bank.get("active_rows", ()))
+        else:
+            rows = {
+                idx for idx, coord in enumerate(z_matrix[:int(n_ic)])
+                if set(int(atom) for atom in coord) & active_atoms
+            }
+        rows.update(signature_rows)
+
+    elif mode == "all_internal":
+        rows = set(range(int(n_ic)))
+
+    else:
+        rows = set()
+
+    return tuple(sorted(row for row in rows if 0 <= int(row) < int(n_ic)))
+
+
+def _factor_bond_angle_rows(driver, rows):
+    selected = []
+    for row in rows:
+        section = _factor_row_section(driver, row)
+        if section in ("bonds", "angles"):
+            selected.append(int(row))
+    return tuple(selected)
+
+
+def _factor_row_section(driver, row_idx):
+    z_matrix = getattr(driver.impes_coordinate, "z_matrix", None)
+    if z_matrix is None:
+        return None
+
+    coord = tuple(int(atom) for atom in z_matrix[int(row_idx)])
+    if len(coord) == 2:
+        return "bonds"
+    if len(coord) == 3:
+        return "angles"
+
+    bounds = driver._get_internal_coordinate_partitions()
+    if int(row_idx) >= int(bounds["dihedral_end"]):
+        return "impropers"
+    return "dihedrals"
+
+
+def _factor_internal_rows_distance_and_gradient(
+        driver,
+        rows,
+        org_eval,
+        ref_eval,
+        b_matrix):
+    rows = tuple(int(row) for row in rows)
+    b_matrix = np.asarray(b_matrix, dtype=np.float64)
+    ncart = b_matrix.shape[1]
+    if not rows:
+        return 0.0, np.zeros(ncart, dtype=np.float64)
+
+    q_cur = np.asarray(org_eval, dtype=np.float64)
+    q_ref = np.asarray(ref_eval, dtype=np.float64)
+
+    d2_total = 0.0
+    grad_total = np.zeros(ncart, dtype=np.float64)
+
+    for row in rows:
+        section = _factor_row_section(driver, row)
+        if section is None:
+            continue
+
+        sigma = driver._imp_coordinate_sigma(section, row, q_ref)
+        sigma2 = max(float(sigma) * float(sigma), 1.0e-24)
+        delta_raw = float(q_cur[row] - q_ref[row])
+
+        if section == "dihedrals":
+            delta = driver._principal_torsion_delta(delta_raw)
+            metric = 2.0 * (1.0 - np.cos(delta)) / sigma2
+            grad_coeff = 2.0 * np.sin(delta) / sigma2
+
+        elif section == "impropers":
+            delta = driver._principal_torsion_delta(delta_raw)
+            eta = driver._improper_dihedral_displacement(delta)
+            chain = driver._improper_dihedral_chain(delta)
+            metric = (eta * eta) / sigma2
+            grad_coeff = 2.0 * eta * chain / sigma2
+
+        else:
+            metric = (delta_raw * delta_raw) / sigma2
+            grad_coeff = 2.0 * delta_raw / sigma2
+
+        d2_total += float(metric)
+        grad_total += grad_coeff * b_matrix[row, :]
+
+    count = max(len(rows), 1)
+    return float(d2_total / count), grad_total / count
+
+
+def _factor_cartesian_active_distance_and_gradient(driver, term_bank, datapoint):
+    active_atoms = tuple(int(atom) for atom in term_bank.get("active_atoms", ()))
+    natm = driver.impes_coordinate.cartesian_coordinates.shape[0]
+    if not active_atoms:
+        active_atoms = tuple(range(natm))
+
+    active_atoms_arr = np.asarray(active_atoms, dtype=np.int64)
+    current = np.asarray(
+        driver.impes_coordinate.cartesian_coordinates,
+        dtype=np.float64,
+    )[active_atoms_arr]
+    reference = np.asarray(
+        datapoint.cartesian_coordinates,
+        dtype=np.float64,
+    )[active_atoms_arr]
+
+    current_centered = current - np.mean(current, axis=0)
+    reference_centered = reference - np.mean(reference, axis=0)
+    delta = current_centered - reference_centered
+
+    d2 = float(np.dot(delta.reshape(-1), delta.reshape(-1)))
+    grad_sub = 2.0 * (delta - np.mean(delta, axis=0))
+
+    inv_sqrt = getattr(driver.impes_coordinate, "inv_sqrt_masses", None)
+    if inv_sqrt is not None:
+        inv_sqrt = np.asarray(inv_sqrt, dtype=np.float64).reshape(-1)
+        active_dofs = np.array(
+            [3 * atom + comp for atom in active_atoms_arr for comp in range(3)],
+            dtype=np.int64,
+        )
+        grad_sub = grad_sub.reshape(-1) * inv_sqrt[active_dofs]
+        grad_sub = grad_sub.reshape(active_atoms_arr.size, 3)
+
+    grad = np.zeros((natm, 3), dtype=np.float64)
+    grad[active_atoms_arr] = grad_sub
+
+    return d2, grad.reshape(-1)
+
+
 def _factor_signature_distance_and_gradient(
         term_bank,
         current_signature,
@@ -1318,8 +1510,14 @@ def _factor_mask_signature_distance_and_gradient(
         mask,
         org_int_coords,
         b_matrix=None,
-        precomputed_current=None):
+        precomputed_current=None,
+        mode=None):
     mask = np.asarray(mask, dtype=np.int64)
+    mode = "signature" if mode is None else str(mode)
+
+    if mode == "cartesian_active":
+        return _factor_cartesian_active_distance_and_gradient(
+            driver, term_bank, datapoint)
 
     if precomputed_current is None:
         org_eval, b_eval = _candidate_current_chart(
@@ -1335,18 +1533,64 @@ def _factor_mask_signature_distance_and_gradient(
     cur_sig = _build_factor_signature(term_bank, org_eval)
     ref_masked = np.asarray(
         datapoint.internal_coordinates_values, dtype=np.float64)[mask]
-    ref_sig = _build_factor_signature(term_bank, ref_masked)
 
-    return _factor_signature_distance_and_gradient(
+    if mode == "signature":
+        ref_sig = _build_factor_signature(term_bank, ref_masked)
+        return _factor_signature_distance_and_gradient(
+            term_bank,
+            cur_sig,
+            ref_sig,
+            b_matrix=b_eval,
+        )
+
+    if mode in ("signature_active_internal", "signature_active_atoms_internal"):
+        ref_sig = _build_factor_signature(term_bank, ref_masked)
+        sig_d2, sig_grad = _factor_signature_distance_and_gradient(
+            term_bank,
+            cur_sig,
+            ref_sig,
+            b_matrix=b_eval,
+        )
+        internal_mode = {
+            "signature_active_internal": "active_internal",
+            "signature_active_atoms_internal": "active_atoms_internal",
+        }[mode]
+        rows = _factor_bond_angle_rows(
+            driver,
+            _factor_internal_metric_rows(
+                driver,
+                term_bank,
+                internal_mode,
+                len(ref_masked),
+            ),
+        )
+        row_d2, row_grad = _factor_internal_rows_distance_and_gradient(
+            driver,
+            rows,
+            org_eval,
+            ref_masked,
+            b_eval,
+        )
+        return sig_d2 + row_d2, sig_grad + row_grad
+
+    rows = _factor_internal_metric_rows(
+        driver,
         term_bank,
-        cur_sig,
-        ref_sig,
-        b_matrix=b_eval,
+        mode,
+        len(ref_masked),
+    )
+    return _factor_internal_rows_distance_and_gradient(
+        driver,
+        rows,
+        org_eval,
+        ref_masked,
+        b_eval,
     )
 
 
 def _factor_state_signature_metric(driver, term_bank, datapoint, org_int_coords):
     masks = _coerce_mapping_masks(datapoint)
+    mode = _factor_state_weight_mode(driver)
 
     best_d2 = None
     best_grad = None
@@ -1357,6 +1601,7 @@ def _factor_state_signature_metric(driver, term_bank, datapoint, org_int_coords)
             datapoint=datapoint,
             mask=mask,
             org_int_coords=org_int_coords,
+            mode=mode,
         )
         if best_d2 is None or d2 < best_d2:
             best_d2, best_grad = d2, grad_d2

@@ -133,6 +133,10 @@ from .dispersionmodel import DispersionModel
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
+from .gxtbdriver import GxtbDriver
+from .gxtbdriver import GxtbGradientDriver
+from .gxtbdriver import GxtbHessianDriver
+from .gxtbdriver import GxtbResult
 from .optimizationdriver import OptimizationDriver
 from .mointsdriver import MOIntegralsDriver
 from .mp2driver import Mp2Driver

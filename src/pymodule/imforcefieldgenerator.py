@@ -44,6 +44,7 @@ from copy import deepcopy
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
+from .gxtbdriver import GxtbDriver, GxtbGradientDriver, GxtbHessianDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfgradientdriver import ScfGradientDriver
@@ -244,9 +245,13 @@ class IMForceFieldGenerator:
             self.drivers['gs'] = (ground_state_driver, qm_grad_driver, qm_hess_driver)
         # External Settings
 
-        if isinstance(ground_state_driver, XtbDriver):
-            qm_grad_driver = XtbGradientDriver(ground_state_driver)
-            qm_hess_driver = XtbHessianDriver(ground_state_driver)
+        if isinstance(ground_state_driver, (XtbDriver, GxtbDriver)):
+            if isinstance(ground_state_driver, GxtbDriver):
+                qm_grad_driver = GxtbGradientDriver(ground_state_driver)
+                qm_hess_driver = GxtbHessianDriver(ground_state_driver)
+            else:
+                qm_grad_driver = XtbGradientDriver(ground_state_driver)
+                qm_hess_driver = XtbHessianDriver(ground_state_driver)
             self.drivers['gs'] = (ground_state_driver, qm_grad_driver, qm_hess_driver)
             self.sampling_driver['gs'] = self.drivers['gs']
 
@@ -276,15 +281,6 @@ class IMForceFieldGenerator:
         self.tc_weight_mode = "multiplicative"  # "additive_rhee"
         self.use_mass_weight = True # set True as it is standard in the YM scheme --> small differences
         self.consider_locality = False
-        self.use_local_group_database = False
-        self.local_group_phase_library = {
-            3: (0.0, np.pi / 6.0, np.pi / 3.0, np.pi / 2.0),
-        }
-        self.local_group_coupling_threshold = 0.15
-        self.local_group_coupling_topology = 'direct_factors'
-        self.local_group_force_merge_overlapping_groups = True
-        self.relax_local_group_rotors_during_optimization = True
-        self.relax_alkyl_local_group_states = False
 
         self.eq_bond_length = None
         self.eq_bond_length_irc_bonds = None
@@ -378,14 +374,75 @@ class IMForceFieldGenerator:
             "primary_amine",
             "ammonium",
         }
+        self.use_local_group_database = False
+        self.local_group_phase_library = {
+            3: (0.0, np.pi / 6.0, np.pi / 3.0, np.pi / 2.0),
+        }
+        self.local_group_coupling_threshold = 0.15
+        self.local_group_coupling_topology = 'direct_factors'
+        self.local_group_force_merge_overlapping_groups = True
+        self.local_factor_state_weight_mode = "signature"
+        self.relax_local_group_rotors_during_optimization = True
+        self.relax_alkyl_local_group_states = True
+        self.relax_methoxy_local_group_states = True
+        self.methoxy_state_opt_max_iter = 500
         self.alkyl_chain_phase_values_degrees = (0, 60, 120, 180, 240, 300)
         self.anchored_linker_phase_values_degrees = (0, 60, 120, 180, 240, 300)
         self.anchored_linker_signature_angle_scale = 0.35
-        self.anchored_linker_state_opt_max_iter = 220
+        self.anchored_linker_state_opt_max_iter = 500
         self.anchored_linker_relax_amide = True
         self.anchored_linker_freeze_boundary_angles = False
         self.local_group_allow_anchored_linker_methyl_coupling = False
         self.methoxy_phase_values_degrees = (0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340)
+
+    @staticmethod
+    def _is_xtb_like_driver(driver):
+        return isinstance(driver, (XtbDriver, GxtbDriver))
+
+    def _read_basis_for_driver(self, molecule, driver, basis_label):
+        if self._is_xtb_like_driver(driver):
+            return None
+        return MolecularBasis.read(molecule, basis_label)
+
+    def _refresh_basis_for_driver(self, molecule, driver, basis):
+        if self._is_xtb_like_driver(driver):
+            return None
+        if basis is not None and hasattr(basis, 'get_main_basis_label'):
+            return MolecularBasis.read(molecule, basis.get_main_basis_label())
+        return basis
+
+    @staticmethod
+    def _driver_metadata(driver):
+        get_metadata = getattr(driver, 'get_metadata', None)
+        if callable(get_metadata):
+            return get_metadata()
+        return getattr(driver, 'metadata', None)
+
+    def _collect_backend_metadata(self, drivers):
+        if drivers is None:
+            return {}
+
+        roles = ('energy', 'gradient', 'hessian')
+        gxtb_metadata = {}
+        for role, driver in zip(roles, drivers):
+            if isinstance(driver, (GxtbDriver, GxtbGradientDriver,
+                                   GxtbHessianDriver)):
+                if role == 'energy' and isinstance(driver, GxtbDriver):
+                    metadata = getattr(driver, 'energy_metadata', None)
+                    if metadata is None:
+                        metadata = self._driver_metadata(driver)
+                else:
+                    metadata = self._driver_metadata(driver)
+                if metadata:
+                    gxtb_metadata[role] = metadata
+
+        if not gxtb_metadata:
+            return {}
+
+        return {
+            'reference_backend': 'gxtb',
+            'gxtb': gxtb_metadata,
+        }
 
     def define_z_matrix_dict(self, molecule, add_coordinates=None):
         g_molecule = geometric.molecule.Molecule()
@@ -2190,6 +2247,23 @@ class IMForceFieldGenerator:
             axis_to_rotor_ids.setdefault(
                 canonical_axis(rotor.axis), []).append(str(rotor_id))
 
+        tertbutyl_parent_axes = set()
+        tertbutyl_parent_owned_sets = []
+        for cluster in local_group_model.clusters.values():
+            if str(getattr(cluster, "family_label", "")) != "tertbutyl_parent":
+                continue
+
+            tertbutyl_parent_owned_sets.append(
+                set(int(atom) for atom in cluster.owned_atoms)
+            )
+            for rotor_id in cluster.rotor_ids:
+                rotor = local_group_model.rotors.get(str(rotor_id))
+                if rotor is None:
+                    continue
+                if str(getattr(rotor, "kind", "")) != "tertbutyl_parent":
+                    continue
+                tertbutyl_parent_axes.add(canonical_axis(rotor.axis))
+
         candidates = []
         for axis in sorted(rotatable_axes):
             atom_a, atom_b = axis
@@ -2197,8 +2271,17 @@ class IMForceFieldGenerator:
                 continue
 
             for anchor, first_atom in ((atom_a, atom_b), (atom_b, atom_a)):
+                if canonical_axis((anchor, first_atom)) in tertbutyl_parent_axes:
+                    continue
+
                 side_atoms = component_on_side(first_atom, axis)
                 if anchor in side_atoms:
+                    continue
+                side_set = set(int(atom) for atom in side_atoms)
+                if any(
+                    side_set <= tertbutyl_atoms
+                    for tertbutyl_atoms in tertbutyl_parent_owned_sets
+                ):
                     continue
                 if not side_is_alkyl_substituent(side_atoms):
                     continue
@@ -2787,6 +2870,8 @@ class IMForceFieldGenerator:
                     'eq_bond_symmetry_mode':self.eq_bond_symmetry_mode,
                     'use_tc_weights':self.use_tc_weights,
                     'tc_weight_mode':self.tc_weight_mode,
+                    'local_factor_state_weight_mode':
+                        self.local_factor_state_weight_mode,
                     'use_mass_weight':self.use_mass_weight,
                 })
 
@@ -2888,7 +2973,7 @@ class IMForceFieldGenerator:
 
             self.local_group_model[root] = self.local_group_primitive_model[root]
             self.local_groups[root] = self.local_group_model[root].clusters
-            
+
             excluded_local_atoms = set()
             for cluster in self.local_group_model[root].clusters.values():
                 cluster_owned = set(int(atom) for atom in cluster.owned_atoms)
@@ -2935,6 +3020,8 @@ class IMForceFieldGenerator:
                 'eq_bond_symmetry_mode': self.eq_bond_symmetry_mode,
                 'use_tc_weights': self.use_tc_weights,
                 'tc_weight_mode': self.tc_weight_mode,
+                'local_factor_state_weight_mode':
+                    self.local_factor_state_weight_mode,
                 'use_mass_weight': self.use_mass_weight,
             }
             self.sampling_states_interpolation_settings[self.roots_to_follow[0]] = self.states_interpolation_settings[self.roots_to_follow[0]].copy()
@@ -3103,6 +3190,8 @@ class IMForceFieldGenerator:
                 mol,
                 basis=None,
             )
+            backend_metadata = self._collect_backend_metadata(
+                self.sampling_driver['gs'])
 
             # Build datapoint in sampling DB using same label and geometry metadata
             inv_sqrt = None
@@ -3119,6 +3208,7 @@ class IMForceFieldGenerator:
             samp_dp = InterpolationDatapoint(self.roots_z_matrix[root])
             samp_dp.update_settings(sampling_settings)
             samp_dp.cartesian_coordinates = ref_dp.cartesian_coordinates
+            samp_dp.metadata = deepcopy(backend_metadata)
             samp_dp.eq_bond_lengths = ref_dp.eq_bond_lengths
             samp_dp.imp_int_coordinates = getattr(ref_dp, 'imp_int_coordinates', [])
             samp_dp.inv_sqrt_masses = inv_sqrt
@@ -3273,7 +3363,7 @@ class IMForceFieldGenerator:
                                     self.ostream.print_blank()
                                     self.ostream.flush()
 
-                                elif self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
+                                elif self.roots_to_follow[0] == 0 and self._is_xtb_like_driver(self.drivers['gs'][0]):
 
                                     opt_results = self._run_optimization(
                                         self.drivers['gs'][0],
@@ -3284,7 +3374,7 @@ class IMForceFieldGenerator:
                                     )
                                     optimized_molecule = opt_results['final_molecule']
                                     optimized_molecule_for_scan = optimized_molecule
-                                    current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
+                                    current_basis = None
                                     current_molecule_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow, constraints_global,transition))
                                     self.ostream.print_blank()
                                     self.ostream.print_header('Optimized Molecule')
@@ -3295,10 +3385,12 @@ class IMForceFieldGenerator:
 
                             else:
                                 if self.roots_to_follow[0] == 0:
-                                    current_basis = MolecularBasis.read(mol, states_basis['gs'])
+                                    current_basis = self._read_basis_for_driver(
+                                        mol, self.drivers['gs'][0], states_basis['gs'])
                                     current_molecule_to_add_info.append((mol, current_basis, self.roots_to_follow, []))
                                 else:
-                                    current_basis = MolecularBasis.read(mol, states_basis['es'])
+                                    current_basis = self._read_basis_for_driver(
+                                        mol, self.drivers['es'][0], states_basis['es'])
                                     current_molecule_to_add_info.append((mol, current_basis, self.roots_to_follow, []))
 
                             if mode == "normal" and optimized_molecule_for_scan is not None:
@@ -3412,7 +3504,7 @@ class IMForceFieldGenerator:
                         self.ostream.print_blank()
                         self.ostream.flush()
 
-                    elif self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], XtbDriver):
+                    elif self.roots_to_follow[0] == 0 and self._is_xtb_like_driver(self.drivers['gs'][0]):
 
                         opt_results = self._run_optimization(
                             self.drivers['gs'][0],
@@ -3423,7 +3515,7 @@ class IMForceFieldGenerator:
 
                         optimized_molecule = opt_results['final_molecule']
 
-                        current_basis = MolecularBasis.read(optimized_molecule, states_basis['gs'])
+                        current_basis = None
                         molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow, self.use_minimized_structures[1]))
 
                         self.ostream.print_blank()
@@ -3437,10 +3529,12 @@ class IMForceFieldGenerator:
 
                 else:
                     if self.roots_to_follow[0] == 0:
-                        current_basis = MolecularBasis.read(molecule, states_basis['gs'])
+                        current_basis = self._read_basis_for_driver(
+                            molecule, self.drivers['gs'][0], states_basis['gs'])
                         molecules_to_add_info.append((molecule, current_basis, self.roots_to_follow, []))
                     else:
-                        current_basis = MolecularBasis.read(molecule, states_basis['es'])
+                        current_basis = self._read_basis_for_driver(
+                            molecule, self.drivers['es'][0], states_basis['es'])
                         molecules_to_add_info.append((molecule, current_basis, self.roots_to_follow, []))
 
                     self.add_point(molecules_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
@@ -3448,10 +3542,12 @@ class IMForceFieldGenerator:
             else:
 
                 if self.roots_to_follow[0] == 0:
-                    current_basis = MolecularBasis.read(molecule, states_basis['gs'])
+                    current_basis = self._read_basis_for_driver(
+                        molecule, self.drivers['gs'][0], states_basis['gs'])
                     molecules_to_add_info.append((molecule, current_basis, self.roots_to_follow, []))
                 else:
-                    current_basis = MolecularBasis.read(molecule, states_basis['es'])
+                    current_basis = self._read_basis_for_driver(
+                        molecule, self.drivers['es'][0], states_basis['es'])
                     molecules_to_add_info.append((molecule, current_basis, self.roots_to_follow, []))
 
                 if not Path(imforcefieldfile).exists():
@@ -3499,6 +3595,12 @@ class IMForceFieldGenerator:
                 )
                 im_database_driver.relax_alkyl_local_group_states = (
                     self.relax_alkyl_local_group_states
+                )
+                im_database_driver.relax_methoxy_local_group_states = (
+                    self.relax_methoxy_local_group_states
+                )
+                im_database_driver.methoxy_state_opt_max_iter = (
+                    self.methoxy_state_opt_max_iter
                 )
 
             im_database_driver.system_from_molecule(dynamics_molecule, self.roots_z_matrix, forcefield_generator, solvent=self.solvent, qm_atoms='all')
@@ -4267,9 +4369,11 @@ class IMForceFieldGenerator:
 
                 for i, mol in enumerate(random_structure_choices_root.get('random_struct_info')[:]):
                     if root == 0:
-                        current_basis = MolecularBasis.read(mol, basis['gs'])
+                        current_basis = self._read_basis_for_driver(
+                            mol, drivers[0], basis['gs'])
                     else:
-                        current_basis = MolecularBasis.read(mol, basis['es'])
+                        current_basis = self._read_basis_for_driver(
+                            mol, drivers[0], basis['es'])
                     impes_driver.compute(mol)
 
                     reference_energies, _, _ = self._compute_energy(drivers[0], mol, current_basis)
@@ -4916,7 +5020,7 @@ class IMForceFieldGenerator:
         if not constraints:
             return molecule, basis
 
-        if isinstance(drivers[0], XtbDriver):
+        if self._is_xtb_like_driver(drivers[0]):
             opt_results = self._run_optimization(
                 drivers[0],
                 molecule,
@@ -4940,14 +5044,117 @@ class IMForceFieldGenerator:
         )
         optimized_molecule = opt_results['final_molecule']
 
-        if (
-            basis is not None
-            and hasattr(basis, 'get_main_basis_label')
-        ):
-            basis = MolecularBasis.read(
-                optimized_molecule,
-                basis.get_main_basis_label(),
+        basis = self._refresh_basis_for_driver(
+            optimized_molecule, drivers[0], basis)
+
+        return optimized_molecule, basis
+
+    def _methoxy_local_state_relaxation_constraints(
+            self,
+            molecule,
+            local_group_model,
+            cluster,
+            rotor_ids):
+        if not self._local_group_cluster_contains_rotor_kind(
+                local_group_model, cluster, 'methoxy'):
+            return []
+
+        movable_atoms = set(
+            int(atom) for atom in getattr(cluster, 'active_atoms', ()))
+        methoxy_atoms = set(
+            self._local_group_cluster_owned_atoms_for_rotor_kind(
+                local_group_model, cluster, 'methoxy')
+        )
+        movable_atoms.update(methoxy_atoms)
+
+        for rotor_id in getattr(cluster, 'rotor_ids', ()):
+            rotor = local_group_model.rotors.get(str(rotor_id))
+            if rotor is None or str(rotor.kind) != 'methoxy':
+                continue
+            movable_atoms.update(int(atom) for atom in rotor.axis)
+            if rotor.phase_coordinate is not None:
+                movable_atoms.update(
+                    int(atom) for atom in rotor.phase_coordinate)
+
+        if not movable_atoms:
+            return []
+
+        constraints = []
+        all_atoms = set(range(len(molecule.get_labels())))
+        frozen_atoms = sorted(all_atoms - movable_atoms)
+        if frozen_atoms:
+            frozen_atoms_one_based = ','.join(
+                str(int(atom) + 1) for atom in frozen_atoms)
+            constraints.append(f'freeze xyz {frozen_atoms_one_based}')
+
+        seen_dihedrals = set()
+        for rotor_id in rotor_ids:
+            rotor = local_group_model.rotors.get(str(rotor_id))
+            if rotor is None:
+                continue
+
+            dihedral = self._oriented_local_rotor_dihedral(rotor)
+            if dihedral is None:
+                continue
+
+            key = tuple(int(atom) for atom in dihedral)
+            canonical_key = min(key, tuple(reversed(key)))
+            if canonical_key in seen_dihedrals:
+                continue
+            seen_dihedrals.add(canonical_key)
+
+            constraints.append(
+                "freeze dihedral "
+                + " ".join(str(int(atom) + 1) for atom in key)
             )
+
+        return constraints
+
+    def _relax_methoxy_local_group_state(
+            self,
+            drivers,
+            molecule,
+            basis,
+            local_group_model,
+            cluster,
+            rotor_ids):
+        if not getattr(self, 'relax_methoxy_local_group_states', False):
+            return molecule, basis
+
+        constraints = self._methoxy_local_state_relaxation_constraints(
+            molecule,
+            local_group_model,
+            cluster,
+            rotor_ids,
+        )
+        if not constraints:
+            return molecule, basis
+
+        max_iter = getattr(self, "methoxy_state_opt_max_iter", 120)
+        if self._is_xtb_like_driver(drivers[0]):
+            opt_results = self._run_optimization(
+                drivers[0],
+                molecule,
+                constraints=constraints,
+                index_offset=1,
+                max_iter=max_iter,
+            )
+            optimized_molecule = opt_results['final_molecule']
+            return optimized_molecule, basis
+
+        _, scf_results, _ = self._compute_energy(drivers[0], molecule, basis)
+        opt_results = self._run_optimization(
+            drivers[0],
+            molecule,
+            constraints=constraints,
+            index_offset=1,
+            compute_args=(basis, scf_results),
+            max_iter=max_iter,
+        )
+        optimized_molecule = opt_results['final_molecule']
+
+        basis = self._refresh_basis_for_driver(
+            optimized_molecule, drivers[0], basis)
 
         return optimized_molecule, basis
 
@@ -5080,7 +5287,7 @@ class IMForceFieldGenerator:
         if not constraints:
             return molecule, basis
 
-        if isinstance(drivers[0], XtbDriver):
+        if self._is_xtb_like_driver(drivers[0]):
             opt_results = self._run_optimization(
                 drivers[0],
                 molecule,
@@ -5104,14 +5311,8 @@ class IMForceFieldGenerator:
         )
         optimized_molecule = opt_results['final_molecule']
 
-        if (
-            basis is not None
-            and hasattr(basis, 'get_main_basis_label')
-        ):
-            basis = MolecularBasis.read(
-                optimized_molecule,
-                basis.get_main_basis_label(),
-            )
+        basis = self._refresh_basis_for_driver(
+            optimized_molecule, drivers[0], basis)
 
         return optimized_molecule, basis
 
@@ -5479,6 +5680,7 @@ class IMForceFieldGenerator:
                     drivers[1], mol_basis[0], mol_basis[1], scf_results, rsp_results)
                 hessians = self._compute_hessian(
                     drivers[2], mol_basis[0], mol_basis[1])
+                backend_metadata = self._collect_backend_metadata(drivers)
 
                 inv_sqrt_masses = None
                 if self.use_mass_weight:
@@ -5521,6 +5723,7 @@ class IMForceFieldGenerator:
                         eq_bond_lengths=self.eq_bond_length,
                         imp_int_constraints=imp_int_constraints,
                     )
+                    core_dp.metadata = deepcopy(backend_metadata)
                     core_dp.point_label = core_label
 
                     local_group_model, coupling_data = self._build_coupled_local_group_model(
@@ -5587,6 +5790,7 @@ class IMForceFieldGenerator:
                                 eq_bond_lengths=self.eq_bond_length,
                                 imp_int_constraints=imp_int_constraints,
                             )
+                            cluster_dp.metadata = deepcopy(backend_metadata)
                             cluster_molecule = mol_basis[0]
                         else:
                             has_anchored_linker = (
@@ -5609,7 +5813,7 @@ class IMForceFieldGenerator:
 
                             cluster_basis = mol_basis[1]
                             if (
-                                not isinstance(drivers[0], XtbDriver)
+                                not self._is_xtb_like_driver(drivers[0])
                                 and cluster_basis is not None
                                 and hasattr(cluster_basis, 'get_main_basis_label')
                             ):
@@ -5753,7 +5957,28 @@ class IMForceFieldGenerator:
                                     phase_signature,
                                     skip_kinds={'anchored_linker'},
                                 )
+                                cluster_molecule, cluster_basis = (
+                                    self._relax_methoxy_local_group_state(
+                                        drivers,
+                                        cluster_molecule,
+                                        cluster_basis,
+                                        local_group_model,
+                                        cluster,
+                                        rotor_ids,
+                                    )
+                                )
                             else:
+                                print("Relax the methoxy group")
+                                cluster_molecule, cluster_basis = (
+                                    self._relax_methoxy_local_group_state(
+                                        drivers,
+                                        cluster_molecule,
+                                        cluster_basis,
+                                        local_group_model,
+                                        cluster,
+                                        rotor_ids,
+                                    )
+                                )
                                 print("Relax the alkyl chain")
                                 cluster_molecule, cluster_basis = (
                                     self._relax_alkyl_local_group_state(
@@ -5783,6 +6008,8 @@ class IMForceFieldGenerator:
                             )
                             cluster_hessians = self._compute_hessian(
                                 drivers[2], cluster_molecule, cluster_basis)
+                            cluster_backend_metadata = (
+                                self._collect_backend_metadata(drivers))
 
                             cluster_dp = self._create_local_group_datapoint(
                                 molecule=cluster_molecule,
@@ -5795,6 +6022,8 @@ class IMForceFieldGenerator:
                                 eq_bond_lengths=self.eq_bond_length,
                                 imp_int_constraints=imp_int_constraints,
                             )
+                            cluster_dp.metadata = deepcopy(
+                                cluster_backend_metadata)
 
                         cluster_dp.point_label = label
                         self._set_local_group_datapoint_metadata(
@@ -5953,6 +6182,7 @@ class IMForceFieldGenerator:
 
                 gradients = self._compute_gradient(drivers[1], mol_basis[0], mol_basis[1], scf_results, rsp_results)
                 hessians = self._compute_hessian(drivers[2], mol_basis[0], mol_basis[1])
+                backend_metadata = self._collect_backend_metadata(drivers)
 
                 inv_sqrt_masses = None
                 if self.use_mass_weight:
@@ -5994,6 +6224,7 @@ class IMForceFieldGenerator:
                     impes_coordinate.eq_bond_lengths = self.eq_bond_length
                     impes_coordinate.imp_int_coordinates = imp_int_constraints
                     impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
+                    impes_coordinate.metadata = deepcopy(backend_metadata)
                     impes_coordinate.energy = energies[number]
                     impes_coordinate.gradient = mw_grad_vec.reshape(grad.shape)
                     impes_coordinate.hessian = mw_hess_mat.reshape(hess.shape)
@@ -6098,6 +6329,13 @@ class IMForceFieldGenerator:
                 raise RuntimeError('XTB energy is None on this rank after MPI synchronization.')
             qm_energy = np.array([qm_energy])
 
+        elif isinstance(qm_driver, GxtbDriver):
+            qm_driver.ostream.mute()
+            result = qm_driver.compute(molecule)
+            qm_driver.ostream.unmute()
+            qm_driver.energy_metadata = result.metadata
+            qm_energy = np.array([result.energy])
+
         # restricted SCF
         elif isinstance(qm_driver, ScfRestrictedDriver) or isinstance(qm_driver, ScfUnrestrictedDriver):
             qm_driver.ostream.mute()
@@ -6131,6 +6369,13 @@ class IMForceFieldGenerator:
 
         if isinstance(grad_driver, XtbGradientDriver):
 
+            grad_driver.ostream.mute()
+            grad_driver.compute(molecule)
+            qm_gradient = grad_driver.gradient
+            qm_gradient = np.array([qm_gradient])
+            grad_driver.ostream.unmute()
+
+        elif isinstance(grad_driver, GxtbGradientDriver):
             grad_driver.ostream.mute()
             grad_driver.compute(molecule)
             qm_gradient = grad_driver.gradient
@@ -6175,6 +6420,17 @@ class IMForceFieldGenerator:
 
             if qm_hessian is None:
                 raise RuntimeError('XTB Hessian is None on this rank after MPI synchronization.')
+            qm_hessians = np.array([qm_hessian])
+
+        elif isinstance(hess_driver, GxtbHessianDriver):
+            hess_driver.ostream.mute()
+            hess_driver.compute(molecule)
+            qm_hessian = hess_driver.hessian
+            hess_driver.ostream.unmute()
+
+            if qm_hessian is None:
+                raise RuntimeError(
+                    'g-XTB Hessian is None on this rank after MPI synchronization.')
             qm_hessians = np.array([qm_hessian])
 
         elif isinstance(hess_driver, ScfHessianDriver):

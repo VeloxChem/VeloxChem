@@ -136,6 +136,7 @@ class InterpolationDriver:
         self.qm_data_points = None
         self.qm_local_factor_banks = {}
         self.local_factor_root = None
+        self.local_factor_state_weight_mode = "signature"
 
         # Confidence radii optimization information
         self.dw_dalpha_list = []
@@ -150,6 +151,9 @@ class InterpolationDriver:
         self.labels = None
         self.use_inverse_bond_length = True
         self.use_eq_bond_length = False
+        self.bond_coordinate_mode = "legacy"
+        self.angle_coordinate_mode = "raw"
+        self.use_eq_angle_cosine = False
         self.eq_bond_symmetry_mode = "masked_exact"
         # self.use_cos_angle = False
         self.use_mass_weight = False
@@ -187,10 +191,14 @@ class InterpolationDriver:
                     ('str', 'the name of the chk file with QM data'),
                     'use_inverse_bond_length': ('bool', 'whether to use inverse bond lengths in the Z-matrix'),
                     'use_eq_bond_length': ('bool', 'whether to use eq bond lengths in the Z-matrix'),
+                    'bond_coordinate_mode': ('str', 'bond coordinate mode'),
+                    'angle_coordinate_mode': ('str', 'angle coordinate mode'),
+                    'use_eq_angle_cosine': ('bool', 'use eq-cosine angle coordinates'),
                     'eq_bond_symmetry_mode': ('str', 'eq-bond symmetry mode: masked_exact or symmetrized'),
                     # 'use_cos_angle': ('bool', 'wether to use cosine description for angles in Z-matrix'),
                     'use_tc_weights':('bool', 'weither to use target coustomized weights'),
                     'tc_weight_mode':('str', 'the mode for the target customized weights (multiplicative/additive)'),
+                    'local_factor_state_weight_mode':('str', 'local factor state weighting metric'),
                     'use_mass_weight':('bool', 'weither to use mass weighting in coordinates'),
                 'labels': ('seq_fixed_str', 'the list of QM data point labels'),
             }
@@ -232,6 +240,15 @@ class InterpolationDriver:
         }
 
         parse_input(self, im_keywords, impes_dict)
+
+        mode = self.impes_coordinate._normalize_bond_coordinate_mode(
+            getattr(self, "bond_coordinate_mode", "legacy")
+        )
+        if mode != "legacy":
+            self.use_inverse_bond_length = (mode == "inverse")
+            self.use_eq_bond_length = (
+                self.impes_coordinate._bond_mode_requires_eq_reference(mode)
+            )
 
         if self.interpolation_type == 'simple':
             AssertionError("simple interpolation scheme is not supported as it is considered worse then shepard interpolation.")
@@ -294,6 +311,82 @@ class InterpolationDriver:
         for family_bank in (self.qm_local_factor_banks or {}).values():
             for data_point in iter_signed_factor_datapoints(family_bank):
                 data_point.inv_sqrt_masses = inv_sqrt_masses
+
+    def _install_runtime_z_matrix(self, z_matrix):
+        self.impes_coordinate.z_matrix_dict = z_matrix
+        self.impes_coordinate.z_matrix = (
+            self.impes_coordinate.flatten_z_matrix(z_matrix)
+        )
+        self.impes_coordinate._b_matrix_row_cache = None
+
+    def _ensure_runtime_z_matrix(self):
+        if getattr(self.impes_coordinate, "z_matrix", None) is not None:
+            return
+
+        z_matrix = getattr(self, "z_matrix", None)
+        if z_matrix is None:
+            labels, z_matrix = self.read_labels()
+            self.labels = labels
+            self.z_matrix = z_matrix
+
+        self._install_runtime_z_matrix(z_matrix)
+
+    def _runtime_inv_sqrt_masses(self, molecule):
+        masses = np.asarray(molecule.get_masses(), dtype=np.float64).reshape(-1)
+        return np.repeat(1.0 / np.sqrt(masses), 3)
+
+    def _ensure_runtime_eq_references(self):
+        needs_eq_bonds = bool(self.use_eq_bond_length)
+        needs_eq_angles = (
+            str(getattr(self, "angle_coordinate_mode", "raw")).strip().lower()
+            == "eq_cosine"
+        )
+        if not needs_eq_bonds and not needs_eq_angles:
+            return
+
+        has_bonds = (
+            not needs_eq_bonds
+            or getattr(self.impes_coordinate, "eq_bond_lengths", None) is not None
+        )
+        has_angles = (
+            not needs_eq_angles
+            or getattr(self.impes_coordinate, "eq_angle_values", None) is not None
+        )
+        if has_bonds and has_angles:
+            return
+
+        self._ensure_runtime_z_matrix()
+        labels = self.labels
+        if not labels:
+            labels, z_matrix = self.read_labels()
+            self.labels = labels
+            self.z_matrix = z_matrix
+            self._install_runtime_z_matrix(z_matrix)
+
+        for label in labels:
+            data_point = InterpolationDatapoint(self.z_matrix)
+            data_point.update_settings(self.impes_dict)
+            data_point.read_hdf5(self.imforcefield_file, label)
+            if needs_eq_bonds and data_point.eq_bond_lengths is not None:
+                self.impes_coordinate.eq_bond_lengths = (
+                    data_point.eq_bond_lengths)
+            if needs_eq_angles and data_point.eq_angle_values is not None:
+                self.impes_coordinate.eq_angle_values = (
+                    data_point.eq_angle_values)
+            break
+
+    def _ensure_runtime_mass_weights(self, molecule):
+        if not self.use_mass_weight:
+            return
+
+        inv_sqrt = getattr(self.impes_coordinate, "inv_sqrt_masses", None)
+        expected_size = 3 * len(molecule.get_labels())
+        if inv_sqrt is None or np.asarray(inv_sqrt).size != expected_size:
+            inv_sqrt = self._runtime_inv_sqrt_masses(molecule)
+            self.impes_coordinate.inv_sqrt_masses = inv_sqrt
+
+        if self.qm_local_factor_banks:
+            self._set_local_factor_inv_sqrt_masses(inv_sqrt)
 
     def install_local_factor_banks(self, family_banks):
         """Installs factor banks and binds their cores to outer datapoints."""
@@ -413,19 +506,8 @@ class InterpolationDriver:
 
         keys = h5f.keys()
 
-        remove_from_label = ""
-        z_matrix_label = ''
-        if self.impes_coordinate.use_inverse_bond_length:
-            remove_from_label += "_rinv"
-            z_matrix_label += '_rinv'
-
-        elif self.impes_coordinate.use_eq_bond_length:
-            remove_from_label += "_eq"
-            z_matrix_label += '_eq'
-
-        else:
-            remove_from_label += "_r"
-            z_matrix_label += '_r'
+        remove_from_label = self.impes_coordinate.coordinate_label_suffix()
+        z_matrix_label = remove_from_label
 
         remove_from_label += "_dihedral"
         z_matrix_label += '_dihedral'
@@ -502,11 +584,15 @@ class InterpolationDriver:
 
         self.molecule = molecule
 
+        self._ensure_runtime_z_matrix()
+        self._ensure_runtime_eq_references()
+        self._ensure_runtime_mass_weights(molecule)
         self.define_impes_coordinate(molecule.get_coordinates_in_bohr())
         self._eq_candidate_base_cache = None
 
         if self.qm_data_points is None:
             self.qm_data_points = self.read_qm_data_points()
+            self._ensure_runtime_mass_weights(molecule)
 
         if self.interpolation_type == 'shepard':
             self.shepard_interpolation()

@@ -60,6 +60,7 @@ from .scfhessiandriver import ScfHessianDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
+from .gxtbdriver import GxtbDriver, GxtbGradientDriver, GxtbHessianDriver
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
 from .imtrustradiusoptimizer import IMTrustRadiusOptimizer
@@ -218,6 +219,11 @@ class IMDatabasePointCollecter:
 
         # QM Region parameters
         self.drivers = None
+        self.reference_backend = None
+        self.gxtb_binary = None
+        self.charge = None
+        self.uhf = None
+        self.nthreads = 1
         self.qm_atoms = None
         self.mm_subregion = None
         self.linking_atoms = None
@@ -761,6 +767,89 @@ class IMDatabasePointCollecter:
         if int(cfg['hill_frequency']) <= 0:
             raise ValueError("metadynamics.hill_frequency must be > 0.")
 
+    def configure_reference_backend(self, backend='gxtb', state_key='gs', **kwargs):
+        """
+        Configures the reference backend used for interpolation point data.
+
+        The g-XTB backend creates the existing collector driver tuple:
+        energy driver, gradient driver, Hessian driver.
+        """
+
+        backend = str(backend).strip().lower()
+        if backend != 'gxtb':
+            raise ValueError(
+                "IMDatabasePointCollecter: unsupported reference backend "
+                f"'{backend}'.")
+
+        gxtb_drv = GxtbDriver(
+            self.comm,
+            self.ostream,
+            xtb_binary=kwargs.get('xtb_binary', self.gxtb_binary),
+            charge=kwargs.get('charge', self.charge),
+            uhf=kwargs.get('uhf', self.uhf),
+            nthreads=kwargs.get('nthreads', self.nthreads),
+            timeout=kwargs.get('timeout', 300),
+            keep_workdir=kwargs.get('keep_workdir', False),
+            verify_binary=kwargs.get('verify_binary', True),
+            hessian_acc=kwargs.get('hessian_acc', 1.0),
+        )
+        self.reference_backend = 'gxtb'
+        self.gxtb_binary = gxtb_drv.xtb_binary
+        self.charge = gxtb_drv.charge
+        self.uhf = gxtb_drv.uhf
+        self.nthreads = gxtb_drv.nthreads
+
+        if self.drivers is None:
+            self.drivers = {}
+        self.drivers[state_key] = (
+            gxtb_drv,
+            GxtbGradientDriver(gxtb_drv),
+            GxtbHessianDriver(gxtb_drv),
+        )
+        return self.drivers[state_key]
+
+    @staticmethod
+    def _driver_requires_basis(driver):
+        return isinstance(driver, (ScfRestrictedDriver, ScfUnrestrictedDriver))
+
+    def _read_basis_for_driver(self, molecule, driver, state_key):
+        if not self._driver_requires_basis(driver):
+            return None
+        return MolecularBasis.read(molecule, self.basis_set_label[state_key])
+
+    @staticmethod
+    def _driver_metadata(driver):
+        get_metadata = getattr(driver, 'get_metadata', None)
+        if callable(get_metadata):
+            return get_metadata()
+        return getattr(driver, 'metadata', None)
+
+    def _collect_backend_metadata(self, drivers):
+        if drivers is None:
+            return {}
+
+        roles = ('energy', 'gradient', 'hessian')
+        gxtb_metadata = {}
+        for role, driver in zip(roles, drivers):
+            if isinstance(driver, (GxtbDriver, GxtbGradientDriver,
+                                   GxtbHessianDriver)):
+                if role == 'energy' and isinstance(driver, GxtbDriver):
+                    metadata = getattr(driver, 'energy_metadata', None)
+                    if metadata is None:
+                        metadata = self._driver_metadata(driver)
+                else:
+                    metadata = self._driver_metadata(driver)
+                if metadata:
+                    gxtb_metadata[role] = metadata
+
+        if not gxtb_metadata:
+            return {}
+
+        return {
+            'reference_backend': 'gxtb',
+            'gxtb': gxtb_metadata,
+        }
+
     def update_settings(self, dynamics_settings, interpolation_settings=None, sampling_interpolation_settings=None):
         """
         Updates settings in the ImpesDynamicsDriver.
@@ -770,7 +859,36 @@ class IMDatabasePointCollecter:
             The input dictionary of settings for IMPES.
         """
 
-        self.drivers = dynamics_settings['drivers']
+        self.drivers = dynamics_settings.get('drivers', self.drivers)
+
+        if 'reference_backend' in dynamics_settings:
+            self.reference_backend = dynamics_settings['reference_backend']
+        if 'gxtb_binary' in dynamics_settings:
+            self.gxtb_binary = dynamics_settings['gxtb_binary']
+        if 'charge' in dynamics_settings:
+            self.charge = dynamics_settings['charge']
+        if 'uhf' in dynamics_settings:
+            self.uhf = dynamics_settings['uhf']
+        if 'nthreads' in dynamics_settings:
+            self.nthreads = dynamics_settings['nthreads']
+
+        if self.drivers is None and self.reference_backend is not None:
+            self.configure_reference_backend(
+                self.reference_backend,
+                xtb_binary=self.gxtb_binary,
+                charge=self.charge,
+                uhf=self.uhf,
+                nthreads=self.nthreads,
+                timeout=dynamics_settings.get('gxtb_timeout', 300),
+                keep_workdir=dynamics_settings.get('gxtb_keep_workdir', False),
+                hessian_acc=dynamics_settings.get('gxtb_hessian_acc', 1.0),
+                verify_binary=dynamics_settings.get('gxtb_verify_binary', True),
+            )
+
+        if self.drivers is None:
+            raise ValueError(
+                "IMDatabasePointCollecter: no QM drivers configured. Provide "
+                "'drivers' or set reference_backend='gxtb'.")
 
         self.interpolation_settings = interpolation_settings
         self.sampling_interpolation_settings = sampling_interpolation_settings
@@ -2612,9 +2730,11 @@ class IMDatabasePointCollecter:
             self.ostream.flush()
             current_basis = None
             if identification_state == 0:
-                current_basis = MolecularBasis.read(molecule, self.basis_set_label['gs'])
+                current_basis = self._read_basis_for_driver(
+                    molecule, drivers[0], 'gs')
             else:
-                current_basis = MolecularBasis.read(molecule, self.basis_set_label['es'])
+                current_basis = self._read_basis_for_driver(
+                    molecule, drivers[0], 'es')
 
             qm_energy, scf_results, rsp_results = self._compute_energy(drivers[0], molecule, current_basis)
             gradients = self._compute_gradient(drivers[1], molecule, current_basis, scf_results, rsp_results)
@@ -2782,10 +2902,12 @@ class IMDatabasePointCollecter:
                     drivers = None
                     if state_to_optim == 0:
                         drivers = self.drivers['gs']
-                        current_basis = MolecularBasis.read(molecule, self.basis_set_label['gs'])
+                        current_basis = self._read_basis_for_driver(
+                            molecule, drivers[0], 'gs')
                     else:
                         drivers = self.drivers['es']
-                        current_basis = MolecularBasis.read(molecule, self.basis_set_label['es'])
+                        current_basis = self._read_basis_for_driver(
+                            molecule, drivers[0], 'es')
 
                     optimized_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
                     self.impes_drivers[state_to_optim].compute(molecule)
@@ -2885,13 +3007,16 @@ class IMDatabasePointCollecter:
                         energies, scf_results, rsp_results = self._compute_energy(drivers[0], molecule, current_basis)
 
                         opt_results, opt_gradient = self._run_optimization(drivers[0], molecule, constraints=constraint_mask, index_offset=1, compute_args=(current_basis, scf_results))
-                    elif isinstance(drivers[0], XtbDriver):
+                    elif isinstance(drivers[0], (XtbDriver, GxtbDriver)):
                         opt_results, opt_gradient = self._run_optimization(drivers[0], molecule, constraints=constraint_mask, index_offset=1)
 
                     optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
                     optimized_molecule.set_charge(molecule.get_charge())
                     optimized_molecule.set_multiplicity(molecule.get_multiplicity())
-                    current_basis = MolecularBasis.read(optimized_molecule, current_basis.get_main_basis_label())
+                    if current_basis is not None:
+                        current_basis = MolecularBasis.read(
+                            optimized_molecule,
+                            current_basis.get_main_basis_label())
                     # determine distance of the new structure:
                     self.impes_drivers[state_to_optim].compute(optimized_molecule)
                     trial_weights = self.impes_drivers[state_to_optim].weights
@@ -2980,7 +3105,7 @@ class IMDatabasePointCollecter:
                                     index_offset=1,
                                     compute_args=(current_basis, scf_results),
                                 )
-                            elif isinstance(drivers[0], XtbDriver):
+                            elif isinstance(drivers[0], (XtbDriver, GxtbDriver)):
                                 opt_results, opt_gradient = self._run_optimization(
                                     drivers[0],
                                     molecule,
@@ -3077,9 +3202,13 @@ class IMDatabasePointCollecter:
 
                 current_basis = None
                 if self.current_state == 0:
-                    current_basis = MolecularBasis.read(molecule, self.basis_set_label['gs'])
+                    drivers = self.drivers['gs']
+                    current_basis = self._read_basis_for_driver(
+                        molecule, drivers[0], 'gs')
                 else:
-                    current_basis = MolecularBasis.read(molecule, self.basis_set_label['es'])
+                    drivers = self.drivers['es']
+                    current_basis = self._read_basis_for_driver(
+                        molecule, drivers[0], 'es')
                 state_specific_molecules.append((molecule, current_basis, addition_of_state_specific_points, {'bonds': [], 'angles': [], 'dihedrals': [], 'impropers':[]}))
 
                 self.add_point(state_specific_molecules, self.non_core_symmetry_groups)
@@ -3336,6 +3465,7 @@ class IMDatabasePointCollecter:
 
                 gradients = self._compute_gradient(drivers[1], mol_basis[0], mol_basis[1], scf_results, rsp_results)
                 hessians = self._compute_hessian(drivers[2], mol_basis[0], mol_basis[1])
+                backend_metadata = self._collect_backend_metadata(drivers)
 
                 inv_sqrt_masses = None
                 if self.use_mass_weight:
@@ -3363,6 +3493,7 @@ class IMDatabasePointCollecter:
                     impes_coordinate.imp_int_coordinates = mol_basis[6]
                     impes_coordinate.eq_bond_lengths = self.qm_data_point_dict[mol_basis[4][number]][0].eq_bond_lengths
                     impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
+                    impes_coordinate.metadata = copy.deepcopy(backend_metadata)
                     impes_coordinate.energy = energies[number]
                     impes_coordinate.gradient = mw_grad_vec.reshape(gradients[number].shape)
                     impes_coordinate.hessian = mw_hess_mat.reshape(hessians[number].shape)
@@ -3441,6 +3572,8 @@ class IMDatabasePointCollecter:
             sampling_grad, molecule, basis=None, scf_results=None, rsp_results=None
         )
         h = self._compute_hessian(sampling_hess, molecule, basis=None)
+        backend_metadata = self._collect_backend_metadata(
+            self.sampling_driver['gs'])
 
         masses = molecule.get_masses().copy()
         inv_sqrt = 1.0 / np.sqrt(np.repeat(masses, 3))
@@ -3454,6 +3587,7 @@ class IMDatabasePointCollecter:
 
         # Geometry + transformed tensors
         dp.cartesian_coordinates = np.array(template_point.cartesian_coordinates, copy=True)
+        dp.metadata = copy.deepcopy(backend_metadata)
         dp.eq_bond_lengths = None if template_point.eq_bond_lengths is None else np.array(template_point.eq_bond_lengths, copy=True)
         dp.imp_int_coordinates = copy.deepcopy(
             getattr(
@@ -4251,6 +4385,13 @@ class IMDatabasePointCollecter:
                 raise RuntimeError('XTB energy is None on this rank after MPI synchronization.')
             qm_energy = np.array([qm_energy])
 
+        elif isinstance(qm_driver, GxtbDriver):
+            qm_driver.ostream.mute()
+            result = qm_driver.compute(molecule)
+            qm_driver.ostream.unmute()
+            qm_driver.energy_metadata = result.metadata
+            qm_energy = np.array([result.energy])
+
         # restricted SCF
         elif isinstance(qm_driver, ScfRestrictedDriver) or isinstance(qm_driver, ScfUnrestrictedDriver):
             qm_driver.ostream.mute()
@@ -4281,6 +4422,13 @@ class IMDatabasePointCollecter:
         qm_gradient = None
 
         if isinstance(grad_driver, XtbGradientDriver):
+            grad_driver.ostream.mute()
+            grad_driver.compute(molecule)
+            qm_gradient = grad_driver.gradient
+            qm_gradient = np.array([qm_gradient])
+            grad_driver.ostream.unmute()
+
+        elif isinstance(grad_driver, GxtbGradientDriver):
             grad_driver.ostream.mute()
             grad_driver.compute(molecule)
             qm_gradient = grad_driver.gradient
@@ -4323,6 +4471,17 @@ class IMDatabasePointCollecter:
 
             if qm_hessian is None:
                 raise RuntimeError('XTB Hessian is None on this rank after MPI synchronization.')
+            qm_hessians = np.array([qm_hessian])
+
+        elif isinstance(hess_driver, GxtbHessianDriver):
+            hess_driver.ostream.mute()
+            hess_driver.compute(molecule)
+            qm_hessian = hess_driver.hessian
+            hess_driver.ostream.unmute()
+
+            if qm_hessian is None:
+                raise RuntimeError(
+                    'g-XTB Hessian is None on this rank after MPI synchronization.')
             qm_hessians = np.array([qm_hessian])
 
         elif isinstance(hess_driver, ScfHessianDriver):

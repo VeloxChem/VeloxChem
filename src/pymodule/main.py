@@ -77,6 +77,7 @@ from .trajectorydriver import TrajectoryDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
+from .gxtbdriver import GxtbDriver, GxtbGradientDriver, GxtbHessianDriver
 from .xpsdriver import XPSDriver
 from .cli import cli
 from .errorhandler import assert_msg_critical, VeloxChemError

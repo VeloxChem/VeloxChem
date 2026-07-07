@@ -33,6 +33,7 @@
 from mpi4py import MPI
 from contextlib import redirect_stderr
 from io import StringIO
+import json
 import numpy as np
 import h5py
 from time import time
@@ -98,6 +99,7 @@ class InterpolationDatapoint:
         self.ostream = ostream
 
         self.point_label = None
+        self.metadata = {}
 
         self.energy = None
         self.gradient = None
@@ -121,6 +123,9 @@ class InterpolationDatapoint:
         self.confidence_radius = None
         self.use_inverse_bond_length = True
         self.use_eq_bond_length = False
+        self.bond_coordinate_mode = "legacy"
+        self.angle_coordinate_mode = "raw"
+        self.use_eq_angle_cosine = False
         self.eq_bond_symmetry_mode = "masked_exact"
         # self.use_cos_angle = False
         self.use_vectorized_b_matrix = True
@@ -128,6 +133,7 @@ class InterpolationDatapoint:
         self.identify_imp_int_coord = True
 
         self.eq_bond_lengths = None
+        self.eq_angle_values = None
 
         # internal_coordinates is a list of geomeTRIC objects which represent
         # different types of internal coordinates (distances, angles, dihedrals)
@@ -162,6 +168,16 @@ class InterpolationDatapoint:
                 'use_eq_bond_length':
                     ('bool',
                      'use the log bond lengths'),
+                'bond_coordinate_mode':
+                    ('str',
+                     'bond coordinate mode: legacy, r, inverse, eq, '
+                     'eq_no_factor, relative, log_relative, scaled_inverse'),
+                'angle_coordinate_mode':
+                    ('str',
+                     'angle coordinate mode: raw, delta, sin_delta, eq_cosine'),
+                'use_eq_angle_cosine':
+                    ('bool',
+                     'use equilibrium-anchored cosine angle coordinates'),
                 'eq_bond_symmetry_mode':
                     ('str', 'eq-bond symmetry mode: masked_exact or symmetrized'),
                 'use_vectorized_b_matrix':
@@ -215,6 +231,12 @@ class InterpolationDatapoint:
         }
 
         parse_input(self, im_keywords, impes_dict)
+        mode = self._normalize_bond_coordinate_mode(
+            getattr(self, "bond_coordinate_mode", "legacy")
+        )
+        if mode != "legacy":
+            self.use_inverse_bond_length = (mode == "inverse")
+            self.use_eq_bond_length = self._bond_mode_requires_eq_reference(mode)
 
     def define_internal_coordinates(self):
         """
@@ -288,6 +310,281 @@ class InterpolationDatapoint:
         )
         return eq_values
 
+    def _normalize_bond_coordinate_mode(self, mode):
+        aliases = {
+            None: "legacy",
+            "": "legacy",
+            "legacy": "legacy",
+            "r": "r",
+            "raw": "r",
+            "plain": "r",
+            "plain_r": "r",
+            "inverse": "inverse",
+            "rinv": "inverse",
+            "1/r": "inverse",
+            "eq": "eq",
+            "equilibrium": "eq",
+            "eq_bond": "eq",
+            "eq_no_factor": "eq_no_factor",
+            "eqnofactor": "eq_no_factor",
+            "inverse_shift": "eq_no_factor",
+            "relative": "relative",
+            "relative_displacement": "relative",
+            "log_relative": "log_relative",
+            "log": "log_relative",
+            "scaled_inverse": "scaled_inverse",
+            "req_over_r_minus_1": "scaled_inverse",
+        }
+        key = str(mode).strip().lower() if mode is not None else None
+        if key not in aliases:
+            raise ValueError(
+                "InterpolationDatapoint: unknown bond_coordinate_mode="
+                f"'{mode}'."
+            )
+        return aliases[key]
+
+    def get_bond_coordinate_mode(self):
+        """
+        Return the active bond coordinate mode.
+
+        The default ``legacy`` value preserves the historical boolean API:
+        ``use_inverse_bond_length=True`` gives ``inverse``; otherwise
+        ``use_eq_bond_length=True`` gives the current equilibrium-bond
+        coordinate; otherwise raw ``r`` is used.
+        """
+        mode = self._normalize_bond_coordinate_mode(
+            getattr(self, "bond_coordinate_mode", "legacy")
+        )
+        if mode == "legacy":
+            if self.use_inverse_bond_length:
+                return "inverse"
+            if self.use_eq_bond_length:
+                return "eq"
+            return "r"
+        return mode
+
+    def _bond_mode_requires_eq_reference(self, mode=None):
+        mode = self.get_bond_coordinate_mode() if mode is None else mode
+        return mode in {
+            "eq",
+            "eq_no_factor",
+            "relative",
+            "log_relative",
+            "scaled_inverse",
+        }
+
+    def coordinate_label_suffix(self):
+        """
+        Return the HDF5 suffix for the active bond coordinate description.
+
+        Existing modes keep their original suffixes. New experimental modes get
+        explicit suffixes so multiple databases can coexist.
+        """
+        mode = self.get_bond_coordinate_mode()
+        suffixes = {
+            "r": "_r",
+            "inverse": "_rinv",
+            "eq": "_eq",
+            "eq_no_factor": "_eqnofactor",
+            "relative": "_rel",
+            "log_relative": "_logrel",
+            "scaled_inverse": "_scaledinv",
+        }
+        return suffixes[mode]
+
+    def _get_eq_angle_values_array(self, n_angles):
+        """
+        Returns reference angle values with shape validation.
+        """
+        assert_msg_critical(
+            self.eq_angle_values is not None,
+            'InterpolationDatapoint: No equilibrium angle values are defined.'
+        )
+        eq_values = np.asarray(self.eq_angle_values, dtype=np.float64).reshape(-1)
+        assert_msg_critical(
+            eq_values.size == int(n_angles),
+            'InterpolationDatapoint: Equilibrium angle size mismatch '
+            f'(expected {int(n_angles)}, got {eq_values.size}).'
+        )
+        return eq_values
+
+    def _normalize_angle_coordinate_mode(self, mode):
+        aliases = {
+            None: "raw",
+            "": "raw",
+            "raw": "raw",
+            "theta": "raw",
+            "radian": "raw",
+            "delta": "delta",
+            "theta_minus_theta_eq": "delta",
+            "sin_delta": "sin_delta",
+            "sin(theta-theta_eq)": "sin_delta",
+            "eq_cosine": "eq_cosine",
+            "eq_angle": "eq_cosine",
+            "cosine": "eq_cosine",
+        }
+        key = str(mode).strip().lower() if mode is not None else None
+        if key not in aliases:
+            raise ValueError(
+                "InterpolationDatapoint: unknown angle_coordinate_mode="
+                f"'{mode}'."
+            )
+        return aliases[key]
+
+    def get_angle_coordinate_mode(self):
+        """
+        Return the active angle coordinate mode.
+
+        ``use_eq_angle_cosine`` is an alias for the benchmark-local
+        equilibrium-anchored cosine mode:
+
+            q = (cos(theta_eq) - cos(theta)) / sin(theta_eq)
+
+        which has dq/dtheta = sin(theta) / sin(theta_eq).
+        """
+        if getattr(self, "use_eq_angle_cosine", False):
+            return "eq_cosine"
+        return self._normalize_angle_coordinate_mode(
+            getattr(self, "angle_coordinate_mode", "raw")
+        )
+
+    def _angle_mode_requires_eq_reference(self, mode=None):
+        mode = self.get_angle_coordinate_mode() if mode is None else mode
+        return mode in {"delta", "sin_delta", "eq_cosine"}
+
+    def _bond_transform(self, r, r_eq=None):
+        """
+        Returns q(r), dq/dr, d2q/dr2 for the active bond coordinate.
+
+        Modes:
+            r              : q = r
+            inverse        : q = 1/r
+            eq             : q = -r_eq^2 * (1/r - 1/r_eq)
+            eq_no_factor   : q = -(1/r - 1/r_eq)
+            relative       : q = (r - r_eq) / r_eq
+            log_relative   : q = log(r / r_eq)
+            scaled_inverse : q = r_eq/r - 1
+        """
+        mode = self.get_bond_coordinate_mode()
+        r_input = np.asarray(r, dtype=np.float64)
+        scalar_input = (r_input.ndim == 0)
+        r_arr = np.atleast_1d(r_input).astype(np.float64, copy=False)
+
+        if not self._bond_mode_requires_eq_reference(mode):
+            if mode == "r":
+                q = r_arr.copy()
+                dq_dr = np.ones_like(r_arr)
+                d2q_dr2 = np.zeros_like(r_arr)
+            elif mode == "inverse":
+                q = 1.0 / r_arr
+                dq_dr = -1.0 / np.square(r_arr)
+                d2q_dr2 = 2.0 / np.power(r_arr, 3)
+            else:
+                raise ValueError(f"Unsupported bond coordinate mode: {mode}")
+        else:
+            assert_msg_critical(
+                r_eq is not None,
+                'InterpolationDatapoint: Bond coordinate mode requires r_eq.'
+            )
+            r_eq_input = np.asarray(r_eq, dtype=np.float64)
+            scalar_input = scalar_input and (r_eq_input.ndim == 0)
+            r_arr, r_eq_arr = np.broadcast_arrays(
+                np.atleast_1d(r_input),
+                np.atleast_1d(r_eq_input),
+            )
+            r_arr = r_arr.astype(np.float64, copy=False)
+            r_eq_arr = r_eq_arr.astype(np.float64, copy=False)
+
+            if mode == "eq":
+                q = -np.square(r_eq_arr) * (1.0 / r_arr - 1.0 / r_eq_arr)
+                dq_dr = np.square(r_eq_arr) / np.square(r_arr)
+                d2q_dr2 = -2.0 * np.square(r_eq_arr) / np.power(r_arr, 3)
+            elif mode == "eq_no_factor":
+                q = -(1.0 / r_arr - 1.0 / r_eq_arr)
+                dq_dr = 1.0 / np.square(r_arr)
+                d2q_dr2 = -2.0 / np.power(r_arr, 3)
+            elif mode == "relative":
+                q = (r_arr - r_eq_arr) / r_eq_arr
+                dq_dr = 1.0 / r_eq_arr
+                d2q_dr2 = np.zeros_like(r_arr)
+            elif mode == "log_relative":
+                q = np.log(r_arr / r_eq_arr)
+                dq_dr = 1.0 / r_arr
+                d2q_dr2 = -1.0 / np.square(r_arr)
+            elif mode == "scaled_inverse":
+                q = r_eq_arr / r_arr - 1.0
+                dq_dr = -r_eq_arr / np.square(r_arr)
+                d2q_dr2 = 2.0 * r_eq_arr / np.power(r_arr, 3)
+            else:
+                raise ValueError(f"Unsupported bond coordinate mode: {mode}")
+
+        if scalar_input:
+            return float(q[0]), float(dq_dr[0]), float(d2q_dr2[0])
+
+        return q, dq_dr, d2q_dr2
+
+    def _angle_transform(self, theta, theta_eq=None):
+        """
+        Returns q(theta), dq/dtheta, d2q/dtheta2 for the active angle mode.
+
+        Modes:
+            raw       : q = theta
+            delta     : q = theta - theta_eq
+            sin_delta : q = sin(theta - theta_eq)
+            eq_cosine : q = (cos(theta_eq) - cos(theta)) / sin(theta_eq)
+        """
+        mode = self.get_angle_coordinate_mode()
+        theta_input = np.asarray(theta, dtype=np.float64)
+        scalar_input = (theta_input.ndim == 0)
+        theta_arr = np.atleast_1d(theta_input).astype(np.float64, copy=False)
+
+        if not self._angle_mode_requires_eq_reference(mode):
+            q = theta_arr.copy()
+            dq = np.ones_like(theta_arr)
+            d2q = np.zeros_like(theta_arr)
+        else:
+            assert_msg_critical(
+                theta_eq is not None,
+                'InterpolationDatapoint: Angle coordinate mode requires theta_eq.'
+            )
+            theta_eq_input = np.asarray(theta_eq, dtype=np.float64)
+            scalar_input = scalar_input and (theta_eq_input.ndim == 0)
+            theta_arr, theta_eq_arr = np.broadcast_arrays(
+                np.atleast_1d(theta_input),
+                np.atleast_1d(theta_eq_input),
+            )
+            theta_arr = theta_arr.astype(np.float64, copy=False)
+            theta_eq_arr = theta_eq_arr.astype(np.float64, copy=False)
+
+            if mode == "delta":
+                q = theta_arr - theta_eq_arr
+                dq = np.ones_like(theta_arr)
+                d2q = np.zeros_like(theta_arr)
+            elif mode == "sin_delta":
+                delta = theta_arr - theta_eq_arr
+                q = np.sin(delta)
+                dq = np.cos(delta)
+                d2q = -np.sin(delta)
+            elif mode == "eq_cosine":
+                denom = np.sin(theta_eq_arr)
+                safe = np.abs(denom) > 1.0e-8
+                q = theta_arr.copy()
+                dq = np.ones_like(theta_arr)
+                d2q = np.zeros_like(theta_arr)
+                q[safe] = (
+                    np.cos(theta_eq_arr[safe]) -
+                    np.cos(theta_arr[safe])
+                ) / denom[safe]
+                dq[safe] = np.sin(theta_arr[safe]) / denom[safe]
+                d2q[safe] = np.cos(theta_arr[safe]) / denom[safe]
+            else:
+                raise ValueError(f"Unsupported angle coordinate mode: {mode}")
+
+        if scalar_input:
+            return float(q[0]), float(dq[0]), float(d2q[0])
+
+        return q, dq, d2q
+
     def _calculate_b_matrix_vectorized(self):
         """
         Vectorized Wilson B-matrix construction.
@@ -305,10 +602,11 @@ class InterpolationDatapoint:
             derivative = q.derivative(coords).reshape(-1)
             derivatives[i, :derivative.shape[0]] = derivative
 
+        bond_mode = self.get_bond_coordinate_mode()
+        angle_mode = self.get_angle_coordinate_mode()
         use_original = (
-            self.use_inverse_bond_length or
-            self.use_eq_bond_length #or 
-            # self.use_cos_angle
+            bond_mode != "r" or
+            angle_mode != "raw"
         )
         
         if use_original:
@@ -321,32 +619,31 @@ class InterpolationDatapoint:
 
         bond_rows = row_cache['bond_rows']
         angle_rows = row_cache['angle_rows']
-        if bond_rows.size > 0 and (self.use_inverse_bond_length or self.use_eq_bond_length):
+        if bond_rows.size > 0 and bond_mode != "r":
             bond_values = np.array(
                 [self.internal_coordinates[idx].value(coords) for idx in bond_rows],
                 dtype=np.float64)
-
-            if self.use_inverse_bond_length:
-                row_scale[bond_rows] = -1.0 / np.square(bond_values)
-            elif self.use_eq_bond_length:
+            eq_values = None
+            if self._bond_mode_requires_eq_reference(bond_mode):
                 eq_values = self._get_eq_bond_lengths_array(bond_rows.size)
-                _, dq_dr, _ = self._bond_transform(
-                    bond_values, eq_values)
-                row_scale[bond_rows] = dq_dr
+            _, dq_dr, _ = self._bond_transform(bond_values, eq_values)
+            row_scale[bond_rows] = dq_dr
 
-        # if angle_rows.size > 0 and self.use_cos_angle:
-        #     angle_values = np.array(
-        #     [self.internal_coordinates[idx].value(coords) for idx in angle_rows],
-        #     dtype=np.float64)
-
-        #     row_scale[angle_rows] = -np.sin(angle_values)
+        if angle_rows.size > 0 and angle_mode != "raw":
+            angle_values = np.array(
+                [self.internal_coordinates[idx].value(coords) for idx in angle_rows],
+                dtype=np.float64)
+            eq_angle_values = self._get_eq_angle_values_array(angle_rows.size)
+            _, dq_dtheta, _ = self._angle_transform(
+                angle_values,
+                eq_angle_values,
+            )
+            row_scale[angle_rows] = dq_dtheta
         
         self.b_matrix = derivatives * row_scale[:, np.newaxis]
 
         if self.inv_sqrt_masses is not None:
             self.b_matrix = self.b_matrix * self.inv_sqrt_masses
-            if self.use_inverse_bond_length or self.use_eq_bond_length:
-                self.original_b_matrix = self.original_b_matrix
 
     def calculate_b_matrix(self):
         """
@@ -368,42 +665,70 @@ class InterpolationDatapoint:
         # self.b2_matrix = np.zeros((len(self.z_matrix), n_atoms * 3, n_atoms * 3))
         self.b2_matrix = np.zeros((len(self.z_matrix), n_atoms * 3, n_atoms * 3))
 
+        bond_mode = self.get_bond_coordinate_mode()
+        angle_mode = self.get_angle_coordinate_mode()
+
         eq_bond_values = None
-        if self.use_eq_bond_length:
+        if self._bond_mode_requires_eq_reference(bond_mode):
             bond_rows = self._get_b_matrix_row_cache()['bond_rows']
             eq_bond_values = self._get_eq_bond_lengths_array(bond_rows.size)
 
+        eq_angle_values = None
+        if self._angle_mode_requires_eq_reference(angle_mode):
+            angle_rows = self._get_b_matrix_row_cache()['angle_rows']
+            eq_angle_values = self._get_eq_angle_values_array(angle_rows.size)
+
         # prev_dihedral = None
         bond_counter = 0
+        angle_counter = 0
         for i, z in enumerate(self.z_matrix):
             q = self.internal_coordinates[i]
             second_derivative = q.second_derivative(coords).reshape(-1, n_atoms * 3)
 
             if len(z) == 2:
-                if self.use_inverse_bond_length:
-
+                if bond_mode != "r":
                     r = q.value(coords)
-                    r_inv_2 = 1.0 / (r * r)
-                    r_inv_3 = r_inv_2 / r
-                    self.b2_matrix[i] = -r_inv_2 * second_derivative
-
+                    r_eq = (
+                        eq_bond_values[bond_counter]
+                        if eq_bond_values is not None
+                        else None
+                    )
+                    _, dq_dr, d2q_dr2 = self._bond_transform(r, r_eq)
+                    self.b2_matrix[i] = dq_dr * second_derivative
                     for m in range(n_atoms):
                         for n in range(n_atoms):
-                            self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += 2 * r_inv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
-
-                elif self.use_eq_bond_length:
-                    r = q.value(coords)
-                    _, r_deriv_2, r_deriv_3 = self._bond_transform(
-                        r, eq_bond_values[bond_counter])
-                    self.b2_matrix[i] = r_deriv_2 * second_derivative
-                    for m in range(n_atoms):
-                        for n in range(n_atoms):
-                            self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += r_deriv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
+                            self.b2_matrix[
+                                i, m*3:(m+1)*3, n*3:(n+1)*3
+                            ] += d2q_dr2 * np.outer(
+                                self.original_b_matrix[i, m*3:(m+1)*3],
+                                self.original_b_matrix[i, n*3:(n+1)*3],
+                            )
 
                 else:
                     self.b2_matrix[i] = second_derivative
 
                 bond_counter += 1
+
+            elif len(z) == 3:
+                if angle_mode != "raw":
+                    theta = q.value(coords)
+                    _, dq_dtheta, d2q_dtheta2 = self._angle_transform(
+                        theta,
+                        eq_angle_values[angle_counter],
+                    )
+                    self.b2_matrix[i] = dq_dtheta * second_derivative
+                    for m in range(n_atoms):
+                        for n in range(n_atoms):
+                            self.b2_matrix[
+                                i, m*3:(m+1)*3, n*3:(n+1)*3
+                            ] += d2q_dtheta2 * np.outer(
+                                self.original_b_matrix[i, m*3:(m+1)*3],
+                                self.original_b_matrix[i, n*3:(n+1)*3],
+                            )
+                else:
+                    self.b2_matrix[i] = second_derivative
+
+                angle_counter += 1
 
             else:
                 self.b2_matrix[i] = second_derivative
@@ -668,48 +993,28 @@ class InterpolationDatapoint:
 
         bond_rows = row_cache['bond_rows']
         angle_rows = row_cache["angle_rows"]
+        bond_mode = self.get_bond_coordinate_mode()
+        angle_mode = self.get_angle_coordinate_mode()
 
         if bond_rows.size > 0:
-            if self.use_inverse_bond_length:
-                int_coords[bond_rows] = 1.0 / base_values[bond_rows]
-            elif self.use_eq_bond_length:
-
-                eq_values = self._get_eq_bond_lengths_array(bond_rows.size)
+            if bond_mode != "r":
+                eq_values = None
+                if self._bond_mode_requires_eq_reference(bond_mode):
+                    eq_values = self._get_eq_bond_lengths_array(bond_rows.size)
                 q_values, _, _ = self._bond_transform(
                     base_values[bond_rows],
                     eq_values)
                 int_coords[bond_rows] = q_values
-        # if angle_rows.size > 0 and self.use_cos_angle:
-        #     int_coords[angle_rows] = np.cos(base_values[angle_rows])
+
+        if angle_rows.size > 0:
+            if angle_mode != "raw":
+                eq_angle_values = self._get_eq_angle_values_array(angle_rows.size)
+                q_values, _, _ = self._angle_transform(
+                    base_values[angle_rows],
+                    eq_angle_values)
+                int_coords[angle_rows] = q_values
 
         self.internal_coordinates_values = int_coords
-
-    def _bond_transform(self, r, r_eq):
-        """
-        Returns q(r), dq/dr, d2q/dr2 for a bond coordinate that is
-        smoothly switched from local r behavior near equilibrium to 1/r outside.
-        """
-        r_input = np.asarray(r, dtype=np.float64)
-        r_eq_input = np.asarray(r_eq, dtype=np.float64)
-        scalar_input = (r_input.ndim == 0 and r_eq_input.ndim == 0)
-
-        r_arr, r_eq_arr = np.broadcast_arrays(np.atleast_1d(r_input),
-                                              np.atleast_1d(r_eq_input))
-        r_arr = r_arr.astype(np.float64, copy=False)
-        r_eq_arr = r_eq_arr.astype(np.float64, copy=False)
-
-        R = - np.square(r_eq_arr) * (1.0 / r_arr - 1.0 / r_eq_arr)
-        dR = np.square(r_eq_arr) / np.square(r_arr)
-        d2R = -np.square(r_eq_arr) * 2.0 / np.power(r_arr, 3)
-        
-        q = R
-        dq_dr = dR
-        d2q_dr2 = d2R
-
-        if scalar_input:
-            return float(q[0]), float(dq_dr[0]), float(d2q_dr2[0])
-
-        return q, dq_dr, d2q_dr2
 
     def get_bond_permutation_from_mask(self, mask):
         """Converts a full internal-coordinate mask to a bond permutation."""
@@ -757,7 +1062,10 @@ class InterpolationDatapoint:
     def symmetrize_eq_bond_lengths_from_masks(self, masks):
         """Averages equilibrium lengths over bond permutation orbits."""
 
-        if not self.use_eq_bond_length or self.eq_bond_lengths is None:
+        if (
+            not self._bond_mode_requires_eq_reference()
+            or self.eq_bond_lengths is None
+        ):
             return self.eq_bond_lengths
 
         masks_array = np.asarray(masks, dtype=np.int64)
@@ -944,6 +1252,20 @@ class InterpolationDatapoint:
             dtype=dt,
         )
 
+    def _metadata_json_safe(self, value):
+        if isinstance(value, dict):
+            return {
+                str(key): self._metadata_json_safe(val)
+                for key, val in value.items()
+            }
+        if isinstance(value, (list, tuple)):
+            return [self._metadata_json_safe(item) for item in value]
+        if isinstance(value, np.ndarray):
+            return value.tolist()
+        if isinstance(value, np.generic):
+            return value.item()
+        return value
+
     def write_hdf5(self, fname, label):
         """
         Writes the energy, internal coordinates, internal gradient, and
@@ -965,13 +1287,7 @@ class InterpolationDatapoint:
             except IOError:
                 h5f = h5py.File(fname, 'w')
 
-            if self.use_inverse_bond_length:
-                label += "_rinv"
-            elif self.use_eq_bond_length:
-                label += "_eq"
-            else:
-                label += "_r"
-
+            label += self.coordinate_label_suffix()
             label += "_dihedral"
 
             assert_msg_critical(self.energy is not None,
@@ -1043,6 +1359,22 @@ class InterpolationDatapoint:
                 h5f.create_dataset(full_label,
                                    data=self.eq_bond_lengths,
                                    compression='gzip')
+
+            if self.eq_angle_values is not None:
+                full_label = label + "_eq_angle_values"
+                h5f.create_dataset(
+                    full_label,
+                    data=np.asarray(self.eq_angle_values, dtype=np.float64),
+                    compression='gzip',
+                )
+
+            if self.inv_sqrt_masses is not None:
+                full_label = label + "_inv_sqrt_masses"
+                h5f.create_dataset(
+                    full_label,
+                    data=np.asarray(self.inv_sqrt_masses, dtype=np.float64),
+                    compression='gzip',
+                )
 
             assert_msg_critical(
                 self.confidence_radius is not None,
@@ -1116,6 +1448,14 @@ class InterpolationDatapoint:
                 self._write_optional_array(
                     h5f, label + "_active_rows", self.active_rows)
 
+            if self.metadata:
+                metadata_json = json.dumps(
+                    self._metadata_json_safe(self.metadata),
+                    sort_keys=True,
+                )
+                self._write_string_dataset(
+                    h5f, label + "_metadata_json", metadata_json)
+
             h5f.close()
 
     def read_hdf5(self, fname, label):
@@ -1165,13 +1505,7 @@ class InterpolationDatapoint:
         if valid_checkpoint:
             h5f = h5py.File(fname, 'r')
 
-            if self.use_inverse_bond_length:
-                label += "_rinv"
-            elif self.use_eq_bond_length:
-                label += "_eq"
-            else:
-                label += "_r"
-
+            label += self.coordinate_label_suffix()
             label += "_dihedral"
 
             energy_label = label + "_energy"
@@ -1181,9 +1515,12 @@ class InterpolationDatapoint:
             cart_grad_label = label + "_cartesian_gradient"
             coords_label = label + "_internal_coordinates"
             eq_bond_length_label = label + "_eq_bond_lengths"
+            eq_angle_values_label = label + "_eq_angle_values"
+            inv_sqrt_masses_label = label + "_inv_sqrt_masses"
             cart_coords_label = label + "_cartesian_coordinates"
             confidence_radius_label = label + "_confidence_radius"
             mapping_masks_label = label + "_masks"
+            metadata_json_label = label + "_metadata_json"
 
             z_matrix_bonds = label + '_bonds'
             z_matrix_angles = label + '_angles'
@@ -1203,9 +1540,15 @@ class InterpolationDatapoint:
             self.hessian = np.array(h5f.get(cart_hess_label))
             self.internal_coordinates_values = np.array(h5f.get(coords_label))
             self.eq_bond_lengths = np.array(h5f.get(eq_bond_length_label))
+            self.eq_angle_values = _read_optional_array(
+                h5f, eq_angle_values_label)
+            self.inv_sqrt_masses = _read_optional_array(
+                h5f, inv_sqrt_masses_label)
             self.cartesian_coordinates = np.array(h5f.get(cart_coords_label))
             self.confidence_radius = np.array(h5f.get(confidence_radius_label))
             self.mapping_masks = _read_optional_array(h5f, mapping_masks_label)
+            metadata_json = _read_scalar_string(h5f.get(metadata_json_label))
+            self.metadata = json.loads(metadata_json) if metadata_json else {}
             self.family_label = _read_scalar_string(
                 h5f.get(label + "_family_label"))
             self.bank_role = (
@@ -1336,13 +1679,7 @@ class InterpolationDatapoint:
         :param new_confidence_radius: new value(s) to store
         """
         with h5py.File(fname, 'r+') as h5f:
-            if self.use_inverse_bond_length:
-                label += "_rinv"
-            elif self.use_eq_bond_length:
-                label += "_eq"
-            else:
-                label += "_r"
-
+            label += self.coordinate_label_suffix()
             label += "_dihedral"
 
             confidence_radius_label = label + "_confidence_radius"

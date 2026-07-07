@@ -54,6 +54,7 @@ from .vibrationalanalysis import VibrationalAnalysis
 from .tddftgradientdriver import TddftGradientDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
+from .gxtbdriver import GxtbDriver, GxtbGradientDriver
 from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .mmdriver import MMDriver
@@ -234,6 +235,9 @@ class OptimizationDriver:
         elif isinstance(drv, XtbDriver):
             grad_drv = XtbGradientDriver(drv)
 
+        elif isinstance(drv, GxtbDriver):
+            grad_drv = GxtbGradientDriver(drv)
+
         elif isinstance(drv, OpenMMDriver):
             grad_drv = OpenMMGradientDriver(drv)
 
@@ -242,6 +246,7 @@ class OptimizationDriver:
 
         elif (isinstance(drv, ScfGradientDriver) or
               isinstance(drv, XtbGradientDriver) or
+              isinstance(drv, GxtbGradientDriver) or
               isinstance(drv, OpenMMGradientDriver) or
               isinstance(drv, TddftGradientDriver) or
               isinstance(drv, MMGradientDriver)):
