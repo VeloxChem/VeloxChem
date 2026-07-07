@@ -438,18 +438,6 @@ class EvbDriver:
             self.ostream.print_blank()
             self.ostream.print_header(f"Running FEP for {conf['name']}")
             self.ostream.flush()
-            # The reporter worker (rank master + 1) did not build the systems;
-            # reconstruct the systems and topology it needs to evaluate energies
-            # from the shared folder the master wrote. Deferred mode has no
-            # reporter worker (it runs entirely on the master), so skip this.
-            if (self.nodes > 1 and self.rank == mpi_master() + 1
-                    and conf.get("recalc_mode", "auto") != "deferred"):
-                sysbuilder = ReactionSystemBuilder(ostream=self.ostream)
-                conf["systems"] = sysbuilder.load_systems_from_xml(
-                    conf["run_folder"])
-                pdb = mmapp.PDBxFile(
-                    str(Path(conf["data_folder"]) / "topology.cif"))
-                conf["topology"] = pdb.getTopology()
 
             FEP = EvbFepDriver(ostream=self.ostream)
             FEP.run_replicas(

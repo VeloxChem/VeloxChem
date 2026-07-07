@@ -41,6 +41,7 @@ from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .evbreporter import (EvbReporter, EvbReporterClient, EvbReporterServer,
                           EvbGpuRecalculator)
+from .reactionsystembuilder import ReactionSystemBuilder
 from .errorhandler import assert_msg_critical, print_exception_if_debug
 from .reactionsystembuilder import EvbForceGroup
 
@@ -420,19 +421,41 @@ class EvbFepDriver:
             self.recalc_mode in ("auto", "inline", "offload", "deferred"),
             f"Unknown recalc_mode '{self.recalc_mode}'. Expected one of "
             "'auto', 'inline', 'offload', 'deferred'.")
-        self._deferred = self.recalc_mode == "deferred"
-        if self.recalc_mode == "offload" and self.nodes <= 1:
-            self.ostream.print_warning(
-                "recalc_mode='offload' requires >1 MPI rank; falling back to "
-                "in-process synchronous reporting.")
+
+        if self.recalc_mode == "auto":
+            if self.debug:
+                self._deferred = False
+                self._async = False
+            elif self.nodes > 1:
+                self._deferred = False
+                self._async = True
+            else:
+                self._deferred = True
+                self._async = False
+        elif self.recalc_mode == "deferred":
+            self._deferred = True
+            self._async = False
+        elif self.recalc_mode == "inline":
+            self._deferred = False
+            self._async = False
+        elif self.recalc_mode == "offload":
+            if self.nodes > 1:
+                self._deferred = False
+                self._async = True
+            else:
+                self._deferred = False
+                self._async = False
+                self.ostream.print_warning(
+                    "recalc_mode='offload' requires >1 MPI rank; falling back to "
+                    "in-process synchronous reporting.")
 
         # Asynchronous reporting: with >=2 MPI ranks on the node, rank
         # (master+1) becomes a dedicated CPU reporter worker that owns the
         # Energies/Forces/Velocities files, while the master drives the GPU and
         # offloads each frame to it. With a single rank the reporting stays
         # synchronous and in-process (unchanged behaviour).
-        self._async = (self.nodes > 1 and not self._deferred
-                       and self.recalc_mode in ("auto", "offload"))
+        # self._async = (self.nodes > 1 and not self._deferred
+        #                and self.recalc_mode in ("auto", "offload"))
 
         if self._deferred:
             # Guard combinations that a positions-only trajectory cannot serve.
@@ -473,6 +496,18 @@ class EvbFepDriver:
         if self._async:
             self._setup_shared_ring()
         if self._async and self.rank != mpi_master():
+            # The reporter worker (rank master + 1) did not build the systems;
+            # reconstruct the systems and topology it needs to evaluate energies
+            # from the shared folder the master wrote. Deferred mode has no
+            # reporter worker (it runs entirely on the master), so skip this.
+
+            sysbuilder = ReactionSystemBuilder(ostream=self.ostream)
+            configuration["systems"] = sysbuilder.load_systems_from_xml(
+                configuration["run_folder"])
+            pdb = mmapp.PDBxFile(
+                str(Path(configuration["data_folder"]) / "topology.cif"))
+            configuration["topology"] = pdb.getTopology()
+
             if self.rank == self._reporter_worker:
                 self._serve_reporter()
                 self._free_shared_ring()
