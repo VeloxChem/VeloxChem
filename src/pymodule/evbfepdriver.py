@@ -83,7 +83,7 @@ class EvbFepDriver:
         self.topology: mmapp.Topology = None
         self.Lambda: list = None
 
-        self.isothermal: bool = False
+        self.isothermal: bool = True
         self.isobaric: bool = False
 
         self.temperature = -1
@@ -140,7 +140,6 @@ class EvbFepDriver:
         self.pdb_equil_start_temp = 10  # kelvin
         self.pdb_equil_temp_step = 50  # kelvin
         self.pdb_temperatures = []
-        self.isobaric: bool = False
 
         self.pdb = None
         self.safe_step: bool = False
@@ -259,6 +258,9 @@ class EvbFepDriver:
                 "type": list
             },
             "isobaric": {
+                "type": bool
+            },
+            "isothermal": {
                 "type": bool
             },
             "pdb_equil_temp_step": {
@@ -553,8 +555,12 @@ class EvbFepDriver:
         self._t_send_total = 0.0
         self._n_windows = 0
         # Deferred mode: separate accumulator for the post-sampling GPU
-        # recalculation (runs after each window, not overlapped with sampling).
+        # recalculation (runs once per replica, after that replica's sampling).
         self._t_recalc_total = 0.0
+        # Windows sampled but not yet re-scored (flushed per replica), and the
+        # truncate-vs-append flag for the recalculator's own output files.
+        self._pending_windows = []
+        self._first_recalc_write = True
 
         forward_order = list(self.Lambda)
         backward_order = list(reversed(self.Lambda))
@@ -566,6 +572,10 @@ class EvbFepDriver:
             # state of the forward sweep.
             positions, velocities = self.run_FEP(backward_order, replica, 1,
                                                  positions, velocities)
+            # Deferred mode: re-score this replica's frames in one batched GPU
+            # pass now that all of its sampling contexts have been released.
+            if self._deferred:
+                self._recalc_replica(replica)
 
         # Tear down the reporter worker and synchronise all ranks.
         reporter_timing = None
@@ -990,13 +1000,13 @@ class EvbFepDriver:
                          initial_state,
                          replica=0,
                          direction=0):
-        """Sample one window without recalculation, then re-score its frames on
-        the GPU from the trajectory once the sampling context is released.
+        """Sample one window without recalculation.
 
-        Only the trajectory and StateData reporters are attached during
-        sampling (no EVB energy evaluation), so the GPU is never stalled. After
-        sampling, the sampling context is torn down and the window's frames are
-        read back from ``trajectory.xtc`` and re-scored in one batched GPU pass.
+        In deferred mode the energy re-scoring is batched per replica (see
+        _recalc_replica), so this only runs the GPU sampling, appends the
+        trajectory, and records the window so its frames can be re-scored once
+        the whole replica has been sampled. No EVB energy evaluation happens
+        here, so the GPU is never stalled during sampling.
         """
         simulation = self._get_simulation(system, self.equil_step_size)
 
@@ -1033,27 +1043,36 @@ class EvbFepDriver:
         # Detached snapshot to seed the next window; survives context teardown.
         final_state = states[-1]
 
-        # Release the sampling GPU context (and flush/close the trajectory) so
-        # the recalculation can build its own context: only one OpenMM context
-        # should live on the GPU at a time.
+        # Release the sampling GPU context (and flush/close the trajectory).
         simulation.reporters.clear()
         del simulation, states, state_reporter, traj_reporter
         gc.collect()
 
-        t_recalc_start = time.perf_counter()
-        self._recalc_window_gpu(l, replica, direction, append)
-        t_recalc = time.perf_counter() - t_recalc_start
+        # Record this window's frames for the per-replica batched recalculation.
+        n_frames = int(self.sample_steps // self.write_step)
+        self._pending_windows.append((replica, direction, l, n_frames))
 
-        self._accumulate_deferred_timing(l, replica, direction, t_window,
-                                         t_recalc)
+        self._accumulate_deferred_sampling_timing(l, replica, direction,
+                                                  t_window)
         return final_state
 
-    def _recalc_window_gpu(self, l, replica, direction, append):
-        """Read this window's frames back from the trajectory and re-score them
-        on the GPU via the batched EvbGpuRecalculator."""
+    def _recalc_replica(self, replica):
+        """Re-score every frame this replica sampled in one batched GPU pass.
+
+        Reads the replica's trajectory frames back from trajectory.xtc and
+        hands them, tagged with their per-frame lambda/replica/direction, to the
+        recalculator. Each energy system builds a single GPU context that is
+        reused across all of the replica's frames (not rebuilt per window), and
+        because recalculation only runs after the replica's sampling is done, no
+        recalc context ever coexists with the sampling context.
+        """
+        if not self._pending_windows:
+            return
         import MDAnalysis as mda
 
-        snapshots = int(self.sample_steps // self.write_step)
+        windows = self._pending_windows
+        total_frames = sum(w[3] for w in windows)
+
         # Use the in-memory OpenMM topology directly (no dependency on a parsed
         # topology file); the XTC supplies the per-frame coordinates.
         universe = mda.Universe(
@@ -1064,7 +1083,7 @@ class EvbFepDriver:
         # Positions/box arrive from MDAnalysis in angstrom; _apply_positions
         # expects nanometers.
         frames = []
-        for ts in universe.trajectory[-snapshots:]:
+        for ts in universe.trajectory[-total_frames:]:
             pos_nm = np.array(ts.positions, dtype=np.float64) * 0.1
             # None for a non-periodic (vacuum) trajectory; a (3,3) box for a
             # periodic (solvated) one.
@@ -1074,24 +1093,45 @@ class EvbFepDriver:
             frames.append((pos_nm, box_nm))
 
         assert_msg_critical(
-            len(frames) == snapshots,
-            f"Deferred recalculation expected {snapshots} trajectory frames for "
-            f"window l={l} but read {len(frames)}.")
+            len(frames) == total_frames,
+            f"Deferred recalculation expected {total_frames} trajectory frames "
+            f"for replica {replica} but read {len(frames)}.")
 
-        self._gpu_recalc.recalc_window(l, replica, direction, frames, append)
+        # Per-frame (lambda, replica, direction) tags, in trajectory order.
+        frame_meta = []
+        for rep, direction, lam, n_frames in windows:
+            frame_meta.extend([(lam, rep, direction)] * n_frames)
 
-    def _accumulate_deferred_timing(self, l, replica, direction, t_window,
-                                    t_recalc):
-        """Record and print the sampling vs recalculation split for one window
-        in deferred mode."""
+        append = not self._first_recalc_write
+        self._first_recalc_write = False
+
+        t_recalc_start = time.perf_counter()
+        self._gpu_recalc.recalc_batch(frame_meta, frames, append)
+        t_recalc = time.perf_counter() - t_recalc_start
+
+        self._pending_windows = []
+        self._accumulate_deferred_recalc_timing(replica, len(frames), t_recalc)
+
+    def _accumulate_deferred_sampling_timing(self, l, replica, direction,
+                                             t_window):
+        """Record and print one window's sampling time in deferred mode (recalc
+        is deferred to the end of the replica)."""
         self._t_window_total += t_window
         self._t_gpu_total += t_window
-        self._t_recalc_total += t_recalc
         self._n_windows += 1
         self.ostream.print_info(
             f"[timing] window l={l} rep={replica} dir={direction} (deferred): "
-            f"sampling(GPU) {t_window:.3f}s + recalculation(GPU) "
-            f"{t_recalc:.3f}s = {t_window + t_recalc:.3f}s")
+            f"sampling(GPU) {t_window:.3f}s (recalc batched at end of replica)")
+        self.ostream.flush()
+
+    def _accumulate_deferred_recalc_timing(self, replica, n_frames, t_recalc):
+        """Record and print one replica's batched recalculation time."""
+        self._t_recalc_total += t_recalc
+        per_frame = t_recalc / n_frames if n_frames else 0.0
+        self.ostream.print_info(
+            f"[timing] replica {replica} recalculation(GPU): {t_recalc:.3f}s "
+            f"over {n_frames} frames ({per_frame * 1e3:.1f} ms/frame, one GPU "
+            "context per system reused across the whole replica)")
         self.ostream.flush()
 
     def _accumulate_window_timing(self, l, replica, direction, t_window,
@@ -1124,14 +1164,13 @@ class EvbFepDriver:
             recalc = self._t_recalc_total
             sampling = self._t_gpu_total
             total = sampling + recalc
-            per_win = recalc / n if n > 0 else 0.0
             self.ostream.print_info(
-                f"[timing] Totals over {n} windows (deferred): "
-                f"sampling(GPU)={sampling:.3f}s + recalculation(GPU)="
-                f"{recalc:.3f}s = {total:.3f}s "
-                f"({per_win:.3f}s recalc/window). Sampling ran without any "
-                "in-loop recalculation; the GPU re-scored each window in a "
-                "single batched pass afterwards.")
+                f"[timing] Totals (deferred): sampling(GPU)={sampling:.3f}s over "
+                f"{n} windows + recalculation(GPU)={recalc:.3f}s batched per "
+                f"replica = {total:.3f}s. Sampling ran without in-loop "
+                "recalculation; each replica's frames were re-scored together on "
+                "the GPU, reusing one context per system across all the replica's "
+                "frames.")
             self.ostream.flush()
             return
         summed = self._t_gpu_total + self._t_comm_total

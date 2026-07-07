@@ -839,6 +839,18 @@ class EvbDriver:
                 "solvent": self.water_model,
                 "temperature": self.temperature,
                 "pressure": 1,
+                "isothermal": True,
+                "padding": 1.5,
+                "ion_count": 0,
+                "neutralize": False
+            }
+        elif name == "water_NVE":
+            conf = {
+                "name": f"water_{self.water_model}_NVT",
+                "solvent": self.water_model,
+                "temperature": self.temperature,
+                "pressure": 1,
+                "isothermal": False,
                 "padding": 1.5,
                 "ion_count": 0,
                 "neutralize": False

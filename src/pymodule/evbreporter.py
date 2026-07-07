@@ -741,17 +741,21 @@ class EvbGpuRecalculator:
             gc.collect()
         return energies, forces
 
-    def recalc_window(self, lambda_val, replica, direction, frames, append):
-        """Re-score one lambda window's frames and append the output rows.
+    def recalc_batch(self, frame_meta, frames, append):
+        """Re-score a batch of frames (a whole replica's worth) and append rows.
 
-        frames: list of (positions_nm (N,3), box_nm (3,3)) in nanometers.
+        frames: list of (positions_nm (N,3), box_nm (3,3) or None) in nm.
+        frame_meta: list of (lambda_val, replica, direction) aligned with
+        frames. Each core / decomposition system is evaluated once over the
+        entire batch through a single GPU context (built and torn down once),
+        so context creation is amortized over all of the replica's frames.
         """
         if not self._opened:
             self._open_outputs(append)
 
-        # Evaluate every needed system once over all frames (one GPU context at
-        # a time). Forces come from the sampled lambda-window system so they
-        # match the synchronous path's sampling-state forces.
+        # The reactant/product PES and the two integration endpoints are the
+        # same system regardless of window, so each is evaluated once over the
+        # whole batch (one GPU context per system, reused across every frame).
         E = {}
         for name in self.core_names:
             E[name], _ = self._evaluate_system(self.systems[name], frames)
@@ -759,12 +763,13 @@ class EvbGpuRecalculator:
         for name in self.decomp_names:
             decomp_E[name], _ = self._evaluate_system(self.systems[name],
                                                       frames)
+
         forces_per_frame = None
         if self.report_forces:
-            _, forces_per_frame = self._evaluate_system(
-                self.systems[lambda_val], frames, want_forces=True)
+            forces_per_frame = self._evaluate_forces_by_lambda(
+                frame_meta, frames)
 
-        for i in range(len(frames)):
+        for i, (lambda_val, replica, direction) in enumerate(frame_meta):
             self.E_out.write(
                 EvbReporter.format_energies_row(lambda_val, E['reactant'][i],
                                                 E['product'][i], E[0][i],
@@ -781,6 +786,24 @@ class EvbGpuRecalculator:
 
         for s in self.out_streams:
             s.flush()
+
+    def _evaluate_forces_by_lambda(self, frame_meta, frames):
+        """Forces come from the per-lambda mixed system, which differs per
+        window; build each distinct lambda's system once and evaluate the frames
+        that belong to it (frames are not necessarily contiguous per lambda, as
+        a replica revisits each lambda in both sweep directions)."""
+        forces = [None] * len(frames)
+        by_lambda = {}
+        for i, (lambda_val, _, _) in enumerate(frame_meta):
+            by_lambda.setdefault(lambda_val, []).append(i)
+        for lambda_val, idxs in by_lambda.items():
+            sub = [frames[i] for i in idxs]
+            _, sub_forces = self._evaluate_system(self.systems[lambda_val],
+                                                  sub,
+                                                  want_forces=True)
+            for j, i in enumerate(idxs):
+                forces[i] = sub_forces[j]
+        return forces
 
     def close(self):
         for s in self.out_streams:
