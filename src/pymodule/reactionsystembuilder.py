@@ -377,7 +377,11 @@ class ReactionSystemBuilder():
             )
             self.ostream.flush()
 
-        # Guard against residues that might have standard names
+        self.ostream.print_info(
+            f"Found {len(templates)} unmatched residues: {residues}")
+        self.ostream.flush()
+
+        # # Guard against residues that might have standard names
         for i in range(len(templates)):
             templates[i].name = f"{templates[i].name}_evb"
 

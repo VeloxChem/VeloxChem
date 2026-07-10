@@ -88,6 +88,11 @@ class EvbDataProcessing:
         self.alpha_guess: float = 0
         self.H12_guess: float = 10
 
+        # "bar": pairwise BAR between adjacent lambda windows (default).
+        # "mbar": joint multistate estimate using every window's overlap with
+        # every other window, not just its neighbors.
+        self.fep_estimator: str = "mbar"
+
         # Boltzmann constant: ca 8.314e-3 kJ/mol/K
         self.kb = boltzmann_in_hartreeperkelvin() * hartree_in_kjpermol()
         self.verbose: bool = True
@@ -100,6 +105,12 @@ class EvbDataProcessing:
         self.bin_size = 10
         self.dens_threshold = 0.1
         self.dens_max_window = 50
+        # gaussian_kde in _calculate_coordinate_bins is O(n_frames^2); replica
+        # x direction sampling can push n_frames into the tens of thousands,
+        # so cap how many frames are fed to it (kept above the ~6k frames/config
+        # in the canned test fixtures, so that regression test is unaffected).
+        self.dens_kde_max_samples: int = 8000
+        self.kde_seed = 0
 
     def _beta(self, T) -> float:
         return 1 / (self.kb * T)
@@ -154,7 +165,7 @@ class EvbDataProcessing:
 
             E2_shifted, V, dE, Eg = self._calculate_Eg_V_dE(
                 E1_ref, E2_ref, alpha, H12)
-            dGfep = self._calculate_dGfep(dE, Temp_set)
+            dGfep = self._calculate_dGfep(E1_ref, E2_shifted, Temp_set)
             xi = np.linspace(-10000, 10000, 20000)
             dGevb_ana, shiftxi, fepxi = self._dGevb_analytical(
                 dGfep, self.Lambda, H12, xi)
@@ -179,7 +190,16 @@ class EvbDataProcessing:
             (E1 + E2_shifted) - np.sqrt((E1 - E2_shifted)**2 + 4 * H12**2))
         return E2_shifted, V, dE, Eg
 
-    def _calculate_dGfep(self, dE, Temp_set):
+    def _calculate_dGfep(self, E1, E2_shifted, Temp_set):
+        assert_msg_critical(
+            self.fep_estimator in ("bar", "mbar"),
+            f"Unknown fep_estimator '{self.fep_estimator}'. Expected 'bar' or 'mbar'."
+        )
+        if self.fep_estimator == "mbar":
+            return self._calculate_dGfep_mbar(E1, E2_shifted, Temp_set)
+        return self._calculate_dGfep_bar(E1 - E2_shifted, Temp_set)
+
+    def _calculate_dGfep_bar(self, dE, Temp_set):
 
         assert_msg_critical('pymbar' in sys.modules,
                             'pymbar is required for EvbDataProcessing.')
@@ -208,6 +228,42 @@ class EvbDataProcessing:
             dG_bar.append(dG_bar[-1] + dg_bar)
 
         return dG_bar
+
+    def _calculate_dGfep_mbar(self, E1, E2_shifted, Temp_set):
+        assert_msg_critical('pymbar' in sys.modules,
+                            'pymbar is required for EvbDataProcessing.')
+
+        beta = self._beta(Temp_set)
+        Lambda_indices = np.asarray(self.Lambda_indices)
+        Lambda_arr = np.asarray(self.Lambda)
+        K = len(Lambda_arr)
+
+        # Group frames by originating state, matching pymbar's N_k convention
+        # (the first N_k[0] samples are from state 0, the next N_k[1] from
+        # state 1, and so on).
+        order = np.argsort(Lambda_indices, kind="stable")
+        E1_sorted = np.asarray(E1)[order]
+        E2_sorted = np.asarray(E2_shifted)[order]
+        N_k = np.array([np.sum(Lambda_indices == k) for k in range(K)])
+
+        # u_kn[k, n] = beta * V_k(frame_n). Cheap to get every frame's energy
+        # at every state because V is linear in Lambda (Vi = (1-Lambda_i)*E1 +
+        # Lambda_i*E2_shifted), so no re-evaluation at other windows is
+        # needed, unlike a typical MBAR use case.
+        u_kn = beta * ((1 - Lambda_arr)[:, None] * E1_sorted[None, :] +
+                       Lambda_arr[:, None] * E2_sorted[None, :])
+
+        # pymbar's default solver protocol tries 'hybr' (scipy's hybrid
+        # Powell method) first, which reliably fails to converge once there
+        # are this many states (tens of lambda windows) and only then falls
+        # back to 'adaptive' -- same convention as solvationfepdriver.py.
+        # Going straight to the 'robust' protocol (adaptive, then L-BFGS-B)
+        # skips the doomed-to-fail hybr attempt: same converged result,
+        # faster, and no spurious "failed to reach a solution" warning.
+        mbar = pymbar.MBAR(u_kn, N_k, solver_protocol='robust')
+        mbar_results = mbar.compute_free_energy_differences()
+        dGfep = (mbar_results['Delta_f'][0, :] / beta).tolist()
+        return dGfep
 
     def _bin(self, data):
         binned_data = [[] for _ in range(np.max(self.Lambda_indices) + 1)]
@@ -384,10 +440,14 @@ class EvbDataProcessing:
             self.ostream.flush()
 
         for result in self.results.values():
-            dE = result["dE"]
             Temp_set = result["Temp_set"]
+            # E2_shifted isn't persisted on the result dict (would otherwise
+            # change its key set and break the h5-reference comparison test),
+            # so recompute the cheap scalar shift instead of storing it.
+            E1 = result["E1_pes"]
+            E2_shifted = result["E2_pes"] + self.alpha
 
-            dGfep = self._calculate_dGfep(dE, Temp_set)
+            dGfep = self._calculate_dGfep(E1, E2_shifted, Temp_set)
 
             result.update({"dGfep": dGfep})
             if self.calculate_discrete:
@@ -454,16 +514,53 @@ class EvbDataProcessing:
         for result in results.values():
             dens_max = np.array([])
             dE = result['dE']
-            xy = np.vstack([dE, Lambda_indices])
+            Lambda_indices_arr = np.asarray(Lambda_indices)
+
+            # gaussian_kde(xy)(xy) is O(n^2); with replica x direction
+            # sampling n can reach the tens of thousands, so cap the frames
+            # fed to it. The density estimate only ever feeds a coarse,
+            # smoothed/thresholded histogram used to pick the coordinate_bins
+            # axis bounds below, not the reported free energies, so a
+            # representative subsample is safe. minde/maxde (and thus the
+            # dE_bins grid) still use the full dE array so the true observed
+            # range is preserved.
+            n_frames = dE.shape[0]
+            subsampled = n_frames > self.dens_kde_max_samples
+            if subsampled:
+                rng = np.random.default_rng(self.kde_seed)
+                kde_idx = rng.choice(n_frames,
+                                     size=self.dens_kde_max_samples,
+                                     replace=False)
+                self.ostream.print_info(
+                    f"Subsampling {n_frames} frames to {self.dens_kde_max_samples} "
+                    "for the coordinate-bin density estimate")
+                self.ostream.flush()
+            else:
+                kde_idx = np.arange(n_frames)
+            dE_kde = dE[kde_idx]
+            Lambda_indices_kde = Lambda_indices_arr[kde_idx]
+
+            xy = np.vstack([dE_kde, Lambda_indices_kde])
             dens = scipy.stats.gaussian_kde(xy)(xy)
             dens = dens / np.max(dens)
             result.update({"dE_dens": dens})
+            if subsampled:
+                # Only stored when a genuine subsample was taken, so results
+                # without subsampling keep exactly the same keys as before
+                # (plot_dE_density falls back to the full dE/Lambda_indices
+                # when these are absent).
+                result.update({
+                    "dE_dens_sample":
+                    dE_kde,
+                    "dE_dens_sample_lambda_indices":
+                    Lambda_indices_kde,
+                })
 
             minde = np.min(dE)
             maxde = np.max(dE)
             steps = int((maxde - minde) // 2)
             dE_bins = np.linspace(np.min(dE), np.max(dE), steps)
-            bin_inds = np.digitize(dE, dE_bins)
+            bin_inds = np.digitize(dE_kde, dE_bins)
             for i, bin in enumerate(dE_bins):
                 inds = np.where(bin_inds == i)[0]
                 dE_hist = []
@@ -514,7 +611,8 @@ class EvbDataProcessing:
                 E2 = E2_fg[i]
                 E2_shifted, V, dE, Eg = self._calculate_Eg_V_dE(
                     E1, E2, self.alpha, self.H12)
-                dGfep = self._calculate_dGfep(dE, result["Temp_set"])
+                dGfep = self._calculate_dGfep(E1, E2_shifted,
+                                              result["Temp_set"])
                 dGevb, shift, fepxi = self._dGevb_analytical(
                     dGfep, self.Lambda, self.H12, self.coordinate_bins)
                 dGfep_fg.append(dGfep)
@@ -574,9 +672,20 @@ class EvbDataProcessing:
             dens_max = result["dE_dens_max"]
             dens_thres = result["dE_dens_threshold"]
 
+            # dE_dens (and dens) may come from a subsample of dE (see
+            # _calculate_coordinate_bins), so scatter against the matching
+            # sample rather than assuming 1:1 alignment with the full dE.
+            dE_scatter = result.get("dE_dens_sample", dE)
+            if "dE_dens_sample_lambda_indices" in result:
+                L_scatter = [
+                    Lambda[i] for i in result["dE_dens_sample_lambda_indices"]
+                ]
+            else:
+                L_scatter = L_values
+
             # dens_max = scipy.signal.savgol_filter(dens_max, 20, 3)
 
-            ax[j, 0].scatter(dE, L_values, c=dens, s=5)
+            ax[j, 0].scatter(dE_scatter, L_scatter, c=dens, s=5)
             ax[j, 0].plot([dE_min, dE_min], [0, 0.3])
             ax[j, 0].plot([dE_max, dE_max], [0.7, 1])
             ax[j, 0].set_ylabel(r"$\lambda$")
@@ -613,7 +722,7 @@ class EvbDataProcessing:
             start = 0
             end = len(dens_max) - 1
 
-            ax[j, 1].scatter(dE, dens, s=1)
+            ax[j, 1].scatter(dE_scatter, dens, s=1)
             ax[j, 1].plot([dE_min, dE_max], [dens_thres, dens_thres])
             ax[j, 1].plot(dE_bins[start:end], dens_max[start:end])
             ax[j, 1].plot([dE_min, dE_min], [0, 1])
@@ -635,7 +744,10 @@ class EvbDataProcessing:
                      plot_analytical=True,
                      plot_discrete=False,
                      order=None,
-                     x_axis_publication=True):
+                     x_axis_publication=True,
+                     figsize=(15, 3.5),
+                     rows=1,
+                     cols=2):
 
         import matplotlib.pyplot as plt
         import matplotlib.colors as mcolors
@@ -644,7 +756,8 @@ class EvbDataProcessing:
         coordinate_bins = results["coordinate_bins"]
         Lambda = results["Lambda"]
 
-        fig, ax = plt.subplots(1, 2, figsize=(15, 3.5))
+        assert_msg_critical(rows * cols == 2, "2 subplots are required")
+        fig, ax = plt.subplots(rows, cols, figsize=figsize)
         bin_indicators = (coordinate_bins[:-1] + coordinate_bins[1:]) / 2
         colors = mcolors.TABLEAU_COLORS
 
@@ -956,7 +1069,8 @@ class EvbDataProcessing:
                         dp.alpha,
                         dp.H12,
                     )
-                    dGfep = dp._calculate_dGfep(dE, result['Temp_set'])
+                    dGfep = dp._calculate_dGfep(E1, E2_shifted,
+                                                result['Temp_set'])
                     dGevb, shift, fepxi = dp._dGevb_analytical(
                         dGfep,
                         lam,

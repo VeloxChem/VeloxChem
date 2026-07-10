@@ -96,6 +96,7 @@ class EvbDriver:
         self.data_folder_override = None
 
         self.ffbuilder = ReactionForceFieldBuilder(ostream=self.ostream)
+        self.dataprocessing = EvbDataProcessing(ostream=self.ostream)
 
     def build_and_run_default_water_EVB(
         self,
@@ -397,6 +398,39 @@ class EvbDriver:
 
         self.ostream.flush()
 
+    def load_results(
+        self,
+        data_folder: str,
+    ):
+        assert_msg_critical('openmm' in sys.modules,
+                            'openmm is required for EvbDriver.')
+
+        # Loading / folder preparation happens only on the master rank; in
+        # async-reporter mode the reporter worker reconstructs what it needs
+        # from the shared folder in run_FEP.
+        if self.rank != mpi_master():
+            return
+
+        options_path = Path(data_folder) / "options.json"
+        with options_path.open("r") as file:
+            conf = json.load(file)
+
+        if self.lambda_vec != conf["Lambda"] and self.lambda_vec is not None:
+            self.ostream.print_warning(
+                f"Lambda vector in {options_path} does not match the current Lambda vector. Overwriting current Lambda vector with the one from the file."
+            )
+        self.temperature = conf['temperature']
+        self.lambda_vec = conf['Lambda']
+        conf["data_folder"] = str(data_folder)
+        conf["run_folder"] = str(Path(data_folder) / "run")
+        self.system_confs.append(conf)
+        self.ostream.print_info(
+            f"Loaded configuration with temperatue {self.temperature} and Lambda vector {self.lambda_vec} from {data_folder}"
+        )
+        self.ostream.print_info(
+            f"Current configurations: {[conf['name'] for conf in self.system_confs]}"
+        )
+
     def run_FEP(
         self,
         platform=None,
@@ -488,25 +522,24 @@ class EvbDriver:
         if self.rank != mpi_master():
             return
 
-        dp = EvbDataProcessing(ostream=self.ostream)
         results = self._load_output_from_folders(lambda_sub_sample,
                                                  lambda_sub_sample_ends,
                                                  time_sub_sample)
         self.ostream.flush()
 
         if alpha is not None:
-            dp.alpha = alpha
+            self.dataprocessing.alpha = alpha
         if H12 is not None:
-            dp.H12 = H12
+            self.dataprocessing.H12 = H12
         if alpha_guess is not None:
-            dp.alpha_guess = alpha_guess
+            self.dataprocessing.alpha_guess = alpha_guess
         if H12_guess is not None:
-            dp.H12_guess = H12_guess
+            self.dataprocessing.H12_guess = H12_guess
         if dE_range is not None:
-            dp.coordinate_bins = np.linspace(dE_range[0], dE_range[1], 200)
+            self.dataprocessing.coordinate_bins = np.linspace(
+                dE_range[0], dE_range[1], 200)
 
-        self.dataprocessing = dp
-        results = dp.compute(results, barrier, free_energy)
+        results = self.dataprocessing.compute(results, barrier, free_energy)
         self.results = results
         self.print_results()
         self._save_dict_as_h5(results, f"results")
@@ -769,10 +802,18 @@ class EvbDriver:
                         subgroup = group.create_group(k)
                         save_group(v, subgroup)
                     elif isinstance(v, (np.ndarray, list, set)):
-                        # sets are unordered so convert to list first; np.array handles both
+                        # # sets are unordered so convert to list first; np.array handles both
+                        # self.ostream.print_info(f"key {k} with type {type(k)}")
+                        # self.ostream.print_info(
+                        #     f"value {v} with type {type(v)}")
+                        # self.ostream.flush()
+
+                        if k == 'pdb_active_res':
+                            continue
                         group.create_dataset(
                             k,
                             data=np.array(list(v) if isinstance(v, set) else v))
+
                     elif isinstance(v,
                                     (bool, int, float, str, bytes, np.generic)):
                         # np.generic covers numpy scalars (np.float64, np.int32, etc.)
