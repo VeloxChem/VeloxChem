@@ -1,0 +1,18 @@
+{
+    "permissions": {
+        "allow": [
+            "Read(./**/*.py)",
+            "Read(./CLAUDE.md)",
+            "Read(./README.md)"
+        ],
+        "deny": [
+            "Read(../.github/*)",
+            "Read(../.pytest_cache/*)",
+            "Read(../basis/**)",
+            "Read(../make/*)",
+            "Read(./**/*.cpp)",
+            "Read(./**/*.hpp)",
+            "Read(../**/__pycache__)"
+        ]
+    }
+}

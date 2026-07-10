@@ -154,6 +154,36 @@ class ReactionSystemBuilder():
         self.pdb_active_res: list[
             dict] | None = None  # Residue ids of the residues active in the reaction in the PDB file
 
+        # vlx reactant atom id -> real openmm Atom for the reacting atoms in the PDB
+        self.reaction_atoms: dict = {}
+
+        # When a reacting residue does not match an AMBER template (e.g. a
+        # modified/reacting residue), the bonds/angles/torsions that connect it to the
+        # surrounding PDB structure receive no AMBER parameters and are
+        # silently dropped. When enabled, the missing boundary terms are
+        # reconstructed from the reactant/product fragments (which encode the
+        # junction via their capping atoms). See _match_boundary_atoms.
+        self.reconstruct_boundary_bonds: bool = True
+        # vlx reactant atom id -> real openmm Atom for the capping atoms that
+        # were resolved onto real neighboring PDB atoms. Deliberately kept
+        # separate from self.reaction_atoms (see _match_boundary_atoms).
+        self.boundary_atoms: dict = {}
+
+        # Internal bookkeeping populated by _match_boundary_atoms /
+        # _classify_boundary_terms (see those methods). Kept empty by default so
+        # the boundary-force / exception paths are inert when there is no
+        # boundary to reconstruct.
+        self._boundary_bond_keys: list = []
+        self._boundary_angle_keys: list = []
+        self._boundary_torsion_keys: list = []
+        self._boundary_improper_keys: list = []
+        self._boundary_nb_exception_keys: list = []
+        self._boundary_atom_nb_params: dict = {}
+        self._boundary_exception_index: dict = {}
+        self._boundary_summary: list = []
+        self._boundary_crossings: list = []
+        self._atom_boundary: dict = {}
+
         self.no_force_groups: bool = False
         self.nb_switching_function: bool = True
 
@@ -224,6 +254,7 @@ class ReactionSystemBuilder():
             "conformer_phi_product": float,
             "conformer_k": float,
             "frozen_atoms": list,
+            "reconstruct_boundary_bonds": bool,
         }
 
     def build_systems(
@@ -261,6 +292,9 @@ class ReactionSystemBuilder():
             self.ostream.print_info(
                 f"conformer_active_torsion: {self.conformer_active_torsion}")
         self.ostream.flush()
+        # Output folder for the detailed boundary-parameterisation log (set by
+        # EvbDriver; may be absent when the builder is driven directly).
+        self.data_folder = configuration.get("data_folder", self.data_folder)
         self.reactant = reactant
         self.product = product
 
@@ -278,7 +312,6 @@ class ReactionSystemBuilder():
             system.addForce(cmm_remover)
             vlx_mol = Molecule(reactant.molecule)
             self.positions = vlx_mol.get_coordinates_in_angstrom()
-            self.reaction_atoms = dict()
         else:
             system, topology, vlx_mol, self.reaction_atoms = self._system_from_pdb(
             )
@@ -459,6 +492,14 @@ class ReactionSystemBuilder():
             if self.reactant.atoms[id].get('pdb') != 'sys':
                 self.reactant.atoms[id]['pdb'] = 'unmapped'
 
+        # Reconstruct the bonded terms (and 1-4 nonbonded exceptions) that
+        # connect the reacting residue(s) to the surrounding PDB structure but
+        # were dropped because the residue did not match an AMBER template.
+        if self.reconstruct_boundary_bonds:
+            self._match_boundary_atoms(residues, mapping, system, res_atoms,
+                                       reaction_atoms)
+            self._print_boundary_summary()
+
         return system, topology, system_mol, reaction_atoms
 
     def _get_mapped_atom_ids_from_residues(self, residues):
@@ -564,6 +605,632 @@ class ReactionSystemBuilder():
             "vlx.Molecule.read_xyz_file('reactant.xyz').show(bonds=np.loadtxt('reactant_bonds.txt'))\n"
             "vlx.Molecule.read_xyz_file('residue.xyz').show(bonds=np.loadtxt('residue_bonds.txt'))"
         )
+
+    def _match_boundary_atoms(self, residues, mapping, system, res_atoms,
+                              reaction_atoms):
+        """Resolve the reactant fragment's capping atoms onto the real
+        neighboring PDB atoms.
+
+        The capping atoms (tagged 'unmapped') of the reactant fragment stand in
+        for the real neighboring residues. They are matched onto the actual
+        neighboring PDB atoms via an anchored, heavy-atom graph isomorphism that
+        keeps the already-established within-residue mapping fixed. Matched atoms
+        are recorded in self.boundary_atoms and tagged 'boundary' so the bonded
+        terms bridging the reacting residue(s) and the surrounding structure can
+        be reconstructed (see _classify_boundary_terms).
+
+        Hydrogens are excluded from the match because a capping-group hydrogen
+        environment (e.g. a methyl cap) does not structurally match the real
+        neighbor it represents (e.g. a C-alpha), which would otherwise break the
+        isomorphism. The backbone-junction terms only involve heavy atoms.
+        """
+
+        # Start from a clean slate for repeated build calls.
+        self.boundary_atoms = {}
+        self._boundary_bond_keys = []
+        self._boundary_angle_keys = []
+        self._boundary_torsion_keys = []
+        self._boundary_improper_keys = []
+        self._boundary_nb_exception_keys = []
+        self._boundary_atom_nb_params = {}
+        self._boundary_exception_index = {}
+        self._boundary_summary = []
+        self._boundary_crossings = []
+        self._atom_boundary = {}
+
+        def tag(i):
+            return self.reactant.atoms[i].get('pdb')
+
+        # Capping atoms directly bonded to a mapped ('sys') atom seed the boundary.
+        boundary_seeds = set()
+        for (i, j) in self.reactant.bonds:
+            ti, tj = tag(i), tag(j)
+            if ti == 'sys' and tj == 'unmapped':
+                boundary_seeds.add(j)
+            elif tj == 'sys' and ti == 'unmapped':
+                boundary_seeds.add(i)
+
+        if not boundary_seeds:
+            self.ostream.print_info(
+                "No capping atoms adjacent to the mapped residue(s) detected; "
+                "skipping boundary bond reconstruction.")
+            self.ostream.flush()
+            return
+
+        # Maximum bond distance at which an unmapped atom can still share a
+        # bonded term with a mapped atom, derived from the arity of the
+        # reactant's own bonded-term dictionaries (4-atom terms -> depth 3).
+        term_arities = [
+            len(k)
+            for k in (list(self.reactant.bonds) + list(self.reactant.angles) +
+                      list(self.reactant.dihedrals) +
+                      list(self.reactant.impropers))
+        ]
+        max_term_depth = (max(term_arities) if term_arities else 2) - 1
+
+        # Reactant adjacency (undirected).
+        vlx_adj = {i: set() for i in self.reactant.atoms}
+        for (i, j) in self.reactant.bonds:
+            vlx_adj[i].add(j)
+            vlx_adj[j].add(i)
+
+        vlx_elements = self.reactant.molecule.get_element_ids()
+
+        def is_heavy_elem(elem):
+            return int(elem) != 1
+
+        sys_ids = [i for i in self.reactant.atoms if tag(i) == 'sys']
+
+        # Real topology adjacency and index -> Atom lookup.
+        topology = residues[0].chain.topology
+        real_atom = {atom.index: atom for atom in topology.atoms()}
+        real_adj = {}
+        for bond in topology.bonds():
+            a, b = bond[0].index, bond[1].index
+            real_adj.setdefault(a, set()).add(b)
+            real_adj.setdefault(b, set()).add(a)
+
+        res_indices = {atom.index for atom in res_atoms}
+        mapped_real = {mapping[n] for n in sys_ids}
+
+        # Anchored greedy alignment: starting from the mapped ('sys') atoms whose
+        # real correspondents are known, walk outward through the fragment and
+        # resolve each heavy capping atom onto a real neighbor atom of the
+        # matching element. Genuine chain termini (no real neighbor, e.g. an acyl
+        # tail) are simply left unresolved, and ambiguous choices are broken by
+        # connectivity to already-resolved atoms. This tolerates fragments that
+        # mix real junctions with true termini, unlike a full-fragment graph
+        # isomorphism which would fail outright.
+        from collections import deque
+        resolved = {i: mapping[i] for i in sys_ids}
+        used_real = set(resolved.values())
+        depth_of = {i: 0 for i in sys_ids}
+        queue = deque(sys_ids)
+        while queue:
+            a = queue.popleft()
+            if depth_of[a] >= max_term_depth:
+                continue
+            ra = resolved[a]
+            for b in vlx_adj[a]:
+                if b in resolved or tag(b) != 'unmapped':
+                    continue
+                if not is_heavy_elem(vlx_elements[b]):
+                    continue
+                target_elem = int(vlx_elements[b])
+                cand = [
+                    rn for rn in real_adj.get(ra, ())
+                    if rn not in used_real and rn not in res_indices
+                    and real_atom[rn].element.atomic_number == target_elem
+                ]
+                if not cand:
+                    continue
+                if len(cand) > 1:
+                    # Prefer the real atom whose neighbors best reproduce the
+                    # already-resolved fragment neighbors of b.
+                    def score(rn):
+                        return sum(1 for bn in vlx_adj[b] if bn in resolved
+                                   and resolved[bn] in real_adj.get(rn, ()))
+
+                    cand.sort(key=score, reverse=True)
+                rn = cand[0]
+                resolved[b] = rn
+                used_real.add(rn)
+                depth_of[b] = depth_of[a] + 1
+                queue.append(b)
+
+        for vlx_id, real_idx in resolved.items():
+            if tag(vlx_id) == 'unmapped':
+                self.boundary_atoms[vlx_id] = real_atom[real_idx]
+                self.reactant.atoms[vlx_id]['pdb'] = 'boundary'
+
+        if self.boundary_atoms:
+            self.ostream.print_info(
+                f"Resolved {len(self.boundary_atoms)} capping atom(s) onto the "
+                "surrounding PDB structure for boundary reconstruction.")
+            self.ostream.flush()
+
+        self._classify_boundary_terms(system, reaction_atoms)
+
+    @staticmethod
+    def _force_constant_value(k):
+        """Return the plain magnitude of a possibly unit-tagged force constant."""
+        try:
+            return k.value_in_unit(k.unit)
+        except AttributeError:
+            return k
+
+    def _classify_boundary_terms(self, system, reaction_atoms):
+        """Decide which boundary bonded terms need reconstructing.
+
+        A term that bridges the reacting fragment and the surrounding structure
+        (one endpoint mapped, the other resolved onto a real neighbor via
+        self.boundary_atoms) is reconstructed from the reactant/product fragment
+        only if the retained AMBER 'PDB' forces do not already parametrise it.
+        Also collects the 1-4 nonbonded exceptions across the junction whose
+        baked-in values are wrong (they were computed from the placeholder
+        residue's null nonbonded parameters).
+        """
+
+        if not self.boundary_atoms:
+            return
+
+        merged = {**reaction_atoms, **self.boundary_atoms}
+
+        # Identify each individual junction (a covalent bond crossing from the
+        # reacting fragment into a resolved boundary atom) and map every
+        # boundary atom to the junction it descends from. This lets the summary
+        # group terms per boundary instead of per residue - a single term (e.g.
+        # a torsion) can span three different residues, so the residue of a term
+        # is ambiguous, whereas the junction it crosses is not.
+        from collections import deque
+        adj = {}
+        for i, j in self.reactant.bonds:
+            adj.setdefault(i, []).append(j)
+            adj.setdefault(j, []).append(i)
+        self._boundary_crossings = []  # list of (reacting_id, boundary_seed_id)
+        self._atom_boundary = {}  # boundary vlx id -> crossing index
+        for i, j in self.reactant.bonds:
+            ti = self.reactant.atoms[i].get('pdb')
+            tj = self.reactant.atoms[j].get('pdb')
+            if (ti == 'boundary') == (tj == 'boundary'):
+                continue  # not a crossing bond (both or neither are boundary)
+            reacting, seed = (j, i) if ti == 'boundary' else (i, j)
+            # The reacting side must be a mapped 'sys' atom (present in merged);
+            # an 'unmapped'/new neighbour is not a real protein junction.
+            if self.reactant.atoms[reacting].get('pdb') != 'sys':
+                continue
+            cidx = len(self._boundary_crossings)
+            self._boundary_crossings.append((reacting, seed))
+            dq = deque([seed])
+            while dq:
+                a = dq.popleft()
+                if a in self._atom_boundary:
+                    continue
+                self._atom_boundary[a] = cidx
+                for nb in adj.get(a, ()):
+                    if (self.reactant.atoms[nb].get('pdb') == 'boundary'
+                            and nb not in self._atom_boundary):
+                        dq.append(nb)
+
+        forces = system.getForces()
+
+        # Lookups of terms already parametrised by the retained PDB forces.
+        bond_force = next(
+            (f for f in forces if f.getName() == 'PDB Bond Force'), None)
+        angle_force = next(
+            (f for f in forces if f.getName() == 'PDB Angle Force'), None)
+        torsion_force = next(
+            (f for f in forces if f.getName() == 'PDB Torsion Force'), None)
+        nb_force = next((f for f in forces if isinstance(f, mm.NonbondedForce)),
+                        None)
+
+        pdb_bonds = set()
+        if bond_force is not None:
+            for i in range(bond_force.getNumBonds()):
+                p1, p2, r, k = bond_force.getBondParameters(i)
+                if self._force_constant_value(k) > 0:
+                    pdb_bonds.add(tuple(sorted((p1, p2))))
+        pdb_angles = set()
+        if angle_force is not None:
+            for i in range(angle_force.getNumAngles()):
+                p1, p2, p3, t, k = angle_force.getAngleParameters(i)
+                if self._force_constant_value(k) > 0:
+                    pdb_angles.add((p1, p2, p3))
+                    pdb_angles.add((p3, p2, p1))
+        pdb_torsions = set()
+        if torsion_force is not None:
+            for i in range(torsion_force.getNumTorsions()):
+                p1, p2, p3, p4, per, phase, k = \
+                    torsion_force.getTorsionParameters(i)
+                if self._force_constant_value(k) > 0:
+                    pdb_torsions.add((p1, p2, p3, p4))
+                    pdb_torsions.add((p4, p3, p2, p1))
+
+        def classify(rea_terms, pro_terms, pdb_lookup, key_list, term_type):
+            for key in set(rea_terms) | set(pro_terms):
+                # Fully within the reacting fragment -> handled by the regular
+                # reaction forces already.
+                if self._key_to_id(key, reaction_atoms) is not None:
+                    continue
+                atom_ids = self._key_to_id(key, merged)
+                if atom_ids is None:
+                    continue  # not resolvable even with the boundary atoms
+
+                if key not in rea_terms or key not in pro_terms:
+                    self.ostream.print_warning(
+                        f"Boundary {term_type} {key} is present on only one "
+                        "side of the reaction; skipping its reconstruction."
+                        "Breaking and forming bonds should be completely contained within the reacting fragment."
+                    )
+                    continue
+                if term_type == 'bond':
+                    covered = tuple(sorted(atom_ids)) in pdb_lookup
+                else:
+                    covered = tuple(atom_ids) in pdb_lookup
+                source = 'amber14' if covered else 'reactant_product'
+                if not covered:
+                    key_list.append(key)
+                self._boundary_summary.append(
+                    self._boundary_summary_entry(term_type, key, merged,
+                                                 source))
+
+        classify(self.reactant.bonds, self.product.bonds, pdb_bonds,
+                 self._boundary_bond_keys, 'bond')
+        classify(self.reactant.angles, self.product.angles, pdb_angles,
+                 self._boundary_angle_keys, 'angle')
+        classify(self.reactant.dihedrals, self.product.dihedrals, pdb_torsions,
+                 self._boundary_torsion_keys, 'torsion')
+        classify(self.reactant.impropers, self.product.impropers, pdb_torsions,
+                 self._boundary_improper_keys, 'improper')
+
+        # Cache the real (AMBER) nonbonded parameters of each boundary atom and
+        # index the existing nonbonded exceptions, both needed to correct the
+        # 1-4 exceptions across the junction per lambda.
+        if nb_force is not None:
+            for vlx_id, atom in self.boundary_atoms.items():
+                params = nb_force.getParticleParameters(atom.index)
+                self._boundary_atom_nb_params[vlx_id] = (
+                    params[0].value_in_unit(mmunit.elementary_charge),
+                    params[1].value_in_unit(mmunit.nanometer),
+                    params[2].value_in_unit(mmunit.kilojoule_per_mole),
+                )
+            for i in range(nb_force.getNumExceptions()):
+                p1, p2, q, s, e = nb_force.getExceptionParameters(i)
+                self._boundary_exception_index[tuple(sorted((p1, p2)))] = i
+
+        # Collect the 1-4 pairs that cross the junction (exactly one endpoint is
+        # a 'boundary' atom, the other a real system atom). 1-2/1-3 exclusions
+        # are already correct (topology-driven) and both-boundary pairs keep
+        # their correct AMBER values.
+        rea_exc = self._create_exceptions_from_bonds(self.reactant.atoms,
+                                                     self.reactant.bonds)
+        for (i, j), entry in rea_exc.items():
+            if entry['qq'] == 0.0 and entry['epsilon'] == 0.0:
+                continue
+            ti = self.reactant.atoms[i].get('pdb')
+            tj = self.reactant.atoms[j].get('pdb')
+            if 'boundary' not in (ti, tj) or {ti, tj} == {'boundary'}:
+                continue
+            if ti == 'boundary':
+                bnd_id, other_id, other_tag = i, j, tj
+            else:
+                bnd_id, other_id, other_tag = j, i, ti
+            if other_tag not in ('sys', None):
+                continue
+            self._boundary_nb_exception_keys.append((other_id, bnd_id))
+
+    def _boundary_term_params(self, term_type, key):
+        if term_type == 'bond':
+            a = self.reactant.bonds[key]
+            b = self.product.bonds[key]
+            return {
+                'eq_reactant': a['equilibrium'],
+                'fc_reactant': a['force_constant'],
+                'eq_product': b['equilibrium'],
+                'fc_product': b['force_constant'],
+            }
+        if term_type == 'angle':
+            a = self.reactant.angles[key]
+            b = self.product.angles[key]
+            return {
+                'eq_reactant': a['equilibrium'],
+                'fc_reactant': a['force_constant'],
+                'eq_product': b['equilibrium'],
+                'fc_product': b['force_constant'],
+            }
+        rea = self.reactant.dihedrals if term_type == 'torsion' \
+            else self.reactant.impropers
+        pro = self.product.dihedrals if term_type == 'torsion' \
+            else self.product.impropers
+
+        def summarize(d):
+            return {
+                'periodicity': d.get('periodicity'),
+                'phase': d.get('phase'),
+                'barrier': d.get('barrier'),
+            }
+
+        return {
+            'reactant': summarize(rea[key]),
+            'product': summarize(pro[key]),
+        }
+
+    def _atom_label(self, atom):
+        return f"{atom.residue.name}{atom.residue.id}:{atom.name}"
+
+    def _term_boundary_index(self, key):
+        """Return the junction (crossing index) a boundary term belongs to."""
+        for vlx_id in key:
+            if vlx_id in self._atom_boundary:
+                return self._atom_boundary[vlx_id]
+        return None
+
+    def _crossing_label(self, cidx, merged):
+        """Human-readable label for junction cidx, e.g. SER131:CA-GLY130:C."""
+        reacting, seed = self._boundary_crossings[cidx]
+        return (f"{self._atom_label(merged[reacting])}"
+                f"-{self._atom_label(merged[seed])}")
+
+    def _term_residue(self, key, merged):
+        """The active (reacting) residue a boundary term belongs to. Terms are
+        grouped by this so each term is counted once, under the reacting residue
+        it bridges - a torsion spanning several boundaries of the same residue is
+        not double counted, as it would be if grouped per junction."""
+        for vlx_id in key:
+            if self.reactant.atoms[vlx_id].get('pdb') == 'sys':
+                r = merged[vlx_id].residue
+                return f"{r.name}{r.id} (chain {r.chain.id})"
+        # All-boundary term: fall back to the crossing's reacting (sys) atom.
+        cidx = self._term_boundary_index(key)
+        if cidx is not None:
+            reacting, _ = self._boundary_crossings[cidx]
+            r = merged[reacting].residue
+            return f"{r.name}{r.id} (chain {r.chain.id})"
+        return 'unassigned'
+
+    def _boundary_summary_entry(self, term_type, key, merged, source):
+        atom_labels = [self._atom_label(merged[vlx_id]) for vlx_id in key]
+        cidx = self._term_boundary_index(key)
+        return {
+            'residue': self._term_residue(key, merged),
+            'boundary': self._crossing_label(cidx, merged)
+            if cidx is not None else 'unassigned',
+            'term_type': term_type,
+            'atoms': atom_labels,
+            'source': source,
+            'parameters': self._boundary_term_params(term_type, key),
+        }
+
+    def _create_boundary_bonded_forces(self, lam):
+        """Reconstruct the bonded terms bridging the reacting fragment and the
+        surrounding PDB structure that AMBER left unparametrised, interpolating
+        reactant/product parameters exactly like the regular reaction forces."""
+
+        bond_force = mm.HarmonicBondForce()
+        bond_force.setName("Boundary reaction harmonic bond")
+        angle_force = mm.HarmonicAngleForce()
+        angle_force.setName("Boundary reaction angle")
+        torsion_force = mm.PeriodicTorsionForce()
+        torsion_force.setName("Boundary reaction proper fourier torsion")
+        improper_force = mm.PeriodicTorsionForce()
+        improper_force.setName("Boundary reaction improper fourier torsion")
+        if not self.no_force_groups:
+            bond_force.setForceGroup(EvbForceGroup.REA_BOUNDARY_BOND.value)
+            angle_force.setForceGroup(EvbForceGroup.REA_BOUNDARY_ANGLE.value)
+            torsion_force.setForceGroup(
+                EvbForceGroup.REA_BOUNDARY_TORSION.value)
+            improper_force.setForceGroup(EvbForceGroup.REA_BOUNDARY_IMP.value)
+
+        if not self.reconstruct_boundary_bonds or not self.boundary_atoms:
+            return bond_force, angle_force, torsion_force, improper_force
+
+        merged = {**self.reaction_atoms, **self.boundary_atoms}
+
+        for key in self._boundary_bond_keys:
+            atom_ids = self._key_to_id(key, merged)
+            if atom_ids is None:
+                continue
+            a = self.reactant.bonds[key]
+            b = self.product.bonds[key]
+            eq = a['equilibrium'] * (1 - lam) + b['equilibrium'] * lam
+            fc = a['force_constant'] * (1 - lam) + b['force_constant'] * lam
+            self._add_bond(bond_force, atom_ids, eq, fc)
+
+        for key in self._boundary_angle_keys:
+            atom_ids = self._key_to_id(key, merged)
+            if atom_ids is None:
+                continue
+            a = self.reactant.angles[key]
+            b = self.product.angles[key]
+            eq = a['equilibrium'] * (1 - lam) + b['equilibrium'] * lam
+            fc = a['force_constant'] * (1 - lam) + b['force_constant'] * lam
+            self._add_angle(angle_force, atom_ids, eq, fc)
+
+        for key in self._boundary_torsion_keys:
+            atom_ids = self._key_to_id(key, merged)
+            if atom_ids is None:
+                continue
+            dihedA = self.reactant.dihedrals[key]
+            dihedB = self.product.dihedrals[key]
+            if dihedA['barrier'] == 0 or dihedB['barrier'] == 0:
+                reascale, proscale = self._get_lambda_scaling(
+                    lam, self.torsion_lambda_switch)
+            else:
+                reascale = 1 - lam
+                proscale = lam
+            self._add_torsion(torsion_force, dihedA, atom_ids, reascale)
+            self._add_torsion(torsion_force, dihedB, atom_ids, proscale)
+
+        for key in self._boundary_improper_keys:
+            atom_ids = self._key_to_id(key, merged)
+            if atom_ids is None:
+                continue
+            dihedA = self.reactant.impropers[key]
+            dihedB = self.product.impropers[key]
+            if dihedA['barrier'] == 0 or dihedB['barrier'] == 0:
+                reascale, proscale = self._get_lambda_scaling(
+                    lam, self.torsion_lambda_switch)
+            else:
+                reascale = 1 - lam
+                proscale = lam
+            self._add_torsion(improper_force,
+                              dihedA,
+                              atom_ids,
+                              reascale,
+                              improper=True)
+            self._add_torsion(improper_force,
+                              dihedB,
+                              atom_ids,
+                              proscale,
+                              improper=True)
+
+        return bond_force, angle_force, torsion_force, improper_force
+
+    def _fix_boundary_nonbonded_exceptions(self, nb_force, lam):
+        """Correct the 1-4 nonbonded exceptions across each junction, whose
+        values were baked from the placeholder residue's null nonbonded
+        parameters. Uses the current lambda-interpolated reacting-atom
+        parameters and the cached real (AMBER) boundary-atom parameters."""
+
+        if not self._boundary_nb_exception_keys:
+            return
+
+        for other_id, bnd_id in self._boundary_nb_exception_keys:
+            idx_other = self.reaction_atoms[other_id].index
+            idx_bnd = self.boundary_atoms[bnd_id].index
+
+            q_o, s_o, e_o = nb_force.getParticleParameters(idx_other)
+            charge_o = q_o.value_in_unit(mmunit.elementary_charge)
+            sigma_o = s_o.value_in_unit(mmunit.nanometer)
+            eps_o = e_o.value_in_unit(mmunit.kilojoule_per_mole)
+            charge_b, sigma_b, eps_b = self._boundary_atom_nb_params[bnd_id]
+
+            qq = self.coul14_scale * charge_o * charge_b
+            sigma = 0.5 * (sigma_o + sigma_b)
+            eps = self.lj14_scale * math.sqrt(eps_o * eps_b)
+
+            key = tuple(sorted((idx_other, idx_bnd)))
+            if key in self._boundary_exception_index:
+                nb_force.setExceptionParameters(
+                    self._boundary_exception_index[key], idx_other, idx_bnd, qq,
+                    sigma, eps)
+            else:
+                new_idx = nb_force.addException(idx_other, idx_bnd, qq, sigma,
+                                                eps)
+                self._boundary_exception_index[key] = new_idx
+
+    @staticmethod
+    def _format_term_params(entry):
+        """One-line human-readable parameter string for the detailed log."""
+        p = entry['parameters']
+        tt = entry['term_type']
+        if tt in ('bond', 'angle'):
+            unit = 'nm' if tt == 'bond' else 'rad'
+            return (f"eq {p['eq_reactant']:.4f}->{p['eq_product']:.4f} {unit}, "
+                    f"k {p['fc_reactant']:.1f}->{p['fc_product']:.1f}")
+        r, pr = p['reactant'], p['product']
+        return (f"reactant(per={r['periodicity']}, phase={r['phase']}, "
+                f"barrier={r['barrier']}) "
+                f"product(per={pr['periodicity']}, phase={pr['phase']}, "
+                f"barrier={pr['barrier']})")
+
+    def _print_boundary_summary(self):
+
+        if not self._boundary_summary:
+            if self.reconstruct_boundary_bonds and self.pdb is not None:
+                self.ostream.print_info(
+                    "Boundary reconstruction: no boundary bonded terms required "
+                    "reconstruction.")
+                self.ostream.flush()
+            return
+
+        # Group per reacting (active) residue, so a term is counted once under
+        # the residue it bridges rather than per junction (where a torsion
+        # spanning two boundaries of the same residue would be double counted).
+        by_res = {}
+        for e in self._boundary_summary:
+            by_res.setdefault(e['residue'], []).append(e)
+
+        # Category label for the concise counts (impropers folded in only if
+        # present, so the common case stays a clean bonds/angles/dihedrals list).
+        cat_of = {
+            'bond': 'bonds',
+            'angle': 'angles',
+            'torsion': 'dihedrals',
+            'improper': 'impropers',
+        }
+
+        self.ostream.print_info(
+            "Boundary parameterisation summary (bonded terms bridging each "
+            "reacting residue and the surrounding PDB structure):")
+        for res in sorted(by_res):
+            entries = by_res[res]
+            self.ostream.print_info(f"  Residue {res}:")
+            # counts[category] = [n_amber14, n_reconstructed]
+            counts = {}
+            for e in entries:
+                c = counts.setdefault(cat_of[e['term_type']], [0, 0])
+                c[1 if e['source'] == 'reactant_product' else 0] += 1
+            for cat in ('bonds', 'angles', 'dihedrals', 'impropers'):
+                if cat not in counts:
+                    continue
+                kept, recon = counts[cat]
+                self.ostream.print_info(f"    {cat:<10}{kept} kept (AMBER14), "
+                                        f"{recon} reconstructed from fragment")
+            # Only bond-stretch reconstructions are called out explicitly.
+            for e in entries:
+                if e['term_type'] == 'bond' and e[
+                        'source'] == 'reactant_product':
+                    self.ostream.print_info(
+                        f"    -> reconstructed bond stretch "
+                        f"{'-'.join(e['atoms'])}: "
+                        f"{self._format_term_params(e)}")
+
+        # Write the full per-term breakdown to a file in the output folder.
+        self._write_boundary_log(by_res)
+        self.ostream.flush()
+
+    def _write_boundary_log(self, by_res):
+        import os
+        folder = self.data_folder if self.data_folder else "."
+        path = os.path.join(folder, "boundary_parameterisation.txt")
+        try:
+            lines = [
+                "Boundary parameterisation - full per-term breakdown",
+                "=" * 60,
+                "Bonded terms bridging each reacting residue and the "
+                "surrounding PDB structure.",
+                "'AMBER14' terms kept the force-field parameters; "
+                "'fragment' terms were",
+                "reconstructed from the reactant/product molecules. The "
+                "'junction' column shows",
+                "which boundary bond the term crosses.",
+                "",
+            ]
+            for res in sorted(by_res):
+                lines.append(f"Residue {res}")
+                lines.append("-" * 60)
+                for term_type in ('bond', 'angle', 'torsion', 'improper'):
+                    for e in by_res[res]:
+                        if e['term_type'] != term_type:
+                            continue
+                        src = ('AMBER14'
+                               if e['source'] == 'amber14' else 'fragment')
+                        line = (f"  {e['term_type']:<9} "
+                                f"{'-'.join(e['atoms']):<40} {src:<9} "
+                                f"junction {e['boundary']}")
+                        if e['source'] == 'reactant_product':
+                            line += f"  [{self._format_term_params(e)}]"
+                        lines.append(line)
+                lines.append("")
+            with open(path, "w") as f:
+                f.write("\n".join(lines))
+            self.ostream.print_info(
+                f"  Full boundary parameterisation written to {path}")
+        except OSError as exc:
+            self.ostream.print_warning(
+                f"Could not write boundary parameterisation log to {path}: "
+                f"{exc}")
 
     def _delete_pdb_forces(self, system, del_indices):
         # set the right force groups, give descriptive names to the pdb forces, and delete all contributions that solely have the given indices
@@ -785,7 +1452,9 @@ class ReactionSystemBuilder():
 
             for id, atom in self.reactant.atoms.items():
                 # if the pdb field is sys, the atom is already in the system and added to the nbforce
-                if atom.get('pdb') == 'sys' or atom.get('pdb') == 'unmapped':
+                # 'boundary' atoms are capping atoms resolved onto real neighboring PDB
+                # atoms; they too already exist in the system and must not be re-added.
+                if atom.get('pdb') in ('sys', 'unmapped', 'boundary'):
                     continue
                 mm_element = mmapp.Element.getBySymbol(elements[id])
                 name = f"{elements[id]}{id}"
@@ -1466,7 +2135,7 @@ class ReactionSystemBuilder():
         rea_charge = [atom['charge'] for atom in self.reactant.atoms.values()]
         rea_pdb_charge = [
             atom['charge'] for atom in self.reactant.atoms.values()
-            if atom.get('pdb') != 'unmapped'
+            if atom.get('pdb') not in ('unmapped', 'boundary')
         ]
 
         if round(sum(rea_charge), 5).is_integer() and len(rea_pdb_charge) > 0:
@@ -1492,7 +2161,7 @@ class ReactionSystemBuilder():
         pro_pdb_charge = [
             pro_atom['charge'] for rea_atom, pro_atom in zip(
                 self.reactant.atoms.values(), self.product.atoms.values())
-            if rea_atom.get('pdb') != 'unmapped'
+            if rea_atom.get('pdb') not in ('unmapped', 'boundary')
         ]
 
         if round(sum(pro_charge), 5).is_integer() and len(pro_pdb_charge) > 0:
@@ -1532,7 +2201,11 @@ class ReactionSystemBuilder():
                 for i, (reactant_atom, product_atom) in enumerate(
                         zip(self.reactant.atoms.values(),
                             self.product.atoms.values())):
-                    if reactant_atom.get('pdb') == 'unmapped':
+                    # 'boundary' atoms are real neighboring PDB atoms; they keep
+                    # their AMBER nonbonded parameters and are not in
+                    # self.reaction_atoms, so they must be skipped here (like
+                    # 'unmapped' capping atoms).
+                    if reactant_atom.get('pdb') in ('unmapped', 'boundary'):
                         continue
                     rea_charge = reactant_atom["charge"] + rea_offset_per_atom
                     pro_charge = product_atom["charge"] + pro_offset_per_atom
@@ -1561,6 +2234,13 @@ class ReactionSystemBuilder():
                             gb_force.getParticleParameters(atom_index))
                         gb_params[0] = charge
                         gb_force.setParticleParameters(atom_index, gb_params)
+
+            # Fix the 1-4 nonbonded exceptions across the reacting-fragment /
+            # PDB boundary. Must run on the shared nb_force after the reacting
+            # atoms' charges have been set for this lambda and before the
+            # deepcopy below, so the corrected values are captured.
+            if not self.no_reactant:
+                self._fix_boundary_nonbonded_exceptions(nb_force, lam)
 
             # Add the interpolated charge to the E_field for both the system and environment
             for i in range(system.getNumParticles()):
@@ -1627,6 +2307,9 @@ class ReactionSystemBuilder():
         torsion_forces = self._create_proper_torsion_forces(lam, pes=pes)
         improper = self._create_improper_torsion_forces(lam)
 
+        (boundary_bond, boundary_angle, boundary_torsion,
+         boundary_improper) = self._create_boundary_bonded_forces(lam)
+
         if not pes:
             system.addForce(dynamic_bonded_harmonic)
             syslj, syscoul = self._create_nonbonded_forces(
@@ -1674,6 +2357,10 @@ class ReactionSystemBuilder():
         for torsion_force in torsion_forces:
             system.addForce(torsion_force)
         system.addForce(improper)
+        system.addForce(boundary_bond)
+        system.addForce(boundary_angle)
+        system.addForce(boundary_torsion)
+        system.addForce(boundary_improper)
         system.addForce(bond_constraint)
         system.addForce(constant_force)
         system.addForce(angle_constraint)
@@ -1695,6 +2382,10 @@ class ReactionSystemBuilder():
             EvbForceGroup.REA_ANGLE.value,
             EvbForceGroup.REA_TORSION.value,
             EvbForceGroup.REA_IMP.value,
+            EvbForceGroup.REA_BOUNDARY_BOND.value,
+            EvbForceGroup.REA_BOUNDARY_ANGLE.value,
+            EvbForceGroup.REA_BOUNDARY_TORSION.value,
+            EvbForceGroup.REA_BOUNDARY_IMP.value,
         ]
         to_remove = []
         for i, force in enumerate(system.getForces()):
@@ -1711,17 +2402,22 @@ class ReactionSystemBuilder():
                     force.setBondParameters(i, p1, p2, [0, 0, r])
             if force.getForceGroup(
             ) == EvbForceGroup.REA_HARM_BOND_STATIC.value or force.getForceGroup(
-            ) == EvbForceGroup.REA_HARM_BOND_DYNAMIC.value:
+            ) == EvbForceGroup.REA_HARM_BOND_DYNAMIC.value or force.getForceGroup(
+            ) == EvbForceGroup.REA_BOUNDARY_BOND.value:
                 for i in range(force.getNumBonds()):
                     p1, p2, r, k = force.getBondParameters(i)
                     force.setBondParameters(i, p1, p2, r, 0)
-            if force.getForceGroup() == EvbForceGroup.REA_ANGLE.value:
+            if force.getForceGroup() == EvbForceGroup.REA_ANGLE.value or \
+                    force.getForceGroup(
+                    ) == EvbForceGroup.REA_BOUNDARY_ANGLE.value:
                 for i in range(force.getNumAngles()):
                     p1, p2, p3, theta, k = force.getAngleParameters(i)
                     force.setAngleParameters(i, p1, p2, p3, theta, 0)
             if force.getForceGroup(
             ) == EvbForceGroup.REA_TORSION.value or force.getForceGroup(
-            ) == EvbForceGroup.REA_IMP.value:
+            ) == EvbForceGroup.REA_IMP.value or force.getForceGroup(
+            ) == EvbForceGroup.REA_BOUNDARY_TORSION.value or force.getForceGroup(
+            ) == EvbForceGroup.REA_BOUNDARY_IMP.value:
                 for i in range(force.getNumTorsions()):
                     p1, p2, p3, p4, periodicity, phase, barrier = force.getTorsionParameters(
                         i)
@@ -2817,6 +3513,12 @@ class EvbForceGroup(Enum):
     REA_ANGLE = auto()
     REA_TORSION = auto()
     REA_IMP = auto()
+
+    # Reconstructed bonded terms at the reacting-fragment / PDB boundary
+    REA_BOUNDARY_BOND = auto()
+    REA_BOUNDARY_ANGLE = auto()
+    REA_BOUNDARY_TORSION = auto()
+    REA_BOUNDARY_IMP = auto()
 
     # Constraints that also should be included in the PES calculations. Currently only used for the linear bond constraint
     PES_CONSTRAINT = auto()
