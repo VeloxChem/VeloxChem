@@ -114,6 +114,7 @@ class GostshypDriver:
         self.tessellation = None
         self._neg_p_amp = 0
         self.tco_tol = tco_tol
+        self._tco_p_stats_printed = False
 
         # mpi information
         self.comm = comm
@@ -131,6 +132,34 @@ class GostshypDriver:
                 'tco_tol': ('float', 'screening threshold for three-center overlap integrals')
             }
         }
+
+    def _print_tco_p_screening_stats(self, screened_counts, total_counts):
+        """
+        Prints the primitive-pair screening statistics for the screened
+        three-center p-type overlap integrals. Since the screening decision
+        does not depend on the density matrix, the statistics are the same
+        for every SCF iteration on a given geometry/tessellation, so this is
+        only printed once per driver instance.
+
+        :param screened_counts:
+            The number of screened primitive pairs per angular-momentum block.
+        :param total_counts:
+            The total number of primitive pairs per angular-momentum block.
+        """
+
+        if self._tco_p_stats_printed:
+            return
+
+        labels = ['S-S', 'S-P', 'S-D', 'S-F', 'P-P', 'P-D', 'P-F', 'D-D', 'D-F', 'F-F']
+
+        self.ostream.print_info(
+            'Screened three-center overlap integrals: primitive-pair screening statistics (screened / total):')
+        for label, screened, total in zip(labels, screened_counts, total_counts):
+            if total > 0:
+                self.ostream.print_info(f'  {label}: {screened} / {total}')
+        self.ostream.flush()
+
+        self._tco_p_stats_printed = True
 
     def screened_gostshyp_contrib(self, den_mat, tessellation_settings=None):
         """
@@ -159,7 +188,7 @@ class GostshypDriver:
         initial_norm_consts = (initial_exponents / np.pi) ** (1.5)
 
         #compute f_tilde vector
-        f_tilde = compute_screened_tco_p_values(self.molecule,
+        f_tilde, screened_counts, total_counts = compute_screened_tco_p_values(self.molecule,
                                                 self.basis,
                                                 initial_centers,
                                                 initial_exponents,
@@ -168,7 +197,8 @@ class GostshypDriver:
                                                 initial_norm_consts,
                                                 den_mat,
                                                 self.tco_tol)
-                    
+        self._print_tco_p_screening_stats(screened_counts, total_counts)
+
         # compute amplitudes
         initial_amplitudes = self.pressure * self.tessellation[3] / f_tilde
 
@@ -331,7 +361,7 @@ class GostshypDriver:
         initial_norm_consts = (initial_exponents / np.pi) ** (1.5)
 
         # compute f_tilde vector
-        f_tilde = compute_screened_tco_p_values(self.molecule,
+        f_tilde, screened_counts, total_counts = compute_screened_tco_p_values(self.molecule,
                                                 self.basis,
                                                 initial_centers,
                                                 initial_exponents,
@@ -340,7 +370,8 @@ class GostshypDriver:
                                                 initial_norm_consts,
                                                 gs_den_mat,
                                                 self.tco_tol)
-        
+        self._print_tco_p_screening_stats(screened_counts, total_counts)
+
         # compute amplitudes and remove grid points associated with
         # negative amplitudes
         initial_amplitudes = self.pressure * self.tessellation[3] / f_tilde
@@ -361,7 +392,7 @@ class GostshypDriver:
         f_tilde = (f_tilde[amplitudes_mask]).copy()
 
         # compute f_tilde at perturbed density (hence prime)
-        f_tilde_prime = compute_screened_tco_p_values(self.molecule,
+        f_tilde_prime, screened_counts, total_counts = compute_screened_tco_p_values(self.molecule,
                                                       self.basis,
                                                       centers,
                                                       exponents,
@@ -370,7 +401,8 @@ class GostshypDriver:
                                                       norm_consts,
                                                       trans_den_mat,
                                                       self.tco_tol)
-        
+        self._print_tco_p_screening_stats(screened_counts, total_counts)
+
         # compute g_tilde at gs density
         g_tilde = compute_screened_tco_s_values(self.molecule,
                                                 self.basis,
@@ -553,7 +585,7 @@ class GostshypDriver:
         initial_norm_consts = (initial_exponents / np.pi) ** (1.5)
 
         # f_tilde is computed for all tesserae
-        f_tilde = compute_screened_tco_p_values(self.molecule,
+        f_tilde, screened_counts, total_counts = compute_screened_tco_p_values(self.molecule,
                                                 self.basis,
                                                 initial_centers,
                                                 initial_exponents,
@@ -562,7 +594,8 @@ class GostshypDriver:
                                                 initial_norm_consts,
                                                 den_mat,
                                                 self.tco_tol)
-        
+        self._print_tco_p_screening_stats(screened_counts, total_counts)
+
         # amplitudes are computed
         initial_amplitudes = self.pressure * initial_areas / f_tilde
         amps_mask = initial_amplitudes >= 0.0

@@ -28,6 +28,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -53,7 +54,7 @@ computescreenedTCOPValues(const             CMolecule& molecule,
                           const double*     point_norm_const,
                           const double*     D,
                           const int         naos,
-                          const double      tco_tol) -> std::vector<double>
+                          const double      tco_tol) -> std::tuple<std::vector<double>, std::vector<int>, std::vector<int>>
 {
     const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
 
@@ -89,8 +90,8 @@ computescreenedTCOPValues(const             CMolecule& molecule,
 
     double N_max = *std::max_element(points_info.begin() + npoints * 8, points_info.end());
 
-    std::cout << "Max norm: " << N_max << "\n";
-    std::cout << "TCO tol: " << tco_tol << "\n";
+    // std::cout << "Max norm: " << N_max << "\n";
+    // std::cout << "TCO tol: " << tco_tol << "\n";
 
 
     // gto blocks
@@ -2017,20 +2018,20 @@ computescreenedTCOPValues(const             CMolecule& molecule,
     }
 
 
-    // print screening statistics
-    std::cout << "computescreenedTCOPValues: screening statistics (screened / total pairs)\n";
-    std::cout << "  S-S: " << screened_ss << " / " << ss_prim_pair_count << "\n";
-    std::cout << "  S-P: " << screened_sp << " / " << sp_prim_pair_count << "\n";
-    std::cout << "  S-D: " << screened_sd << " / " << sd_prim_pair_count << "\n";
-    std::cout << "  S-F: " << screened_sf << " / " << sf_prim_pair_count << "\n";
-    std::cout << "  P-P: " << screened_pp << " / " << pp_prim_pair_count << "\n";
-    std::cout << "  P-D: " << screened_pd << " / " << pd_prim_pair_count << "\n";
-    std::cout << "  P-F: " << screened_pf << " / " << pf_prim_pair_count << "\n";
-    std::cout << "  D-D: " << screened_dd << " / " << dd_prim_pair_count << "\n";
-    std::cout << "  D-F: " << screened_df << " / " << df_prim_pair_count << "\n";
-    std::cout << "  F-F: " << screened_ff << " / " << ff_prim_pair_count << "\n";
+    // screening statistics (screened / total primitive pairs), ordered as
+    // S-S, S-P, S-D, S-F, P-P, P-D, P-F, D-D, D-F, F-F
 
-    return f_tilde_values;
+    std::vector<int> screened_counts{
+            screened_ss, screened_sp, screened_sd, screened_sf,
+            screened_pp, screened_pd, screened_pf,
+            screened_dd, screened_df, screened_ff};
+
+    std::vector<int> total_counts{
+            ss_prim_pair_count, sp_prim_pair_count, sd_prim_pair_count, sf_prim_pair_count,
+            pp_prim_pair_count, pd_prim_pair_count, pf_prim_pair_count,
+            dd_prim_pair_count, df_prim_pair_count, ff_prim_pair_count};
+
+    return std::make_tuple(f_tilde_values, screened_counts, total_counts);
 }
 
 }  // namespace onee

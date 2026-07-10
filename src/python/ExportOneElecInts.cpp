@@ -783,7 +783,7 @@ export_oneeints(py::module& m)
                 const py::array_t<double>& point_norm_const,
                 const py::array_t<double>& D,
                 const double               tco_tol
-                ) -> py::array_t<double> {
+                ) -> py::tuple {
                 std::string errstyle("compute_screened_tco_p_values: Expecting contiguous numpy arrays");
                 auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
                 auto        c_style_2 = py::detail::check_flags(point_exp.ptr(), py::array::c_style);
@@ -804,10 +804,14 @@ export_oneeints(py::module& m)
                 errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
                 auto npoints = static_cast<int>(point_coords.shape(0));
                 auto naos = static_cast<int>(basis.dimensions_of_basis());
-                auto tco_p_vals = onee::computescreenedTCOPValues(molecule, basis, point_coords.data(), npoints, point_exp.data(), point_amp.data(), point_norms.data(), point_norm_const.data(), D.data(), naos, tco_tol);
-                return vlx_general::pointer_to_numpy(tco_p_vals.data(), {static_cast<int>(tco_p_vals.size())});
+                auto [tco_p_vals, screened_counts, total_counts] = onee::computescreenedTCOPValues(molecule, basis, point_coords.data(), npoints, point_exp.data(), point_amp.data(), point_norms.data(), point_norm_const.data(), D.data(), naos, tco_tol);
+                return py::make_tuple(vlx_general::pointer_to_numpy(tco_p_vals.data(), {static_cast<int>(tco_p_vals.size())}),
+                                       screened_counts,
+                                       total_counts);
             },
-            "Computes screened three-center p-type overlap integrals.",
+            "Computes screened three-center p-type overlap integrals; also returns the "
+            "(screened, total) primitive-pair counts per angular-momentum block "
+            "[S-S, S-P, S-D, S-F, P-P, P-D, P-F, D-D, D-F, F-F].",
                 "molecule"_a,
                 "basis"_a,
                 "point_coords"_a,

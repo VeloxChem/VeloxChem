@@ -98,8 +98,8 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
     double N_max = *std::max_element(points_info.begin() + npoints * 5, points_info.end());
 
-    std::cout << "Max norm: " << N_max << "\n";
-    std::cout << "TCO tol: " << tco_tol << "\n";
+    // std::cout << "Max norm: " << N_max << "\n";
+    // std::cout << "TCO tol: " << tco_tol << "\n";
 
     // gto blocks
 
@@ -2408,17 +2408,17 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
 
     // print screening statistics
-    std::cout << "computescreenedTCOSGradient: screening statistics (screened / total pairs)\n";
-    std::cout << "  S-S: " << screened_ss << " / " << ss_prim_pair_count << "\n";
-    std::cout << "  S-P: " << screened_sp << " / " << sp_prim_pair_count << "\n";
-    std::cout << "  S-D: " << screened_sd << " / " << sd_prim_pair_count << "\n";
-    std::cout << "  S-F: " << screened_sf << " / " << sf_prim_pair_count << "\n";
-    std::cout << "  P-P: " << screened_pp << " / " << pp_prim_pair_count << "\n";
-    std::cout << "  P-D: " << screened_pd << " / " << pd_prim_pair_count << "\n";
-    std::cout << "  P-F: " << screened_pf << " / " << pf_prim_pair_count << "\n";
-    std::cout << "  D-D: " << screened_dd << " / " << dd_prim_pair_count << "\n";
-    std::cout << "  D-F: " << screened_df << " / " << df_prim_pair_count << "\n";
-    std::cout << "  F-F: " << screened_ff << " / " << ff_prim_pair_count << "\n";
+    // std::cout << "computescreenedTCOSGradient: screening statistics (screened / total pairs)\n";
+    // std::cout << "  S-S: " << screened_ss << " / " << ss_prim_pair_count << "\n";
+    // std::cout << "  S-P: " << screened_sp << " / " << sp_prim_pair_count << "\n";
+    // std::cout << "  S-D: " << screened_sd << " / " << sd_prim_pair_count << "\n";
+    // std::cout << "  S-F: " << screened_sf << " / " << sf_prim_pair_count << "\n";
+    // std::cout << "  P-P: " << screened_pp << " / " << pp_prim_pair_count << "\n";
+    // std::cout << "  P-D: " << screened_pd << " / " << pd_prim_pair_count << "\n";
+    // std::cout << "  P-F: " << screened_pf << " / " << pf_prim_pair_count << "\n";
+    // std::cout << "  D-D: " << screened_dd << " / " << dd_prim_pair_count << "\n";
+    // std::cout << "  D-F: " << screened_df << " / " << df_prim_pair_count << "\n";
+    // std::cout << "  F-F: " << screened_ff << " / " << ff_prim_pair_count << "\n";
 
     return TCOS_grad;
 }

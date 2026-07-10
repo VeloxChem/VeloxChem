@@ -2827,7 +2827,7 @@ class ScfDriver:
             e_pr, V_pr = 0.0, None
 
         if self.timing and self._gostshyp and not self._first_step:
-            profiler.add_timing_info('FockGOSTSHYP', tm.time() - gostshyp_t0)
+            profiler.add_timing_info('GOSTSHYP', tm.time() - gostshyp_t0)
 
         return fock_mat, vxc_mat, e_emb, V_emb, e_pr, V_pr
 
