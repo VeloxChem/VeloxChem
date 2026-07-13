@@ -919,41 +919,30 @@ class ReactionSystemBuilder():
                 continue
             self._boundary_nb_exception_keys.append((other_id, bnd_id))
 
-    def _boundary_term_params(self, term_type, key):
-        if term_type == 'bond':
-            a = self.reactant.bonds[key]
-            b = self.product.bonds[key]
-            return {
-                'eq_reactant': a['equilibrium'],
-                'fc_reactant': a['force_constant'],
-                'eq_product': b['equilibrium'],
-                'fc_product': b['force_constant'],
-            }
-        if term_type == 'angle':
-            a = self.reactant.angles[key]
-            b = self.product.angles[key]
-            return {
-                'eq_reactant': a['equilibrium'],
-                'fc_reactant': a['force_constant'],
-                'eq_product': b['equilibrium'],
-                'fc_product': b['force_constant'],
-            }
+    def _boundary_term_params_str(self, term_type, key):
+        """Human-readable reactant->product parameter string for a boundary
+        term, used in both the console summary and the detailed log."""
+        if term_type in ('bond', 'angle'):
+            rea = self.reactant.bonds if term_type == 'bond' \
+                else self.reactant.angles
+            pro = self.product.bonds if term_type == 'bond' \
+                else self.product.angles
+            a, b = rea[key], pro[key]
+            unit = 'nm' if term_type == 'bond' else 'rad'
+            return (
+                f"reactant(eq {a['equilibrium']:.4f} {unit}, k {a['force_constant']:.1f}) "
+                f"product(eq {b['equilibrium']:.4f} {unit}, k {b['force_constant']:.1f}) "
+            )
         rea = self.reactant.dihedrals if term_type == 'torsion' \
             else self.reactant.impropers
         pro = self.product.dihedrals if term_type == 'torsion' \
             else self.product.impropers
 
-        def summarize(d):
-            return {
-                'periodicity': d.get('periodicity'),
-                'phase': d.get('phase'),
-                'barrier': d.get('barrier'),
-            }
+        def fmt(d):
+            return (f"per={d.get('periodicity')}, phase={d.get('phase')}, "
+                    f"barrier={d.get('barrier')}")
 
-        return {
-            'reactant': summarize(rea[key]),
-            'product': summarize(pro[key]),
-        }
+        return f"reactant({fmt(rea[key])}) product({fmt(pro[key])})"
 
     def _atom_label(self, atom):
         return f"{atom.residue.name}{atom.residue.id}:{atom.name}"
@@ -998,7 +987,7 @@ class ReactionSystemBuilder():
             'term_type': term_type,
             'atoms': atom_labels,
             'source': source,
-            'parameters': self._boundary_term_params(term_type, key),
+            'params': self._boundary_term_params_str(term_type, key),
         }
 
     def _create_boundary_bonded_forces(self, lam):
@@ -1119,21 +1108,6 @@ class ReactionSystemBuilder():
                                                 eps)
                 self._boundary_exception_index[key] = new_idx
 
-    @staticmethod
-    def _format_term_params(entry):
-        """One-line human-readable parameter string for the detailed log."""
-        p = entry['parameters']
-        tt = entry['term_type']
-        if tt in ('bond', 'angle'):
-            unit = 'nm' if tt == 'bond' else 'rad'
-            return (f"eq {p['eq_reactant']:.4f}->{p['eq_product']:.4f} {unit}, "
-                    f"k {p['fc_reactant']:.1f}->{p['fc_product']:.1f}")
-        r, pr = p['reactant'], p['product']
-        return (f"reactant(per={r['periodicity']}, phase={r['phase']}, "
-                f"barrier={r['barrier']}) "
-                f"product(per={pr['periodicity']}, phase={pr['phase']}, "
-                f"barrier={pr['barrier']})")
-
     def _print_boundary_summary(self):
 
         if not self._boundary_summary:
@@ -1183,8 +1157,7 @@ class ReactionSystemBuilder():
                         'source'] == 'reactant_product':
                     self.ostream.print_info(
                         f"    -> reconstructed bond stretch "
-                        f"{'-'.join(e['atoms'])}: "
-                        f"{self._format_term_params(e)}")
+                        f"{'-'.join(e['atoms'])}: {e['params']}")
 
         # Write the full per-term breakdown to a file in the output folder.
         self._write_boundary_log(by_res)
@@ -1217,10 +1190,9 @@ class ReactionSystemBuilder():
                         src = ('AMBER14'
                                if e['source'] == 'amber14' else 'fragment')
                         line = (f"  {e['term_type']:<9} "
-                                f"{'-'.join(e['atoms']):<40} {src:<9} "
-                                f"junction {e['boundary']}")
+                                f"{'-'.join(e['atoms']):<40} {src:<9} ")
                         if e['source'] == 'reactant_product':
-                            line += f"  [{self._format_term_params(e)}]"
+                            line += f"  [{e['params']}]"
                         lines.append(line)
                 lines.append("")
             with open(path, "w") as f:
