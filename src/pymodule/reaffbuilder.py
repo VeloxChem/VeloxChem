@@ -78,7 +78,6 @@ class ReactionForceFieldBuilder:
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
-
         self.calculate_resp: bool = True
         self.optimize_mol: bool = False
         self.reparameterize_bonds: bool = False
@@ -97,6 +96,12 @@ class ReactionForceFieldBuilder:
 
         self.hessian_xc_fun: str = 'B3LYP'
         self.hessian_basis = 'def2-SV_P_'
+
+    def _sub_ostream(self, silent):
+        # Output stream to hand to a sub-driver. Never leave it to the driver
+        # default: that opens a stream on whatever sys.stdout happens to be at
+        # construction time, which then outlives the call.
+        return OutputStream(None) if silent else self.ostream
 
     def build_force_fields(
         self,
@@ -265,7 +270,8 @@ class ReactionForceFieldBuilder:
             molecule_sanity_check(molecule)
             if partial_charge is not None:
                 # Casting to float is necessary for json serialization
-                assert isinstance(partial_charge, list) or isinstance(partial_charge, np.ndarray)
+                assert isinstance(partial_charge, list) or isinstance(
+                    partial_charge, np.ndarray)
                 partial_charge = [float(x) for x in partial_charge]
                 cond = len(partial_charge) == molecule.number_of_atoms()
                 msg = f"Number of partial charges {len(partial_charge)} must match the number of atoms {molecule.number_of_atoms()} in the molecule."
@@ -315,12 +321,11 @@ class ReactionForceFieldBuilder:
 
         # The topology creation will calculate charges if they're not already set
         if self.optimize_mol:
-            scf_drv = XtbDriver()
+            scf_drv = XtbDriver(ostream=self._sub_ostream(self.mute_scf))
             opt_drv = OptimizationDriver(scf_drv)
             if self.mute_scf:
                 self.ostream.print_info("Optimising the geometry with xtb.")
                 self.ostream.flush()
-                scf_drv.ostream.mute()
             opt_results = opt_drv.compute(molecule)
 
             charge = molecule.get_charge()
@@ -359,15 +364,14 @@ class ReactionForceFieldBuilder:
                     basis = MolecularBasis.read(molecule,
                                                 "6-31G*",
                                                 ostream=None)
+                sub_ostream = self._sub_ostream(self.mute_scf)
                 if molecule.get_multiplicity() == 1:
-                    scf_drv = ScfRestrictedDriver()
+                    scf_drv = ScfRestrictedDriver(ostream=sub_ostream)
                 else:
-                    scf_drv = ScfUnrestrictedDriver()
+                    scf_drv = ScfUnrestrictedDriver(ostream=sub_ostream)
 
                 self.ostream.print_info("Calculating SCF for RESP charges")
                 self.ostream.flush()
-                if self.mute_scf:
-                    scf_drv.ostream.mute()
                 scf_results = scf_drv.compute(molecule, basis)
                 if not scf_drv.is_converged:
                     self.ostream.print_warning(
@@ -379,10 +383,10 @@ class ReactionForceFieldBuilder:
                     scf_results = scf_drv.compute(molecule, basis)
                 # self.ostream.unmute()
                 assert scf_drv.is_converged, "SCF calculation for RESP charges did not converge, aborting"
-                resp_drv = RespChargesDriver()
+                resp_drv = RespChargesDriver(
+                    ostream=self._sub_ostream(self.mute_scf))
                 self.ostream.flush()
                 if self.mute_scf:
-                    resp_drv.ostream.mute()
                     self.ostream.print_info("Calculating RESP charges")
                     self.ostream.flush()
                 forcefield.partial_charges = resp_drv.compute(
@@ -434,13 +438,12 @@ class ReactionForceFieldBuilder:
                 self.ostream.print_info(
                     f"Calculating hessian submatrices for atom pairs {unknown_pairs} to reparameterise the force field."
                 )
+                sub_ostream = self._sub_ostream(self.mute_scf)
                 if molecule.get_multiplicity() == 1:
-                    scf_drv = ScfRestrictedDriver()
+                    scf_drv = ScfRestrictedDriver(ostream=sub_ostream)
                 else:
-                    scf_drv = ScfUnrestrictedDriver()
+                    scf_drv = ScfUnrestrictedDriver(ostream=sub_ostream)
                 self.ostream.flush()
-                if self.mute_scf:
-                    scf_drv.ostream.mute()
                 basis = MolecularBasis.read(molecule, self.hessian_basis)
                 scf_drv.xcfun = self.hessian_xc_fun
                 scf_drv.dispersion = True
@@ -455,9 +458,8 @@ class ReactionForceFieldBuilder:
                     scf_drv.compute(molecule, basis)
                 assert scf_drv.is_converged, "SCF calculation for Hessian did not converge, aborting"
 
+                # inherits scf_drv's (already silent) output stream
                 hess_drv = ScfHessianDriver(scf_drv)
-                if self.mute_scf:
-                    hess_drv.ostream.mute()
                 hess_drv.atom_pairs = list(unknown_pairs)
                 hess_drv.compute(molecule, basis)
                 hessian = np.copy(hess_drv.hessian)  # type: ignore
@@ -545,13 +547,13 @@ class ReactionForceFieldBuilder:
         self.ostream.flush()
         return total_mapping
 
-    @staticmethod
     def _combine_forcefield(
+            self,
             forcefields: list[MMForceFieldGenerator]) -> MMForceFieldGenerator:
 
         # Merge a list of forcefield generators into a single forcefield generator while taking care of the atom indices
 
-        forcefield = MMForceFieldGenerator()
+        forcefield = MMForceFieldGenerator(ostream=self.ostream)
         forcefield.atoms = {}
         forcefield.bonds = {}
         forcefield.angles = {}
@@ -742,8 +744,7 @@ class ReactionForceFieldBuilder:
                 with sys_xml_path.open('w') as f:
                     f.write(mm.XmlSerializer.serialize(mmsys))
 
-                opm_dyn = OpenMMDynamics()
-                opm_dyn.ostream.mute()
+                opm_dyn = OpenMMDynamics(ostream=self._sub_ostream(True))
                 opm_dyn.openmm_platform = "CPU"
 
                 opm_dyn.pdb = pdb

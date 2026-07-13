@@ -2,9 +2,9 @@
     "atoms": {
         "0": {
             "type": "c2",
-            "name": "C11",
+            "name": "C21",
             "mass": 12.0,
-            "charge": -0.337857,
+            "charge": -0.341918,
             "sigma": 0.3315212309943831,
             "epsilon": 0.4133792,
             "equivalent_atom": "c2_00",
@@ -12,55 +12,15 @@
         },
         "1": {
             "type": "c2",
-            "name": "C21",
+            "name": "C11",
             "mass": 12.0,
-            "charge": -0.3485849999999999,
+            "charge": -0.347619,
             "sigma": 0.3315212309943831,
             "epsilon": 0.4133792,
             "equivalent_atom": "c2_00",
             "comment": "GAFF"
         },
         "2": {
-            "type": "ha",
-            "name": "H11",
-            "mass": 1.007825,
-            "charge": 0.170322,
-            "sigma": 0.262547852235958,
-            "epsilon": 0.0673624,
-            "equivalent_atom": "ha_00",
-            "comment": "GAFF"
-        },
-        "3": {
-            "type": "ha",
-            "name": "H21",
-            "mass": 1.007825,
-            "charge": 0.170175,
-            "sigma": 0.262547852235958,
-            "epsilon": 0.0673624,
-            "equivalent_atom": "ha_00",
-            "comment": "GAFF"
-        },
-        "4": {
-            "type": "ha",
-            "name": "H31",
-            "mass": 1.007825,
-            "charge": 0.173394,
-            "sigma": 0.262547852235958,
-            "epsilon": 0.0673624,
-            "equivalent_atom": "ha_00",
-            "comment": "GAFF"
-        },
-        "5": {
-            "type": "ha",
-            "name": "H41",
-            "mass": 1.007825,
-            "charge": 0.172551,
-            "sigma": 0.262547852235958,
-            "epsilon": 0.0673624,
-            "equivalent_atom": "ha_00",
-            "comment": "GAFF"
-        },
-        "6": {
             "type": "ow",
             "name": "O2",
             "mass": 15.994915,
@@ -70,9 +30,9 @@
             "equivalent_atom": "ow_00",
             "comment": "GAFF"
         },
-        "7": {
+        "3": {
             "type": "hw",
-            "name": "H12",
+            "name": "H22",
             "mass": 1.007825,
             "charge": 0.4238,
             "sigma": 0.11658,
@@ -80,9 +40,49 @@
             "equivalent_atom": "hw_00",
             "comment": "GAFF"
         },
+        "4": {
+            "type": "ha",
+            "name": "H31",
+            "mass": 1.007825,
+            "charge": 0.172241,
+            "sigma": 0.262547852235958,
+            "epsilon": 0.0673624,
+            "equivalent_atom": "ha_00",
+            "comment": "GAFF"
+        },
+        "5": {
+            "type": "ha",
+            "name": "H41",
+            "mass": 1.007825,
+            "charge": 0.170728,
+            "sigma": 0.262547852235958,
+            "epsilon": 0.0673624,
+            "equivalent_atom": "ha_00",
+            "comment": "GAFF"
+        },
+        "6": {
+            "type": "ha",
+            "name": "H11",
+            "mass": 1.007825,
+            "charge": 0.173576,
+            "sigma": 0.262547852235958,
+            "epsilon": 0.0673624,
+            "equivalent_atom": "ha_00",
+            "comment": "GAFF"
+        },
+        "7": {
+            "type": "ha",
+            "name": "H21",
+            "mass": 1.007825,
+            "charge": 0.172992,
+            "sigma": 0.262547852235958,
+            "epsilon": 0.0673624,
+            "equivalent_atom": "ha_00",
+            "comment": "GAFF"
+        },
         "8": {
             "type": "hw",
-            "name": "H22",
+            "name": "H12",
             "mass": 1.007825,
             "charge": 0.4238,
             "sigma": 0.11658,
@@ -98,37 +98,37 @@
             "equilibrium": 0.13340000000000002,
             "comment": "c2-c2"
         },
-        "(0, 2)": {
+        "(0, 4)": {
             "type": "harmonic",
             "force_constant": 328192.9599999999,
             "equilibrium": 0.10880000000000001,
             "comment": "c2-ha"
         },
-        "(0, 3)": {
+        "(0, 5)": {
             "type": "harmonic",
             "force_constant": 328192.9599999999,
             "equilibrium": 0.10880000000000001,
             "comment": "c2-ha"
         },
-        "(1, 4)": {
+        "(1, 6)": {
             "type": "harmonic",
             "force_constant": 328192.9599999999,
             "equilibrium": 0.10880000000000001,
             "comment": "c2-ha"
         },
-        "(1, 5)": {
+        "(1, 7)": {
             "type": "harmonic",
             "force_constant": 328192.9599999999,
             "equilibrium": 0.10880000000000001,
             "comment": "c2-ha"
         },
-        "(6, 7)": {
+        "(2, 3)": {
             "type": "harmonic",
             "force_constant": 345000,
             "equilibrium": 0.1,
             "comment": "cSPC/E water, formed in reaction"
         },
-        "(6, 8)": {
+        "(2, 8)": {
             "type": "harmonic",
             "force_constant": 345000,
             "equilibrium": 0.1,
@@ -136,51 +136,51 @@
         }
     },
     "angles": {
-        "(0, 1, 4)": {
+        "(0, 1, 6)": {
             "type": "harmonic",
             "force_constant": 421.7472,
             "equilibrium": 120.43,
             "comment": "c2-c2-ha"
         },
-        "(0, 1, 5)": {
+        "(0, 1, 7)": {
             "type": "harmonic",
             "force_constant": 421.7472,
             "equilibrium": 120.43,
             "comment": "c2-c2-ha"
         },
-        "(1, 0, 2)": {
+        "(1, 0, 4)": {
             "type": "harmonic",
             "force_constant": 421.7472,
             "equilibrium": 120.43,
             "comment": "c2-c2-ha"
         },
-        "(1, 0, 3)": {
+        "(1, 0, 5)": {
             "type": "harmonic",
             "force_constant": 421.7472,
             "equilibrium": 120.43,
             "comment": "c2-c2-ha"
         },
-        "(2, 0, 3)": {
-            "type": "harmonic",
-            "force_constant": 315.47360000000003,
-            "equilibrium": 116.9,
-            "comment": "ha-c2-ha"
-        },
-        "(4, 1, 5)": {
-            "type": "harmonic",
-            "force_constant": 315.47360000000003,
-            "equilibrium": 116.9,
-            "comment": "ha-c2-ha"
-        },
-        "(7, 6, 8)": {
+        "(3, 2, 8)": {
             "type": "harmonic",
             "force_constant": 383,
             "equilibrium": 109.47,
             "comment": "cSPC/E water"
+        },
+        "(4, 0, 5)": {
+            "type": "harmonic",
+            "force_constant": 315.47360000000003,
+            "equilibrium": 116.9,
+            "comment": "ha-c2-ha"
+        },
+        "(6, 1, 7)": {
+            "type": "harmonic",
+            "force_constant": 315.47360000000003,
+            "equilibrium": 116.9,
+            "comment": "ha-c2-ha"
         }
     },
     "dihedrals": {
-        "(2, 0, 1, 4)": {
+        "(4, 0, 1, 6)": {
             "type": "Fourier",
             "multiple": false,
             "barrier": 27.823600000000003,
@@ -188,7 +188,7 @@
             "periodicity": 2,
             "comment": "X-c2-c2-X"
         },
-        "(2, 0, 1, 5)": {
+        "(4, 0, 1, 7)": {
             "type": "Fourier",
             "multiple": false,
             "barrier": 27.823600000000003,
@@ -196,7 +196,7 @@
             "periodicity": 2,
             "comment": "X-c2-c2-X"
         },
-        "(3, 0, 1, 4)": {
+        "(5, 0, 1, 6)": {
             "type": "Fourier",
             "multiple": false,
             "barrier": 27.823600000000003,
@@ -204,7 +204,7 @@
             "periodicity": 2,
             "comment": "X-c2-c2-X"
         },
-        "(3, 0, 1, 5)": {
+        "(5, 0, 1, 7)": {
             "type": "Fourier",
             "multiple": false,
             "barrier": 27.823600000000003,
@@ -214,14 +214,14 @@
         }
     },
     "impropers": {
-        "(0, 1, 2, 3)": {
+        "(0, 1, 4, 5)": {
             "type": "Fourier",
             "barrier": 4.6024,
             "phase": 180.0,
             "periodicity": 2,
             "comment": "Guessed"
         },
-        "(1, 0, 4, 5)": {
+        "(1, 0, 6, 7)": {
             "type": "Fourier",
             "barrier": 4.6024,
             "phase": 180.0,

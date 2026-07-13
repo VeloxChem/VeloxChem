@@ -1639,8 +1639,7 @@ class MMForceFieldGenerator:
         coords = self.molecule.get_coordinates_in_angstrom()
         n_atoms = self.molecule.number_of_atoms()
 
-        atomtypeidentifier = AtomTypeIdentifier(self.comm)
-        atomtypeidentifier.ostream.mute()
+        atomtypeidentifier = AtomTypeIdentifier(self.comm, OutputStream(None))
         # set GAFF version
         atomtypeidentifier.gaff_version = gaff_version
 
@@ -4789,26 +4788,29 @@ class MMForceFieldGenerator:
         return atom_names
 
     @staticmethod
-    def load_forcefield_from_json_string(json_string: str):
+    def load_forcefield_from_json_string(json_string: str, ostream=None):
         """
         Load forcefield data from a JSON string.
 
         Args:
             json_string (str): The JSON string containing the forcefield data.
+            ostream (OutputStream): The output stream for the loaded object.
 
         Returns:
             MMForceFieldGenerator: The updated forcefield object with the loaded data.
         """
         ff_data = json.loads(json_string)
-        return MMForceFieldGenerator._forcefield_from_json_data(ff_data)
+        return MMForceFieldGenerator._forcefield_from_json_data(
+            ff_data, ostream=ostream)
 
     @staticmethod
-    def load_forcefield_from_json_file(path: str):
+    def load_forcefield_from_json_file(path: str, ostream=None):
         """
         Load forcefield data from a JSON file.
 
         Args:
             Path (str): The path to the JSON file containing the forcefield data.
+            ostream (OutputStream): The output stream for the loaded object.
 
         Returns:
             MMForceFieldGenerator: The updated forcefield object with the loaded data.
@@ -4816,7 +4818,7 @@ class MMForceFieldGenerator:
         json_path = Path(path)
         json_string = json_path.read_text(encoding="utf-8")
         return MMForceFieldGenerator.load_forcefield_from_json_string(
-            json_string)
+            json_string, ostream=ostream)
 
     def print_bonds(self):
         """Prints the bond parameters in a tabular format."""
@@ -4919,10 +4921,10 @@ class MMForceFieldGenerator:
         json_path.write_text(json_payload, encoding="utf-8")
 
     @staticmethod
-    def _forcefield_from_json_data(ff_data: dict):
+    def _forcefield_from_json_data(ff_data: dict, ostream=None):
         """Builds a force field generator instance from decoded JSON data."""
 
-        forcefield = MMForceFieldGenerator()
+        forcefield = MMForceFieldGenerator(ostream=ostream)
         forcefield.atoms = MMForceFieldGenerator._str_to_tuple_key(
             ff_data["atoms"])
         forcefield.bonds = MMForceFieldGenerator._str_to_tuple_key(

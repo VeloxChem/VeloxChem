@@ -1095,7 +1095,6 @@ class OpenMMDynamics:
             self.labels = [
                 atom.element.symbol for atom in self.pdb.topology.atoms()
             ]
-            
 
         # Determine the frequency of saving depending on the number of snapshots.
         save_freq = max(nsteps // snapshots, 1)
@@ -1228,20 +1227,23 @@ class OpenMMDynamics:
             opt_coordinates = qm_opt_coordinates
 
         # Save final molecules, coordinates and corresponding energies to a dictionary
+        if self.molecule:
+            charge = self.molecule.get_charge()
+            multiplicity = self.molecule.get_multiplicity()
+        else:
+            charge = 0
+            multiplicity = 1
         molecules = []
         for coords in opt_coordinates:
             mol = Molecule.from_xyz_string(coords)
-            mol.set_charge(self.molecule.get_charge())
-            mol.set_multiplicity(self.molecule.get_multiplicity())
+            mol.set_charge(charge)
+            mol.set_multiplicity(multiplicity)
             molecules.append(mol)
-            
+
         conformers_dict = {
-            'energies':
-            energies,
-            'molecules':
-            molecules,
-            'geometries':
-            opt_coordinates
+            'energies': energies,
+            'molecules': molecules,
+            'geometries': opt_coordinates
         }
 
         self.conformer_dict = conformers_dict

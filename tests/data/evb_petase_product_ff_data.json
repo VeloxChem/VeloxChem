@@ -1,0 +1,4879 @@
+{
+    "atoms": {
+        "0": {
+            "type": "c3",
+            "name": "C11",
+            "mass": 12.0,
+            "charge": -0.084778,
+            "sigma": 0.3397709531243626,
+            "epsilon": 0.4510352,
+            "equivalent_atom": "c3_00",
+            "comment": "GAFF"
+        },
+        "1": {
+            "type": "c3",
+            "name": "C21",
+            "mass": 12.0,
+            "charge": 0.129893,
+            "sigma": 0.3397709531243626,
+            "epsilon": 0.4510352,
+            "equivalent_atom": "c3_01",
+            "comment": "GAFF"
+        },
+        "2": {
+            "type": "c3",
+            "name": "C31",
+            "mass": 12.0,
+            "charge": 0.046646,
+            "sigma": 0.3397709531243626,
+            "epsilon": 0.4510352,
+            "equivalent_atom": "c3_02",
+            "comment": "GAFF"
+        },
+        "3": {
+            "type": "c3",
+            "name": "C41",
+            "mass": 12.0,
+            "charge": 0.445926,
+            "sigma": 0.3397709531243626,
+            "epsilon": 0.4510352,
+            "equivalent_atom": "c3_03",
+            "comment": "GAFF"
+        },
+        "4": {
+            "type": "o",
+            "name": "O41",
+            "mass": 15.994915,
+            "charge": -0.808591,
+            "sigma": 0.3048120874245357,
+            "epsilon": 0.6121192000000001,
+            "equivalent_atom": "o_02",
+            "comment": "GAFF"
+        },
+        "5": {
+            "type": "os",
+            "name": "O51",
+            "mass": 15.994915,
+            "charge": -0.385515,
+            "sigma": 0.3156097798883966,
+            "epsilon": 0.3037584,
+            "equivalent_atom": "os_01",
+            "comment": "GAFF"
+        },
+        "6": {
+            "type": "ca",
+            "name": "C111",
+            "mass": 12.0,
+            "charge": 0.243736,
+            "sigma": 0.3315212309943831,
+            "epsilon": 0.4133792,
+            "equivalent_atom": "ca_00",
+            "comment": "GAFF"
+        },
+        "7": {
+            "type": "ca",
+            "name": "C121",
+            "mass": 12.0,
+            "charge": -0.161912,
+            "sigma": 0.3315212309943831,
+            "epsilon": 0.4133792,
+            "equivalent_atom": "ca_01",
+            "comment": "GAFF"
+        },
+        "8": {
+            "type": "ca",
+            "name": "C131",
+            "mass": 12.0,
+            "charge": -0.164019,
+            "sigma": 0.3315212309943831,
+            "epsilon": 0.4133792,
+            "equivalent_atom": "ca_02",
+            "comment": "GAFF"
+        },
+        "9": {
+            "type": "ca",
+            "name": "C141",
+            "mass": 12.0,
+            "charge": 0.146002,
+            "sigma": 0.3315212309943831,
+            "epsilon": 0.4133792,
+            "equivalent_atom": "ca_03",
+            "comment": "GAFF"
+        },
+        "10": {
+            "type": "no",
+            "name": "N31",
+            "mass": 14.003074,
+            "charge": 0.505994,
+            "sigma": 0.336510263815969,
+            "epsilon": 0.3589872,
+            "equivalent_atom": "no_00",
+            "comment": "GAFF"
+        },
+        "11": {
+            "type": "o",
+            "name": "O61",
+            "mass": 15.994915,
+            "charge": -0.376685,
+            "sigma": 0.3048120874245357,
+            "epsilon": 0.6121192000000001,
+            "equivalent_atom": "o_03",
+            "comment": "GAFF"
+        },
+        "12": {
+            "type": "o",
+            "name": "O71",
+            "mass": 15.994915,
+            "charge": -0.46965,
+            "sigma": 0.3048120874245357,
+            "epsilon": 0.6121192000000001,
+            "equivalent_atom": "o_03",
+            "comment": "GAFF"
+        },
+        "13": {
+            "type": "ca",
+            "name": "C151",
+            "mass": 12.0,
+            "charge": -0.219446,
+            "sigma": 0.3315212309943831,
+            "epsilon": 0.4133792,
+            "equivalent_atom": "ca_02",
+            "comment": "GAFF"
+        },
+        "14": {
+            "type": "ca",
+            "name": "C161",
+            "mass": 12.0,
+            "charge": -0.147774,
+            "sigma": 0.3315212309943831,
+            "epsilon": 0.4133792,
+            "equivalent_atom": "ca_01",
+            "comment": "GAFF"
+        },
+        "15": {
+            "type": "hc",
+            "name": "H31",
+            "mass": 1.007825,
+            "charge": -0.004048,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_00",
+            "comment": "GAFF"
+        },
+        "16": {
+            "type": "hc",
+            "name": "H11",
+            "mass": 1.007825,
+            "charge": -0.004048,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_00",
+            "comment": "GAFF"
+        },
+        "17": {
+            "type": "hc",
+            "name": "H21",
+            "mass": 1.007825,
+            "charge": -0.004048,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_00",
+            "comment": "GAFF"
+        },
+        "18": {
+            "type": "hc",
+            "name": "H41",
+            "mass": 1.007825,
+            "charge": -0.035324,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_01",
+            "comment": "GAFF"
+        },
+        "19": {
+            "type": "hc",
+            "name": "H51",
+            "mass": 1.007825,
+            "charge": -0.035324,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_01",
+            "comment": "GAFF"
+        },
+        "20": {
+            "type": "hc",
+            "name": "H71",
+            "mass": 1.007825,
+            "charge": -0.012775,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_02",
+            "comment": "GAFF"
+        },
+        "21": {
+            "type": "hc",
+            "name": "H61",
+            "mass": 1.007825,
+            "charge": -0.012775,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_02",
+            "comment": "GAFF"
+        },
+        "22": {
+            "type": "ha",
+            "name": "H191",
+            "mass": 1.007825,
+            "charge": 0.178562,
+            "sigma": 0.262547852235958,
+            "epsilon": 0.0673624,
+            "equivalent_atom": "ha_00",
+            "comment": "GAFF"
+        },
+        "23": {
+            "type": "ha",
+            "name": "H201",
+            "mass": 1.007825,
+            "charge": 0.149524,
+            "sigma": 0.262547852235958,
+            "epsilon": 0.0673624,
+            "equivalent_atom": "ha_01",
+            "comment": "GAFF"
+        },
+        "24": {
+            "type": "ha",
+            "name": "H211",
+            "mass": 1.007825,
+            "charge": 0.177188,
+            "sigma": 0.262547852235958,
+            "epsilon": 0.0673624,
+            "equivalent_atom": "ha_01",
+            "comment": "GAFF"
+        },
+        "25": {
+            "type": "ha",
+            "name": "H221",
+            "mass": 1.007825,
+            "charge": 0.171178,
+            "sigma": 0.262547852235958,
+            "epsilon": 0.0673624,
+            "equivalent_atom": "ha_00",
+            "comment": "GAFF"
+        },
+        "26": {
+            "type": "c3",
+            "name": "C81",
+            "mass": 12.0,
+            "charge": -0.173955,
+            "sigma": 0.3397709531243626,
+            "epsilon": 0.4510352,
+            "equivalent_atom": "c3_06",
+            "comment": "GAFF"
+        },
+        "27": {
+            "type": "c",
+            "name": "C71",
+            "mass": 12.0,
+            "charge": 0.641965,
+            "sigma": 0.3315212309943831,
+            "epsilon": 0.4133792,
+            "equivalent_atom": "c_00",
+            "comment": "GAFF"
+        },
+        "28": {
+            "type": "o",
+            "name": "O21",
+            "mass": 15.994915,
+            "charge": -0.570985,
+            "sigma": 0.3048120874245357,
+            "epsilon": 0.6121192000000001,
+            "equivalent_atom": "o_00",
+            "comment": "GAFF"
+        },
+        "29": {
+            "type": "ns",
+            "name": "N11",
+            "mass": 14.003074,
+            "charge": -0.582927,
+            "sigma": 0.32699546550623015,
+            "epsilon": 0.4912016,
+            "equivalent_atom": "ns_00",
+            "comment": "GAFF"
+        },
+        "30": {
+            "type": "c3",
+            "name": "C61",
+            "mass": 12.0,
+            "charge": -0.020703,
+            "sigma": 0.3397709531243626,
+            "epsilon": 0.4510352,
+            "equivalent_atom": "c3_05",
+            "comment": "GAFF"
+        },
+        "31": {
+            "type": "c3",
+            "name": "C51",
+            "mass": 12.0,
+            "charge": -0.262731,
+            "sigma": 0.3397709531243626,
+            "epsilon": 0.4510352,
+            "equivalent_atom": "c3_04",
+            "comment": "GAFF"
+        },
+        "32": {
+            "type": "os",
+            "name": "O11",
+            "mass": 15.994915,
+            "charge": -0.317443,
+            "sigma": 0.3156097798883966,
+            "epsilon": 0.3037584,
+            "equivalent_atom": "os_00",
+            "comment": "GAFF"
+        },
+        "33": {
+            "type": "c",
+            "name": "C91",
+            "mass": 12.0,
+            "charge": 0.527173,
+            "sigma": 0.3315212309943831,
+            "epsilon": 0.4133792,
+            "equivalent_atom": "c_01",
+            "comment": "GAFF"
+        },
+        "34": {
+            "type": "o",
+            "name": "O31",
+            "mass": 15.994915,
+            "charge": -0.541549,
+            "sigma": 0.3048120874245357,
+            "epsilon": 0.6121192000000001,
+            "equivalent_atom": "o_01",
+            "comment": "GAFF"
+        },
+        "35": {
+            "type": "ns",
+            "name": "N21",
+            "mass": 14.003074,
+            "charge": -0.345355,
+            "sigma": 0.32699546550623015,
+            "epsilon": 0.4912016,
+            "equivalent_atom": "ns_01",
+            "comment": "GAFF"
+        },
+        "36": {
+            "type": "c3",
+            "name": "C101",
+            "mass": 12.0,
+            "charge": -0.433131,
+            "sigma": 0.3397709531243626,
+            "epsilon": 0.4510352,
+            "equivalent_atom": "c3_07",
+            "comment": "GAFF"
+        },
+        "37": {
+            "type": "hc",
+            "name": "H121",
+            "mass": 1.007825,
+            "charge": 0.052892,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_03",
+            "comment": "GAFF"
+        },
+        "38": {
+            "type": "hc",
+            "name": "H131",
+            "mass": 1.007825,
+            "charge": 0.052892,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_03",
+            "comment": "GAFF"
+        },
+        "39": {
+            "type": "hc",
+            "name": "H141",
+            "mass": 1.007825,
+            "charge": 0.052892,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_03",
+            "comment": "GAFF"
+        },
+        "40": {
+            "type": "hn",
+            "name": "H111",
+            "mass": 1.007825,
+            "charge": 0.331424,
+            "sigma": 0.11064962079303015,
+            "epsilon": 0.04184,
+            "equivalent_atom": "hn_00",
+            "comment": "GAFF"
+        },
+        "41": {
+            "type": "h1",
+            "name": "H101",
+            "mass": 1.007825,
+            "charge": 0.167761,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_01",
+            "comment": "GAFF"
+        },
+        "42": {
+            "type": "h1",
+            "name": "H91",
+            "mass": 1.007825,
+            "charge": 0.189418,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_00",
+            "comment": "GAFF"
+        },
+        "43": {
+            "type": "h1",
+            "name": "H81",
+            "mass": 1.007825,
+            "charge": 0.189418,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_00",
+            "comment": "GAFF"
+        },
+        "44": {
+            "type": "hn",
+            "name": "H92",
+            "mass": 1.007825,
+            "charge": 0.353682,
+            "sigma": 0.11064962079303015,
+            "epsilon": 0.04184,
+            "equivalent_atom": "hn_01",
+            "comment": "GAFF"
+        },
+        "45": {
+            "type": "hn",
+            "name": "H151",
+            "mass": 1.007825,
+            "charge": 0.284141,
+            "sigma": 0.11064962079303015,
+            "epsilon": 0.04184,
+            "equivalent_atom": "hn_01",
+            "comment": "GAFF"
+        },
+        "46": {
+            "type": "h1",
+            "name": "H161",
+            "mass": 1.007825,
+            "charge": 0.163622,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_02",
+            "comment": "GAFF"
+        },
+        "47": {
+            "type": "h1",
+            "name": "H171",
+            "mass": 1.007825,
+            "charge": 0.163622,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_02",
+            "comment": "GAFF"
+        },
+        "48": {
+            "type": "h1",
+            "name": "H181",
+            "mass": 1.007825,
+            "charge": 0.163622,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_02",
+            "comment": "GAFF"
+        },
+        "49": {
+            "type": "c3",
+            "name": "C12",
+            "mass": 12.0,
+            "charge": -0.176299,
+            "sigma": 0.3397709531243626,
+            "epsilon": 0.4510352,
+            "equivalent_atom": "c3_00",
+            "comment": "GAFF"
+        },
+        "50": {
+            "type": "c",
+            "name": "C22",
+            "mass": 12.0,
+            "charge": 0.498998,
+            "sigma": 0.3315212309943831,
+            "epsilon": 0.4133792,
+            "equivalent_atom": "c_00",
+            "comment": "GAFF"
+        },
+        "51": {
+            "type": "o",
+            "name": "O12",
+            "mass": 15.994915,
+            "charge": -0.536209,
+            "sigma": 0.3048120874245357,
+            "epsilon": 0.6121192000000001,
+            "equivalent_atom": "o_00",
+            "comment": "GAFF"
+        },
+        "52": {
+            "type": "ns",
+            "name": "N12",
+            "mass": 14.003074,
+            "charge": -0.427573,
+            "sigma": 0.32699546550623015,
+            "epsilon": 0.4912016,
+            "equivalent_atom": "ns_00",
+            "comment": "GAFF"
+        },
+        "53": {
+            "type": "c3",
+            "name": "C32",
+            "mass": 12.0,
+            "charge": 0.066744,
+            "sigma": 0.3397709531243626,
+            "epsilon": 0.4510352,
+            "equivalent_atom": "c3_01",
+            "comment": "GAFF"
+        },
+        "54": {
+            "type": "c3",
+            "name": "C42",
+            "mass": 12.0,
+            "charge": -0.049148,
+            "sigma": 0.3397709531243626,
+            "epsilon": 0.4510352,
+            "equivalent_atom": "c3_02",
+            "comment": "GAFF"
+        },
+        "55": {
+            "type": "cc",
+            "name": "C52",
+            "mass": 12.0,
+            "charge": 0.2665,
+            "sigma": 0.3315212309943831,
+            "epsilon": 0.4133792,
+            "equivalent_atom": "cc_00",
+            "comment": "GAFF"
+        },
+        "56": {
+            "type": "cd",
+            "name": "C62",
+            "mass": 12.0,
+            "charge": -0.298281,
+            "sigma": 0.3315212309943831,
+            "epsilon": 0.4133792,
+            "equivalent_atom": "cc_01",
+            "comment": "GAFF"
+        },
+        "57": {
+            "type": "na",
+            "name": "N22",
+            "mass": 14.003074,
+            "charge": -0.30447,
+            "sigma": 0.3205809947356197,
+            "epsilon": 0.8543728,
+            "equivalent_atom": "na_00",
+            "comment": "GAFF"
+        },
+        "58": {
+            "type": "cc",
+            "name": "C72",
+            "mass": 12.0,
+            "charge": 0.123953,
+            "sigma": 0.3315212309943831,
+            "epsilon": 0.4133792,
+            "equivalent_atom": "cc_02",
+            "comment": "GAFF"
+        },
+        "59": {
+            "type": "nc",
+            "name": "N32",
+            "mass": 14.003074,
+            "charge": -0.494048,
+            "sigma": 0.33841678707278927,
+            "epsilon": 0.3937144,
+            "equivalent_atom": "nc_00",
+            "comment": "GAFF"
+        },
+        "60": {
+            "type": "c",
+            "name": "C82",
+            "mass": 12.0,
+            "charge": 0.646745,
+            "sigma": 0.3315212309943831,
+            "epsilon": 0.4133792,
+            "equivalent_atom": "c_01",
+            "comment": "GAFF"
+        },
+        "61": {
+            "type": "o",
+            "name": "O22",
+            "mass": 15.994915,
+            "charge": -0.553501,
+            "sigma": 0.3048120874245357,
+            "epsilon": 0.6121192000000001,
+            "equivalent_atom": "o_01",
+            "comment": "GAFF"
+        },
+        "62": {
+            "type": "ns",
+            "name": "N42",
+            "mass": 14.003074,
+            "charge": -0.485408,
+            "sigma": 0.32699546550623015,
+            "epsilon": 0.4912016,
+            "equivalent_atom": "ns_01",
+            "comment": "GAFF"
+        },
+        "63": {
+            "type": "c3",
+            "name": "C92",
+            "mass": 12.0,
+            "charge": -0.22737,
+            "sigma": 0.3397709531243626,
+            "epsilon": 0.4510352,
+            "equivalent_atom": "c3_03",
+            "comment": "GAFF"
+        },
+        "64": {
+            "type": "hc",
+            "name": "H12",
+            "mass": 1.007825,
+            "charge": 0.068802,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_00",
+            "comment": "GAFF"
+        },
+        "65": {
+            "type": "hc",
+            "name": "H22",
+            "mass": 1.007825,
+            "charge": 0.068802,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_00",
+            "comment": "GAFF"
+        },
+        "66": {
+            "type": "hc",
+            "name": "H32",
+            "mass": 1.007825,
+            "charge": 0.068802,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_00",
+            "comment": "GAFF"
+        },
+        "67": {
+            "type": "hn",
+            "name": "H42",
+            "mass": 1.007825,
+            "charge": 0.261521,
+            "sigma": 0.11064962079303015,
+            "epsilon": 0.04184,
+            "equivalent_atom": "hn_00",
+            "comment": "GAFF"
+        },
+        "68": {
+            "type": "h1",
+            "name": "H52",
+            "mass": 1.007825,
+            "charge": 0.052829,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_00",
+            "comment": "GAFF"
+        },
+        "69": {
+            "type": "hc",
+            "name": "H62",
+            "mass": 1.007825,
+            "charge": 0.053124,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_01",
+            "comment": "GAFF"
+        },
+        "70": {
+            "type": "hc",
+            "name": "H72",
+            "mass": 1.007825,
+            "charge": 0.053124,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_01",
+            "comment": "GAFF"
+        },
+        "71": {
+            "type": "h4",
+            "name": "H82",
+            "mass": 1.007825,
+            "charge": 0.197311,
+            "sigma": 0.25363886505455463,
+            "epsilon": 0.0673624,
+            "equivalent_atom": "h4_00",
+            "comment": "GAFF"
+        },
+        "72": {
+            "type": "h5",
+            "name": "H102",
+            "mass": 1.007825,
+            "charge": 0.139253,
+            "sigma": 0.24472987787315117,
+            "epsilon": 0.0673624,
+            "equivalent_atom": "h5_00",
+            "comment": "GAFF"
+        },
+        "73": {
+            "type": "ho",
+            "name": "H83",
+            "mass": 1.007825,
+            "charge": 0.497741,
+            "sigma": 0.053792464601313685,
+            "epsilon": 0.019664800000000003,
+            "equivalent_atom": "ho_00",
+            "comment": "GAFF"
+        },
+        "74": {
+            "type": "hn",
+            "name": "H112",
+            "mass": 1.007825,
+            "charge": 0.276845,
+            "sigma": 0.11064962079303015,
+            "epsilon": 0.04184,
+            "equivalent_atom": "hn_02",
+            "comment": "GAFF"
+        },
+        "75": {
+            "type": "h1",
+            "name": "H122",
+            "mass": 1.007825,
+            "charge": 0.118424,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_01",
+            "comment": "GAFF"
+        },
+        "76": {
+            "type": "h1",
+            "name": "H132",
+            "mass": 1.007825,
+            "charge": 0.118424,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_01",
+            "comment": "GAFF"
+        },
+        "77": {
+            "type": "h1",
+            "name": "H142",
+            "mass": 1.007825,
+            "charge": 0.118424,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_01",
+            "comment": "GAFF"
+        },
+        "78": {
+            "type": "c3",
+            "name": "C13",
+            "mass": 12.0,
+            "charge": -0.151538,
+            "sigma": 0.3397709531243626,
+            "epsilon": 0.4510352,
+            "equivalent_atom": "c3_00",
+            "comment": "GAFF"
+        },
+        "79": {
+            "type": "c",
+            "name": "C23",
+            "mass": 12.0,
+            "charge": 0.572902,
+            "sigma": 0.3315212309943831,
+            "epsilon": 0.4133792,
+            "equivalent_atom": "c_00",
+            "comment": "GAFF"
+        },
+        "80": {
+            "type": "o",
+            "name": "O13",
+            "mass": 15.994915,
+            "charge": -0.526346,
+            "sigma": 0.3048120874245357,
+            "epsilon": 0.6121192000000001,
+            "equivalent_atom": "o_00",
+            "comment": "GAFF"
+        },
+        "81": {
+            "type": "ns",
+            "name": "N13",
+            "mass": 14.003074,
+            "charge": -0.482269,
+            "sigma": 0.32699546550623015,
+            "epsilon": 0.4912016,
+            "equivalent_atom": "ns_00",
+            "comment": "GAFF"
+        },
+        "82": {
+            "type": "c3",
+            "name": "C33",
+            "mass": 12.0,
+            "charge": -0.039792,
+            "sigma": 0.3397709531243626,
+            "epsilon": 0.4510352,
+            "equivalent_atom": "c3_01",
+            "comment": "GAFF"
+        },
+        "83": {
+            "type": "c3",
+            "name": "C43",
+            "mass": 12.0,
+            "charge": -0.01326,
+            "sigma": 0.3397709531243626,
+            "epsilon": 0.4510352,
+            "equivalent_atom": "c3_02",
+            "comment": "GAFF"
+        },
+        "84": {
+            "type": "c",
+            "name": "C53",
+            "mass": 12.0,
+            "charge": 0.678178,
+            "sigma": 0.3315212309943831,
+            "epsilon": 0.4133792,
+            "equivalent_atom": "c_01",
+            "comment": "GAFF"
+        },
+        "85": {
+            "type": "oh",
+            "name": "O23",
+            "mass": 15.994915,
+            "charge": -0.6833740000000001,
+            "sigma": 0.3242871334030835,
+            "epsilon": 0.389112,
+            "equivalent_atom": "oh_00",
+            "comment": "GAFF"
+        },
+        "86": {
+            "type": "o",
+            "name": "O33",
+            "mass": 15.994915,
+            "charge": -0.5622,
+            "sigma": 0.3048120874245357,
+            "epsilon": 0.6121192000000001,
+            "equivalent_atom": "o_01",
+            "comment": "GAFF"
+        },
+        "87": {
+            "type": "c",
+            "name": "C63",
+            "mass": 12.0,
+            "charge": 0.530514,
+            "sigma": 0.3315212309943831,
+            "epsilon": 0.4133792,
+            "equivalent_atom": "c_02",
+            "comment": "GAFF"
+        },
+        "88": {
+            "type": "o",
+            "name": "O43",
+            "mass": 15.994915,
+            "charge": -0.513045,
+            "sigma": 0.3048120874245357,
+            "epsilon": 0.6121192000000001,
+            "equivalent_atom": "o_02",
+            "comment": "GAFF"
+        },
+        "89": {
+            "type": "ns",
+            "name": "N23",
+            "mass": 14.003074,
+            "charge": -0.374719,
+            "sigma": 0.32699546550623015,
+            "epsilon": 0.4912016,
+            "equivalent_atom": "ns_01",
+            "comment": "GAFF"
+        },
+        "90": {
+            "type": "c3",
+            "name": "C73",
+            "mass": 12.0,
+            "charge": -0.415865,
+            "sigma": 0.3397709531243626,
+            "epsilon": 0.4510352,
+            "equivalent_atom": "c3_03",
+            "comment": "GAFF"
+        },
+        "91": {
+            "type": "hc",
+            "name": "H13",
+            "mass": 1.007825,
+            "charge": 0.059576,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_00",
+            "comment": "GAFF"
+        },
+        "92": {
+            "type": "hc",
+            "name": "H23",
+            "mass": 1.007825,
+            "charge": 0.059576,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_00",
+            "comment": "GAFF"
+        },
+        "93": {
+            "type": "hc",
+            "name": "H33",
+            "mass": 1.007825,
+            "charge": 0.059576,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_00",
+            "comment": "GAFF"
+        },
+        "94": {
+            "type": "hn",
+            "name": "H43",
+            "mass": 1.007825,
+            "charge": 0.282068,
+            "sigma": 0.11064962079303015,
+            "epsilon": 0.04184,
+            "equivalent_atom": "hn_00",
+            "comment": "GAFF"
+        },
+        "95": {
+            "type": "h1",
+            "name": "H53",
+            "mass": 1.007825,
+            "charge": 0.147562,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_00",
+            "comment": "GAFF"
+        },
+        "96": {
+            "type": "hc",
+            "name": "H63",
+            "mass": 1.007825,
+            "charge": 0.045679,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_01",
+            "comment": "GAFF"
+        },
+        "97": {
+            "type": "hc",
+            "name": "H73",
+            "mass": 1.007825,
+            "charge": 0.045679,
+            "sigma": 0.2600176998764394,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "hc_01",
+            "comment": "GAFF"
+        },
+        "98": {
+            "type": "hn",
+            "name": "H93",
+            "mass": 1.007825,
+            "charge": 0.283938,
+            "sigma": 0.11064962079303015,
+            "epsilon": 0.04184,
+            "equivalent_atom": "hn_01",
+            "comment": "GAFF"
+        },
+        "99": {
+            "type": "h1",
+            "name": "H103",
+            "mass": 1.007825,
+            "charge": 0.166473,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_01",
+            "comment": "GAFF"
+        },
+        "100": {
+            "type": "h1",
+            "name": "H113",
+            "mass": 1.007825,
+            "charge": 0.166473,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_01",
+            "comment": "GAFF"
+        },
+        "101": {
+            "type": "h1",
+            "name": "H123",
+            "mass": 1.007825,
+            "charge": 0.166473,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_01",
+            "comment": "GAFF"
+        }
+    },
+    "bonds": {
+        "(0, 1)": {
+            "type": "harmonic",
+            "force_constant": 194555.99999999997,
+            "equilibrium": 0.15380000000000002,
+            "comment": "c3-c3"
+        },
+        "(0, 15)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(0, 16)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(0, 17)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(1, 2)": {
+            "type": "harmonic",
+            "force_constant": 194555.99999999997,
+            "equilibrium": 0.15380000000000002,
+            "comment": "c3-c3"
+        },
+        "(1, 18)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(1, 19)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(2, 3)": {
+            "type": "harmonic",
+            "force_constant": 194555.99999999997,
+            "equilibrium": 0.15380000000000002,
+            "comment": "c3-c3"
+        },
+        "(2, 20)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(2, 21)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(3, 4)": {
+            "type": "harmonic",
+            "force_constant": 366602.07999999996,
+            "equilibrium": 0.1317,
+            "comment": "c3-o"
+        },
+        "(3, 5)": {
+            "type": "harmonic",
+            "force_constant": 238320.63999999996,
+            "equilibrium": 0.1432,
+            "comment": "c3-os"
+        },
+        "(3, 32)": {
+            "type": "harmonic",
+            "force_constant": 238320.63999999996,
+            "equilibrium": 0.1432,
+            "comment": "c3-os, formed in reaction"
+        },
+        "(5, 6)": {
+            "type": "harmonic",
+            "force_constant": 299155.99999999994,
+            "equilibrium": 0.137,
+            "comment": "ca-os"
+        },
+        "(6, 7)": {
+            "type": "harmonic",
+            "force_constant": 316812.48,
+            "equilibrium": 0.1398,
+            "comment": "ca-ca"
+        },
+        "(6, 14)": {
+            "type": "harmonic",
+            "force_constant": 316812.48,
+            "equilibrium": 0.1398,
+            "comment": "ca-ca"
+        },
+        "(7, 8)": {
+            "type": "harmonic",
+            "force_constant": 316812.48,
+            "equilibrium": 0.1398,
+            "comment": "ca-ca"
+        },
+        "(7, 22)": {
+            "type": "harmonic",
+            "force_constant": 331121.75999999995,
+            "equilibrium": 0.10860000000000002,
+            "comment": "ca-ha"
+        },
+        "(8, 9)": {
+            "type": "harmonic",
+            "force_constant": 316812.48,
+            "equilibrium": 0.1398,
+            "comment": "ca-ca"
+        },
+        "(8, 23)": {
+            "type": "harmonic",
+            "force_constant": 331121.75999999995,
+            "equilibrium": 0.10860000000000002,
+            "comment": "ca-ha"
+        },
+        "(9, 10)": {
+            "type": "harmonic",
+            "force_constant": 215392.31999999995,
+            "equilibrium": 0.1469,
+            "comment": "ca-no"
+        },
+        "(9, 13)": {
+            "type": "harmonic",
+            "force_constant": 316812.48,
+            "equilibrium": 0.1398,
+            "comment": "ca-ca"
+        },
+        "(10, 11)": {
+            "type": "harmonic",
+            "force_constant": 307858.7199999999,
+            "equilibrium": 0.1226,
+            "comment": "no-o"
+        },
+        "(10, 12)": {
+            "type": "harmonic",
+            "force_constant": 307858.7199999999,
+            "equilibrium": 0.1226,
+            "comment": "no-o"
+        },
+        "(13, 14)": {
+            "type": "harmonic",
+            "force_constant": 316812.48,
+            "equilibrium": 0.1398,
+            "comment": "ca-ca"
+        },
+        "(13, 24)": {
+            "type": "harmonic",
+            "force_constant": 331121.75999999995,
+            "equilibrium": 0.10860000000000002,
+            "comment": "ca-ha"
+        },
+        "(14, 25)": {
+            "type": "harmonic",
+            "force_constant": 331121.75999999995,
+            "equilibrium": 0.10860000000000002,
+            "comment": "ca-ha"
+        },
+        "(26, 27)": {
+            "type": "harmonic",
+            "force_constant": 203509.75999999995,
+            "equilibrium": 0.1524,
+            "comment": "c-c3"
+        },
+        "(26, 37)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(26, 38)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(26, 39)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(27, 28)": {
+            "type": "harmonic",
+            "force_constant": 546095.6799999999,
+            "equilibrium": 0.1218,
+            "comment": "c-o"
+        },
+        "(27, 29)": {
+            "type": "harmonic",
+            "force_constant": 250000.0,
+            "equilibrium": 0.14337845771903812,
+            "comment": "Guessed"
+        },
+        "(29, 30)": {
+            "type": "harmonic",
+            "force_constant": 250000.0,
+            "equilibrium": 0.14666356594563626,
+            "comment": "Guessed"
+        },
+        "(29, 40)": {
+            "type": "harmonic",
+            "force_constant": 250000.0,
+            "equilibrium": 0.10463308579646308,
+            "comment": "Guessed"
+        },
+        "(30, 31)": {
+            "type": "harmonic",
+            "force_constant": 194555.99999999997,
+            "equilibrium": 0.15380000000000002,
+            "comment": "c3-c3"
+        },
+        "(30, 33)": {
+            "type": "harmonic",
+            "force_constant": 203509.75999999995,
+            "equilibrium": 0.1524,
+            "comment": "c-c3"
+        },
+        "(30, 41)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        },
+        "(31, 32)": {
+            "type": "harmonic",
+            "force_constant": 238320.63999999996,
+            "equilibrium": 0.1432,
+            "comment": "c3-os"
+        },
+        "(31, 42)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        },
+        "(31, 43)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        },
+        "(33, 34)": {
+            "type": "harmonic",
+            "force_constant": 546095.6799999999,
+            "equilibrium": 0.1218,
+            "comment": "c-o"
+        },
+        "(33, 35)": {
+            "type": "harmonic",
+            "force_constant": 250000.0,
+            "equilibrium": 0.14342776348632785,
+            "comment": "Guessed"
+        },
+        "(35, 36)": {
+            "type": "harmonic",
+            "force_constant": 250000.0,
+            "equilibrium": 0.145709121809,
+            "comment": "Guessed"
+        },
+        "(35, 45)": {
+            "type": "harmonic",
+            "force_constant": 250000.0,
+            "equilibrium": 0.10440004538073727,
+            "comment": "Guessed"
+        },
+        "(36, 46)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        },
+        "(36, 47)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        },
+        "(36, 48)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        },
+        "(44, 57)": {
+            "type": "harmonic",
+            "force_constant": 447771.67999999993,
+            "equilibrium": 0.101,
+            "comment": "hn-na, formed in reaction"
+        },
+        "(49, 50)": {
+            "type": "harmonic",
+            "force_constant": 203509.75999999995,
+            "equilibrium": 0.1524,
+            "comment": "c-c3"
+        },
+        "(49, 64)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(49, 65)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(49, 66)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(50, 51)": {
+            "type": "harmonic",
+            "force_constant": 546095.6799999999,
+            "equilibrium": 0.1218,
+            "comment": "c-o"
+        },
+        "(50, 52)": {
+            "type": "harmonic",
+            "force_constant": 250000.0,
+            "equilibrium": 0.14340440345808772,
+            "comment": "Guessed"
+        },
+        "(52, 53)": {
+            "type": "harmonic",
+            "force_constant": 250000.0,
+            "equilibrium": 0.14672557186301916,
+            "comment": "Guessed"
+        },
+        "(52, 67)": {
+            "type": "harmonic",
+            "force_constant": 250000.0,
+            "equilibrium": 0.10460772140511426,
+            "comment": "Guessed"
+        },
+        "(53, 54)": {
+            "type": "harmonic",
+            "force_constant": 194555.99999999997,
+            "equilibrium": 0.15380000000000002,
+            "comment": "c3-c3"
+        },
+        "(53, 60)": {
+            "type": "harmonic",
+            "force_constant": 203509.75999999995,
+            "equilibrium": 0.1524,
+            "comment": "c-c3"
+        },
+        "(53, 68)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        },
+        "(54, 55)": {
+            "type": "harmonic",
+            "force_constant": 219743.67999999996,
+            "equilibrium": 0.1502,
+            "comment": "c3-cc"
+        },
+        "(54, 69)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(54, 70)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(55, 56)": {
+            "type": "harmonic",
+            "force_constant": 348192.48,
+            "equilibrium": 0.1373,
+            "comment": "cc-cd"
+        },
+        "(55, 59)": {
+            "type": "harmonic",
+            "force_constant": 308862.87999999995,
+            "equilibrium": 0.1369,
+            "comment": "cc-nc"
+        },
+        "(56, 57)": {
+            "type": "harmonic",
+            "force_constant": 296645.5999999999,
+            "equilibrium": 0.13799999999999998,
+            "comment": "cd-na"
+        },
+        "(56, 71)": {
+            "type": "harmonic",
+            "force_constant": 337983.5199999999,
+            "equilibrium": 0.10820000000000002,
+            "comment": "cd-h4"
+        },
+        "(57, 58)": {
+            "type": "harmonic",
+            "force_constant": 296645.5999999999,
+            "equilibrium": 0.13799999999999998,
+            "comment": "cc-na"
+        },
+        "(58, 59)": {
+            "type": "harmonic",
+            "force_constant": 308862.87999999995,
+            "equilibrium": 0.1369,
+            "comment": "cc-nc"
+        },
+        "(58, 72)": {
+            "type": "harmonic",
+            "force_constant": 337648.79999999993,
+            "equilibrium": 0.10820000000000002,
+            "comment": "cc-h5"
+        },
+        "(60, 61)": {
+            "type": "harmonic",
+            "force_constant": 546095.6799999999,
+            "equilibrium": 0.1218,
+            "comment": "c-o"
+        },
+        "(60, 62)": {
+            "type": "harmonic",
+            "force_constant": 250000.0,
+            "equilibrium": 0.14341365551878246,
+            "comment": "Guessed"
+        },
+        "(62, 63)": {
+            "type": "harmonic",
+            "force_constant": 250000.0,
+            "equilibrium": 0.14573433361703067,
+            "comment": "Guessed"
+        },
+        "(62, 74)": {
+            "type": "harmonic",
+            "force_constant": 250000.0,
+            "equilibrium": 0.10449416390181797,
+            "comment": "Guessed"
+        },
+        "(63, 75)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        },
+        "(63, 76)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        },
+        "(63, 77)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        },
+        "(73, 85)": {
+            "type": "harmonic",
+            "force_constant": 471536.79999999993,
+            "equilibrium": 0.0973,
+            "comment": "ho-oh, formed in reaction"
+        },
+        "(78, 79)": {
+            "type": "harmonic",
+            "force_constant": 203509.75999999995,
+            "equilibrium": 0.1524,
+            "comment": "c-c3"
+        },
+        "(78, 91)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(78, 92)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(78, 93)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(79, 80)": {
+            "type": "harmonic",
+            "force_constant": 546095.6799999999,
+            "equilibrium": 0.1218,
+            "comment": "c-o"
+        },
+        "(79, 81)": {
+            "type": "harmonic",
+            "force_constant": 250000.0,
+            "equilibrium": 0.14342906434042577,
+            "comment": "Guessed"
+        },
+        "(81, 82)": {
+            "type": "harmonic",
+            "force_constant": 250000.0,
+            "equilibrium": 0.1466363096176728,
+            "comment": "Guessed"
+        },
+        "(81, 94)": {
+            "type": "harmonic",
+            "force_constant": 250000.0,
+            "equilibrium": 0.10459202374067536,
+            "comment": "Guessed"
+        },
+        "(82, 83)": {
+            "type": "harmonic",
+            "force_constant": 194555.99999999997,
+            "equilibrium": 0.15380000000000002,
+            "comment": "c3-c3"
+        },
+        "(82, 87)": {
+            "type": "harmonic",
+            "force_constant": 203509.75999999995,
+            "equilibrium": 0.1524,
+            "comment": "c-c3"
+        },
+        "(82, 95)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        },
+        "(83, 84)": {
+            "type": "harmonic",
+            "force_constant": 203509.75999999995,
+            "equilibrium": 0.1524,
+            "comment": "c-c3"
+        },
+        "(83, 96)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(83, 97)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-hc"
+        },
+        "(84, 85)": {
+            "type": "harmonic",
+            "force_constant": 320578.07999999996,
+            "equilibrium": 0.1351,
+            "comment": "c-oh"
+        },
+        "(84, 86)": {
+            "type": "harmonic",
+            "force_constant": 546095.6799999999,
+            "equilibrium": 0.1218,
+            "comment": "c-o"
+        },
+        "(87, 88)": {
+            "type": "harmonic",
+            "force_constant": 546095.6799999999,
+            "equilibrium": 0.1218,
+            "comment": "c-o"
+        },
+        "(87, 89)": {
+            "type": "harmonic",
+            "force_constant": 250000.0,
+            "equilibrium": 0.1434095242409304,
+            "comment": "Guessed"
+        },
+        "(89, 90)": {
+            "type": "harmonic",
+            "force_constant": 250000.0,
+            "equilibrium": 0.14571392476774483,
+            "comment": "Guessed"
+        },
+        "(89, 98)": {
+            "type": "harmonic",
+            "force_constant": 250000.0,
+            "equilibrium": 0.10448535720310287,
+            "comment": "Guessed"
+        },
+        "(90, 99)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        },
+        "(90, 100)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        },
+        "(90, 101)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        }
+    },
+    "angles": {
+        "(0, 1, 2)": {
+            "type": "harmonic",
+            "force_constant": 543.0832,
+            "equilibrium": 111.51,
+            "comment": "c3-c3-c3"
+        },
+        "(0, 1, 18)": {
+            "type": "harmonic",
+            "force_constant": 391.62239999999997,
+            "equilibrium": 109.8,
+            "comment": "c3-c3-hc"
+        },
+        "(0, 1, 19)": {
+            "type": "harmonic",
+            "force_constant": 391.62239999999997,
+            "equilibrium": 109.8,
+            "comment": "c3-c3-hc"
+        },
+        "(1, 0, 15)": {
+            "type": "harmonic",
+            "force_constant": 391.62239999999997,
+            "equilibrium": 109.8,
+            "comment": "c3-c3-hc"
+        },
+        "(1, 0, 16)": {
+            "type": "harmonic",
+            "force_constant": 391.62239999999997,
+            "equilibrium": 109.8,
+            "comment": "c3-c3-hc"
+        },
+        "(1, 0, 17)": {
+            "type": "harmonic",
+            "force_constant": 391.62239999999997,
+            "equilibrium": 109.8,
+            "comment": "c3-c3-hc"
+        },
+        "(1, 2, 3)": {
+            "type": "harmonic",
+            "force_constant": 543.0832,
+            "equilibrium": 111.51,
+            "comment": "c3-c3-c3"
+        },
+        "(1, 2, 20)": {
+            "type": "harmonic",
+            "force_constant": 391.62239999999997,
+            "equilibrium": 109.8,
+            "comment": "c3-c3-hc"
+        },
+        "(1, 2, 21)": {
+            "type": "harmonic",
+            "force_constant": 391.62239999999997,
+            "equilibrium": 109.8,
+            "comment": "c3-c3-hc"
+        },
+        "(2, 1, 18)": {
+            "type": "harmonic",
+            "force_constant": 391.62239999999997,
+            "equilibrium": 109.8,
+            "comment": "c3-c3-hc"
+        },
+        "(2, 1, 19)": {
+            "type": "harmonic",
+            "force_constant": 391.62239999999997,
+            "equilibrium": 109.8,
+            "comment": "c3-c3-hc"
+        },
+        "(2, 3, 4)": {
+            "type": "harmonic",
+            "force_constant": 718.8112000000001,
+            "equilibrium": 113.01,
+            "comment": "c3-c3-o"
+        },
+        "(2, 3, 5)": {
+            "type": "harmonic",
+            "force_constant": 713.7904,
+            "equilibrium": 107.97,
+            "comment": "c3-c3-os"
+        },
+        "(2, 3, 32)": {
+            "type": "harmonic",
+            "force_constant": 713.7904,
+            "equilibrium": 107.97,
+            "comment": "c3-c3-os"
+        },
+        "(3, 2, 20)": {
+            "type": "harmonic",
+            "force_constant": 391.62239999999997,
+            "equilibrium": 109.8,
+            "comment": "c3-c3-hc"
+        },
+        "(3, 2, 21)": {
+            "type": "harmonic",
+            "force_constant": 391.62239999999997,
+            "equilibrium": 109.8,
+            "comment": "c3-c3-hc"
+        },
+        "(3, 5, 6)": {
+            "type": "harmonic",
+            "force_constant": 553.1247999999999,
+            "equilibrium": 117.96,
+            "comment": "c3-os-ca"
+        },
+        "(3, 32, 31)": {
+            "type": "harmonic",
+            "force_constant": 554.7984,
+            "equilibrium": 112.48,
+            "comment": "c3-os-c3"
+        },
+        "(4, 3, 5)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 109.03545281050505,
+            "comment": "Guessed"
+        },
+        "(4, 3, 32)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 113.5860183944705,
+            "comment": "Guessed"
+        },
+        "(5, 3, 32)": {
+            "type": "harmonic",
+            "force_constant": 928.0112,
+            "equilibrium": 108.29000000000002,
+            "comment": "os-c3-os"
+        },
+        "(5, 6, 7)": {
+            "type": "harmonic",
+            "force_constant": 730.5264,
+            "equilibrium": 119.2,
+            "comment": "ca-ca-os"
+        },
+        "(5, 6, 14)": {
+            "type": "harmonic",
+            "force_constant": 730.5264,
+            "equilibrium": 119.2,
+            "comment": "ca-ca-os"
+        },
+        "(6, 7, 8)": {
+            "type": "harmonic",
+            "force_constant": 575.7184,
+            "equilibrium": 120.01999999999998,
+            "comment": "ca-ca-ca"
+        },
+        "(6, 7, 22)": {
+            "type": "harmonic",
+            "force_constant": 407.52160000000003,
+            "equilibrium": 119.88000000000001,
+            "comment": "ca-ca-ha"
+        },
+        "(6, 14, 13)": {
+            "type": "harmonic",
+            "force_constant": 575.7184,
+            "equilibrium": 120.01999999999998,
+            "comment": "ca-ca-ca"
+        },
+        "(6, 14, 25)": {
+            "type": "harmonic",
+            "force_constant": 407.52160000000003,
+            "equilibrium": 119.88000000000001,
+            "comment": "ca-ca-ha"
+        },
+        "(7, 6, 14)": {
+            "type": "harmonic",
+            "force_constant": 575.7184,
+            "equilibrium": 120.01999999999998,
+            "comment": "ca-ca-ca"
+        },
+        "(7, 8, 9)": {
+            "type": "harmonic",
+            "force_constant": 575.7184,
+            "equilibrium": 120.01999999999998,
+            "comment": "ca-ca-ca"
+        },
+        "(7, 8, 23)": {
+            "type": "harmonic",
+            "force_constant": 407.52160000000003,
+            "equilibrium": 119.88000000000001,
+            "comment": "ca-ca-ha"
+        },
+        "(8, 7, 22)": {
+            "type": "harmonic",
+            "force_constant": 407.52160000000003,
+            "equilibrium": 119.88000000000001,
+            "comment": "ca-ca-ha"
+        },
+        "(8, 9, 10)": {
+            "type": "harmonic",
+            "force_constant": 704.5856,
+            "equilibrium": 119.01,
+            "comment": "ca-ca-no"
+        },
+        "(8, 9, 13)": {
+            "type": "harmonic",
+            "force_constant": 575.7184,
+            "equilibrium": 120.01999999999998,
+            "comment": "ca-ca-ca"
+        },
+        "(9, 8, 23)": {
+            "type": "harmonic",
+            "force_constant": 407.52160000000003,
+            "equilibrium": 119.88000000000001,
+            "comment": "ca-ca-ha"
+        },
+        "(9, 10, 11)": {
+            "type": "harmonic",
+            "force_constant": 718.8112000000001,
+            "equilibrium": 117.76,
+            "comment": "ca-no-o"
+        },
+        "(9, 10, 12)": {
+            "type": "harmonic",
+            "force_constant": 718.8112000000001,
+            "equilibrium": 117.76,
+            "comment": "ca-no-o"
+        },
+        "(9, 13, 14)": {
+            "type": "harmonic",
+            "force_constant": 575.7184,
+            "equilibrium": 120.01999999999998,
+            "comment": "ca-ca-ca"
+        },
+        "(9, 13, 24)": {
+            "type": "harmonic",
+            "force_constant": 407.52160000000003,
+            "equilibrium": 119.88000000000001,
+            "comment": "ca-ca-ha"
+        },
+        "(10, 9, 13)": {
+            "type": "harmonic",
+            "force_constant": 704.5856,
+            "equilibrium": 119.01,
+            "comment": "ca-ca-no"
+        },
+        "(11, 10, 12)": {
+            "type": "harmonic",
+            "force_constant": 975.7088,
+            "equilibrium": 125.08,
+            "comment": "o-no-o"
+        },
+        "(13, 14, 25)": {
+            "type": "harmonic",
+            "force_constant": 407.52160000000003,
+            "equilibrium": 119.88000000000001,
+            "comment": "ca-ca-ha"
+        },
+        "(14, 13, 24)": {
+            "type": "harmonic",
+            "force_constant": 407.52160000000003,
+            "equilibrium": 119.88000000000001,
+            "comment": "ca-ca-ha"
+        },
+        "(15, 0, 16)": {
+            "type": "harmonic",
+            "force_constant": 326.35200000000003,
+            "equilibrium": 107.58,
+            "comment": "hc-c3-hc"
+        },
+        "(15, 0, 17)": {
+            "type": "harmonic",
+            "force_constant": 326.35200000000003,
+            "equilibrium": 107.58,
+            "comment": "hc-c3-hc"
+        },
+        "(16, 0, 17)": {
+            "type": "harmonic",
+            "force_constant": 326.35200000000003,
+            "equilibrium": 107.58,
+            "comment": "hc-c3-hc"
+        },
+        "(18, 1, 19)": {
+            "type": "harmonic",
+            "force_constant": 326.35200000000003,
+            "equilibrium": 107.58,
+            "comment": "hc-c3-hc"
+        },
+        "(20, 2, 21)": {
+            "type": "harmonic",
+            "force_constant": 326.35200000000003,
+            "equilibrium": 107.58,
+            "comment": "hc-c3-hc"
+        },
+        "(26, 27, 28)": {
+            "type": "harmonic",
+            "force_constant": 707.9327999999999,
+            "equilibrium": 123.19999999999999,
+            "comment": "c3-c-o"
+        },
+        "(26, 27, 29)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 119.86340319919266,
+            "comment": "Guessed"
+        },
+        "(27, 26, 37)": {
+            "type": "harmonic",
+            "force_constant": 396.6432,
+            "equilibrium": 108.77000000000001,
+            "comment": "c-c3-hc"
+        },
+        "(27, 26, 38)": {
+            "type": "harmonic",
+            "force_constant": 396.6432,
+            "equilibrium": 108.77000000000001,
+            "comment": "c-c3-hc"
+        },
+        "(27, 26, 39)": {
+            "type": "harmonic",
+            "force_constant": 396.6432,
+            "equilibrium": 108.77000000000001,
+            "comment": "c-c3-hc"
+        },
+        "(27, 29, 30)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 122.14995643151515,
+            "comment": "Guessed"
+        },
+        "(27, 29, 40)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 118.17494064676659,
+            "comment": "Guessed"
+        },
+        "(28, 27, 29)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 120.43085592440482,
+            "comment": "Guessed"
+        },
+        "(29, 30, 31)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 110.74642194509939,
+            "comment": "Guessed"
+        },
+        "(29, 30, 33)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 110.07826096638489,
+            "comment": "Guessed"
+        },
+        "(29, 30, 41)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 108.84325948391235,
+            "comment": "Guessed"
+        },
+        "(30, 29, 40)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 119.67460852469976,
+            "comment": "Guessed"
+        },
+        "(30, 31, 32)": {
+            "type": "harmonic",
+            "force_constant": 713.7904,
+            "equilibrium": 107.97,
+            "comment": "c3-c3-os"
+        },
+        "(30, 31, 42)": {
+            "type": "harmonic",
+            "force_constant": 392.4592,
+            "equilibrium": 109.56,
+            "comment": "c3-c3-h1"
+        },
+        "(30, 31, 43)": {
+            "type": "harmonic",
+            "force_constant": 392.4592,
+            "equilibrium": 109.56,
+            "comment": "c3-c3-h1"
+        },
+        "(30, 33, 34)": {
+            "type": "harmonic",
+            "force_constant": 707.9327999999999,
+            "equilibrium": 123.19999999999999,
+            "comment": "c3-c-o"
+        },
+        "(30, 33, 35)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 120.51134917376196,
+            "comment": "Guessed"
+        },
+        "(31, 30, 33)": {
+            "type": "harmonic",
+            "force_constant": 546.4304,
+            "equilibrium": 111.04,
+            "comment": "c-c3-c3"
+        },
+        "(31, 30, 41)": {
+            "type": "harmonic",
+            "force_constant": 392.4592,
+            "equilibrium": 109.56,
+            "comment": "c3-c3-h1"
+        },
+        "(32, 31, 42)": {
+            "type": "harmonic",
+            "force_constant": 522.1632,
+            "equilibrium": 109.78,
+            "comment": "h1-c3-os"
+        },
+        "(32, 31, 43)": {
+            "type": "harmonic",
+            "force_constant": 522.1632,
+            "equilibrium": 109.78,
+            "comment": "h1-c3-os"
+        },
+        "(33, 30, 41)": {
+            "type": "harmonic",
+            "force_constant": 397.48,
+            "equilibrium": 108.22,
+            "comment": "c-c3-h1"
+        },
+        "(33, 35, 36)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 121.70979022253992,
+            "comment": "Guessed"
+        },
+        "(33, 35, 45)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 119.64995516168064,
+            "comment": "Guessed"
+        },
+        "(34, 33, 35)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 120.10380018485822,
+            "comment": "Guessed"
+        },
+        "(35, 36, 46)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 109.85464363887498,
+            "comment": "Guessed"
+        },
+        "(35, 36, 47)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 109.73090887585874,
+            "comment": "Guessed"
+        },
+        "(35, 36, 48)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 109.88683848007993,
+            "comment": "Guessed"
+        },
+        "(36, 35, 45)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 118.6392056170933,
+            "comment": "Guessed"
+        },
+        "(37, 26, 38)": {
+            "type": "harmonic",
+            "force_constant": 326.35200000000003,
+            "equilibrium": 107.58,
+            "comment": "hc-c3-hc"
+        },
+        "(37, 26, 39)": {
+            "type": "harmonic",
+            "force_constant": 326.35200000000003,
+            "equilibrium": 107.58,
+            "comment": "hc-c3-hc"
+        },
+        "(38, 26, 39)": {
+            "type": "harmonic",
+            "force_constant": 326.35200000000003,
+            "equilibrium": 107.58,
+            "comment": "hc-c3-hc"
+        },
+        "(42, 31, 43)": {
+            "type": "harmonic",
+            "force_constant": 324.6784,
+            "equilibrium": 108.46,
+            "comment": "h1-c3-h1"
+        },
+        "(44, 57, 56)": {
+            "type": "harmonic",
+            "force_constant": 394.13280000000003,
+            "equilibrium": 125.50000000000001,
+            "comment": "cd-na-hn"
+        },
+        "(44, 57, 58)": {
+            "type": "harmonic",
+            "force_constant": 394.13280000000003,
+            "equilibrium": 125.50000000000001,
+            "comment": "cc-na-hn"
+        },
+        "(46, 36, 47)": {
+            "type": "harmonic",
+            "force_constant": 324.6784,
+            "equilibrium": 108.46,
+            "comment": "h1-c3-h1"
+        },
+        "(46, 36, 48)": {
+            "type": "harmonic",
+            "force_constant": 324.6784,
+            "equilibrium": 108.46,
+            "comment": "h1-c3-h1"
+        },
+        "(47, 36, 48)": {
+            "type": "harmonic",
+            "force_constant": 324.6784,
+            "equilibrium": 108.46,
+            "comment": "h1-c3-h1"
+        },
+        "(49, 50, 51)": {
+            "type": "harmonic",
+            "force_constant": 707.9327999999999,
+            "equilibrium": 123.19999999999999,
+            "comment": "c3-c-o"
+        },
+        "(49, 50, 52)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 119.85276785581189,
+            "comment": "Guessed"
+        },
+        "(50, 49, 64)": {
+            "type": "harmonic",
+            "force_constant": 396.6432,
+            "equilibrium": 108.77000000000001,
+            "comment": "c-c3-hc"
+        },
+        "(50, 49, 65)": {
+            "type": "harmonic",
+            "force_constant": 396.6432,
+            "equilibrium": 108.77000000000001,
+            "comment": "c-c3-hc"
+        },
+        "(50, 49, 66)": {
+            "type": "harmonic",
+            "force_constant": 396.6432,
+            "equilibrium": 108.77000000000001,
+            "comment": "c-c3-hc"
+        },
+        "(50, 52, 53)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 122.47146946685817,
+            "comment": "Guessed"
+        },
+        "(50, 52, 67)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 118.21850441124225,
+            "comment": "Guessed"
+        },
+        "(51, 50, 52)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 120.50460216191112,
+            "comment": "Guessed"
+        },
+        "(52, 53, 54)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 110.22771233639428,
+            "comment": "Guessed"
+        },
+        "(52, 53, 60)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 110.2576014778802,
+            "comment": "Guessed"
+        },
+        "(52, 53, 68)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 108.943160042375,
+            "comment": "Guessed"
+        },
+        "(53, 52, 67)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 119.0141931406332,
+            "comment": "Guessed"
+        },
+        "(53, 54, 55)": {
+            "type": "harmonic",
+            "force_constant": 548.104,
+            "equilibrium": 111.93,
+            "comment": "c3-c3-cc"
+        },
+        "(53, 54, 69)": {
+            "type": "harmonic",
+            "force_constant": 391.62239999999997,
+            "equilibrium": 109.8,
+            "comment": "c3-c3-hc"
+        },
+        "(53, 54, 70)": {
+            "type": "harmonic",
+            "force_constant": 391.62239999999997,
+            "equilibrium": 109.8,
+            "comment": "c3-c3-hc"
+        },
+        "(53, 60, 61)": {
+            "type": "harmonic",
+            "force_constant": 707.9327999999999,
+            "equilibrium": 123.19999999999999,
+            "comment": "c3-c-o"
+        },
+        "(53, 60, 62)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 119.72266251691994,
+            "comment": "Guessed"
+        },
+        "(54, 53, 60)": {
+            "type": "harmonic",
+            "force_constant": 546.4304,
+            "equilibrium": 111.04,
+            "comment": "c-c3-c3"
+        },
+        "(54, 53, 68)": {
+            "type": "harmonic",
+            "force_constant": 392.4592,
+            "equilibrium": 109.56,
+            "comment": "c3-c3-h1"
+        },
+        "(54, 55, 56)": {
+            "type": "harmonic",
+            "force_constant": 558.9824,
+            "equilibrium": 119.45,
+            "comment": "c3-cc-cd"
+        },
+        "(54, 55, 59)": {
+            "type": "harmonic",
+            "force_constant": 696.2176000000001,
+            "equilibrium": 120.95,
+            "comment": "c3-cc-nc"
+        },
+        "(55, 54, 69)": {
+            "type": "harmonic",
+            "force_constant": 399.15360000000004,
+            "equilibrium": 110.49,
+            "comment": "cc-c3-hc"
+        },
+        "(55, 54, 70)": {
+            "type": "harmonic",
+            "force_constant": 399.15360000000004,
+            "equilibrium": 110.49,
+            "comment": "cc-c3-hc"
+        },
+        "(55, 56, 57)": {
+            "type": "harmonic",
+            "force_constant": 775.7136,
+            "equilibrium": 106.99,
+            "comment": "cc-cd-na"
+        },
+        "(55, 56, 71)": {
+            "type": "harmonic",
+            "force_constant": 399.99039999999997,
+            "equilibrium": 128.48,
+            "comment": "cc-cd-h4"
+        },
+        "(55, 59, 58)": {
+            "type": "harmonic",
+            "force_constant": 611.7008,
+            "equilibrium": 103.76000000000002,
+            "comment": "cc-nc-cc"
+        },
+        "(56, 55, 59)": {
+            "type": "harmonic",
+            "force_constant": 762.3248,
+            "equilibrium": 111.65,
+            "comment": "cd-cc-nc"
+        },
+        "(56, 57, 58)": {
+            "type": "harmonic",
+            "force_constant": 546.4304,
+            "equilibrium": 128.01000000000002,
+            "comment": "cc-na-cd"
+        },
+        "(57, 56, 71)": {
+            "type": "harmonic",
+            "force_constant": 514.6320000000001,
+            "equilibrium": 120.53,
+            "comment": "h4-cd-na"
+        },
+        "(57, 58, 59)": {
+            "type": "harmonic",
+            "force_constant": 910.4384,
+            "equilibrium": 121.95,
+            "comment": "na-cc-nc"
+        },
+        "(57, 58, 72)": {
+            "type": "harmonic",
+            "force_constant": 512.1216000000001,
+            "equilibrium": 121.55,
+            "comment": "h5-cc-na"
+        },
+        "(59, 58, 72)": {
+            "type": "harmonic",
+            "force_constant": 512.9584,
+            "equilibrium": 122.92000000000002,
+            "comment": "h5-cc-nc"
+        },
+        "(60, 53, 68)": {
+            "type": "harmonic",
+            "force_constant": 397.48,
+            "equilibrium": 108.22,
+            "comment": "c-c3-h1"
+        },
+        "(60, 62, 63)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 121.79097848421557,
+            "comment": "Guessed"
+        },
+        "(60, 62, 74)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 119.54475697764815,
+            "comment": "Guessed"
+        },
+        "(61, 60, 62)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 119.65655337404117,
+            "comment": "Guessed"
+        },
+        "(62, 63, 75)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 109.86375036281272,
+            "comment": "Guessed"
+        },
+        "(62, 63, 76)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 109.84413133085411,
+            "comment": "Guessed"
+        },
+        "(62, 63, 77)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 109.7958010512596,
+            "comment": "Guessed"
+        },
+        "(63, 62, 74)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 118.66422541311364,
+            "comment": "Guessed"
+        },
+        "(64, 49, 65)": {
+            "type": "harmonic",
+            "force_constant": 326.35200000000003,
+            "equilibrium": 107.58,
+            "comment": "hc-c3-hc"
+        },
+        "(64, 49, 66)": {
+            "type": "harmonic",
+            "force_constant": 326.35200000000003,
+            "equilibrium": 107.58,
+            "comment": "hc-c3-hc"
+        },
+        "(65, 49, 66)": {
+            "type": "harmonic",
+            "force_constant": 326.35200000000003,
+            "equilibrium": 107.58,
+            "comment": "hc-c3-hc"
+        },
+        "(69, 54, 70)": {
+            "type": "harmonic",
+            "force_constant": 326.35200000000003,
+            "equilibrium": 107.58,
+            "comment": "hc-c3-hc"
+        },
+        "(73, 85, 84)": {
+            "type": "harmonic",
+            "force_constant": 431.78880000000004,
+            "equilibrium": 106.55000000000001,
+            "comment": "c-oh-ho"
+        },
+        "(75, 63, 76)": {
+            "type": "harmonic",
+            "force_constant": 324.6784,
+            "equilibrium": 108.46,
+            "comment": "h1-c3-h1"
+        },
+        "(75, 63, 77)": {
+            "type": "harmonic",
+            "force_constant": 324.6784,
+            "equilibrium": 108.46,
+            "comment": "h1-c3-h1"
+        },
+        "(76, 63, 77)": {
+            "type": "harmonic",
+            "force_constant": 324.6784,
+            "equilibrium": 108.46,
+            "comment": "h1-c3-h1"
+        },
+        "(78, 79, 80)": {
+            "type": "harmonic",
+            "force_constant": 707.9327999999999,
+            "equilibrium": 123.19999999999999,
+            "comment": "c3-c-o"
+        },
+        "(78, 79, 81)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 119.89275241230952,
+            "comment": "Guessed"
+        },
+        "(79, 78, 91)": {
+            "type": "harmonic",
+            "force_constant": 396.6432,
+            "equilibrium": 108.77000000000001,
+            "comment": "c-c3-hc"
+        },
+        "(79, 78, 92)": {
+            "type": "harmonic",
+            "force_constant": 396.6432,
+            "equilibrium": 108.77000000000001,
+            "comment": "c-c3-hc"
+        },
+        "(79, 78, 93)": {
+            "type": "harmonic",
+            "force_constant": 396.6432,
+            "equilibrium": 108.77000000000001,
+            "comment": "c-c3-hc"
+        },
+        "(79, 81, 82)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 122.16660759804027,
+            "comment": "Guessed"
+        },
+        "(79, 81, 94)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 118.19010253722867,
+            "comment": "Guessed"
+        },
+        "(80, 79, 81)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 120.44476490258202,
+            "comment": "Guessed"
+        },
+        "(81, 82, 83)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 110.31513763207042,
+            "comment": "Guessed"
+        },
+        "(81, 82, 87)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 109.72875779147161,
+            "comment": "Guessed"
+        },
+        "(81, 82, 95)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 108.38617539370945,
+            "comment": "Guessed"
+        },
+        "(82, 81, 94)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 119.64059753097833,
+            "comment": "Guessed"
+        },
+        "(82, 83, 84)": {
+            "type": "harmonic",
+            "force_constant": 546.4304,
+            "equilibrium": 111.04,
+            "comment": "c-c3-c3"
+        },
+        "(82, 83, 96)": {
+            "type": "harmonic",
+            "force_constant": 391.62239999999997,
+            "equilibrium": 109.8,
+            "comment": "c3-c3-hc"
+        },
+        "(82, 83, 97)": {
+            "type": "harmonic",
+            "force_constant": 391.62239999999997,
+            "equilibrium": 109.8,
+            "comment": "c3-c3-hc"
+        },
+        "(82, 87, 88)": {
+            "type": "harmonic",
+            "force_constant": 707.9327999999999,
+            "equilibrium": 123.19999999999999,
+            "comment": "c3-c-o"
+        },
+        "(82, 87, 89)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 120.49501121772961,
+            "comment": "Guessed"
+        },
+        "(83, 82, 87)": {
+            "type": "harmonic",
+            "force_constant": 546.4304,
+            "equilibrium": 111.04,
+            "comment": "c-c3-c3"
+        },
+        "(83, 82, 95)": {
+            "type": "harmonic",
+            "force_constant": 392.4592,
+            "equilibrium": 109.56,
+            "comment": "c3-c3-h1"
+        },
+        "(83, 84, 85)": {
+            "type": "harmonic",
+            "force_constant": 717.9744000000001,
+            "equilibrium": 112.73,
+            "comment": "c3-c-oh"
+        },
+        "(83, 84, 86)": {
+            "type": "harmonic",
+            "force_constant": 707.9327999999999,
+            "equilibrium": 123.19999999999999,
+            "comment": "c3-c-o"
+        },
+        "(84, 83, 96)": {
+            "type": "harmonic",
+            "force_constant": 396.6432,
+            "equilibrium": 108.77000000000001,
+            "comment": "c-c3-hc"
+        },
+        "(84, 83, 97)": {
+            "type": "harmonic",
+            "force_constant": 396.6432,
+            "equilibrium": 108.77000000000001,
+            "comment": "c-c3-hc"
+        },
+        "(85, 84, 86)": {
+            "type": "harmonic",
+            "force_constant": 968.1776000000001,
+            "equilibrium": 122.09999999999998,
+            "comment": "o-c-oh"
+        },
+        "(87, 82, 95)": {
+            "type": "harmonic",
+            "force_constant": 397.48,
+            "equilibrium": 108.22,
+            "comment": "c-c3-h1"
+        },
+        "(87, 89, 90)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 121.7292493444104,
+            "comment": "Guessed"
+        },
+        "(87, 89, 98)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 119.55634237078907,
+            "comment": "Guessed"
+        },
+        "(88, 87, 89)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 120.11723561174098,
+            "comment": "Guessed"
+        },
+        "(89, 90, 99)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 109.86334562866281,
+            "comment": "Guessed"
+        },
+        "(89, 90, 100)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 109.80306921092131,
+            "comment": "Guessed"
+        },
+        "(89, 90, 101)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 109.81235162392524,
+            "comment": "Guessed"
+        },
+        "(90, 89, 98)": {
+            "type": "harmonic",
+            "force_constant": 1000,
+            "equilibrium": 118.71437786164898,
+            "comment": "Guessed"
+        },
+        "(91, 78, 92)": {
+            "type": "harmonic",
+            "force_constant": 326.35200000000003,
+            "equilibrium": 107.58,
+            "comment": "hc-c3-hc"
+        },
+        "(91, 78, 93)": {
+            "type": "harmonic",
+            "force_constant": 326.35200000000003,
+            "equilibrium": 107.58,
+            "comment": "hc-c3-hc"
+        },
+        "(92, 78, 93)": {
+            "type": "harmonic",
+            "force_constant": 326.35200000000003,
+            "equilibrium": 107.58,
+            "comment": "hc-c3-hc"
+        },
+        "(96, 83, 97)": {
+            "type": "harmonic",
+            "force_constant": 326.35200000000003,
+            "equilibrium": 107.58,
+            "comment": "hc-c3-hc"
+        },
+        "(99, 90, 100)": {
+            "type": "harmonic",
+            "force_constant": 324.6784,
+            "equilibrium": 108.46,
+            "comment": "h1-c3-h1"
+        },
+        "(99, 90, 101)": {
+            "type": "harmonic",
+            "force_constant": 324.6784,
+            "equilibrium": 108.46,
+            "comment": "h1-c3-h1"
+        },
+        "(100, 90, 101)": {
+            "type": "harmonic",
+            "force_constant": 324.6784,
+            "equilibrium": 108.46,
+            "comment": "h1-c3-h1"
+        }
+    },
+    "dihedrals": {
+        "(0, 1, 2, 3)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                0.5439200000000001,
+                1.21336,
+                0.46024000000000004
+            ],
+            "phase": [
+                0.0,
+                180.0,
+                0.0
+            ],
+            "periodicity": [
+                3,
+                2,
+                1
+            ],
+            "comment": [
+                "c3-c3-c3-c3",
+                "c3-c3-c3-c3",
+                "c3-c3-c3-c3"
+            ]
+        },
+        "(0, 1, 2, 20)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.33472,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "hc-c3-c3-c3"
+        },
+        "(0, 1, 2, 21)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.33472,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "hc-c3-c3-c3"
+        },
+        "(1, 2, 3, 4)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(1, 2, 3, 5)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(1, 2, 3, 32)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(2, 1, 0, 15)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.33472,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "hc-c3-c3-c3"
+        },
+        "(2, 1, 0, 16)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.33472,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "hc-c3-c3-c3"
+        },
+        "(2, 1, 0, 17)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.33472,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "hc-c3-c3-c3"
+        },
+        "(2, 3, 5, 6)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 1.6038666666666666,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-os-X"
+        },
+        "(2, 3, 32, 31)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                1.00416,
+                0.66944
+            ],
+            "phase": [
+                0.0,
+                0.0
+            ],
+            "periodicity": [
+                3,
+                2
+            ],
+            "comment": [
+                "c3-os-c3-c3",
+                "c3-os-c3-c3"
+            ]
+        },
+        "(3, 2, 1, 18)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.33472,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "hc-c3-c3-c3"
+        },
+        "(3, 2, 1, 19)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.33472,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "hc-c3-c3-c3"
+        },
+        "(3, 5, 6, 7)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 6.7362400000000004,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "c3-os-ca-ca"
+        },
+        "(3, 5, 6, 14)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 6.7362400000000004,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "c3-os-ca-ca"
+        },
+        "(3, 32, 31, 30)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                1.00416,
+                0.66944
+            ],
+            "phase": [
+                0.0,
+                0.0
+            ],
+            "periodicity": [
+                3,
+                2
+            ],
+            "comment": [
+                "c3-os-c3-c3",
+                "c3-os-c3-c3"
+            ]
+        },
+        "(3, 32, 31, 42)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 1.4100080000000002,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "c3-os-c3-h1"
+        },
+        "(3, 32, 31, 43)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 1.4100080000000002,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "c3-os-c3-h1"
+        },
+        "(4, 3, 2, 20)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(4, 3, 2, 21)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(4, 3, 5, 6)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 1.6038666666666666,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-os-X"
+        },
+        "(4, 3, 32, 31)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 1.6038666666666666,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-os-X"
+        },
+        "(5, 3, 2, 20)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                0.0,
+                1.046
+            ],
+            "phase": [
+                0.0,
+                0.0
+            ],
+            "periodicity": [
+                3,
+                1
+            ],
+            "comment": [
+                "hc-c3-c3-os",
+                "hc-c3-c3-os"
+            ]
+        },
+        "(5, 3, 2, 21)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                0.0,
+                1.046
+            ],
+            "phase": [
+                0.0,
+                0.0
+            ],
+            "periodicity": [
+                3,
+                1
+            ],
+            "comment": [
+                "hc-c3-c3-os",
+                "hc-c3-c3-os"
+            ]
+        },
+        "(5, 3, 32, 31)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                0.0,
+                5.18816,
+                4.05848
+            ],
+            "phase": [
+                180.0,
+                0.0,
+                180.0
+            ],
+            "periodicity": [
+                3,
+                2,
+                1
+            ],
+            "comment": [
+                "os-c3-os-c3",
+                "os-c3-os-c3",
+                "os-c3-os-c3"
+            ]
+        },
+        "(5, 6, 7, 8)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(5, 6, 7, 22)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(5, 6, 14, 13)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(5, 6, 14, 25)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(6, 5, 3, 32)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 1.6038666666666666,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-os-X"
+        },
+        "(6, 7, 8, 9)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(6, 7, 8, 23)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(6, 14, 13, 9)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(6, 14, 13, 24)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(7, 6, 14, 13)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(7, 6, 14, 25)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(7, 8, 9, 10)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(7, 8, 9, 13)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(8, 7, 6, 14)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(8, 9, 10, 11)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 2.9288,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "o-no-ca-ca"
+        },
+        "(8, 9, 10, 12)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 2.9288,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "o-no-ca-ca"
+        },
+        "(8, 9, 13, 14)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(8, 9, 13, 24)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(9, 8, 7, 22)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(9, 13, 14, 25)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(10, 9, 8, 23)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(10, 9, 13, 14)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(10, 9, 13, 24)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(11, 10, 9, 13)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 2.9288,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "o-no-ca-ca"
+        },
+        "(12, 10, 9, 13)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 2.9288,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "o-no-ca-ca"
+        },
+        "(13, 9, 8, 23)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(14, 6, 7, 22)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(15, 0, 1, 18)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.50208,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "hc-c3-c3-hc"
+        },
+        "(15, 0, 1, 19)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.50208,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "hc-c3-c3-hc"
+        },
+        "(16, 0, 1, 18)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.50208,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "hc-c3-c3-hc"
+        },
+        "(16, 0, 1, 19)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.50208,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "hc-c3-c3-hc"
+        },
+        "(17, 0, 1, 18)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.50208,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "hc-c3-c3-hc"
+        },
+        "(17, 0, 1, 19)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.50208,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "hc-c3-c3-hc"
+        },
+        "(18, 1, 2, 20)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.50208,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "hc-c3-c3-hc"
+        },
+        "(18, 1, 2, 21)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.50208,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "hc-c3-c3-hc"
+        },
+        "(19, 1, 2, 20)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.50208,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "hc-c3-c3-hc"
+        },
+        "(19, 1, 2, 21)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.50208,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "hc-c3-c3-hc"
+        },
+        "(20, 2, 3, 32)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                0.0,
+                1.046
+            ],
+            "phase": [
+                0.0,
+                0.0
+            ],
+            "periodicity": [
+                3,
+                1
+            ],
+            "comment": [
+                "hc-c3-c3-os",
+                "hc-c3-c3-os"
+            ]
+        },
+        "(21, 2, 3, 32)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                0.0,
+                1.046
+            ],
+            "phase": [
+                0.0,
+                0.0
+            ],
+            "periodicity": [
+                3,
+                1
+            ],
+            "comment": [
+                "hc-c3-c3-os",
+                "hc-c3-c3-os"
+            ]
+        },
+        "(22, 7, 8, 23)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(24, 13, 14, 25)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 15.167,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-ca-ca-X"
+        },
+        "(26, 27, 29, 30)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for c3-ns-c -c3)"
+        },
+        "(26, 27, 29, 40)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for c3-c -ns-hn)"
+        },
+        "(27, 29, 30, 31)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c3-c3-ns-c )"
+        },
+        "(27, 29, 30, 33)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -ns-c3-c )"
+        },
+        "(27, 29, 30, 41)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -ns-c3-h1)"
+        },
+        "(28, 27, 26, 37)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                3.47272,
+                0.16736
+            ],
+            "phase": [
+                0.0,
+                180.0
+            ],
+            "periodicity": [
+                1,
+                3
+            ],
+            "comment": [
+                "o-c-c3-hc",
+                "o-c-c3-hc"
+            ]
+        },
+        "(28, 27, 26, 38)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                3.47272,
+                0.16736
+            ],
+            "phase": [
+                0.0,
+                180.0
+            ],
+            "periodicity": [
+                1,
+                3
+            ],
+            "comment": [
+                "o-c-c3-hc",
+                "o-c-c3-hc"
+            ]
+        },
+        "(28, 27, 26, 39)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                3.47272,
+                0.16736
+            ],
+            "phase": [
+                0.0,
+                180.0
+            ],
+            "periodicity": [
+                1,
+                3
+            ],
+            "comment": [
+                "o-c-c3-hc",
+                "o-c-c3-hc"
+            ]
+        },
+        "(28, 27, 29, 30)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for c3-ns-c -o )"
+        },
+        "(28, 27, 29, 40)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for o -c -ns-hn)"
+        },
+        "(29, 27, 26, 37)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(29, 27, 26, 38)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(29, 27, 26, 39)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(29, 30, 31, 32)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(29, 30, 31, 42)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(29, 30, 31, 43)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(29, 30, 33, 34)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(29, 30, 33, 35)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(30, 33, 35, 36)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for c3-c -ns-c3)"
+        },
+        "(30, 33, 35, 45)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for c3-c -ns-hn)"
+        },
+        "(31, 30, 29, 40)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c3-c3-ns-hn)"
+        },
+        "(31, 30, 33, 34)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 1.12968,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "o-c-c3-c3"
+        },
+        "(31, 30, 33, 35)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(32, 31, 30, 33)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(32, 31, 30, 41)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                0.0,
+                1.046
+            ],
+            "phase": [
+                0.0,
+                0.0
+            ],
+            "periodicity": [
+                3,
+                1
+            ],
+            "comment": [
+                "h1-c3-c3-os",
+                "h1-c3-c3-os"
+            ]
+        },
+        "(33, 30, 29, 40)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -c3-ns-hn)"
+        },
+        "(33, 30, 31, 42)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(33, 30, 31, 43)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(33, 35, 36, 46)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -ns-c3-h1)"
+        },
+        "(33, 35, 36, 47)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -ns-c3-h1)"
+        },
+        "(33, 35, 36, 48)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -ns-c3-h1)"
+        },
+        "(34, 33, 30, 41)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                3.3472000000000004,
+                0.33472
+            ],
+            "phase": [
+                0.0,
+                180.0
+            ],
+            "periodicity": [
+                1,
+                3
+            ],
+            "comment": [
+                "h1-c3-c-o",
+                "h1-c3-c-o"
+            ]
+        },
+        "(34, 33, 35, 36)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for o -c -ns-c3)"
+        },
+        "(34, 33, 35, 45)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for o -c -ns-hn)"
+        },
+        "(35, 33, 30, 41)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(40, 29, 30, 41)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for h1-c3-ns-hn)"
+        },
+        "(41, 30, 31, 42)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(41, 30, 31, 43)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(44, 57, 56, 55)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 7.1128,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-cd-na-X"
+        },
+        "(44, 57, 56, 71)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 7.1128,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-cd-na-X"
+        },
+        "(44, 57, 58, 59)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 7.1128,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-cc-na-X"
+        },
+        "(44, 57, 58, 72)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 7.1128,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-cc-na-X"
+        },
+        "(45, 35, 36, 46)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for hn-ns-c3-h1)"
+        },
+        "(45, 35, 36, 47)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for hn-ns-c3-h1)"
+        },
+        "(45, 35, 36, 48)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for hn-ns-c3-h1)"
+        },
+        "(49, 50, 52, 53)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for c3-c -ns-c3)"
+        },
+        "(49, 50, 52, 67)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for c3-c -ns-hn)"
+        },
+        "(50, 52, 53, 54)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -ns-c3-c3)"
+        },
+        "(50, 52, 53, 60)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -ns-c3-c )"
+        },
+        "(50, 52, 53, 68)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -ns-c3-h1)"
+        },
+        "(51, 50, 49, 64)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                3.47272,
+                0.16736
+            ],
+            "phase": [
+                0.0,
+                180.0
+            ],
+            "periodicity": [
+                1,
+                3
+            ],
+            "comment": [
+                "o-c-c3-hc",
+                "o-c-c3-hc"
+            ]
+        },
+        "(51, 50, 49, 65)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                3.47272,
+                0.16736
+            ],
+            "phase": [
+                0.0,
+                180.0
+            ],
+            "periodicity": [
+                1,
+                3
+            ],
+            "comment": [
+                "o-c-c3-hc",
+                "o-c-c3-hc"
+            ]
+        },
+        "(51, 50, 49, 66)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                3.47272,
+                0.16736
+            ],
+            "phase": [
+                0.0,
+                180.0
+            ],
+            "periodicity": [
+                1,
+                3
+            ],
+            "comment": [
+                "o-c-c3-hc",
+                "o-c-c3-hc"
+            ]
+        },
+        "(51, 50, 52, 53)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for o -c -ns-c3)"
+        },
+        "(51, 50, 52, 67)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for o -c -ns-hn)"
+        },
+        "(52, 50, 49, 64)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(52, 50, 49, 65)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(52, 50, 49, 66)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(52, 53, 54, 55)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(52, 53, 54, 69)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(52, 53, 54, 70)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(52, 53, 60, 61)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(52, 53, 60, 62)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(53, 54, 55, 56)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.656888,
+            "phase": 180.0,
+            "periodicity": 3,
+            "comment": "cd-cc-c3-c3"
+        },
+        "(53, 54, 55, 59)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-cc-X"
+        },
+        "(53, 60, 62, 63)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for c3-c -ns-c3)"
+        },
+        "(53, 60, 62, 74)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for c3-c -ns-hn)"
+        },
+        "(54, 53, 52, 67)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c3-c3-ns-hn)"
+        },
+        "(54, 53, 60, 61)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 1.12968,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "o-c-c3-c3"
+        },
+        "(54, 53, 60, 62)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(54, 55, 56, 57)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 16.736,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-cc-cd-X"
+        },
+        "(54, 55, 56, 71)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 16.736,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-cc-cd-X"
+        },
+        "(54, 55, 59, 58)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 19.874000000000002,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-cc-nc-X"
+        },
+        "(55, 54, 53, 60)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(55, 54, 53, 68)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(55, 56, 57, 58)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 7.1128,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-cd-na-X"
+        },
+        "(55, 59, 58, 57)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 19.874000000000002,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-cc-nc-X"
+        },
+        "(55, 59, 58, 72)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 19.874000000000002,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-cc-nc-X"
+        },
+        "(56, 55, 54, 69)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-cc-X"
+        },
+        "(56, 55, 54, 70)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-cc-X"
+        },
+        "(56, 55, 59, 58)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 19.874000000000002,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-cc-nc-X"
+        },
+        "(56, 57, 58, 59)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 7.1128,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-cc-na-X"
+        },
+        "(56, 57, 58, 72)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 7.1128,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-cc-na-X"
+        },
+        "(57, 56, 55, 59)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 16.736,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-cc-cd-X"
+        },
+        "(58, 57, 56, 71)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 7.1128,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-cd-na-X"
+        },
+        "(59, 55, 54, 69)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-cc-X"
+        },
+        "(59, 55, 54, 70)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-cc-X"
+        },
+        "(59, 55, 56, 71)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 16.736,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-cc-cd-X"
+        },
+        "(60, 53, 52, 67)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -c3-ns-hn)"
+        },
+        "(60, 53, 54, 69)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(60, 53, 54, 70)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(60, 62, 63, 75)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -ns-c3-h1)"
+        },
+        "(60, 62, 63, 76)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -ns-c3-h1)"
+        },
+        "(60, 62, 63, 77)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -ns-c3-h1)"
+        },
+        "(61, 60, 53, 68)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                3.3472000000000004,
+                0.33472
+            ],
+            "phase": [
+                0.0,
+                180.0
+            ],
+            "periodicity": [
+                1,
+                3
+            ],
+            "comment": [
+                "h1-c3-c-o",
+                "h1-c3-c-o"
+            ]
+        },
+        "(61, 60, 62, 63)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for o -c -ns-c3)"
+        },
+        "(61, 60, 62, 74)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for o -c -ns-hn)"
+        },
+        "(62, 60, 53, 68)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(67, 52, 53, 68)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for hn-ns-c3-h1)"
+        },
+        "(68, 53, 54, 69)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(68, 53, 54, 70)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(73, 85, 84, 83)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 7.447520000000001,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "ho-oh-c-c3"
+        },
+        "(73, 85, 84, 86)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                9.623199999999999,
+                7.9496
+            ],
+            "phase": [
+                180.0,
+                0.0
+            ],
+            "periodicity": [
+                2,
+                1
+            ],
+            "comment": [
+                "ho-oh-c-o",
+                "ho-oh-c-o"
+            ]
+        },
+        "(74, 62, 63, 75)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for hn-ns-c3-h1)"
+        },
+        "(74, 62, 63, 76)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for hn-ns-c3-h1)"
+        },
+        "(74, 62, 63, 77)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for hn-ns-c3-h1)"
+        },
+        "(78, 79, 81, 82)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for c3-c -ns-c3)"
+        },
+        "(78, 79, 81, 94)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for c3-c -ns-hn)"
+        },
+        "(79, 81, 82, 83)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -ns-c3-c3)"
+        },
+        "(79, 81, 82, 87)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -ns-c3-c )"
+        },
+        "(79, 81, 82, 95)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -ns-c3-h1)"
+        },
+        "(80, 79, 78, 91)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                3.47272,
+                0.16736
+            ],
+            "phase": [
+                0.0,
+                180.0
+            ],
+            "periodicity": [
+                1,
+                3
+            ],
+            "comment": [
+                "o-c-c3-hc",
+                "o-c-c3-hc"
+            ]
+        },
+        "(80, 79, 78, 92)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                3.47272,
+                0.16736
+            ],
+            "phase": [
+                0.0,
+                180.0
+            ],
+            "periodicity": [
+                1,
+                3
+            ],
+            "comment": [
+                "o-c-c3-hc",
+                "o-c-c3-hc"
+            ]
+        },
+        "(80, 79, 78, 93)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                3.47272,
+                0.16736
+            ],
+            "phase": [
+                0.0,
+                180.0
+            ],
+            "periodicity": [
+                1,
+                3
+            ],
+            "comment": [
+                "o-c-c3-hc",
+                "o-c-c3-hc"
+            ]
+        },
+        "(80, 79, 81, 82)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for o -c -ns-c3)"
+        },
+        "(80, 79, 81, 94)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for o -c -ns-hn)"
+        },
+        "(81, 79, 78, 91)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(81, 79, 78, 92)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(81, 79, 78, 93)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(81, 82, 83, 84)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(81, 82, 83, 96)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(81, 82, 83, 97)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(81, 82, 87, 88)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(81, 82, 87, 89)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(82, 83, 84, 85)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(82, 83, 84, 86)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 1.12968,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "o-c-c3-c3"
+        },
+        "(82, 87, 89, 90)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for c3-c -ns-c3)"
+        },
+        "(82, 87, 89, 98)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for c3-c -ns-hn)"
+        },
+        "(83, 82, 81, 94)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c3-c3-ns-hn)"
+        },
+        "(83, 82, 87, 88)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 1.12968,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "o-c-c3-c3"
+        },
+        "(83, 82, 87, 89)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(84, 83, 82, 87)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(84, 83, 82, 95)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(85, 84, 83, 96)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(85, 84, 83, 97)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(86, 84, 83, 96)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                3.47272,
+                0.16736
+            ],
+            "phase": [
+                0.0,
+                180.0
+            ],
+            "periodicity": [
+                1,
+                3
+            ],
+            "comment": [
+                "o-c-c3-hc",
+                "o-c-c3-hc"
+            ]
+        },
+        "(86, 84, 83, 97)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                3.47272,
+                0.16736
+            ],
+            "phase": [
+                0.0,
+                180.0
+            ],
+            "periodicity": [
+                1,
+                3
+            ],
+            "comment": [
+                "o-c-c3-hc",
+                "o-c-c3-hc"
+            ]
+        },
+        "(87, 82, 81, 94)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -c3-ns-hn)"
+        },
+        "(87, 82, 83, 96)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(87, 82, 83, 97)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(87, 89, 90, 99)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -ns-c3-h1)"
+        },
+        "(87, 89, 90, 100)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -ns-c3-h1)"
+        },
+        "(87, 89, 90, 101)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for c -ns-c3-h1)"
+        },
+        "(88, 87, 82, 95)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                3.3472000000000004,
+                0.33472
+            ],
+            "phase": [
+                0.0,
+                180.0
+            ],
+            "periodicity": [
+                1,
+                3
+            ],
+            "comment": [
+                "h1-c3-c-o",
+                "h1-c3-c-o"
+            ]
+        },
+        "(88, 87, 89, 90)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for o -c -ns-c3)"
+        },
+        "(88, 87, 89, 98)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 10.46,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-n-X(Guessed for o -c -ns-hn)"
+        },
+        "(89, 87, 82, 95)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-c3-X"
+        },
+        "(94, 81, 82, 95)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for hn-ns-c3-h1)"
+        },
+        "(95, 82, 83, 96)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(95, 82, 83, 97)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(98, 89, 90, 99)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for hn-ns-c3-h1)"
+        },
+        "(98, 89, 90, 100)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for hn-ns-c3-h1)"
+        },
+        "(98, 89, 90, 101)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.0,
+            "phase": 0.0,
+            "periodicity": 2,
+            "comment": "X-c3-n-X(Guessed for hn-ns-c3-h1)"
+        }
+    },
+    "impropers": {
+        "(6, 5, 7, 14)": {
+            "type": "Fourier",
+            "barrier": 4.6024,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "Guessed"
+        },
+        "(7, 6, 8, 22)": {
+            "type": "Fourier",
+            "barrier": 4.6024,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "ca-X-X-ha"
+        },
+        "(8, 7, 9, 23)": {
+            "type": "Fourier",
+            "barrier": 4.6024,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "ca-X-X-ha"
+        },
+        "(9, 8, 10, 13)": {
+            "type": "Fourier",
+            "barrier": 4.6024,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "Guessed"
+        },
+        "(13, 9, 14, 24)": {
+            "type": "Fourier",
+            "barrier": 4.6024,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "ca-X-X-ha"
+        },
+        "(14, 6, 13, 25)": {
+            "type": "Fourier",
+            "barrier": 4.6024,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "ca-X-X-ha"
+        },
+        "(27, 26, 29, 28)": {
+            "type": "Fourier",
+            "barrier": 43.932,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "c-X-X-o"
+        },
+        "(29, 30, 27, 40)": {
+            "type": "Fourier",
+            "barrier": 4.6024,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "Guessed"
+        },
+        "(33, 35, 30, 34)": {
+            "type": "Fourier",
+            "barrier": 43.932,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "c-X-X-o"
+        },
+        "(35, 33, 36, 45)": {
+            "type": "Fourier",
+            "barrier": 4.6024,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "Guessed"
+        },
+        "(44, 58, 56, 57)": {
+            "type": "Fourier",
+            "barrier": 4.6024,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "na-X-X-hn"
+        },
+        "(50, 52, 49, 51)": {
+            "type": "Fourier",
+            "barrier": 43.932,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "c-X-X-o"
+        },
+        "(52, 50, 53, 67)": {
+            "type": "Fourier",
+            "barrier": 4.6024,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "Guessed"
+        },
+        "(55, 54, 56, 59)": {
+            "type": "Fourier",
+            "barrier": 4.6024,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "Guessed"
+        },
+        "(56, 55, 57, 71)": {
+            "type": "Fourier",
+            "barrier": 4.6024,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "Guessed"
+        },
+        "(58, 57, 59, 72)": {
+            "type": "Fourier",
+            "barrier": 4.6024,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "Guessed"
+        },
+        "(60, 62, 53, 61)": {
+            "type": "Fourier",
+            "barrier": 43.932,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "c-X-X-o"
+        },
+        "(62, 60, 63, 74)": {
+            "type": "Fourier",
+            "barrier": 4.6024,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "Guessed"
+        },
+        "(79, 81, 78, 80)": {
+            "type": "Fourier",
+            "barrier": 43.932,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "c-X-X-o"
+        },
+        "(81, 79, 82, 94)": {
+            "type": "Fourier",
+            "barrier": 4.6024,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "Guessed"
+        },
+        "(84, 86, 83, 85)": {
+            "type": "Fourier",
+            "barrier": 4.6024,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "c-c3-o-oh"
+        },
+        "(87, 89, 82, 88)": {
+            "type": "Fourier",
+            "barrier": 43.932,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "c-X-X-o"
+        },
+        "(89, 87, 90, 98)": {
+            "type": "Fourier",
+            "barrier": 4.6024,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "Guessed"
+        }
+    }
+}

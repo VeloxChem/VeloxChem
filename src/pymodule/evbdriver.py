@@ -309,7 +309,8 @@ class EvbDriver:
                             name: str,
                             load_systems=False,
                             load_top=False,
-                            restart: str | None = None):
+                            restart_pdb: str = None,
+                            rename_data=False):
         """Load a configuration from a data folder for which the systems have already been generated, such that an FEP can be performed.
         The topology, initial positions, temperature and Lambda vector will be loaded from the data folder.
 
@@ -318,6 +319,8 @@ class EvbDriver:
             name (str): The name of the configuration. Can be arbitrary, but should be unique.
             load_systems (bool, optional): If set to true, the systems will be loaded from the xml files. Used for debugging. Defaults to False.
             load_top (bool, optional): If set to true, the topology will be loaded from the cif file. Used for debugging. Defaults to False.
+            restart_pdb (str, optional): If given, the topology and initial positions will be loaded from the given pdb file. Used for restarting an FEP. Defaults to None.
+            rename_data (bool, optional): If set to true, any csv or xtc files in the data folder will be renamed with the prefix OLD_ to avoid overwriting them during the new FEP run. Defaults to False.
         """
 
         assert_msg_critical('openmm' in sys.modules,
@@ -332,6 +335,7 @@ class EvbDriver:
         options_path = Path(data_folder) / "options.json"
         with options_path.open("r") as file:
             conf = json.load(file)
+        conf['name'] = name
 
         if self.lambda_vec != conf["Lambda"] and self.lambda_vec is not None:
             self.ostream.print_warning(
@@ -343,22 +347,22 @@ class EvbDriver:
         conf["run_folder"] = str(Path(data_folder) / "run")
 
         if load_systems:
-            sysbuilder = ReactionSystemBuilder()
+            sysbuilder = ReactionSystemBuilder(ostream=self.ostream)
             systems = sysbuilder.load_systems_from_xml(
                 str(Path(data_folder) / "run"))
             conf["systems"] = systems
         else:
             systems = []
 
-        if restart is not None:
+        if restart_pdb is not None:
             try:
-                pdb = mmapp.PDBxFile(str(Path(data_folder) / restart))
+                pdb = mmapp.PDBxFile(str(Path(data_folder) / restart_pdb))
             except Exception as e:
                 raise ValueError(
-                    f"Could not load restart pdb file {restart} from {data_folder}. Error: {e}"
+                    f"Could not load restart pdb file {restart_pdb} from {data_folder}. Error: {e}"
                 )
             self.ostream.print_info(
-                f"Loading topology and initial positions from restart pdb file {restart} from {data_folder}."
+                f"Loading topology and initial positions from restart pdb file {restart_pdb} from {data_folder}."
             )
             self.ostream.print_info(
                 "Turning on skip_initial_equil, so the FEP will start directly with sampling instead of equilibration."
@@ -383,8 +387,8 @@ class EvbDriver:
         )
 
         #If there are any csv or xtc files in the data folder
-        if any(Path(data_folder).glob("*.csv")) or any(
-                Path(data_folder).glob("*.xtc")):
+        if (any(Path(data_folder).glob("*.csv"))
+                or any(Path(data_folder).glob("*.xtc"))) and rename_data:
             self.ostream.print_warning(
                 f"Found csv or xtc files in {data_folder}. These might be from a previous FEP run using the same folder. The files will be renamed with the prefix OLD_ to avoid overwriting them during the new FEP run."
             )
@@ -927,8 +931,8 @@ class EvbDriver:
             }
         else:
             try:
-                solvent_prop_not_used = SolvationBuilder()._solvent_properties(
-                    name)
+                solvent_prop_not_used = SolvationBuilder(
+                    ostream=self.ostream)._solvent_properties(name)
                 conf = {
                     "name": name,
                     "solvent": name,
