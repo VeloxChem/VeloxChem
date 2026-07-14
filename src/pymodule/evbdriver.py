@@ -335,7 +335,23 @@ class EvbDriver:
         options_path = Path(data_folder) / "options.json"
         with options_path.open("r") as file:
             conf = json.load(file)
-        conf['name'] = name
+
+        existing_names = {
+            other_conf["name"]
+            for other_conf in self.system_confs
+        }
+        if name in existing_names:
+            i = 1
+            unique_name = f"{name}_{i}"
+            while unique_name in existing_names:
+                i += 1
+                unique_name = f"{name}_{i}"
+            self.ostream.print_warning(
+                f"Name {name} is already in use. Using {unique_name} instead.")
+            self.ostream.print_info(
+                f"The name can be edited in options.json before loading")
+            name = unique_name
+        conf["name"] = name
 
         if self.lambda_vec != conf["Lambda"] and self.lambda_vec is not None:
             self.ostream.print_warning(
@@ -499,19 +515,18 @@ class EvbDriver:
             with path.open("w") as file:
                 json.dump(options, file, indent=4)
 
-    def compute_energy_profiles(
-        self,
-        barrier,
-        free_energy,
-        lambda_sub_sample=1,
-        lambda_sub_sample_ends=False,
-        time_sub_sample=1,
-        dE_range=None,
-        alpha=None,
-        H12=None,
-        alpha_guess=None,
-        H12_guess=None,
-    ):
+    def compute_energy_profiles(self,
+                                barrier,
+                                free_energy,
+                                lambda_sub_sample=1,
+                                lambda_sub_sample_ends=False,
+                                time_sub_sample=1,
+                                dE_range=None,
+                                alpha=None,
+                                H12=None,
+                                alpha_guess=None,
+                                H12_guess=None,
+                                results_filename="results"):
         """Compute the EVB energy profiles using the FEP results, print the results and save them to an h5 file
 
         Args:
@@ -546,7 +561,7 @@ class EvbDriver:
         results = self.dataprocessing.compute(results, barrier, free_energy)
         self.results = results
         self.print_results()
-        self._save_dict_as_h5(results, f"results")
+        self._save_dict_as_h5(results, results_filename)
         self.ostream.flush()
         return self.results
 

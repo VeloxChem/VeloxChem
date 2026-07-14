@@ -1117,29 +1117,30 @@ class EvbFepDriver:
         """
         if not self._pending_windows:
             return
-        import MDAnalysis as mda
+        try:
+            from MDAnalysis.lib.formats.libmdaxdr import XTCFile as MdaXTCFile
+        except ImportError:
+            raise ImportError(
+                'Unable to import MDAnalysis. Please install MDAnalysis to use deferred recalculation mode.'
+            )
 
         windows = self._pending_windows
         total_frames = sum(w[3] for w in windows)
 
-        # Use the in-memory OpenMM topology directly (no dependency on a parsed
-        # topology file); the XTC supplies the per-frame coordinates.
-        universe = mda.Universe(
-            self.topology,
-            str(self.data_folder / "trajectory.xtc"),
-            topology_format='OPENMMTOPOLOGY',
-        )
-        # Positions/box arrive from MDAnalysis in angstrom; _apply_positions
-        # expects nanometers.
         frames = []
-        for ts in universe.trajectory[-total_frames:]:
-            pos_nm = np.array(ts.positions, dtype=np.float64) * 0.1
+        with MdaXTCFile(str(self.data_folder / "trajectory.xtc"),
+                        mode='r') as reader:
+            start = max(0, len(reader) - total_frames)
+            reader.seek(start)
             # None for a non-periodic (vacuum) trajectory; a (3,3) box for a
             # periodic (solvated) one.
-            box = ts.triclinic_dimensions
-            box_nm = None if box is None else np.array(box,
-                                                       dtype=np.float64) * 0.1
-            frames.append((pos_nm, box_nm))
+            periodic = self.topology.getPeriodicBoxVectors() is not None
+            for _ in range(total_frames):
+                frame = reader.read()
+                pos_nm = np.array(frame.x, dtype=np.float64)
+                box_nm = np.array(frame.box,
+                                  dtype=np.float64) if periodic else None
+                frames.append((pos_nm, box_nm))
 
         assert_msg_critical(
             len(frames) == total_frames,
