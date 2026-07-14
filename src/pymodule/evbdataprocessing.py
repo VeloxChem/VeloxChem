@@ -169,7 +169,7 @@ class EvbDataProcessing:
             xi = np.linspace(-10000, 10000, 20000)
             dGevb_ana, shiftxi, fepxi = self._dGevb_analytical(
                 dGfep, self.Lambda, H12, xi)
-            dGevb_smooth, barrier, free_energy, _, _ = self._get_free_energies(
+            dGevb_smooth, barrier, free_energy, _, _, _, _, _ = self._get_free_energies(
                 dGevb_ana, fitting=True)
             barrier_dif = self.barrier - barrier
             free_energy_dif = self.free_energy - free_energy
@@ -346,17 +346,13 @@ class EvbDataProcessing:
         assert_msg_critical('scipy' in sys.modules,
                             'scipy is required for EvbDataProcessing.')
 
-        if fitting:
-            try:
-                dGevb_smooth = scipy.signal.savgol_filter(
-                    dGevb, self.smooth_window_size,
-                    self.smooth_polynomial_order)
-            except ValueError:
-                self.ostream.print_warning(
-                    f"Could not apply Savitzky-Golay filter with window size {self.smooth_window_size} and polynomial order {self.smooth_polynomial_order}. Using unfiltered data for fitting."
-                )
-                dGevb_smooth = dGevb
-        else:
+        try:
+            dGevb_smooth = scipy.signal.savgol_filter(
+                dGevb, self.smooth_window_size, self.smooth_polynomial_order)
+        except ValueError:
+            self.ostream.print_warning(
+                f"Could not apply Savitzky-Golay filter with window size {self.smooth_window_size} and polynomial order {self.smooth_polynomial_order}. Using unfiltered data."
+            )
             dGevb_smooth = dGevb
 
         if fitting:
@@ -375,11 +371,13 @@ class EvbDataProcessing:
             #     min_arg = [0,-1]
 
         if len(min_arg) >= 2:
-            Erea = dGevb_smooth[min_arg[0]]
-            Epro = dGevb_smooth[min_arg[-1]]
+            erea_ind = min_arg[0]
+            epro_ind = min_arg[-1]
         else:
-            Erea = dGevb_smooth[0]
-            Epro = dGevb_smooth[-1]
+            erea_ind = 0
+            epro_ind = len(dGevb_smooth) - 1
+        Erea = dGevb_smooth[erea_ind]
+        Epro = dGevb_smooth[epro_ind]
 
         if not fitting and len(min_arg) != 2:
             self.ostream.print_warning(
@@ -387,12 +385,18 @@ class EvbDataProcessing:
             )
 
         if len(max_arg) == 1:
-            Ebar = dGevb_smooth[max_arg[0]]
+            ebar_ind = max_arg[0]
         elif len(max_arg) > 1:
-            mid_arg = max_arg[len(max_arg) // 2]
-            Ebar = dGevb_smooth[mid_arg]
+            # NOTE: picks the positional-middle candidate maximum, not
+            # necessarily the tallest one. Left as-is on purpose: this value
+            # feeds into the alpha/H12 fsolve calibration in
+            # _fit_EVB_parameters, so changing the selection rule would
+            # shift the fitted EVB parameters for every caller, not just
+            # what gets plotted.
+            ebar_ind = max_arg[len(max_arg) // 2]
         else:
-            Ebar = dGevb_smooth[len(dGevb_smooth) // 2]
+            ebar_ind = len(dGevb_smooth) // 2
+        Ebar = dGevb_smooth[ebar_ind]
 
         if not fitting and len(max_arg) != 1:
             self.ostream.print_warning(
@@ -401,9 +405,12 @@ class EvbDataProcessing:
 
         barrier = Ebar - Erea
         free_energy = Epro - Erea
-        dGevb_smooth -= Erea
+        # Avoid mutating the caller's array in place: when fitting is False,
+        # dGevb_smooth is the same object as the input dGevb.
+        dGevb_smooth = dGevb_smooth - Erea
         self.ostream.flush()
-        return dGevb_smooth, barrier, free_energy, min_arg, max_arg
+        return (dGevb_smooth, barrier, free_energy, min_arg, max_arg,
+                erea_ind, epro_ind, ebar_ind)
 
     def _get_FEP_and_EVB(self):
 
@@ -461,6 +468,9 @@ class EvbDataProcessing:
                     reaction_free_energy_discretised,
                     min_arg,
                     max_arg,
+                    _,
+                    _,
+                    _,
                 ) = self._get_free_energies(dGevb_discrete)
 
                 result.update({
@@ -489,7 +499,10 @@ class EvbDataProcessing:
                     reaction_free_energy_analytical,
                     min_arg,
                     max_arg,
-                ) = self._get_free_energies(dGevb_analytical)
+                    _,
+                    _,
+                    _,
+                ) = self._get_free_energies(dGevb_analytical, fitting=False)
 
                 result.update({
                     "analytical": {
@@ -798,18 +811,44 @@ class EvbDataProcessing:
 
             if plot_analytical:
                 if "analytical" in result.keys():
+                    EVB = result["analytical"]["EVB"]
                     ax[1].plot(
                         bin_indicators,
-                        result["analytical"]["EVB"][1:],
+                        EVB[1:],
                         label=f"{name} analytical",
                         color=colors[colorkeys[i]],
                     )
-                    # add zero-line
-                    zero_ind = result['analytical']['min_arg'][0]
+                    # Re-derive the specific minima/maximum indices actually
+                    # used for "barrier"/"free_energy" in _get_free_energies,
+                    # rather than assuming they sit at min_arg[0]/min_arg[1]/
+                    # max_arg[0] -- there can be more than 2 minima or more
+                    # than 1 maximum, in which case those fixed positions
+                    # silently point at the wrong peak (wrong marker location
+                    # and/or a label that doesn't match the marked point).
+                    min_arg = result['analytical']['min_arg']
+                    max_arg = result['analytical']['max_arg']
                     barrier = result['analytical']['barrier']
-                    barrier_ind = result['analytical']['max_arg'][0]
                     free_energy = result['analytical']['free_energy']
-                    free_ind = result['analytical']['min_arg'][1]
+
+                    if len(min_arg) >= 2:
+                        erea_ind, epro_ind = min_arg[0], min_arg[-1]
+                    else:
+                        erea_ind, epro_ind = 0, len(EVB) - 1
+                    # Mirrors _get_free_energies' selection rule exactly
+                    # (positional-middle candidate, not the tallest one).
+                    if len(max_arg) == 1:
+                        ebar_ind = max_arg[0]
+                    elif len(max_arg) > 1:
+                        ebar_ind = max_arg[len(max_arg) // 2]
+                    else:
+                        ebar_ind = len(EVB) // 2
+
+                    # EVB[1:] is what's actually plotted against
+                    # bin_indicators, so an index into EVB corresponds to
+                    # bin_indicators[index - 1].
+                    zero_ind = max(erea_ind - 1, 0)
+                    barrier_ind = max(ebar_ind - 1, 0)
+                    free_ind = max(epro_ind - 1, 0)
 
                     # mark the zero-point
                     ax[1].plot(
@@ -1077,7 +1116,8 @@ class EvbDataProcessing:
                         dp.H12,
                         bins,
                     )
-                    dGevb, _, _, min_arg, max_arg = dp._get_free_energies(dGevb)
+                    dGevb, _, _, min_arg, max_arg, _, _, _ = dp._get_free_energies(
+                        dGevb, fitting=False)
                     evbs.append(dGevb)
                     ax1[0].plot(lam, dGfep)
 
