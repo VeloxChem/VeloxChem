@@ -134,8 +134,9 @@ class EvbFepDriver:
         self.save_frames: int = 1000
         self.save_crash_pdb: bool = True
         self.save_crash_xml: bool = True
-        self.save_equil_traj: bool = False
+        self.save_equil_traj: bool = True
         self.save_equil_pdb: bool = False
+        self.save_equil_data: bool = True
         self.xml_crash_save_interval: int = 50
         self.pdb_crash_save_interval: int = 1
         self.pdb_equil_start_temp = 10  # kelvin
@@ -241,6 +242,9 @@ class EvbFepDriver:
                 "type": bool
             },
             "save_equil_pdb": {
+                "type": bool
+            },
+            "save_equil_data": {
                 "type": bool
             },
             "xml_crash_save_interval": {
@@ -795,11 +799,16 @@ class EvbFepDriver:
         self._minimize(simulation)
         if self.save_equil_traj:
             equil_traj_reporter = mmapp.XTCReporter(
-                str(self.run_folder / "equil_traj_initial.xtc"),
+                str(self.run_folder / "initial_equil_traj.xtc"),
                 self.write_step,
                 enforcePeriodicBox=True,
             )
             simulation.reporters.append(equil_traj_reporter)
+
+        if self.save_equil_data:
+            equil_data_reporter = self._get_data_reporter(
+                str(self.data_folder), 'initial_equil_data.csv')
+            simulation.reporters.append(equil_data_reporter)
         if self.pdb is None:
             barostat = self._get_barostat(simulation)
             if barostat:

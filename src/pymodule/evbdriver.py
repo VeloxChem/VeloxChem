@@ -585,11 +585,8 @@ class EvbDriver:
         dp.print_results(self.results, self.ostream)
         self.ostream.flush()
 
-    def plot_results(self,
-                     results: dict = None,
-                     file_name: str = None,
-                     **kwargs):
-        """Plot EVB results. Uses the provided dictionary first, then tries to load it from the disk, and last it uses the results attribute of this object.
+    def print_uncertainties(self, results: dict = None, file_name: str = None):
+        """Print total, per-replica/direction, and hysteresis uncertainty diagnostics. Uses the provided dictionary first, then tries to load it from the disk, and last it uses the results attribute of this object.
 
         Args:
             results (dict, optional): A dictionary with EVB results. Defaults to None.
@@ -603,8 +600,29 @@ class EvbDriver:
                 self.results = self._load_dict_from_h5(file_name)
             else:
                 results = self.results
+
         dp = EvbDataProcessing()
-        dp.plot_results(self.results, **kwargs)
+        dp.print_uncertainties(self.results, self.ostream)
+        self.ostream.flush()
+
+    def plot_results(self,
+                     results: dict = None,
+                     file_name: str = None,
+                     **kwargs):
+        """Plot EVB results. Uses the provided dictionary first, then tries to load it from the disk, and last it uses the results attribute of this object.
+
+        Args:
+            results (dict, optional): A dictionary with EVB results. Defaults to None.
+            file_name (str, optional): Filename of an h5 file containing EVB results. Defaults to None.
+        """
+        if results is None:
+            if file_name is not None:
+                results = self._load_dict_from_h5(file_name)
+            else:
+                assert self.results is not None, "No results known, and none provided"
+                results = self.results
+        dp = EvbDataProcessing()
+        dp.plot_results(results, **kwargs)
         self.ostream.flush()
 
     def _load_output_from_folders(
@@ -719,6 +737,18 @@ class EvbDriver:
         E_m_pes = E_data[5, sub_indices]
         # E_m_int = E_data[6, sub_indices]
 
+        # Columns 6/7 (replica, direction) were added later; older
+        # Energies.csv files (7 columns, e.g. canned test fixtures) don't
+        # have them, so only extract when present. direction: 0 = forward
+        # sweep (l: 0 -> 1), 1 = backward sweep (l: 1 -> 0), see
+        # EvbFepDriver.run_replicas.
+        if E_data.shape[0] >= 8:
+            replica_frame = E_data[6, sub_indices].astype(int)
+            direction_frame = E_data[7, sub_indices].astype(int)
+        else:
+            replica_frame = None
+            direction_frame = None
+
         step, Ep, Ek, Temp, Vol, Dens = np.loadtxt(
             data_file,
             skiprows=1,
@@ -739,6 +769,12 @@ class EvbDriver:
             "options": options,
             "Temp_set": Temp_set,
         }
+
+        if replica_frame is not None:
+            specific_result.update({
+                "Replica_frame": replica_frame,
+                "Direction_frame": direction_frame,
+            })
 
         if fg_file is not None and Path(fg_file).is_file():
             fg_data = np.loadtxt(fg_file, skiprows=1, delimiter=',').T
@@ -796,6 +832,11 @@ class EvbDriver:
                         data[k] = v[()]
                     else:
                         data[k] = v
+                # Values that couldn't be stored natively (see
+                # _save_dict_as_h5) are saved as group attrs instead of
+                # datasets/subgroups; without this they'd silently disappear.
+                for k, v in group.attrs.items():
+                    data[k] = None if v == 'None' else v
                 return data
 
             data = load_group(f)
@@ -804,53 +845,92 @@ class EvbDriver:
     def _save_dict_as_h5(self, data: dict, file_name: str, overwrite=True):
         """Save the provided dictionary to an h5 file
 
+        Any value that can't be represented natively in HDF5 (heterogeneous
+        lists, unsupported object attributes, circular references, etc.) is
+        stored as a ``repr()`` string attribute instead of aborting the save.
+
         Args:
             results (dict): Dictionary to be saved.
+            file_name (str): Name (without extension) of the h5 file to write.
+            overwrite (bool): If False and the target file already exists, raise
+                instead of silently overwriting it.
         """
         cwd = Path.cwd()
 
         file_path = str(cwd / f"{file_name}.h5")
 
+        if not overwrite and Path(file_path).exists():
+            raise FileExistsError(
+                f"{file_path} already exists and overwrite=False")
+
+        # Tracks ids of custom objects currently being recursed into, to avoid
+        # infinite recursion on circular references (e.g. an object holding a
+        # reference back to something already being saved).
+        seen_object_ids = set()
+
+        def sanitize_key(k):
+            # '/' is the HDF5 path separator: an unsanitized key would silently
+            # create nested groups (or collide with an existing dataset).
+            k = str(k)
+            return k.replace('/', '_') if '/' in k else k
+
+        def store_as_repr(group, key, value, reason):
+            group.attrs[key] = repr(value)
+            self.ostream.print_warning(
+                f"Key '{key}': {reason}, stored {type(value).__name__} as string repr"
+            )
+
+        def save_group(data, group):
+            for raw_k, v in data.items():
+                k = sanitize_key(raw_k)
+                if k == 'pdb_active_res':
+                    continue
+                try:
+                    save_item(k, v, group)
+                except Exception as e:
+                    store_as_repr(group, k, v,
+                                   f"failed with {type(e).__name__}: {e}")
+
+        def save_item(k, v, group):
+            if v is None:
+                group.attrs[k] = 'None'
+            elif isinstance(v, dict):
+                # Recurse into nested dicts as HDF5 subgroups
+                subgroup = group.create_group(k)
+                save_group(v, subgroup)
+            elif isinstance(v, (np.ndarray, list, set, tuple)):
+                # sets/tuples are converted to list first; np.array handles both
+                arr = np.array(list(v) if isinstance(v, (set, tuple)) else v)
+                if arr.dtype == object:
+                    # Heterogeneous/ragged data (e.g. a list of dicts or custom
+                    # objects) has no native HDF5 representation.
+                    store_as_repr(group, k, v,
+                                  "no native HDF5 representation for object dtype")
+                else:
+                    group.create_dataset(k, data=arr)
+            elif isinstance(v, (bool, int, float, str, bytes, np.generic)):
+                # np.generic covers numpy scalars (np.float64, np.int32, etc.)
+                group[k] = v
+            elif hasattr(v, '__dict__'):
+                # Custom objects: recurse into their attributes as a subgroup
+                if id(v) in seen_object_ids:
+                    store_as_repr(group, k, v, "circular reference detected")
+                    return
+                seen_object_ids.add(id(v))
+                try:
+                    subgroup = group.create_group(k)
+                    save_group(vars(v), subgroup)
+                finally:
+                    seen_object_ids.discard(id(v))
+            else:
+                # Last resort: let h5py try; fall back to repr string if it fails
+                try:
+                    group[k] = v
+                except TypeError:
+                    store_as_repr(group, k, v, "unsupported type for h5py")
+
         with h5py.File(file_path, "w") as file:
             self.ostream.print_info(f"Saving results to {file_path}")
-
-            def save_group(data, group):
-                for k, v in data.items():
-                    if isinstance(v, dict):
-                        # Recurse into nested dicts as HDF5 subgroups
-                        subgroup = group.create_group(k)
-                        save_group(v, subgroup)
-                    elif isinstance(v, (np.ndarray, list, set)):
-                        # # sets are unordered so convert to list first; np.array handles both
-                        # self.ostream.print_info(f"key {k} with type {type(k)}")
-                        # self.ostream.print_info(
-                        #     f"value {v} with type {type(v)}")
-                        # self.ostream.flush()
-
-                        if k == 'pdb_active_res':
-                            continue
-                        group.create_dataset(
-                            k,
-                            data=np.array(list(v) if isinstance(v, set) else v))
-
-                    elif isinstance(v,
-                                    (bool, int, float, str, bytes, np.generic)):
-                        # np.generic covers numpy scalars (np.float64, np.int32, etc.)
-                        group[k] = v
-                    elif hasattr(v, '__dict__'):
-                        # Custom objects: recurse into their attributes as a subgroup
-                        subgroup = group.create_group(k)
-                        save_group(vars(v), subgroup)
-                    else:
-                        # Last resort: let h5py try; fall back to repr string if it fails
-                        try:
-                            group[k] = v
-                        except TypeError:
-                            group.attrs[k] = repr(v)
-                            self.ostream.print_warning(
-                                f"Key '{k}': stored {type(v).__name__} as string repr"
-                            )
-
             save_group(data, file)
 
     def default_system_configurations(self, name: str) -> dict:

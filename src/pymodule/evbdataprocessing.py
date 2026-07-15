@@ -99,6 +99,28 @@ class EvbDataProcessing:
 
         self.calculate_discrete = True
         self.calculate_analytical = True
+        # Per-(replica, direction) FEP/EVB curves + uncertainty, used for
+        # hysteresis analysis and per-replica plotting. Only computed when
+        # the loaded results carry "Replica_frame"/"Direction_frame" (see
+        # EvbDriver._load_output_files). Set to False to skip -- this reruns
+        # BAR/MBAR per replica/direction, so it can be expensive for runs
+        # with many replicas.
+        self.calculate_per_replica = True
+        # Also compute each replica's "both" (forward+backward pooled)
+        # curve, on top of the forward-only/backward-only curves hysteresis
+        # needs. Set to False to skip it and cut per-replica work by ~1/3
+        # when only the hysteresis check matters, not the per-replica
+        # "both" curve used by print_uncertainties/plot_evb_replicas.
+        self.calculate_per_replica_pooled = True
+        # Estimator used for the per-(replica, direction) subsets in
+        # _calculate_per_replica_results. None (default) reuses whatever
+        # fep_estimator is set to. These per-replica curves are primarily a
+        # diagnostic (uncertainty/hysteresis), so forcing "bar" here can be
+        # much faster than "mbar" when fep_estimator="mbar"
+        self.per_replica_fep_estimator = 'bar'
+
+        # Warm-start cache for _calculate_dGfep_mbar
+        self._mbar_f_k_warm_start = None
         self.smooth_window_size = 10
         self.smooth_polynomial_order = 3
         self.coordinate_bins = np.array([])
@@ -160,13 +182,14 @@ class EvbDataProcessing:
         E2_ref = self.results[reference_key]["E2_pes"]
         Temp_set = self.results[reference_key]["Temp_set"]
 
+        xi = np.linspace(-10000, 10000, 20000)
+
         def get_barrier_and_free_energy_difference(x):
             alpha, H12 = x
 
             E2_shifted, V, dE, Eg = self._calculate_Eg_V_dE(
                 E1_ref, E2_ref, alpha, H12)
-            dGfep = self._calculate_dGfep(E1_ref, E2_shifted, Temp_set)
-            xi = np.linspace(-10000, 10000, 20000)
+            dGfep, _ = self._calculate_dGfep(E1_ref, E2_shifted, Temp_set)
             dGevb_ana, shiftxi, fepxi = self._dGevb_analytical(
                 dGfep, self.Lambda, H12, xi)
             dGevb_smooth, barrier, free_energy, _, _, _, _, _ = self._get_free_energies(
@@ -178,7 +201,8 @@ class EvbDataProcessing:
 
         alpha, H12 = scipy.optimize.fsolve(
             get_barrier_and_free_energy_difference,
-            [self.alpha_guess, self.H12_guess])
+            [self.alpha_guess, self.H12_guess],
+            xtol=self.tol)
         self.ostream.print_info(f"Fitted alpha: {alpha}, H12: {H12}")
         return alpha, H12
 
@@ -190,22 +214,25 @@ class EvbDataProcessing:
             (E1 + E2_shifted) - np.sqrt((E1 - E2_shifted)**2 + 4 * H12**2))
         return E2_shifted, V, dE, Eg
 
-    def _calculate_dGfep(self, E1, E2_shifted, Temp_set):
+    def _calculate_dGfep(self, E1, E2_shifted, Temp_set, lambda_indices=None):
         assert_msg_critical(
             self.fep_estimator in ("bar", "mbar"),
             f"Unknown fep_estimator '{self.fep_estimator}'. Expected 'bar' or 'mbar'."
         )
         if self.fep_estimator == "mbar":
-            return self._calculate_dGfep_mbar(E1, E2_shifted, Temp_set)
-        return self._calculate_dGfep_bar(E1 - E2_shifted, Temp_set)
+            return self._calculate_dGfep_mbar(E1, E2_shifted, Temp_set,
+                                              lambda_indices)
+        return self._calculate_dGfep_bar(E1 - E2_shifted, Temp_set,
+                                         lambda_indices)
 
-    def _calculate_dGfep_bar(self, dE, Temp_set):
+    def _calculate_dGfep_bar(self, dE, Temp_set, lambda_indices=None):
 
         assert_msg_critical('pymbar' in sys.modules,
                             'pymbar is required for EvbDataProcessing.')
 
-        de_lambda = self._bin(dE)
+        de_lambda = self._bin(dE, lambda_indices)
         dG_bar = [0.0]
+        ddG_bar = [0.0]
         for i, l in enumerate(self.Lambda[:-1]):
             delta_lambda = self.Lambda[i + 1] - l
 
@@ -214,27 +241,40 @@ class EvbDataProcessing:
                 i + 1]
 
             try:
-                dF = pymbar.other_estimators.bar(forward_energy,
-                                                 -backward_energy,
-                                                 False)["Delta_f"]
+                bar_result = pymbar.other_estimators.bar(
+                    forward_energy, -backward_energy, False)
+                dF = bar_result["Delta_f"]
+                ddF = bar_result["dDelta_f"]
                 dg_bar = -1 / self._beta(Temp_set) * dF
+                ddg_bar = 1 / self._beta(Temp_set) * ddF
             except Exception as e:
                 print_exception_if_debug()
                 self.ostream.print_warning(
                     f"Error {e} encountered during BAR calculation, setting dG_bar to 0 for lambda {l}"
                 )
                 dg_bar = 0
+                ddg_bar = 0
 
             dG_bar.append(dG_bar[-1] + dg_bar)
+            # Adjacent-window BAR estimates are independent, so their
+            # variances add along the cumulative sum.
+            ddG_bar.append(np.sqrt(ddG_bar[-1]**2 + ddg_bar**2))
 
-        return dG_bar
+        return dG_bar, ddG_bar
 
-    def _calculate_dGfep_mbar(self, E1, E2_shifted, Temp_set):
+    def _calculate_dGfep_mbar(self,
+                              E1,
+                              E2_shifted,
+                              Temp_set,
+                              lambda_indices=None):
         assert_msg_critical('pymbar' in sys.modules,
                             'pymbar is required for EvbDataProcessing.')
 
+        if lambda_indices is None:
+            lambda_indices = self.Lambda_indices
+
         beta = self._beta(Temp_set)
-        Lambda_indices = np.asarray(self.Lambda_indices)
+        Lambda_indices = np.asarray(lambda_indices)
         Lambda_arr = np.asarray(self.Lambda)
         K = len(Lambda_arr)
 
@@ -260,17 +300,49 @@ class EvbDataProcessing:
         # Going straight to the 'robust' protocol (adaptive, then L-BFGS-B)
         # skips the doomed-to-fail hybr attempt: same converged result,
         # faster, and no spurious "failed to reach a solution" warning.
-        mbar = pymbar.MBAR(u_kn, N_k, solver_protocol='robust')
+        initial_f_k = self._mbar_f_k_warm_start
+        if initial_f_k is not None and len(initial_f_k) != K:
+            # Mismatched state count (different Lambda ladder / caller) --
+            # not a valid warm start, fall back to MBAR's own default.
+            initial_f_k = None
+        mbar = pymbar.MBAR(u_kn,
+                           N_k,
+                           solver_protocol='robust',
+                           initial_f_k=initial_f_k)
         mbar_results = mbar.compute_free_energy_differences()
+        # Cache for the next call (e.g. the next alpha tried during fitting,
+        # or the next replica/configuration) -- only changes how fast the
+        # solver converges, not what it converges to.
+        self._mbar_f_k_warm_start = mbar.f_k
         dGfep = (mbar_results['Delta_f'][0, :] / beta).tolist()
-        return dGfep
+        ddGfep = (mbar_results['dDelta_f'][0, :] / beta).tolist()
+        return dGfep, ddGfep
 
-    def _bin(self, data):
-        binned_data = [[] for _ in range(np.max(self.Lambda_indices) + 1)]
-        for i, li in enumerate(self.Lambda_indices):
-            binned_data[li].append(data[i])
+    def _bin(self, data, lambda_indices=None):
+        if lambda_indices is None:
+            lambda_indices = self.Lambda_indices
+        lambda_indices = np.asarray(lambda_indices)
+        data = np.asarray(data)
+        n_bins = np.max(lambda_indices) + 1
 
-        binned_data = np.array(binned_data)
+        # Vectorized equivalent of "for i, li in enumerate(lambda_indices):
+        # binned_data[li].append(data[i])" -- a stable sort groups frames by
+        # bin while preserving each bin's original relative frame order, so
+        # this produces the exact same per-bin grouping, just without a
+        # pure-Python per-frame loop.
+        order = np.argsort(lambda_indices, kind="stable")
+        sorted_data = data[order]
+        sorted_indices = lambda_indices[order]
+        counts = np.bincount(sorted_indices, minlength=n_bins)
+
+        if np.all(counts == counts[0]):
+            # Equal-sized bins (the common case): reshape directly into a
+            # dense 2D array.
+            binned_data = sorted_data.reshape(n_bins, counts[0])
+        else:
+            split_points = np.cumsum(counts)[:-1]
+            binned_data = np.array(np.split(sorted_data, split_points),
+                                   dtype=object)
         return binned_data
 
     @staticmethod
@@ -289,6 +361,39 @@ class EvbDataProcessing:
         fepxi = np.interp(arg(xi), Lambda, dGfep)
         dGevb = shiftxi + fepxi
         return dGevb, shiftxi, fepxi
+
+    @staticmethod
+    def _dGevb_analytical_uncertainty(ddGfep, Lambda, H12, xi):
+        """Propagate per-window dGfep uncertainty through the same
+        interpolation _dGevb_analytical uses to build the EVB curve.
+
+        shift(xi) is a deterministic function of H12 alone, so only the
+        interpolated FEP term carries sampling uncertainty. Linear
+        interpolation of the uncertainty is an approximation: it ignores
+        correlation between neighbouring lambda windows.
+        """
+
+        def R(de):
+            return np.sqrt(de**2 + 4 * H12**2)
+
+        def arg(xi):
+            return 0.5 * (1 + xi / R(xi))
+
+        return np.interp(arg(xi), Lambda, ddGfep)
+
+    @staticmethod
+    def _propagate_free_energy_uncertainty(dGevb_unc, erea_ind, ebar_ind,
+                                           epro_ind):
+        """Combine pointwise EVB-curve uncertainty at the reactant/barrier/
+        product indices in quadrature into barrier/free_energy uncertainty.
+
+        Approximate: ignores correlation between curve points (they share
+        the same underlying dGfep uncertainty they were interpolated from).
+        """
+        barrier_unc = np.sqrt(dGevb_unc[ebar_ind]**2 + dGevb_unc[erea_ind]**2)
+        free_energy_unc = np.sqrt(dGevb_unc[epro_ind]**2 +
+                                  dGevb_unc[erea_ind]**2)
+        return barrier_unc, free_energy_unc
 
     def _dGevb_discretised(self, dGfep, Eg, V, dE, Temp_set):
         V = np.array(V)
@@ -409,8 +514,8 @@ class EvbDataProcessing:
         # dGevb_smooth is the same object as the input dGevb.
         dGevb_smooth = dGevb_smooth - Erea
         self.ostream.flush()
-        return (dGevb_smooth, barrier, free_energy, min_arg, max_arg,
-                erea_ind, epro_ind, ebar_ind)
+        return (dGevb_smooth, barrier, free_energy, min_arg, max_arg, erea_ind,
+                epro_ind, ebar_ind)
 
     def _get_FEP_and_EVB(self):
 
@@ -446,7 +551,7 @@ class EvbDataProcessing:
             )
             self.ostream.flush()
 
-        for result in self.results.values():
+        for name, result in self.results.items():
             Temp_set = result["Temp_set"]
             # E2_shifted isn't persisted on the result dict (would otherwise
             # change its key set and break the h5-reference comparison test),
@@ -454,9 +559,9 @@ class EvbDataProcessing:
             E1 = result["E1_pes"]
             E2_shifted = result["E2_pes"] + self.alpha
 
-            dGfep = self._calculate_dGfep(E1, E2_shifted, Temp_set)
+            dGfep, dGfep_unc = self._calculate_dGfep(E1, E2_shifted, Temp_set)
 
-            result.update({"dGfep": dGfep})
+            result.update({"dGfep": dGfep, "dGfep_unc": dGfep_unc})
             if self.calculate_discrete:
                 dGevb_discrete, pns, dGcor = self._dGevb_discretised(
                     dGfep, result["Eg"], result["V"], result["dE"],
@@ -486,8 +591,18 @@ class EvbDataProcessing:
                 })
 
             if self.calculate_analytical:
+                self.ostream.print_info(
+                    f"Calculating analytical EVB curve for configuration {name}"
+                )
+                self.ostream.flush()
                 dGevb_analytical, shift, fepxi = self._dGevb_analytical(
                     result["dGfep"],
+                    self.Lambda,
+                    self.H12,
+                    self.coordinate_bins,
+                )
+                dGevb_analytical_unc = self._dGevb_analytical_uncertainty(
+                    dGfep_unc,
                     self.Lambda,
                     self.H12,
                     self.coordinate_bins,
@@ -499,22 +614,297 @@ class EvbDataProcessing:
                     reaction_free_energy_analytical,
                     min_arg,
                     max_arg,
-                    _,
-                    _,
-                    _,
+                    erea_ind,
+                    epro_ind,
+                    ebar_ind,
                 ) = self._get_free_energies(dGevb_analytical, fitting=False)
+
+                barrier_analytical_unc, free_energy_analytical_unc = (
+                    self._propagate_free_energy_uncertainty(
+                        dGevb_analytical_unc, erea_ind, ebar_ind, epro_ind))
 
                 result.update({
                     "analytical": {
                         "EVB": dGevb_analytical,
+                        "EVB_unc": dGevb_analytical_unc,
                         "shift": shift,
                         "fep": fepxi,
                         "free_energy": reaction_free_energy_analytical,
+                        "free_energy_unc": free_energy_analytical_unc,
                         "barrier": barrier_analytical,
+                        "barrier_unc": barrier_analytical_unc,
                         "min_arg": min_arg,
                         "max_arg": max_arg,
                     }
                 })
+
+            if self.calculate_per_replica and result.get(
+                    "Replica_frame") is not None:
+                self.ostream.print_info(
+                    f"Calculating per-replica FEP/EVB curves for configuration {name}"
+                )
+                self.ostream.flush()
+                self._calculate_per_replica_results(name, result, E1,
+                                                    E2_shifted, Temp_set)
+                self.ostream.print_info(
+                    f"Calculating per-replica hysteresis for configuration {name}"
+                )
+                self.ostream.flush()
+                self._calculate_hysteresis(result)
+                self._calculate_hysterisis_data(result)
+                self._calculate_replica_average(result)
+
+    def _calculate_replica_average(self, result):
+        """Mean and standard error of the mean of barrier/free_energy across replicas.
+
+        Uses each replica's "both" (forward+backward pooled) analytical
+        estimate from _calculate_per_replica_results as that replica's single
+        independent data point, so the resulting mean/SEM captures
+        replica-to-replica variability -- a different (and often more
+        conservative) uncertainty source than the internal BAR/MBAR
+        statistical error reported per curve, since it also picks up
+        replica-to-replica effects like slow correlated fluctuations that a
+        single replica's own BAR/MBAR estimate can't see.
+
+        Requires calculate_per_replica_pooled=True (the default): with it off,
+        no replica has a "both" curve to average, so this is skipped.
+        """
+        by_replica = result.get('replicas')
+        if not by_replica:
+            return
+
+        barriers = []
+        free_energies = []
+        for directions in by_replica.values():
+            if "both" not in directions:
+                continue
+            barriers.append(directions["both"]["analytical"]["barrier"])
+            free_energies.append(
+                directions["both"]["analytical"]["free_energy"])
+
+        if not barriers:
+            return
+
+        barriers = np.asarray(barriers)
+        free_energies = np.asarray(free_energies)
+        n = len(barriers)
+        # SEM needs at least 2 replicas to estimate a spread; report NaN
+        # rather than a misleading 0.0 when there's only one.
+        if n > 1:
+            barrier_sem = float(np.std(barriers, ddof=1) / np.sqrt(n))
+            free_energy_sem = float(np.std(free_energies, ddof=1) / np.sqrt(n))
+        else:
+            barrier_sem = float("nan")
+            free_energy_sem = float("nan")
+
+        result.update({
+            "replica_average": {
+                "n_replicas": n,
+                "barrier_mean": float(np.mean(barriers)),
+                "barrier_sem": barrier_sem,
+                "free_energy_mean": float(np.mean(free_energies)),
+                "free_energy_sem": free_energy_sem,
+            }
+        })
+
+    def _calculate_hysterisis_data(self, result):
+        """Calculate the average, median, min max and std of the hysteresis
+        data for each configuration"""
+
+        by_replica = result.get('replicas')
+        if not by_replica or not any('hysteresis' in directions
+                                     for directions in by_replica.values()):
+            return
+
+        metrics = (
+            "max_abs_dGfep_delta",
+            "mean_abs_dGfep_delta",
+            "endpoint_dGfep_delta",
+            "barrier_delta",
+            "free_energy_delta",
+        )
+
+        values = {metric: [] for metric in metrics}
+        replica_ids = {metric: [] for metric in metrics}
+        for replica, directions in by_replica.items():
+            hysteresis = directions.get("hysteresis")
+            if not hysteresis:
+                continue
+            for metric in metrics:
+                values[metric].append(hysteresis[metric])
+                replica_ids[metric].append(replica)
+
+        hysteresis_summary = {}
+        for metric, data in values.items():
+            data = np.asarray(data)
+            metric_replicas = replica_ids[metric]
+            median = float(np.median(data))
+            # The median of an even-sized sample isn't necessarily any single
+            # replica's value, so report whichever replica sits closest to it.
+            median_replica = metric_replicas[int(
+                np.argmin(np.abs(data - median)))]
+            hysteresis_summary[metric] = {
+                "mean":
+                float(np.mean(data)),
+                "median":
+                median,
+                "median_replica":
+                median_replica,
+                "min":
+                float(np.min(data)),
+                "min_replica":
+                metric_replicas[int(np.argmin(data))],
+                "max":
+                float(np.max(data)),
+                "max_replica":
+                metric_replicas[int(np.argmax(data))],
+                # std needs at least 2 replicas to estimate a spread; report
+                # NaN rather than a misleading 0.0 when there's only one.
+                "std":
+                float(np.std(data, ddof=1)) if len(data) > 1 else float("nan"),
+            }
+
+        result.update({"hysteresis_summary": hysteresis_summary})
+
+    def _calculate_hysteresis(self, result):
+        """Per-replica forward-vs-backward reversibility check.
+
+        Compares the forward-only and backward-only dGfep/EVB curves from
+        _calculate_per_replica_results. Both are independently anchored to 0
+        at lambda=0 (same BAR/MBAR convention as the pooled curve), so if
+        sampling were perfectly reversible the forward and backward curves
+        would coincide at every lambda; the gap between them is the
+        hysteresis.
+        """
+        replicas = result.get('replicas')
+        if not replicas:
+            self.ostream.print_info(
+                "No per-replica forward/backward curves available, skipping hysteresis analysis"
+            )
+            return
+
+        for directions in replicas.values():
+            if "forward" not in directions or "backward" not in directions:
+                continue
+
+            dGfep_fwd = np.asarray(directions["forward"]["dGfep"])
+            dGfep_bwd = np.asarray(directions["backward"]["dGfep"])
+            delta = dGfep_fwd - dGfep_bwd
+
+            barrier_fwd = directions["forward"]["analytical"]["barrier"]
+            barrier_bwd = directions["backward"]["analytical"]["barrier"]
+            free_energy_fwd = directions["forward"]["analytical"]["free_energy"]
+            free_energy_bwd = directions["backward"]["analytical"][
+                "free_energy"]
+
+            directions["hysteresis"] = {
+                "dGfep_delta": delta,
+                "max_abs_dGfep_delta": float(np.max(np.abs(delta))),
+                "mean_abs_dGfep_delta": float(np.mean(np.abs(delta))),
+                # Disagreement in the overall (lambda=0 -> 1) free energy
+                # estimate between the forward-only and backward-only frames.
+                "endpoint_dGfep_delta": float(delta[-1]),
+                "barrier_delta": barrier_fwd - barrier_bwd,
+                "free_energy_delta": free_energy_fwd - free_energy_bwd,
+            }
+
+    def _calculate_per_replica_results(self, name, result, E1, E2_shifted,
+                                       Temp_set):
+        """Per-(replica, direction) FEP/EVB curves + uncertainty.
+
+        Feeds the hysteresis analysis (_calculate_hysteresis) and the
+        per-replica plots (plot_evb_replicas / plot_fep_hysteresis). Each
+        subset reruns the same BAR/MBAR estimator used for the pooled curve,
+        restricted to that subset's frames -- every frame carries both
+        end-state energies regardless of which lambda window it was sampled
+        from, so this is a frame-subsetting exercise, not a different
+        estimator.
+        """
+        replica_frame = np.asarray(result["Replica_frame"])
+        direction_frame = np.asarray(result["Direction_frame"])
+        lambda_indices = np.asarray(self.Lambda_indices)
+
+        subsets = [("forward", 0), ("backward", 1)]
+        if self.calculate_per_replica_pooled:
+            subsets.append(("both", None))
+
+        # These per-replica curves are a diagnostic (uncertainty/hysteresis),
+        # not the main reported free energy, so allow forcing the cheaper
+        # BAR estimator here even when fep_estimator="mbar" is used for the
+        # pooled curve -- MBAR's joint multistate solve is otherwise repeated
+        # from scratch for every one of the (up to) 3 * n_replicas subsets.
+        saved_estimator = self.fep_estimator
+        if self.per_replica_fep_estimator is not None:
+            self.fep_estimator = self.per_replica_fep_estimator
+
+        try:
+            by_replica = {}
+            for replica in sorted(set(replica_frame.tolist())):
+                by_replica[replica] = {}
+                for label, direction in subsets:
+                    if direction is None:
+                        mask = replica_frame == replica
+                    else:
+                        mask = (replica_frame == replica) & (direction_frame
+                                                             == direction)
+
+                    if not np.any(mask):
+                        continue
+
+                    try:
+                        dGfep_sub, dGfep_unc_sub = (self._calculate_dGfep(
+                            E1[mask], E2_shifted[mask], Temp_set,
+                            lambda_indices[mask]))
+
+                        dGevb_sub, _, _ = self._dGevb_analytical(
+                            dGfep_sub, self.Lambda, self.H12,
+                            self.coordinate_bins)
+                        dGevb_unc_sub = self._dGevb_analytical_uncertainty(
+                            dGfep_unc_sub, self.Lambda, self.H12,
+                            self.coordinate_bins)
+
+                        (
+                            dGevb_sub,
+                            barrier_sub,
+                            free_energy_sub,
+                            min_arg_sub,
+                            max_arg_sub,
+                            erea_ind_sub,
+                            epro_ind_sub,
+                            ebar_ind_sub,
+                        ) = self._get_free_energies(dGevb_sub, fitting=False)
+
+                        barrier_unc_sub, free_energy_unc_sub = (
+                            self._propagate_free_energy_uncertainty(
+                                dGevb_unc_sub, erea_ind_sub, ebar_ind_sub,
+                                epro_ind_sub))
+                    except Exception as e:
+                        print_exception_if_debug()
+                        self.ostream.print_warning(
+                            f"Error {e} encountered while processing replica "
+                            f"{replica} ({label}) of configuration '{name}', skipping"
+                        )
+                        continue
+
+                    by_replica[replica][label] = {
+                        "dGfep": dGfep_sub,
+                        "dGfep_unc": dGfep_unc_sub,
+                        "analytical": {
+                            "EVB": dGevb_sub,
+                            "EVB_unc": dGevb_unc_sub,
+                            "barrier": barrier_sub,
+                            "barrier_unc": barrier_unc_sub,
+                            "free_energy": free_energy_sub,
+                            "free_energy_unc": free_energy_unc_sub,
+                            "min_arg": min_arg_sub,
+                            "max_arg": max_arg_sub,
+                        },
+                    }
+        finally:
+            self.fep_estimator = saved_estimator
+
+        result.update({'replicas': by_replica})
+        self.ostream.flush()
 
     def _calculate_coordinate_bins(self, Lambda_indices, results, bin_size,
                                    dens_threshold):
@@ -624,8 +1014,8 @@ class EvbDataProcessing:
                 E2 = E2_fg[i]
                 E2_shifted, V, dE, Eg = self._calculate_Eg_V_dE(
                     E1, E2, self.alpha, self.H12)
-                dGfep = self._calculate_dGfep(E1, E2_shifted,
-                                              result["Temp_set"])
+                dGfep, _ = self._calculate_dGfep(E1, E2_shifted,
+                                                 result["Temp_set"])
                 dGevb, shift, fepxi = self._dGevb_analytical(
                     dGfep, self.Lambda, self.H12, self.coordinate_bins)
                 dGfep_fg.append(dGfep)
@@ -635,26 +1025,165 @@ class EvbDataProcessing:
             result.update({"dGevb_fg": np.array(dGevb_fg)})
 
     @staticmethod
-    def print_results(results, ostream):
+    def print_results(results, ostream=None):
+        if ostream == None:
+            ostream = OutputStream(sys.stdout)
 
-        # ostream.print_info(
-        #     f"{'Discrete':<30} {'Barrier (kJ/mol)':>20} {'Free Energy (kJ/mol)':>20}"
-        # )
-        # for name, result in results["configuration_results"].items():
-        #     if "discrete" in result.keys():
-        #         ostream.print_info(
-        #             f"{name:<30} {result['discrete']['barrier']:20.2f} {result['discrete']['free_energy']:20.2f}"
-        #         )
-
-        # ostream.print_info("\n")
         ostream.print_info(
-            f"{'Analytical':<30} {'Barrier (kJ/mol)':>20} {'Free Energy (kJ/mol)':>20}"
+            f"{'Analytical':<30} {'Barrier (kJ/mol)':>25} {'Free Energy (kJ/mol)':>25}"
         )
         for name, result in results["configuration_results"].items():
             if "analytical" in result.keys():
+                analytical = result["analytical"]
+                barrier_str = f"{analytical['barrier']:.2f}"
+                if "barrier_unc" in analytical:
+                    barrier_str += f" +/- {analytical['barrier_unc']:.2f}"
+                free_energy_str = f"{analytical['free_energy']:.2f}"
+                if "free_energy_unc" in analytical:
+                    free_energy_str += f" +/- {analytical['free_energy_unc']:.2f}"
                 ostream.print_info(
-                    f"{name:<30} {result['analytical']['barrier']:20.2f} {result['analytical']['free_energy']:20.2f}"
+                    f"{name:<30} {barrier_str:>25} {free_energy_str:>25}")
+
+        ostream.flush()
+
+    @staticmethod
+    def print_uncertainties(results, ostream=None):
+        """Print total uncertainty, per-replica/direction uncertainty, and hysteresis diagnostics.
+
+        The total-uncertainty section only needs the pooled dGfep_unc /
+        analytical uncertainty, always present once EvbDataProcessing.compute
+        has run. The per-replica and hysteresis sections additionally
+        require EvbDataProcessing.calculate_per_replica = True (the default)
+        and Replica_frame/Direction_frame to have been loaded (see
+        EvbDriver._load_output_files) -- if neither is available this prints
+        a note and returns after the total-uncertainty section.
+
+        Args:
+            results (dict): EVB results, as produced by EvbDataProcessing.compute.
+            ostream (OutputStream): output stream to print to.
+        """
+        if ostream == None:
+            ostream = OutputStream(sys.stdout)
+
+        ostream.print_header(
+            "Total uncertainty (pooled over all replicas/directions)")
+        ostream.print_info(
+            f"{'Configuration':<20} {'Barrier (kJ/mol)':>25} {'Free Energy (kJ/mol)':>25} {'dGfep(l=1) unc':>18}"
+        )
+        for name, result in results["configuration_results"].items():
+            if "analytical" not in result:
+                continue
+            analytical = result["analytical"]
+            barrier_str = f"{analytical['barrier']:.2f} +/- {analytical.get('barrier_unc', float('nan')):.2f}"
+            free_energy_str = f"{analytical['free_energy']:.2f} +/- {analytical.get('free_energy_unc', float('nan')):.2f}"
+            dGfep_unc = result.get("dGfep_unc")
+            endpoint_str = (f"{dGfep_unc[-1]:.3f}" if dGfep_unc is not None
+                            and len(dGfep_unc) > 0 else "n/a")
+            ostream.print_info(
+                f"{name:<20} {barrier_str:>25} {free_energy_str:>25} {endpoint_str:>18}"
+            )
+        ostream.print_blank()
+
+        has_per_replica = any(
+            'replicas' in result
+            for result in results["configuration_results"].values())
+        if not has_per_replica:
+            ostream.print_info(
+                "No per-replica data available (set EvbDataProcessing.calculate_per_replica "
+                "= True and ensure Replica_frame/Direction_frame were loaded).")
+            ostream.flush()
+            return
+
+        # ostream.print_header("Per-replica / per-direction uncertainty")
+        # ostream.print_info(
+        #     f"{'Configuration':<20} {'Replica':>8} {'Direction':>10} {'Barrier (kJ/mol)':>25} {'Free Energy (kJ/mol)':>25}"
+        # )
+        # for name, result in results["configuration_results"].items():
+        #     by_replica = result.get('replicas')
+        #     if not by_replica:
+        #         continue
+        #     for replica in sorted(by_replica.keys()):
+        #         for direction in ("forward", "backward", "both"):
+        #             if direction not in by_replica[replica]:
+        #                 continue
+        #             analytical = by_replica[replica][direction]["analytical"]
+        #             barrier_str = f"{analytical['barrier']:.2f} +/- {analytical['barrier_unc']:.2f}"
+        #             free_energy_str = f"{analytical['free_energy']:.2f} +/- {analytical['free_energy_unc']:.2f}"
+        #             ostream.print_info(
+        #                 f"{name:<20} {replica:>8} {direction:>10} {barrier_str:>25} {free_energy_str:>25}"
+        #             )
+        # ostream.print_blank()
+
+        # ostream.print_header("Hysteresis (forward vs backward per replica)")
+        # ostream.print_info(
+        #     f"{'Configuration':<20} {'Replica':>8} {'max|Δ dGfep|':>15} {'mean|Δ dGfep|':>15} {'Δ barrier':>12} {'Δ free energy':>15}"
+        # )
+        # for name, result in results["configuration_results"].items():
+        #     by_replica = result.get('replicas')
+        #     if not by_replica:
+        #         continue
+        #     for replica in sorted(by_replica.keys()):
+        #         h = by_replica[replica].get("hysteresis")
+        #         if not h:
+        #             continue
+        #         ostream.print_info(
+        #             f"{name:<20} {replica:>8} {h['max_abs_dGfep_delta']:15.3f} "
+        #             f"{h['mean_abs_dGfep_delta']:15.3f} {h['barrier_delta']:12.3f} "
+        #             f"{h['free_energy_delta']:15.3f}")
+        # ostream.print_blank()
+
+        has_replica_average = any(
+            "replica_average" in result
+            for result in results["configuration_results"].values())
+        ostream.print_header("Replica average (mean +/- SEM across replicas)")
+        if not has_replica_average:
+            ostream.print_info(
+                "No replica averages available (requires EvbDataProcessing."
+                "calculate_per_replica_pooled = True, the default, so each "
+                "replica has a \"both\" forward+backward curve to average).")
+        else:
+            ostream.print_info(
+                f"{'Configuration':<20} {'N':>4} {'Barrier (kJ/mol)':>25} {'Free Energy (kJ/mol)':>25}"
+            )
+            for name, result in results["configuration_results"].items():
+                replica_average = result.get("replica_average")
+                if not replica_average:
+                    continue
+                barrier_str = (f"{replica_average['barrier_mean']:.2f} +/- "
+                               f"{replica_average['barrier_sem']:.2f}")
+                free_energy_str = (
+                    f"{replica_average['free_energy_mean']:.2f} +/- "
+                    f"{replica_average['free_energy_sem']:.2f}")
+                ostream.print_info(
+                    f"{name:<20} {replica_average['n_replicas']:>4} {barrier_str:>25} {free_energy_str:>25}"
                 )
+
+        has_hysteresis_summary = any(
+            "hysteresis_summary" in result
+            for result in results["configuration_results"].values())
+        if not has_hysteresis_summary:
+            ostream.print_info(
+                "No hysteresis summary available (requires per-replica "
+                "forward/backward curves, see the Hysteresis section above).")
+        else:
+            ostream.print_blank()
+            ostream.print_header("Hysteresis summary (stats across replicas)")
+            ostream.print_info(
+                f"{'Configuration':<20} {'Metric':<22} {'Mean':>12} {'Std':>12} "
+                f"{'Median':>18} {'Min':>18} {'Max':>18}")
+            for name, result in results["configuration_results"].items():
+                hysteresis_summary = result.get("hysteresis_summary")
+                if not hysteresis_summary:
+                    continue
+                for metric, stats in hysteresis_summary.items():
+                    median_str = f"{stats['median']:.3f} ({stats['median_replica']})"
+                    min_str = f"{stats['min']:.3f} ({stats['min_replica']})"
+                    max_str = f"{stats['max']:.3f} ({stats['max_replica']})"
+                    ostream.print_info(
+                        f"{name:<20} {metric:<22} {stats['mean']:12.3f} "
+                        f"{stats['std']:12.3f} {median_str:>18} "
+                        f"{min_str:>18} {max_str:>18}")
+                ostream.print_blank()
 
         ostream.flush()
 
@@ -884,9 +1413,13 @@ class EvbDataProcessing:
                         color=colors[colorkeys[i]],
                         linewidth=.5,
                     )
+                    barrier_unc = result['analytical'].get('barrier_unc')
+                    barrier_label = f"{barrier:.0f}"
+                    if barrier_unc is not None:
+                        barrier_label += f" ± {barrier_unc:.0f}"
                     ax[1].text(bin_indicators[barrier_ind],
                                barrier,
-                               f"{barrier:.0f}",
+                               barrier_label,
                                ha='left',
                                va='bottom')
 
@@ -906,9 +1439,14 @@ class EvbDataProcessing:
                         color=colors[colorkeys[i]],
                         linewidth=.5,
                     )
+                    free_energy_unc = result['analytical'].get(
+                        'free_energy_unc')
+                    free_energy_label = f"{free_energy:.0f}"
+                    if free_energy_unc is not None:
+                        free_energy_label += f" ± {free_energy_unc:.0f}"
                     ax[1].text(bin_indicators[free_ind],
                                free_energy,
-                               f"{free_energy:.0f}",
+                               free_energy_label,
                                ha='left',
                                va='bottom')
                     # #Add barrier
@@ -957,6 +1495,170 @@ class EvbDataProcessing:
         #     loc=(0.22, 0.91),
         #     ncol=1,
         # )
+        return fig, ax
+
+    @staticmethod
+    def plot_fep_hysteresis(results,
+                            configuration_name,
+                            replicas=None,
+                            figsize=(8, 6)):
+        """Plot the FEP curve as a continuous forward/backward trace to visualise hysteresis.
+
+        For each replica, the forward sweep (lambda 0 -> 1) is drawn rising
+        from the current y-offset; the backward sweep (lambda 1 -> 0) is
+        drawn retracing the same lambda range, continuing from the forward
+        sweep's end point. If sampling were perfectly reversible the
+        backward sweep would land back exactly where the forward sweep
+        started; the gap it actually lands on is the hysteresis, and it
+        becomes the starting point for the next replica's forward sweep
+        (mirroring the physical trajectory, which is seeded from the
+        previous sweep's final state -- see EvbFepDriver.run_replicas).
+
+        Args:
+            results (dict): EVB results, as produced by EvbDataProcessing.compute.
+            configuration_name (str): key into results["configuration_results"].
+            replicas (list, optional): which replicas to plot, in order. Defaults to all replicas with both a forward and backward curve, in ascending order.
+            figsize (tuple, optional): figure size. Defaults to (12, 4).
+        """
+
+        import matplotlib.pyplot as plt
+        import matplotlib.colors as mcolors
+        from matplotlib.lines import Line2D
+
+        result = results['configuration_results'][configuration_name]
+        by_replica = result.get('replicas')
+        assert_msg_critical(
+            by_replica,
+            f"No per-replica data for configuration '{configuration_name}'. "
+            "Set EvbDataProcessing.calculate_per_replica = True and ensure "
+            "Replica_frame/Direction_frame were loaded (see EvbDriver._load_output_files)."
+        )
+
+        Lambda = np.asarray(results['Lambda'])
+        colors = list(mcolors.TABLEAU_COLORS.values())
+
+        if replicas is None:
+            replicas = sorted(r for r, d in by_replica.items()
+                              if 'forward' in d and 'backward' in d)
+
+        fig, ax = plt.subplots(figsize=figsize)
+
+        offset = 0.0
+        for i, replica in enumerate(replicas):
+            directions = by_replica[replica]
+            if 'forward' not in directions or 'backward' not in directions:
+                continue
+
+            y_fwd_local = np.asarray(directions['forward']['dGfep'])
+            y_bwd_local = np.asarray(directions['backward']['dGfep'])
+
+            y_fwd = offset + y_fwd_local
+            ax.plot(Lambda, y_fwd, linewidth=.5, color=colors[0])
+
+            # Backward sweep continues from the forward sweep's end point,
+            # then retraces lambda 1 -> 0 using the backward-only estimate
+            # (itself 0-anchored at lambda=0) shifted by the same amount so
+            # its lambda=1 value matches the forward curve's end point.
+            y_bwd = y_fwd[-1] - y_bwd_local[-1] + y_bwd_local
+            ax.plot(Lambda[::-1],
+                    y_bwd[::-1],
+                    linestyle='--',
+                    linewidth=.5,
+                    color=colors[0])
+
+            # Next replica's forward sweep starts where this one's backward
+            # sweep landed -- 0 only if this replica showed no hysteresis.
+            offset = y_bwd[0]
+
+        legend_lines = [
+            Line2D([0], [0], color='grey', linestyle='-'),
+            Line2D([0], [0], color='grey', linestyle='--'),
+        ]
+        ax.legend(legend_lines, ['forward (l: 0->1)', 'backward (l: 1->0)'])
+        ax.set_xlabel(r"$\lambda$")
+        ax.set_ylabel(r"$\Delta G_{FEP}$ (kJ/mol)")
+        ax.set_title(f"FEP hysteresis: {configuration_name}", fontsize=12)
+        return fig, ax
+
+    @staticmethod
+    def plot_evb_replicas(results,
+                          configuration_names=None,
+                          replicas=None,
+                          direction='both',
+                          figsize=(6, 4)):
+        """Overlay each replica's independently-computed EVB profile.
+
+        First-pass visualisation: every replica's EVB curve is plotted as-is
+        (each already zeroed at its own reactant-well minimum, per
+        EvbDataProcessing._get_free_energies), with no averaging or
+        uncertainty band across replicas yet.
+
+        Args:
+            results (dict): EVB results, as produced by EvbDataProcessing.compute.
+            configuration_name (str): key into results["configuration_results"].
+            replicas (list, optional): which replicas to plot. Defaults to all replicas that have the requested direction.
+            direction (str, optional): "both" (pool forward+backward frames per replica), "forward", or "backward". Defaults to "both".
+            figsize (tuple, optional): figure size. Defaults to (6, 4).
+        """
+
+        import matplotlib.pyplot as plt
+        import matplotlib.colors as mcolors
+
+        names = []
+        if configuration_names is None:
+            names = list(results['configuration_results'].keys())
+        else:
+            if isinstance(configuration_names, str):
+                configuration_name = [configuration_names]
+
+            elif isinstance(configuration_names, list):
+                names = configuration_names
+            else:
+                raise ValueError(
+                    "configuration_names must be a string or a list of strings")
+        plot_colours = list(mcolors.TABLEAU_COLORS.values())
+        fig, ax = plt.subplots(figsize=figsize)
+
+        for i, configuration_name in enumerate(names):
+            result = results['configuration_results'][configuration_name]
+            by_replica = result.get('replicas')
+            assert_msg_critical(
+                by_replica,
+                f"No per-replica data for configuration '{configuration_name}'. "
+                "Set EvbDataProcessing.calculate_per_replica = True and ensure "
+                "Replica_frame/Direction_frame were loaded (see EvbDriver._load_output_files)."
+            )
+
+            coordinate_bins = results['coordinate_bins']
+            bin_indicators = (coordinate_bins[:-1] + coordinate_bins[1:]) / 2
+
+            if replicas is None:
+                replicas = sorted(r for r, d in by_replica.items()
+                                  if direction in d)
+
+            for j, replica in enumerate(replicas):
+                directions = by_replica[replica]
+                if direction not in directions:
+                    continue
+                EVB = directions[direction]['analytical']['EVB']
+                if len(names) > 1:
+                    if j == 0:
+                        label = f"{configuration_name}"
+                    else:
+                        label = None
+                else:
+                    label = f"Replica {replica}"
+                ax.plot(bin_indicators,
+                        EVB[1:],
+                        alpha=0.5,
+                        linewidth=1,
+                        color=plot_colours[i % len(plot_colours)],
+                        label=label)
+
+        ax.set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
+        ax.set_ylabel(r"$\Delta G_{EVB}$ (kJ/mol)")
+        ax.set_title(f"EVB profiles per replica", fontsize=12)
+        ax.legend()
         return fig, ax
 
     @staticmethod
@@ -1108,8 +1810,8 @@ class EvbDataProcessing:
                         dp.alpha,
                         dp.H12,
                     )
-                    dGfep = dp._calculate_dGfep(E1, E2_shifted,
-                                                result['Temp_set'])
+                    dGfep, _ = dp._calculate_dGfep(E1, E2_shifted,
+                                                   result['Temp_set'])
                     dGevb, shift, fepxi = dp._dGevb_analytical(
                         dGfep,
                         lam,
