@@ -1477,8 +1477,6 @@ class ReactionSystemBuilder():
                         0.0,
                     )
 
-            self.ostream.flush()
-
             for bond in self.reactant.bonds.keys():
                 if not (self.reactant.atoms[bond[0]].get('pdb') == None
                         and self.reactant.atoms[bond[1]].get('pdb') == None):

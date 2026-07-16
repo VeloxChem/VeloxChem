@@ -654,6 +654,13 @@ class EvbDataProcessing:
                 self._calculate_hysterisis_data(result)
                 self._calculate_replica_average(result)
 
+            if 'E1_fg' in result.keys():
+                self.ostream.print_info(
+                    f"Calculating per-force-group FEP/EVB curves for configuration {name}"
+                )
+                self.ostream.flush()
+                self._calculate_fg_profiles(result)
+
     def _calculate_replica_average(self, result):
         """Mean and standard error of the mean of barrier/free_energy across replicas.
 
@@ -1000,35 +1007,33 @@ class EvbDataProcessing:
 
         return np.arange(dE_min, dE_max, bin_size)
 
-    def _calculate_fg_profiles(self):
+    def _calculate_fg_profiles(self, result):
         assert len(self.coordinate_bins) > 0, "Coordinate bins not set"
         assert len(self.Lambda) > 0, "Lambda not set"
 
-        for result in self.results.values():
-            E1_fg = result["E1_fg"]
-            E2_fg = result["E2_fg"]
+        E1_fg = result["E1_fg"]
+        E2_fg = result["E2_fg"]
 
-            names = result.get("E1_fg_names")
-            names = names.split(',') if names is not None else [
-                fg.name for fg in EvbForceGroup
-            ]
-            dGfep_fg = []
-            dGevb_fg = []
-            for i, name in enumerate(names):
-                E1 = E1_fg[i]
-                E2 = E2_fg[i]
-                E2_shifted, V, dE, Eg = self._calculate_Eg_V_dE(
-                    E1, E2, self.alpha, self.H12)
-                dGfep, _ = self._calculate_dGfep(E1, E2_shifted,
-                                                 result["Temp_set"])
-                dGevb, shift, fepxi = self._dGevb_analytical(
-                    dGfep, self.Lambda, self.H12, self.coordinate_bins)
-                dGfep_fg.append(dGfep)
-                dGevb_fg.append(dGevb)
+        names = result.get("E1_fg_names")
+        names = names.split(',') if names is not None else [
+            fg.name for fg in EvbForceGroup
+        ]
+        dGfep_fg = []
+        dGevb_fg = []
+        for i, name in enumerate(names):
+            E1 = E1_fg[i]
+            E2 = E2_fg[i]
+            E2_shifted, V, dE, Eg = self._calculate_Eg_V_dE(
+                E1, E2, self.alpha, self.H12)
+            dGfep, _ = self._calculate_dGfep(E1, E2_shifted, result["Temp_set"])
+            dGevb, shift, fepxi = self._dGevb_analytical(
+                dGfep, self.Lambda, self.H12, self.coordinate_bins)
+            dGfep_fg.append(dGfep)
+            dGevb_fg.append(dGevb)
 
-            result.update({"dGfep_fg_names": names})
-            result.update({"dGfep_fg": np.array(dGfep_fg)})
-            result.update({"dGevb_fg": np.array(dGevb_fg)})
+        result.update({"dGfep_fg_names": names})
+        result.update({"dGfep_fg": np.array(dGfep_fg)})
+        result.update({"dGevb_fg": np.array(dGevb_fg)})
 
     @staticmethod
     def print_results(results, ostream=None):
@@ -1099,44 +1104,6 @@ class EvbDataProcessing:
                 "= True and ensure Replica_frame/Direction_frame were loaded).")
             ostream.flush()
             return
-
-        # ostream.print_header("Per-replica / per-direction uncertainty")
-        # ostream.print_info(
-        #     f"{'Configuration':<20} {'Replica':>8} {'Direction':>10} {'Barrier (kJ/mol)':>25} {'Free Energy (kJ/mol)':>25}"
-        # )
-        # for name, result in results["configuration_results"].items():
-        #     by_replica = result.get('replicas')
-        #     if not by_replica:
-        #         continue
-        #     for replica in sorted(by_replica.keys()):
-        #         for direction in ("forward", "backward", "both"):
-        #             if direction not in by_replica[replica]:
-        #                 continue
-        #             analytical = by_replica[replica][direction]["analytical"]
-        #             barrier_str = f"{analytical['barrier']:.2f} +/- {analytical['barrier_unc']:.2f}"
-        #             free_energy_str = f"{analytical['free_energy']:.2f} +/- {analytical['free_energy_unc']:.2f}"
-        #             ostream.print_info(
-        #                 f"{name:<20} {replica:>8} {direction:>10} {barrier_str:>25} {free_energy_str:>25}"
-        #             )
-        # ostream.print_blank()
-
-        # ostream.print_header("Hysteresis (forward vs backward per replica)")
-        # ostream.print_info(
-        #     f"{'Configuration':<20} {'Replica':>8} {'max|Δ dGfep|':>15} {'mean|Δ dGfep|':>15} {'Δ barrier':>12} {'Δ free energy':>15}"
-        # )
-        # for name, result in results["configuration_results"].items():
-        #     by_replica = result.get('replicas')
-        #     if not by_replica:
-        #         continue
-        #     for replica in sorted(by_replica.keys()):
-        #         h = by_replica[replica].get("hysteresis")
-        #         if not h:
-        #             continue
-        #         ostream.print_info(
-        #             f"{name:<20} {replica:>8} {h['max_abs_dGfep_delta']:15.3f} "
-        #             f"{h['mean_abs_dGfep_delta']:15.3f} {h['barrier_delta']:12.3f} "
-        #             f"{h['free_energy_delta']:15.3f}")
-        # ostream.print_blank()
 
         has_replica_average = any(
             "replica_average" in result
@@ -1726,6 +1693,97 @@ class EvbDataProcessing:
         ])
 
     @staticmethod
+    def plot_force_contributions(results, dif_to=0):
+        from IPython.display import clear_output
+        from IPython.display import display
+        import matplotlib.pyplot as plt
+        import ipywidgets as widgets
+
+        missing_fg = [
+            name for name, result in results['configuration_results'].items()
+            if 'E1_fg' not in result or 'E2_fg' not in result
+        ]
+
+        assert_msg_critical(
+            not missing_fg,
+            "plot_force_decomp requires force-group contributions "
+            "(E1_fg/E2_fg), which are not present for configuration(s): "
+            f"{missing_fg}. Run EvbDriver.compute_force_groups() and "
+            "EvbDriver.compute_energy_profiles() again before plotting.")
+
+        # Get tableau colors
+        tableau_colors = plt.cm.tab10.colors[
+            1:]  # skip first color (blue) to match colours with plot_force_decomp
+
+        def rgb_to_hex(rgb):
+            """Convert RGB tuple to hex string"""
+            return '#{:02x}{:02x}{:02x}'.format(int(rgb[0] * 255),
+                                                int(rgb[1] * 255),
+                                                int(rgb[2] * 255))
+
+        def lighten_color(rgb, amount=0.3):
+            """Make color lighter by moving towards white"""
+            r, g, b = rgb
+            return (r + (1 - r) * amount, g + (1 - g) * amount,
+                    b + (1 - b) * amount)
+
+        def darken_color(rgb, amount=0.3):
+            """Make color darker by moving towards black"""
+            r, g, b = rgb
+            return (r * (1 - amount), g * (1 - amount), b * (1 - amount))
+
+        # Generate variations
+        colors = []
+        for color in tableau_colors:
+            original_hex = rgb_to_hex(color)
+            lighter_hex = rgb_to_hex(lighten_color(color, 0.3))
+            darker_hex = rgb_to_hex(darken_color(color, 0.3))
+
+            colors.append(lighter_hex)
+            colors.append(darker_hex)
+
+        conf_keys = results['configuration_results'].keys()
+        ref_result = results['configuration_results'][list(conf_keys)[dif_to]]
+        fg_names = ref_result['E1_fg_names']
+        max_arg = ref_result['analytical']['max_arg']
+        min_arg = ref_result['analytical']['min_arg']
+        ref_evb = ref_result['dGevb_fg']
+
+        to_plot = {}
+        for name, result in results['configuration_results'].items():
+            if name == list(conf_keys)[dif_to]:
+                continue
+            max_arg = result['analytical']['max_arg']
+            min_arg = result['analytical']['min_arg']
+            dif = result['dGevb_fg'] - ref_evb
+
+            barrier = dif[:, max_arg[0]]
+            e0 = dif[:, min_arg[0]]
+            e1 = dif[:, min_arg[1]]
+            free_energy = e1 - e0
+            to_plot.update({
+                f"{name}_barrier_dif": barrier,
+                f"{name}_free_energy_dif": free_energy
+            })
+
+        to_pop = []
+        for i in range(ref_evb.shape[0]):
+            keep = False
+            for name, data in to_plot.items():
+                if abs(data[i]) > 0.01:
+                    keep = True
+                    break
+            if not keep:
+                to_pop.append(i)
+        for name, data in to_plot.items():
+            to_plot[name] = np.delete(data, to_pop)
+        tick_labels = np.delete(fg_names.split(','), to_pop)
+
+        fig, ax = plt.subplots(figsize=(20, 6))
+        ax.grouped_bar(to_plot, colors=colors, tick_labels=tick_labels)
+        ax.legend()
+
+    @staticmethod
     def plot_force_decomp(results, dif_to=0):
         from IPython.display import clear_output
         from IPython.display import display
@@ -1808,9 +1866,25 @@ class EvbDataProcessing:
             with plot_output:
                 fig1, ax1 = plt.subplots(1, 3, figsize=(18, 4))
                 fig2, ax2 = plt.subplots(1, 1, figsize=(18, 4))
+
+                ax1[0].set_title("FEP")
+                ax1[0].set_xlabel(r"$\lambda$")
+                ax1[0].set_ylabel(r"$\Delta G_{FEP}$ (kJ/mol)")
+                ax1[0].set_xlim(0, 1)
+                ax1[1].set_title("EVB")
+                ax1[1].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
+                ax1[1].set_ylabel(r"$\Delta G_{EVB}$ (kJ/mol)")
+                ax1[1].set_xlim(bins[0], bins[-1])
+                ax1[2].set_title("EVB difference")
+                ax1[2].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
+                ax1[2].set_ylabel(r"$\Delta G_{EVB}$ difference (kJ/mol)")
+                ax1[2].set_xlim(bins[0], bins[-1])
+                ax2.set_title("E1/E2")
+                ax2.set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
+                ax2.set_ylabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
                 evbs = []
+
                 for name, result in config_results.items():
-                    print(name)
                     clear_output(wait=True)
 
                     # Each result gets its own name->index lookup: two
@@ -1870,9 +1944,9 @@ class EvbDataProcessing:
                     ax2.plot(E2 - np.min(E2), label=f'pro {name}', alpha=0.7)
                 for i, (name, evb) in enumerate(zip(config_results.keys(),
                                                     evbs)):
-                    if not i == dif_to:
-                        dif = evb - evbs[dif_to]
-                        ax1[2].plot(bins, dif, label=f"dif {name}")
+
+                    dif = evb - evbs[dif_to]
+                    ax1[2].plot(bins, dif)
 
                 fig1.legend()
                 fig2.legend()

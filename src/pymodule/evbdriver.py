@@ -907,6 +907,14 @@ class EvbDriver:
             # what they saved.
             if isinstance(v, bytes):
                 return v.decode('utf-8')
+            if isinstance(v, np.ndarray) and v.dtype == object:
+                # String arrays are saved via h5py's variable-length string
+                # dtype (see _save_dict_as_h5) and read back as an object
+                # array of bytes - decode each element to undo that.
+                return np.array([
+                    x.decode('utf-8') if isinstance(x, bytes) else x
+                    for x in v
+                ])
             return v
 
         with h5py.File(file, "r") as f:
@@ -995,6 +1003,12 @@ class EvbDriver:
                     store_as_repr(
                         group, k, v,
                         "no native HDF5 representation for object dtype")
+                elif arr.dtype.kind == 'U':
+                    # h5py has no conversion path for numpy's fixed-width
+                    # unicode dtype ('<U..'); store as variable-length
+                    # UTF-8 strings instead.
+                    group.create_dataset(
+                        k, data=arr.astype(h5py.string_dtype(encoding='utf-8')))
                 else:
                     group.create_dataset(k, data=arr)
             elif isinstance(v, (bool, int, float, str, bytes, np.generic)):
