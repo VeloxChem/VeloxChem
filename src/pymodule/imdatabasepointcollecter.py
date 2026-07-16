@@ -35,7 +35,12 @@ import numpy as np
 import h5py
 import itertools
 import copy
+import inspect
+import json
 import math
+import uuid
+from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from sys import stdout
 import sys
@@ -64,6 +69,15 @@ from .gxtbdriver import GxtbDriver, GxtbGradientDriver, GxtbHessianDriver
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
 from .imtrustradiusoptimizer import IMTrustRadiusOptimizer
+from .imcorefamilies import (
+    _FrozenRecord,
+    _as_frozen_record,
+    _dataclass_payload,
+    _string_tuple,
+    _validated_id,
+    stable_msi_id,
+)
+from .immsiregistry import has_msi_registry, read_msi_registry
 
 
 with redirect_stderr(StringIO()) as fg_err:
@@ -76,6 +90,90 @@ try:
     from openmm.app.metadynamics import Metadynamics, BiasVariable
 except ImportError:
     pass
+
+
+class MSIExpansionAction(str, Enum):
+    """Explicit schema-4 dynamics expansion outcomes."""
+
+    NO_ACTION = "no_action"
+    ADD_CORE_POINT_TO_EXISTING_FAMILY = (
+        "add_core_point_to_existing_family"
+    )
+    CREATE_CORE_FAMILY = "create_core_family"
+    ADD_FACTOR_VALIDATION_PROBE = "add_factor_validation_probe"
+    ADD_NATIVE_FACTOR_VALIDATION_PROBE = "add_factor_validation_probe"
+    BUILD_NATIVE_FACTOR_LIBRARY = "build_native_factor_library"
+    ORDINARY_GLOBAL_POINT = "ordinary_global_point"
+
+
+@dataclass(frozen=True)
+class MSIExpansionDecision:
+    """Restart-safe decision with independent promotion/error signals."""
+
+    decision_id: str
+    root: str
+    action: str
+    candidate_key: str
+    reason_codes: tuple[str, ...] = ()
+    signals: object = _FrozenRecord()
+    payload: object = _FrozenRecord()
+
+    def __post_init__(self):
+        object.__setattr__(
+            self, "decision_id", _validated_id(self.decision_id, "decision_id")
+        )
+        object.__setattr__(self, "root", str(self.root))
+        action = str(self.action).strip().lower()
+        allowed = {item.value for item in MSIExpansionAction}
+        if action not in allowed:
+            raise ValueError(
+                f"Unsupported MSI expansion action {self.action!r}."
+            )
+        object.__setattr__(self, "action", action)
+        candidate_key = str(self.candidate_key).strip()
+        if not candidate_key:
+            raise ValueError("candidate_key must not be empty.")
+        object.__setattr__(self, "candidate_key", candidate_key)
+        object.__setattr__(
+            self, "reason_codes", _string_tuple(self.reason_codes)
+        )
+        object.__setattr__(
+            self, "signals", _as_frozen_record(self.signals, "signals")
+        )
+        object.__setattr__(
+            self, "payload", _as_frozen_record(self.payload, "payload")
+        )
+
+    @classmethod
+    def create(
+            cls, root, action, candidate_key, reason_codes=(), signals=None,
+            payload=None):
+        action = action.value if isinstance(action, MSIExpansionAction) else str(action)
+        decision_id = stable_msi_id(
+            "expansion",
+            {
+                "root": str(root),
+                "action": action,
+                "candidate_key": str(candidate_key),
+                "signals": signals or {},
+            },
+        )
+        return cls(
+            decision_id=decision_id,
+            root=str(root),
+            action=action,
+            candidate_key=str(candidate_key),
+            reason_codes=reason_codes,
+            signals=signals or {},
+            payload=payload or {},
+        )
+
+    def to_payload(self):
+        return _dataclass_payload(self)
+
+    @classmethod
+    def from_payload(cls, payload):
+        return cls(**dict(payload))
 
 
 class IMDatabasePointCollecter:
@@ -331,6 +429,12 @@ class IMDatabasePointCollecter:
         self._latest_qm_molecule = None
         self._latest_qm_positions_nm = None
 
+        self.msi_schema_version = 3
+        self.msi_expansion_queue = {}
+        self.msi_expansion_queue_filename = None
+        self.msi_descriptor_coverage_radius = 0.50
+        self.msi_binding_uncertainty_threshold = 1.0
+
     def _create_platform(self):
         """
         Creates an OpenMM platform.
@@ -538,6 +642,366 @@ class IMDatabasePointCollecter:
             self.ostream.flush()
 
         self.phase = phase
+
+    def classify_msi_expansion_decision(
+            self,
+            root,
+            candidate_key,
+            locality_classification="local",
+            contact_regime_changed=False,
+            descriptor_distance=0.0,
+            descriptor_domain_radius=None,
+            target_core_family_id="",
+            binding_uncertainty=0.0,
+            native_library_required=False,
+            ordinary_error_gate=False,
+            payload=None):
+        """Classify schema-4 expansion without coupling promotion to error gates."""
+
+        root = str(root)
+        locality = str(locality_classification).strip().lower()
+        radius = (
+            self.msi_descriptor_coverage_radius
+            if descriptor_domain_radius is None
+            else float(descriptor_domain_radius)
+        )
+        descriptor_distance = float(descriptor_distance)
+        binding_uncertainty = float(binding_uncertainty)
+        signals = {
+            "locality_classification": locality,
+            "contact_regime_changed": bool(contact_regime_changed),
+            "descriptor_distance": descriptor_distance,
+            "descriptor_domain_radius": radius,
+            "binding_uncertainty": binding_uncertainty,
+            "native_library_required": bool(native_library_required),
+            "ordinary_error_gate": bool(ordinary_error_gate),
+        }
+
+        if int(self.msi_schema_version) != 4:
+            action = (
+                MSIExpansionAction.ORDINARY_GLOBAL_POINT
+                if ordinary_error_gate else MSIExpansionAction.NO_ACTION
+            )
+            reasons = (
+                ("legacy_global_error_gate",)
+                if ordinary_error_gate else ("legacy_no_action",)
+            )
+        elif (
+            bool(contact_regime_changed)
+            or locality == "core_candidate"
+        ):
+            outside = descriptor_distance > radius
+            if bool(contact_regime_changed) or outside or not target_core_family_id:
+                action = MSIExpansionAction.CREATE_CORE_FAMILY
+                reasons = tuple(code for code, enabled in (
+                    ("contact_regime_changed", bool(contact_regime_changed)),
+                    ("outside_descriptor_domain", outside),
+                    ("no_compatible_family", not bool(target_core_family_id)),
+                ) if enabled)
+            else:
+                action = MSIExpansionAction.ADD_CORE_POINT_TO_EXISTING_FAMILY
+                reasons = ("core_candidate_inside_descriptor_domain",)
+        elif native_library_required:
+            action = MSIExpansionAction.BUILD_NATIVE_FACTOR_LIBRARY
+            reasons = ("transfer_validation_failed",)
+        elif binding_uncertainty >= self.msi_binding_uncertainty_threshold:
+            action = MSIExpansionAction.ADD_FACTOR_VALIDATION_PROBE
+            reasons = ("binding_uncertainty",)
+        elif ordinary_error_gate:
+            action = MSIExpansionAction.ORDINARY_GLOBAL_POINT
+            reasons = ("global_energy_or_gradient_gate",)
+        else:
+            action = MSIExpansionAction.NO_ACTION
+            reasons = ("covered_and_validated",)
+
+        decision_payload = dict(payload or {})
+        if target_core_family_id:
+            decision_payload["target_core_family_id"] = str(
+                target_core_family_id
+            )
+        return MSIExpansionDecision.create(
+            root=root,
+            action=action,
+            candidate_key=candidate_key,
+            reason_codes=reasons,
+            signals=signals,
+            payload=decision_payload,
+        )
+
+    def queue_msi_expansion_decision(self, decision, filename=None):
+        """Queue one actionable decision, deduplicated by root/candidate."""
+
+        if not isinstance(decision, MSIExpansionDecision):
+            raise TypeError("decision must be an MSIExpansionDecision.")
+        if decision.action == MSIExpansionAction.NO_ACTION.value:
+            return False
+        root = str(decision.root)
+        queue = list(self.msi_expansion_queue.get(root, ()))
+        replacement = None
+        for index, existing in enumerate(queue):
+            if existing.candidate_key == decision.candidate_key:
+                replacement = index
+                break
+        changed = replacement is None or queue[replacement] != decision
+        if replacement is None:
+            queue.append(decision)
+        else:
+            queue[replacement] = decision
+        queue.sort(key=lambda item: (item.candidate_key, item.decision_id))
+        self.msi_expansion_queue[root] = queue
+        queue_file = filename or self._msi_queue_filename(root)
+        if queue_file is not None:
+            self._write_msi_expansion_queue_atomic(queue_file, root, queue)
+        return changed
+
+    def load_msi_expansion_queue(self, root, filename=None):
+        """Restore and validate a queued expansion set after restart."""
+
+        root = str(root)
+        queue_file = filename or self._msi_queue_filename(root)
+        if queue_file is None or not Path(queue_file).exists():
+            self.msi_expansion_queue[root] = []
+            return ()
+        path = f"msi_expansion_queue/root_{root}/decisions_json"
+        with h5py.File(queue_file, "r") as h5f:
+            if path not in h5f:
+                self.msi_expansion_queue[root] = []
+                return ()
+            raw = h5f[path][()]
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8")
+        queue = tuple(
+            MSIExpansionDecision.from_payload(item)
+            for item in json.loads(str(raw))
+        )
+        if len({item.candidate_key for item in queue}) != len(queue):
+            raise ValueError("Persisted MSI expansion queue contains duplicates.")
+        if any(item.root != root for item in queue):
+            raise ValueError("Persisted MSI expansion queue has a root mismatch.")
+        self.msi_expansion_queue[root] = list(queue)
+        return queue
+
+    def process_msi_expansion_queue(self, root, handlers, filename=None):
+        """Process queued work and reload a validated registry after each write."""
+
+        root = str(root)
+        queue = list(self.msi_expansion_queue.get(root, ()))
+        completed = []
+        for decision in queue:
+            handler = handlers.get(decision.action)
+            if handler is None:
+                continue
+            result = handler(decision)
+            if result is False:
+                continue
+            completed.append(decision)
+            self.msi_expansion_queue[root].remove(decision)
+            queue_file = filename or self._msi_queue_filename(root)
+            if queue_file is not None:
+                self._write_msi_expansion_queue_atomic(
+                    queue_file, root, self.msi_expansion_queue[root]
+                )
+            database_file = self._msi_database_filename(root)
+            if (
+                database_file is not None
+                and has_msi_registry(database_file, root)
+                and self.impes_drivers is not None
+                and root in {str(key) for key in self.impes_drivers}
+            ):
+                driver_root = next(
+                    key for key in self.impes_drivers if str(key) == root
+                )
+                self._reload_schema4_root_atomic(
+                    driver_root, self.inv_sqrt_masses
+                )
+        return tuple(completed)
+
+    def _msi_database_filename(self, root):
+        if not self.interpolation_settings:
+            return None
+        settings = self.interpolation_settings.get(root)
+        if settings is None:
+            try:
+                settings = self.interpolation_settings.get(int(root))
+            except (TypeError, ValueError):
+                settings = None
+        if settings is None:
+            return None
+        return settings.get("imforcefield_file")
+
+    def _classify_runtime_msi_expansion(self, root):
+        """Build a coverage/binding decision from the last interpolation trace."""
+
+        driver = self.impes_drivers[root]
+        registry = getattr(driver, "msi_model_registry", None)
+        trace = getattr(driver, "msi_descriptor_trace", {})
+        if int(self.msi_schema_version) != 4 or registry is None or not trace:
+            return None
+        point_by_id = {
+            point.core_point_id: point for point in registry.core_points
+        }
+        family_by_id = {
+            family.core_family_id: family
+            for family in registry.core_families
+        }
+        nearest_point_id, nearest = min(
+            trace.items(),
+            key=lambda item: (
+                float(item[1]["distance_squared"]), str(item[0])
+            ),
+        )
+        point = point_by_id[nearest_point_id]
+        family = family_by_id[point.core_family_id]
+        distance = math.sqrt(max(
+            float(nearest["distance_squared"]), 0.0
+        ))
+        descriptor = next(
+            spec for spec in registry.descriptor_specs
+            if spec.descriptor_spec_id == family.descriptor_spec_id
+        )
+        contact_indices = [
+            index for index, feature in enumerate(
+                descriptor.feature_definitions)
+            if str(feature.get("kind", "")) in (
+                "smooth_contact", "smooth_contact_pool"
+            )
+        ]
+        contact_changed = False
+        if contact_indices:
+            scales = np.asarray(descriptor.feature_scales)
+            current = np.asarray(nearest["value"])
+            prototype = np.asarray(family.prototype_descriptor)
+            current_contact = float(np.sum(
+                current[contact_indices] * scales[contact_indices]
+            ))
+            prototype_contact = float(np.sum(
+                prototype[contact_indices] * scales[contact_indices]
+            ))
+            cutoff = 0.15
+            contact_changed = (
+                (current_contact >= cutoff) != (prototype_contact >= cutoff)
+            )
+
+        target_bindings = [
+            binding for binding in registry.factor_bindings
+            if binding.target_core_family_id == family.core_family_id
+        ]
+        binding_uncertainty = 1.0 if any(
+            binding.mode == "disabled" for binding in target_bindings
+        ) else 0.0
+        value = np.asarray(nearest["value"], dtype=np.float64)
+        candidate_key = stable_msi_id(
+            "candidate",
+            {
+                "root": str(root),
+                "descriptor_spec_id": descriptor.descriptor_spec_id,
+                "descriptor_bin": np.round(value, decimals=6).tolist(),
+            },
+        )
+        return self.classify_msi_expansion_decision(
+            root=root,
+            candidate_key=candidate_key,
+            locality_classification="local",
+            contact_regime_changed=contact_changed,
+            descriptor_distance=distance,
+            descriptor_domain_radius=family.descriptor_domain_radius,
+            target_core_family_id=family.core_family_id,
+            binding_uncertainty=binding_uncertainty,
+            payload={
+                "nearest_core_point_id": point.core_point_id,
+                "descriptor": value.tolist(),
+            },
+        )
+
+    def _msi_queue_filename(self, root):
+        return (
+            self.msi_expansion_queue_filename
+            or self._msi_database_filename(root)
+        )
+
+    @staticmethod
+    def _write_msi_expansion_queue_atomic(filename, root, queue):
+        payload = json.dumps(
+            [item.to_payload() for item in queue],
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        root_name = f"root_{root}"
+        token = uuid.uuid4().hex
+        staging_name = f"__staging_{root_name}_{token}"
+        backup_name = f"__backup_{root_name}_{token}"
+        with h5py.File(filename, "a") as h5f:
+            base = h5f.require_group("msi_expansion_queue")
+            staging = base.create_group(staging_name)
+            try:
+                dtype = h5py.string_dtype(encoding="utf-8")
+                staging.create_dataset(
+                    "decisions_json",
+                    data=np.array(payload, dtype=object),
+                    dtype=dtype,
+                )
+                staged = staging["decisions_json"][()]
+                if isinstance(staged, bytes):
+                    staged = staged.decode("utf-8")
+                tuple(
+                    MSIExpansionDecision.from_payload(item)
+                    for item in json.loads(str(staged))
+                )
+                had_active = root_name in base
+                if had_active:
+                    base.move(root_name, backup_name)
+                try:
+                    base.move(staging_name, root_name)
+                except Exception:
+                    if had_active and backup_name in base:
+                        base.move(backup_name, root_name)
+                    raise
+                if backup_name in base:
+                    del base[backup_name]
+                h5f.flush()
+            except Exception:
+                if staging_name in base:
+                    del base[staging_name]
+                if backup_name in base and root_name not in base:
+                    base.move(backup_name, root_name)
+                raise
+
+    def _reload_schema4_root_atomic(self, root, inv_sqrt_masses):
+        """Stage a complete runtime reload, then swap it into the live driver."""
+
+        driver = self.impes_drivers[root]
+        filename = self.interpolation_settings[root]["imforcefield_file"]
+        registry = read_msi_registry(filename, root)
+        staged = copy.copy(driver)
+        labels, z_matrix = staged.read_labels()
+        staged.labels = list(labels)
+        staged.z_matrix = z_matrix
+        staged.msi_model_root = str(root)
+        staged.qm_data_points = None
+        outer_points = staged.read_qm_data_points()
+        for datapoint in outer_points:
+            datapoint.inv_sqrt_masses = inv_sqrt_masses
+        for datapoint in staged.msi_datapoints_by_label.values():
+            datapoint.inv_sqrt_masses = inv_sqrt_masses
+
+        self.qm_data_point_dict[root] = list(outer_points)
+        self.qm_energies_dict[root] = [
+            datapoint.energy for datapoint in outer_points
+        ]
+        self.sorted_state_spec_im_labels[root] = [
+            str(datapoint.point_label) for datapoint in outer_points
+        ]
+        self.qm_symmetry_datapoint_dict[root] = {}
+        driver.labels = list(labels)
+        driver.z_matrix = z_matrix
+        driver.qm_data_points = list(outer_points)
+        driver.qm_local_factor_banks = staged.qm_local_factor_banks
+        driver.msi_datapoints_by_label = staged.msi_datapoints_by_label
+        driver.install_msi_model_registry(registry)
+        driver._set_local_factor_inv_sqrt_masses(inv_sqrt_masses)
+        driver.mark_runtime_data_cache_dirty()
+        return registry
 
     def _refresh_interpolation_driver_caches(self, root):
         """
@@ -893,6 +1357,23 @@ class IMDatabasePointCollecter:
         self.interpolation_settings = interpolation_settings
         self.sampling_interpolation_settings = sampling_interpolation_settings
         self.dynamics_settings_interpolation_run = dynamics_settings
+
+        self.msi_schema_version = int(dynamics_settings.get(
+            "msi_schema_version", self.msi_schema_version
+        ))
+        if self.msi_schema_version not in (2, 3, 4):
+            raise ValueError("msi_schema_version must be 2, 3, or 4.")
+        self.msi_expansion_queue_filename = dynamics_settings.get(
+            "msi_expansion_queue_file", self.msi_expansion_queue_filename
+        )
+        self.msi_descriptor_coverage_radius = float(dynamics_settings.get(
+            "msi_descriptor_coverage_radius",
+            self.msi_descriptor_coverage_radius,
+        ))
+        self.msi_binding_uncertainty_threshold = float(dynamics_settings.get(
+            "msi_binding_uncertainty_threshold",
+            self.msi_binding_uncertainty_threshold,
+        ))
 
         self.use_mass_weight = interpolation_settings[list(interpolation_settings.keys())[0]].get('use_mass_weight', False) if interpolation_settings else False
 
@@ -1258,6 +1739,10 @@ class IMDatabasePointCollecter:
             self.sampling_impes_drivers[root] = drv
 
     def _reload_interpolation_root_from_hdf5(self, root, inv_sqrt_masses):
+        filename = self.interpolation_settings[root]['imforcefield_file']
+        if has_msi_registry(filename, root):
+            self._reload_schema4_root_atomic(root, inv_sqrt_masses)
+            return
         driver_object = self.impes_drivers[root]
 
         im_labels, _ = driver_object.read_labels()
@@ -2557,6 +3042,22 @@ class IMDatabasePointCollecter:
             if self.skipping_value < 0:
                 self.skipping_value = 0
 
+        self.current_msi_expansion_decision = (
+            self._classify_runtime_msi_expansion(self.current_state)
+        )
+        if self.current_msi_expansion_decision is not None:
+            self.queue_msi_expansion_decision(
+                self.current_msi_expansion_decision
+            )
+            if self.current_msi_expansion_decision.action in (
+                MSIExpansionAction.ADD_CORE_POINT_TO_EXISTING_FAMILY.value,
+                MSIExpansionAction.CREATE_CORE_FAMILY.value,
+            ):
+                # This gate is intentionally independent of global energy and
+                # gradient thresholds.  The subsequent correlation call still
+                # obtains the QM energy/gradient needed by construction.
+                self.add_a_point = True
+
         self.point_checker += 1
         # if self.point_checker % 100 == 0 and self.point_checker != 0:
         #     self.add_a_point = True
@@ -2689,7 +3190,14 @@ class IMDatabasePointCollecter:
                 in the IM dynamics.
         """
 
-        if self.sampling_enabled:
+        pending_msi_core = (
+            getattr(self, "current_msi_expansion_decision", None) is not None
+            and self.current_msi_expansion_decision.action in (
+                MSIExpansionAction.ADD_CORE_POINT_TO_EXISTING_FAMILY.value,
+                MSIExpansionAction.CREATE_CORE_FAMILY.value,
+            )
+        )
+        if self.sampling_enabled and not pending_msi_core:
             screen = self._sampling_screen_check(molecule)
             if screen["skip_full_qm"]:
                 self.add_a_point = False
@@ -2763,11 +3271,15 @@ class IMDatabasePointCollecter:
                 current_state_difference[self.roots_to_follow[identification_state + e_idx]][1] = rmsd_gradient
                 state_specific_gradients[self.roots_to_follow[identification_state + e_idx]] = [grad, self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.gradient]
 
+        if pending_msi_core:
+            addition_of_state_specific_points.append(self.current_state)
+
         if (current_state_difference[self.current_state][0] > self.energy_threshold and not self.use_opt_confidence_radius[0]
                 or current_state_difference[self.current_state][0] > self.energy_threshold and self.use_opt_confidence_radius[0] and self.confidence_radius_optimized
                 or current_state_difference[self.current_state][1] > self.gradient_rmsd_thrsh and not self.use_opt_confidence_radius[0]
                 or current_state_difference[self.current_state][1] > self.gradient_rmsd_thrsh and self.use_opt_confidence_radius[0] and self.confidence_radius_optimized):
-            addition_of_state_specific_points.append(self.current_state)
+            if self.current_state not in addition_of_state_specific_points:
+                addition_of_state_specific_points.append(self.current_state)
 
         for comb in all_combinations:
             current_state_to_state_difference[comb][0] = abs((state_specific_energies[comb[0]][0] - state_specific_energies[comb[1]][0]) * hartree_in_kjpermol())
@@ -3387,11 +3899,16 @@ class IMDatabasePointCollecter:
                 self.relax_alkyl_local_group_states
             )
 
+        builder_kwargs = {
+            "symmetry_information": symmetry_information,
+        }
+        if "write_org_database" in inspect.signature(
+                self.local_group_family_builder).parameters:
+            builder_kwargs["write_org_database"] = False
         self.local_group_family_builder(
             state_specific_molecules,
             self.interpolation_settings,
-            symmetry_information=symmetry_information,
-            write_org_database=False,
+            **builder_kwargs,
         )
 
         affected_roots = sorted({
@@ -3417,6 +3934,23 @@ class IMDatabasePointCollecter:
         if affected_roots and self.allowed_molecules is not None:
             self.last_added = len(
                 self.allowed_molecules[affected_roots[-1]]['molecules'])
+
+        decision = getattr(self, "current_msi_expansion_decision", None)
+        if decision is not None and any(
+                str(root) == decision.root for root in affected_roots):
+            queue = self.msi_expansion_queue.get(decision.root, [])
+            self.msi_expansion_queue[decision.root] = [
+                item for item in queue
+                if item.candidate_key != decision.candidate_key
+            ]
+            queue_file = self._msi_queue_filename(decision.root)
+            if queue_file is not None:
+                self._write_msi_expansion_queue_atomic(
+                    queue_file,
+                    decision.root,
+                    self.msi_expansion_queue[decision.root],
+                )
+            self.current_msi_expansion_decision = None
 
         if self.simulation is not None:
             self.simulation.saveCheckpoint('checkpoint')

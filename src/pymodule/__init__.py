@@ -221,6 +221,20 @@ from .imdatabasepointcollecter import IMDatabasePointCollecter
 from .openmmimdynamics import OpenMMIMDynamics
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
+from .imcorefamilies import (
+    CoreFamilySpec,
+    CorePointSpec,
+    EnvironmentDescriptorSpec,
+    LocalityAuditRecord,
+    PromotionRecord,
+)
+from .imlocalfactorlibrary import (
+    FactorBindingSpec,
+    FactorClassSpec,
+    FactorDefinitionSpec,
+    FactorValidationRecord,
+    ProvenanceFingerprint,
+)
 from .mofbuilder.core.builder import MetalOrganicFrameworkBuilder as MofBuilder
 from .imtrustradiusoptimizer import IMTrustRadiusOptimizer
 from .conformergenerator import ConformerGenerator

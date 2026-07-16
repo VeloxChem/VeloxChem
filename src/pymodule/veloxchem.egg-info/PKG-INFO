@@ -1,0 +1,47 @@
+Metadata-Version: 2.4
+Name: veloxchem
+Version: 1.0rc4
+Summary: VeloxChem: an electronic structure code
+Home-page: https://veloxchem.org
+Author: VeloxChem developers
+License: BSD-3-Clause
+Keywords: electronic structure theory,response theory,computational spectroscopy
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Education
+Classifier: Intended Audience :: Science/Research
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: C++
+Classifier: Topic :: Scientific/Engineering :: Chemistry
+Requires-Python: >=3.10
+License-File: LICENSE
+License-File: LICENSE-THIRD-PARTY
+Requires-Dist: geometric>=1.0
+Requires-Dist: h5py>=2.8
+Requires-Dist: mpi4py>=3.0
+Requires-Dist: numpy>=1.15.0
+Requires-Dist: psutil>=5.6
+Provides-Extra: qmmm
+Requires-Dist: MDAnalysis>=1.0; extra == "qmmm"
+Provides-Extra: doc
+Requires-Dist: sphinx; extra == "doc"
+Requires-Dist: sphinx_rtd_theme; extra == "doc"
+Provides-Extra: test
+Requires-Dist: h5py>=2.8; extra == "test"
+Requires-Dist: geometric>=1.0; extra == "test"
+Requires-Dist: psutil>=5.6; extra == "test"
+Requires-Dist: pytest; extra == "test"
+Requires-Dist: pytest-cov; extra == "test"
+Provides-Extra: dev
+Requires-Dist: sphinx; extra == "dev"
+Requires-Dist: sphinx_rtd_theme; extra == "dev"
+Requires-Dist: h5py>=2.8; extra == "dev"
+Requires-Dist: geometric>=1.0; extra == "dev"
+Requires-Dist: psutil>=5.6; extra == "dev"
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-cov; extra == "dev"
+Requires-Dist: yapf; extra == "dev"
+Dynamic: license-file

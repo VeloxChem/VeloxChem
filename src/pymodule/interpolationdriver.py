@@ -31,6 +31,7 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
+import copy
 import numpy as np
 from typing import List, Tuple, Dict, Optional
 from sys import stdout
@@ -40,9 +41,21 @@ from io import StringIO
 
 from .interpolationdatapoint import InterpolationDatapoint
 from .imlocalfactorregistry import (
+    TOPOLOGY_SIGNED_FULL,
+    TOPOLOGY_SIGNED_RELAXED_RESIDUAL,
     evaluate_signed_local_factor_model,
     iter_signed_factor_datapoints,
     load_signed_factor_banks_for_root,
+)
+from .immsiregistry import (
+    list_msi_registry_roots,
+    read_msi_registry,
+    validate_msi_registry,
+)
+from .imlocalfactorlibrary import build_canonical_residual_library
+from .imcorefamilies import (
+    descriptor_squared_distance,
+    evaluate_environment_descriptor,
 )
 from .outputstream import OutputStream
 from .veloxchemlib import mpi_master, bohr_in_angstrom
@@ -116,6 +129,7 @@ class InterpolationDriver:
         # Raw and normalized Shepard-weight bookkeeping.
         self.raw_weights_array = None
         self.normalized_weights_array = None
+        self.normalized_weight_gradients_array = None
         self.raw_sum_of_weights = None
         self.used_weight_fallback = False
         self.weight_eps = 1.0e-12
@@ -137,6 +151,15 @@ class InterpolationDriver:
         self.qm_local_factor_banks = {}
         self.local_factor_root = None
         self.local_factor_state_weight_mode = "signature"
+        self.local_factor_combination_mode = "signed_full"
+        self.msi_model_root = None
+        self.msi_model_registry = None
+        self.msi_core_points_by_label = {}
+        self.msi_runtime_by_core_label = {}
+        self.msi_datapoints_by_label = {}
+        self.msi_canonical_residual_libraries = {}
+        self.msi_descriptor_cache = {}
+        self.msi_descriptor_trace = {}
 
         # Confidence radii optimization information
         self.dw_dalpha_list = []
@@ -199,6 +222,8 @@ class InterpolationDriver:
                     'use_tc_weights':('bool', 'weither to use target coustomized weights'),
                     'tc_weight_mode':('str', 'the mode for the target customized weights (multiplicative/additive)'),
                     'local_factor_state_weight_mode':('str', 'local factor state weighting metric'),
+                    'local_factor_combination_mode':('str', 'local factor combination mode'),
+                    'msi_model_root':('str', 'schema-4 MSI model root'),
                     'use_mass_weight':('bool', 'weither to use mass weighting in coordinates'),
                 'labels': ('seq_fixed_str', 'the list of QM data point labels'),
             }
@@ -299,6 +324,597 @@ class InterpolationDriver:
             local_root,
             z_matrix,
             self.impes_dict or {},
+        )
+
+    def _load_msi_model_registry(self, root=None):
+        """Load one active schema-4 root without altering legacy registries."""
+
+        if self.imforcefield_file is None:
+            return None
+
+        selected_root = root
+        if selected_root is None:
+            selected_root = self.msi_model_root
+        if selected_root is None:
+            selected_root = self.local_factor_root
+        if selected_root is None:
+            roots = list_msi_registry_roots(self.imforcefield_file)
+            if len(roots) != 1:
+                return None
+            selected_root = roots[0]
+
+        roots = list_msi_registry_roots(self.imforcefield_file)
+        if str(selected_root) not in roots:
+            return None
+        return read_msi_registry(self.imforcefield_file, selected_root)
+
+    @staticmethod
+    def _schema4_datapoint_label(data_point):
+        label = getattr(data_point, "point_label", None)
+        return None if label is None else str(label)
+
+    def _schema4_datapoint_roles(self, data_point=None, label=None):
+        registry = self.msi_model_registry
+        if registry is None:
+            return frozenset()
+        candidate_labels = []
+        if label is not None:
+            candidate_labels.append(str(label))
+        if data_point is not None:
+            point_label = self._schema4_datapoint_label(data_point)
+            if point_label is not None:
+                candidate_labels.append(point_label)
+        record = next((
+            registry.datapoint_index.get(candidate)
+            for candidate in candidate_labels
+            if registry.datapoint_index.get(candidate) is not None
+        ), None)
+        if record is None:
+            return frozenset()
+        roles = record.get("model_roles", ())
+        if isinstance(roles, str):
+            roles = (roles,)
+        result = {str(role) for role in roles if str(role)}
+        role = str(record.get("model_role", ""))
+        if role:
+            result.add(role)
+        return frozenset(result)
+
+    def _schema4_datapoint_role(self, data_point=None, label=None):
+        """Compatibility accessor for registries with one model role."""
+
+        roles = self._schema4_datapoint_roles(data_point, label)
+        if "outer_core" in roles:
+            return "outer_core"
+        return next(iter(sorted(roles)), None)
+
+    def _is_schema4_residual_datapoint(self, data_point=None, label=None):
+        return bool(self._schema4_datapoint_roles(data_point, label).intersection((
+            "residual_state", "factor_validation_probe", "validation_probe"
+        )))
+
+    def install_msi_model_registry(self, registry):
+        """Install validated schema-4 core lookup independent of family_label."""
+
+        if registry is None:
+            self.msi_model_registry = None
+            self.msi_core_points_by_label = {}
+            self.msi_runtime_by_core_label = {}
+            self.msi_canonical_residual_libraries = {}
+            self.mark_runtime_data_cache_dirty()
+            return
+
+        validate_msi_registry(registry)
+        family_by_id = {
+            family.core_family_id: family
+            for family in registry.core_families
+        }
+        binding_by_id = {
+            binding.factor_binding_id: binding
+            for binding in registry.factor_bindings
+        }
+        definition_by_id = {
+            definition.factor_definition_id: definition
+            for definition in registry.factor_definitions
+        }
+
+        points_by_label = {}
+        runtime_by_label = {}
+        for point in registry.core_points:
+            label = str(point.datapoint_label)
+            if label in points_by_label:
+                raise ValueError(
+                    f"Schema-4 core datapoint label {label!r} is duplicated."
+                )
+            family = family_by_id[point.core_family_id]
+            binding_ids = (
+                point.factor_binding_ids
+                if point.factor_binding_ids
+                else family.factor_binding_ids
+            )
+            resolved_bindings = tuple(
+                binding_by_id[binding_id] for binding_id in binding_ids
+            )
+            points_by_label[label] = point
+            runtime_by_label[label] = {
+                "core_point": point,
+                "core_family": family,
+                "bindings": resolved_bindings,
+                "definitions": {
+                    binding.factor_binding_id: definition_by_id.get(
+                        binding.factor_definition_id
+                    )
+                    for binding in resolved_bindings
+                },
+            }
+
+        self.msi_model_registry = registry
+        self.msi_model_root = registry.root
+        self.msi_core_points_by_label = points_by_label
+        self.msi_runtime_by_core_label = runtime_by_label
+        self.msi_canonical_residual_libraries = {}
+        self.mark_runtime_data_cache_dirty()
+
+    def _schema4_descriptor_spec_for_datapoint(self, data_point):
+        if self.msi_model_registry is None:
+            return None, None
+        label = self._schema4_datapoint_label(data_point)
+        point = self.msi_core_points_by_label.get(label)
+        if point is None:
+            return None, None
+        family = next(
+            family for family in self.msi_model_registry.core_families
+            if family.core_family_id == point.core_family_id
+        )
+        descriptor = next(
+            spec for spec in self.msi_model_registry.descriptor_specs
+            if spec.descriptor_spec_id == family.descriptor_spec_id
+        )
+        return point, descriptor
+
+    def _schema4_descriptor_value_and_jacobian(self, descriptor):
+        cached = self.msi_descriptor_cache.get(descriptor.descriptor_spec_id)
+        if cached is not None:
+            return cached
+        result = evaluate_environment_descriptor(
+            descriptor,
+            self.impes_coordinate.cartesian_coordinates,
+        )
+        self.msi_descriptor_cache[descriptor.descriptor_spec_id] = result
+        return result
+
+    def _raw_shepard_from_squared_distance(
+            self, distance_squared, gradient_squared, confidence_radius):
+        radius = max(float(confidence_radius), 1.0e-12)
+        distance_squared = max(float(distance_squared), 1.0e-16)
+        u = distance_squared / (radius * radius)
+        gradient_squared = np.asarray(gradient_squared, dtype=np.float64)
+        if u > 1.0e6:
+            return 0.0, np.zeros_like(gradient_squared)
+        p = float(self.exponent_p)
+        q = float(self.exponent_q)
+        denominator = max(u**p + u**q, 1.0e-300)
+        raw_weight = 1.0 / denominator
+        derivative = p * u**(p - 1.0) + q * u**(q - 1.0)
+        gradient = (
+            -derivative
+            / (radius * radius * denominator * denominator)
+            * gradient_squared
+        )
+        return raw_weight, gradient
+
+    def _apply_schema4_descriptor_distance(
+            self,
+            data_point,
+            base_distance_squared,
+            base_distance_gradient,
+            denominator,
+            weight_gradient):
+        point, descriptor = self._schema4_descriptor_spec_for_datapoint(
+            data_point
+        )
+        if point is None or descriptor.descriptor_kind == "legacy_none":
+            return np.sqrt(max(float(base_distance_squared), 0.0)), (
+                denominator, weight_gradient
+            )
+        value, jacobian = self._schema4_descriptor_value_and_jacobian(
+            descriptor
+        )
+        descriptor_distance, descriptor_gradient = descriptor_squared_distance(
+            descriptor,
+            value,
+            point.reference_descriptor,
+            jacobian,
+        )
+        self.msi_descriptor_trace[point.core_point_id] = {
+            "value": np.asarray(value, dtype=np.float64).copy(),
+            "reference": np.asarray(
+                point.reference_descriptor, dtype=np.float64
+            ).copy(),
+            "distance_squared": float(descriptor_distance),
+        }
+        is_promoted_core = bool(
+            point.provenance.get("promoted_from_residual", False)
+        )
+        if (
+            descriptor_distance <= 1.0e-30
+            and not np.any(descriptor_gradient)
+            and not is_promoted_core
+        ):
+            return np.sqrt(max(float(base_distance_squared), 0.0)), (
+                denominator, weight_gradient
+            )
+        if self.use_tc_weights and self.tc_weight_mode == "additive_rhee":
+            raise NotImplementedError(
+                "Schema-4 descriptor weighting is not yet compatible with the "
+                "additive_rhee target-customized distance."
+            )
+
+        base_gradient = np.asarray(base_distance_gradient, dtype=np.float64)
+        final_gradient = np.asarray(weight_gradient, dtype=np.float64)
+        new_distance_squared = (
+            float(base_distance_squared) + float(descriptor_distance)
+        )
+        support_u = None
+        if is_promoted_core:
+            radius = max(float(point.confidence_radius), 1.0e-12)
+            support_u = new_distance_squared / (radius * radius)
+            if support_u >= 1.0:
+                return np.sqrt(new_distance_squared), (
+                    np.inf,
+                    np.zeros_like(base_gradient),
+                )
+        old_base_weight, old_base_gradient = (
+            self._raw_shepard_from_squared_distance(
+                base_distance_squared,
+                base_gradient,
+                data_point.confidence_radius,
+            )
+        )
+        new_base_weight, new_base_gradient = (
+            self._raw_shepard_from_squared_distance(
+                new_distance_squared,
+                base_gradient + descriptor_gradient,
+                data_point.confidence_radius,
+            )
+        )
+        # Promoted residual datapoints are trustworthy full-PES Taylor centres
+        # only inside their declared local confidence domain.  A radius used
+        # solely to scale every Shepard denominator cancels during
+        # normalization and permits arbitrarily distant extrapolation.  Apply
+        # a C2 compact-support gate to promoted cores; the original global core
+        # remains ungated and is therefore the deterministic fallback.
+        if is_promoted_core:
+            support_gate = (1.0 - support_u)**3
+            support_gate_gradient = (
+                -3.0 * (1.0 - support_u)**2
+                / (radius * radius)
+                * (base_gradient + descriptor_gradient)
+            )
+            new_base_gradient = (
+                support_gate * new_base_gradient
+                + new_base_weight * support_gate_gradient
+            )
+            new_base_weight *= support_gate
+        final_weight = 0.0 if not np.isfinite(denominator) else 1.0 / denominator
+        if old_base_weight <= 0.0 or final_weight <= 0.0:
+            return np.sqrt(new_distance_squared), (
+                np.inf,
+                np.zeros_like(final_gradient),
+            )
+        gate = final_weight / old_base_weight
+        gradient_gate = (
+            final_gradient * old_base_weight
+            - final_weight * old_base_gradient
+        ) / (old_base_weight * old_base_weight)
+        combined_weight = gate * new_base_weight
+        combined_gradient = (
+            gate * new_base_gradient + new_base_weight * gradient_gate
+        )
+        if combined_weight <= 1.0e-300:
+            return np.sqrt(new_distance_squared), (
+                np.inf,
+                np.zeros_like(combined_gradient),
+            )
+        return np.sqrt(new_distance_squared), (
+            1.0 / combined_weight,
+            combined_gradient,
+        )
+
+    def _schema4_datapoint_by_label(self, label):
+        label = str(label)
+        datapoint = self.msi_datapoints_by_label.get(label)
+        if datapoint is not None:
+            return datapoint
+        for datapoint in self.qm_data_points or ():
+            if self._schema4_datapoint_label(datapoint) == label:
+                return datapoint
+        for family_bank in (self.qm_local_factor_banks or {}).values():
+            for datapoint in iter_signed_factor_datapoints(family_bank):
+                if self._schema4_datapoint_label(datapoint) == label:
+                    return datapoint
+        return None
+
+    def _schema4_periodic_rows(self, rows):
+        z_matrix = getattr(self.impes_coordinate, "z_matrix", None)
+        if z_matrix is None:
+            z_matrix = ()
+        return tuple(
+            int(row)
+            for row in rows
+            if int(row) < len(z_matrix) and len(z_matrix[int(row)]) == 4
+        )
+
+    def _canonical_residual_library(self, definition, binding):
+        source_rows = tuple(
+            int(source_row)
+            for source_row, _ in binding.row_transport_map
+        )
+        cache_key = (definition.factor_definition_id, source_rows)
+        cached = self.msi_canonical_residual_libraries.get(cache_key)
+        if cached is not None:
+            return cached
+        datapoints = {
+            label: self._schema4_datapoint_by_label(label)
+            for label in definition.state_datapoint_labels
+        }
+        library = build_canonical_residual_library(
+            definition,
+            datapoints,
+            source_rows,
+            periodic_source_rows=self._schema4_periodic_rows(source_rows),
+        )
+        self.msi_canonical_residual_libraries[cache_key] = library
+        return library
+
+    def _materialize_bound_residual_bank(
+            self, library, binding, target_core):
+        row_transport = {
+            int(source): int(target)
+            for source, target in binding.row_transport_map
+        }
+        missing_rows = [
+            row for row in library.source_rows if row not in row_transport
+        ]
+        if missing_rows:
+            raise ValueError(
+                f"Binding {binding.factor_binding_id!r} does not transport "
+                f"canonical rows {missing_rows}."
+            )
+        target_rows = tuple(row_transport[row] for row in library.source_rows)
+        if len(set(target_rows)) != len(target_rows):
+            raise ValueError("Canonical target rows must be bijective.")
+
+        n_internal = len(target_core.internal_coordinates_values)
+        if any(row < 0 or row >= n_internal for row in target_rows):
+            raise ValueError("Canonical binding contains an out-of-range target row.")
+        target_row_array = np.asarray(target_rows, dtype=np.int64)
+        source_periodic = set(library.periodic_source_rows)
+        row_types = tuple(
+            "torsion" if row in source_periodic else "linear"
+            for row in library.source_rows
+        )
+        expected_states = {}
+        for state_index, state in enumerate(library.states):
+            datapoint = copy.copy(target_core)
+            reference_coordinates = np.asarray(
+                target_core.internal_coordinates_values, dtype=np.float64
+            ).copy()
+            reference_coordinates[target_row_array] += np.asarray(
+                state.relative_coordinates, dtype=np.float64
+            )
+            # Reconstitute a target-anchored full jet.  The canonical library
+            # stores source-state minus source-anchor E/G/H.  Adding that jet
+            # to the target core and evaluating it through the established
+            # signed-relaxed-residual helper makes the helper subtract the
+            # target core Taylor model at the displaced state.  Treating the
+            # stored differences as a standalone signed-full PES instead
+            # leaves the target-core torsional Taylor energy in place and
+            # produces a geometry-dependent energy-reference offset.
+            gradient = np.asarray(
+                target_core.internal_gradient, dtype=np.float64
+            ).copy()
+            gradient[target_row_array] += np.asarray(
+                state.residual_gradient, dtype=np.float64
+            )
+            hessian = np.asarray(
+                target_core.internal_hessian, dtype=np.float64
+            ).copy()
+            hessian[np.ix_(target_row_array, target_row_array)] += np.asarray(
+                state.residual_hessian, dtype=np.float64
+            )
+            datapoint.point_label = (
+                f"{binding.factor_binding_id}:{state.state_id}"
+            )
+            datapoint.energy = (
+                float(target_core.energy) + float(state.residual_energy)
+            )
+            datapoint.internal_coordinates_values = reference_coordinates
+            datapoint.internal_gradient = gradient
+            datapoint.internal_hessian = hessian
+            datapoint.mapping_masks = np.arange(
+                n_internal, dtype=np.int64
+            ).reshape(1, -1)
+            datapoint.bank_role = "cluster"
+            datapoint.confidence_radius = max(
+                float(getattr(target_core, "confidence_radius", 1.0) or 1.0),
+                1.0e-8,
+            )
+            expected_states[state_index] = datapoint
+
+        term_bank = {
+            "term_id": binding.factor_binding_id,
+            "role": "canonical_residual",
+            "coefficient": 1.0,
+            "rotor_ids": (binding.factor_class_id,),
+            "active_atoms": tuple(
+                int(target) for _, target in binding.atom_transport_map
+            ),
+            "active_rows": target_rows,
+            "projector_rows": target_rows,
+            "grouped_signature_rows": (target_rows,),
+            "grouped_signature_row_types": (row_types,),
+            "grouped_signature_row_scales": (
+                tuple(1.0 for _ in target_rows),
+            ),
+            "expected_states": expected_states,
+            "anchor_state_ids": (next(
+                index for index, state in enumerate(library.states)
+                if state.state_id == library.anchor_state_id
+            ),),
+            "response_rows": (),
+            "projector_policy_id": "canonical_transport_v1",
+        }
+        occupied = set(target_rows)
+        return {
+            "topology": TOPOLOGY_SIGNED_RELAXED_RESIDUAL,
+            "combination_mode": "signed_relaxed_residual",
+            "factor_info": {
+                "schema_version": 0,
+                "combination_mode": "signed_relaxed_residual",
+                "family_label": binding.target_core_family_id,
+            },
+            "core": target_core,
+            "core_coefficient": 1.0,
+            "core_rows": tuple(
+                row for row in range(n_internal) if row not in occupied
+            ),
+            "primitive_signature_rows": {
+                binding.factor_class_id: target_rows
+            },
+            "terms": {binding.factor_binding_id: term_bank},
+        }
+
+    def _compute_plain_taylor_via_shared_helper(
+            self, data_point, org_int_coords):
+        plain_driver = copy.copy(self)
+        plain_driver.msi_model_registry = None
+        plain_driver.msi_runtime_by_core_label = {}
+        plain_driver.msi_core_points_by_label = {}
+        plain_driver.qm_local_factor_banks = {}
+        return plain_driver.compute_potential(data_point, org_int_coords)
+
+    def _evaluate_canonical_binding(
+            self, binding, definition, target_core, org_int_coords):
+        if definition is None:
+            raise RuntimeError(
+                f"Binding {binding.factor_binding_id!r} has no factor definition."
+            )
+        library = self._canonical_residual_library(definition, binding)
+        residual_bank = self._materialize_bound_residual_bank(
+            library, binding, target_core
+        )
+        residual_driver = copy.copy(self)
+        residual_driver.local_factor_state_weight_mode = "signature"
+        trace = getattr(self, "local_factor_trace", None)
+        trace_start = len(trace) if isinstance(trace, list) else None
+        energy, gradient = evaluate_signed_local_factor_model(
+            residual_driver, residual_bank, org_int_coords
+        )
+        core_energy, core_gradient, _ = (
+            self._compute_plain_taylor_via_shared_helper(
+                target_core, org_int_coords
+            )
+        )
+        energy = float(energy) - float(core_energy)
+        gradient = (
+            np.asarray(gradient, dtype=np.float64)
+            - np.asarray(core_gradient, dtype=np.float64)
+        )
+        if trace_start is not None:
+            for record in trace[trace_start:]:
+                record["factor_binding_id"] = binding.factor_binding_id
+                record["factor_definition_id"] = definition.factor_definition_id
+                record["binding_mode"] = binding.mode
+                record["source_core_family_id"] = (
+                    definition.source_core_family_id
+                )
+                record["target_core_family_id"] = (
+                    binding.target_core_family_id
+                )
+        return energy, gradient
+
+    def _compute_msi_model_potential(self, data_point, org_int_coords):
+        """Evaluate the native-only schema-4 vertical slice via legacy helpers."""
+
+        label = self._schema4_datapoint_label(data_point)
+        runtime = self.msi_runtime_by_core_label.get(label)
+        if runtime is None:
+            return None
+
+        family = runtime["core_family"]
+        legacy_family_label = family.provenance.get("legacy_family_label")
+        native_adapter = (
+            self.msi_model_registry.model_info.get("migration_status")
+            == "unvalidated_native_adapter"
+            and all(
+                binding.mode in ("native", "disabled")
+                for binding in runtime["bindings"]
+            )
+        )
+        if not native_adapter:
+            core_energy, core_gradient, hessian_error = (
+                self._compute_plain_taylor_via_shared_helper(
+                    data_point, org_int_coords
+                )
+            )
+            total_energy = float(core_energy)
+            total_gradient = np.asarray(core_gradient, dtype=np.float64).copy()
+            for binding in runtime["bindings"]:
+                if binding.mode == "disabled":
+                    continue
+                definition = runtime["definitions"][binding.factor_binding_id]
+                energy, gradient = self._evaluate_canonical_binding(
+                    binding, definition, data_point, org_int_coords
+                )
+                total_energy += float(energy)
+                total_gradient += np.asarray(gradient, dtype=np.float64)
+            return total_energy, total_gradient, hessian_error
+
+        if legacy_family_label is None:
+            if runtime["bindings"]:
+                raise RuntimeError(
+                    f"Schema-4 family {family.core_family_id!r} has factor "
+                    "bindings but no native runtime representation."
+                )
+            return None
+
+        family_bank = (self.qm_local_factor_banks or {}).get(
+            str(legacy_family_label)
+        )
+        if not isinstance(family_bank, dict):
+            raise RuntimeError(
+                f"Schema-4 native adapter cannot find legacy family bank "
+                f"{str(legacy_family_label)!r}."
+            )
+
+        enabled_term_ids = set()
+        for binding in runtime["bindings"]:
+            if binding.mode == "disabled":
+                continue
+            definition = runtime["definitions"][binding.factor_binding_id]
+            term_id = definition.provenance.get("legacy_term_id")
+            if term_id is None:
+                raise RuntimeError(
+                    f"Native binding {binding.factor_binding_id!r} has no "
+                    "legacy term identity for the adapter bridge."
+                )
+            enabled_term_ids.add(str(term_id))
+
+        installed_bank = dict(family_bank)
+        installed_bank["core"] = data_point
+        installed_bank["terms"] = {
+            str(term_id): term_bank
+            for term_id, term_bank in family_bank.get("terms", {}).items()
+            if str(term_id) in enabled_term_ids
+        }
+        pes, gradient = evaluate_signed_local_factor_model(
+            self,
+            installed_bank,
+            org_int_coords,
+        )
+        return pes, gradient, np.zeros_like(
+            np.asarray(org_int_coords, dtype=np.float64)
         )
 
     def _is_local_factor_cluster_datapoint(self, data_point):
@@ -429,7 +1045,9 @@ class InterpolationDriver:
         family_bank = (self.qm_local_factor_banks or {}).get(family_label)
         if not isinstance(family_bank, dict):
             return None
-        if family_bank.get("topology") != "signed_local_factors":
+        if family_bank.get("topology") not in (
+                TOPOLOGY_SIGNED_FULL,
+                TOPOLOGY_SIGNED_RELAXED_RESIDUAL):
             return None
 
         pes, gradient = evaluate_signed_local_factor_model(
@@ -589,6 +1207,8 @@ class InterpolationDriver:
         self._ensure_runtime_mass_weights(molecule)
         self.define_impes_coordinate(molecule.get_coordinates_in_bohr())
         self._eq_candidate_base_cache = None
+        self.msi_descriptor_cache = {}
+        self.msi_descriptor_trace = {}
 
         if self.qm_data_points is None:
             self.qm_data_points = self.read_qm_data_points()
@@ -772,6 +1392,7 @@ class InterpolationDriver:
         self.used_weight_rescale = bool(used_weight_rescale)
         self.raw_weights_array = w_i.copy()
         self.normalized_weights_array = W_i.copy()
+        self.normalized_weight_gradients_array = grad_W_i.copy()
         self.used_weight_fallback = bool(used_weight_fallback)
         self.weight_eps = eps
 
@@ -796,6 +1417,7 @@ class InterpolationDriver:
         """
 
         qm_data_points = []
+        self.msi_datapoints_by_label = {}
 
         assert_msg_critical(
             self.imforcefield_file is not None,
@@ -810,16 +1432,33 @@ class InterpolationDriver:
             z_matrix = self.z_matrix
 
         self.qm_local_factor_banks = self._load_local_factor_banks(z_matrix)
+        self.msi_model_registry = self._load_msi_model_registry()
 
         for label in self.labels:
             data_point = InterpolationDatapoint(z_matrix)  # , self.comm, self.ostream
             data_point.update_settings(self.impes_dict)
             data_point.read_hdf5(self.imforcefield_file, label)
-            if self._is_local_factor_cluster_datapoint(data_point):
+            schema4_roles = self._schema4_datapoint_roles(
+                data_point, label=label)
+            if schema4_roles.intersection((
+                    "residual_state", "factor_validation_probe",
+                    "validation_probe")):
+                runtime_label = (
+                    self._schema4_datapoint_label(data_point) or str(label)
+                )
+                self.msi_datapoints_by_label[runtime_label] = data_point
+            if schema4_roles and not schema4_roles.intersection((
+                    "outer_core", "outer_global")):
+                continue
+            if (
+                not schema4_roles.intersection(("outer_core", "outer_global"))
+                and self._is_local_factor_cluster_datapoint(data_point)
+            ):
                 continue
             qm_data_points.append(data_point)
 
         self.qm_data_points = qm_data_points
+        self.install_msi_model_registry(self.msi_model_registry)
 
         return qm_data_points
 
@@ -830,6 +1469,11 @@ class InterpolationDriver:
            :param data_point:
                 InterpolationDatapoint object.
         """
+
+        msi_model_result = self._compute_msi_model_potential(
+            data_point, org_int_coords)
+        if msi_model_result is not None:
+            return msi_model_result
 
         local_factor_result = self._compute_local_factor_potential(
             data_point, org_int_coords)
@@ -1614,6 +2258,19 @@ class InterpolationDriver:
         weight_gradient = np.zeros_like(reference_coordinates)
         weight_gradient[active_atoms] = weight_gradient_sub
 
+        base_distance_gradient = np.zeros_like(reference_coordinates)
+        base_distance_gradient[active_atoms] = grad_Dint.reshape(
+            active_atoms.shape[0], 3
+        )
+        distance, descriptor_weight = self._apply_schema4_descriptor_distance(
+            data_point,
+            Dint_sq,
+            base_distance_gradient,
+            denominator,
+            weight_gradient,
+        )
+        denominator, weight_gradient = descriptor_weight
+
         dw_dalpha_i = 0.0
         dw_dX_dalpha_i = np.zeros_like(weight_gradient_sub)
 
@@ -1930,6 +2587,19 @@ class InterpolationDriver:
 
         weight_gradient = np.zeros_like(reference_coordinates)   # (natms,3)
         weight_gradient[active_atoms] = weight_gradient_sub_imp_coord
+
+        base_distance_gradient = np.zeros_like(reference_coordinates)
+        base_distance_gradient[active_atoms] = (
+            2.0 * scale2 * distance_vector_sub
+        )
+        distance, descriptor_weight = self._apply_schema4_descriptor_distance(
+            data_point,
+            distance * distance,
+            base_distance_gradient,
+            denominator_imp_coord,
+            weight_gradient,
+        )
+        denominator_imp_coord, weight_gradient = descriptor_weight
 
         return distance, dihedral_dist, denominator_imp_coord, weight_gradient, distance_vector_sub, grad_s, dw_dalhpa_i, dw_dX_dalpha_i
 

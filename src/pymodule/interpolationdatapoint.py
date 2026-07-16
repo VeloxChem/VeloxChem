@@ -151,6 +151,13 @@ class InterpolationDatapoint:
         self.phase_signature = None
         self.active_atoms = None
         self.active_rows = None
+        self.canonical_subset_key = ()
+        self.response_rows = ()
+        self.relaxation_policy_id = None
+        self.is_anchor = False
+        self.anchor_state_ids = ()
+        self.local_factor_combination_mode = "signed_full"
+        self.local_factor_overlap_source = None
 
         # internal_coordinates_values is a numpy array with the values of the
         # geomeTRIC internal coordinates. It is used in InterpolationDriver to
@@ -1234,7 +1241,7 @@ class InterpolationDatapoint:
         if value is None:
             return
         array_value = np.asarray(value)
-        if array_value.ndim == 0:
+        if array_value.ndim == 0 or array_value.size == 0:
             h5f.create_dataset(name, data=array_value)
         else:
             h5f.create_dataset(name, data=array_value, compression="gzip")
@@ -1427,6 +1434,13 @@ class InterpolationDatapoint:
                 or self.cluster_id is not None
                 or self.active_atoms is not None
                 or self.active_rows is not None
+                or bool(self.canonical_subset_key)
+                or bool(self.response_rows)
+                or self.relaxation_policy_id is not None
+                or self.is_anchor
+                or bool(self.anchor_state_ids)
+                or self.local_factor_combination_mode != "signed_full"
+                or self.local_factor_overlap_source is not None
             )
 
             if write_local_metadata:
@@ -1447,6 +1461,32 @@ class InterpolationDatapoint:
                     h5f, label + "_active_atoms", self.active_atoms)
                 self._write_optional_array(
                     h5f, label + "_active_rows", self.active_rows)
+                self._write_optional_string_sequence(
+                    h5f,
+                    label + "_canonical_subset_key",
+                    self.canonical_subset_key,
+                )
+                self._write_optional_array(
+                    h5f, label + "_response_rows", self.response_rows)
+                self._write_string_dataset(
+                    h5f,
+                    label + "_relaxation_policy_id",
+                    self.relaxation_policy_id,
+                )
+                self._write_optional_array(
+                    h5f, label + "_is_anchor", [int(bool(self.is_anchor))])
+                self._write_optional_array(
+                    h5f, label + "_anchor_state_ids", self.anchor_state_ids)
+                self._write_string_dataset(
+                    h5f,
+                    label + "_local_factor_combination_mode",
+                    self.local_factor_combination_mode,
+                )
+                self._write_string_dataset(
+                    h5f,
+                    label + "_local_factor_overlap_source",
+                    self.local_factor_overlap_source,
+                )
 
             if self.metadata:
                 metadata_json = json.dumps(
@@ -1572,6 +1612,35 @@ class InterpolationDatapoint:
                 h5f, label + "_active_atoms")
             self.active_rows = _read_optional_array(
                 h5f, label + "_active_rows")
+            self.canonical_subset_key = (
+                _read_optional_string_sequence(
+                    h5f, label + "_canonical_subset_key") or ()
+            )
+            response_rows = _read_optional_array(
+                h5f, label + "_response_rows")
+            self.response_rows = (
+                () if response_rows is None else tuple(
+                    int(row) for row in response_rows.reshape(-1))
+            )
+            self.relaxation_policy_id = _read_scalar_string(
+                h5f.get(label + "_relaxation_policy_id"))
+            is_anchor = _read_optional_array(h5f, label + "_is_anchor")
+            self.is_anchor = bool(
+                is_anchor.reshape(-1)[0]) if is_anchor is not None else False
+            anchor_state_ids = _read_optional_array(
+                h5f, label + "_anchor_state_ids")
+            self.anchor_state_ids = (
+                () if anchor_state_ids is None else tuple(
+                    int(state_id)
+                    for state_id in anchor_state_ids.reshape(-1))
+            )
+            self.local_factor_combination_mode = (
+                _read_scalar_string(
+                    h5f.get(label + "_local_factor_combination_mode"))
+                or "signed_full"
+            )
+            self.local_factor_overlap_source = _read_scalar_string(
+                h5f.get(label + "_local_factor_overlap_source"))
 
             z_matrix_dict = {}
             for kname, key in [

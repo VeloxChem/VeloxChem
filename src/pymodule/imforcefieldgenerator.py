@@ -40,6 +40,7 @@ from pathlib import Path
 from .outputstream import OutputStream
 from io import StringIO
 from copy import deepcopy
+from dataclasses import replace
 
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
@@ -56,7 +57,15 @@ from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
 from .imdatabasepointcollecter import IMDatabasePointCollecter
 from .imlocalgroups import LocalRotor, LocalCluster, LocalGroupModel
-from .imlocalfactorregistry import write_signed_factor_registry_for_family
+from .imlocalfactorregistry import (
+    COMBINATION_SIGNED_RELAXED_RESIDUAL,
+    COMBINATION_SIGNED_FULL,
+    build_intersection_coefficients,
+    load_signed_factor_banks_for_root,
+    write_signed_factor_registry_for_family,
+)
+from .imcorefamilies import build_contact_torsion_v1_spec
+from .immsiconstruction import Schema4MSIConstructor
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .conformergenerator import ConformerGenerator
 from .optimizationdriver import OptimizationDriver
@@ -382,6 +391,23 @@ class IMForceFieldGenerator:
         self.local_group_coupling_topology = 'direct_factors'
         self.local_group_force_merge_overlapping_groups = True
         self.local_factor_state_weight_mode = "signature"
+        self.local_factor_combination_mode = COMBINATION_SIGNED_FULL
+        self.methyl_local_group_active_row_mode = "torsion_only"
+        self.relax_local_factor_states = True
+        self.local_factor_state_opt_max_iter = 120
+        # Schema-3 factors are conditional residuals for one canonical rotor
+        # subset.  Keep every rotor outside that subset at the family anchor;
+        # otherwise a relaxed state can move another factor's signature and
+        # activate both residuals when the training state is reconstructed.
+        # Non-rotor environment coordinates remain free to respond.
+        self.local_factor_anchor_external_rotors = True
+        self.local_factor_detect_response_rows = False
+        self.local_factor_response_thresholds = {
+            "bond": 0.01,
+            "angle": np.deg2rad(1.0),
+            "dihedral": np.deg2rad(3.0),
+            "improper": np.deg2rad(3.0),
+        }
         self.relax_local_group_rotors_during_optimization = True
         self.relax_alkyl_local_group_states = True
         self.relax_methoxy_local_group_states = True
@@ -395,9 +421,67 @@ class IMForceFieldGenerator:
         self.local_group_allow_anchored_linker_methyl_coupling = False
         self.methoxy_phase_values_degrees = (0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340)
 
+        # Schema 4 is opt-in.  Leaving this at 3 preserves every existing
+        # construction and HDF5 path unless the user explicitly selects MSI.
+        self.msi_schema_version = 3
+        self.msi_descriptor_policy = {
+            "policy_id": "contact_torsion_v1",
+            "distance_coefficient": 1.0,
+            "contact_r0_angstrom": 4.0,
+            "contact_exponent": 6,
+        }
+        self.msi_locality_threshold_policy = {
+            "policy_id": "schema4_locality_v1",
+        }
+        self.msi_promotion_policy = {
+            "policy_id": "schema4_promotion_v1",
+            "family_domain_radius": 0.50,
+            "max_new_family_core_points": 3,
+            "contact_regime_cutoff": 0.15,
+        }
+        self.msi_transfer_policy = {
+            "policy_id": "schema4_transfer_v1",
+            "require_target_probe": True,
+        }
+        self.msi_construction_stage_trace = ()
+
     @staticmethod
     def _is_xtb_like_driver(driver):
         return isinstance(driver, (XtbDriver, GxtbDriver))
+
+    @staticmethod
+    def _normalize_methyl_local_group_active_row_mode(mode):
+        mode = "torsion_only" if mode is None else str(mode).strip().lower()
+        mode = mode.replace("-", "_")
+
+        aliases = {
+            "": "torsion_only",
+            "torsion": "torsion_only",
+            "torsions": "torsion_only",
+            "torsion_only": "torsion_only",
+            "legacy_methyl": "torsion_only",
+            "old_methyl": "torsion_only",
+            "hydrogen": "hydrogen_internal",
+            "hydrogens": "hydrogen_internal",
+            "hydrogen_internal": "hydrogen_internal",
+            "hydrogen_bond_angle": "hydrogen_internal",
+            "hydrogen_bond_angles": "hydrogen_internal",
+            "bond_angle": "hydrogen_internal",
+            "bond_angles": "hydrogen_internal",
+            "active_internal": "hydrogen_internal",
+            "full": "full_internal",
+            "full_internal": "full_internal",
+            "full_methyl": "full_internal",
+            "full_methyl_internal": "full_internal",
+            "carbon_internal": "full_internal",
+        }
+        if mode not in aliases:
+            raise ValueError(
+                "Unsupported methyl_local_group_active_row_mode="
+                f"'{mode}'. Use 'torsion_only', 'hydrogen_internal', "
+                "or 'full_internal'."
+            )
+        return aliases[mode]
 
     def _read_basis_for_driver(self, molecule, driver, basis_label):
         if self._is_xtb_like_driver(driver):
@@ -591,6 +675,15 @@ class IMForceFieldGenerator:
         }
 
         flat_z_matrix = InterpolationDatapoint.flatten_z_matrix(z_matrix)
+        methyl_active_row_mode = (
+            self._normalize_methyl_local_group_active_row_mode(
+                getattr(
+                    self,
+                    "methyl_local_group_active_row_mode",
+                    "torsion_only",
+                )
+            )
+        )
 
         methyl_by_carbon = {}
         rotors = {}
@@ -618,7 +711,7 @@ class IMForceFieldGenerator:
                 kind='methyl',
                 axis=tuple(int(x) for x in axis),
                 symmetry_order=3,
-                owned_atoms=tuple(sorted((int(atom_idx),) + h_neighbors)),
+                owned_atoms=tuple(sorted(int(atom) for atom in h_neighbors)),
                 unit_atom_sets=tuple((int(h_atom),) for h_atom in h_neighbors),
                 torsion_rows=torsion_rows,
                 phase_coordinate=_phase_coordinate(torsion_rows),
@@ -626,6 +719,7 @@ class IMForceFieldGenerator:
 
             methyl_by_carbon[int(atom_idx)] = {
                 'anchor': anchor,
+                'carbon': int(atom_idx),
                 'hydrogens': h_neighbors,
                 'rotor_id': rotor_id,
             }
@@ -712,11 +806,23 @@ class IMForceFieldGenerator:
             rotor_id = methyl_info['rotor_id']
 
             rotor = rotors[rotor_id]
-            active_atoms = tuple(sorted(set(rotor.owned_atoms) | {rotor.axis[0]}))
-            active_rows = tuple(sorted(
-                set(_rows_for_local_atoms(rotor.owned_atoms, active_atoms))
-                | set(rotor.torsion_rows)
-            ))
+            active_seed = set(rotor.owned_atoms) | set(rotor.axis)
+            if methyl_active_row_mode == "torsion_only":
+                active_rows = set(int(row) for row in rotor.torsion_rows)
+            else:
+                row_local_atoms = set(rotor.owned_atoms)
+                if methyl_active_row_mode == "full_internal":
+                    row_local_atoms.add(int(methyl_info['carbon']))
+                active_rows = set(
+                    _rows_for_local_atoms(row_local_atoms, active_seed))
+                active_rows.update(int(row) for row in rotor.torsion_rows)
+
+            active_atom_set = set(active_seed)
+            for row_idx in active_rows:
+                active_atom_set.update(
+                    int(atom) for atom in flat_z_matrix[int(row_idx)])
+            active_atoms = tuple(sorted(active_atom_set))
+            active_rows = tuple(sorted(active_rows))
 
             cluster_id = f"methyl_{methyl_carbon}"
             family_label = (
@@ -733,14 +839,16 @@ class IMForceFieldGenerator:
             )
 
         local_owned_atoms = set()
+        local_active_rows = set()
         for cluster in clusters.values():
             local_owned_atoms.update(int(atom) for atom in cluster.owned_atoms)
+            local_active_rows.update(int(row) for row in cluster.active_rows)
 
         all_atoms = set(range(natoms))
         core_atoms = tuple(sorted(all_atoms - local_owned_atoms))
         core_rows = tuple(
-            row_idx for row_idx, coord in enumerate(flat_z_matrix)
-            if not any(int(atom) in local_owned_atoms for atom in coord)
+            row_idx for row_idx in range(len(flat_z_matrix))
+            if row_idx not in local_active_rows
         )
 
         local_group_model = LocalGroupModel(
@@ -2872,6 +2980,8 @@ class IMForceFieldGenerator:
                     'tc_weight_mode':self.tc_weight_mode,
                     'local_factor_state_weight_mode':
                         self.local_factor_state_weight_mode,
+                    'local_factor_combination_mode':
+                        self.local_factor_combination_mode,
                     'use_mass_weight':self.use_mass_weight,
                 })
 
@@ -2882,111 +2992,113 @@ class IMForceFieldGenerator:
             dihedral_end = dihedral_start + len(self.roots_z_matrix[root]['dihedrals'])
 
             self.all_rotatable_bonds = rotatable_bonds_zero_based
-            self.local_group_primitive_model[root] = self._detect_methyl_and_tertbutyl_local_groups(
-                molecule=molecule,
-                ff_gen=ff_gen,
-                z_matrix=self.roots_z_matrix[root],
-                rotatable_bonds_zero_based=rotatable_bonds_zero_based,
-            )
-
-            self.local_group_primitive_model[root] = (
-                self._detect_heteroatom_local_groups(
+            excluded_local_atoms = set() 
+            if self.use_local_group_database:
+                self.local_group_primitive_model[root] = self._detect_methyl_and_tertbutyl_local_groups(
                     molecule=molecule,
                     ff_gen=ff_gen,
                     z_matrix=self.roots_z_matrix[root],
-                    local_group_model=self.local_group_primitive_model[root],
                     rotatable_bonds_zero_based=rotatable_bonds_zero_based,
                 )
-            )
 
-            self.local_group_primitive_model[root] = (
-                self._detect_methoxy_local_groups(
-                    molecule=molecule,
-                    ff_gen=ff_gen,
-                    z_matrix=self.roots_z_matrix[root],
-                    local_group_model=self.local_group_primitive_model[root],
-                    rotatable_bonds_zero_based=rotatable_bonds_zero_based,
-                )
-            )
-
-            self.local_group_primitive_model[root] = (
-                self._detect_amide_side_chain_local_groups(
-                    molecule=molecule,
-                    ff_gen=ff_gen,
-                    z_matrix=self.roots_z_matrix[root],
-                    local_group_model=self.local_group_primitive_model[root],
-                    rotatable_bonds_zero_based=rotatable_bonds_zero_based,
-                )
-            )
-
-            self.local_group_primitive_model[root] = (
-                self._detect_anchored_linker_local_groups(
-                    molecule=molecule,
-                    ff_gen=ff_gen,
-                    z_matrix=self.roots_z_matrix[root],
-                    local_group_model=self.local_group_primitive_model[root],
-                    rotatable_bonds_zero_based=rotatable_bonds_zero_based,
-                )
-            )
-
-            self.local_group_primitive_model[root] = (
-                self._detect_alkyl_chain_local_groups(
-                    molecule=molecule,
-                    ff_gen=ff_gen,
-                    z_matrix=self.roots_z_matrix[root],
-                    local_group_model=self.local_group_primitive_model[root],
-                    rotatable_bonds_zero_based=rotatable_bonds_zero_based,
-                )
-            )
-
-            print("\n 2 \n", self.local_group_primitive_model)
-
-            manual_specs = self.local_group_specs or ()
-            if isinstance(manual_specs, dict):
-                manual_specs = (manual_specs,)
-
-            for spec in manual_specs:
-                kind = str(spec.get("kind", "")).lower()
-                if kind != "phenyl":
-                    raise ValueError(
-                        f"Unsupported manual local-group kind '{kind}'."
+                self.local_group_primitive_model[root] = (
+                    self._detect_heteroatom_local_groups(
+                        molecule=molecule,
+                        ff_gen=ff_gen,
+                        z_matrix=self.roots_z_matrix[root],
+                        local_group_model=self.local_group_primitive_model[root],
+                        rotatable_bonds_zero_based=rotatable_bonds_zero_based,
                     )
+                )
 
-                rotor, cluster = self._build_manual_phenyl_local_group(
-                    self.roots_z_matrix[root], spec)
-                group_id = str(spec["group_id"])
-                if (
-                    group_id in self.local_group_primitive_model[root].rotors
-                    or group_id in self.local_group_primitive_model[root].clusters
-                ):
-                    raise ValueError(
-                        f"Duplicate local-group id '{group_id}'."
+                self.local_group_primitive_model[root] = (
+                    self._detect_methoxy_local_groups(
+                        molecule=molecule,
+                        ff_gen=ff_gen,
+                        z_matrix=self.roots_z_matrix[root],
+                        local_group_model=self.local_group_primitive_model[root],
+                        rotatable_bonds_zero_based=rotatable_bonds_zero_based,
                     )
-                self.local_group_primitive_model[root].rotors[group_id] = rotor
-                self.local_group_primitive_model[root].clusters[group_id] = cluster
+                )
 
-            self._refresh_local_group_core_partition(
-                self.local_group_primitive_model[root],
-                self.roots_z_matrix[root],
-                len(molecule.get_labels()),
-            )
+                self.local_group_primitive_model[root] = (
+                    self._detect_amide_side_chain_local_groups(
+                        molecule=molecule,
+                        ff_gen=ff_gen,
+                        z_matrix=self.roots_z_matrix[root],
+                        local_group_model=self.local_group_primitive_model[root],
+                        rotatable_bonds_zero_based=rotatable_bonds_zero_based,
+                    )
+                )
 
-            self.local_group_model[root] = self.local_group_primitive_model[root]
-            self.local_groups[root] = self.local_group_model[root].clusters
+                self.local_group_primitive_model[root] = (
+                    self._detect_anchored_linker_local_groups(
+                        molecule=molecule,
+                        ff_gen=ff_gen,
+                        z_matrix=self.roots_z_matrix[root],
+                        local_group_model=self.local_group_primitive_model[root],
+                        rotatable_bonds_zero_based=rotatable_bonds_zero_based,
+                    )
+                )
 
-            excluded_local_atoms = set()
-            for cluster in self.local_group_model[root].clusters.values():
-                cluster_owned = set(int(atom) for atom in cluster.owned_atoms)
+                self.local_group_primitive_model[root] = (
+                    self._detect_alkyl_chain_local_groups(
+                        molecule=molecule,
+                        ff_gen=ff_gen,
+                        z_matrix=self.roots_z_matrix[root],
+                        local_group_model=self.local_group_primitive_model[root],
+                        rotatable_bonds_zero_based=rotatable_bonds_zero_based,
+                    )
+                )
+    
+                print("\n 2 \n", self.local_group_primitive_model)
 
-                axis_atoms = set()
-                for rotor_id in cluster.rotor_ids:
-                    rotor = self.local_group_model[root].rotors[str(rotor_id)]
-                    axis_atoms.update(int(atom) for atom in rotor.axis)
+                manual_specs = self.local_group_specs or ()
+                if isinstance(manual_specs, dict):
+                    manual_specs = (manual_specs,)
 
-                excluded_local_atoms.update(cluster_owned - axis_atoms)
+                for spec in manual_specs:
+                    kind = str(spec.get("kind", "")).lower()
+                    if kind != "phenyl":
+                        raise ValueError(
+                            f"Unsupported manual local-group kind '{kind}'."
+                        )
 
-            excluded_local_atoms = sorted(excluded_local_atoms)
-                        
+                    rotor, cluster = self._build_manual_phenyl_local_group(
+                        self.roots_z_matrix[root], spec)
+                    group_id = str(spec["group_id"])
+                    if (
+                        group_id in self.local_group_primitive_model[root].rotors
+                        or group_id in self.local_group_primitive_model[root].clusters
+                    ):
+                        raise ValueError(
+                            f"Duplicate local-group id '{group_id}'."
+                        )
+                    self.local_group_primitive_model[root].rotors[group_id] = rotor
+                    self.local_group_primitive_model[root].clusters[group_id] = cluster
+
+                self._refresh_local_group_core_partition(
+                    self.local_group_primitive_model[root],
+                    self.roots_z_matrix[root],
+                    len(molecule.get_labels()),
+                )
+
+                self.local_group_model[root] = self.local_group_primitive_model[root]
+                self.local_groups[root] = self.local_group_model[root].clusters
+
+                excluded_local_atoms = set()
+                for cluster in self.local_group_model[root].clusters.values():
+                    cluster_owned = set(int(atom) for atom in cluster.owned_atoms)
+
+                    axis_atoms = set()
+                    for rotor_id in cluster.rotor_ids:
+                        rotor = self.local_group_model[root].rotors[str(rotor_id)]
+                        axis_atoms.update(int(atom) for atom in rotor.axis)
+
+                    excluded_local_atoms.update(cluster_owned - axis_atoms)
+
+                excluded_local_atoms = sorted(excluded_local_atoms)
+                      
             all_exclision = [element for rot_bond in rotatable_bonds_zero_based for element in rot_bond]
 
             symmetry_groups_ref = [groups for groups in symmetry_groups[1] if not any(item in all_exclision for item in groups)]
@@ -3005,7 +3117,7 @@ class IMForceFieldGenerator:
                 #     for i, element in enumerate(self.roots_z_matrix[root]['dihedrals']):
                 #         if tuple(sorted(element)) in dihedral_list:
                 #             indices_list.append(i)
-                self.symmetry_information['gs'] = [symmetry_groups[0], rot_groups['gs'], regrouped['gs'], core_atoms, excluded_local_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, [], [dihedral_start, dihedral_end]]
+                self.symmetry_information['gs'] = [symmetry_groups[0], rot_groups['gs'], regrouped['gs'], core_atoms, list(excluded_local_atoms), rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, [], [dihedral_start, dihedral_end]]
 
             imforcefieldfile = self.imforcefieldfiles[self.roots_to_follow[0]]
             self.states_interpolation_settings[self.roots_to_follow[0]] = {
@@ -3022,6 +3134,8 @@ class IMForceFieldGenerator:
                 'tc_weight_mode': self.tc_weight_mode,
                 'local_factor_state_weight_mode':
                     self.local_factor_state_weight_mode,
+                'local_factor_combination_mode':
+                    self.local_factor_combination_mode,
                 'use_mass_weight': self.use_mass_weight,
             }
             self.sampling_states_interpolation_settings[self.roots_to_follow[0]] = self.states_interpolation_settings[self.roots_to_follow[0]].copy()
@@ -4841,6 +4955,301 @@ class IMForceFieldGenerator:
 
         return coupled_model, coupling_data
 
+    def _schema3_relaxed_residual_enabled(self):
+        mode = getattr(
+            self,
+            "local_factor_combination_mode",
+            COMBINATION_SIGNED_FULL,
+        )
+        return str(mode).strip().lower().replace(
+            "-", "_") == COMBINATION_SIGNED_RELAXED_RESIDUAL
+
+    def _schema4_msi_enabled(self):
+        version = int(getattr(self, "msi_schema_version", 3))
+        if version not in (2, 3, 4):
+            raise ValueError("msi_schema_version must be 2, 3, or 4.")
+        return version == 4
+
+    def _schema4_environment_descriptor_spec(self, root):
+        if not self._schema4_msi_enabled():
+            raise RuntimeError(
+                "Schema-4 descriptor construction requires msi_schema_version=4."
+            )
+        molecule = getattr(self, "molecule", None)
+        if molecule is None:
+            raise RuntimeError(
+                "Schema-4 construction requires the setup molecule."
+            )
+        local_group_model = self.local_group_model.get(
+            root, self.local_group_primitive_model.get(root)
+        )
+        if local_group_model is None:
+            raise RuntimeError(
+                f"Schema-4 construction has no local-group model for root {root}."
+            )
+        policy = dict(self.msi_descriptor_policy)
+        return build_contact_torsion_v1_spec(
+            descriptor_spec_id=f"descriptor.contact_torsion.root_{root}.v1",
+            labels=molecule.get_labels(),
+            connectivity=molecule.get_connectivity_matrix(),
+            local_group_model=local_group_model,
+            z_matrix=self.roots_z_matrix[root],
+            distance_coefficient=float(policy["distance_coefficient"]),
+            contact_r0_angstrom=float(policy["contact_r0_angstrom"]),
+            contact_exponent=int(policy["contact_exponent"]),
+        )
+
+    def construct_schema4_registry(
+            self,
+            target_file,
+            root,
+            interpolation_settings,
+            descriptor_spec=None,
+            legacy_banks=None):
+        """Audit computed factor states, promote cores, and atomically write MSI."""
+
+        if not self._schema4_msi_enabled():
+            raise RuntimeError(
+                "construct_schema4_registry requires msi_schema_version=4; "
+                "schemas 2/3 are intentionally left on their legacy path."
+            )
+        if descriptor_spec is None:
+            descriptor_spec = self._schema4_environment_descriptor_spec(root)
+        if legacy_banks is None:
+            legacy_banks = load_signed_factor_banks_for_root(
+                target_file,
+                root,
+                self.roots_z_matrix[root],
+                interpolation_settings,
+            )
+        constructor = Schema4MSIConstructor(
+            locality_threshold_policy=self.msi_locality_threshold_policy,
+            promotion_policy=self.msi_promotion_policy,
+        )
+        registry, audits, promotions = constructor.construct(
+            legacy_banks=legacy_banks,
+            root=root,
+            descriptor_spec=descriptor_spec,
+            output_file=target_file,
+        )
+        self.msi_construction_stage_trace = tuple(constructor.stage_trace)
+        return registry, audits, promotions
+
+    @staticmethod
+    def _active_projector_rows(cluster, rotor_map):
+        """Cluster-active rows plus every physical signature/torsion row."""
+
+        rows = set(int(row) for row in cluster.active_rows)
+        for rotor_id in cluster.rotor_ids:
+            rotor = rotor_map.get(str(rotor_id))
+            if rotor is None:
+                continue
+            rows.update(int(row) for row in rotor.signature_rows)
+            rows.update(int(row) for row in rotor.torsion_rows)
+
+        return tuple(sorted(rows))
+
+    def _with_schema3_projector_rows(self, local_group_model):
+        """Attach explicit support only to direct anchored-linker factors."""
+
+        if not self._schema3_relaxed_residual_enabled():
+            return local_group_model
+
+        clusters = {}
+        changed = False
+        for cluster_id, cluster in local_group_model.clusters.items():
+            if str(cluster.family_label) != "anchored_linker":
+                clusters[str(cluster_id)] = cluster
+                continue
+
+            projector_rows = self._active_projector_rows(
+                cluster, local_group_model.rotors)
+            cluster = replace(
+                cluster,
+                projector_rows=projector_rows,
+                projector_policy_id="active_rows_plus_signatures",
+            )
+            clusters[str(cluster_id)] = cluster
+            changed = True
+
+        if not changed:
+            return local_group_model
+
+        return replace(local_group_model, clusters=clusters)
+
+    def _local_factor_overlap_cluster_id(self, rotor_key, clusters):
+        safe_parts = []
+        for rotor_id in rotor_key:
+            safe = "".join(
+                char if char.isalnum() else "_"
+                for char in str(rotor_id)
+            ).strip("_")
+            safe_parts.append(safe or "rotor")
+        base = "overlap_" + "_".join(safe_parts)
+        cluster_id = base
+        counter = 1
+        while cluster_id in clusters:
+            cluster_id = f"{base}_{counter}"
+            counter += 1
+        return cluster_id
+
+    def _augment_schema3_relaxed_residual_clusters(self, local_group_model):
+        """Adds explicit canonical overlap clusters required by schema 3."""
+
+        if not self._schema3_relaxed_residual_enabled():
+            return local_group_model, ()
+
+        direct_items = sorted(
+            (
+                (str(cluster_id), cluster)
+                for cluster_id, cluster in local_group_model.clusters.items()
+                if str(getattr(cluster, "role", "factor")).lower()
+                != "overlap"
+            ),
+            key=lambda item: str(item[0]),
+        )
+        coefficient_by_key, _ = build_intersection_coefficients(
+            (cluster_id, cluster.rotor_ids)
+            for cluster_id, cluster in direct_items)
+
+        clusters = dict(local_group_model.clusters)
+        key_to_cluster_id = {}
+        for cluster_id, cluster in clusters.items():
+            key = tuple(sorted(
+                str(rotor_id)
+                for rotor_id in (
+                    getattr(cluster, "canonical_subset_key", ())
+                    or getattr(cluster, "rotor_ids", ())
+                )
+            ))
+            key_to_cluster_id[key] = str(cluster_id)
+
+        added_cluster_ids = []
+        for rotor_key, coefficient in sorted(coefficient_by_key.items()):
+            if abs(float(coefficient)) <= 1.0e-12:
+                continue
+            if rotor_key in key_to_cluster_id:
+                continue
+
+            rotor_set = set(str(rotor_id) for rotor_id in rotor_key)
+            parents = [
+                (cluster_id, cluster)
+                for cluster_id, cluster in direct_items
+                if rotor_set.issubset(
+                    set(str(rotor_id) for rotor_id in cluster.rotor_ids))
+            ]
+            if not parents:
+                continue
+
+            active_row_sets = [
+                set(int(row) for row in cluster.active_rows)
+                for _, cluster in parents
+                if getattr(cluster, "active_rows", ())
+            ]
+            active_rows = (
+                set.intersection(*active_row_sets)
+                if active_row_sets else set()
+            )
+            owned_atoms = set()
+            active_atoms = set()
+            anchor_atoms = set()
+            relaxation_atoms = set()
+
+            for rotor_id in rotor_key:
+                rotor = local_group_model.rotors.get(str(rotor_id))
+                if rotor is None:
+                    continue
+                active_rows.update(int(row) for row in rotor.torsion_rows)
+                owned_atoms.update(int(atom) for atom in rotor.owned_atoms)
+
+            for _, cluster in parents:
+                parent_active_atoms = set(
+                    int(atom) for atom in getattr(cluster, "active_atoms", ()))
+                if active_atoms:
+                    active_atoms.intersection_update(parent_active_atoms)
+                else:
+                    active_atoms.update(parent_active_atoms)
+                anchor_atoms.update(
+                    int(atom)
+                    for atom in getattr(cluster, "anchor_atoms", ())
+                )
+                relaxation_atoms.update(
+                    int(atom)
+                    for atom in getattr(cluster, "relaxation_atoms", ())
+                )
+
+            active_atoms.update(owned_atoms)
+            cluster_id = self._local_factor_overlap_cluster_id(
+                rotor_key, clusters)
+            clusters[cluster_id] = LocalCluster(
+                cluster_id=cluster_id,
+                family_label="canonical_overlap",
+                rotor_ids=tuple(str(rotor_id) for rotor_id in rotor_key),
+                owned_atoms=tuple(sorted(owned_atoms)),
+                active_atoms=tuple(sorted(active_atoms)),
+                active_rows=tuple(sorted(active_rows)),
+                anchor_atoms=tuple(sorted(anchor_atoms)),
+                relaxation_atoms=tuple(sorted(relaxation_atoms)),
+                role="overlap",
+                canonical_subset_key=tuple(str(rotor_id)
+                                           for rotor_id in rotor_key),
+                parent_cluster_ids=tuple(
+                    str(parent_id) for parent_id, _ in parents),
+                relaxation_policy_id="default",
+            )
+            key_to_cluster_id[rotor_key] = cluster_id
+            added_cluster_ids.append(cluster_id)
+
+        if not added_cluster_ids:
+            return local_group_model, ()
+
+        return (
+            LocalGroupModel(
+                version=local_group_model.version,
+                enabled=local_group_model.enabled,
+                rotors=local_group_model.rotors,
+                clusters=clusters,
+                core_atoms=local_group_model.core_atoms,
+                core_rows=local_group_model.core_rows,
+            ),
+            tuple(added_cluster_ids),
+        )
+
+    def _with_schema3_anchor_state_ids(self, local_group_model):
+        """Returns a schema-3 model whose clusters declare anchor state ids."""
+
+        if not self._schema3_relaxed_residual_enabled():
+            return local_group_model
+
+        clusters = {}
+        changed = False
+        for cluster_id, cluster in local_group_model.clusters.items():
+            anchor_state_ids = tuple(
+                int(state_id)
+                for state_id in (
+                    getattr(cluster, "anchor_state_ids", ()) or (0,)
+                )
+            )
+            if anchor_state_ids != getattr(cluster, "anchor_state_ids", ()):
+                cluster = replace(
+                    cluster,
+                    anchor_state_ids=anchor_state_ids,
+                )
+                changed = True
+            clusters[cluster_id] = cluster
+
+        if not changed:
+            return local_group_model
+
+        return LocalGroupModel(
+            version=local_group_model.version,
+            enabled=local_group_model.enabled,
+            rotors=local_group_model.rotors,
+            clusters=clusters,
+            core_atoms=local_group_model.core_atoms,
+            core_rows=local_group_model.core_rows,
+        )
+
     def _local_group_phase_values(self, rotor):
         if getattr(rotor, "phase_values", None):
             return tuple(float(x) for x in rotor.phase_values)
@@ -4917,6 +5326,129 @@ class IMForceFieldGenerator:
             )
 
         return rotated
+
+    def _local_factor_relaxation_constraints(
+            self,
+            molecule,
+            anchor_molecule,
+            z_matrix,
+            local_group_model,
+            cluster,
+            rotor_ids,
+            phase_signature):
+        """
+        Builds schema-3 canonical local-factor relaxation constraints.
+
+        The constraints intentionally do not freeze Cartesian atoms.  They hold
+        the sampled subset rotors at their requested phases and anchor every
+        other local rotor at its family/core phase, while allowing the rest of
+        the molecule, including core atoms, to relax as response coordinates.
+        """
+
+        del z_matrix, cluster
+
+        if anchor_molecule is None:
+            anchor_molecule = molecule
+
+        selected_phases = {
+            str(rotor_id): float(phase)
+            for rotor_id, phase in zip(rotor_ids, phase_signature)
+        }
+        anchor_external = bool(
+            getattr(self, "local_factor_anchor_external_rotors", True)
+        )
+
+        constraints = []
+        seen = set()
+        # Selected subset constraints take precedence if two rotor records use
+        # equivalent oriented dihedrals.  This also makes duplicate physical
+        # constraints deterministic instead of depending on rotor-id sorting.
+        rotor_items = sorted(
+            local_group_model.rotors.items(),
+            key=lambda item: (
+                str(item[0]) not in selected_phases,
+                str(item[0]),
+            ),
+        )
+        for rotor_id, rotor in rotor_items:
+            rotor_id = str(rotor_id)
+            if rotor_id not in selected_phases and not anchor_external:
+                continue
+
+            dihedral = self._oriented_local_rotor_dihedral(rotor)
+            if dihedral is None:
+                continue
+
+            key = tuple(int(atom) for atom in dihedral)
+            canonical_key = min(key, tuple(reversed(key)))
+            if canonical_key in seen:
+                continue
+            seen.add(canonical_key)
+
+            phase = selected_phases.get(rotor_id, 0.0)
+            dihedral_one_based = [int(atom) + 1 for atom in key]
+            anchor_angle = anchor_molecule.get_dihedral(
+                dihedral_one_based, 'degree')
+            target_angle = float(anchor_angle) + np.rad2deg(float(phase))
+            constraints.append(
+                "set dihedral "
+                + " ".join(str(atom) for atom in dihedral_one_based)
+                + f" {target_angle:.12f}"
+            )
+
+        return constraints
+
+    def _relax_canonical_local_factor_state(
+            self,
+            drivers,
+            molecule,
+            basis,
+            z_matrix,
+            local_group_model,
+            cluster,
+            rotor_ids,
+            phase_signature,
+            anchor_molecule=None):
+        if not getattr(self, "relax_local_factor_states", True):
+            return molecule, basis
+
+        constraints = self._local_factor_relaxation_constraints(
+            molecule,
+            anchor_molecule,
+            z_matrix,
+            local_group_model,
+            cluster,
+            rotor_ids,
+            phase_signature,
+        )
+        if not constraints:
+            return molecule, basis
+
+        max_iter = getattr(self, "local_factor_state_opt_max_iter", 120)
+        if self._is_xtb_like_driver(drivers[0]):
+            opt_results = self._run_optimization(
+                drivers[0],
+                molecule,
+                constraints=constraints,
+                index_offset=1,
+                max_iter=max_iter,
+            )
+            return opt_results['final_molecule'], basis
+
+        _, scf_results, _ = self._compute_energy(drivers[0], molecule, basis)
+        opt_results = self._run_optimization(
+            drivers[0],
+            molecule,
+            constraints=constraints,
+            index_offset=1,
+            compute_args=(basis, scf_results),
+            max_iter=max_iter,
+        )
+        optimized_molecule = opt_results['final_molecule']
+        basis = self._refresh_basis_for_driver(
+            optimized_molecule, drivers[0], basis)
+
+        return optimized_molecule, basis
 
     def _local_group_cluster_contains_rotor_kind(
             self,
@@ -5442,7 +5974,8 @@ class IMForceFieldGenerator:
             rotor_ids=(),
             dihedrals_to_rotate=None,
             phase_signature=None,
-            reference_molecule=None):
+            reference_molecule=None,
+            is_anchor=False):
 
         datapoint.family_label = family_label
         datapoint.bank_role = bank_role
@@ -5450,25 +5983,71 @@ class IMForceFieldGenerator:
         datapoint.cluster_rotor_ids = tuple(str(rotor_id) for rotor_id in rotor_ids)
         datapoint.dihedrals_to_rotate = dihedrals_to_rotate
         datapoint.phase_signature = phase_signature
+        datapoint.is_anchor = bool(is_anchor)
+        datapoint.local_factor_combination_mode = getattr(
+            self,
+            "local_factor_combination_mode",
+            COMBINATION_SIGNED_FULL,
+        )
 
         if bank_role == 'core':
             datapoint.cluster_id = None
             datapoint.cluster_type = None
             datapoint.active_atoms = np.array(local_group_model.core_atoms, dtype=np.int64)
             datapoint.active_rows = np.array(local_group_model.core_rows, dtype=np.int64)
+            datapoint.canonical_subset_key = ()
+            datapoint.response_rows = ()
+            datapoint.relaxation_policy_id = None
+            datapoint.anchor_state_ids = ()
+            datapoint.local_factor_overlap_source = None
         else:
             datapoint.cluster_id = str(cluster.cluster_id)
             datapoint.cluster_type = str(cluster.family_label)
             datapoint.active_atoms = np.array(cluster.active_atoms, dtype=np.int64)
             datapoint.active_rows = np.array(cluster.active_rows, dtype=np.int64)
+            datapoint.canonical_subset_key = tuple(
+                str(rotor_id)
+                for rotor_id in (
+                    getattr(cluster, "canonical_subset_key", ())
+                    or getattr(cluster, "rotor_ids", ())
+                )
+            )
+            datapoint.response_rows = tuple(
+                int(row) for row in getattr(cluster, "response_rows", ()))
+            datapoint.relaxation_policy_id = getattr(
+                cluster, "relaxation_policy_id", "default")
+            datapoint.anchor_state_ids = tuple(
+                int(state_id)
+                for state_id in getattr(cluster, "anchor_state_ids", ()))
+            datapoint.local_factor_overlap_source = (
+                ",".join(
+                    str(parent_id)
+                    for parent_id in getattr(
+                        cluster, "parent_cluster_ids", ())
+                )
+                if str(getattr(cluster, "role", "factor")).lower() == "overlap"
+                else None
+            )
 
         if reference_molecule is not None:
+            mapping_rotor_ids = tuple(str(rotor_id) for rotor_id in rotor_ids)
+            if bank_role == 'core':
+                # The schema-3 core is evaluated with coefficient one and must
+                # retain the full local-rotor permutation symmetry.  Passing an
+                # empty rotor list here leaves only the identity mask, causing
+                # a symmetry-equivalent methyl rotation to look like a large
+                # displacement of the full core Taylor surface.
+                mapping_rotor_ids = tuple(
+                    str(rotor_id)
+                    for rotor_id in sorted(
+                        local_group_model.rotors, key=lambda value: str(value))
+                )
             datapoint.mapping_masks = np.array(
                 self._build_local_group_mapping_masks(
                     reference_molecule,
                     datapoint.z_matrix_dict,
                     local_group_model,
-                    rotor_ids,
+                    mapping_rotor_ids,
                 ),
                 dtype=np.int64,
             )
@@ -5566,6 +6145,138 @@ class IMForceFieldGenerator:
                     'is_anchor': False,
                 }
                 state_id += 1
+
+    def _detect_local_factor_response_rows(
+            self, core_datapoint, cluster_datapoints, z_matrix,
+            force_detection=False):
+        """Detect internal-coordinate response to constrained relaxation."""
+
+        if not cluster_datapoints or (
+            not force_detection
+            and not bool(getattr(
+                self, "local_factor_detect_response_rows", True))
+        ):
+            return ()
+
+        thresholds = dict(getattr(
+            self,
+            "local_factor_response_thresholds",
+            {},
+        ))
+        defaults = {
+            "bond": 0.01,
+            "angle": np.deg2rad(1.0),
+            "dihedral": np.deg2rad(3.0),
+            "improper": np.deg2rad(3.0),
+        }
+        defaults.update(thresholds)
+
+        sections = (
+            ("bond", len(z_matrix.get("bonds", ()))),
+            ("angle", len(z_matrix.get("angles", ()))),
+            ("dihedral", len(z_matrix.get("dihedrals", ()))),
+            ("improper", len(z_matrix.get("impropers", ()))),
+        )
+        row_thresholds = []
+        periodic_rows = []
+        offset = 0
+        for section, count in sections:
+            row_thresholds.extend([float(defaults[section])] * int(count))
+            if section in ("dihedral", "improper"):
+                periodic_rows.extend(range(offset, offset + int(count)))
+            offset += int(count)
+
+        core_values = np.asarray(
+            core_datapoint.internal_coordinates_values, dtype=np.float64)
+        if len(row_thresholds) != core_values.size:
+            raise RuntimeError(
+                "Local-factor response detection found an inconsistent "
+                "z-matrix/internal-coordinate size."
+            )
+
+        displacements = []
+        for datapoint in cluster_datapoints:
+            delta = np.asarray(
+                datapoint.internal_coordinates_values,
+                dtype=np.float64,
+            ) - core_values
+            if periodic_rows:
+                idx = np.asarray(periodic_rows, dtype=np.int64)
+                delta[idx] = (delta[idx] + np.pi) % (2.0 * np.pi) - np.pi
+            displacements.append(delta)
+
+        rms = np.sqrt(np.mean(np.square(displacements), axis=0))
+        return tuple(int(row) for row in np.flatnonzero(
+            rms > np.asarray(row_thresholds, dtype=np.float64)))
+
+    def _promote_local_factor_response_rows(
+            self, local_group_model, cluster_datapoints, core_datapoint,
+            z_matrix, force_detection=False):
+        """Return a model whose factor support includes relaxed responses."""
+
+        flat_z_matrix = InterpolationDatapoint.flatten_z_matrix(z_matrix)
+        clusters = {}
+        for cluster_id, cluster in local_group_model.clusters.items():
+            detected = self._detect_local_factor_response_rows(
+                core_datapoint,
+                cluster_datapoints.get(str(cluster_id), ()),
+                z_matrix,
+                force_detection=force_detection,
+            )
+            active_rows = set(int(row) for row in cluster.active_rows)
+            response_rows = set(int(row) for row in cluster.response_rows)
+            response_rows.update(detected)
+            active_rows.update(response_rows)
+            for rotor_id in cluster.rotor_ids:
+                rotor = local_group_model.rotors.get(str(rotor_id))
+                if rotor is not None:
+                    active_rows.update(int(row) for row in rotor.torsion_rows)
+
+            active_atoms = set(int(atom) for atom in cluster.active_atoms)
+            for row in active_rows:
+                active_atoms.update(int(atom) for atom in flat_z_matrix[row])
+            policy_id = getattr(cluster, "relaxation_policy_id", None)
+            if not policy_id or str(policy_id) == "default":
+                kinds = {
+                    str(local_group_model.rotors[str(rotor_id)].kind)
+                    for rotor_id in cluster.rotor_ids
+                    if str(rotor_id) in local_group_model.rotors
+                }
+                if "anchored_linker" in kinds:
+                    policy_id = "anchored_linker_torsion_relaxed"
+                elif "alkyl_chain" in kinds:
+                    policy_id = "alkyl_chain_torsion_relaxed"
+                elif "methoxy" in kinds:
+                    policy_id = "methoxy_torsion_relaxed"
+                elif kinds & {"alcohol", "primary_amine", "ammonium"}:
+                    policy_id = "heteroatom_torsion_relaxed"
+                elif "tert_butyl_parent" in kinds:
+                    policy_id = "tertbutyl_parent_torsion_relaxed"
+                else:
+                    policy_id = "methyl_torsion_relaxed"
+
+            clusters[str(cluster_id)] = replace(
+                cluster,
+                active_rows=tuple(sorted(active_rows)),
+                active_atoms=tuple(sorted(active_atoms)),
+                response_rows=tuple(sorted(response_rows)),
+                relaxation_policy_id=str(policy_id),
+            )
+
+        factor_rows = {
+            int(row)
+            for cluster in clusters.values()
+            for row in cluster.active_rows
+        }
+        core_rows = tuple(
+            int(row) for row in local_group_model.core_rows
+            if int(row) not in factor_rows
+        )
+        return replace(
+            local_group_model,
+            clusters=clusters,
+            core_rows=core_rows,
+        )
 
     def add_point_local_groups(
             self,
@@ -5726,10 +6437,33 @@ class IMForceFieldGenerator:
                     core_dp.metadata = deepcopy(backend_metadata)
                     core_dp.point_label = core_label
 
+                    schema4_ordered_construction = self._schema4_msi_enabled()
                     local_group_model, coupling_data = self._build_coupled_local_group_model(
                         local_group_model,
                         core_dp.internal_hessian,
                     )
+                    if not schema4_ordered_construction:
+                        local_group_model, added_overlap_clusters = (
+                            self._augment_schema3_relaxed_residual_clusters(
+                                local_group_model)
+                        )
+                        local_group_model = (
+                            self._with_schema3_anchor_state_ids(local_group_model)
+                        )
+                        local_group_model = self._with_schema3_projector_rows(
+                            local_group_model)
+                        if added_overlap_clusters:
+                            coupling_data = dict(coupling_data)
+                            coupling_data[
+                                'schema3_canonical_overlap_cluster_ids'
+                            ] = added_overlap_clusters
+                            coupling_data['coupled_cluster_ids'] = tuple(
+                                local_group_model.clusters.keys())
+                    else:
+                        coupling_data = dict(coupling_data)
+                        coupling_data["construction_status"] = (
+                            "provisional_topology_before_response_audit"
+                        )
                     self.local_group_coupled_model[target_root] = local_group_model
                     self.local_group_model[target_root] = local_group_model
                     self.local_groups[target_root] = local_group_model.clusters
@@ -5740,22 +6474,11 @@ class IMForceFieldGenerator:
 
                     print(coupling_data)
 
-                    self._set_local_group_datapoint_metadata(
-                        core_dp,
-                        family_label=family_label,
-                        bank_role='core',
-                        local_group_model=local_group_model,
-                        rotor_ids=(),
-                        reference_molecule=mol_basis[0],
-                    )
-                    core_dp.write_hdf5(target_file, core_label)
-                    if write_org_database:
-                        core_dp.write_hdf5(
-                            f'im_database_{target_root}_org.h5', core_label)
-
                     point_labels = [core_label]
                     point_labels_by_cluster = {}
+                    generated_cluster_records = []
                     anchored_linker_state_cache = {}
+                    local_state_continuation_cache = {}
                     anchored_linker_failed_states = set()
 
                     for job in self._local_group_state_jobs(local_group_model):
@@ -5800,6 +6523,9 @@ class IMForceFieldGenerator:
                                     'anchored_linker',
                                 )
                             )
+                            use_canonical_relaxation = (
+                                self._schema3_relaxed_residual_enabled()
+                            )
                             cluster_molecule = self._apply_local_group_state(
                                 mol_basis[0],
                                 local_group_model,
@@ -5807,7 +6533,10 @@ class IMForceFieldGenerator:
                                 phase_signature,
                                 skip_kinds=(
                                     {'anchored_linker'}
-                                    if has_anchored_linker else None
+                                    if (
+                                        has_anchored_linker
+                                        and not use_canonical_relaxation
+                                    ) else None
                                 ),
                             )
 
@@ -5822,7 +6551,21 @@ class IMForceFieldGenerator:
                                     cluster_basis.get_main_basis_label(),
                                 )
 
-                            if has_anchored_linker:
+                            if use_canonical_relaxation:
+                                cluster_molecule, cluster_basis = (
+                                    self._relax_canonical_local_factor_state(
+                                        drivers,
+                                        cluster_molecule,
+                                        cluster_basis,
+                                        z_matrix,
+                                        local_group_model,
+                                        cluster,
+                                        rotor_ids,
+                                        phase_signature,
+                                        anchor_molecule=mol_basis[0],
+                                    )
+                                )
+                            elif has_anchored_linker:
                                 anchored_phase_signature = tuple(
                                     float(phase)
                                     if (
@@ -5950,11 +6693,34 @@ class IMForceFieldGenerator:
                                             cluster_basis,
                                         )
 
+                                continuation_key = (str(cluster.cluster_id), anchored_cache_key[1])
+                                continuation = local_state_continuation_cache.get(continuation_key)
+
+                                application_phase_signature = phase_signature
+
+                                if continuation is not None:
+                                    previous_molecule, previous_basis, previous_phase_signature = continuation
+                                    cluster_molecule = self._clone_molecule_for_local_group(previous_molecule)
+                                    cluster_basis = previous_basis
+
+                                    application_phase_signature = []
+                                    for rotor_id, target_phase, previous_phase in zip(rotor_ids, phase_signature, previous_phase_signature):
+                                        rotor = local_group_model.rotors.get(str(rotor_id))
+
+                                        if rotor is not None and str(rotor.kind) == 'anchored_linker':
+                                            application_phase_signature.append(0.0)
+                                            continue
+
+                                        delta = float(target_phase) - float(previous_phase)
+                                        delta = (delta + np.pi) % (2.0 * np.pi) - np.pi
+                                        application_phase_signature.append(delta)
+
+                                    application_phase_signature = tuple(application_phase_signature)
                                 cluster_molecule = self._apply_local_group_state(
                                     cluster_molecule,
                                     local_group_model,
                                     rotor_ids,
-                                    phase_signature,
+                                    application_phase_signature,
                                     skip_kinds={'anchored_linker'},
                                 )
                                 cluster_molecule, cluster_basis = (
@@ -5967,6 +6733,13 @@ class IMForceFieldGenerator:
                                         rotor_ids,
                                     )
                                 )
+
+                                local_state_continuation_cache[continuation_key] = (
+                                    self._clone_molecule_for_local_group(cluster_molecule),
+                                    cluster_basis,
+                                    tuple(float(x) for x in phase_signature),
+                                )
+                                print("I am in the addition of continuation cache", continuation_key)
                             else:
                                 print("Relax the methoxy group")
                                 cluster_molecule, cluster_basis = (
@@ -5991,6 +6764,7 @@ class IMForceFieldGenerator:
                                         dihedrals_to_rotate,
                                     )
                                 )
+
                             print("After the relaxiation")
                             cluster_energies, cluster_scf, cluster_rsp = (
                                 self._compute_energy(
@@ -6026,22 +6800,17 @@ class IMForceFieldGenerator:
                                 cluster_backend_metadata)
 
                         cluster_dp.point_label = label
-                        self._set_local_group_datapoint_metadata(
-                            cluster_dp,
-                            family_label=family_label,
-                            bank_role='cluster',
-                            local_group_model=local_group_model,
-                            cluster=cluster,
-                            cluster_state_id=state_id,
-                            rotor_ids=rotor_ids,
-                            dihedrals_to_rotate=dihedrals_to_rotate,
-                            phase_signature=phase_signature,
-                            reference_molecule=cluster_molecule,
-                        )
-                        cluster_dp.write_hdf5(target_file, label)
-                        if write_org_database:
-                            cluster_dp.write_hdf5(
-                                f'im_database_{target_root}_org.h5', label)
+                        generated_cluster_records.append({
+                            'datapoint': cluster_dp,
+                            'molecule': cluster_molecule,
+                            'label': label,
+                            'cluster_id': str(cluster.cluster_id),
+                            'state_id': state_id,
+                            'rotor_ids': rotor_ids,
+                            'dihedrals_to_rotate': dihedrals_to_rotate,
+                            'phase_signature': phase_signature,
+                            'is_anchor': bool(job['is_anchor']),
+                        })
                         point_labels.append(label)
                         point_labels_by_cluster.setdefault(
                             str(cluster.cluster_id), {})[int(state_id)] = {
@@ -6060,6 +6829,127 @@ class IMForceFieldGenerator:
                         ) 
                         self.ostream.flush()
                         
+                    if (
+                        self._schema3_relaxed_residual_enabled()
+                        or schema4_ordered_construction
+                    ):
+                        datapoints_by_cluster = {}
+                        for record in generated_cluster_records:
+                            datapoints_by_cluster.setdefault(
+                                record['cluster_id'], []).append(
+                                    record['datapoint'])
+                        local_group_model = (
+                            self._promote_local_factor_response_rows(
+                                local_group_model,
+                                datapoints_by_cluster,
+                                core_dp,
+                                z_matrix,
+                                force_detection=schema4_ordered_construction,
+                            )
+                        )
+                        if schema4_ordered_construction:
+                            final_model, final_coupling_data = (
+                                self._build_coupled_local_group_model(
+                                    local_group_model,
+                                    core_dp.internal_hessian,
+                                )
+                            )
+                            provisional_ids = set(
+                                str(value)
+                                for value in local_group_model.clusters
+                            )
+                            final_ids = set(
+                                str(value) for value in final_model.clusters
+                            )
+                            if final_ids == provisional_ids:
+                                local_group_model = final_model
+                            else:
+                                # A newly discovered coupling requires joint QM
+                                # states.  Preserve independent factors and
+                                # persist the deferred edge instead of silently
+                                # assembling a factor from missing states.
+                                final_coupling_data = dict(final_coupling_data)
+                                final_coupling_data[
+                                    "deferred_coupling_requires_states"
+                                ] = tuple(sorted(final_ids - provisional_ids))
+                            coupling_data = dict(final_coupling_data)
+                            coupling_data["construction_status"] = (
+                                "finalized_after_response_audit"
+                            )
+                            local_group_model, added_overlap_clusters = (
+                                self._augment_schema3_relaxed_residual_clusters(
+                                    local_group_model
+                                )
+                            )
+                            local_group_model = (
+                                self._with_schema3_anchor_state_ids(
+                                    local_group_model
+                                )
+                            )
+                            local_group_model = (
+                                self._with_schema3_projector_rows(
+                                    local_group_model
+                                )
+                            )
+                            if added_overlap_clusters:
+                                coupling_data[
+                                    "schema3_canonical_overlap_cluster_ids"
+                                ] = added_overlap_clusters
+                                coupling_data["coupled_cluster_ids"] = tuple(
+                                    local_group_model.clusters.keys()
+                                )
+                        self.local_group_coupled_model[
+                            target_root] = local_group_model
+                        self.local_group_model[target_root] = local_group_model
+                        self.local_groups[
+                            target_root] = local_group_model.clusters
+                        if schema4_ordered_construction:
+                            self.local_group_coupling_matrix[
+                                target_root
+                            ] = coupling_data
+                            self.local_group_coupling_matrix[
+                                (target_root, family_label)
+                            ] = coupling_data
+
+                    self._set_local_group_datapoint_metadata(
+                        core_dp,
+                        family_label=family_label,
+                        bank_role='core',
+                        local_group_model=local_group_model,
+                        rotor_ids=(),
+                        reference_molecule=mol_basis[0],
+                    )
+                    core_dp.write_hdf5(target_file, core_label)
+                    if write_org_database:
+                        core_dp.write_hdf5(
+                            f'im_database_{target_root}_org.h5', core_label)
+
+                    for record in generated_cluster_records:
+                        cluster = local_group_model.clusters[
+                            record['cluster_id']]
+                        cluster_dp = record['datapoint']
+                        self._set_local_group_datapoint_metadata(
+                            cluster_dp,
+                            family_label=family_label,
+                            bank_role='cluster',
+                            local_group_model=local_group_model,
+                            cluster=cluster,
+                            cluster_state_id=record['state_id'],
+                            rotor_ids=record['rotor_ids'],
+                            dihedrals_to_rotate=record[
+                                'dihedrals_to_rotate'],
+                            phase_signature=record['phase_signature'],
+                            reference_molecule=record['molecule'],
+                            is_anchor=record['is_anchor'],
+                        )
+                        cluster_dp.write_hdf5(
+                            target_file, record['label'])
+                        if write_org_database:
+                            cluster_dp.write_hdf5(
+                                f'im_database_{target_root}_org.h5',
+                                record['label'],
+                            )
+
                     write_signed_factor_registry_for_family(
                         target_file,
                         target_root,
@@ -6067,7 +6957,18 @@ class IMForceFieldGenerator:
                         local_group_model,
                         core_label,
                         point_labels_by_cluster,
+                        local_factor_combination_mode=(
+                            self.local_factor_combination_mode),
                     )
+
+                    if self._schema4_msi_enabled():
+                        self.construct_schema4_registry(
+                            target_file=target_file,
+                            root=target_root,
+                            interpolation_settings=(
+                                interpolation_settings[target_root]
+                            ),
+                        )
 
                     labels, _ = interpolation_driver.read_labels()
 

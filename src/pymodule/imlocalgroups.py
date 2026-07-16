@@ -59,6 +59,14 @@ class LocalCluster:
     active_rows: tuple[int, ...]
     anchor_atoms: tuple[int, ...] = ()
     relaxation_atoms: tuple[int, ...] = ()
+    role: str = "factor"
+    canonical_subset_key: tuple[str, ...] = ()
+    parent_cluster_ids: tuple[str, ...] = ()
+    response_rows: tuple[int, ...] = ()
+    projector_rows: tuple[int, ...] = ()
+    projector_policy_id: str = "legacy"
+    relaxation_policy_id: str = "default"
+    anchor_state_ids: tuple[int, ...] = ()
 
 @dataclass
 class LocalGroupModel:

@@ -18,6 +18,16 @@ import numpy as np
 from .interpolationdatapoint import InterpolationDatapoint
 
 
+SCHEMA_SIGNED_FULL = 2
+SCHEMA_SIGNED_RELAXED_RESIDUAL = 3
+
+TOPOLOGY_SIGNED_FULL = "signed_local_factors"
+TOPOLOGY_SIGNED_RELAXED_RESIDUAL = "signed_relaxed_residual_factors"
+
+COMBINATION_SIGNED_FULL = "signed_full"
+COMBINATION_SIGNED_RELAXED_RESIDUAL = "signed_relaxed_residual"
+
+
 def _restore_id(value):
     if isinstance(value, bytes):
         value = value.decode("utf-8")
@@ -58,6 +68,48 @@ def _rotor_key(rotor_ids):
     return tuple(sorted((str(rotor_id) for rotor_id in rotor_ids), key=str))
 
 
+def build_intersection_coefficients(factors):
+    """
+    Build inclusion-exclusion coefficients for direct local factors.
+
+    Parameters
+    ----------
+    factors
+        Iterable of ``(cluster_id, rotor_ids)`` pairs.
+
+    Returns
+    -------
+    coefficient_by_key
+        Counter keyed by sorted rotor-id tuples for non-empty intersections.
+    core_coefficient
+        Signed coefficient for empty intersections.
+    """
+
+    coefficient_by_key = Counter()
+    core_coefficient = 0.0
+
+    factors = [
+        (str(cluster_id), tuple(sorted(str(r) for r in rotor_ids)))
+        for cluster_id, rotor_ids in factors
+    ]
+
+    for order in range(1, len(factors) + 1):
+        sign = 1.0 if order % 2 == 1 else -1.0
+
+        for combo in combinations(factors, order):
+            intersection = set(combo[0][1])
+            for _, rotor_ids in combo[1:]:
+                intersection.intersection_update(rotor_ids)
+
+            if intersection:
+                key = tuple(sorted(intersection))
+                coefficient_by_key[key] += sign
+            else:
+                core_coefficient += sign
+
+    return coefficient_by_key, core_coefficient
+
+
 def _phase_for_record(record, n_rotors):
     phase = np.asarray(
         record.get("phase_signature", ()),
@@ -70,7 +122,7 @@ def _phase_for_record(record, n_rotors):
     return out
 
 
-def _rotor_rows(local_group_model, rotor_id):
+def _rotor_signature_rows(local_group_model, rotor_id):
     rotor = local_group_model.rotors.get(str(rotor_id))
     if rotor is None:
         return ()
@@ -78,6 +130,17 @@ def _rotor_rows(local_group_model, rotor_id):
     if signature_rows:
         return tuple(int(row) for row in signature_rows)
     return tuple(int(row) for row in rotor.torsion_rows)
+
+
+def _rotor_physical_torsion_rows(local_group_model, rotor_id):
+    rotor = local_group_model.rotors.get(str(rotor_id))
+    if rotor is None:
+        return ()
+    return tuple(int(row) for row in rotor.torsion_rows)
+
+
+def _rotor_rows(local_group_model, rotor_id):
+    return _rotor_signature_rows(local_group_model, rotor_id)
 
 
 def _rotor_row_types(local_group_model, rotor_id):
@@ -144,7 +207,9 @@ def _active_rows_for_term(local_group_model, rotor_ids, cluster=None):
         rows.extend(int(row) for row in getattr(cluster, "active_rows", ()))
     if not rows:
         for rotor_id in rotor_ids:
-            rows.extend(_rotor_rows(local_group_model, rotor_id))
+            rows.extend(_rotor_physical_torsion_rows(local_group_model, rotor_id))
+    for rotor_id in rotor_ids:
+        rows.extend(_rotor_physical_torsion_rows(local_group_model, rotor_id))
     return tuple(sorted(set(int(row) for row in rows)))
 
 
@@ -170,7 +235,7 @@ def _overlap_active_rows(local_group_model, rotor_ids):
 
     rows = set.intersection(*containing_rows) if containing_rows else set()
     for rotor_id in rotor_ids:
-        rows.update(_rotor_rows(local_group_model, rotor_id))
+        rows.update(_rotor_physical_torsion_rows(local_group_model, rotor_id))
     return tuple(sorted(rows))
 
 
@@ -182,8 +247,30 @@ def _validate_local_group_row_partition(local_group_model):
         cluster_rows = set(int(row) for row in cluster.active_rows)
         active_rows.update(cluster_rows)
 
+        response_rows = tuple(
+            int(row) for row in getattr(cluster, "response_rows", ()))
+        if len(response_rows) != len(set(response_rows)):
+            raise RuntimeError(
+                f"Local cluster {cluster_id} has duplicate response rows: "
+                f"{list(response_rows)}."
+            )
+        negative_response_rows = sorted(
+            row for row in response_rows if row < 0)
+        if negative_response_rows:
+            raise RuntimeError(
+                f"Local cluster {cluster_id} has out-of-bounds response "
+                f"rows: {negative_response_rows}."
+            )
+        missing_response_rows = set(response_rows) - cluster_rows
+        if missing_response_rows:
+            raise RuntimeError(
+                f"Local cluster {cluster_id} response rows are not included "
+                f"in active_rows: {sorted(missing_response_rows)}."
+            )
+
         for rotor_id in cluster.rotor_ids:
-            rotor_rows = set(_rotor_rows(local_group_model, rotor_id))
+            rotor_rows = set(
+                _rotor_physical_torsion_rows(local_group_model, rotor_id))
             missing = rotor_rows - cluster_rows
             if missing:
                 raise RuntimeError(
@@ -235,11 +322,33 @@ def _find_source_factor_for_overlap(factors, overlap_key):
     return None, None
 
 
+def _normalize_local_factor_combination_mode(mode):
+    mode = COMBINATION_SIGNED_FULL if mode is None else str(mode).strip().lower()
+    mode = mode.replace("-", "_")
+    aliases = {
+        "": COMBINATION_SIGNED_FULL,
+        COMBINATION_SIGNED_FULL: COMBINATION_SIGNED_FULL,
+        TOPOLOGY_SIGNED_FULL: COMBINATION_SIGNED_FULL,
+        COMBINATION_SIGNED_RELAXED_RESIDUAL:
+            COMBINATION_SIGNED_RELAXED_RESIDUAL,
+        TOPOLOGY_SIGNED_RELAXED_RESIDUAL:
+            COMBINATION_SIGNED_RELAXED_RESIDUAL,
+    }
+    if mode not in aliases:
+        raise ValueError(
+            "Unsupported local_factor_combination_mode="
+            f"'{mode}'. Allowed values are 'signed_full' and "
+            "'signed_relaxed_residual'."
+        )
+    return aliases[mode]
+
+
 def build_signed_factor_registry_payload(
         local_group_model,
         family_label,
         core_label,
-        point_labels_by_cluster):
+        point_labels_by_cluster,
+        local_factor_combination_mode=COMBINATION_SIGNED_FULL):
     """
     Build an inclusion-exclusion registry for possibly overlapping clusters.
 
@@ -250,6 +359,16 @@ def build_signed_factor_registry_payload(
     rotor that appears in two direct factors.
     """
 
+    mode = _normalize_local_factor_combination_mode(
+        local_factor_combination_mode)
+    if mode == COMBINATION_SIGNED_RELAXED_RESIDUAL:
+        return _build_signed_relaxed_residual_registry_payload(
+            local_group_model,
+            family_label,
+            core_label,
+            point_labels_by_cluster,
+        )
+
     _validate_local_group_row_partition(local_group_model)
 
     factors = sorted(
@@ -258,22 +377,8 @@ def build_signed_factor_registry_payload(
         key=lambda item: str(item[0]),
     )
 
-    coefficient_by_key = Counter()
-    core_coefficient = 0.0
-
-    for order in range(1, len(factors) + 1):
-        sign = 1.0 if order % 2 == 1 else -1.0
-        for combo in combinations(factors, order):
-            intersection = set(str(rotor_id) for rotor_id in combo[0][1].rotor_ids)
-            for _, cluster in combo[1:]:
-                intersection.intersection_update(
-                    str(rotor_id) for rotor_id in cluster.rotor_ids
-                )
-
-            if intersection:
-                coefficient_by_key[_rotor_key(intersection)] += sign
-            else:
-                core_coefficient += sign
+    coefficient_by_key, core_coefficient = build_intersection_coefficients(
+        (cluster_id, cluster.rotor_ids) for cluster_id, cluster in factors)
 
     explicit_key_to_cluster = {
         _rotor_key(cluster.rotor_ids): (str(cluster_id), cluster)
@@ -429,13 +534,259 @@ def build_signed_factor_registry_payload(
         term_angle_library[term_key] = state_payloads
 
     factor_info = {
-        "schema_version": 2,
-        "topology": "signed_local_factors",
+        "schema_version": SCHEMA_SIGNED_FULL,
+        "topology": TOPOLOGY_SIGNED_FULL,
+        "combination_mode": COMBINATION_SIGNED_FULL,
         "family_label": str(family_label),
         "core_label": str(core_label),
         "core_rows": [int(row) for row in local_group_model.core_rows],
         "core_atoms": [int(atom) for atom in local_group_model.core_atoms],
         "core_coefficient": float(core_coefficient),
+        "primitive_signature_rows": {
+            _json_key(rotor_id): [int(row) for row in rows]
+            for rotor_id, rows in primitive_signature_rows.items()
+        },
+        "primitive_signature_row_types": {
+            _json_key(rotor_id): [
+                str(row_type)
+                for row_type in _rotor_row_types(local_group_model, rotor_id)
+            ]
+            for rotor_id in primitive_signature_rows
+        },
+        "primitive_signature_row_scales": {
+            _json_key(rotor_id): [
+                float(scale)
+                for scale in _rotor_row_scales(local_group_model, rotor_id)
+            ]
+            for rotor_id in primitive_signature_rows
+        },
+        "terms": terms,
+    }
+    factor_index = {
+        "family_label": str(family_label),
+        "core_label": str(core_label),
+        "term_state_labels": term_state_labels,
+    }
+
+    return factor_info, term_angle_library, factor_index
+
+
+def _cluster_canonical_subset_key(cluster):
+    key = getattr(cluster, "canonical_subset_key", ()) or getattr(
+        cluster, "rotor_ids", ())
+    return _rotor_key(key)
+
+
+def _build_signed_relaxed_residual_registry_payload(
+        local_group_model,
+        family_label,
+        core_label,
+        point_labels_by_cluster):
+    """
+    Build a schema-3 relaxed-residual local-factor registry.
+
+    Schema 3 keeps one explicit core contribution and combines each canonical
+    local factor as F_S - F_S(anchor). Overlap surfaces must therefore be
+    sampled as their own canonical clusters; they are not inferred from parent
+    factor slices.
+    """
+
+    _validate_local_group_row_partition(local_group_model)
+
+    cluster_items = sorted(
+        ((str(cluster_id), cluster)
+         for cluster_id, cluster in local_group_model.clusters.items()),
+        key=lambda item: str(item[0]),
+    )
+    direct_factors = [
+        (cluster_id, cluster)
+        for cluster_id, cluster in cluster_items
+        if str(getattr(cluster, "role", "factor")).strip().lower() != "overlap"
+    ]
+
+    coefficient_by_key, _ = build_intersection_coefficients(
+        (cluster_id, cluster.rotor_ids)
+        for cluster_id, cluster in direct_factors)
+
+    explicit_key_to_cluster = {}
+    for cluster_id, cluster in cluster_items:
+        canonical_key = _cluster_canonical_subset_key(cluster)
+        if canonical_key in explicit_key_to_cluster:
+            previous_id, _ = explicit_key_to_cluster[canonical_key]
+            raise RuntimeError(
+                "Duplicate canonical local-factor subset "
+                f"{canonical_key}: clusters {previous_id} and {cluster_id}."
+            )
+        explicit_key_to_cluster[canonical_key] = (str(cluster_id), cluster)
+
+    direct_key_to_cluster = {
+        _rotor_key(cluster.rotor_ids): (str(cluster_id), cluster)
+        for cluster_id, cluster in direct_factors
+    }
+
+    primitive_signature_rows = {}
+    for _, cluster in direct_factors:
+        for rotor_id in cluster.rotor_ids:
+            rotor_id = str(rotor_id)
+            primitive_signature_rows.setdefault(
+                rotor_id,
+                tuple(int(row) for row in _rotor_rows(
+                    local_group_model, rotor_id)),
+            )
+
+    terms = {}
+    term_state_labels = {}
+    term_angle_library = {}
+
+    for rotor_key, coefficient in sorted(
+            coefficient_by_key.items(), key=lambda item: item[0]):
+        coefficient = float(coefficient)
+        if abs(coefficient) <= 1.0e-12:
+            continue
+
+        direct = direct_key_to_cluster.get(rotor_key)
+        if direct is not None:
+            cluster_id, cluster = direct
+            role = "factor"
+            parent_cluster_ids = ()
+        else:
+            explicit = explicit_key_to_cluster.get(rotor_key)
+            if explicit is None:
+                raise RuntimeError(
+                    "Missing canonical relaxed overlap library for subset "
+                    f"{rotor_key}.\n"
+                    "Schema-3 signed_relaxed_residual requires explicit "
+                    "canonical overlap terms."
+                )
+            cluster_id, cluster = explicit
+            role = "overlap"
+            parent_cluster_ids = tuple(
+                str(parent_id)
+                for parent_id in getattr(cluster, "parent_cluster_ids", ())
+            )
+            if not parent_cluster_ids:
+                rotor_set = set(str(rotor_id) for rotor_id in rotor_key)
+                parent_cluster_ids = tuple(
+                    str(parent_id)
+                    for parent_id, parent_cluster in direct_factors
+                    if rotor_set.issubset(
+                        set(str(rotor_id)
+                            for rotor_id in parent_cluster.rotor_ids))
+                )
+
+        term_id = str(getattr(cluster, "cluster_id", cluster_id))
+        canonical_subset_key = _cluster_canonical_subset_key(cluster)
+        term_rotor_ids = tuple(str(rotor_id) for rotor_id in cluster.rotor_ids)
+        if not term_rotor_ids:
+            term_rotor_ids = canonical_subset_key
+
+        source_records = _records_for_cluster(point_labels_by_cluster, cluster_id)
+        state_payloads = []
+        state_labels = {}
+        anchor_state_ids = []
+        for record in source_records:
+            state_id = int(record.get("state_id", len(state_payloads)))
+            label = str(record["label"])
+            phase = _phase_for_record(record, len(term_rotor_ids))
+            is_anchor = bool(record.get("is_anchor", False)) or all(
+                abs(float(value)) <= 1.0e-12 for value in phase)
+            state_payloads.append(
+                _state_payload(
+                    state_id,
+                    term_rotor_ids,
+                    phase,
+                    label,
+                    is_anchor=is_anchor,
+                )
+            )
+            state_labels[int(state_id)] = label
+            if is_anchor:
+                anchor_state_ids.append(int(state_id))
+
+        if not state_payloads:
+            raise RuntimeError(
+                "No local-group datapoints were registered for sampled "
+                f"cluster {cluster_id}."
+            )
+        if not anchor_state_ids:
+            raise RuntimeError(
+                f"Schema-3 relaxed residual term {term_id} has no anchor state."
+            )
+
+        response_rows = tuple(
+            int(row) for row in getattr(cluster, "response_rows", ())
+        )
+        active_rows = set(
+            int(row) for row in _active_rows_for_term(
+                local_group_model, term_rotor_ids, cluster=cluster)
+        )
+        active_rows.update(response_rows)
+        for rotor_id in term_rotor_ids:
+            active_rows.update(
+                _rotor_physical_torsion_rows(local_group_model, rotor_id))
+
+        active_atoms = _active_atoms_for_term(
+            local_group_model, term_rotor_ids, cluster=cluster)
+        relaxation_atoms = tuple(
+            int(atom) for atom in getattr(cluster, "relaxation_atoms", ()))
+        projector_rows = tuple(
+            int(row) for row in getattr(cluster, "projector_rows", ()))
+
+        term_key = _json_key(term_id)
+        terms[term_key] = {
+            "term_id": term_id,
+            "role": role,
+            "coefficient": coefficient,
+            "rotor_ids": [str(rotor_id) for rotor_id in term_rotor_ids],
+            "canonical_subset_key": [
+                str(rotor_id) for rotor_id in canonical_subset_key
+            ],
+            "parent_cluster_ids": [
+                str(parent_id) for parent_id in parent_cluster_ids
+            ],
+            "active_rows": [int(row) for row in sorted(active_rows)],
+            "active_atoms": [int(atom) for atom in active_atoms],
+            "response_rows": [int(row) for row in response_rows],
+            "projector_rows": [int(row) for row in projector_rows],
+            "projector_policy_id": str(
+                getattr(cluster, "projector_policy_id", "legacy") or "legacy"
+            ),
+            "relaxation_atoms": [int(atom) for atom in relaxation_atoms],
+            "relaxation_policy_id": str(
+                getattr(cluster, "relaxation_policy_id", "default")
+                or "default"
+            ),
+            "anchor_state_ids": [int(state_id) for state_id in anchor_state_ids],
+            "grouped_signature_rows": [
+                [int(row) for row in rows]
+                for rows in _signature_rows(local_group_model, term_rotor_ids)
+            ],
+            "grouped_signature_row_types": [
+                [str(row_type) for row_type in row_types]
+                for row_types in _signature_row_types(
+                    local_group_model, term_rotor_ids)
+            ],
+            "grouped_signature_row_scales": [
+                [float(scale) for scale in row_scales]
+                for row_scales in _signature_row_scales(
+                    local_group_model, term_rotor_ids)
+            ],
+        }
+        term_state_labels[term_key] = {
+            str(int(state_id)): str(label)
+            for state_id, label in state_labels.items()
+        }
+        term_angle_library[term_key] = state_payloads
+
+    factor_info = {
+        "schema_version": SCHEMA_SIGNED_RELAXED_RESIDUAL,
+        "topology": TOPOLOGY_SIGNED_RELAXED_RESIDUAL,
+        "combination_mode": COMBINATION_SIGNED_RELAXED_RESIDUAL,
+        "family_label": str(family_label),
+        "core_label": str(core_label),
+        "core_rows": [int(row) for row in local_group_model.core_rows],
+        "core_atoms": [int(atom) for atom in local_group_model.core_atoms],
+        "core_coefficient": 1.0,
         "primitive_signature_rows": {
             _json_key(rotor_id): [int(row) for row in rows]
             for rotor_id, rows in primitive_signature_rows.items()
@@ -471,13 +822,15 @@ def write_signed_factor_registry_for_family(
         family_label,
         local_group_model,
         core_label,
-        point_labels_by_cluster):
+        point_labels_by_cluster,
+        local_factor_combination_mode=COMBINATION_SIGNED_FULL):
     factor_info, factor_angle_library, factor_index = (
         build_signed_factor_registry_payload(
             local_group_model,
             family_label,
             core_label,
             point_labels_by_cluster,
+            local_factor_combination_mode=local_factor_combination_mode,
         )
     )
 
@@ -848,6 +1201,23 @@ def load_signed_factor_banks_for_root(imff_file, root, z_matrix, im_settings):
             read_signed_factor_registry_for_family(
                 imff_file, registry_root, family)
         )
+        schema_version = int(factor_info.get("schema_version", 0))
+        combination_mode = _normalize_local_factor_combination_mode(
+            factor_info.get(
+                "combination_mode",
+                COMBINATION_SIGNED_RELAXED_RESIDUAL
+                if schema_version >= SCHEMA_SIGNED_RELAXED_RESIDUAL
+                else COMBINATION_SIGNED_FULL,
+            )
+        )
+        topology = str(
+            factor_info.get(
+                "topology",
+                TOPOLOGY_SIGNED_RELAXED_RESIDUAL
+                if combination_mode == COMBINATION_SIGNED_RELAXED_RESIDUAL
+                else TOPOLOGY_SIGNED_FULL,
+            )
+        )
 
         core_dp = InterpolationDatapoint(z_matrix)
         core_dp.update_settings(im_settings)
@@ -901,8 +1271,32 @@ def load_signed_factor_banks_for_root(imff_file, root, z_matrix, im_settings):
             active_rows = set(
                 int(row) for row in term_payload.get("active_rows", ())
             )
-            for rows in grouped_signature_rows:
-                active_rows.update(rows)
+            if combination_mode == COMBINATION_SIGNED_FULL:
+                for rows in grouped_signature_rows:
+                    active_rows.update(rows)
+
+            anchor_state_ids = tuple(
+                int(state_id)
+                for state_id in term_payload.get("anchor_state_ids", ())
+            )
+            if combination_mode == COMBINATION_SIGNED_RELAXED_RESIDUAL:
+                if not anchor_state_ids:
+                    term_id = str(term_payload.get("term_id", term_key))
+                    raise RuntimeError(
+                        "Schema-3 relaxed residual term "
+                        f"{term_id} has no anchor state."
+                    )
+                missing_anchor_ids = [
+                    state_id for state_id in anchor_state_ids
+                    if state_id not in expected_states
+                ]
+                if missing_anchor_ids:
+                    term_id = str(term_payload.get("term_id", term_key))
+                    raise RuntimeError(
+                        "Schema-3 relaxed residual term "
+                        f"{term_id} has missing anchor states "
+                        f"{missing_anchor_ids}."
+                    )
 
             terms[str(term_payload.get("term_id", term_key))] = {
                 "term_id": str(term_payload.get("term_id", term_key)),
@@ -916,6 +1310,35 @@ def load_signed_factor_banks_for_root(imff_file, root, z_matrix, im_settings):
                 "active_atoms": tuple(
                     int(atom) for atom in term_payload.get("active_atoms", ())
                 ),
+                "canonical_subset_key": tuple(
+                    _restore_id(rotor_id)
+                    for rotor_id in term_payload.get(
+                        "canonical_subset_key",
+                        term_payload.get("rotor_ids", ()),
+                    )
+                ),
+                "parent_cluster_ids": tuple(
+                    _restore_id(cluster_id)
+                    for cluster_id in term_payload.get(
+                        "parent_cluster_ids", ())
+                ),
+                "response_rows": tuple(
+                    int(row) for row in term_payload.get("response_rows", ())
+                ),
+                "projector_rows": tuple(
+                    int(row) for row in term_payload.get("projector_rows", ())
+                ),
+                "projector_policy_id": str(
+                    term_payload.get("projector_policy_id", "legacy")
+                ),
+                "relaxation_atoms": tuple(
+                    int(atom)
+                    for atom in term_payload.get("relaxation_atoms", ())
+                ),
+                "relaxation_policy_id": str(
+                    term_payload.get("relaxation_policy_id", "default")
+                ),
+                "anchor_state_ids": anchor_state_ids,
                 "grouped_signature_rows": grouped_signature_rows,
                 "grouped_signature_row_types": grouped_signature_row_types,
                 "grouped_signature_row_scales": grouped_signature_row_scales,
@@ -924,13 +1347,17 @@ def load_signed_factor_banks_for_root(imff_file, root, z_matrix, im_settings):
             }
 
         banks[str(family)] = {
-            "topology": "signed_local_factors",
+            "topology": topology,
+            "combination_mode": combination_mode,
             "root": str(registry_root),
             "factor_info": factor_info,
             "factor_angle_library": factor_angle_library,
             "point_index": factor_index,
             "core": core_dp,
-            "core_coefficient": float(factor_info.get("core_coefficient", 0.0)),
+            "core_coefficient": (
+                1.0 if combination_mode == COMBINATION_SIGNED_RELAXED_RESIDUAL
+                else float(factor_info.get("core_coefficient", 0.0))
+            ),
             "core_rows": tuple(int(row) for row in factor_info.get("core_rows", ())),
             "primitive_signature_rows": {
                 _restore_id(rotor_id): tuple(int(row) for row in rows)
@@ -1205,7 +1632,7 @@ def _factor_core_rows(family_bank, n_ic):
         missing = set(range(int(n_ic))) - rows - occupied
         if overlap or missing:
             raise RuntimeError(
-                "Invalid schema-2 local-factor row partition: "
+                f"Invalid schema-{schema_version} local-factor row partition: "
                 f"core/factor overlap={sorted(overlap)}, "
                 f"unassigned={sorted(missing)}."
             )
@@ -1218,6 +1645,17 @@ def _factor_core_rows(family_bank, n_ic):
 
 
 def _factor_core_projector(family_bank, n_ic):
+    combination_mode = _normalize_local_factor_combination_mode(
+        family_bank.get(
+            "combination_mode",
+            family_bank.get("factor_info", {}).get("combination_mode"),
+        )
+    )
+    if combination_mode == COMBINATION_SIGNED_RELAXED_RESIDUAL:
+        # The relaxed-residual factors add deviations from their anchor states;
+        # the core Taylor model remains the full internal-coordinate baseline.
+        return np.ones(int(n_ic), dtype=np.float64)
+
     projector = np.zeros(n_ic, dtype=np.float64)
     rows = _factor_core_rows(family_bank, n_ic)
     if rows:
@@ -1226,8 +1664,25 @@ def _factor_core_projector(family_bank, n_ic):
 
 
 def _factor_term_projector(family_bank, term_bank, n_ic):
-    rows = set(_factor_core_rows(family_bank, n_ic))
-    rows.update(int(row) for row in term_bank.get("active_rows", ()))
+    explicit_rows = tuple(
+        int(row) for row in term_bank.get("projector_rows", ()))
+    if explicit_rows:
+        rows = set(explicit_rows)
+    else:
+        # Backward-compatible support for databases without an explicit
+        # topology-derived projector.
+        rows = set(_factor_core_rows(family_bank, n_ic))
+        rows.update(int(row) for row in term_bank.get("active_rows", ()))
+        for group_rows in term_bank.get("grouped_signature_rows", ()):
+            rows.update(int(row) for row in group_rows)
+
+    invalid_rows = sorted(
+        row for row in rows if row < 0 or row >= int(n_ic))
+    if invalid_rows:
+        raise RuntimeError(
+            "Local-factor projector contains out-of-bounds rows: "
+            f"{invalid_rows}.")
+
     projector = np.zeros(n_ic, dtype=np.float64)
     if rows:
         projector[list(sorted(rows))] = 1.0
@@ -1739,7 +2194,7 @@ def _evaluate_masked_factor_state(
     return energy, gradient
 
 
-def _all_factor_mask_signature_distance_and_gradient(
+def _per_rotor_mask_signature_distance_and_gradient(
         driver,
         *,
         family_bank,
@@ -1747,7 +2202,14 @@ def _all_factor_mask_signature_distance_and_gradient(
         mask,
         org_int_coords,
         b_matrix=None,
-        precomputed_current=None):
+        precomputed_current=None,
+        rotor_filter=None):
+    """Per-rotor (unaveraged) signature mismatch for one candidate mask.
+
+    The mismatch of each rotor is kept separate instead of being folded
+    into a single family-wide average, so callers can weight each rotor's
+    match independently (see :func:`_mask_pool_product_weights`).
+    """
     mask = np.asarray(mask, dtype=np.int64)
 
     if precomputed_current is None:
@@ -1765,27 +2227,98 @@ def _all_factor_mask_signature_distance_and_gradient(
         datapoint.internal_coordinates_values, dtype=np.float64)[mask]
     b_eval = np.asarray(b_eval, dtype=np.float64)
 
-    d2_total = 0.0
-    grad_total = np.zeros(b_eval.shape[1], dtype=np.float64)
     rows_by_rotor = family_bank.get("primitive_signature_rows", {})
+    if rotor_filter is not None:
+        rotor_filter_set = {str(rotor_id) for rotor_id in rotor_filter}
+        rows_by_rotor = {
+            rotor_id: rows
+            for rotor_id, rows in rows_by_rotor.items()
+            if str(rotor_id) in rotor_filter_set
+        }
 
-    for rows in rows_by_rotor.values():
+    per_rotor = {}
+    for rotor_id, rows in rows_by_rotor.items():
         if len(rows) == 0:
             continue
         rows_arr = np.asarray(rows, dtype=np.int64)
-        delta = np.asarray(org_eval, dtype=np.float64)[rows_arr] - ref_masked[rows_arr]
-        d2_total += float(np.mean(2.0 * (1.0 - np.cos(delta))))
-        grad_total += np.mean(
-            2.0 * np.sin(delta)[:, None] * b_eval[rows_arr, :],
-            axis=0,
+        delta = (
+            np.asarray(org_eval, dtype=np.float64)[rows_arr]
+            - ref_masked[rows_arr]
         )
+        d2 = float(np.mean(2.0 * (1.0 - np.cos(delta))))
+        grad = np.mean(
+            2.0 * np.sin(delta)[:, None] * b_eval[rows_arr, :], axis=0)
+        per_rotor[rotor_id] = (d2, grad)
+    return per_rotor
 
-    n_groups = len(rows_by_rotor)
-    if n_groups > 0:
-        d2_total /= n_groups
-        grad_total /= n_groups
 
-    return d2_total, grad_total
+def _mask_pool_product_weights(
+        per_mask_rotor_distances,
+        natm,
+        exact_tol=1.0e-10):
+    """
+    Weight each candidate symmetry mask using the product of independent
+    per-rotor match qualities instead of a single metric averaged across
+    every rotor known to the family.
+
+    Local rotors are decoupled by construction: a large mismatch on one
+    rotor must not dilute the (otherwise unambiguous) match quality of an
+    unrelated, untouched rotor.  Averaging the mismatch across rotors before
+    weighting candidate masks lets a displaced rotor "borrow" weight from
+    mask candidates that mislabel a completely different, stationary rotor,
+    injecting a spurious residual there.  This grows with the number of
+    independent local groups in the molecule, so it is fixed generally
+    (not just for the specific two-rotor case it was diagnosed on) by
+    scoring each rotor's own match independently and combining the results
+    as a product of independent weights (i.e. as independent probabilities).
+    """
+    rotor_ids = set()
+    for per_rotor in per_mask_rotor_distances:
+        rotor_ids.update(per_rotor.keys())
+
+    rotor_has_exact = {
+        rotor_id: any(
+            per_rotor.get(rotor_id, (np.inf, None))[0] <= exact_tol
+            for per_rotor in per_mask_rotor_distances
+        )
+        for rotor_id in rotor_ids
+    }
+
+    raw = []
+    raw_grad = []
+    fully_exact = []
+    for per_rotor in per_mask_rotor_distances:
+        excluded = False
+        all_exact = True
+        weight = 1.0
+        grad_sum = np.zeros(natm * 3, dtype=np.float64)
+        for rotor_id in rotor_ids:
+            d2_r, grad_d2_r = per_rotor.get(rotor_id, (0.0, None))
+            if rotor_has_exact[rotor_id]:
+                if d2_r <= exact_tol:
+                    continue
+                excluded = True
+                break
+            all_exact = False
+            d2_r = max(float(d2_r), 1.0e-14)
+            weight *= 1.0 / (2.0 * d2_r * d2_r)
+            grad_sum += -(2.0 / d2_r) * np.asarray(
+                grad_d2_r, dtype=np.float64).reshape(-1)
+
+        if excluded:
+            raw.append(0.0)
+            raw_grad.append(np.zeros((natm, 3), dtype=np.float64))
+            fully_exact.append(False)
+        elif all_exact:
+            raw.append(0.0)
+            raw_grad.append(np.zeros((natm, 3), dtype=np.float64))
+            fully_exact.append(True)
+        else:
+            raw.append(weight)
+            raw_grad.append((weight * grad_sum).reshape(natm, 3))
+            fully_exact.append(False)
+
+    return raw, raw_grad, fully_exact
 
 
 def _evaluate_masked_factor_core_state(
@@ -1793,15 +2326,15 @@ def _evaluate_masked_factor_core_state(
         family_bank,
         core_dp,
         core_projector,
-        org_int_coords):
+        org_int_coords,
+        rotor_filter=None,
+        mapping_masks=None):
     masked_energy = []
     masked_gradient = []
-    raw = []
-    raw_grad = []
-    exact_flags = []
+    per_mask_rotor_distances = []
     natm = driver.impes_coordinate.cartesian_coordinates.shape[0]
 
-    for mask in _coerce_mapping_masks(core_dp):
+    for mask in _coerce_mapping_masks(core_dp, masks=mapping_masks):
         mask_arr = np.asarray(mask, dtype=np.int64)
         current = _candidate_current_chart(
             driver,
@@ -1818,7 +2351,7 @@ def _evaluate_masked_factor_core_state(
             org_int_coords=org_int_coords,
             precomputed_current=current,
         )
-        d2_m, grad_d2_m = _all_factor_mask_signature_distance_and_gradient(
+        per_rotor = _per_rotor_mask_signature_distance_and_gradient(
             driver,
             family_bank=family_bank,
             datapoint=core_dp,
@@ -1826,24 +2359,18 @@ def _evaluate_masked_factor_core_state(
             org_int_coords=org_int_coords,
             b_matrix=current[1],
             precomputed_current=current,
+            rotor_filter=rotor_filter,
         )
 
         masked_energy.append(energy_m)
         masked_gradient.append(gradient_m)
-        if d2_m <= 1.0e-10:
-            exact_flags.append(True)
-            raw.append(0.0)
-            raw_grad.append(np.zeros((natm, 3), dtype=np.float64))
-        else:
-            exact_flags.append(False)
-            w_m, grad_w_m = _normalize_symmetry_candidate_weight(
-                driver, d2_m, grad_d2_m)
-            raw.append(w_m)
-            raw_grad.append(grad_w_m)
+        per_mask_rotor_distances.append(per_rotor)
 
     masked_energy = np.asarray(masked_energy, dtype=np.float64)
     masked_gradient = np.asarray(masked_gradient, dtype=np.float64)
-    exact_idx = np.where(np.asarray(exact_flags, dtype=bool))[0]
+    raw, raw_grad, fully_exact = _mask_pool_product_weights(
+        per_mask_rotor_distances, natm)
+    exact_idx = np.where(np.asarray(fully_exact, dtype=bool))[0]
     if exact_idx.size > 0:
         weights = np.zeros(masked_energy.size, dtype=np.float64)
         weights[exact_idx] = 1.0 / exact_idx.size
@@ -1859,6 +2386,16 @@ def _evaluate_masked_factor_core_state(
     return energy, gradient
 
 
+def _combination_mode_for_family_bank(family_bank):
+    factor_info = family_bank.get("factor_info", {})
+    return _normalize_local_factor_combination_mode(
+        family_bank.get(
+            "combination_mode",
+            factor_info.get("combination_mode", COMBINATION_SIGNED_FULL),
+        )
+    )
+
+
 def evaluate_signed_local_factor_model(driver, family_bank, org_int_coords):
     """
     Evaluate a signed local-factor model for one local-group family.
@@ -1870,12 +2407,19 @@ def evaluate_signed_local_factor_model(driver, family_bank, org_int_coords):
     core_dp = family_bank["core"]
     org_coords = np.asarray(org_int_coords, dtype=np.float64)
     n_ic = len(org_coords)
+    combination_mode = _combination_mode_for_family_bank(family_bank)
+    relaxed_residual = (
+        combination_mode == COMBINATION_SIGNED_RELAXED_RESIDUAL)
 
     core_projector = _factor_core_projector(family_bank, n_ic)
-    core_coeff = float(family_bank.get("core_coefficient", 0.0))
+    core_coeff = (
+        1.0 if relaxed_residual
+        else float(family_bank.get("core_coefficient", 0.0))
+    )
 
     total_energy = 0.0
     total_gradient = np.zeros_like(driver.impes_coordinate.cartesian_coordinates)
+    trace = getattr(driver, "local_factor_trace", None)
 
     if abs(core_coeff) > 1.0e-12 or not family_bank.get("terms"):
         core_energy, core_gradient = _evaluate_masked_factor_core_state(
@@ -1887,6 +2431,41 @@ def evaluate_signed_local_factor_model(driver, family_bank, org_int_coords):
         )
         total_energy += core_coeff * core_energy
         total_gradient += core_coeff * core_gradient
+        if isinstance(trace, list):
+            trace.append({
+                "family_identifier": str(
+                    family_bank.get("factor_info", {}).get(
+                        "family_label", "")),
+                "group_identifier": "core",
+                "canonical_subset_key": (),
+                "active_atom_indices": tuple(
+                    int(atom) for atom in family_bank.get("core_atoms", ())),
+                "environment_atom_indices": (),
+                "response_rows": (),
+                "anchor_state_ids": (),
+                "relaxation_policy_id": "core",
+                "local_factor_overlap_source": "core",
+                "local_factor_combination_mode": combination_mode,
+                "is_anchor": True,
+                "signed_coefficient": float(core_coeff),
+                "raw_local_energy": float(core_energy),
+                "anchor_energy": None,
+                "residual_energy": float(core_energy),
+                "signed_local_energy_contribution": float(
+                    core_coeff * core_energy),
+                "raw_local_gradient_norm": float(
+                    np.linalg.norm(core_gradient)),
+                "signed_local_gradient_norm": float(
+                    np.linalg.norm(core_coeff * core_gradient)),
+                "signed_local_gradient_contribution": np.asarray(
+                    core_coeff * core_gradient, dtype=np.float64).tolist(),
+                "cumulative_gradient": np.asarray(
+                    total_gradient, dtype=np.float64).tolist(),
+                "state_weights": (),
+                "cumulative_energy": float(total_energy),
+                "cumulative_gradient_norm": float(
+                    np.linalg.norm(total_gradient)),
+            })
 
     evaluated_terms = 0
     for _, term_bank in sorted(
@@ -1918,12 +2497,103 @@ def evaluate_signed_local_factor_model(driver, family_bank, org_int_coords):
             + np.tensordot(state_energy - term_energy, grad_weights, axes=1)
         )
 
+        raw_term_energy = float(term_energy)
+        raw_term_gradient = np.asarray(term_gradient, dtype=np.float64).copy()
         coefficient = float(term_bank.get("coefficient", 1.0))
+        anchor_energy = None
+        if relaxed_residual:
+            # A_S is the part of the family core already present on this
+            # term's rows.  It uses the core datapoint and family-wide chart so
+            # anchor factors cancel the matching pieces of the full core model
+            # when another subset or a response coordinate is displaced.
+            # The symmetry-mask used to evaluate that baseline must be picked
+            # using only this term's own rotor(s): scoring it against every
+            # rotor in the family (as the plain core contribution does)
+            # entangles unrelated, non-overlapping local groups, so a large
+            # displacement of one rotor injects a spurious mask-mixing
+            # residual into every other (untouched) term's anchor baseline.
+            anchor_state_ids = tuple(
+                int(state_id)
+                for state_id in term_bank.get("anchor_state_ids", ())
+            )
+
+            anchor_dp = term_bank["expected_states"][anchor_state_ids[0]]
+            anchor_masks = getattr(anchor_dp, "mapping_masks", None)
+
+            anchor_energy, anchor_gradient = (
+                _evaluate_masked_factor_core_state(
+                    driver,
+                    family_bank,
+                    core_dp,
+                    projector,
+                    org_coords,
+                    rotor_filter=term_bank.get("rotor_ids", ()),
+                    mapping_masks=anchor_masks,
+                )
+            )
+            term_energy -= anchor_energy
+            term_gradient -= anchor_gradient
+
         total_energy += coefficient * term_energy
         total_gradient += coefficient * term_gradient
         evaluated_terms += 1
+        if isinstance(trace, list):
+            active_atoms = tuple(
+                int(atom) for atom in term_bank.get("active_atoms", ()))
+            relaxation_atoms = tuple(
+                int(atom) for atom in term_bank.get(
+                    "relaxation_atoms", ()))
+            trace.append({
+                "family_identifier": str(
+                    family_bank.get("factor_info", {}).get(
+                        "family_label", "")),
+                "group_identifier": str(term_bank.get("term_id", "")),
+                "canonical_subset_key": tuple(
+                    str(item) for item in term_bank.get(
+                        "canonical_subset_key", ())),
+                "active_atom_indices": active_atoms,
+                "environment_atom_indices": tuple(
+                    atom for atom in relaxation_atoms
+                    if atom not in set(active_atoms)),
+                "response_rows": tuple(
+                    int(row) for row in term_bank.get("response_rows", ())),
+                "anchor_state_ids": tuple(
+                    int(state_id) for state_id in term_bank.get(
+                        "anchor_state_ids", ())),
+                "relaxation_policy_id": str(
+                    term_bank.get("relaxation_policy_id", "default")),
+                "local_factor_overlap_source": str(
+                    term_bank.get("role", "factor")),
+                "local_factor_combination_mode": combination_mode,
+                "is_anchor": False,
+                "signed_coefficient": float(coefficient),
+                "raw_local_energy": raw_term_energy,
+                "anchor_energy": (
+                    None if anchor_energy is None else float(anchor_energy)),
+                "residual_energy": float(term_energy),
+                "signed_local_energy_contribution": float(
+                    coefficient * term_energy),
+                "raw_local_gradient_norm": float(
+                    np.linalg.norm(raw_term_gradient)),
+                "signed_local_gradient_norm": float(
+                    np.linalg.norm(coefficient * term_gradient)),
+                "signed_local_gradient_contribution": np.asarray(
+                    coefficient * term_gradient,
+                    dtype=np.float64,
+                ).tolist(),
+                "cumulative_gradient": np.asarray(
+                    total_gradient, dtype=np.float64).tolist(),
+                "state_weights": tuple(float(weight) for weight in weights),
+                "cumulative_energy": float(total_energy),
+                "cumulative_gradient_norm": float(
+                    np.linalg.norm(total_gradient)),
+            })
 
-    if evaluated_terms == 0 and abs(core_coeff) <= 1.0e-12:
+    if (
+        not relaxed_residual
+        and evaluated_terms == 0
+        and abs(core_coeff) <= 1.0e-12
+    ):
         return _evaluate_masked_factor_core_state(
             driver,
             family_bank,

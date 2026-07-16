@@ -1,0 +1,2 @@
+[console_scripts]
+vlx = veloxchem.main:main
