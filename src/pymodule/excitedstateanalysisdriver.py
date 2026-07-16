@@ -703,7 +703,7 @@ class ExcitedStateAnalysisDriver:
         """
 
         dens_viewer = DensityViewer()
-        dens_viewer.use_k3d = use_k3d
+        #dens_viewer.use_k3d = use_k3d
         dens_viewer.interpolate = interpolate
         dens_viewer_dict = {}
         if 'hole_density_matrix_AO' in descriptors:
@@ -716,7 +716,11 @@ class ExcitedStateAnalysisDriver:
                     'particle_density_matrix_AO']
                 dens_viewer_dict[
                     key + ' hole'] = descriptors[key]['hole_density_matrix_AO']
-        dens_viewer.plot(molecule, basis, dens_viewer_dict)
+
+        if use_k3d:
+            dens_viewer.plot_using_k3d(molecule, basis, dens_viewer_dict)
+        else:
+            dens_viewer.plot(molecule, basis, dens_viewer_dict)
 
     def print_header(self, title, state_index):
         """

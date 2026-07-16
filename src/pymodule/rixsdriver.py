@@ -733,17 +733,27 @@ class RixsDriver(LinearSolver):
 
         if not self.tamm_dancoff:
             # RPA
-            assert_msg_critical(
-                'eigenvectors_distributed' in rsp_results,
-                'RixsDriver._get_eigvecs: Incorrect key in rsp_results')
-
+            #assert_msg_critical(
+            #    'eigenvectors_distributed' in rsp_results,
+            #    'RixsDriver._get_eigvecs: Incorrect key in rsp_results')
             vecs = []
-            for i in states:
-                full_v = self.get_full_solution_vector(
-                    rsp_results['eigenvectors_distributed'][i])
-                full_v = self.comm.bcast(full_v, root=mpi_master())
-                vecs.append(full_v)
-            return np.array(vecs)
+            if 'eigenvectors_distributed' in rsp_results:
+                for i in states:
+                    full_v = self.get_full_solution_vector(
+                        rsp_results['eigenvectors_distributed'][i])
+                    full_v = self.comm.bcast(full_v, root=mpi_master())
+                    vecs.append(full_v)
+                return np.array(vecs)
+            elif 'number_of_states' in rsp_results:
+                nstates = rsp_results['number_of_states']
+                for i in range(nstates):
+                    state = "S%d" % (i+1)
+                    full_v = rsp_results[state]
+                    vecs.append(full_v)
+                return np.array(vecs)
+            else:
+                assert_msg_critical(False,
+                    'RixsDriver._get_eigvecs: Incorrect key in rsp_results')
 
         else:
             # TDA
