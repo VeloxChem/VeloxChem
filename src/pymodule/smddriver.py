@@ -40,6 +40,7 @@ from .smdsolventproperties import get_smd_solvent_properties, get_sigma_properti
 from .atomtypeidentifier import AtomTypeIdentifier
 from .errorhandler import assert_msg_critical
 
+
 class SmdDriver:
     """
     SMD (Solvation Model based on Density) calculations.
@@ -49,14 +50,14 @@ class SmdDriver:
     :param ostream:
         The output stream.
     Instance variables:
-        - solvent (str): The solvent used for SMD calculations (default is 'water'). 
+        - solvent (str): The solvent used for SMD calculations (default is 'water').
     """
 
     def __init__(self, comm=None, ostream=None):
         """
         Initializes SMD driver.
         """
-        
+
         if comm is None:
             comm = MPI.COMM_WORLD
 
@@ -65,7 +66,7 @@ class SmdDriver:
                 ostream = OutputStream(sys.stdout)
             else:
                 ostream = OutputStream(None)
-        
+
         # mpi information
         self.comm = comm
         self.rank = comm.Get_rank()
@@ -73,31 +74,41 @@ class SmdDriver:
 
         # outputstream
         self.ostream = ostream
-        
+
         # solvent properties
         self.solvent = 'water'
-        self.smd_solvent_parameters = get_smd_solvent_properties() 
+        self.smd_solvent_parameters = get_smd_solvent_properties()
         self.sigma_param, self.sigma_water = get_sigma_properties()
         self.r_zz_dict = get_rzz_parameters()
 
         self.solute = None
 
-    
+    def print_available_solvents(self):
+        """
+        Print the available solvents for SMD calculations.
+        """
+
+        if self.rank == mpi_master():
+            self.ostream.print_info('Available solvents for SMD calculations:')
+            for solvent in self.smd_solvent_parameters.keys():
+                self.ostream.print_info(f' {solvent}')
+            self.ostream.flush()
+
     def get_intrinsic_coulomb_radii(self):
         """
         Get the intrinsic Coulomb radii (Å) for the solute.
         """
 
-        atom_labels = self.solute.get_labels() 
+        atom_labels = self.solute.get_labels()
         vdw_radii = self.solute.vdw_radii_to_numpy() * bohr_in_angstrom()
 
-        # Table 3 in SMD paper (Å). 
+        # Table 3 in SMD paper (Å).
         # If not in smd_elements, use Bondi radius (default in vlx); if not in Bondi, use 2.0 Å (also default in vlx)
         smd_elements = {
-            'H':1.20,'C':1.85,'N':1.89,
-            'O':1.52,'F':1.73,'Si':2.47,
-            'P':2.12,'S':2.49,'Cl':2.38,
-            'Br':3.06
+            'H': 1.20, 'C': 1.85, 'N': 1.89,
+            'O': 1.52, 'F': 1.73, 'Si': 2.47,
+            'P': 2.12, 'S': 2.49, 'Cl': 2.38,
+            'Br': 3.06
         }
 
         alpha = self.smd_solvent_parameters['alpha']
@@ -105,7 +116,7 @@ class SmdDriver:
 
         for atom, vdw_r in zip(atom_labels, vdw_radii):
             atom_radii.append(atom)
-            
+
             if atom not in smd_elements:
                 # Using Bondi Radius
                 atom_radii.append(vdw_r)
@@ -115,7 +126,6 @@ class SmdDriver:
                     atom_radii.append(1.52 if alpha >= 0.43 else round((1.52 + 1.8*(0.43 - alpha)), 4))
                 else:
                     atom_radii.append(smd_elements[atom])
-
 
         return atom_radii
 
@@ -127,32 +137,32 @@ class SmdDriver:
         assert_msg_critical(
             self.solvent in self.smd_solvent_parameters,
             'Solvent {self.solvent} not available')
-        
+
         self.smd_solvent_parameters = self.smd_solvent_parameters[self.solvent]
         self.epsilon = self.smd_solvent_parameters['epsilon']
-        
+
         CDS_energy = 0.0
         cal_per_mol_to_hartree = 1/627509.5
-        
+
         SASA_list = self._get_SASA()
 
         sigma_k = self._calculate_sigma_k()
 
         for k in range(len(self.solute.get_labels())):
             CDS_energy += sigma_k[k] * SASA_list[k]
-        
-        if self.solvent != 'water': # sigma[M] = 0 for water
+
+        if self.solvent != 'water':  # sigma[M] = 0 for water
             self._get_molecular_surface_tension()
             CDS_energy += self.sigma_M * sum(SASA_list)
 
         CDS_energy *= cal_per_mol_to_hartree
-        
+
         return CDS_energy
 
-    def _calculate_sigma_k(self):        
-        # Table 4 (cal/molÅ^2):  Any possible surface tension parameter that is not in this table is set equal to zero in SMD. 
+    def _calculate_sigma_k(self):
+        # Table 4 (cal/molÅ^2):  Any possible surface tension parameter that is not in this table is set equal to zero in SMD.
         param = self.smd_solvent_parameters
-        
+
         # Extract all sigma_i for the solvent
         if self.solvent == 'water':
             sigma_params = self.sigma_water
@@ -161,17 +171,17 @@ class SmdDriver:
                 key: vals[0] * param['n'] + vals[1] * param['alpha'] + vals[2] * param['beta']
                 for key, vals in self.sigma_param.items()
             }
-        
+
         distance_matrix = self.solute.get_distance_matrix_in_angstrom()
         atoms = self.solute.get_labels()
         num_atoms = len(atoms)
-        
+
         atomtypeidentifier = AtomTypeIdentifier(self.comm)
         atomtypeidentifier.ostream.mute()
         atom_types = atomtypeidentifier.generate_gaff_atomtypes(self.solute)
 
-        halogens = ['F', 'Si', 'S', 'Cl', 'Br'] #if Zk in halogens, sigma_k = sigma_tilde_Z_k 
-        all_smd_atoms = ['H', 'C', 'N', 'O'] + halogens #if Z_k not in all_smd, sigma_k = 0
+        halogens = ['F', 'Si', 'S', 'Cl', 'Br']  # if Zk in halogens, sigma_k = sigma_tilde_Z_k
+        all_smd_atoms = ['H', 'C', 'N', 'O'] + halogens  # if Z_k not in all_smd, sigma_k = 0
 
         sigma_k = {}
         r_ZZ_param = self.r_zz_dict
@@ -193,7 +203,7 @@ class SmdDriver:
 
             sigma += sigma_params.get((Zk,), 0.0)
 
-            # Initialize sums depending on atom type 
+            # Initialize sums depending on atom type
             if Zk == 'H':
                 # Contributions from C and O neighbors
                 for k2 in range(num_atoms):
@@ -206,7 +216,7 @@ class SmdDriver:
                     if key not in r_ZZ_param or key not in sigma_params:
                         continue
                     R = distance_matrix[k, k2]
-                    r_zz, dr_zz = r_ZZ_param[key]            
+                    r_zz, dr_zz = r_ZZ_param[key]
                     if R < r_zz + dr_zz:
                         tanh = np.exp(dr_zz / (R - dr_zz - r_zz))
                         sigma += sigma_params[key] * tanh
@@ -228,18 +238,18 @@ class SmdDriver:
                             sigma += sigma_params[key] * tanh
                         else:
                             tanh_sum += tanh
-                
+
                 sigma += sigma_params.get(('C','N'), 0.0) * (tanh_sum ** 2)
 
             elif Zk == 'N':
 
                 nested_cn_sum = 0.0
                 nc3_sum = 0.0
-                
+
                 for k_prime in range(num_atoms):
                     if k_prime == k:
                         continue
-                    
+
                     Zk_prime = atoms[k_prime]
                     atom_type = atom_types[k_prime]
 
@@ -250,12 +260,12 @@ class SmdDriver:
                         if R < r_zz + dr_zz:
                             tanh_k_kp = np.exp(dr_zz / (R - dr_zz - r_zz))
                             nc3_sum += tanh_k_kp
-                    
+
                     # NC + C-X nested sum
                     elif Zk_prime == 'C' and atom_type != 'c3':
                         R = distance_matrix[k,k_prime]
                         r_nc, dr_nc = r_ZZ_param[('N', 'C')]
-                        if R >= r_nc + dr_nc: 
+                        if R >= r_nc + dr_nc:
                             continue
 
                         tanh_k_kp = np.exp(dr_nc / (R - dr_nc - r_nc))
@@ -299,32 +309,32 @@ class SmdDriver:
                         sigma += sigma_params[key] * tanh
 
             sigma_k[k] = sigma
-        
+
         return sigma_k
-    
+
     def _get_SASA(self):
-        """ 
+        """
         Computes the solvent accessible surface area (SASA) for each atom in the molecule
         """
 
-        # Defined in: "The interpretation of protein structures: Estimation of static accessibility" 
+        # Defined in: "The interpretation of protein structures: Estimation of static accessibility"
         # https://www.sciencedirect.com/science/article/pii/002228367190324X?via%3Dihub
-        # Using the Lee Richard algorithm available from FreeSASA via RDkit 
+        # Using the Lee Richard algorithm available from FreeSASA via RDkit
 
         try:
             from rdkit import Chem
             from rdkit.Chem import rdFreeSASA
         except ImportError:
             raise ImportError('Unable to import rdkit.')
-        
+
         solute = Chem.MolFromXYZBlock(self.solute.get_xyz_string())
         ptable = Chem.GetPeriodicTable()
         radii = [ptable.GetRvdw(atom.GetAtomicNum()) for atom in solute.GetAtoms()]
-        r_s = 0.4 
-        
+        r_s = 0.4
+
         opts = rdFreeSASA.SASAOpts(
             rdFreeSASA.SASAAlgorithm.LeeRichards,
-            rdFreeSASA.SASAClassifier.Protor,  
+            rdFreeSASA.SASAClassifier.Protor,
             r_s
         )
 
@@ -332,22 +342,18 @@ class SmdDriver:
 
         atoms = solute.GetAtoms()
         SASA_list = [float(atoms[i].GetProp("SASA")) for i in range(len(atoms))]
-        
+
         return SASA_list
 
     def _get_molecular_surface_tension(self):
         # Eq. 9 (Note: sigma^[beta^2] = 0)
-        
+
         # Table 5: solute-indep. param cal/molÅ^2
         sigma_gamma, sigma_phi2, sigma_psi2 = [0.35, -4.19, -6.68]
         param = self.smd_solvent_parameters
-        
+
         self.sigma_M = (
-            sigma_gamma * param['gamma'] 
-            + sigma_phi2 * param['phi']**2 
+            sigma_gamma * param['gamma']
+            + sigma_phi2 * param['phi']**2
             + sigma_psi2 * param['psi']**2
         )
- 
-
-    
-    

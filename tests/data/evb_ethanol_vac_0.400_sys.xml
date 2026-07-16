@@ -1,9 +1,9 @@
 <?xml version="1.0" ?>
-<System openmmVersion="8.2" type="System" version="1">
+<System openmmVersion="8.4" type="System" version="1">
 	<PeriodicBoxVectors>
-		<A x="3.324873611207033" y="0" z="0"/>
-		<B x="0" y="3.2979210539515185" z="0"/>
-		<C x="0" y="0" z="3.3023162413101783"/>
+		<A x="2" y="0" z="0"/>
+		<B x="0" y="2" z="0"/>
+		<C x="0" y="0" z="2"/>
 	</PeriodicBoxVectors>
 	<Particles>
 		<Particle mass="12.01078"/>
@@ -18,7 +18,7 @@
 	</Particles>
 	<Constraints/>
 	<Forces>
-		<Force alpha="0" cutoff="1" dispersionCorrection="1" ewaldTolerance=".0005" exceptionsUsePeriodic="0" forceGroup="8" includeDirectSpace="1" ljAlpha="0" ljnx="0" ljny="0" ljnz="0" method="4" name="NonbondedForce" nx="0" ny="0" nz="0" recipForceGroup="-1" rfDielectric="78.3" switchingDistance=".9" type="NonbondedForce" useSwitchingFunction="1" version="4">
+		<Force alpha="0" cutoff="1" dispersionCorrection="1" ewaldTolerance=".0005" exceptionsUsePeriodic="0" forceGroup="8" includeDirectSpace="1" ljAlpha="0" ljnx="0" ljny="0" ljnz="0" method="0" name="NonbondedForce" nx="0" ny="0" nz="0" recipForceGroup="-1" rfDielectric="78.3" switchingDistance="-1" type="NonbondedForce" useSwitchingFunction="0" version="4">
 			<GlobalParameters/>
 			<ParticleOffsets/>
 			<ExceptionOffsets/>

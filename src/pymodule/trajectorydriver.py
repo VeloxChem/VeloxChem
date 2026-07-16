@@ -360,51 +360,62 @@ class TrajectoryDriver:
                 classical_fragments = []
 
                 res_count = 0
+                atom_count = 0
 
-                # polarizable water
-                res_name = 'water'
-                res_charges = []
-                res_polarizabilities = []
+                # water parameters
+                pe_res_name = 'water'
+                npe_res_name = 'water-n'
+                pe_res_charges = []
+                npe_res_charges = []
+                pe_res_polarizabilities = []
                 if self.charges:
                     for line in self.charges:
                         content = line.split()
-                        if content[-1] == res_name:
-                            res_charges.append(float(content[1]))
+                        if content[-1] == pe_res_name:
+                            pe_res_charges.append(float(content[1]))
+                        if content[-1] == npe_res_name:
+                            npe_res_charges.append(float(content[1]))
                 if self.polarizabilities:
                     for line in self.polarizabilities:
                         content = line.split()
-                        if content[-1] == res_name:
-                            res_polarizabilities.append(
+                        if content[-1] == pe_res_name:
+                            pe_res_polarizabilities.append(
                                 [float(x) for x in content[1:7]])
 
-                for res in mm_pol.residues:
+                def _append_classical_fragment(res, fragment_name,
+                                               atom_charges,
+                                               atom_polarizabilities):
+                    nonlocal res_count, atom_count
+
+                    assert_msg_critical(
+                        len(atom_charges) == len(res.atoms),
+                        'TrajectoryDriver: Inconsistent charges for residue ' +
+                        f'{fragment_name}')
+
+                    assert_msg_critical(
+                        len(atom_polarizabilities) == len(res.atoms),
+                        'TrajectoryDriver: Inconsistent polarizabilities for residue '
+                        + f'{fragment_name}')
+
                     res_count += 1
+                    start_index = atom_count + 1
+                    end_index = atom_count + len(res.atoms)
 
                     classical_fragments.append({
                         "index": res_count,
-                        "name": res_name,
+                        "name": fragment_name,
                         "atoms": [],
                     })
-
-                    assert_msg_critical(
-                        len(res_charges) == len(res.atoms),
-                        'TrajectoryDriver: Inconsistent charges for residue ' +
-                        f'{res_name}')
-
-                    assert_msg_critical(
-                        len(res_polarizabilities) == len(res.atoms),
-                        'TrajectoryDriver: Inconsistent polarizabilities for residue '
-                        + f'{res_name}')
 
                     for atom_idx, atom in enumerate(res.atoms):
                         atom_label = default_guesser.guess_atom_element(
                             atom.name)
+                        atom_index = start_index + atom_idx
 
                         # Note: make sure all elements in classical_fragments
                         # are serializable by json
                         classical_fragments[-1]["atoms"].append({
-                            "index":
-                                (res_count - 1) * len(res.atoms) + atom_idx + 1,
+                            "index": atom_index,
                             "element": atom_label.capitalize(),
                             "coordinate": [
                                 float(atom.position[0]) / bohr_in_angstroms(),
@@ -412,17 +423,32 @@ class TrajectoryDriver:
                                 float(atom.position[2]) / bohr_in_angstroms(),
                             ],
                             "multipoles": {
-                                "elements": [res_charges[atom_idx]],
+                                "elements": [atom_charges[atom_idx]],
                             },
-                            "exclusions": list(
-                                range((res_count - 1) * len(res.atoms) + 1,
-                                      res_count * len(res.atoms) + 1)),
+                            "exclusions": list(range(start_index,
+                                                     end_index + 1)),
                             "polarizabilities": {
                                 "elements": ([0.0, 0.0, 0.0, 0.0] +
-                                             res_polarizabilities[atom_idx]),
+                                             atom_polarizabilities[atom_idx]),
                                 "order": [1, 1],
                             },
                         })
+
+                    atom_count = end_index
+
+                for res in mm_pol.residues:
+                    resname = getattr(res, 'resname', pe_res_name)
+                    _append_classical_fragment(
+                        res, f'{str(resname)}_pe', pe_res_charges,
+                        pe_res_polarizabilities)
+
+                for res in mm_nonpol.residues:
+                    resname = getattr(res, 'resname', npe_res_name)
+                    zero_polarizabilities = [[0.0 for _ in range(6)]
+                                             for _ in range(len(res.atoms))]
+                    _append_classical_fragment(
+                        res, f'{str(resname)}_npe', npe_res_charges,
+                        zero_polarizabilities)
 
                 embedding_json.update({
                     "classical_subsystems": [{

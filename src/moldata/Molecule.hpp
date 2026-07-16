@@ -199,11 +199,6 @@ class CMolecule
     /// @return The vector of atom indices.
     auto atom_indices(const std::string &label) const -> std::vector<int>;
 
-    /// @brief Gets nuclear repulsion energy for molecule assuming point charge
-    /// model for nucleus.
-    /// @return The nuclear repulsion energy.
-    auto nuclear_repulsion_energy() const -> double;
-
     /// @brief Checks if any pair of atoms in molecule is closer than given
     /// minimal distance.
     /// @param distance The minimal distance between two atoms.

@@ -10,6 +10,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.tdaeigensolverunrest import TdaUnrestrictedEigenSolver
 from veloxchem.inputparser import (unparse_input, read_unparsed_input_from_hdf5)
+from veloxchem.errorhandler import VeloxChemError
 
 
 @pytest.mark.solvers
@@ -430,7 +431,7 @@ class TestUnrestrictedTDA:
         lr_drv.core_excitation = True
         lr_drv.nstates = 2
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='num_core_orbitals not set or invalid'):
             lr_drv.compute(mol, bas, scf_results)
 
@@ -447,7 +448,7 @@ class TestUnrestrictedTDA:
         lr_drv.num_core_orbitals = 5
         lr_drv.nstates = 2
 
-        with pytest.raises(AssertionError, match='num_core_orbitals too large'):
+        with pytest.raises(VeloxChemError, match='num_core_orbitals too large'):
             lr_drv.compute(mol, bas, scf_results)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
@@ -462,6 +463,6 @@ class TestUnrestrictedTDA:
         lr_drv.restricted_subspace = True
         lr_drv.nstates = 2
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='restricted_subspace not implemented'):
             lr_drv.compute(mol, bas, scf_results)

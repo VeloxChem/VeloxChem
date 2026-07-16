@@ -12,6 +12,9 @@ Modifications made by VeloxChem developers, 2024, to match gaff-2.11.dat:
     c -n -c3-c3
     c2-ce-ca-ca
     o -c -c3-c3
+Modifications made by VeloxChem developers, 2026, in default ow/hw parameters:
+    ow: sigma=0.31658, epsilon=0.649775 (cSPE/E, JCTC 2010, 6, 607)
+    hw: sigma=0.11658, epsilon=0.064978 (cSPE/E, JCTC 2010, 6, 607)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -7437,7 +7440,7 @@ SOFTWARE.
     <Atom class="ho" sigma="0.053792464601313685" epsilon="0.019664800000000003"/>
     <Atom class="hp" sigma="0.10746020338208773" epsilon="0.0602496"/>
     <Atom class="hs" sigma="0.10890345930547507" epsilon="0.0518816"/>
-    <Atom class="hw" sigma="1.0" epsilon="0.0"/>
+    <Atom class="hw" sigma="0.11658" epsilon="0.064978"/>
     <Atom class="hx" sigma="0.18874580242521227" epsilon="0.0870272"/>
     <Atom class="f" sigma="0.30342228542423677" epsilon="0.3481088"/>
     <Atom class="cl" sigma="0.3465952373053176" epsilon="1.1037392"/>
@@ -7482,7 +7485,7 @@ SOFTWARE.
     <Atom class="op" sigma="0.3156097798883966" epsilon="0.3037584"/>
     <Atom class="oq" sigma="0.3156097798883966" epsilon="0.3037584"/>
     <Atom class="os" sigma="0.3156097798883966" epsilon="0.3037584"/>
-    <Atom class="ow" sigma="1.0" epsilon="0.0"/>
+    <Atom class="ow" sigma="0.31658" epsilon="0.649775"/>
     <Atom class="p2" sigma="0.36940224448971026" epsilon="0.9602280000000001"/>
     <Atom class="p3" sigma="0.36940224448971026" epsilon="0.9602280000000001"/>
     <Atom class="p4" sigma="0.36940224448971026" epsilon="0.9602280000000001"/>

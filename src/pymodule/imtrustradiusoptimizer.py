@@ -31,30 +31,11 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-from mpi4py import MPI
 import numpy as np
-import scipy
-import copy
 import warnings
 
-from contextlib import redirect_stderr
-from io import StringIO
-
-from .veloxchemlib import mpi_master
-from.veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
+from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
 from .interpolationdriver import InterpolationDriver
-
-
-with redirect_stderr(StringIO()) as fg_err:
-    import geometric
-
-try:
-    import openmm as mm
-    import openmm.app as app
-    import openmm.unit as unit
-except ImportError:
-    pass
-
 
 
 class IMTrustRadiusOptimizer:
@@ -74,19 +55,19 @@ class IMTrustRadiusOptimizer:
                 RuntimeWarning,
                 stacklevel=2,
             )
-        self.z_matrix       = z_matrix
-        self.impes_dict     = impes_dict
-        self.sym_dict       = sym_dict
-        self.dps            = dps
-        self.structures     = structure_list
-        self.qm_e           = np.asarray(qm_e, dtype=np.float64)
-        self.qm_g_flat      = np.stack([g.reshape(-1) for g in qm_g], axis=0)  # (S,D)
-        self.e_x            = float(e_x)
-        self.beta           = float(beta)
-        self.M              = len(dps)
-        self.S              = len(structure_list)
-        self.idx            = np.asarray([o*3 + i for o in sym_dict[3] for i in range(3)], dtype=int)
-        self.verbose        = bool(verbose)
+        self.z_matrix = z_matrix
+        self.impes_dict = impes_dict
+        self.sym_dict = sym_dict
+        self.dps = dps
+        self.structures = structure_list
+        self.qm_e = np.asarray(qm_e, dtype=np.float64)
+        self.qm_g_flat = np.stack([g.reshape(-1) for g in qm_g], axis=0)  # (S,D)
+        self.e_x = float(e_x)
+        self.beta = float(beta)
+        self.M = len(dps)
+        self.S = len(structure_list)
+        self.idx = np.asarray([o*3 + i for o in sym_dict[3] for i in range(3)], dtype=int)
+        self.verbose = bool(verbose)
 
         self._init_worker_state(exponent_p_q)
 
@@ -130,9 +111,12 @@ class IMTrustRadiusOptimizer:
 
         W = self._worker_state
 
-        drv    = W["driver"]
-        idx    = W["idx"]; nsub = W["nsub"]
-        beta   = W["beta"]; e_x = W["e_x"]; conv = W["conv"]
+        drv = W["driver"]
+        idx = W["idx"]
+        nsub = W["nsub"]
+        beta = W["beta"]
+        e_x = W["e_x"]
+        conv = W["conv"]
         mol = W["structures"][s_idx]
         E_qm = W["qm_e"][s_idx]
         G_qm_flat = W["qm_g_flat"][s_idx]
@@ -284,13 +268,13 @@ class IMTrustRadiusOptimizer:
         )
 
         dG_dα_sub = term1 + term2 - term3
-        
+
         if nh > 1e-8:
             dL_dg_sub = (2.0 * gate) * ((beta/nsub)*(gper) + (1.0 - beta)*(gpar)) + (2.0 * (1.0 - gate) / nsub) * g_sub
         else:
             dL_dg_sub = 2.0 * g_sub / nsub
 
-        grad_force_part  = dG_dα_sub @ dL_dg_sub                     # (M,)
+        grad_force_part = dG_dα_sub @ dL_dg_sub                     # (M,)
         grad_energy_part = 2.0 * e_x * dE_res * dE_dα                # (M,)
         grad_s = grad_energy_part + 0.5 * (1.0 - e_x) * grad_force_part   # (M,)
         return float(loss_s), grad_s, float(L_e), float(L_F)
@@ -311,7 +295,6 @@ class IMTrustRadiusOptimizer:
             raise ValueError("AlphaOptimizer.fun received non-finite alpha values")
 
         futs = (self._eval_structure((i, alphas_arr)) for i in range(self.S))
- 
 
         sum_loss = 0.0
         sum_grad = np.zeros(self.M, dtype=np.float64)
@@ -335,7 +318,6 @@ class IMTrustRadiusOptimizer:
             'loss_energy': mean_energy,
             'loss_force': mean_force,
         }
-    
 
         return mean_loss
 
@@ -363,7 +345,6 @@ class IMTrustRadiusOptimizer:
 
         return idx
 
-
     def _validate_full_alpha(self, alpha_full):
         alpha = np.asarray(alpha_full, dtype=np.float64).reshape(-1)
 
@@ -376,13 +357,11 @@ class IMTrustRadiusOptimizer:
 
         return alpha
 
-
     def pack_reduced_alphas(self, alpha_full, trainable_idx):
 
         alpha = self._validate_full_alpha(alpha_full)
         idx = self._validate_trainable_idx(trainable_idx)
         return alpha[idx].copy()
-
 
     def expand_reduced_alphas(self, x_var, trainable_idx, alpha_full_fixed):
 
@@ -401,7 +380,6 @@ class IMTrustRadiusOptimizer:
         alpha_full[idx] = x
         return alpha_full
 
-
     def project_full_gradient_to_reduced(self, grad_full, trainable_idx):
 
         g = np.asarray(grad_full, dtype=np.float64).reshape(-1)
@@ -412,12 +390,10 @@ class IMTrustRadiusOptimizer:
         idx = self._validate_trainable_idx(trainable_idx)
         return g[idx].copy()
 
-
     def fun_reduced(self, x_var, trainable_idx, alpha_full_fixed):
 
         alpha_full = self.expand_reduced_alphas(x_var, trainable_idx, alpha_full_fixed)
         return self.fun(alpha_full)
-
 
     def jac_reduced(self, x_var, trainable_idx, alpha_full_fixed):
 
@@ -425,11 +401,9 @@ class IMTrustRadiusOptimizer:
         g_full = self.jac(alpha_full)
         return self.project_full_gradient_to_reduced(g_full, trainable_idx)
 
-
     def get_metrics_reduced(self, x_var, trainable_idx, alpha_full_fixed, evaluate_if_missing=True):
         alpha_full = self.expand_reduced_alphas(x_var, trainable_idx, alpha_full_fixed)
         return self.get_metrics(alpha_full, evaluate_if_missing=evaluate_if_missing)
-
 
     def get_metrics(self, alphas=None, evaluate_if_missing=True):
 

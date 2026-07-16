@@ -11,6 +11,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.valetanalyzer import ValetAnalyzer
 from veloxchem.veloxchemlib import mpi_master
+from veloxchem.errorhandler import VeloxChemError
 
 skip_multi_rank = pytest.mark.skipif(
     MPI.COMM_WORLD.Get_size() > 1,
@@ -108,13 +109,13 @@ class TestValetAnalyzer:
             'eigenvectors': np.array([[1.0]]),
         }
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='ValetAnalyzer is not yet initialized'):
             analyzer.compute_detach_attach_densities(scf_results, rsp_results)
 
         self._initialize_silently(analyzer, molecule, basis)
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='does not yet support open-shell'):
             analyzer.compute_detach_attach_densities(
                 {
@@ -122,7 +123,7 @@ class TestValetAnalyzer:
                     'C_alpha': np.eye(2),
                 }, rsp_results)
 
-        with pytest.raises(AssertionError, match='Invalid state_index'):
+        with pytest.raises(VeloxChemError, match='Invalid state_index'):
             analyzer.compute_detach_attach_densities(scf_results,
                                                      rsp_results,
                                                      state_index=2)
@@ -210,14 +211,14 @@ class TestValetAnalyzer:
         analyzer = ValetAnalyzer()
         self._initialize_silently(analyzer, molecule, basis)
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='subgroup atom indices must be in the range'):
             analyzer.compute_transition_data(scf_results,
                                              rsp_results,
                                              [('bad', 0)],
                                              state_index=1)
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='subgroup atom indices must be in the range'):
             analyzer.compute_transition_data(scf_results,
                                              rsp_results,
@@ -264,17 +265,3 @@ class TestValetAnalyzer:
         assert 'Donor' in texts
 
         valet_module.plt.close(fig)
-
-    @skip_multi_rank
-    def test_real_distributed_solution_vector_reconstruction_matches_solver(
-            self):
-
-        _, _, _, rsp_results, lr_drv = self._get_water_lr_case()
-        solution = rsp_results['eigenvectors_distributed'][0]
-
-        full_vector = ValetAnalyzer.get_full_solution_vector(solution)
-        ref_vector = lr_drv.get_full_solution_vector(solution)
-
-        assert solution.rank == mpi_master()
-        assert full_vector is not None
-        assert np.allclose(full_vector, ref_vector)

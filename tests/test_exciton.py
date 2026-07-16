@@ -12,6 +12,7 @@ from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.excitondriver import ExcitonModelDriver
+from veloxchem.errorhandler import VeloxChemError
 
 
 @pytest.mark.solvers
@@ -452,7 +453,7 @@ class TestExciton:
         exciton_results = self.get_plot_results()
         exciton_results.pop('rotatory_strengths')
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Missing key "rotatory_strengths"'):
             exciton_drv._get_spectrum_plot_dict(exciton_results)
 

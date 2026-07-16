@@ -35,7 +35,6 @@ from io import StringIO
 from pathlib import Path
 import numpy as np
 import tempfile
-import h5py
 import re
 
 from .scfrestdriver import ScfRestrictedDriver
@@ -858,7 +857,7 @@ class VibrationalAnalysis:
 
             if self.do_raman and (self.raman_activities is not None):
                 freq_unit = ' a.u.'
-                #freqs = list(self.raman_activities.keys())
+                # freqs = list(self.raman_activities.keys())
                 freqs = list(self.frequencies)
                 for i, freq in enumerate(freqs):
                     if freq == 0.0:
@@ -937,7 +936,7 @@ class VibrationalAnalysis:
             pass
 
         number_of_modes = len(self.vib_frequencies)
-        #freqs = list(self.raman_activities.keys())
+        # freqs = list(self.raman_activities.keys())
         freqs = list(self.frequencies)
 
         title = 'Resonance Raman'
@@ -969,24 +968,24 @@ class VibrationalAnalysis:
             # TODO figure out how to (maybe) also print depolarization infor
             # with resonance Raman
 
-            #if self.print_depolarization_ratio:
-            #    column_string = '{:>16s}  {:>24s} {:>20s} {:>24s} {:>14s}'.format(
-            #        'Frequency', 'Raman activity', 'Parallel',
-            #        'Perpendicular', 'Depol. ratio')
-            #    unit_string = f'{"(a.u)":16s}  {"(A**4/amu)":24s} {"(A**4/amu)":20s} {"(A**4/amu)"}'
-            #    self.ostream.print_header(column_string.ljust(width))
-            #    self.ostream.print_header(unit_string.ljust(width))
-            #    self.ostream.print_header('-' * width)
+            # if self.print_depolarization_ratio:
+            #     column_string = '{:>16s}  {:>24s} {:>20s} {:>24s} {:>14s}'.format(
+            #         'Frequency', 'Raman activity', 'Parallel',
+            #         'Perpendicular', 'Depol. ratio')
+            #     unit_string = f'{"(a.u)":16s}  {"(A**4/amu)":24s} {"(A**4/amu)":20s} {"(A**4/amu)"}'
+            #     self.ostream.print_header(column_string.ljust(width))
+            #     self.ostream.print_header(unit_string.ljust(width))
+            #     self.ostream.print_header('-' * width)
 
-            #    # loop through the external frequencies
-            #    for i, freq in enumerate(freqs):
-            #        raman_str = '{:16.6f} {:18.4f} {:18.4f} {:18.4f} {:18.4f}'.format(
-            #            freq, self.raman_activities[i,k], self.int_pol[i,k],
-            #            self.int_depol[i,k], self.depol_ratio[i,k])
-            #        self.ostream.print_header(raman_str.ljust(width))
+            #     # loop through the external frequencies
+            #     for i, freq in enumerate(freqs):
+            #         raman_str = '{:16.6f} {:18.4f} {:18.4f} {:18.4f} {:18.4f}'.format(
+            #             freq, self.raman_activities[i,k], self.int_pol[i,k],
+            #             self.int_depol[i,k], self.depol_ratio[i,k])
+            #         self.ostream.print_header(raman_str.ljust(width))
 
-            #    self.ostream.print_blank()
-            #    self.ostream.print_blank()
+            #     self.ostream.print_blank()
+            #     self.ostream.print_blank()
 
         self.ostream.flush()
 
@@ -1003,7 +1002,7 @@ class VibrationalAnalysis:
             return
 
         number_of_modes = len(self.vib_frequencies)
-        #freqs = list(self.raman_activities.keys())
+        # freqs = list(self.raman_activities.keys())
         freqs = list(self.frequencies)
 
         # open output file
@@ -1289,7 +1288,6 @@ class VibrationalAnalysis:
         import matplotlib.pyplot as plt
         import matplotlib.lines as mlines
 
-        #if ax is None:
         fig, ax = plt.subplots(figsize=(8, 5))
         ax2 = ax.twinx()
 
@@ -1402,18 +1400,17 @@ class VibrationalAnalysis:
         # 1. vib_results from vis_drv.compute: use freq key 0
         # 2. vib_results from reading final h5: use freq key '0'
 
-        #assert_msg_critical(
-        #    '0' in raman_results or 0 in raman_results,
-        #    'plot_raman: Could not find frequency 0 in raman_activities')
+        # assert_msg_critical(
+        #     '0' in raman_results or 0 in raman_results,
+        #     'plot_raman: Could not find frequency 0 in raman_activities')
 
-        #assert_msg_critical(
-        #    not ('0' in raman_results and 0 in raman_results),
-        #    'plot_raman: Duplicate entry of frequency 0 and "0" in raman_activities'
-        #)
+        # assert_msg_critical(
+        #     not ('0' in raman_results and 0 in raman_results),
+        #     'plot_raman: Duplicate entry of frequency 0 and "0" in raman_activities'
+        # )
 
-        #raman_act_key = '0' if '0' in raman_results else 0
-        #raman_act = raman_results[raman_act_key]
-
+        # raman_act_key = '0' if '0' in raman_results else 0
+        # raman_act = raman_results[raman_act_key]
 
         raman_type = 'Raman'
         if self.do_resonance_raman:
@@ -1536,22 +1533,22 @@ class VibrationalAnalysis:
             # an axis in the function call. This function will now
             # return separate figures. -JHA
 
-            #fig, axs = plt.subplots(2, 1, figsize=(8, 10))
+            # fig, axs = plt.subplots(2, 1, figsize=(8, 10))
             # Increase the height space between subplots
-            #fig.subplots_adjust(hspace=0.3)
+            # fig.subplots_adjust(hspace=0.3)
+
             self.plot_ir(vib_results,
                          broadening_type=broadening_type,
                          broadening_value=broadening_value,
                          scaling_factor=scaling_factor,
                          invert_axes=invert_axes)
-            #             ax=axs[0])
+
             if 'raman_activities' in vib_results:
                 self.plot_raman(vib_results,
                                 broadening_type=broadening_type,
                                 broadening_value=broadening_value,
                                 scaling_factor=scaling_factor,
                                 invert_axes=invert_axes)
-                                #ax=axs[1])
 
         else:
             assert_msg_critical(False, 'Invalid plot type')
@@ -1725,15 +1722,15 @@ class VibrationalAnalysis:
     @staticmethod
     def gaussian_broadening(x, y, xmin, xmax, xstep, br):
         # Eq. 8.164 in Norman, Ruud, and Saue
-        #br_g = br / np.sqrt(4.0 * 2.0 * np.log(2))
+        # br_g = br / np.sqrt(4.0 * 2.0 * np.log(2))
         # calculate sigma from HWHM
         br_g = br * np.sqrt(2) / np.sqrt(np.log(2))
         xi = np.arange(xmin, xmax, xstep)
         yi = np.zeros(len(xi))
         for i in range(len(xi)):
             for k in range(len(y)):
-                #yi[i] = yi[i] + y[k] * np.exp(-((xi[i] - x[k])**2) /
-                #                              (2 * br_g**2))
+                # yi[i] = yi[i] + y[k] * np.exp(-((xi[i] - x[k])**2) /
+                #                               (2 * br_g**2))
                 yi[i] = (yi[i] + y[k]
                          * np.sqrt(2) / (br_g * np.sqrt(np.pi))
                          * np.exp(-(2.0 * (xi[i] - x[k])**2) / br_g**2))

@@ -36,6 +36,7 @@ import h5py
 import sys
 
 from .veloxchemlib import mpi_master
+from .errorhandler import print_exception_if_debug
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponseSolver
 from .inputparser import parse_seq_range
@@ -400,6 +401,7 @@ class PulsedResponse:
                                           data=np.array(polarizability))
 
         except Exception as e:
+            print_exception_if_debug()
             print('Pulsed response failed to create h5 data file: {}'.format(e),
                   file=sys.stdout)
 

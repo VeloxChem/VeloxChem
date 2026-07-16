@@ -9,6 +9,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.lrsolverunrest import LinearResponseUnrestrictedSolver
+from veloxchem.errorhandler import VeloxChemError
 
 
 @pytest.mark.solvers
@@ -198,6 +199,6 @@ class TestUnrestrictedLR:
         }
 
         with pytest.raises(
-                AssertionError,
+                VeloxChemError,
                 match='LinearResponseUnrestrictedSolver: not implemented for external rhs'):
             lr_drv.compute(mol, bas, scf_results, v_grad=v_grad)
