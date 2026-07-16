@@ -306,7 +306,6 @@ class EvbDriver:
 
     def load_initialisation(self,
                             data_folder: str,
-                            name: str,
                             load_systems=False,
                             load_top=False,
                             restart_pdb: str = None,
@@ -340,7 +339,9 @@ class EvbDriver:
             other_conf["name"]
             for other_conf in self.system_confs
         }
-        if name in existing_names:
+
+        if conf['name'] in existing_names:
+            name = conf['name']
             i = 1
             unique_name = f"{name}_{i}"
             while unique_name in existing_names:
@@ -351,7 +352,7 @@ class EvbDriver:
             self.ostream.print_info(
                 f"The name can be edited in options.json before loading")
             name = unique_name
-        conf["name"] = name
+            conf["name"] = name
 
         if self.lambda_vec != conf["Lambda"] and self.lambda_vec is not None:
             self.ostream.print_warning(
@@ -499,6 +500,52 @@ class EvbDriver:
                 configuration=conf,
                 platform=platform,
                 platform_properties=platform_properties,
+            )
+
+    def compute_force_groups(self,
+                             platform=None,
+                             platform_properties=None,
+                             bonded_decomp=False):
+        """Compute reactant/product OpenMM force-group energy decompositions
+        for every configuration in self.system_confs, from the trajectory
+        already sampled by run_FEP() (or reloaded via
+        load_initialisation(..., load_systems=True, load_top=True)). This is
+        a standalone post-processing step: it is never run automatically and
+        does not affect sampling.
+
+        Writes ForceGroups_rea.csv / ForceGroups_pro.csv into each
+        configuration's data_folder. If bonded_decomp is True, also writes
+        the per-bonded-term decomposition (bonded_E1_decomp.csv /
+        bonded_E2_decomp.csv / bonded_params.csv), which requires the
+        configuration's forming_bonds/breaking_bonds and
+        reactant_bonded_decomp/product_bonded_decomp systems to be present.
+
+        Args:
+            platform (str, optional): OpenMM platform name to use for the
+                recalculation (e.g. "CUDA", "CPU"). Defaults to None, which
+                lets OpenMM auto-select the fastest available platform.
+            platform_properties (dict, optional): OpenMM platform properties.
+            bonded_decomp (bool, optional): also compute the per-bonded-term
+                energy decomposition. Defaults to False.
+        """
+        # Post-processing reads the trajectory/Energies.csv that only the
+        # master rank produced; the reporter / helper ranks have nothing to
+        # recompute.
+        if self.rank != mpi_master():
+            return
+
+        for conf in self.system_confs:
+            self.ostream.print_blank()
+            self.ostream.print_header(
+                f"Computing force-group contributions for {conf['name']}")
+            self.ostream.flush()
+
+            FEP = EvbFepDriver(ostream=self.ostream)
+            FEP.compute_force_group_contributions(
+                configuration=conf,
+                platform=platform,
+                platform_properties=platform_properties,
+                bonded_decomp=bonded_decomp,
             )
 
     def update_options_json(self, dict, conf):
@@ -781,10 +828,27 @@ class EvbDriver:
             specific_result.update({"E_m_fg": fg_data})
         if fg_rea_file is not None and Path(fg_rea_file).is_file():
             rea_fg_data = np.loadtxt(fg_rea_file, skiprows=1, delimiter=',').T
-            specific_result.update({"E1_fg": rea_fg_data})
+            specific_result.update({
+                "E1_fg":
+                rea_fg_data,
+                # Comma-joined, not a list: the generic h5 dict saver
+                # (_save_dict_as_h5) can't natively store a numpy unicode
+                # array (h5py has no conversion path for '<U' dtype) and
+                # would silently fall back to a repr() string on save; a
+                # plain str round-trips through h5 either way, so this is the
+                # one representation that works identically whether read
+                # fresh this session or reloaded from an h5 file.
+                "E1_fg_names":
+                ",".join(self._parse_force_group_header(fg_rea_file)),
+            })
         if fg_pro_file is not None and Path(fg_pro_file).is_file():
             pro_fg_data = np.loadtxt(fg_pro_file, skiprows=1, delimiter=',').T
-            specific_result.update({"E2_fg": pro_fg_data})
+            specific_result.update({
+                "E2_fg":
+                pro_fg_data,
+                "E2_fg_names":
+                ",".join(self._parse_force_group_header(fg_pro_file)),
+            })
         if decomp_file is not None and Path(decomp_file).exists():
             decomp_data = np.loadtxt(decomp_file, skiprows=1, delimiter=',').T
             decomp_rea = decomp_data[decomp_data.shape[0] // 2:, :]
@@ -812,8 +876,21 @@ class EvbDriver:
         return specific_result, common_result
 
     @staticmethod
+    def _parse_force_group_header(path):
+        """Column names, in order, from a ForceGroups_rea/pro.csv header
+        line ("NAME(value), NAME(value), ..."). The numeric values are
+        per-run (see ReactionSystemBuilder.save_systems_as_xml /
+        force_group_name.json) and not meaningful across runs, so only the
+        names - which are what E1_fg/E2_fg should always be indexed by - are
+        kept here.
+        """
+        with Path(path).open("r") as file:
+            header = file.readline().strip()
+        return [cell.strip().split("(")[0] for cell in header.split(",")]
+
+    @staticmethod
     def _load_dict_from_h5(file):
-        """Load a dictionary from from an h5 file
+        """Load a dictionary from an h5 file
 
         Args:
             file (path): The file to load the results from.
@@ -821,6 +898,17 @@ class EvbDriver:
         Returns:
             dict: Dictionary with the results
         """
+
+        def decode_bytes(v):
+            # h5py reads back a scalar string dataset/attr (saved from a
+            # plain Python str, e.g. group[k] = v in _save_dict_as_h5) as
+            # bytes, not str - silently changing the value's type across a
+            # save/load round trip. Undo that so callers get back exactly
+            # what they saved.
+            if isinstance(v, bytes):
+                return v.decode('utf-8')
+            return v
+
         with h5py.File(file, "r") as f:
 
             def load_group(group):
@@ -829,14 +917,14 @@ class EvbDriver:
                     if isinstance(v, h5py.Group):
                         data[k] = load_group(v)
                     elif isinstance(v, h5py.Dataset):
-                        data[k] = v[()]
+                        data[k] = decode_bytes(v[()])
                     else:
                         data[k] = v
-                # Values that couldn't be stored natively (see
+                # Values that Cn't be stored natively (see
                 # _save_dict_as_h5) are saved as group attrs instead of
                 # datasets/subgroups; without this they'd silently disappear.
                 for k, v in group.attrs.items():
-                    data[k] = None if v == 'None' else v
+                    data[k] = None if v == 'None' else decode_bytes(v)
                 return data
 
             data = load_group(f)
@@ -889,7 +977,7 @@ class EvbDriver:
                     save_item(k, v, group)
                 except Exception as e:
                     store_as_repr(group, k, v,
-                                   f"failed with {type(e).__name__}: {e}")
+                                  f"failed with {type(e).__name__}: {e}")
 
         def save_item(k, v, group):
             if v is None:
@@ -904,8 +992,9 @@ class EvbDriver:
                 if arr.dtype == object:
                     # Heterogeneous/ragged data (e.g. a list of dicts or custom
                     # objects) has no native HDF5 representation.
-                    store_as_repr(group, k, v,
-                                  "no native HDF5 representation for object dtype")
+                    store_as_repr(
+                        group, k, v,
+                        "no native HDF5 representation for object dtype")
                 else:
                     group.create_dataset(k, data=arr)
             elif isinstance(v, (bool, int, float, str, bytes, np.generic)):

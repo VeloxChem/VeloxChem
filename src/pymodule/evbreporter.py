@@ -40,7 +40,7 @@ from pathlib import Path
 from mpi4py import MPI
 
 from .errorhandler import assert_msg_critical
-from .reactionsystembuilder import EvbForceGroup, ReactionSystemBuilder
+from .reactionsystembuilder import EvbForceGroup
 
 try:
     import openmm.app as mmapp
@@ -59,9 +59,6 @@ class EvbReporter:
         topology,
         lambda_val,
         outputstream,
-        forming_bonds=None,
-        breaking_bonds=None,
-        forcegroup_file=None,
         force_file=None,
         velocity_file=None,
         append=False,
@@ -69,20 +66,16 @@ class EvbReporter:
         replica=0,
         direction=0,
         cpu_threads=None,
-        enable_bonded_decomp=True,
         defer_open=False,
         core_outputs=True,
     ):
         # core_outputs: when False, the energy / force / velocity / NB-decomp
-        #   files are neither opened nor written (only force-group / bonded
-        #   decomposition are). Used by the master-side reporter in async mode
-        #   so it does not collide with the worker's Energies.csv.
+        #   files are neither opened nor written. Used by the master-side
+        #   reporter in async mode so it does not collide with the worker's
+        #   Energies.csv.
         # cpu_threads: number of OpenMM CPU-platform threads for the energy
         #   simulations (None = OpenMM default). Used by the async reporter
         #   worker to saturate the CPU on a single node.
-        # enable_bonded_decomp: allow the (expensive, GPU-system-dependent)
-        #   bonded decomposition. The async worker disables it; the master-side
-        #   synchronous reporter keeps it.
         # defer_open: if True, do not open the output files in __init__; the
         #   caller (worker) opens them per window via _open_outputs(append).
         self.ostream = outputstream
@@ -122,10 +115,8 @@ class EvbReporter:
         self._energy_file = energy_file
         self._force_file = force_file
         self._velocity_file = velocity_file
-        self._forcegroup_file = forcegroup_file
         self.report_forces = force_file is not None and core_outputs
         self.report_velocities = velocity_file is not None and core_outputs
-        self.report_forcegroups = forcegroup_file is not None
 
         # These auxiliary simulations only evaluate potential energies; run
         # them on the CPU platform so they don't each reserve a separate CUDA
@@ -151,37 +142,6 @@ class EvbReporter:
 
         self.decomp_names = [s for s in systems if 'decomp' in str(s)]
         self.report_nb_decomp = len(self.decomp_names) > 0 and core_outputs
-
-        # Bonded-decomposition parameters depend only on the systems, so they
-        # are computed once here; the per-window file handling lives in
-        # _open_outputs.
-        self.report_bonded_decomp = False
-        if enable_bonded_decomp and 'reactant_bonded_decomp' in systems.keys():
-            if forming_bonds is None or breaking_bonds is None:
-                self.ostream.print_warning(
-                    "Formed and broken bonds need to be supplied to do bonded decomposition"
-                )
-                self.ostream.flush()
-            else:
-                self.report_bonded_decomp = True
-                active_atoms = []
-                for bond in forming_bonds + breaking_bonds:
-                    if bond[0] not in active_atoms:
-                        active_atoms.append(bond[0])
-                    if bond[1] not in active_atoms:
-                        active_atoms.append(bond[1])
-
-                self.reactant_params = self._get_bonded_decomp_params(
-                    systems['reactant'], active_atoms)
-                self.product_params = self._get_bonded_decomp_params(
-                    systems['product'], active_atoms)
-                self.measure_params = set()
-                for force in list(self.reactant_params.values()) + list(
-                        self.product_params.values()):
-                    for params in force.values():
-                        self.measure_params.add(params[0])
-                self.measure_params = sorted(self.measure_params,
-                                             key=lambda x: (len(x), x))
 
         if not defer_open:
             self._open_outputs(append)
@@ -249,26 +209,6 @@ class EvbReporter:
                     header += f"V(x, {j}), V(y, {j}), V(z, {j}), "
                 self.v_out.write(header[:-2] + '\n')
 
-        if self.report_forcegroups:
-            forcegroup_path = Path(self._forcegroup_file)
-            rea_fg = str(
-                forcegroup_path.with_name(forcegroup_path.stem + '_rea' +
-                                          forcegroup_path.suffix))
-            pro_fg = str(
-                forcegroup_path.with_name(forcegroup_path.stem + '_pro' +
-                                          forcegroup_path.suffix))
-            self.FG_out = open(self._forcegroup_file, mode)
-            self.rea_FG_out = open(rea_fg, mode)
-            self.pro_FG_out = open(pro_fg, mode)
-            self.out_streams.append(self.FG_out)
-            self.out_streams.append(self.rea_FG_out)
-            self.out_streams.append(self.pro_FG_out)
-            if not append:
-                fg_header = EvbForceGroup.get_header()
-                self.FG_out.write(fg_header)
-                self.rea_FG_out.write(fg_header)
-                self.pro_FG_out.write(fg_header)
-
         if self.report_nb_decomp:
             output_dir = Path(self._energy_file).parent
             filename = str(output_dir / 'NB_decompositions.csv')
@@ -276,34 +216,6 @@ class EvbReporter:
             self.out_streams.append(self.decomp_out)
             if not append:
                 self.decomp_out.write(", ".join(self.decomp_names) + '\n')
-
-        if self.report_bonded_decomp:
-            output_dir = Path(self._energy_file).parent
-            filename = str(output_dir / 'bonded_E1_decomp.csv')
-            self.bonded_E1_decomp_out = open(filename, mode)
-            self.bonded_E2_decomp_out = open(filename, mode)
-            self.bonded_params_out = open(filename, mode)
-            self.out_streams.append(self.bonded_E1_decomp_out)
-            self.out_streams.append(self.bonded_E2_decomp_out)
-            self.out_streams.append(self.bonded_params_out)
-            if not append:
-                rea_header = ""
-                for force in self.reactant_params.values():
-                    for param in force.values():
-                        rea_header += f"{param[0]}, "
-                rea_header = rea_header[:-2] + '\n'
-                self.bonded_E1_decomp_out.write(rea_header)
-                pro_header = ""
-                for force in self.product_params.values():
-                    for param in force.values():
-                        pro_header += f"{param[0]}, "
-                pro_header = pro_header[:-2] + '\n'
-                self.bonded_E2_decomp_out.write(pro_header)
-                params_header = ""
-                for param in self.measure_params:
-                    params_header += str(param) + ", "
-                params_header = params_header[:-2] + '\n'
-                self.bonded_params_out.write(params_header)
 
         for stream in self.out_streams:
             stream.flush()
@@ -449,90 +361,17 @@ class EvbReporter:
             forces = state.getForces(asNumpy=True).value_in_unit(
                 mm.unit.kilojoules_per_mole / mm.unit.nanometer)
         # Core outputs; this also applies the current positions to every CPU
-        # simulation, which the force-group block below relies on.
+        # simulation.
         self._write_core(positions, box, velocities, forces)
-
-        # Force-group and bonded-decomposition outputs depend on the live GPU
-        # simulation / full state and stay synchronous.
-        Em_fg = []
-        E1_fg = []
-        E2_fg = []
-        if self.report_forcegroups:
-            line = ""
-            reasim = self.simulations['reactant']
-            prosim = self.simulations['product']
-            for fg in EvbForceGroup:
-                em = self._get_potential_energy(simulation, fg)
-                e1 = self._get_potential_energy(reasim, fg)
-                e2 = self._get_potential_energy(prosim, fg)
-
-                Em_fg.append(em)
-                E1_fg.append(e1)
-                E2_fg.append(e2)
-
-                if em > 1e9:
-                    raise ValueError(
-                        f"Force group {fg.name}({fg.value}) energy is too large: {em}"
-                    )
-
-            Em_line = ""
-            E1_line = ""
-            E2_line = ""
-
-            for em, e1, e2 in zip(Em_fg, E1_fg, E2_fg):
-                Em_line += f"{em}, "
-                E1_line += f"{e1}, "
-                E2_line += f"{e2}, "
-            Em_line = Em_line[:-2] + '\n'
-            E1_line = E1_line[:-2] + '\n'
-            E2_line = E2_line[:-2] + '\n'
-            self.FG_out.write(Em_line)
-            self.rea_FG_out.write(E1_line)
-            self.pro_FG_out.write(E2_line)
-
-        if self.report_bonded_decomp:
-            reasim = self.simulations['reactant_bonded_decomp']
-            E1 = self._get_bonded_decomp_energy(reasim, state,
-                                                self.reactant_params)
-            line = ", ".join([f"{e:.10e}" for e in E1]) + '\n'
-            self.bonded_E1_decomp_out.write(line)
-            pro_sim = self.simulations['product_bonded_decomp']
-            E2 = self._get_bonded_decomp_energy(pro_sim, state,
-                                                self.product_params)
-            line = ", ".join([f"{e:.10e}" for e in E2]) + '\n'
-            self.bonded_E2_decomp_out.write(line)
-
-            positions = state.getPositions(asNumpy=True)
-            line = ""
-            for i, param in enumerate(self.measure_params):
-                val = ""
-                if len(param) == 2:
-                    val = ReactionSystemBuilder.measure_length(
-                        positions[param[0]],
-                        positions[param[1]],
-                    )
-                elif len(param) == 3:
-                    val = ReactionSystemBuilder.measure_angle(
-                        positions[param[0]],
-                        positions[param[1]],
-                        positions[param[2]],
-                    )
-                elif len(param) == 4:
-                    val = ReactionSystemBuilder.measure_dihedral(
-                        positions[param[0]],
-                        positions[param[1]],
-                        positions[param[2]],
-                        positions[param[3]],
-                    )
-                line += f"{val:.10e}, "
-            line = line[:-2] + '\n'
-            self.bonded_params_out.write(line)
 
         for stream in self.out_streams:
             stream.flush()
 
     @staticmethod
-    def _get_bonded_decomp_energy(sim, state, parameters):
+    def _get_bonded_decomp_energy(sim, parameters):
+        """Per-term bonded energy decomposition, evaluated on ``sim`` at
+        whatever positions are currently applied to its context (the caller is
+        responsible for calling ``_apply_positions`` first)."""
         E = []
         for force, params in zip(sim.system.getForces(), parameters.values()):
             for i, param in params.items():
@@ -544,10 +383,7 @@ class EvbReporter:
                         param[1],
                     )
                     force.updateParametersInContext(sim.context)
-                    e = EvbReporter._get_potential_energy(
-                        sim,
-                        state=state,
-                    )
+                    e = EvbReporter._get_potential_energy(sim)
                     force.setBondParameters(
                         i,
                         param[0][0],
@@ -565,10 +401,7 @@ class EvbReporter:
                         param[1][1],
                     )
                     force.updateParametersInContext(sim.context)
-                    e = EvbReporter._get_potential_energy(
-                        sim,
-                        state=state,
-                    )
+                    e = EvbReporter._get_potential_energy(sim)
                     force.setBondParameters(
                         i,
                         param[0][0],
@@ -586,10 +419,7 @@ class EvbReporter:
                         param[1][1],
                     )
                     force.updateParametersInContext(sim.context)
-                    e = EvbReporter._get_potential_energy(
-                        sim,
-                        state=state,
-                    )
+                    e = EvbReporter._get_potential_energy(sim)
                     force.setAngleParameters(
                         i,
                         param[0][0],
@@ -612,10 +442,7 @@ class EvbReporter:
                         param[1][2],
                     )
                     force.updateParametersInContext(sim.context)
-                    e = EvbReporter._get_potential_energy(
-                        sim,
-                        state=state,
-                    )
+                    e = EvbReporter._get_potential_energy(sim)
                     force.setTorsionParameters(
                         i,
                         param[0][0],
@@ -633,30 +460,12 @@ class EvbReporter:
         return E
 
     @staticmethod
-    def _get_potential_energy(simulation, forcegroups=None, state=None):
-        """
-        Get the potential energy of the system.
-        """
-        # return 0
-        if state is not None:
-            try:
-                simulation.context.setState(state)
-            except Exception:
-                # Decomposition systems which have the barostat removed will throw an error on the above case
-                simulation.context.setPositions(state.getPositions())
-
-        if forcegroups is None:
-            return simulation.context.getState(
-                getEnergy=True, ).getPotentialEnergy().value_in_unit(
-                    mm.unit.kilojoules_per_mole)
-        else:
-            if isinstance(forcegroups, EvbForceGroup):
-                forcegroups = set([forcegroups.value])
-
-            return simulation.context.getState(
-                getEnergy=True,
-                groups=forcegroups,
-            ).getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)
+    def _get_potential_energy(simulation):
+        """Potential energy of ``simulation`` at whatever positions are
+        currently applied to its context."""
+        return simulation.context.getState(
+            getEnergy=True).getPotentialEnergy().value_in_unit(
+                mm.unit.kilojoules_per_mole)
 
 
 class EvbGpuRecalculator:
@@ -1009,9 +818,7 @@ class EvbReporterServer(_EvbReporterMPI):
     Builds the CPU energy-evaluation simulations once (multithreaded so it
     saturates the CPU while the GPU rank samples), owns the Energies / Forces /
     Velocities / NB-decomposition output files, and serves snapshots from the
-    master in order until it receives TERMINATE. Force-group / bonded
-    decomposition outputs are handled synchronously on the master and are not
-    produced here.
+    master in order until it receives TERMINATE.
     """
 
     def __init__(self,
@@ -1024,8 +831,6 @@ class EvbReporterServer(_EvbReporterMPI):
                  outputstream,
                  shm_ring,
                  shm_win,
-                 forming_bonds=None,
-                 breaking_bonds=None,
                  force_file=None,
                  velocity_file=None,
                  cpu_threads=None):
@@ -1043,14 +848,10 @@ class EvbReporterServer(_EvbReporterMPI):
             topology,
             lambda_val=0.0,
             outputstream=outputstream,
-            forming_bonds=forming_bonds,
-            breaking_bonds=breaking_bonds,
-            forcegroup_file=None,
             force_file=force_file,
             velocity_file=velocity_file,
             append=False,
             cpu_threads=cpu_threads,
-            enable_bonded_decomp=False,
             defer_open=True,
         )
         self._opened = False

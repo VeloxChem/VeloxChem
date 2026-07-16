@@ -1007,9 +1007,14 @@ class EvbDataProcessing:
         for result in self.results.values():
             E1_fg = result["E1_fg"]
             E2_fg = result["E2_fg"]
+
+            names = result.get("E1_fg_names")
+            names = names.split(',') if names is not None else [
+                fg.name for fg in EvbForceGroup
+            ]
             dGfep_fg = []
             dGevb_fg = []
-            for i, fg in enumerate(EvbForceGroup):
+            for i, name in enumerate(names):
                 E1 = E1_fg[i]
                 E2 = E2_fg[i]
                 E2_shifted, V, dE, Eg = self._calculate_Eg_V_dE(
@@ -1021,6 +1026,7 @@ class EvbDataProcessing:
                 dGfep_fg.append(dGfep)
                 dGevb_fg.append(dGevb)
 
+            result.update({"dGfep_fg_names": names})
             result.update({"dGfep_fg": np.array(dGfep_fg)})
             result.update({"dGevb_fg": np.array(dGevb_fg)})
 
@@ -1729,6 +1735,24 @@ class EvbDataProcessing:
         lam = results['Lambda']
         bins = results['coordinate_bins']
         config_results = results['configuration_results']
+
+        missing_fg = [
+            name for name, result in config_results.items()
+            if 'E1_fg' not in result or 'E2_fg' not in result
+        ]
+        assert_msg_critical(
+            not missing_fg,
+            "plot_force_decomp requires force-group contributions "
+            "(E1_fg/E2_fg), which are not present for configuration(s): "
+            f"{missing_fg}. Run EvbDriver.compute_force_groups() and "
+            "EvbDriver.compute_energy_profiles() again before plotting.")
+
+        def fg_names(result):
+            names = result.get('E1_fg_names')
+            if names is not None:
+                return names.split(',')
+            return [fg.name for fg in EvbForceGroup]
+
         # relevant_column = []
         relevant_fgs = []
         relevant_decomps = []
@@ -1741,22 +1765,33 @@ class EvbDataProcessing:
         dp.H12 = results['H12']
 
         for result in config_results.values():
-            for fg in EvbForceGroup.pes_forcegroups():
-                if not np.all(result['E1_fg'][fg - 1] == 0) or not np.all(
-                        result['E2_fg'][fg - 1] == 0):
-                    if fg not in relevant_fgs:
-                        relevant_fgs.append(fg)
+            for i, name in enumerate(fg_names(result)):
+                if name == EvbForceGroup.FROZEN.name:
                     continue
+                if not np.all(result['E1_fg'][i] == 0) or not np.all(
+                        result['E2_fg'][i] == 0):
+                    if name not in relevant_fgs:
+                        relevant_fgs.append(name)
+        if dif_to == 0:
+            print(
+                "Differences are taken with respect to the first configuration in the results dictionary, unless specified with the dif_to argument."
+            )
+        print(
+            f"Static forces stay present over the whole reaction, although their parameters might change"
+        )
+        print(
+            f"Dynamic forces either appear or disappear over the course of the reaction",
+            flush=True)
+        for result in config_results.values():
             if 'decompositions' in result.keys():
                 for name in result['decompositions']['names']:
                     if name not in relevant_decomps:
                         relevant_decomps.append(name)
-
         fg_checkboxes = [
             widgets.Checkbox(
                 True,
-                description=f"{EvbForceGroup(fg_val).name} ({fg_val})",
-            ) for fg_val in relevant_fgs
+                description=fg_name,
+            ) for fg_name in relevant_fgs
         ]
 
         decomp_checkboxes = [
@@ -1778,10 +1813,16 @@ class EvbDataProcessing:
                     print(name)
                     clear_output(wait=True)
 
+                    # Each result gets its own name->index lookup: two
+                    # configurations being compared here may have been built
+                    # under different EvbForceGroup numberings (or even
+                    # different sets of force groups), so a shared/global
+                    # index list would silently misalign one of them.
+                    name_to_idx = {n: i for i, n in enumerate(fg_names(result))}
                     fg_to_sum = []
-                    for fg, cb in zip(relevant_fgs, fg_checkboxes):
-                        if cb.value:
-                            fg_to_sum.append(fg - 1)
+                    for fg_name, cb in zip(relevant_fgs, fg_checkboxes):
+                        if cb.value and fg_name in name_to_idx:
+                            fg_to_sum.append(name_to_idx[fg_name])
                     E1_fg = np.sum(result['E1_fg'][fg_to_sum], axis=0)
                     E2_fg = np.sum(result['E2_fg'][fg_to_sum], axis=0)
 
@@ -1837,9 +1878,8 @@ class EvbDataProcessing:
                 fig2.legend()
                 plt.show()
 
-        # Observe checkbox changes
-        for cb in checkboxes:
-            cb.observe(update_plot, names='value')
+        recalculate_button = widgets.Button(description="Recalculate")
+        recalculate_button.on_click(update_plot)
 
         # Layout in 5x5 grid
         grid = widgets.GridBox(
@@ -1851,5 +1891,5 @@ class EvbDataProcessing:
         )
 
         # Initial display
-        display(grid, plot_output)
+        display(grid, recalculate_button, plot_output)
         update_plot()  # initial empty plot

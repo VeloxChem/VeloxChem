@@ -35,7 +35,7 @@ from pathlib import Path
 import numpy as np
 import time
 import sys
-import gc
+import json
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
@@ -49,6 +49,12 @@ try:
     import openmm as mm
     import openmm.app as mmapp
     import openmm.unit as mmunit
+except ImportError:
+    pass
+
+try:
+    import MDAnalysis
+    from MDAnalysis.lib.formats.libmdaxdr import XTCFile
 except ImportError:
     pass
 
@@ -120,7 +126,6 @@ class EvbFepDriver:
         self.constrain_H: bool = False
         self.report_forces: bool = False
         self.report_velocities: bool = False
-        self.report_forcegroups: bool = False
 
         # Recalculation mode selects how per-frame EVB energies are produced:
         #   "auto"     - offload to a reporter worker if >1 rank, else in-process
@@ -220,9 +225,6 @@ class EvbFepDriver:
             "report_velocities": {
                 "type": bool
             },
-            "report_forcegroups": {
-                "type": bool
-            },
             "recalc_mode": {
                 "type": str
             },
@@ -279,15 +281,14 @@ class EvbFepDriver:
             },
         }
 
-    def run_replicas(
-        self,
-        Lambda,
-        configuration,
-        platform,
-        platform_properties,
-    ):
-        # todo add this to the configuration keywords
-
+    def _apply_configuration_keywords(self, configuration, platform,
+                                      platform_properties):
+        """Apply platform selection, every recognised keyword in
+        self.keywords, and forming/breaking bonds from a configuration dict
+        onto self. Shared by run_replicas and
+        compute_force_group_contributions so both set up identically
+        (integrator temperature, friction, etc. are keyword-driven and
+        _get_simulation depends on them)."""
         self.platform = platform
         self.platform_properties = platform_properties
         if self.platform is None and self.platform_properties is not None:
@@ -314,9 +315,22 @@ class EvbFepDriver:
         self.forming_bonds = configuration.get("forming_bonds")
         self.breaking_bonds = configuration.get("breaking_bonds")
 
+    def run_replicas(
+        self,
+        Lambda,
+        configuration,
+        platform,
+        platform_properties,
+    ):
+        # todo add this to the configuration keywords
+
+        self._apply_configuration_keywords(configuration, platform,
+                                           platform_properties)
+
         self.ostream.flush()
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbFepDriver.')
+
         cwd = Path.cwd()
         self.run_folder = cwd / configuration["run_folder"]
         self.data_folder = cwd / configuration["data_folder"]
@@ -462,16 +476,14 @@ class EvbFepDriver:
         #                and self.recalc_mode in ("auto", "offload"))
 
         if self._deferred:
+            assert_msg_critical('MDAnalysis' in sys.modules,
+                                "MDAnalysis is required for deferred mode.")
             # Guard combinations that a positions-only trajectory cannot serve.
             assert_msg_critical(
                 not (self.report_velocities or self.debug),
                 "recalc_mode='deferred' cannot report velocities: they are not "
                 "stored in the XTC trajectory. Use recalc_mode 'inline'/'offload'."
             )
-            assert_msg_critical(
-                not (self.report_forcegroups or self.debug),
-                "recalc_mode='deferred' does not support force-group / bonded "
-                "decomposition. Use recalc_mode 'inline'/'offload'.")
             if self.rank == mpi_master():
                 self.ostream.print_info(
                     "Running in deferred mode: sampling without recalculation, "
@@ -717,8 +729,6 @@ class EvbFepDriver:
             self.ostream,
             self._shm_ring,
             self._shm_win,
-            forming_bonds=self.forming_bonds,
-            breaking_bonds=self.breaking_bonds,
             force_file=force_file,
             velocity_file=velocity_file,
         )
@@ -878,8 +888,6 @@ class EvbFepDriver:
         # Release the initial-equilibration GPU context deterministically so it
         # does not linger for the whole run (same rationale as _equilibrate).
         simulation.reporters.clear()
-        del simulation
-        gc.collect()
 
         return equil_state
 
@@ -901,7 +909,6 @@ class EvbFepDriver:
                 ))
             f_file = str(self.run_folder / f"forces_equil_{name}.csv")
             v_file = str(self.run_folder / f"velocities_equil_{name}.csv")
-            g_file = str(self.run_folder / f"forcegroups_equil_{name}.csv")
             simulation.reporters.append(
                 EvbReporter(
                     str(self.run_folder / f"energies_equil_{name}.csv"),
@@ -910,11 +917,8 @@ class EvbFepDriver:
                     self.topology,
                     name,
                     self.ostream,
-                    forming_bonds=self.forming_bonds,
-                    breaking_bonds=self.breaking_bonds,
                     force_file=f_file,
                     velocity_file=v_file,
-                    forcegroup_file=g_file,
                     append=False,
                 ))
 
@@ -965,8 +969,6 @@ class EvbFepDriver:
         # CUDA context (reference cycles defer collection), so GPU memory grows
         # window-over-window and slows sampling. Mirror _sample_deferred.
         simulation.reporters.clear()
-        del simulation
-        gc.collect()
 
         return equil_state
 
@@ -1103,8 +1105,6 @@ class EvbFepDriver:
         # Release the sampling GPU context. The trajectory reporter is shared
         # across windows and outlives this call, so it is not torn down here.
         simulation.reporters.clear()
-        del simulation, states, state_reporter
-        gc.collect()
 
         # Record this window's frames for the per-replica batched recalculation.
         n_frames = int(self.sample_steps // self.write_step)
@@ -1126,19 +1126,13 @@ class EvbFepDriver:
         """
         if not self._pending_windows:
             return
-        try:
-            from MDAnalysis.lib.formats.libmdaxdr import XTCFile as MdaXTCFile
-        except ImportError:
-            raise ImportError(
-                'Unable to import MDAnalysis. Please install MDAnalysis to use deferred recalculation mode.'
-            )
 
         windows = self._pending_windows
         total_frames = sum(w[3] for w in windows)
 
         frames = []
-        with MdaXTCFile(str(self.data_folder / "trajectory.xtc"),
-                        mode='r') as reader:
+        with XTCFile(str(self.data_folder / "trajectory.xtc"),
+                     mode='r') as reader:
             start = max(0, len(reader) - total_frames)
             reader.seek(start)
             # None for a non-periodic (vacuum) trajectory; a (3,3) box for a
@@ -1170,6 +1164,276 @@ class EvbFepDriver:
 
         self._pending_windows = []
         self._accumulate_deferred_recalc_timing(replica, len(frames), t_recalc)
+
+    def _iter_trajectory_frames(self, traj_file, periodic, n_frames):
+        """Stream (positions_nm, box_nm) frames from trajectory.xtc from the
+        start, one at a time. Deliberately does not accumulate frames into a
+        list: trajectory.xtc can be tens of GB for a full run (every replica /
+        direction / lambda window), so unlike _recalc_replica (which reads one
+        replica's frames into memory - bounded by construction), this must
+        keep memory flat regardless of how many frames the trajectory holds.
+        """
+
+        with XTCFile(str(traj_file), mode='r') as reader:
+            for _ in range(n_frames):
+                frame = reader.read()
+                pos_nm = np.array(frame.x, dtype=np.float64)
+                box_nm = np.array(frame.box,
+                                  dtype=np.float64) if periodic else None
+                yield pos_nm, box_nm
+
+    def _write_force_group_csv(self, traj_file, periodic, n_frames, system,
+                               out_path, force_group_map, progress_interval,
+                               label):
+        """Build one CPU/GPU Simulation for ``system``, stream every frame of
+        trajectory.xtc against it, and write one force-group-energy row per
+        frame.
+
+        force_group_map: dict[name -> group value] describing what this
+        specific system's forces were actually tagged with (loaded from the
+        run's own force_group_name.json, not necessarily the live
+        EvbForceGroup enum - see compute_force_group_contributions).
+        """
+        sim = self._get_simulation(system, self.step_size)
+        platformname = sim.context.getPlatform()
+        self.ostream.print_info(
+            f"Performing recalculation on platform: {platformname.getName()}")
+        self.ostream.flush()
+
+        header = ", ".join(f"{name}({value})"
+                           for name, value in force_group_map.items())
+        with out_path.open('w') as out:
+            out.write(header + '\n')
+            for i, (pos_nm, box_nm) in enumerate(
+                    self._iter_trajectory_frames(traj_file, periodic,
+                                                 n_frames)):
+                EvbReporter._apply_positions(sim, pos_nm, box_nm)
+                line = ""
+                for name, value in force_group_map.items():
+                    e = sim.context.getState(
+                        getEnergy=True,
+                        groups={value},
+                    ).getPotentialEnergy().value_in_unit(
+                        mm.unit.kilojoules_per_mole)
+                    line += f"{e}, "
+                out.write(line[:-2] + '\n')
+                if (i + 1) % progress_interval == 0:
+                    self.ostream.print_info(
+                        f"Force groups ({label}): {i + 1}/{n_frames} frames")
+                    self.ostream.flush()
+
+    def _write_bonded_decomp_csv(self, traj_file, periodic, n_frames, system,
+                                 params, out_path, header, progress_interval,
+                                 label):
+        """Same single-context-at-a-time discipline as
+        _write_force_group_csv, but for the per-bonded-term decomposition."""
+        sim = self._get_simulation(system, self.step_size)
+
+        with out_path.open('w') as out:
+            out.write(header)
+            for i, (pos_nm, box_nm) in enumerate(
+                    self._iter_trajectory_frames(traj_file, periodic,
+                                                 n_frames)):
+                EvbReporter._apply_positions(sim, pos_nm, box_nm)
+                E = EvbReporter._get_bonded_decomp_energy(sim, params)
+                out.write(", ".join(f"{e:.10e}" for e in E) + '\n')
+                if (i + 1) % progress_interval == 0:
+                    self.ostream.print_info(
+                        f"Bonded decomposition ({label}): {i + 1}/{n_frames} "
+                        "frames")
+                    self.ostream.flush()
+
+    def _write_bonded_params_csv(self, traj_file, periodic, n_frames,
+                                 measure_params, out_path, header,
+                                 progress_interval):
+        """Geometry measurements (bond lengths / angles / dihedrals) for the
+        atoms probed by bonded decomposition. Needs no Simulation, only
+        positions, so this is a lightweight streaming pass on its own."""
+        with out_path.open('w') as out:
+            out.write(header)
+            for i, (pos_nm, _box_nm) in enumerate(
+                    self._iter_trajectory_frames(traj_file, periodic,
+                                                 n_frames)):
+                line = ""
+                for param in measure_params:
+                    if len(param) == 2:
+                        val = ReactionSystemBuilder.measure_length(
+                            pos_nm[param[0]], pos_nm[param[1]])
+                    elif len(param) == 3:
+                        val = ReactionSystemBuilder.measure_angle(
+                            pos_nm[param[0]], pos_nm[param[1]],
+                            pos_nm[param[2]])
+                    else:
+                        val = ReactionSystemBuilder.measure_dihedral(
+                            pos_nm[param[0]], pos_nm[param[1]],
+                            pos_nm[param[2]], pos_nm[param[3]])
+                    line += f"{val:.10e}, "
+                out.write(line[:-2] + '\n')
+                if (i + 1) % progress_interval == 0:
+                    self.ostream.print_info(
+                        f"Bonded params: {i + 1}/{n_frames} frames")
+                    self.ostream.flush()
+
+    def compute_force_group_contributions(self,
+                                          configuration,
+                                          platform=None,
+                                          platform_properties=None,
+                                          bonded_decomp=False,
+                                          progress_interval=1000):
+        """Compute reactant/product OpenMM force-group energy decompositions
+        from a trajectory already sampled by run_replicas(), by replaying
+        trajectory.xtc.
+
+        Writes ForceGroups_rea.csv / ForceGroups_pro.csv (one row per
+        trajectory frame, one column per force group named in this run's own
+        force_group_name.json - saved by save_systems_as_xml alongside the
+        systems, and preferred over the live EvbForceGroup enum so results
+        stay correct even if the enum has since been reordered/extended -
+        matching the format EvbDriver._load_output_files already expects)
+        into configuration["data_folder"]. If bonded_decomp is True, also writes
+        bonded_E1_decomp.csv / bonded_E2_decomp.csv (per-bonded-term energies)
+        and bonded_params.csv (the corresponding bond length / angle /
+        dihedral values), which requires forming_bonds/breaking_bonds and the
+        reactant_bonded_decomp/product_bonded_decomp systems to be present.
+
+        Uses the GPU when available (via _get_simulation, same as sampling)
+        and only ever holds one system's context alive at a time: builds a
+        system, streams the whole trajectory against it from disk, tears it
+        down, then builds the next.
+        """
+        if self.rank != mpi_master():
+            return
+        assert_msg_critical('openmm' in sys.modules,
+                            'openmm is required for EvbFepDriver.')
+        assert_msg_critical(
+            'MDAnalysis' in sys.modules,
+            'MDAnalysis is required for force group decomposition.')
+
+        # Populates temperature / integrator / platform settings that
+        # _get_simulation depends on, exactly as run_replicas does (they are
+        # not otherwise set outside of an actual sampling run).
+        self._apply_configuration_keywords(configuration, platform,
+                                           platform_properties)
+
+        cwd = Path.cwd()
+        self.data_folder = cwd / configuration["data_folder"]
+        self.run_folder = cwd / configuration["run_folder"]
+        self.systems = configuration.get("systems")
+        self.topology = configuration.get("topology")
+
+        assert_msg_critical(
+            self.systems is not None and self.topology is not None,
+            "compute_force_group_contributions requires configuration"
+            "['systems']/['topology'] to be populated, e.g. via "
+            "build_systems() or load_initialisation(..., load_systems=True, "
+            "load_top=True).")
+
+        # Force-group values are only meaningful together with the name they
+        # meant when these systems were built (EvbForceGroup's auto() values
+        # shift whenever the enum is reordered/extended). Prefer the mapping
+        # recorded alongside the systems at save time over the live enum, so
+        # results stay correct even for systems built under an older
+        # EvbForceGroup definition.
+        fg_map_path = self.run_folder / "force_group_name.json"
+        if fg_map_path.is_file():
+            with fg_map_path.open("r", encoding="utf-8") as f:
+                force_group_map = json.load(f)
+        else:
+            self.ostream.print_warning(
+                f"No force_group_name.json found in {self.run_folder}; "
+                "falling back to the current EvbForceGroup definition, which "
+                "may not match how this run's systems were originally built.")
+            force_group_map = {fg.name: fg.value for fg in EvbForceGroup}
+
+        traj_file = self.data_folder / "trajectory.xtc"
+        energies_file = self.data_folder / "Energies.csv"
+        with open(energies_file) as f:
+            n_energy_rows = sum(1 for _ in f) - 1
+
+        with XTCFile(str(traj_file), mode='r') as reader:
+            n_frames = len(reader)
+        assert_msg_critical(
+            n_frames == n_energy_rows,
+            f"{traj_file} has {n_frames} frames but {energies_file} has "
+            f"{n_energy_rows} rows; they must be row-aligned to compute "
+            "force-group contributions.")
+
+        if bonded_decomp:
+            for name in ('reactant_bonded_decomp', 'product_bonded_decomp'):
+                assert_msg_critical(
+                    name in self.systems,
+                    f"bonded_decomp=True requires configuration['systems']"
+                    f"['{name}'] (build the systems with forming_bonds/"
+                    "breaking_bonds supplied).")
+            assert_msg_critical(
+                self.forming_bonds is not None
+                and self.breaking_bonds is not None,
+                "bonded_decomp=True requires forming_bonds/breaking_bonds "
+                "to be set on the configuration.")
+
+        periodic = self.topology.getPeriodicBoxVectors() is not None
+
+        self.ostream.print_info(
+            f"Computing force-group contributions from {traj_file} "
+            f"({n_frames} frames)")
+        self.ostream.flush()
+
+        self._write_force_group_csv(traj_file, periodic, n_frames,
+                                    self.systems['reactant'],
+                                    self.data_folder / "ForceGroups_rea.csv",
+                                    force_group_map, progress_interval,
+                                    "reactant")
+        self._write_force_group_csv(traj_file, periodic, n_frames,
+                                    self.systems['product'],
+                                    self.data_folder / "ForceGroups_pro.csv",
+                                    force_group_map, progress_interval,
+                                    "product")
+
+        if bonded_decomp:
+            active_atoms = []
+            for bond in self.forming_bonds + self.breaking_bonds:
+                if bond[0] not in active_atoms:
+                    active_atoms.append(bond[0])
+                if bond[1] not in active_atoms:
+                    active_atoms.append(bond[1])
+
+            reactant_params = EvbReporter._get_bonded_decomp_params(
+                self.systems['reactant'], active_atoms)
+            product_params = EvbReporter._get_bonded_decomp_params(
+                self.systems['product'], active_atoms)
+            measure_params = set()
+            for force in list(reactant_params.values()) + list(
+                    product_params.values()):
+                for params in force.values():
+                    measure_params.add(params[0])
+            measure_params = sorted(measure_params, key=lambda x: (len(x), x))
+
+            rea_header = ", ".join(
+                str(param[0]) for force in reactant_params.values()
+                for param in force.values()) + '\n'
+            pro_header = ", ".join(
+                str(param[0]) for force in product_params.values()
+                for param in force.values()) + '\n'
+            params_header = ", ".join(str(p) for p in measure_params) + '\n'
+
+            self._write_bonded_decomp_csv(
+                traj_file, periodic, n_frames,
+                self.systems['reactant_bonded_decomp'], reactant_params,
+                self.data_folder / "bonded_E1_decomp.csv", rea_header,
+                progress_interval, "reactant")
+            self._write_bonded_decomp_csv(
+                traj_file, periodic, n_frames,
+                self.systems['product_bonded_decomp'], product_params,
+                self.data_folder / "bonded_E2_decomp.csv", pro_header,
+                progress_interval, "product")
+            self._write_bonded_params_csv(
+                traj_file, periodic, n_frames, measure_params,
+                self.data_folder / "bonded_params.csv", params_header,
+                progress_interval)
+
+        self.ostream.print_info(
+            f"Force-group contributions written to {self.data_folder}")
+        self.ostream.flush()
 
     def _accumulate_deferred_sampling_timing(self, l, replica, direction,
                                              t_window):
@@ -1279,11 +1543,6 @@ class EvbFepDriver:
                     verdict = ("transfer-bound: data movement dominates the "
                                "communication cost")
                 self.ostream.print_info(f"[timing] Verdict: {verdict}.")
-        if self.report_forcegroups or self.debug:
-            self.ostream.print_warning(
-                "[timing] A master-side synchronous reporter is active "
-                "(report_forcegroups/debug): its CPU energy work runs inside the "
-                "sampling step and inflates the reported sampling(GPU) figure.")
         self.ostream.flush()
 
     def _make_evb_reporters(self, l, append, replica, direction):
@@ -1291,8 +1550,7 @@ class EvbFepDriver:
 
         Synchronous mode returns a single in-process EvbReporter. Async mode
         returns an EvbReporterClient that offloads the core energies to the
-        worker, plus (only when force-groups / bonded decomposition are
-        requested) a master-side EvbReporter that writes just those files.
+        worker.
         """
         if not self._async:
             return [
@@ -1317,26 +1575,7 @@ class EvbFepDriver:
             self._shm_ring,
             self._shm_win,
         )
-        reporters = [client]
-
-        if self.report_forcegroups or self.debug:
-            fg_reporter = EvbReporter(
-                str(self.data_folder / "Energies.csv"),
-                self.write_step,
-                self.systems,
-                self.topology,
-                l,
-                self.ostream,
-                forming_bonds=self.forming_bonds,
-                breaking_bonds=self.breaking_bonds,
-                forcegroup_file=str(self.data_folder / "ForceGroups.csv"),
-                append=append,
-                replica=replica,
-                direction=direction,
-                core_outputs=False,
-            )
-            reporters.append(fg_reporter)
-        return reporters
+        return [client]
 
     def _get_simulation(self, system, step_size):
         if self.isothermal:
@@ -1426,10 +1665,6 @@ class EvbFepDriver:
             v_file = str(folder / f"Velocities{name_suffix}.csv")
         else:
             v_file = None
-        if self.report_forcegroups or self.debug:
-            g_file = str(folder / f"ForceGroups{name_suffix}.csv")
-        else:
-            g_file = None
 
         evb_reporter = EvbReporter(
             str(folder / f"Energies{name_suffix}.csv"),
@@ -1438,9 +1673,6 @@ class EvbFepDriver:
             self.topology,
             l,
             self.ostream,
-            forming_bonds=self.forming_bonds,
-            breaking_bonds=self.breaking_bonds,
-            forcegroup_file=g_file,
             velocity_file=v_file,
             force_file=f_file,
             append=append,

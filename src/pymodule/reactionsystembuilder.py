@@ -38,6 +38,7 @@ from networkx.algorithms.isomorphism import categorical_node_match
 import typing
 from pathlib import Path
 import copy
+import json
 import math
 import sys
 import os
@@ -1507,6 +1508,7 @@ class ReactionSystemBuilder():
             interp_pos_nm = ((1 - lam) * rea_pos[atom_id] +
                              lam * pro_pos[atom_id]) * 0.1  # Å → nm
             frozen_force.addParticle(particle_index, interp_pos_nm)
+        frozen_force.setForceGroup(EvbForceGroup.FROZEN.value)
         system.addForce(frozen_force)
 
     def _add_CNT_graphene(self, system, nb_force, topology, system_mol):
@@ -2095,6 +2097,9 @@ class ReactionSystemBuilder():
         # screening.
         nb_force.setReactionFieldDielectric(1)
 
+        # implicit_solvent_model and solvent (explicit) are mutually exclusive
+        # (asserted above), so reusing SOLVENT here is unambiguous.
+        gb_force.setForceGroup(EvbForceGroup.SOLVENT.value)
         system.addForce(gb_force)
         self.ostream.print_info(
             f'Added implicit solvent ({model}) with '
@@ -2258,9 +2263,6 @@ class ReactionSystemBuilder():
             systems['reactant_bonded_decomp'] = rea_bond_decomp
             systems['product_bonded_decomp'] = pro_bond_decomp
 
-        # rea_system = self._split_nb_force(rea_system)
-        # pro_system = self._split_nb_force(pro_system)
-
         systems['reactant'] = rea_system
         systems['product'] = pro_system
         self.ostream.flush()
@@ -2270,7 +2272,11 @@ class ReactionSystemBuilder():
 
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
+        # Static interactions are present in both the reactant and product states,
+        # but can still change with lambda as they are dependent on the atomtypes which might change
         static_bonded_harmonic = self._create_static_harmonic_bond_forces(lam)
+
+        # Dynamic interactions are from breaking or forming bonds, and either form or dissapear as the reaction progresses
         dynamic_bonded_harmonic = self._create_dynamic_harmonic_bond_forces(lam)
         morse = self._create_morse_force(lam, model_broken=False)
         angle = self._create_harmonic_angle_forces(lam, model_broken=False)
@@ -2296,6 +2302,9 @@ class ReactionSystemBuilder():
             system.addForce(syscoul)
         else:
             system.addForce(morse)
+
+            # static nonbonded interactions that are present in both the reactant and product states,
+            # but can still change with lambda as they are dependent on the atomtypes which might change
             syslj_static, syscoul_static = self._create_nonbonded_forces(
                 lam,
                 lj_soft_core=self.soft_core_lj_pes_static,
@@ -2308,6 +2317,8 @@ class ReactionSystemBuilder():
             syscoul_static.setName('Reaction internal Coul static')
             system.addForce(syslj_static)
             system.addForce(syscoul_static)
+
+            # dynamic nonbonded interactions that are from breaking or forming bonds, and either form or dissapear as the reaction progresses
             syslj_dynamic, syscoul_dynamic = self._create_nonbonded_forces(
                 lam,
                 lj_soft_core=self.soft_core_lj_pes_dynamic,
@@ -2488,32 +2499,6 @@ class ReactionSystemBuilder():
         return systems
 
     @staticmethod
-    def _split_nb_force(system):
-        nb_force = [
-            force for force in system.getForces()
-            if isinstance(force, mm.NonbondedForce)
-        ][0]
-        # nb_force.setNonbondedMethod(mm.NonbondedForce.CutoffNonPeriodic)
-        coul_force = nb_force
-        lj_force = copy.copy(nb_force)
-        coul_force.setName('Solvent coul')
-        coul_force.setForceGroup(EvbForceGroup.SOL_COUL.value)
-        lj_force.setName('Solvent lj')
-        lj_force.setForceGroup(EvbForceGroup.SOL_LJ.value)
-
-        for i in range(nb_force.getNumParticles()):
-            charge, sigma, epsilon = nb_force.getParticleParameters(i)
-            coul_force.setParticleParameters(i, charge, 1, 0)
-            lj_force.setParticleParameters(i, 0, sigma, epsilon)
-
-        for i in range(nb_force.getNumExceptions()):
-            p1, p2, charge, sigma, epsilon = nb_force.getExceptionParameters(i)
-            coul_force.setExceptionParameters(i, p1, p2, charge, 1, 0)
-            lj_force.setExceptionParameters(i, p1, p2, 0, sigma, epsilon)
-
-        system.addForce(lj_force)
-
-    @staticmethod
     def _remove_forces(system):
         for i in range(system.getNumForces()):
             system.removeForce(0)
@@ -2543,6 +2528,8 @@ class ReactionSystemBuilder():
         return E_field_force
 
     def _create_static_harmonic_bond_forces(self, lam):
+        """Creates the harmonic bond forces for all the bonds
+        that are present in both the reactant and product states"""
 
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
@@ -3429,6 +3416,18 @@ class ReactionSystemBuilder():
             with (path / filename).open(mode="w", encoding="utf-8") as output:
                 output.write(mm.XmlSerializer.serialize(system))
 
+        # Force-group values are only meaningful together with the name they
+        # meant at save time (EvbForceGroup's auto() values shift whenever the
+        # enum is reordered/extended). Save that mapping alongside the systems
+        # so it can always be deciphered later, regardless of how the enum has
+        # since changed.
+        fg_map_path = path / "force_group_name.json"
+        with fg_map_path.open(mode="w", encoding="utf-8") as output:
+            json.dump({fg.name: fg.value
+                       for fg in EvbForceGroup},
+                      output,
+                      indent=2)
+
     def load_systems_from_xml(self, folder: str):
         """Load the systems from xml files in the given folder.
 
@@ -3499,8 +3498,6 @@ class EvbForceGroup(Enum):
     )  # All solvent-solvent interactions. Does not include the solute-solvent long range interaction
     CARBON = auto()  # Graphene and CNTs
     PDB = auto()  # Bonded forces added from the PDB
-    SOL_COUL = auto()
-    SOL_LJ = auto()
     FROZEN = auto()
 
     @classmethod

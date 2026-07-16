@@ -11,9 +11,11 @@ import csv
 import math
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from veloxchem.evbdriver import EvbDriver
+from veloxchem.errorhandler import VeloxChemError
 
 from veloxchem.outputstream import OutputStream
 
@@ -96,3 +98,48 @@ class TestTinyFep:
 
             assert _finite_energy_rows(energies) > 0
             assert _finite_energy_rows(combined) > 0
+
+    @pytest.mark.parametrize("recalc_mode", ["inline", "deferred"])
+    def test_compute_force_groups(self, recalc_mode):
+        # recalc_mode='deferred' used to be incompatible with in-loop force
+        # groups; compute_force_groups() runs identically afterwards
+        # regardless of how sampling was done, since it replays the trajectory
+        # rather than hooking into the sampling loop.
+        config = _tiny_config(f"tiny_fg_{recalc_mode}", recalc_mode=recalc_mode)
+
+        with evb_chdir_tmp():
+            EVB, data_folder = _run_tiny_fep(evb_ff_pair(), config)
+
+            EVB.compute_force_groups()
+
+            rea_file = data_folder / "ForceGroups_rea.csv"
+            pro_file = data_folder / "ForceGroups_pro.csv"
+            assert rea_file.exists(), f"missing {rea_file}"
+            assert pro_file.exists(), f"missing {pro_file}"
+
+            energies = data_folder / "Energies.csv"
+            n_energy_rows = _finite_energy_rows(energies)
+            n_rea_rows = _finite_energy_rows(rea_file)
+            n_pro_rows = _finite_energy_rows(pro_file)
+            assert n_rea_rows == n_energy_rows
+            assert n_pro_rows == n_energy_rows
+
+            from veloxchem.reactionsystembuilder import EvbForceGroup
+            expected_header = EvbForceGroup.get_header().strip()
+            with open(rea_file) as handle:
+                assert handle.readline().strip() == expected_header
+            with open(pro_file) as handle:
+                assert handle.readline().strip() == expected_header
+
+    def test_compute_force_groups_bonded_decomp_requires_decomp_systems(self):
+        # The tiny fixture builds systems with decompose_bonded left at its
+        # default (False), so reactant_bonded_decomp/product_bonded_decomp
+        # are absent; bonded_decomp=True should fail with a clear error
+        # rather than a raw KeyError.
+        config = _tiny_config("tiny_fg_bonded_guard")
+
+        with evb_chdir_tmp():
+            EVB, _ = _run_tiny_fep(evb_ff_pair(), config)
+
+            with pytest.raises(VeloxChemError, match="bonded_decomp"):
+                EVB.compute_force_groups(bonded_decomp=True)
