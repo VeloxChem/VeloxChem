@@ -581,11 +581,18 @@ class SerenityScfDriver:
             return f"{self.filename}.h5"
         
     def _veloxchem_basis(self, molecule, basis_label=None):
-        
+
         if basis_label is None:
-            return MolecularBasis.read(molecule, self.basis)
+            vlx_label = self.basis
+            if self.basis == "6-31GS":
+                vlx_label = "6-31g*"
+            return MolecularBasis.read(molecule, vlx_label)
         else:
-            return MolecularBasis.read(molecule, basis_label)
+            vlx_label = basis_label
+            if self.basis == "6-31GS":
+                vlx_label = "6-31g*"
+
+            return MolecularBasis.read(molecule, vlx_label)
     
     def create_final_hdf5(self, fname, molecule, basis=None):
         if self.rank != mpi_master() or self._skip_writing_h5:

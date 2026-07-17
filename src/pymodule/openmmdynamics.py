@@ -59,6 +59,10 @@ from .serenityscfdriver import SerenityScfDriver
 from .serenitygradientdriver import SerenityGradientDriver
 from .serenitylrrspeigensolver import SerenityLinearResponseSolver
 from .serenityexcitedstategradientdriver import SerenityExcitedStateGradientDriver
+from .openqpscfdriver import OpenQPScfDriver
+from .openqpgradientdriver import OpenQPGradientDriver
+from .openqpexcitedstatesdriver import OpenQPExcitedStatesDriver
+from .openqpexcitedstategradientdriver import OpenQPExcitedStateGradientDriver
 from .transitiondensitytracker import TransitionDensityTracker
 
 from .errorhandler import assert_msg_critical
@@ -1548,7 +1552,60 @@ class OpenMMDynamics:
 
                 self.grad_driver.set_state_tracker(state_tracker)
 
-        
+        elif isinstance(self.qm_driver, OpenQPScfDriver):
+            errmsg = 'run_qmmm: OpenQPScfDriver requires '
+            errmsg += 'OpenQPGradientDriver as grad_driver.'
+            assert_msg_critical(
+                isinstance(self.grad_driver, OpenQPGradientDriver), errmsg)
+            errmsg = 'run_qmmm: OpenQPScfDriver and OpenQPGradientDriver '
+            errmsg += 'must be linked to the same OpenQP SCF driver instance.'
+            assert_msg_critical(self.grad_driver.openqp_driver is
+                                self.qm_driver, errmsg)
+            self.driver_flag = 'OpenQP Ground-State Driver'
+
+        elif isinstance(self.qm_driver, OpenQPExcitedStatesDriver):
+            errmsg = 'run_qmmm: OpenQPExcitedStatesDriver requires '
+            errmsg += 'OpenQPExcitedStateGradientDriver as grad_driver.'
+            assert_msg_critical(
+                isinstance(self.grad_driver, OpenQPExcitedStateGradientDriver),
+                errmsg)
+            errmsg = 'run_qmmm: OpenQP excited-state dynamics requires the '
+            errmsg += 'same OpenQPExcitedStatesDriver in qm_driver and '
+            errmsg += 'grad_driver.exc_driver.'
+            assert_msg_critical(self.grad_driver.exc_driver is self.qm_driver,
+                                errmsg)
+            errmsg = 'run_qmmm: OpenQP excited-state dynamics requires the '
+            errmsg += 'same OpenQPScfDriver in qm_driver and grad_driver.'
+            assert_msg_critical(self.grad_driver.openqp_driver is
+                                self.qm_driver.openqp_driver, errmsg)
+
+            state_index = self.grad_driver.state_deriv_index
+            if isinstance(state_index, (list, tuple, np.ndarray)):
+                assert_msg_critical(
+                    len(state_index) > 0,
+                    'run_qmmm: empty state_deriv_index for excited-state dynamics.'
+                )
+                state_index = state_index[0]
+            state_index = int(state_index)
+            assert_msg_critical(
+                state_index > 0,
+                'run_qmmm: state_deriv_index must be > 0 for excited-state dynamics.'
+            )
+
+            self.state_mode = 'excited'
+            self.active_state_index = state_index
+            self.driver_flag = 'OpenQP Excited-State Driver'
+
+            # State tracking is not available for OpenQP drivers (it relies on
+            # the Serenity transition-density tracker); the target state stays
+            # fixed at state_deriv_index throughout the dynamics.
+            if track_state or state_tracker is not None:
+                warning = 'run_qmmm: state tracking is not supported for '
+                warning += 'OpenQP excited-state dynamics; using a fixed target '
+                warning += 'state.'
+                self.ostream.print_warning(warning)
+                self.ostream.flush()
+
         else:
             raise ValueError('Invalid QM driver. Please use a valid VeloxChem driver.')
 
@@ -1567,6 +1624,15 @@ class OpenMMDynamics:
             if basis is not None:
                 warning = 'Ignoring basis argument in run_qmmm for Serenity '
                 warning += 'drivers. Configure basis via SerenityScfDriver.'
+                self.ostream.print_warning(warning)
+                self.ostream.flush()
+            self.basis = None
+
+        elif isinstance(self.qm_driver,
+                        (OpenQPScfDriver, OpenQPExcitedStatesDriver)):
+            if basis is not None:
+                warning = 'Ignoring basis argument in run_qmmm for OpenQP '
+                warning += 'drivers. Configure basis via OpenQPScfDriver.'
                 self.ostream.print_warning(warning)
                 self.ostream.flush()
             self.basis = None
@@ -2600,6 +2666,24 @@ class OpenMMDynamics:
             potential_kjmol = float(self.qm_driver.get_energy()) * hartree_in_kjpermol()
             gradient = self.grad_driver.get_gradient()
 
+        elif isinstance(self.qm_driver, OpenQPExcitedStatesDriver):
+            # OpenQP excited-state (MRSF/SF-TDDFT) dynamics; the excited-state
+            # gradient driver computes the reference, excitation, and gradient.
+            self.grad_driver.compute(new_molecule)
+            gradient = self.grad_driver.get_gradient()
+            total_energy_au = self.grad_driver.total_energy
+            if total_energy_au is None:
+                total_energy_au = self.grad_driver.compute_energy(new_molecule)
+            potential_kjmol = float(total_energy_au) * hartree_in_kjpermol()
+
+        elif isinstance(self.qm_driver, OpenQPScfDriver):
+            # OpenQP ground-state dynamics.  Read the energy before the gradient
+            # driver invalidates the OpenQP cache.
+            self.qm_driver.compute(new_molecule)
+            potential_kjmol = float(self.qm_driver.get_energy()) * hartree_in_kjpermol()
+            self.grad_driver.compute(new_molecule)
+            gradient = self.grad_driver.get_gradient()
+
         elif self.basis is not None:
             basis = MolecularBasis.read(new_molecule, self.basis)
             scf_results = self.qm_driver.compute(new_molecule, basis)
@@ -2700,7 +2784,17 @@ class OpenMMDynamics:
 
         if isinstance(self.qm_driver, SerenityScfDriver):
             return float(self.qm_driver.get_energy()) * hartree_in_kjpermol()
-        
+
+        if isinstance(self.qm_driver, OpenQPExcitedStatesDriver):
+            assert_msg_critical(
+                hasattr(self.grad_driver, 'total_energy') and
+                self.grad_driver.total_energy is not None,
+                'get_qm_potential_energy: missing OpenQP excited-state energy.')
+            return float(self.grad_driver.total_energy) * hartree_in_kjpermol()
+
+        if isinstance(self.qm_driver, OpenQPScfDriver):
+            return float(self.qm_driver.get_energy()) * hartree_in_kjpermol()
+
         if self.basis is not None:
             potential_energy = self.qm_driver.get_scf_energy() * hartree_in_kjpermol()
         else:

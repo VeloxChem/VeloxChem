@@ -56,6 +56,9 @@ from .serenityscfdriver import SerenityScfDriver
 from .serenitygradientdriver import SerenityGradientDriver
 from .serenitylrrspeigensolver import SerenityLinearResponseSolver
 from .serenityexcitedstategradientdriver import SerenityExcitedStateGradientDriver
+from .openqpscfdriver import OpenQPScfDriver
+from .openqpgradientdriver import OpenQPGradientDriver
+from .openqpexcitedstategradientdriver import OpenQPExcitedStateGradientDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .openmmdriver import OpenMMDriver
@@ -239,6 +242,12 @@ class OptimizationDriver:
             grad_drv = SerenityGradientDriver(drv)
 
         elif isinstance(drv, SerenityExcitedStateGradientDriver):
+            grad_drv = drv
+
+        elif isinstance(drv, OpenQPScfDriver):
+            grad_drv = OpenQPGradientDriver(drv)
+
+        elif isinstance(drv, OpenQPExcitedStateGradientDriver):
             grad_drv = drv
 
         elif isinstance(drv, XtbDriver):
