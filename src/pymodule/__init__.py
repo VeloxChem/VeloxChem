@@ -228,6 +228,10 @@ from .serenityscfdriver import SerenityScfDriver
 from .serenitygradientdriver import SerenityGradientDriver
 from .serenitylrrspeigensolver import SerenityLinearResponseSolver
 from .serenityexcitedstategradientdriver import SerenityExcitedStateGradientDriver
+from .openqpscfdriver import OpenQPScfDriver
+from .openqpgradientdriver import OpenQPGradientDriver
+from .openqpexcitedstatesdriver import OpenQPExcitedStatesDriver
+from .openqpexcitedstategradientdriver import OpenQPExcitedStateGradientDriver
 from .transitiondensitytracker import TransitionDensityTracker
 
 # Python functions
