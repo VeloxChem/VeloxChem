@@ -73,7 +73,7 @@
 			</Exceptions>
 		</Force>
 		<Force forceGroup="7" frequency="1" name="CMMotionRemover" type="CMMotionRemover" version="1"/>
-		<Force cutoff="1" forceGroup="0" method="0" name="CustomGBForce" type="CustomGBForce" version="2">
+		<Force cutoff="1" forceGroup="23" method="0" name="CustomGBForce" type="CustomGBForce" version="2">
 			<PerParticleParameters>
 				<Parameter name="charge"/>
 				<Parameter name="or"/>

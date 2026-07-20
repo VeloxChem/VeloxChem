@@ -126,11 +126,6 @@ def _branch_configs():
             "temperature": 300.0,
             "E_field": [0, 0, 10],
         }, None),
-        "decompose_bonded": ({
-            "name": "vacuum",
-            "temperature": 300.0,
-            "decompose_bonded": True,
-        }, None),
         "frozen_atoms": ({
             "name": "vacuum",
             "temperature": 300.0,

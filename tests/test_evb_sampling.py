@@ -15,7 +15,6 @@ import numpy as np
 import pytest
 
 from veloxchem.evbdriver import EvbDriver
-from veloxchem.errorhandler import VeloxChemError
 
 from veloxchem.outputstream import OutputStream
 
@@ -131,15 +130,128 @@ class TestTinyFep:
             with open(pro_file) as handle:
                 assert handle.readline().strip() == expected_header
 
-    def test_compute_force_groups_bonded_decomp_requires_decomp_systems(self):
-        # The tiny fixture builds systems with decompose_bonded left at its
-        # default (False), so reactant_bonded_decomp/product_bonded_decomp
-        # are absent; bonded_decomp=True should fail with a clear error
-        # rather than a raw KeyError.
-        config = _tiny_config("tiny_fg_bonded_guard")
+    def test_compute_force_groups_bonded_decomp(self):
+        # Test if compute_force_groups(decompose_bonded=True) regenerates the bonded
+        # decomposition systems and writes the expected files.
+        config = _tiny_config("tiny_fg_bonded_regen")
 
         with evb_chdir_tmp():
-            EVB, _ = _run_tiny_fep(evb_ff_pair(), config)
+            EVB, data_folder = _run_tiny_fep(evb_ff_pair(), config)
+            run_folder = Path(EVB.system_confs[0]["run_folder"])
 
-            with pytest.raises(VeloxChemError, match="bonded_decomp"):
-                EVB.compute_force_groups(bonded_decomp=True)
+            EVB.compute_force_groups(decompose_bonded=True)
+
+            for fname in ("bonded_E1_decomp.csv", "bonded_E2_decomp.csv",
+                          "bonded_params.csv"):
+                assert (data_folder / fname).exists(), f"missing {fname}"
+
+            # Regenerated systems are persisted under unique names so a later
+            # load_initialisation(load_systems=True) picks them up.
+            for name in ("reactant_bonded_decomp", "product_bonded_decomp"):
+                assert (run_folder / f"{name}_sys.xml").exists(), \
+                    f"missing regenerated {name}_sys.xml"
+
+    def test_reconstruct_decomp_atom_indices_matches_builder(self):
+        # The load-bearing guarantee for post-hoc NB decomposition: the
+        # reaction/solvent atom partition reconstructed from the (reloaded)
+        # topology must reproduce exactly what the builder derived at build
+        # time. No FEP/MD needed - just a solvated build.
+        from veloxchem.reactionsystembuilder import ReactionSystemBuilder
+        from veloxchem.evbfepdriver import EvbFepDriver
+
+        config = {
+            "name": "water_recon",
+            "temperature": 300.0,
+            "solvent": "cspce",
+            "pressure": 1,
+            "padding": 0.5,
+            "ion_count": 0,
+            "neutralize": False,
+        }
+
+        with evb_chdir_tmp():
+            pair = evb_ff_pair()
+            builder = ReactionSystemBuilder(ostream=OutputStream(None))
+            builder.water_model = "cspce"
+            _, topology, _ = builder.build_systems(pair.reactant, pair.product,
+                                                   [0.0, 0.5, 1.0], config)
+
+            FEP = EvbFepDriver(ostream=OutputStream(None))
+            rec_idx, solv_idx = FEP._reconstruct_decomp_atom_indices(topology)
+
+            assert rec_idx == sorted(builder.reaction_atom_indices)
+            assert solv_idx == sorted(builder.solvent_atom_ids)
+            # sanity: solute + solvent partition the whole topology
+            assert len(rec_idx) + len(solv_idx) == topology.getNumAtoms()
+            assert len(solv_idx) > 0
+
+    # TODO: base this on a pre-generated trajectory
+    # @pytest.mark.timeconsuming
+    # def test_compute_force_groups_nb_decomp(self):
+    #     # End-to-end nonbonded decomposition against a solvated configuration:
+    #     # decompose_nb reconstructs the reaction/solvent partition from the
+    #     # topology, regenerates the decomp_* systems, saves them to run_folder,
+    #     # and writes NB_decompositions.csv. The trajectory is fabricated from the
+    #     # system's own (stable, packed) initial positions rather than sampled,
+    #     # so the test exercises the decomposition plumbing without depending on
+    #     # a freshly-solvated box equilibrating without blowing up.
+    #     import openmm as mm
+    #     from MDAnalysis.lib.formats.libmdaxdr import XTCFile
+
+    #     config = {
+    #         "name": "water_nb",
+    #         "temperature": 300.0,
+    #         "solvent": "cspce",
+    #         "pressure": 1,
+    #         "padding": 1.0,
+    #         "ion_count": 0,
+    #         "neutralize": False,
+    #         "step_size": 0.001,
+    #     }
+
+    #     with evb_chdir_tmp():
+    #         EVB = _seed_driver(evb_ff_pair())
+    #         EVB.build_systems(configurations=[config], Lambda=[0.0, 0.5, 1.0])
+    #         conf = EVB.system_confs[0]
+    #         data_folder = Path(conf["data_folder"])
+    #         run_folder = Path(conf["run_folder"])
+
+    #         # Fabricate a single-frame trajectory.xtc (nm) from the packed
+    #         # initial positions, plus a row-aligned Energies.csv.
+    #         positions = conf["initial_positions"]
+    #         try:
+    #             pos_nm = np.asarray(positions.value_in_unit(mm.unit.nanometer),
+    #                                 dtype=np.float32)
+    #         except AttributeError:
+    #             pos_nm = np.asarray(positions, dtype=np.float32)
+    #         box_nm = np.asarray(
+    #             conf["topology"].getPeriodicBoxVectors().value_in_unit(
+    #                 mm.unit.nanometer),
+    #             dtype=np.float32)
+    #         with XTCFile(str(data_folder / "trajectory.xtc"), mode='w') as xtc:
+    #             xtc.write(pos_nm, box_nm, 1, 0.0, 1000.0)
+    #         with open(data_folder / "Energies.csv", "w") as handle:
+    #             handle.write("Lambda, reactant PES, product PES, reactant "
+    #                          "integration, product integration, Em, replica, "
+    #                          "direction\n")
+    #             handle.write("0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0\n")
+
+    #         EVB.compute_force_groups(decompose_nb=[[0]])
+
+    #         nb_file = data_folder / "NB_decompositions.csv"
+    #         assert nb_file.exists(), f"missing {nb_file}"
+    #         assert _finite_energy_rows(nb_file) == 1
+
+    #         # Reactant and product halves must be symmetric so the midpoint
+    #         # split in _load_output_files lines columns up.
+    #         with open(nb_file) as handle:
+    #             names = handle.readline().strip().split(",")
+    #         rea_cols = [n for n in names if n.strip().startswith("decomp_rea_")]
+    #         pro_cols = [n for n in names if n.strip().startswith("decomp_pro_")]
+    #         assert len(rea_cols) == len(pro_cols) > 0
+    #         assert names[:len(names) // 2] == rea_cols
+
+    #         # The regenerated nonbonded decomposition systems are persisted for
+    #         # both states, so a later reload picks them up.
+    #         assert list(run_folder.glob("decomp_rea_*_sys.xml"))
+    #         assert list(run_folder.glob("decomp_pro_*_sys.xml"))

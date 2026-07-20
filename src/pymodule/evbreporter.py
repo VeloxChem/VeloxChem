@@ -69,10 +69,9 @@ class EvbReporter:
         defer_open=False,
         core_outputs=True,
     ):
-        # core_outputs: when False, the energy / force / velocity / NB-decomp
-        #   files are neither opened nor written. Used by the master-side
-        #   reporter in async mode so it does not collide with the worker's
-        #   Energies.csv.
+        # core_outputs: when False, the energy / force / velocity files are
+        #   neither opened nor written. Used by the master-side reporter in
+        #   async mode so it does not collide with the worker's Energies.csv.
         # cpu_threads: number of OpenMM CPU-platform threads for the energy
         #   simulations (None = OpenMM default). Used by the async reporter
         #   worker to saturate the CPU on a single node.
@@ -127,21 +126,17 @@ class EvbReporter:
         # Only the reactant/product PES and the two integration endpoints
         # (lambda 0 / 1) feed the energy output; the intermediate lambda-window
         # systems would be evaluated every frame and discarded, so skip building
-        # them. Decomposition systems (nb / bonded) are kept because the
-        # decomposition reporters below reference them by name.
+        # them.
         self.simulations = {}
         core_names = ['reactant', 'product', 0, 1]
         for name, system in systems.items():
-            if name not in core_names and 'decomp' not in str(name):
+            if name not in core_names:
                 continue
             sim = mmapp.Simulation(topology,
                                    system,
                                    mm.LangevinIntegrator(1, 1, 1),
                                    platform=cpu_platform)
             self.simulations.update({name: sim})
-
-        self.decomp_names = [s for s in systems if 'decomp' in str(s)]
-        self.report_nb_decomp = len(self.decomp_names) > 0 and core_outputs
 
         if not defer_open:
             self._open_outputs(append)
@@ -208,14 +203,6 @@ class EvbReporter:
                 for j in range(self.num_atoms):
                     header += f"V(x, {j}), V(y, {j}), V(z, {j}), "
                 self.v_out.write(header[:-2] + '\n')
-
-        if self.report_nb_decomp:
-            output_dir = Path(self._energy_file).parent
-            filename = str(output_dir / 'NB_decompositions.csv')
-            self.decomp_out = open(filename, mode)
-            self.out_streams.append(self.decomp_out)
-            if not append:
-                self.decomp_out.write(", ".join(self.decomp_names) + '\n')
 
         for stream in self.out_streams:
             stream.flush()
@@ -302,9 +289,9 @@ class EvbReporter:
         simulation.context.setPositions(positions * nm)
 
     def _write_core(self, positions, box, velocities=None, forces=None):
-        """Write the per-frame core outputs (Energies / Forces / Velocities /
-        NB-decomposition) from raw numpy arrays. This is the part that is
-        offloaded to the async reporter worker; it needs no live GPU simulation.
+        """Write the per-frame core outputs (Energies / Forces / Velocities)
+        from raw numpy arrays. This is the part that is offloaded to the async
+        reporter worker; it needs no live GPU simulation.
 
         positions: (N,3) nm, box: (3,3) nm, velocities: (N,3) nm/ps,
         forces: (N,3) kJ/mol/nm.
@@ -340,12 +327,6 @@ class EvbReporter:
             for i in range(velocities.shape[0]):
                 line += f", {velocities[i][0]:.5e}, {velocities[i][1]:.5e}, {velocities[i][2]:.5e}"
             self.v_out.write(line + '\n')
-
-        if self.report_nb_decomp:
-            line = ""
-            for name in self.decomp_names:
-                line += f"{E[name]:.10e}, "
-            self.decomp_out.write(line[:-2] + '\n')
 
     def report(self, simulation, state):
         positions = state.getPositions(asNumpy=True).value_in_unit(
@@ -476,8 +457,8 @@ class EvbGpuRecalculator:
     and then hands the window's frames here. Because only one OpenMM context
     should live on the GPU at a time, each system is built, evaluated over every
     frame, and torn down before the next system is built - so the GPU holds a
-    single context at any moment. The output files (Energies / optional Forces /
-    NB decomposition) match those the synchronous ``EvbReporter`` writes.
+    single context at any moment. The output files (Energies / optional Forces)
+    match those the synchronous ``EvbReporter`` writes.
     """
 
     def __init__(self,
@@ -496,16 +477,13 @@ class EvbGpuRecalculator:
         self.report_forces = report_forces
 
         # Same system selection as EvbReporter.simulations: the reactant/product
-        # PES and the two integration endpoints (0/1), plus any nb/bonded
-        # decomposition systems.
+        # PES and the two integration endpoints (0/1).
         core_names = ['reactant', 'product', 0, 1]
         self.core_names = [n for n in core_names if n in systems]
-        self.decomp_names = [s for s in systems if 'decomp' in str(s)]
 
         self._opened = False
         self.E_out = None
         self.F_out = None
-        self.decomp_out = None
         self.out_streams = []
 
     def _open_outputs(self, append):
@@ -519,13 +497,6 @@ class EvbGpuRecalculator:
             self.out_streams.append(self.F_out)
             if not append:
                 self.F_out.write(EvbReporter.forces_header(self.num_atoms))
-        if self.decomp_names:
-            self.decomp_out = open(self.data_folder / "NB_decompositions.csv",
-                                   mode)
-            self.out_streams.append(self.decomp_out)
-            if not append:
-                self.decomp_out.write(
-                    ", ".join([str(n) for n in self.decomp_names]) + '\n')
         self._opened = True
 
     def _evaluate_system(self, system, frames, want_forces=False):
@@ -555,9 +526,9 @@ class EvbGpuRecalculator:
 
         frames: list of (positions_nm (N,3), box_nm (3,3) or None) in nm.
         frame_meta: list of (lambda_val, replica, direction) aligned with
-        frames. Each core / decomposition system is evaluated once over the
-        entire batch through a single GPU context (built and torn down once),
-        so context creation is amortized over all of the replica's frames.
+        frames. Each core system is evaluated once over the entire batch
+        through a single GPU context (built and torn down once), so context
+        creation is amortized over all of the replica's frames.
         """
         if not self._opened:
             self._open_outputs(append)
@@ -568,10 +539,6 @@ class EvbGpuRecalculator:
         E = {}
         for name in self.core_names:
             E[name], _ = self._evaluate_system(self.systems[name], frames)
-        decomp_E = {}
-        for name in self.decomp_names:
-            decomp_E[name], _ = self._evaluate_system(self.systems[name],
-                                                      frames)
 
         forces_per_frame = None
         if self.report_forces:
@@ -588,10 +555,6 @@ class EvbGpuRecalculator:
                     EvbReporter.format_forces_row(lambda_val, replica,
                                                   direction,
                                                   forces_per_frame[i]))
-            if self.decomp_names:
-                line = ", ".join(
-                    [f"{decomp_E[name][i]:.10e}" for name in self.decomp_names])
-                self.decomp_out.write(line + '\n')
 
         for s in self.out_streams:
             s.flush()
@@ -817,8 +780,8 @@ class EvbReporterServer(_EvbReporterMPI):
 
     Builds the CPU energy-evaluation simulations once (multithreaded so it
     saturates the CPU while the GPU rank samples), owns the Energies / Forces /
-    Velocities / NB-decomposition output files, and serves snapshots from the
-    master in order until it receives TERMINATE.
+    Velocities output files, and serves snapshots from the master in order until
+    it receives TERMINATE.
     """
 
     def __init__(self,

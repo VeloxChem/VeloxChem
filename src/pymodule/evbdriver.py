@@ -505,7 +505,8 @@ class EvbDriver:
     def compute_force_groups(self,
                              platform=None,
                              platform_properties=None,
-                             bonded_decomp=False):
+                             decompose_nb=None,
+                             decompose_bonded=False):
         """Compute reactant/product OpenMM force-group energy decompositions
         for every configuration in self.system_confs, from the trajectory
         already sampled by run_FEP() (or reloaded via
@@ -514,18 +515,30 @@ class EvbDriver:
         does not affect sampling.
 
         Writes ForceGroups_rea.csv / ForceGroups_pro.csv into each
-        configuration's data_folder. If bonded_decomp is True, also writes
-        the per-bonded-term decomposition (bonded_E1_decomp.csv /
-        bonded_E2_decomp.csv / bonded_params.csv), which requires the
-        configuration's forming_bonds/breaking_bonds and
-        reactant_bonded_decomp/product_bonded_decomp systems to be present.
+        configuration's data_folder.
+
+        The two finer decompositions are exclusively options of this method (no
+        other code path touches them). When requested, the required decomposition systems are
+        regenerated on the fly, saved to the run folder as unique {name}_sys.xml
+        files (so a later load_initialisation picks them up), and then evaluated
+        against the existing trajectory - no re-sampling:
+
+        - decompose_nb: list of reactant-atom-index groups; writes
+          NB_decompositions.csv (solute-solvent Coulomb / LJ contributions).
+          Requires a solvated configuration.
+        - decompose_bonded: writes the per-bonded-term decomposition
+          (bonded_E1_decomp.csv / bonded_E2_decomp.csv / bonded_params.csv),
+          which uses the configuration's forming_bonds/breaking_bonds.
 
         Args:
             platform (str, optional): OpenMM platform name to use for the
                 recalculation (e.g. "CUDA", "CPU"). Defaults to None, which
                 lets OpenMM auto-select the fastest available platform.
             platform_properties (dict, optional): OpenMM platform properties.
-            bonded_decomp (bool, optional): also compute the per-bonded-term
+            decompose_nb (list, optional): reactant-atom-index groups to
+                decompose the solute-solvent nonbonded energy over. Defaults to
+                None (no nonbonded decomposition).
+            decompose_bonded (bool, optional): also compute the per-bonded-term
                 energy decomposition. Defaults to False.
         """
         # Post-processing reads the trajectory/Energies.csv that only the
@@ -545,7 +558,8 @@ class EvbDriver:
                 configuration=conf,
                 platform=platform,
                 platform_properties=platform_properties,
-                bonded_decomp=bonded_decomp,
+                decompose_nb=decompose_nb,
+                decompose_bonded=decompose_bonded,
             )
 
     def update_options_json(self, dict, conf):
@@ -912,8 +926,7 @@ class EvbDriver:
                 # dtype (see _save_dict_as_h5) and read back as an object
                 # array of bytes - decode each element to undo that.
                 return np.array([
-                    x.decode('utf-8') if isinstance(x, bytes) else x
-                    for x in v
+                    x.decode('utf-8') if isinstance(x, bytes) else x for x in v
                 ])
             return v
 

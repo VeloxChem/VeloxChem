@@ -158,6 +158,12 @@ class ReactionSystemBuilder():
         # vlx reactant atom id -> real openmm Atom for the reacting atoms in the PDB
         self.reaction_atoms: dict = {}
 
+        # Ordered system-particle indices of the solute/reaction atoms (the
+        # reactant fragment), populated during build_systems. Used by the
+        # nonbonded decomposition; reconstructed from the topology for a
+        # post-hoc decomposition (see EvbFepDriver).
+        self.reaction_atom_indices: list = []
+
         # When a reacting residue does not match an AMBER template (e.g. a
         # modified/reacting residue), the bonds/angles/torsions that connect it to the
         # surrounding PDB structure receive no AMBER parameters and are
@@ -195,8 +201,6 @@ class ReactionSystemBuilder():
 
         self.begin_index = 0
         self.water_model: str
-        self.decompose_bonded = False
-        self.decompose_nb: list | None = None
 
         self.implicit_solvent_model: str | None = None
         self.solute_dielectric: float = 1.0
@@ -246,8 +250,6 @@ class ReactionSystemBuilder():
             'graphene_size_nm': float,
             "CNT": bool,
             "CNT_radius_nm": float,
-            "decompose_nb": list,
-            "decompose_bonded": bool,
             "implicit_solvent_model": str,
             "solute_dielectric": float,
             "solvent_dielectric": float,
@@ -2243,23 +2245,18 @@ class ReactionSystemBuilder():
         self._add_reaction_forces(rea_system, 0, pes=True)
         self._add_reaction_forces(pro_system, 1, pes=True)
 
-        if self.decompose_nb is not None:
-            if self.solvent:
-                self.ostream.print_info(
-                    f"Adding nonbonded force decomposition reporting for particles {self.decompose_nb}"
-                )
-                systems.update(self._add_nb_decompositions(rea_system, 'rea'))
-                systems.update(self._add_nb_decompositions(pro_system, 'pro'))
-            else:
-                self.ostream.print_info(
-                    "Skipping nonbonded force decompositions")
-            self.ostream.flush()
-
-        if self.decompose_bonded:
-            rea_bond_decomp = self._add_bonded_decompositions(rea_system)
-            pro_bond_decomp = self._add_bonded_decompositions(pro_system)
-            systems['reactant_bonded_decomp'] = rea_bond_decomp
-            systems['product_bonded_decomp'] = pro_bond_decomp
+        # Record the ordered solute/reaction-atom particle indices (same
+        # mapping the nonbonded decomposition used to derive inline). Kept so a
+        # post-hoc topology-based reconstruction can be validated against it;
+        # the production post-hoc path reconstructs from the topology instead,
+        # so a gap here can never break an ordinary build.
+        try:
+            self.reaction_atom_indices = [
+                self.reaction_atoms[i].index
+                for i in range(len(self.reactant.atoms))
+            ]
+        except (KeyError, AttributeError):
+            self.reaction_atom_indices = []
 
         systems['reactant'] = rea_system
         systems['product'] = pro_system
@@ -2351,23 +2348,36 @@ class ReactionSystemBuilder():
 
     # Removes all forces from the system that are not related to the reaction, and sets the remaining force constants to 0
     # The evbreporter can then be used to report the energy of each contributing force separately
-    def _add_bonded_decompositions(self, system):
+    def _add_bonded_decompositions(self, system, force_group_map=None):
         system = copy.deepcopy(system)
-        # Remove all forces that are not directly related to the reaction
-        bonded_fgs = [
-            EvbForceGroup.REA_HARM_BOND_STATIC.
-            value,  # Bonded forces for the reaction atoms
-            EvbForceGroup.REA_HARM_BOND_DYNAMIC.
-            value,  # Static bonded forces for the reaction atoms
-            EvbForceGroup.REA_MORSE_BOND.value,
-            EvbForceGroup.REA_ANGLE.value,
-            EvbForceGroup.REA_TORSION.value,
-            EvbForceGroup.REA_IMP.value,
-            EvbForceGroup.REA_BOUNDARY_BOND.value,
-            EvbForceGroup.REA_BOUNDARY_ANGLE.value,
-            EvbForceGroup.REA_BOUNDARY_TORSION.value,
-            EvbForceGroup.REA_BOUNDARY_IMP.value,
+
+        # Which force groups count as reaction-bonded is resolved by *name*
+        # through the run's saved force_group_name.json mapping (name -> integer
+        # value at build time), because EvbForceGroup's auto() values shift
+        # whenever the enum is reordered/extended. Systems serialized under an
+        # older enum carry integers that mean something different today, so
+        # comparing against the live enum would keep/drop the wrong forces.
+        # Fall back to the live enum only when no mapping was supplied.
+        bonded_names = [
+            "REA_HARM_BOND_STATIC",  # Bonded forces for the reaction atoms
+            "REA_HARM_BOND_DYNAMIC",  # Static bonded forces for the reaction atoms
+            "REA_MORSE_BOND",
+            "REA_ANGLE",
+            "REA_TORSION",
+            "REA_IMP",
+            "REA_BOUNDARY_BOND",
+            "REA_BOUNDARY_ANGLE",
+            "REA_BOUNDARY_TORSION",
+            "REA_BOUNDARY_IMP",
         ]
+        if force_group_map is None:
+            force_group_map = {fg.name: fg.value for fg in EvbForceGroup}
+        bonded_fgs = {
+            force_group_map[name]
+            for name in bonded_names if name in force_group_map
+        }
+
+        # Remove all forces that are not directly related to the reaction
         to_remove = []
         for i, force in enumerate(system.getForces()):
             if force.getForceGroup() not in bonded_fgs:
@@ -2375,30 +2385,21 @@ class ReactionSystemBuilder():
         for i in reversed(to_remove):
             system.removeForce(i)
 
-        # Set all force constants in the remaining forces to 0
+        # Set all force constants in the remaining forces to 0.
         for force in system.getForces():
-            if force.getForceGroup() == EvbForceGroup.REA_MORSE_BOND.value:
+            if isinstance(force, mm.CustomBondForce):  # Morse bond (D, a, r)
                 for i in range(force.getNumBonds()):
                     p1, p2, (D, a, r) = force.getBondParameters(i)
                     force.setBondParameters(i, p1, p2, [0, 0, r])
-            if force.getForceGroup(
-            ) == EvbForceGroup.REA_HARM_BOND_STATIC.value or force.getForceGroup(
-            ) == EvbForceGroup.REA_HARM_BOND_DYNAMIC.value or force.getForceGroup(
-            ) == EvbForceGroup.REA_BOUNDARY_BOND.value:
+            elif isinstance(force, mm.HarmonicBondForce):
                 for i in range(force.getNumBonds()):
                     p1, p2, r, k = force.getBondParameters(i)
                     force.setBondParameters(i, p1, p2, r, 0)
-            if force.getForceGroup() == EvbForceGroup.REA_ANGLE.value or \
-                    force.getForceGroup(
-                    ) == EvbForceGroup.REA_BOUNDARY_ANGLE.value:
+            elif isinstance(force, mm.HarmonicAngleForce):
                 for i in range(force.getNumAngles()):
                     p1, p2, p3, theta, k = force.getAngleParameters(i)
                     force.setAngleParameters(i, p1, p2, p3, theta, 0)
-            if force.getForceGroup(
-            ) == EvbForceGroup.REA_TORSION.value or force.getForceGroup(
-            ) == EvbForceGroup.REA_IMP.value or force.getForceGroup(
-            ) == EvbForceGroup.REA_BOUNDARY_TORSION.value or force.getForceGroup(
-            ) == EvbForceGroup.REA_BOUNDARY_IMP.value:
+            elif isinstance(force, mm.PeriodicTorsionForce):
                 for i in range(force.getNumTorsions()):
                     p1, p2, p3, p4, periodicity, phase, barrier = force.getTorsionParameters(
                         i)
@@ -2408,6 +2409,10 @@ class ReactionSystemBuilder():
         return system
 
     # Decomposes the total nonbonded energy into contributions in a baseline solute LJ and Coul system, and systems for each specified reactant atom with the solvent
+    # Reads self.reaction_atom_indices (ordered system-particle indices of the
+    # solute/reaction atoms), self.solvent_atom_ids and self.decompose_nb. Those
+    # are populated during build_systems, or reconstructed from the topology for
+    # a post-hoc call (see EvbFepDriver.compute_force_group_contributions).
     def _add_nb_decompositions(self, system, state_name):
         systems = {}
         nbforce = copy.deepcopy([
@@ -2421,8 +2426,7 @@ class ReactionSystemBuilder():
         sollj = copy.deepcopy(nbforce)
 
         # remove all nonbonded parameters for the compound
-        for i, _ in enumerate(self.reactant.atoms.values()):
-            atom_id = self.reaction_atoms[i].index
+        for atom_id in self.reaction_atom_indices:
             solcoul.setParticleParameters(atom_id, 0, 1, 0)
             sollj.setParticleParameters(atom_id, 0, 1, 0)
 
@@ -2454,8 +2458,7 @@ class ReactionSystemBuilder():
             lj_dec = copy.deepcopy(nbforce)
             coul_dec = copy.deepcopy(nbforce)
 
-            for i, _ in enumerate(self.reactant.atoms.values()):
-                atom_id = self.reaction_atoms[i].index
+            for i, atom_id in enumerate(self.reaction_atom_indices):
                 charge, sigma, epsilon = nbforce.getParticleParameters(atom_id)
 
                 if i in to_decompose:

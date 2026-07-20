@@ -35,6 +35,7 @@ from pathlib import Path
 import numpy as np
 import time
 import sys
+import gc
 import json
 
 from .veloxchemlib import mpi_master
@@ -1274,11 +1275,146 @@ class EvbFepDriver:
                         f"Bonded params: {i + 1}/{n_frames} frames")
                     self.ostream.flush()
 
+    def _write_nb_decomp_csv(self, traj_file, periodic, n_frames, named_systems,
+                             out_path, progress_interval):
+        """Stream the trajectory once per nonbonded-decomposition system,
+        writing NB_decompositions.csv (one column per system, total potential
+        energy per frame). named_systems is an ordered list of (name, system)
+        with all reactant systems first and all product systems second, so the
+        midpoint split EvbDriver._load_output_files performs stays valid. One
+        OpenMM context is alive at a time, same discipline as the other writers.
+        """
+        columns = []
+        for name, system in named_systems:
+            sim = self._get_simulation(system, self.step_size)
+            try:
+                energies = []
+                for i, (pos_nm, box_nm) in enumerate(
+                        self._iter_trajectory_frames(traj_file, periodic,
+                                                     n_frames)):
+                    EvbReporter._apply_positions(sim, pos_nm, box_nm)
+                    energies.append(
+                        sim.context.getState(
+                            getEnergy=True).getPotentialEnergy().value_in_unit(
+                                mm.unit.kilojoules_per_mole))
+                    if (i + 1) % progress_interval == 0:
+                        self.ostream.print_info(
+                            f"NB decomposition ({name}): {i + 1}/{n_frames} "
+                            "frames")
+                        self.ostream.flush()
+            finally:
+                # Release the GPU context deterministically
+                del sim
+                gc.collect()
+            columns.append(energies)
+
+        header = ", ".join(name for name, _ in named_systems)
+        with out_path.open('w') as out:
+            out.write(header + '\n')
+            for i in range(n_frames):
+                out.write(", ".join(f"{col[i]:.10e}" for col in columns) + '\n')
+
+    def _reconstruct_decomp_atom_indices(self, topology):
+        """Recover the ordered solute/reaction-atom particle indices and the
+        solvent atom indices from a (reloaded) topology, for post-hoc nonbonded
+        decomposition. The builder tags solvent residues SOL / ION
+        (ReactionSystemBuilder._add_solvent); everything else is solute."""
+        solvent_resnames = ("SOL", "ION")
+        reaction_atom_indices = []
+        solvent_atom_ids = []
+        for atom in topology.atoms():
+            if atom.residue.name in solvent_resnames:
+                solvent_atom_ids.append(atom.index)
+            else:
+                reaction_atom_indices.append(atom.index)
+        reaction_atom_indices.sort()
+        solvent_atom_ids.sort()
+        return reaction_atom_indices, solvent_atom_ids
+
+    def _save_regenerated_systems(self, new_systems):
+        """Serialize freshly regenerated decomposition systems to the run folder
+        as {name}_sys.xml so load_initialisation(load_systems=True) reloads them.
+        Deliberately does not touch force_group_name.json: pre-existing systems
+        may have been serialized under an older enum, and rewriting that sidecar
+        with the current enum would mislabel them."""
+        for name, system in new_systems.items():
+            out_path = self.run_folder / f"{name}_sys.xml"
+            with out_path.open("w", encoding="utf-8") as f:
+                f.write(mm.XmlSerializer.serialize(system))
+            self.ostream.print_info(f"Saved regenerated system to {out_path}")
+        self.ostream.flush()
+
+    def _prepare_decomposition_systems(self,
+                                       decompose_nb,
+                                       decompose_bonded,
+                                       force_group_map=None):
+        """Ensure the requested decomposition systems exist on self.systems,
+        regenerating (and persisting) any that are missing. Returns the ordered
+        list of nonbonded decomposition system names (reactant systems first,
+        product systems second), or None when NB decomposition isn't requested.
+
+        force_group_map (name -> integer value at build time, from this run's
+        force_group_name.json) is used to identify the reaction-bonded force
+        groups correctly even for systems serialized under an older enum.
+        """
+        newly_generated = {}
+
+        if decompose_bonded and 'reactant_bonded_decomp' not in self.systems:
+            builder = ReactionSystemBuilder(ostream=self.ostream)
+            rea_bonded = builder._add_bonded_decompositions(
+                self.systems['reactant'], force_group_map)
+            pro_bonded = builder._add_bonded_decompositions(
+                self.systems['product'], force_group_map)
+            self.systems['reactant_bonded_decomp'] = rea_bonded
+            self.systems['product_bonded_decomp'] = pro_bonded
+            newly_generated['reactant_bonded_decomp'] = rea_bonded
+            newly_generated['product_bonded_decomp'] = pro_bonded
+
+        nb_decomp_names = None
+        if decompose_nb is not None:
+            has_nb = any(str(n).startswith('decomp_') for n in self.systems)
+            if not has_nb:
+                rea_idx, solv_idx = self._reconstruct_decomp_atom_indices(
+                    self.topology)
+                assert_msg_critical(
+                    len(solv_idx) > 0,
+                    "decompose_nb requires a solvated configuration, but no "
+                    "solvent atoms (residues SOL / ION) were found in the "
+                    "topology.")
+                builder = ReactionSystemBuilder(ostream=self.ostream)
+                builder.reaction_atom_indices = rea_idx
+                builder.solvent_atom_ids = solv_idx
+                builder.decompose_nb = decompose_nb
+                rea_nb = builder._add_nb_decompositions(
+                    self.systems['reactant'], 'rea')
+                pro_nb = builder._add_nb_decompositions(self.systems['product'],
+                                                        'pro')
+                self.systems.update(rea_nb)
+                self.systems.update(pro_nb)
+                newly_generated.update(rea_nb)
+                newly_generated.update(pro_nb)
+            # (Re)derive the ordered names from whatever is now present, keeping
+            # reactant and product halves aligned so the loader's midpoint split
+            # matches columns up correctly.
+            nb_rea = sorted(
+                (n for n in self.systems if str(n).startswith('decomp_rea_')),
+                key=lambda n: str(n)[len('decomp_rea_'):])
+            nb_pro = sorted(
+                (n for n in self.systems if str(n).startswith('decomp_pro_')),
+                key=lambda n: str(n)[len('decomp_pro_'):])
+            nb_decomp_names = nb_rea + nb_pro
+
+        if newly_generated:
+            self._save_regenerated_systems(newly_generated)
+
+        return nb_decomp_names
+
     def compute_force_group_contributions(self,
                                           configuration,
                                           platform=None,
                                           platform_properties=None,
-                                          bonded_decomp=False,
+                                          decompose_nb=None,
+                                          decompose_bonded=False,
                                           progress_interval=1000):
         """Compute reactant/product OpenMM force-group energy decompositions
         from a trajectory already sampled by run_replicas(), by replaying
@@ -1290,11 +1426,24 @@ class EvbFepDriver:
         systems, and preferred over the live EvbForceGroup enum so results
         stay correct even if the enum has since been reordered/extended -
         matching the format EvbDriver._load_output_files already expects)
-        into configuration["data_folder"]. If bonded_decomp is True, also writes
-        bonded_E1_decomp.csv / bonded_E2_decomp.csv (per-bonded-term energies)
-        and bonded_params.csv (the corresponding bond length / angle /
-        dihedral values), which requires forming_bonds/breaking_bonds and the
-        reactant_bonded_decomp/product_bonded_decomp systems to be present.
+        into configuration["data_folder"].
+
+        The two finer decompositions are regenerated on demand: if the required
+        decomposition systems are not already present in configuration['systems']
+        they are built from the reactant/product systems, saved to the run folder
+        as unique {name}_sys.xml files (without touching force_group_name.json,
+        so pre-existing systems built under an older enum stay correctly
+        labelled), and then evaluated against the trajectory:
+
+        - decompose_nb (list of reactant-atom-index groups): writes
+          NB_decompositions.csv (solute-solvent Coulomb / LJ contributions). The
+          reaction/solvent atom indices needed to build these systems are
+          reconstructed from the reloaded topology (solvent residues are named
+          SOL / ION). Requires a solvated configuration.
+        - decompose_bonded (bool): writes bonded_E1_decomp.csv /
+          bonded_E2_decomp.csv (per-bonded-term energies) and bonded_params.csv
+          (the corresponding bond length / angle / dihedral values), which uses
+          forming_bonds/breaking_bonds.
 
         Uses the GPU when available (via _get_simulation, same as sampling)
         and only ever holds one system's context alive at a time: builds a
@@ -1358,18 +1507,20 @@ class EvbFepDriver:
             f"{n_energy_rows} rows; they must be row-aligned to compute "
             "force-group contributions.")
 
-        if bonded_decomp:
-            for name in ('reactant_bonded_decomp', 'product_bonded_decomp'):
-                assert_msg_critical(
-                    name in self.systems,
-                    f"bonded_decomp=True requires configuration['systems']"
-                    f"['{name}'] (build the systems with forming_bonds/"
-                    "breaking_bonds supplied).")
+        if decompose_bonded:
             assert_msg_critical(
                 self.forming_bonds is not None
                 and self.breaking_bonds is not None,
-                "bonded_decomp=True requires forming_bonds/breaking_bonds "
+                "decompose_bonded=True requires forming_bonds/breaking_bonds "
                 "to be set on the configuration.")
+
+        # Regenerate any requested decomposition systems that aren't already
+        # present, and persist them to the run folder so a later
+        # load_initialisation picks them up. nb_decomp_names is the ordered
+        # (all-reactant-then-all-product) list of nonbonded decomposition system
+        # names, or None when NB decomposition isn't requested.
+        nb_decomp_names = self._prepare_decomposition_systems(
+            decompose_nb, decompose_bonded, force_group_map)
 
         periodic = self.topology.getPeriodicBoxVectors() is not None
 
@@ -1389,13 +1540,46 @@ class EvbFepDriver:
                                     force_group_map, progress_interval,
                                     "product")
 
-        if bonded_decomp:
-            active_atoms = []
-            for bond in self.forming_bonds + self.breaking_bonds:
-                if bond[0] not in active_atoms:
-                    active_atoms.append(bond[0])
-                if bond[1] not in active_atoms:
-                    active_atoms.append(bond[1])
+        if nb_decomp_names is not None:
+            self._write_nb_decomp_csv(
+                traj_file, periodic, n_frames,
+                [(name, self.systems[name]) for name in nb_decomp_names],
+                self.data_folder / "NB_decompositions.csv", progress_interval)
+
+        if decompose_bonded:
+            # active_atoms must be full-system particle indices, because
+            # _get_bonded_decomp_params filters bonded terms by particle index.
+            # forming_bonds/breaking_bonds are stored in reactant-fragment-local
+            # numbering (0..N of the reactant molecule) and the local->global map
+            # (builder's self.reaction_atoms) is not persisted, so they cannot be
+            # used here directly. Instead recover the reacting atoms from the EVB
+            # Morse bonds, which already hold global indices
+            morse_fg = force_group_map.get("REA_MORSE_BOND")
+            active = set()
+            for state in ("reactant", "product"):
+                for force in self.systems[state].getForces():
+                    if (force.getForceGroup() == morse_fg
+                            and isinstance(force, mm.CustomBondForce)):
+                        for i in range(force.getNumBonds()):
+                            p1, p2, _ = force.getBondParameters(i)
+                            active.add(p1)
+                            active.add(p2)
+            active_atoms = sorted(active)
+
+            # Sanity check against the fragment-local forming/breaking bonds: the
+            # number of distinct reacting atoms should agree
+            local_active = {
+                a
+                for bond in self.forming_bonds + self.breaking_bonds
+                for a in bond
+            }
+            if len(active_atoms) != len(local_active):
+                self.ostream.print_warning(
+                    f"Bonded decomposition: recovered {len(active_atoms)} reacting "
+                    f"atoms from the Morse bonds but forming_bonds/breaking_bonds "
+                    f"list {len(local_active)} distinct atoms; the per-term "
+                    "decomposition may be incomplete.")
+                self.ostream.flush()
 
             reactant_params = EvbReporter._get_bonded_decomp_params(
                 self.systems['reactant'], active_atoms)
