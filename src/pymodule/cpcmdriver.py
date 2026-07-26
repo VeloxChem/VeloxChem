@@ -42,6 +42,10 @@ from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .veloxchemlib import gen_lebedev_grid
 from .veloxchemlib import compute_nuclear_potential_erf_values
 from .veloxchemlib import compute_nuclear_potential_erf_gradient
+from .veloxchemlib import compute_nuclear_potential_erf_hessian_200
+from .veloxchemlib import compute_nuclear_potential_erf_hessian_101
+from .veloxchemlib import compute_nuclear_potential_erf_hessian_110
+from .veloxchemlib import compute_nuclear_potential_erf_hessian_020
 from .veloxchemlib import NuclearPotentialErfDriver
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
@@ -961,6 +965,279 @@ class CpcmDriver:
         return compute_nuclear_potential_erf_gradient(molecule, basis,
                                                       grid_coords, q[start:end],
                                                       DM, zeta, atom_indices)
+
+    def hess_B(self, molecule, grid, q):
+        """
+        Calculates the nuclear-cavity hessian contribution.
+
+        :param molecule:
+            The molecule.
+        :param grid:
+            The grid object containing the grid positions, weights,
+            the Gaussian exponents, and the indices for which atom the grid
+            point belongs to.
+        :param q:
+            The c-pcm charges.
+
+        :return:
+            The hessian array of each cartesian pair, shape (nAtoms*3, nAtoms*3)
+        """
+
+        atom_coords = molecule.get_coordinates_in_bohr()
+        natms = molecule.number_of_atoms()
+        two_sqrt_invpi = 2 / math.sqrt(math.pi)
+
+        d2B_mat = np.zeros((grid.shape[0], natms, natms, natms, 3, 3))
+        z = molecule.get_element_ids()
+
+        for m, (xk, yk, zk, wk, zeta_k, atom_idx) in enumerate(grid):
+            for a in range(natms):
+                R_A = atom_coords[a]
+                rk = np.array([xk, yk, zk])
+                r_kA_vec = rk - R_A
+                r_kA = np.linalg.norm(r_kA_vec)
+                unit_kA = r_kA_vec / r_kA
+
+                exp_term = np.exp(-(zeta_k**2) * r_kA**2)
+                erf_term = math.erf(zeta_k * r_kA)
+
+                T1 = -(erf_term -
+                       two_sqrt_invpi * zeta_k * r_kA * exp_term) / r_kA**2
+                T2 = (2 * erf_term / r_kA**3 -
+                      4 * zeta_k / np.sqrt(np.pi) * exp_term / r_kA**2 -
+                      4 * zeta_k**3 / np.sqrt(np.pi) * exp_term)
+
+                for L in range(natms):
+                    factor1 = int(L == atom_idx) - int(L == a)
+                    for alpha in range(3):
+                        for J in range(natms):
+                            factor2 = int(J == atom_idx) - int(J == a)
+                            for beta in range(3):
+
+                                delta = 1.0 if alpha == beta else 0.0
+
+                                unitf = T2 * unit_kA[alpha] * unit_kA[beta] + (
+                                    T1 / r_kA) * (
+                                        delta - unit_kA[alpha] * unit_kA[beta])
+
+                                d2B_mat[m, a, L, J, alpha,
+                                        beta] += (factor1 * factor2 * unitf)
+
+        return (np.einsum("m,maijxy,a->ijxy", q, d2B_mat,
+                          z).transpose(0, 2, 1,
+                                       3).reshape(3 * natms,
+                                                  3 * natms))  # change this
+
+    def hess_C(self, molecule, basis, grid, q, D):
+        """
+        Calculates the electron-cavity and electron-nuclear hessian contribution.
+
+        :param molecule:
+            The molecule object.
+        :param basis:
+            The basis.
+        :param grid:
+            The grid object containing the grid positions, weights,
+            the Gaussian exponents, and indices for which atom the grid point belongs to.
+        :param q:
+            The grid point charges.
+        :param D:
+            The converged density matrix.
+
+        :return:
+            The hessian array of each cartesian component, shape (nAtoms *3, nAtoms*3).
+        """
+
+        point_coords = np.copy(grid[:, :3])
+        pq = np.copy(q)
+        omega = np.copy(grid[:, 4])
+        idx = np.copy(grid[:, -1].astype(int))
+
+        ana_200 = compute_nuclear_potential_erf_hessian_200(
+            molecule, basis, point_coords, pq, D, omega)
+        ana_101 = compute_nuclear_potential_erf_hessian_101(
+            molecule, basis, point_coords, pq, D, omega)
+        ana_020 = compute_nuclear_potential_erf_hessian_020(
+            molecule, basis, point_coords, pq, D, omega, idx)
+        ana_110 = compute_nuclear_potential_erf_hessian_110(
+            molecule, basis, point_coords, pq, D, omega, idx)
+
+        return ana_200 + ana_101 + ana_020 + ana_110
+
+    def hessA_ii(self, molecule, grid, swf, q, eps=78.39):
+        """
+        Calculates the diagonal cavity-cavity hessian contribution.
+
+        :param molecule:
+            The molecule object.
+        :param grid:
+            The grid object containing the grid positions, weights,
+            the Gaussian exponents, and indices for which atom the grid point belongs to.
+        :param sw_f:
+            The switching function.
+        :param q:
+            The grid point charges.
+        :param eps:
+            Dielectric constant.
+
+        :return:
+            The hessian array of each cartesian component, shape (nAtoms*3, nAtoms*3).
+        """
+
+        natms = molecule.number_of_atoms()
+        atom_coords = molecule.get_coordinates_in_bohr()
+        grid_coords = grid[:, :3]
+        vdw_R = molecule.vdw_radii_to_numpy() * 1.2
+        hessian = np.zeros((natms, 3, natms, 3))
+        scale_f = -(eps - 1) / (eps)
+
+        for k in range(grid.shape[0]):
+            atm = int(grid[k, -1])
+            z = grid[k, 4]
+            F_k = swf[k]
+
+            sum_df_over_f = np.zeros((natms, 3))
+            sum_d2f = np.zeros((natms, natms, 3, 3))
+
+            for L in range(natms):
+
+                V_L = vdw_R[L]
+                vec_kL = grid_coords[k] - atom_coords[L]
+                r_kL = np.linalg.norm(vec_kL)
+                unitvec_kL = vec_kL / r_kL
+
+                f_kL = 1 - 1 / 2 * (math.erf(z * (V_L + r_kL)) +
+                                    math.erf(z * (V_L - r_kL)))
+
+                df_kL_pref = (
+                    z / np.sqrt(np.pi) *
+                    (np.exp(-(z**2) *
+                            (V_L - r_kL)**2) - np.exp(-(z**2) *
+                                                      (V_L + r_kL)**2)))
+                df_kL = df_kL_pref * unitvec_kL
+
+                d2f_pref1 = (z**3 / np.sqrt(np.pi) *
+                             (2 * (V_L + r_kL) * np.exp(-(z**2) *
+                                                        (V_L + r_kL)**2) - 2 *
+                              (V_L - r_kL) * np.exp(-(z**2) * (V_L - r_kL)**2)))
+
+                d2f_pref2 = (
+                    z / np.sqrt(np.pi) *
+                    (np.exp(-(z**2) *
+                            (V_L + r_kL)**2) - np.exp(-(z**2) *
+                                                      (V_L - r_kL)**2)) / r_kL)
+
+                d2f_unitvec = np.outer(unitvec_kL, unitvec_kL)
+
+                d2f_delta_unitvec = np.eye(3) - d2f_unitvec
+
+                d2f_kL = d2f_pref1 * d2f_unitvec + d2f_pref2 * d2f_delta_unitvec
+
+                for A in range(natms):
+
+                    deltaA = int(A == atm) - int(A == L)  # delta_AI - delta_AL
+
+                    sum_df_over_f[A] += deltaA * df_kL / f_kL
+
+                    for B in range(natms):
+                        deltaB = int(B == atm) - int(
+                            B == L)  # delta_BI - delta_BL
+
+                        sum_d2f[A, B] += (
+                            deltaA * deltaB *
+                            (-np.outer(df_kL, df_kL) / f_kL**2 + d2f_kL / f_kL))
+
+            dF = np.zeros((natms, 3))
+            d2F = np.zeros((natms, natms, 3, 3))
+
+            for A in range(natms):
+                dF[A] = -F_k * sum_df_over_f[A]
+
+            for A in range(natms):
+                for B in range(natms):
+
+                    d2F[A, B] = -F_k * (np.outer(
+                        sum_df_over_f[A], sum_df_over_f[B]) + sum_d2f[A, B])
+
+            for A in range(natms):
+                for B in range(natms):
+
+                    A_contrib = (z * np.sqrt(2 / np.pi) *
+                                 (2 * np.outer(dF[A], dF[B]) / F_k**3 -
+                                  d2F[A, B] / F_k**2))
+
+                    hessian[A, :,
+                            B, :] += (-0.5 / scale_f) * q[k]**2 * A_contrib
+
+        return hessian.reshape(3 * natms, 3 * natms)
+
+    def hessA_ij(self, molecule, grid, q, eps=78.39):
+        """
+        Calculates the off-diagonal cavity-cavity hessian contribution.
+
+        :param molecule:
+            The molecule object.
+        :param grid:
+            The grid object containing the grid positions, weights,
+            the Gaussian exponents, and indices for which atom they belong to.
+        :param q:
+            The grid point charges.
+        :param eps:
+            Dielectric constant.
+
+        :return:
+            The hessian array of each cartesian component, shape (nAtoms*3, nAtoms*3).
+        """
+
+        natms = molecule.number_of_atoms()
+        hess = np.zeros((3 * natms, 3 * natms))
+        scale_f = -(eps - 1) / (eps)
+
+        for m in range(grid.shape[0]):
+            grid_coords_m = grid[m, :3].squeeze()
+            z_m = grid[m, 4]
+            z_m2 = np.dot(z_m, z_m)
+            idx_m = int(grid[m, -1])
+            q_m = q[m]
+
+            for n in range(m + 1, grid.shape[0]):
+                grid_coords_n = grid[n, :3]
+                z_n = grid[n, 4]
+                z_n2 = np.dot(z_n, z_n)
+                idx_n = int(grid[n, -1])
+                q_n = q[n]
+
+                z_mn = (z_m * z_n) / np.sqrt(z_n2 + z_m2)
+                r_mn_vec = grid_coords_m - grid_coords_n
+                r_mn = np.linalg.norm(r_mn_vec)
+                r_mn2 = np.dot(r_mn_vec, r_mn_vec)
+                rmn_unit = r_mn_vec / r_mn
+
+                O_mn = (-(math.erf(z_mn * r_mn) - 2 / np.sqrt(np.pi) * z_mn *
+                          r_mn * math.exp(-(z_mn**2) * r_mn**2)) / r_mn2)
+                P_mn = -2 * O_mn / r_mn - 4 * z_mn**3 / np.sqrt(np.pi) * np.exp(
+                    -(z_mn**2) * r_mn**2)
+
+                for L in range(natms):
+                    fL = int(idx_m == L) - int(idx_n == L)
+                    for x in range(3):
+                        drL = fL * r_mn_vec[x] / r_mn
+
+                        for J in range(natms):
+                            fJ = int(idx_m == J) - int(idx_n == J)
+                            for y in range(3):
+                                drJ = fJ * r_mn_vec[y] / r_mn
+
+                                delta = 1.0 if x == y else 0.0
+
+                                d2r = (-(fL * fJ) *
+                                       (delta - rmn_unit[x] * rmn_unit[y]) /
+                                       r_mn)
+                                d2A_kl = P_mn * drL * drJ - O_mn * d2r
+                                hess[3 * L + x, 3 * J + y] += (
+                                    (-0.5 / scale_f) * q_m * d2A_kl * q_n) * 2
+
+        return hess
 
     def cg_solve_parallel_direct(self,
                                  grid,
