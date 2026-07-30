@@ -1121,7 +1121,7 @@ class CpcmDriver:
         cpcm_rsp_q = self.cg_solve_parallel_direct(grid, sw_f, precond, rhs,
                                                    None, cpcm_cg_thresh)
 
-        grad_V_pol += self.grad_B(molecule, grid, cpcm_rsp_q) + self.grad_C(
+        grad_V_pol += self.grad_B(molecule, basis, grid, cpcm_rsp_q) + self.grad_C(
             molecule, basis, grid, cpcm_rsp_q, DM)
 
         # Third term
