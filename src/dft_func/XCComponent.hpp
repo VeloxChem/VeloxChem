@@ -36,6 +36,7 @@
 #include <xc.h>
 
 #include <string>
+#include <vector>
 
 /**
  Class CXCComponent implements XC functional component.
@@ -51,6 +52,11 @@ class CXCComponent
      Scaling factor of the functional component.
      */
     double _scalingFactor{1.0};
+
+    /**
+     Range-separated parameters of the functional component.
+     */
+    std::vector<double> _rangeSeparatedParameters;
 
     /**
      The Libxc functional component.
@@ -81,7 +87,7 @@ class CXCComponent
     /**
      Creates an XC component object.
      */
-    CXCComponent(const std::string& label, const double scalingFactor);
+    CXCComponent(const std::string& label, const double scalingFactor, const std::vector<double>& rangeSeparatedParameters = std::vector<double>());
 
     /**
      Creates an XC component object by copying other XC component object.

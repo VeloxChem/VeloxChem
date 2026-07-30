@@ -81,6 +81,11 @@ class CMatrices
     /// @param other The dictionary of matrices to be compared.
     /// @return True if dictionaries of matrices are not equal, False otherwise.
     auto operator!=(const CMatrices& other) const -> bool;
+    
+    /// @brief The addition operator.
+    /// @param other The matrix to be added.
+    /// @return The sum of two matrices.
+    auto operator+(const CMatrices &other) const -> CMatrices;
 
     /// @brief Adds matrix to dictionary of matrices.
     /// @param matrix The matrix to be added.

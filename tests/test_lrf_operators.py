@@ -2,7 +2,7 @@ from mpi4py import MPI
 import pytest
 
 from veloxchem.veloxchemlib import mpi_master
-from veloxchem.cppsolver import ComplexResponse
+from veloxchem.cppsolver import ComplexResponseSolver
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -24,7 +24,7 @@ class TestLrfOperators:
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
 
-        lrf_drv = ComplexResponse()
+        lrf_drv = ComplexResponseSolver()
         lrf_drv.ostream.mute()
 
         op_a, op_b = operators

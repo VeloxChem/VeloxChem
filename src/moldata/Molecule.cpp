@@ -433,19 +433,6 @@ CMolecule::atom_indices(const std::string &label) const -> std::vector<int>
 }
 
 auto
-CMolecule::nuclear_repulsion_energy() const -> double
-{
-    double nenergy = 0.0;
-
-    std::ranges::for_each(views::upper_triangular(_identifiers.size()), [&](const auto &index) {
-        const auto [i, j] = index;
-        nenergy += _identifiers[i] * _identifiers[j] / _coordinates[i].distance(_coordinates[j]);
-    });
-
-    return nenergy;
-}
-
-auto
 CMolecule::check_proximity(const double distance) const -> bool
 {
     const auto r2dist = distance * distance;
@@ -549,6 +536,36 @@ CMolecule::get_covalent_radii() const -> std::vector<double>
     }
 
     return atomradii;
+}
+
+auto
+CMolecule::shift_origin(const int atom) const -> CMolecule
+{
+    const auto rxyz = _coordinates.at(atom).coordinates();
+    
+    std::vector<TPoint<double>> coords;
+    
+    for (int i = 0; i < number_of_atoms(); i++)
+    {
+        if (i == atom)
+        {
+            coords.push_back(TPoint<double>({0.0, 0.0, 0.0})); 
+        }
+        else
+        {
+            const auto lxyz = _coordinates.at(i).coordinates();
+            
+            coords.push_back(TPoint<double>({lxyz[0] - rxyz[0], lxyz[1] - rxyz[1], lxyz[2] - rxyz[2]}));
+        }
+    }
+    
+    CMolecule new_mol(_identifiers, coords, "au", _atom_basis_labels);
+    
+    new_mol.set_charge(_charge);
+    
+    new_mol.set_multiplicity(_multiplicity);
+    
+    return new_mol; 
 }
 
 auto

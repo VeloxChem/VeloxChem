@@ -2,7 +2,6 @@ from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import pytest
-import sys
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
@@ -11,10 +10,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.scfgradientdriver import ScfGradientDriver
 
-try:
-    import pyframe
-except ImportError:
-    pass
+pytest.importorskip("pyframe")
 
 
 @pytest.mark.solvers
@@ -76,8 +72,6 @@ class TestPolarizableEmbeddingGradient:
 
         return grad_drv.get_gradient()
 
-    @pytest.mark.skipif('pyframe' not in sys.modules,
-                        reason='pyframe not available')
     def test_rest_scf_grad_with_pe(self):
 
         grad = self.run_scf_grad_with_pe('restricted')
@@ -91,8 +85,6 @@ class TestPolarizableEmbeddingGradient:
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert np.max(np.abs(grad - ref_grad)) < 5.0e-4
 
-    @pytest.mark.skipif('pyframe' not in sys.modules,
-                        reason='pyframe not available')
     def test_unrest_scf_grad_with_pe(self):
 
         grad = self.run_scf_grad_with_pe('unrestricted')

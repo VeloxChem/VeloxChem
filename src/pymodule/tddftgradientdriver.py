@@ -285,7 +285,7 @@ class TddftGradientDriver(GradientDriver):
 
         if self.rank == mpi_master():
             # only alpha part
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             mo = scf_tensors['C_alpha']
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
@@ -376,7 +376,7 @@ class TddftGradientDriver(GradientDriver):
         if self.rank == mpi_master():
             # only alpha part
             gs_dm = scf_tensors['D_alpha']
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             mo = scf_tensors['C_alpha']
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]

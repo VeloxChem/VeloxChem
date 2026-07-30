@@ -502,6 +502,14 @@ class CDensityGridCubic
                                const CDensityGrid& rw2DensityGrid,
                                const int           numdens);
 
+    void DensityProdForLDA_THG(const CDensityGrid& rwDensityGrid,
+                               const CDensityGrid& rw2DensityGrid,
+                               const int           numdens);
+
+    void DensityProdForLDA_THGRED(const CDensityGrid& rwDensityGrid,
+                                  const CDensityGrid& rw2DensityGrid,
+                                  const int           numdens);
+
     void DensityProdForLDA_CRF(const CDensityGrid& rwDensityGrid,
                                const CDensityGrid& rw2DensityGrid,
                                const int           numdens);
@@ -522,9 +530,26 @@ class CDensityGridCubic
                                const CDensityGrid& rw2DensityGrid,
                                const int           numdens);
 
+    void DensityProdForGGA_THG(const CDensityGrid& rwDensityGrid,
+                               const CDensityGrid& rw2DensityGrid,
+                               const int           numdens);
+
+    void DensityProdForGGA_THGRED(const CDensityGrid& rwDensityGrid,
+                               const CDensityGrid& rw2DensityGrid,
+                               const int           numdens);
+
     void DensityProdForMGGA_TPA(const CDensityGrid& rwDensityGrid,
                                 const CDensityGrid& rw2DensityGrid,
                                 const int           numdens);
+
+    void DensityProdForMGGA_THG(const CDensityGrid& rwDensityGrid,
+                                const CDensityGrid& rw2DensityGrid,
+                                const int           numdens);
+
+    void DensityProdForMGGA_THGRED(const CDensityGrid& rwDensityGrid,
+                                   const CDensityGrid& rw2DensityGrid,
+                                   const int           numdens);
+
 
     void DensityProdForMGGA_CRF(const CDensityGrid& rwDensityGrid,
                                 const CDensityGrid& rw2DensityGrid,

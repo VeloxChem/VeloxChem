@@ -33,7 +33,7 @@ class TestOrbitalResponse:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_drv.compute(task.molecule, task.ao_basis)
 
         # Our references: lambda and omega in AO basis
 
@@ -42,7 +42,7 @@ class TestOrbitalResponse:
             tda_solver.update_settings(rsp_dict,
                                        task.input_dict['method_settings'])
             rsp_results = tda_solver.compute(task.molecule, task.ao_basis,
-                                             scf_drv.scf_tensors)
+                                             scf_drv.scf_results)
 
             orb_resp = TddftOrbitalResponse(task.mpi_comm, task.ostream)
             orbrsp_dict['tamm_dancoff'] = 'yes'
@@ -53,7 +53,7 @@ class TestOrbitalResponse:
             rpa_solver.update_settings({'nstates': 3},
                                        task.input_dict['method_settings'])
             rsp_results = rpa_solver.compute(task.molecule, task.ao_basis,
-                                             scf_drv.scf_tensors)
+                                             scf_drv.scf_results)
 
             orb_resp = TddftOrbitalResponse(task.mpi_comm, task.ostream)
             lambda_ref = 'lambda_rpa'
@@ -62,11 +62,11 @@ class TestOrbitalResponse:
         orb_resp.update_settings(orbrsp_dict,
                                  task.input_dict['method_settings'])
 
-        orb_resp.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors,
+        orb_resp.compute(task.molecule, task.ao_basis, scf_drv.scf_results,
                          rsp_results)
         orb_resp_results = orb_resp.cphf_results
-        #omega_ao = orb_resp.compute_omega(task.molecule, task.ao_basis,
-        #                                  scf_drv.scf_tensors)
+        omega_ao = orb_resp.compute_omega(task.molecule, task.ao_basis,
+                                          scf_drv.scf_results)
 
         dft_dict = {'dft_func_label': 'HF'}
         pe_dict = {'potfile_text': ''}
@@ -87,13 +87,13 @@ class TestOrbitalResponse:
                 cphf_coefficients.append(solution_vec)
 
         if task.mpi_rank == mpi_master():
-            nocc = task.molecule.number_of_alpha_electrons()
-            mo = scf_drv.scf_tensors['C_alpha']
+            nocc = task.molecule.number_of_alpha_occupied_orbitals(
+                task.ao_basis)
+            mo = scf_drv.scf_results['C_alpha']
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
             nvir = mo_vir.shape[1]
             nao = task.ao_basis.get_dimensions_of_basis()
-            #lambda_ov = orb_resp_results['cphf_ov']
 
             lambda_ov = np.array(cphf_coefficients)
             dof = lambda_ov.shape[0]
@@ -102,9 +102,23 @@ class TestOrbitalResponse:
             lambda_ao = np.einsum('mi,sia,na->smn', mo_occ, lambda_ov, mo_vir)
             lambda_ao = lambda_ao.reshape(dof, nao, nao)
 
+            mo_energies = scf_drv.scf_results['E_alpha']
+            eocc = mo_energies[:nocc]
+            gs_omega_ao = -np.linalg.multi_dot(
+                [mo_occ, np.diag(eocc), mo_occ.T])
+
             assert np.max(np.abs(lambda_ao[0] - ref_lambda_ao)) < 5.0e-4
-            # TODO: uncomment once TDDFT gradients are working
-            #assert np.max(np.abs(omega_ao[0] - ref_omega_ao)) < 5.0e-4
+
+            # The omega data in orbital_response_hf_ref.h5 is historical: it
+            # predates the current TddftOrbitalResponse.compute_omega()
+            # convention and includes the ground-state overlap multiplier in
+            # addition to the excited-state TDDFT orbital-response contribution.
+            # Keeping the old HDF5 data gives an independent cross-check; this
+            # subtraction compares the same excited-state quantity used by the
+            # TDDFT gradient driver.
+            ref_excited_omega_ao = ref_omega_ao - gs_omega_ao
+            assert np.max(np.abs(omega_ao[0] -
+                                 ref_excited_omega_ao)) < 5.0e-4
 
     def test_tda_hf(self):
 

@@ -155,7 +155,7 @@ class TestInputUVVis:
             'n_scf_iterations': 9,
             'dipole': 0.786770,
             'nstates': 5,
-            'n_uvvis_iterations': 9,
+            'n_uvvis_iterations': 8,
             'exc_ene': np.array(
                 [0.32282999, 0.38491251, 0.41024825, 0.44793326, 0.47139996]),
             'osc_str': np.array([0.0530, 0.0000, 0.1070, 0.0045, 0.0248]),
@@ -176,7 +176,7 @@ class TestInputUVVis:
             'n_scf_iterations': 9,
             'dipole': 0.786770,
             'nstates': 5,
-            'n_uvvis_iterations': 10,
+            'n_uvvis_iterations': 9,
             'exc_ene': np.array(
                 [0.32139517, 0.38339622, 0.40934426, 0.44665234, 0.47004797]),
             'osc_str': np.array([0.0519, 0.0000, 0.1018, 0.0048, 0.0233]),
@@ -197,7 +197,7 @@ class TestInputUVVis:
             'n_scf_iterations': 7,
             'dipole': 0.731257,
             'nstates': 5,
-            'n_uvvis_iterations': 6,
+            'n_uvvis_iterations': 4,
             'exc_ene': np.array(
                 [0.25720123, 0.30977192, 0.33859452, 0.37854004, 0.39054751]),
             'osc_str': np.array([0.0537, 0.0000, 0.0906, 0.0000, 0.0127]),
@@ -218,7 +218,7 @@ class TestInputUVVis:
             'n_scf_iterations': 7,
             'dipole': 0.731257,
             'nstates': 5,
-            'n_uvvis_iterations': 7,
+            'n_uvvis_iterations': 5,
             'exc_ene': np.array(
                 [0.25675266, 0.30971169, 0.33794203, 0.37844329, 0.39025586]),
             'osc_str': np.array([0.0520, 0.0000, 0.0848, 0.0000, 0.0116]),

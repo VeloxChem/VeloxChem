@@ -344,9 +344,9 @@ CGtoBlock::getAtomicOrbitalsIndexes() const -> std::vector<int>
         // because _orb_indices[0] is the total number of CGTOs of _angular_momentum
         // which could be larger than the number of CGTOs in this block
 
-        for (size_t ind = 1; ind < _orb_indices.size(); ind++)
+        for (int ind = 1; ind < static_cast<int>(_orb_indices.size()); ind++)
         {
-            ao_inds.push_back(comp * _orb_indices[0] + _orb_indices[ind]);
+            ao_inds.push_back(static_cast<int>(comp * _orb_indices[0] + _orb_indices[ind]));
         }
     }
 
@@ -379,9 +379,9 @@ CGtoBlock::getAtomicOrbitalsIndexesForCartesian(const int ncgtos_d) const -> std
         // because _orb_indices[0] is the total number of CGTOs of _angular_momentum
         // which could be larger than the number of CGTOs in this block
 
-        for (size_t ind = 1; ind < _orb_indices.size(); ind++)
+        for (int ind = 1; ind < static_cast<int>(_orb_indices.size()); ind++)
         {
-            ao_inds.push_back(comp * _orb_indices[0] + _orb_indices[ind] + orb_ind_shift);
+            ao_inds.push_back(static_cast<int>(comp * _orb_indices[0] + _orb_indices[ind] + orb_ind_shift));
         }
     }
 
@@ -412,9 +412,9 @@ CGtoBlock::getCartesianToSphericalMappingForP() const -> std::unordered_map<int,
         // because _orb_indices[0] is the total number of CGTOs of _angular_momentum
         // which could be larger than the number of CGTOs in this block
 
-        for (size_t ind = 1; ind < _orb_indices.size(); ind++)
+        for (int ind = 1; ind < static_cast<int>(_orb_indices.size()); ind++)
         {
-            auto cart_ind = cart_comp * _orb_indices[0] + _orb_indices[ind];
+            auto cart_ind = static_cast<int>(cart_comp * _orb_indices[0] + _orb_indices[ind]);
 
             cart_sph_p[cart_ind] = std::vector<std::pair<int, double>>();
 
@@ -467,9 +467,9 @@ CGtoBlock::getCartesianToSphericalMappingForD() const -> std::unordered_map<int,
         // because _orb_indices[0] is the total number of CGTOs of _angular_momentum
         // which could be larger than the number of CGTOs in this block
 
-        for (size_t ind = 1; ind < _orb_indices.size(); ind++)
+        for (int ind = 1; ind < static_cast<int>(_orb_indices.size()); ind++)
         {
-            auto cart_ind = cart_comp * _orb_indices[0] + _orb_indices[ind];
+            auto cart_ind = static_cast<int>(cart_comp * _orb_indices[0] + _orb_indices[ind]);
 
             cart_sph_d[cart_ind] = std::vector<std::pair<int, double>>();
 
@@ -522,9 +522,9 @@ CGtoBlock::getCartesianToSphericalMappingForF(const int ncgtos_d) const -> std::
         // because _orb_indices[0] is the total number of CGTOs of _angular_momentum
         // which could be larger than the number of CGTOs in this block
 
-        for (size_t ind = 1; ind < _orb_indices.size(); ind++)
+        for (int ind = 1; ind < static_cast<int>(_orb_indices.size()); ind++)
         {
-            auto cart_ind = cart_comp * _orb_indices[0] + _orb_indices[ind];
+            auto cart_ind = static_cast<int>(cart_comp * _orb_indices[0] + _orb_indices[ind]);
 
             // take into account the shifting of cart_ind due to 6 d Cartesian components
             cart_ind += ncgtos_d;

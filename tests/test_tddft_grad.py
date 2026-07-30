@@ -53,7 +53,7 @@ class TestGrad:
         rsp_solver.nstates = 3
 
         rsp_solver.ostream.mute()
-        rsp_results = rsp_solver.compute(molecule, basis, scf_drv.scf_tensors)
+        rsp_results = rsp_solver.compute(molecule, basis, scf_drv.scf_results)
 
         tddft_grad = TddftGradientDriver(scf_drv)
 

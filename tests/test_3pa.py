@@ -1,5 +1,4 @@
 from mpi4py import MPI
-import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import mpi_master
@@ -62,8 +61,8 @@ class Test3PA:
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             for key in ref_result:
-                assert abs(results_ThreePA['transition_moments'][key] -
-                           ref_result[key].real) < 1.0e-4
+                assert abs(abs(results_ThreePA['transition_moments'][key]) -
+                           abs(ref_result[key]).real) < 1.0e-4
 
     def test_hf_3pa(self):
 

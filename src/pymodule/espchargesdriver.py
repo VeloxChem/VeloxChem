@@ -44,7 +44,9 @@ from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .inputparser import parse_input, print_keywords
-from .errorhandler import assert_msg_critical, safe_solve
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_solve
+from .resultsio import write_results_to_hdf5
 
 
 class EspChargesDriver:
@@ -242,6 +244,30 @@ class EspChargesDriver:
             # single molecule esp charges
             return self._compute_single_molecule(molecule, basis, scf_results)
 
+    def _write_esp_results_to_hdf5(self, label, key, charges):
+        """
+        Writes charge-fitting results to the final HDF5 file when available.
+
+        :param label:
+            The results group label.
+        :param key:
+            The results dataset key.
+        :param charges:
+            The fitted charges.
+        """
+
+        if self.filename is None:
+            return
+
+        h5_fname = Path(f'{self.filename}.h5')
+        if not h5_fname.is_file():
+            return
+
+        write_results_to_hdf5(str(h5_fname),
+                              label,
+                              {key: charges},
+                              value_label=f'{label.upper()} charge result')
+
     def _get_grid_esp_for_single_mol(self,
                                      molecule,
                                      basis=None,
@@ -367,9 +393,12 @@ class EspChargesDriver:
                 q = self.compute_esp_charges_on_fitting_points([molecule],
                                                                [grid_m],
                                                                [esp_m])
+                # Fitting-point charges are not atomic properties.
+                self._write_esp_results_to_hdf5('esp', 'esp_on_points', q)
             else:
                 q = self.compute_esp_charges([molecule], [grid_m], [esp_m],
                                              [1.0])
+                self._write_esp_results_to_hdf5('esp', 'esp_charges', q)
         else:
             q = None
 
@@ -1042,7 +1071,7 @@ class EspChargesDriver:
         # nuclear contribution
 
         coords = molecule.get_coordinates_in_bohr()
-        elem_ids = molecule.get_element_ids()
+        elem_ids = molecule.get_effective_nuclear_charges(basis)
 
         for a in range(molecule.number_of_atoms()):
             esp += elem_ids[a] / np.sqrt(

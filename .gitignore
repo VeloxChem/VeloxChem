@@ -22,6 +22,7 @@ dummy.*
 *.DS_Store
 /.ccls-cache/
 .DS_Store
+*imgui.ini
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -155,8 +156,5 @@ cython_debug/
 ConfigMKL.hpp
 /.direnv/
 /compile_commands.json
-
-# generated Python sources
-mklconf.py
 
 veloxchem.sh

@@ -123,8 +123,6 @@ getPartialCharges(const CMolecule& molecule, const double netcharge) -> std::vec
 
     CDenseMatrix Amat(natoms + 1, natoms + 1);
 
-    const double sqrtpi = std::sqrt(mathconst::pi_value());
-
     const double sqrt2pi = std::sqrt(2.0 / mathconst::pi_value());
 
     auto xyzcoord = molecule.coordinates("bohr");
@@ -225,8 +223,6 @@ getCoordinationNumber(const CMolecule& molecule) -> std::vector<double>
     const double cn_max = 8.0;
 
     const double cutoff2 = 25.0 * 25.0;
-
-    const double sqrtpi = std::sqrt(mathconst::pi_value());
 
     // get molecular information
 

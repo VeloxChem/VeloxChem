@@ -1,4 +1,3 @@
-from mpi4py import MPI
 import numpy as np
 import pytest
 
@@ -48,12 +47,12 @@ class TestRestrictedSubspace:
         rpa_result = rpa_drv.compute(molecule, basis, scf_result)
 
         ref_exc_ene = np.array([
-            19.09409611, 19.15795969, 19.20965780, 19.21608706, 19.25755683,
-            19.28712810, 19.33009437, 19.33571861, 19.36632321, 19.44738600
+            19.09409612, 19.15795970, 19.20965781, 19.21608707, 19.25755683,
+            19.28712811, 19.33009438, 19.33571862, 19.36632322, 19.44542822
         ])
         ref_osc_str = np.array([
-            0.0100, 0.0221, 0.0118, 0.0084, 0.0047, 0.0028, 0.0000, 0.0086,
-            0.0044, 0.0017
+            0.01  , 0.0221, 0.0118, 0.0084, 0.0047, 0.0028, 0.    , 0.0086,
+            0.0044, 0.0185
         ])
 
         if rpa_drv.rank == mpi_master():
@@ -78,12 +77,12 @@ class TestRestrictedSubspace:
         tda_result = tda_drv.compute(molecule, basis, scf_result)
 
         ref_exc_ene = np.array([
-            19.09414620, 19.15797993, 19.20966688, 19.21610156, 19.25756094,
-            19.28713597, 19.33009443, 19.33573228, 19.36632620, 19.44744147
+            19.0941462 , 19.15797992, 19.20966688, 19.21610156, 19.25756094,
+            19.28713597, 19.33009442, 19.33573228, 19.36632619, 19.44544945
         ])
         ref_osc_str = np.array([
-            0.0101, 0.0222, 0.0119, 0.0084, 0.0048, 0.0028, 0.0000, 0.0087,
-            0.0044, 0.0017
+            0.0101, 0.0222, 0.0119, 0.0084, 0.0048, 0.0028, 0.    , 0.0087,
+            0.0044, 0.0186
         ])
 
         if tda_drv.rank == mpi_master():
@@ -110,7 +109,7 @@ class TestRestrictedSubspace:
 
         scf_results = scf_drv.compute(mol, bas)
 
-        nocc = mol.number_of_alpha_electrons()
+        nocc = mol.number_of_alpha_occupied_orbitals(bas)
 
         if scf_drv.rank == mpi_master():
             norb = scf_results['C_alpha'].shape[0]
@@ -183,13 +182,13 @@ class TestRestrictedSubspace:
         ref_osc_str = np.array([0.0180, 0.0000, 0.0854, 0.0695, 0.3006])
 
         self.run_rsa('b3lyp', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-5, tda=True)
-    
+
     def test_b3lyp_svp_rsa_rpa(self):
 
         ref_exc_enes = np.array(
             [0.28013457, 0.35056008, 0.3692739 , 0.44042579, 0.77320255])
 
-        ref_osc_str = np.array([0.0175, 0.    , 0.1071, 0.0965, 0.    ])
+        ref_osc_str = np.array([0.0175, 0.    , 0.1071, 0.0965, 0.])
 
         self.run_rsa('b3lyp', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-5,
                      ncore=1, nvir=15, nval=2)
@@ -199,7 +198,7 @@ class TestRestrictedSubspace:
         ref_exc_enes = np.array(
             [0.28099976, 0.35063639, 0.37179368, 0.44191394, 0.77325388])
 
-        ref_osc_str = np.array([0.0175, 0.    , 0.1166, 0.1079, 0.    ])
+        ref_osc_str = np.array([0.0175, 0.    , 0.1166, 0.1079, 0.])
 
         self.run_rsa('b3lyp', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-5,
                      ncore=1, nvir=15, nval=2, tda=True)

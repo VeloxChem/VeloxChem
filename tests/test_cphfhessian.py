@@ -23,7 +23,7 @@ class TestCphfSolver:
         scf_drv.xcfun = xcfun
 
         scf_drv.ostream.mute()
-        scf_tensors = scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
 
         hess_orbrsp_drv = HessianOrbitalResponse()
         orbrsp_settings = {'conv_thresh': 2e-7}
@@ -33,7 +33,7 @@ class TestCphfSolver:
         hess_orbrsp_drv.use_subcomms = use_subcomms
 
         # TODO: hess_orbrsp_drv should return cphf_results
-        hess_orbrsp_drv.compute(molecule, basis, scf_tensors)
+        hess_orbrsp_drv.compute(molecule, basis, scf_results)
 
         dist_cphf_coefficients = hess_orbrsp_drv.cphf_results['dist_cphf_ov']
         dof = len(dist_cphf_coefficients)

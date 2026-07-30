@@ -33,22 +33,21 @@
 from mpi4py import MPI
 import sys
 import numpy as np
-import os
 import math
 import copy
 import h5py
 import time
+from random import getrandbits
 from pathlib import Path
 
 from .veloxchemlib import mpi_master, hartree_in_kjpermol, bohr_in_angstrom
 from .outputstream import OutputStream
 from .openmmdynamics import OpenMMDynamics
 from .errorhandler import assert_msg_critical
-from .sanitychecks import molecule_sanity_check
 from .mmforcefieldgenerator import MMForceFieldGenerator
-from .evbdriver import EvbDriver
 from .molecule import Molecule
 from .scfrestdriver import ScfRestrictedDriver
+from .scfunrestdriver import ScfUnrestrictedDriver
 from .molecularbasis import MolecularBasis
 from .reaffbuilder import ReactionForceFieldBuilder
 from .evbsystembuilder import EvbSystemBuilder
@@ -60,13 +59,47 @@ try:
 except ImportError:
     pass
 
+# All positions are in Angsrom unless otherwise stated
 
-class TransitionStateGuesser():
+
+class TransitionStateGuesser:
+    """
+    Generates a transition state guess from reactant and product structures by
+    interpolating their force fields (V = (1-lambda)*E_reactant + lambda*E_product),
+    sampling a structure at each lambda and selecting the highest-energy
+    structure along the approximate reaction path. The guess can optionally be
+    refined with a QM scan.
+
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
+
+    Instance variables
+        - molecule: The current molecule (the transition state guess after a scan).
+        - results: The dictionary holding the scan results.
+        - lambda_vector: The lambda values sampled along the reaction path.
+        - mm_temperature: The temperature in K for the MM sampling.
+        - mm_steps: The number of MD steps per sampling run.
+        - conformer_snapshots: The number of conformer snapshots per lambda.
+        - do_qm_scan: The flag for running a QM scan after the MM scan.
+        - qm_xcfun: The exchange-correlation functional for the QM scan.
+        - qm_basis: The basis set for the QM scan.
+        - max_qm_conformers: The number of lowest conformers evaluated per lambda.
+        - implicit_solvent_model: The implicit solvation model, or None for vacuum.
+        - active_torsion: The explicit active torsion for a conformational TS.
+        - save_intermediates: The flag for writing intermediate files to disk.
+        - save_results_file: The flag for writing the HDF5 results file.
+        - comm: The MPI communicator.
+        - rank: The rank of MPI process.
+        - nodes: The number of MPI processes.
+        - ostream: The output stream.
+    """
 
     def __init__(self, comm=None, ostream=None):
-        '''
-        Initialize the Transition State Guesser class.
-        '''
+        """
+        Initializes the Transition State Guesser to default setup.
+        """
         if comm is None:
             comm = MPI.COMM_WORLD
 
@@ -86,108 +119,76 @@ class TransitionStateGuesser():
 
         self.molecule = None
         self.results = {}
-
-        self.lambda_vec = list(np.round(np.linspace(0, 1, 21), 3))
-        self.scf_xcfun = "b3lyp"
-        self.scf_basis = 'def2-svp'
-        self.mute_scf = True
+        self.lambda_vector = list(np.round(np.linspace(0, 1, 21), 3))
         self.mute_ff_build = True
+
+        # File I/O controls
+        # Set save_intermediates=True to write reactant/product JSON and
+        # system XML files to disk — useful for debugging but off by default
+        # to avoid unnecessary file I/O on HPC shared filesystems.
+        self.save_intermediates = False
+        # Set save_results_file=True (default) to write the HDF5 results file
+        # after each scan. This enables crash recovery and load_results().
+        self.save_results_file = True
+
+        timing_str = str(int(time.time()))
+        self.folder_name = f'ts_data_{timing_str}'
+        self.results_file = f'ts_results_{timing_str}.h5'
+
         self.mm_temperature = 600
         self.mm_steps = 1000
+        self.conformer_snapshots = 10
         self.mm_step_size = 0.001
         self.save_mm_traj = False
-        self.scf_drv = None
-        self.folder_name = 'ts_data_' + str(int(time.time()))
         self.force_conformer_search = False
         self.discont_conformer_search = False
         self.peak_conformer_search = False
-        self.peak_conformer_search_range = 1
-        self.conformer_steps = 10000
-        self.conformer_snapshots = 10
-        self.results_file = 'ts_results.h5'
+        self.peak_conformer_search_range = 2
+        self.mm_conformer_equivalence_threshold = 1e-1  # kJ/mol
+        self.mm_scan_backward = False
 
-        self.ffbuilder = ReactionForceFieldBuilder(ostream=self.ostream)
+        # Force constant (kJ/mol) for the periodic dihedral restraint used in
+        # the integration systems when a conformational TS is detected (no
+        # forming or breaking bonds).  The expression k*(1-cos(theta-theta0))
+        # is used, which is periodic and harmonic-like near the minimum.
+        self.conformer_k: float = 200.0
 
-    def find_TS(
-        self,
-        reactant: Molecule | list[Molecule],
-        product: Molecule | list[Molecule],
-        scf=True,
-        **ff_kwargs,
-    ):
-        """Find a guess for the transition state using a force field scan.
+        # Optional explicit active torsion (1-indexed atom indices) for the
+        # conformational TS scan.  When set, auto-detection via
+        # _detect_active_dihedral is skipped and this dihedral is used instead.
+        # Must be a 4-element sequence [i, j, k, l] with 1-based atom indices.
+        self.active_torsion: tuple | None = None
 
-        Args:
-            reactant (Molecule | list[Molecule]): The reactant molecule or a list of reactant molecules.
-            product (Molecule | list[Molecule]): The product molecule or a list of product molecules.
-            scf (bool, optional): If True, performs an SCF scan after the MM scan. Defaults to True.
-            reactant_partial_charges (list[float], list[list[float]]): Partial charges for the reactant. Will be calculated if not provided. Defaults to None.
-            product_partial_charges (list[float], list[list[float]]): Partial charges for the product. Will be calculated if not provided. Defaults to None.
-            reparameterize (bool): If True, reparameterizes unknown force constants with the Seminario method. Defaults to True
-            reactant_hessians (np.ndarray, list[np.ndarray]): Hessians for the reactant for the Seminario method. Will be calculated if not provided. Defaults to None.
-            product_hessians (np.ndarray, list[np.ndarray]): Hessians for the product for the Seminario method. Will be calculated if not provided. Defaults to None.
-            mm_opt_constrain_bonds (list[tuple[int, int]]): Bonds to constrain during MM optimization.
-            reactant_total_multiplicity (int): Total multiplicity for the reactant to override calculated value. Defaults to -1.
-            product_total_multiplicity (int): Total multiplicity for the product to override calculated value. Defaults to -1.
-            breaking_bonds (list[tuple[int, int]]): (List of) Bond(s) that is forced to break and is not allowed to recombine over the reaction. Defaults to None.
-            mute_ff_scf (bool): If True, mutes SCF output from RESP calculations. Has no effect if mute_ff_build is True. Defaults to True.
-            optimize_mol (bool): If True, does an xtb optimization of every provided molecule object before reparameterisation. Defaults to False.
-            optimize_ff (bool): If True, does an mm optimization of the combined reactant and product after reparameterisation. Defaults to True.
-            water_model (str): The water model used by the ffbuilder. Only has effect if there is a water molecule involved in the reaction. Defaults to "cspce".
-            
-        Raises:
-            ff_exception: If for whatever reason the force field scan crashes, an exception is raised.
+        # Set by build_systems when a conformational TS is detected; used for
+        # descriptive output during the scan.
+        self._conformer_active_torsion: tuple | None = None
+        self._conformer_phi_reactant: float | None = None
+        self._conformer_phi_product: float | None = None
 
-        Returns:
-            molecule, dict: molecule object of the guessed transition state and a dictionary with the results of the scan.
-        """
+        # Implicit solvation during conformational sampling.
+        # Set implicit_solvent_model to one of 'gbn', 'gbn2', 'obc1', 'obc2', 'hct' to enable GB solvation; None runs in vacuum (default).
+        self.implicit_solvent_model: str | None = None
+        self.solute_dielectric: float = 1.0
+        self.solvent_dielectric: float = 78.39
 
-        # Build forcefields and systems
-        self.build_forcefields(reactant, product, **ff_kwargs)
+        # Named solvent for the QM SMD calculation, used automatically when
+        # implicit_solvent_model is set and do_qm_scan is True.
+        # Must be a solvent name recognised by VeloxChem's SMD driver
+        # (e.g. 'water', 'ethanol', 'acetonitrile'). Defaults to 'water'.
+        # Note: XTB does not support SMD; a warning is emitted in that case.
+        self.smd_solvent: str = 'water'
 
-        # Scan MM
-        self.scan_mm()
+        self.scf_drv = None
+        self.qm_xcfun = "PBE0"
+        self.qm_basis = 'def2-svp'
+        self.do_qm_scan = False
+        self.max_qm_conformers = 5
+        self.mute_scf = True
 
-        # Scan SCF
-        if scf:
-            # assert False, 'Not implemented yet'
-            self.scan_scf(self.results)
+        self.mol_multiplicity = 1
+        self.mol_charge = 0
 
-        return self.results
-
-    def build_forcefields(self, reactant, product, constraints=[], **ts_kwargs):
-        if self.mute_ff_build:
-            self.ffbuilder.ostream.mute()
-            self.ostream.print_info(
-                "Building forcefields. Disable mute_ff_build to see detailed output."
-            )
-            self.ostream.flush()
-        self.ffbuilder.read_keywords(**ts_kwargs)
-
-        self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_forcefields(
-            reactant=reactant,
-            product=product,
-        )
-
-        self.molecule = Molecule.read_xyz_string(
-            self.reactant.molecule.get_xyz_string())
-        self.molecule.set_charge(self.reactant.molecule.get_charge())
-        self.molecule.set_multiplicity(
-            self.reactant.molecule.get_multiplicity())
-
-        if self.mute_ff_build:
-            self.ostream.print_blank()
-            self.ostream.flush()
-            self.ffbuilder.ostream.unmute()
-            self.ffbuilder._summarise_reaction(self.reactant, self.product)
-            self.ffbuilder.ostream.mute()
-        self.ostream.print_info(
-            f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong."
-        )
-        self.mol_charge = self.molecule.get_charge()
-        self.mol_multiplicity = self.molecule.get_multiplicity()
-
-        conf = {
+        self.sys_builder_configuration = {
             "name": "vacuum",
             "bonded_integration": True,
             "soft_core_coulomb_pes": True,
@@ -195,6 +196,165 @@ class TransitionStateGuesser():
             "soft_core_coulomb_int": False,
             "soft_core_lj_int": False,
         }
+
+        self.ffbuilder = ReactionForceFieldBuilder(ostream=self.ostream)
+        self.ffbuilder.calculate_resp = False
+
+    def find_transition_state(
+        self,
+        reactant: Molecule | list[Molecule],
+        product: Molecule | list[Molecule],
+        constraints=None,
+        **build_forcefields_kwargs,
+    ):
+        """
+        Finds a guess for the transition state using a force field scan.
+
+        Builds the reactant and product force fields, interpolates them over a
+        range of lambda values (V = (1-lambda)*E_reactant + lambda*E_product),
+        samples a structure at each lambda with the structure mapping potential,
+        and selects the highest-energy sampled structure as the transition state
+        guess. When do_qm_scan is True a QM scan refines the selection. The
+        guessed transition state geometry is stored on self.molecule and in the
+        returned dictionary under 'max_mm_xyz' (and 'max_qm_xyz' if a QM scan was
+        run).
+
+        :param reactant:
+            The reactant molecule or a list of reactant molecules.
+        :param product:
+            The product molecule or a list of product molecules.
+        :param constraints:
+            List of constraints to be applied during the scan.
+        :param build_forcefields_kwargs:
+            Additional keyword arguments to be passed to the force field builder.
+
+        :return:
+            The results of the scan, including the forming/breaking/static
+            bonds, the reactant and product force fields, the per-lambda scan
+            data, and the transition state guess geometry ('max_mm_xyz' and, if
+            a QM scan was run, 'max_qm_xyz').
+        """
+        self.results = {}
+        # Build forcefields and systems
+        if self.implicit_solvent_model is not None:
+            self.ostream.print_info(
+                "Forcing RESP charge calculation for implicit solvent model.")
+            self.ffbuilder.calculate_resp = True
+        self.build_forcefields(reactant, product, **build_forcefields_kwargs)
+        self.build_systems(constraints)
+
+        # Scan MM
+        self.scan_mm()
+
+        # Scan QM
+        if self.do_qm_scan:
+            self.scan_qm(self.results)
+
+        return self.results
+
+    def build_forcefields(self, reactant, product, **build_forcefields_kwargs):
+        """
+        Builds the reactant and product force fields and maps the reaction.
+
+        Delegates to ReactionForceFieldBuilder to construct the GAFF/UFF force
+        fields for the reactant and product, solve the atom-atom (reaction)
+        mapping, and determine which bonds are forming and breaking. The charge
+        and multiplicity are taken from the mapped reactant and stored on
+        self.molecule, self.mol_charge and self.mol_multiplicity.
+
+        :param reactant:
+            The reactant molecule or a list of reactant molecules.
+        :param product:
+            The product molecule or a list of product molecules.
+        :param build_forcefields_kwargs:
+            Additional keyword arguments forwarded to
+            ReactionForceFieldBuilder.build_forcefields (e.g. explicitly
+            specified forming/breaking bonds).
+
+        :return:
+            self.results updated with 'breaking_bonds', 'forming_bonds',
+            'static_bonds', 'reactant' and 'product' (the reactant and product
+            force field generators).
+        """
+        if self.mute_ff_build:
+            self.ostream.print_info(
+                "Building forcefields. Disable mute_ff_build to see detailed output."
+            )
+            self.ostream.flush()
+            self.ostream.mute()
+
+        self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_forcefields(
+            reactant=reactant,
+            product=product,
+            **build_forcefields_kwargs,
+        )
+
+        if self.mute_ff_build:
+            self.ostream.unmute()
+            self.ffbuilder._summarise_reaction(self.reactant, self.product)
+
+        self.molecule = Molecule.read_xyz_string(
+            self.reactant.molecule.get_xyz_string())
+        self.molecule.set_charge(self.reactant.molecule.get_charge())
+        self.molecule.set_multiplicity(
+            self.reactant.molecule.get_multiplicity())
+
+        self.ostream.print_info(
+            f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong."
+        )
+        self.mol_charge = self.molecule.get_charge()
+        self.mol_multiplicity = self.molecule.get_multiplicity()
+
+        if self.save_intermediates:
+            Path(self.folder_name).mkdir(parents=True, exist_ok=True)
+            self.ostream.print_info(
+                f"Saving reactant and product forcefield as json to {self.folder_name}"
+            )
+            self.ostream.flush()
+            self.reactant.save_forcefield_as_json(
+                self.reactant, str(Path(self.folder_name) / "reactant.json"))
+            self.product.save_forcefield_as_json(
+                self.product, str(Path(self.folder_name) / "product.json"))
+
+        rea_bonds = set(self.reactant.bonds.keys())
+        pro_bonds = set(self.product.bonds.keys())
+        static_bonds = rea_bonds & pro_bonds
+        self.results.update({
+            'breaking_bonds': self.breaking_bonds,
+            'forming_bonds': self.forming_bonds,
+            'static_bonds': static_bonds,
+            'reactant': self.reactant,
+            'product': self.product,
+        })
+
+        return self.results
+
+    def build_systems(self, constraints=None):
+        """
+        Builds the interpolated OpenMM systems for every lambda value.
+
+        Rounds the lambda vector to three decimals and uses EvbSystemBuilder to
+        build one OpenMM System per lambda using the structure mapping potential
+        (forming/breaking bonds modelled as harmonic potentials so that
+        intermediate geometries are reasonable), together with the reactant and
+        product systems used to evaluate the interpolated energy V. The
+        resulting systems and shared topology are stored on self.systems and
+        self.topology. Must be called after build_forcefields.
+
+        When no bonds are forming or breaking the reaction is treated as a
+        conformational transition state: the active dihedral (auto-detected via
+        _detect_active_dihedral, or taken from self.active_torsion) is replaced
+        by a periodic restraint whose minimum shifts from the reactant to the
+        product dihedral as lambda goes from 0 to 1.
+
+        :param constraints:
+            Optional list of constraints applied to every system during the
+            scan.
+        """
+        self.lambda_vector = [round(l, 3) for l in self.lambda_vector]
+        self.ostream.print_info(
+            f"Rounding lambda vector to 3 decimal places: {self.lambda_vector}")
+
         sysbuilder = EvbSystemBuilder()
         if self.mute_ff_build:
             sysbuilder.ostream.mute()
@@ -203,45 +363,120 @@ class TransitionStateGuesser():
             )
             self.ostream.flush()
 
-        self.ostream.print_info(
-            f"Saving reactant and product forcefield as json to {self.folder_name}"
-        )
-        self.ostream.flush()
-        self.reactant.save_forcefield_as_json(
-            self.reactant, f"{self.folder_name}/reactant.json")
-        self.product.save_forcefield_as_json(
-            self.product, f"{self.folder_name}/product.json")
+        configuration = dict(self.sys_builder_configuration)
+        if self.implicit_solvent_model is not None:
+            configuration[
+                'implicit_solvent_model'] = self.implicit_solvent_model
+            configuration['solute_dielectric'] = self.solute_dielectric
+            configuration['solvent_dielectric'] = self.solvent_dielectric
 
-        # self.initial_positions in angstrom
-        self.systems, self.topology, self.initial_positions = sysbuilder.build_systems(
+        # Conformational TS: no bonds forming or breaking — replace the
+        # active dihedral in the integration systems with a periodic restraint
+        # whose minimum shifts from phi_reactant (λ=0) to phi_product (λ=1).
+        if len(self.forming_bonds) == 0 and len(self.breaking_bonds) == 0:
+            self.ostream.print_info(
+                "No forming or breaking bonds detected. "
+                "Treating as a conformational transition state: "
+                "using a shifting dihedral restraint in the integration systems."
+            )
+            self.ostream.flush()
+            if self.active_torsion is not None:
+                assert_msg_critical(
+                    len(self.active_torsion) == 4,
+                    'TransitionStateGuesser: active_torsion must contain '
+                    'exactly four 1-based atom indices')
+                reactant_natoms = self.reactant.molecule.number_of_atoms()
+                assert_msg_critical(
+                    all(1 <= a <= reactant_natoms for a in self.active_torsion),
+                    'TransitionStateGuesser: active_torsion indices must be '
+                    f'between 1 and {reactant_natoms}')
+
+                # Convert user-supplied 1-indexed tuple to 0-indexed
+                torsion_0idx = tuple(a - 1 for a in self.active_torsion)
+                one_based = list(self.active_torsion)
+                phi_reactant = self.reactant.molecule.get_dihedral_in_degrees(
+                    one_based)
+                phi_product = self.product.molecule.get_dihedral_in_degrees(
+                    one_based)
+                # Wrap product angle to shortest path from reactant
+                delta = phi_product - phi_reactant
+                if delta > 180.0:
+                    delta -= 360.0
+                elif delta <= -180.0:
+                    delta += 360.0
+                self.ostream.print_info(
+                    f"Using explicitly set active torsion (1-indexed): "
+                    f"{tuple(self.active_torsion)}, "
+                    f"phi_reactant = {phi_reactant:.1f}°, "
+                    f"phi_product = {phi_product:.1f}°, "
+                    f"|Δφ| = {abs(delta):.1f}°.")
+                self.ostream.flush()
+                active_torsion = torsion_0idx
+            else:
+                active_torsion, phi_reactant, phi_product = self._detect_active_dihedral(
+                )
+            self._conformer_active_torsion = active_torsion
+            self._conformer_phi_reactant = float(phi_reactant)
+            self._conformer_phi_product = float(phi_product)
+            configuration['conformer_active_torsion'] = active_torsion
+            configuration['conformer_phi_reactant'] = float(phi_reactant)
+            configuration['conformer_phi_product'] = float(phi_product)
+            configuration['conformer_k'] = float(self.conformer_k)
+            self.ostream.print_info(
+                f"Conformer restraint force constant: {self.conformer_k:.1f} kJ/mol."
+            )
+            self.ostream.flush()
+
+        self.systems, self.topology, _ = sysbuilder.build_systems(
             self.reactant,
             self.product,
-            list(self.lambda_vec),
-            conf,
+            list(self.lambda_vector),
+            configuration,
             constraints,
         )
-        self.ostream.print_info(
-            f"Saving systems as xml to {self.folder_name}/systems")
-        self.ostream.flush()
-        sysbuilder.save_systems_as_xml(self.systems,
-                                       self.folder_name + "/systems")
-        self.results.update({
-            'breaking_bonds': self.breaking_bonds,
-            'forming_bonds': self.forming_bonds,
-            'lambda_vec': self.lambda_vec
-        })
-
-        return
+        if self.mute_ff_build:
+            self.ostream.print_blank()
+            self.ostream.flush()
+            sysbuilder.ostream.unmute()
+        if self.save_intermediates:
+            systems_dir_path = Path(self.folder_name) / "systems"
+            systems_dir_path.mkdir(parents=True, exist_ok=True)
+            systems_dir = str(systems_dir_path)
+            self.ostream.print_info(f"Saving systems as xml to {systems_dir}")
+            self.ostream.flush()
+            sysbuilder.save_systems_as_xml(self.systems, systems_dir)
+        self.results.update({'lambda_vec': self.lambda_vector})
 
     def scan_mm(self):
+        """
+        Runs the MM scan over lambda and selects the MM transition state guess.
 
-        self.folder = Path().cwd() / self.folder_name
+        For each lambda the structure is optimised, briefly sampled with NVT
+        molecular dynamics and re-optimised using the structure mapping
+        potential; the interpolated MM energy
+        V = (1-lambda)*E_reactant + lambda*E_product is then evaluated. The
+        structure from one lambda seeds the next. The scan can optionally be run
+        in both directions (mm_scan_backward) and can trigger additional
+        conformer searches everywhere (force_conformer_search), around the
+        energy peak (peak_conformer_search) and/or at detected discontinuities
+        (discont_conformer_search). Conformers within
+        mm_conformer_equivalence_threshold kJ/mol of one another are discarded.
+
+        Per lambda the lowest-MM-energy conformer is kept; across all lambda the
+        structure with the highest such energy is selected as the transition
+        state guess and stored on self.molecule.
+
+        Requires build_systems to have been called. If the scan raises, partial
+        results are stored in self.results before re-raising. When
+        save_results_file is True the results are written to HDF5.
+
+        :return:
+            self.results updated with 'scan' (per-lambda conformer data),
+            'max_mm_xyz', 'max_mm_lambda' and 'min_mm_conformer_index'.
+        """
+        self.folder = Path.cwd() / self.folder_name
 
         # pdbs are saved in angstrom
-        if self.save_mm_traj:
-            mmapp.PDBFile.writeFile(self.topology, self.initial_positions,
-                                    str(self.folder / 'topology.pdb'))
-        exception = None
 
         rea_int = mm.VerletIntegrator(1)
         rea_sim = mmapp.Simulation(
@@ -257,74 +492,120 @@ class TransitionStateGuesser():
         )
 
         # pos in angstrom
-        pos = self.initial_positions
-
+        # pos = self.initial_positions
+        rea_init_pos = self.reactant.molecule.get_coordinates_in_angstrom()
+        pro_init_pos = self.product.molecule.get_coordinates_in_angstrom()
+        scan_dict = {}
         try:
             if self.force_conformer_search:
                 self.ostream.print_info(
                     "force_conformer_search true. Doing conformer search at every lambda."
                 )
                 self.ostream.flush()
-                positions, V, E1, E2, E_int, N_conf = self._run_mm_scan(
-                    self.lambda_vec,
+                scan_dict = self._run_mm_scan(
+                    self.lambda_vector,
                     rea_sim,
                     pro_sim,
                     conformer_search=True,
-                    init_pos=pos,
+                    forward_init_pos=rea_init_pos,
+                    backward_init_pos=pro_init_pos,
                 )
             else:
-                positions, V, E1, E2, E_int, N_conf = self._run_mm_scan(
-                    self.lambda_vec,
+                scan_dict = self._run_mm_scan(
+                    self.lambda_vector,
                     rea_sim,
                     pro_sim,
                     conformer_search=False,
-                    init_pos=pos,
+                    forward_init_pos=rea_init_pos,
+                    backward_init_pos=pro_init_pos,
                 )
 
-                # Find peak
+                #     # Find peak
                 searched_conformers_indices = []
+                V, E1, E2, conf_indices = self._get_best_mm_E_from_scan_dict(
+                    scan_dict)
                 if self.peak_conformer_search:
-                    peak_index = np.argmax(V)
-                    self.ostream.print_info(
-                        f"Found peak MM E: {V[peak_index]:.3f} at Lambda: {self.lambda_vec[peak_index]}."
-                    )
-                    max_index = min(
-                        len(self.lambda_vec),
-                        peak_index + self.peak_conformer_search_range,
-                    )
-                    min_index = max(
-                        0,
-                        peak_index - self.peak_conformer_search_range,
-                    )
-                    self.ostream.print_info(
-                        f"Doing conformer search from Lambda: {self.lambda_vec[min_index]} to Lambda: {self.lambda_vec[max_index]}."
-                    )
-                    self.ostream.flush()
-                    searched_conformers_indices.extend(
-                        range(min_index, max_index + 1))
-                    positions_cs, Em_cs, E1_cs, E2_cs, E_int_cs, N_conf_cs = self._run_mm_scan(
-                        self.lambda_vec[min_index:max_index + 1],
-                        rea_sim,
-                        pro_sim,
-                        conformer_search=True,
-                        init_pos=positions[min_index],
-                    )
+                    peak_iteration = 0
 
-                    for i, l in enumerate(self.lambda_vec[min_index:max_index +
-                                                          1]):
-                        if Em_cs[i] < V[min_index + i]:
-                            positions[min_index + i] = positions_cs[i]
-                            V[min_index + i] = Em_cs[i]
-                            E1[min_index + i] = E1_cs[i]
-                            E2[min_index + i] = E2_cs[i]
-                            E_int[min_index + i] = E_int_cs[i]
-                            N_conf[min_index + i] = N_conf_cs[i]
+                    while True:
+                        peak_iteration += 1
+                        peak_index = int(np.argmax(V))
+                        peak_lambda = self.lambda_vector[peak_index]
+
+                        # Stop as soon as the peak itself has already been
+                        # conformer-searched. Checking neighbours is not
+                        # sufficient: the peak can fall in a gap between two
+                        # disjoint search windows whose edges are both marked.
+                        if (peak_index in searched_conformers_indices
+                                and (max(0, peak_index - 1)
+                                     in searched_conformers_indices)
+                                and (min(peak_index + 1,
+                                         len(self.lambda_vector) - 1)
+                                     in searched_conformers_indices)):
+                            break
+
+                        min_index = max(
+                            0,
+                            peak_index - self.peak_conformer_search_range,
+                        )
+                        max_index = min(
+                            len(self.lambda_vector) - 1,
+                            peak_index + self.peak_conformer_search_range,
+                        )
+
+                        # Only scan indices not yet covered by a prior
+                        # iteration to avoid redundant MD runs.
+                        new_indices = [
+                            i for i in range(min_index, max_index + 1)
+                            if i not in searched_conformers_indices
+                        ]
+                        if not new_indices:
+                            # Entire window already searched but peak not
+                            # recorded — guard against infinite loop.
+                            break
+
+                        new_lambdas = [
+                            self.lambda_vector[i] for i in new_indices
+                        ]
+
+                        self.ostream.print_info(
+                            f"Found peak MM E: {V[peak_index]:.3f} at Lambda: {peak_lambda}"
+                            f" (iteration {peak_iteration}).")
+                        self.ostream.print_info(
+                            f"Doing conformer search from Lambda: {new_lambdas[0]} to Lambda: {new_lambdas[-1]}."
+                        )
+                        self.ostream.flush()
+
+                        forward_init_pos = scan_dict[new_lambdas[0]][0]['pos']
+                        backward_init_pos = scan_dict[new_lambdas[-1]][0]['pos']
+
+                        scan_dict_peak_conf = self._run_mm_scan(
+                            new_lambdas,
+                            rea_sim,
+                            pro_sim,
+                            conformer_search=True,
+                            forward_init_pos=forward_init_pos,
+                            backward_init_pos=backward_init_pos,
+                            skip_backward=True,
+                        )
+                        for l in scan_dict_peak_conf.keys():
+                            scan_dict[l] += scan_dict_peak_conf[l]
+
+                        searched_conformers_indices.extend(new_indices)
+                        searched_conformers_indices = sorted(
+                            list(set(searched_conformers_indices)))
+
+                        # Re-evaluate so the next iteration and the
+                        # discontinuity check both see up-to-date energies.
+                        V, E1, E2, conf_indices = (
+                            self._get_best_mm_E_from_scan_dict(scan_dict))
 
                 if self.discont_conformer_search:
                     discont_indices = self._check_discontinuities(E1, E2)
 
                     while len(discont_indices) > 0 and len(
-                            searched_conformers_indices) < len(self.lambda_vec):
+                            searched_conformers_indices) < len(
+                                self.lambda_vector):
                         self.ostream.flush()
                         self.ostream.print_info(
                             f"Found discontinuities at indices: {discont_indices}."
@@ -337,79 +618,67 @@ class TransitionStateGuesser():
                         searched_conformers_indices = sorted(
                             list(set(searched_conformers_indices)))
                         to_search_lambda = [
-                            self.lambda_vec[i] for i in to_search_indices
+                            self.lambda_vector[i] for i in to_search_indices
                         ]
                         self.ostream.print_info(
                             f"Performing conformer search at lambda values: {to_search_lambda}."
                         )
                         self.ostream.flush()
-                        positions_cs, Em_cs, E1_cs, E2_cs, E_int_cs, N_conf_cs = self._run_mm_scan(
+                        forward_init_pos = scan_dict[self.lambda_vector[
+                            to_search_indices[0]]][0]['pos']
+                        backward_init_pos = scan_dict[self.lambda_vector[
+                            to_search_indices[-1]]][0]['pos']
+                        scan_dict_discont_conf = self._run_mm_scan(
                             to_search_lambda,
                             rea_sim,
                             pro_sim,
                             conformer_search=True,
-                            init_pos=positions[to_search_indices[
-                                0]],  # TODO improve initial guess when searching multiple regions
+                            forward_init_pos=forward_init_pos,
+                            backward_init_pos=backward_init_pos,
+                            skip_backward=True,
                         )
-
-                        for i, i_l in enumerate(to_search_indices):
-                            if Em_cs[i] < V[i_l]:
-                                positions[i_l] = positions_cs[i]
-                                V[i_l] = Em_cs[i]
-                                E1[i_l] = E1_cs[i]
-                                E2[i_l] = E2_cs[i]
-                                E_int[i_l] = E_int_cs[i]
-                                N_conf[i_l] = N_conf_cs[i]
-
+                        for l in scan_dict_discont_conf.keys():
+                            scan_dict[l] += scan_dict_discont_conf[l]
+                        V, E1, E2, conf_indices = self._get_best_mm_E_from_scan_dict(
+                            scan_dict)
                         discont_indices = self._check_discontinuities(E1, E2)
-
-            pass
-        except Exception as e:
-            self.ostream.print_warning(f"Error in the ff scan: {e}")
-            exception = e
-
-        # Save the results and return them or raise the exception
-
-        structures = []
-        for mm_pos in positions:
-            xyz = self._mm_to_xyz_str(mm_pos, self.molecule)
-            structures.append(xyz)
-        results = {
-            'mm_energies': V,
-            'mm_energies_reactant': E1,
-            'mm_energies_product': E2,
-            'int_energies': E_int,
-            'structures': structures,
-        }
-
-        if exception is None:
-            max_mm_index = np.argmax(V)
-            max_mm_structure = structures[max_mm_index]
-            max_mm_energy = V[max_mm_index]
-            max_mm_lambda = self.lambda_vec[max_mm_index]
-            self.ostream.print_info(
-                f"Found highest MM E: {max_mm_energy:.3f} at Lammba: {max_mm_lambda}."
-            )
-            self.ostream.print_blank()
-            results.update({
-                'max_mm_structure': max_mm_structure,
-                'max_mm_lambda': max_mm_lambda,
-            })
-            self.results.update(results)
-
-            self.molecule = Molecule.read_xyz_string(max_mm_structure)
-            self.molecule.set_multiplicity(self.mol_multiplicity)
-            self.molecule.set_charge(self.mol_charge)
-            self._save_results(self.results_file, self.results)
-            return self.results
-        else:
+        except Exception:
+            err_str = "The MM scan crashed. Saving results in self.results and raising exception"
+            self.ostream.print_warning(err_str)
             self.ostream.flush()
-            self.results.update(results)
-            # self._save_results(self.results_file, self.results)
-            self.ostream.print_warning(
-                "The force field scan crashed. Saving results in self.results and raising exception"
-            )
-            raise exception
+            self.results.update({'scan': scan_dict})
+            raise
+
+        max_mm_energy = None
+        for i, (l, mm_result) in enumerate(scan_dict.items()):
+            min_local_E = None
+            for j, conformer in enumerate(mm_result):
+                if min_local_E is None or conformer['v'] < min_local_E:
+                    min_local_E = conformer['v']
+                    min_local_conformer_index = j
+
+            if max_mm_energy is None or min_local_E > max_mm_energy:
+                max_mm_xyz = mm_result[min_local_conformer_index]['xyz']
+                max_mm_energy = min_local_E
+                max_mm_lambda = l
+                min_mm_conformer_index = min_local_conformer_index
+
+        self.ostream.print_info(
+            f"Found highest MM E: {max_mm_energy:.3f} at Lambda: {max_mm_lambda} and conformer index: {min_mm_conformer_index}."
+        )
+        self.ostream.print_blank()
+        self.results.update({
+            'scan': scan_dict,
+            'max_mm_xyz': max_mm_xyz,
+            'max_mm_lambda': max_mm_lambda,
+            'min_mm_conformer_index': min_mm_conformer_index,
+        })
+        self.molecule = Molecule.read_xyz_string(max_mm_xyz)
+        self.molecule.set_multiplicity(self.mol_multiplicity)
+        self.molecule.set_charge(self.mol_charge)
+        if self.save_results_file:
+            self.save_results(self.results_file, self.results)
+        return self.results
 
     def _check_discontinuities(self, E1, E2):
         discont_indices = []
@@ -425,21 +694,20 @@ class TransitionStateGuesser():
         discont_indices = set(sorted(discont_indices))
         return discont_indices
 
-    def _run_mm_scan(self, lambda_vals, rea_sim, pro_sim, conformer_search,
-                     init_pos):
-
-        pos = copy.copy(init_pos)
-        positions = []
-        V = []
-        E1 = []
-        E2 = []
-        E_int = []
-        N_conf = []
-        self._print_mm_header(conformer_search=conformer_search,
-                              lambda_vals=lambda_vals)
+    def _run_mm_scan(self,
+                     lambda_vals,
+                     rea_sim,
+                     pro_sim,
+                     conformer_search,
+                     forward_init_pos,
+                     backward_init_pos,
+                     skip_backward=False):
+        pos = copy.copy(forward_init_pos)
+        results = {}
+        self._print_mm_header(conformer_search=conformer_search)
         for l in lambda_vals:
 
-            v, e1, e2, e_int, return_pos, n_conf = self._get_mm_energy(
+            result = self._get_mm_energy(
                 self.topology,
                 self.systems[l],
                 l,
@@ -448,19 +716,70 @@ class TransitionStateGuesser():
                 pro_sim,
                 conformer_search,
             )
-            positions.append(return_pos)
-            V.append(v)
-            E1.append(e1)
-            E2.append(e2)
-            E_int.append(e_int)
-            N_conf.append(n_conf)
-            if conformer_search:
-                self._print_mm_iter(l, e1, e2, v, e_int, n_conf)
-            else:
-                self._print_mm_iter(l, e1, e2, v, e_int)
-            pos = return_pos
+            results[l] = result
+            arg = np.argmin([res['v'] for res in result])
+            e1 = result[arg]['e1']
+            e2 = result[arg]['e2']
+            v = result[arg]['v']
+            # e_int = result[arg]['e_int']
+            pos = result[arg]['pos']
+            n_conf = len(result)
 
-        return positions, V, E1, E2, E_int, N_conf
+            self._print_mm_iter(l, e1, e2, v, n_conf)
+
+        if self.mm_scan_backward and not skip_backward:
+            self.ostream.print_info(
+                "mm_scan_backward turned on. Scanning in reverse direction.")
+            self.ostream.flush()
+            lambda_vals_rev = list(reversed(lambda_vals))
+            self._print_mm_header(conformer_search=conformer_search)
+            pos = copy.copy(backward_init_pos)
+            for l in lambda_vals_rev:
+                result = self._get_mm_energy(
+                    self.topology,
+                    self.systems[l],
+                    l,
+                    pos,
+                    rea_sim,
+                    pro_sim,
+                    conformer_search,
+                )
+                results[l] += result
+                arg = np.argmin([res['v'] for res in result])
+                e1 = result[arg]['e1']
+                e2 = result[arg]['e2']
+                v = result[arg]['v']
+                # e_int = result[arg]['e_int']
+                pos = result[arg]['pos']
+                n_conf = len(result)
+                self._print_mm_iter(l, e1, e2, v, n_conf)
+                self.ostream.flush()
+
+        self.ostream.print_blank()
+
+        for l, result in results.items():
+            # remove duplicate conformers with identical MM energy 'v'
+            unique_confs = []
+            seen_v = set()
+            for conf in result:
+                v_val = conf['v']
+                seen = False
+                for v in seen_v:
+                    if abs(v - v_val) < self.mm_conformer_equivalence_threshold:
+                        seen = True
+                if not seen:
+                    seen_v.add(v_val)
+                    unique_confs.append(conf)
+            original_n_conf = len(result)
+            new_n_conf = len(unique_confs)
+            if original_n_conf != new_n_conf:
+                self.ostream.print_info(
+                    f"Lambda {l}: Reduced {original_n_conf} conformers to {new_n_conf} unique conformers using equivalence threshold of {self.mm_conformer_equivalence_threshold} kJ/mol."
+                )
+                self.ostream.flush()
+            results[l] = unique_confs
+
+        return results
 
     def _get_mm_energy(
         self,
@@ -472,89 +791,61 @@ class TransitionStateGuesser():
         prosim,
         conformer_search,
     ):
-        if not conformer_search:
-            integrator = mm.VerletIntegrator(self.mm_step_size *
-                                             mmunit.picoseconds)
-            # TODO add more flexible options if we need them, coordinate with conformergenerator as well
-            # platform settings for small molecule
-            platform = mm.Platform.getPlatformByName("CPU")
-            platform.setPropertyDefaultValue("Threads", "1")
-            simulation = mmapp.Simulation(
-                topology,
-                system,
-                integrator,
-                platform,
-            )
-
-            # units converted from angstrom to nm
-            init_pos_nm = init_pos * 0.1
-            simulation.context.setPositions(init_pos_nm)
-
-            simulation.minimizeEnergy()
-            simulation.context.setVelocitiesToTemperature(self.mm_temperature *
-                                                          mmunit.kelvin)
-            if self.save_mm_traj:
-                state_pos = simulation.context.getState(
-                    getPositions=True).getPositions(asNumpy=True)
-                mmapp.PDBFile.writeFile(
-                    topology,
-                    state_pos,
-                    str(self.folder / f'{l}_begin_minim.pdb'),
-                )
-                simulation.reporters.append(
-                    mmapp.XTCReporter(str(self.folder / f'{l}_traj.xtc'), 1))
-            simulation.step(self.mm_steps)
-            simulation.minimizeEnergy()
-            if self.save_mm_traj:
-                state_pos = simulation.context.getState(
-                    getPositions=True).getPositions(asNumpy=True)
-                mmapp.PDBFile.writeFile(
-                    topology,
-                    state_pos,
-                    str(self.folder / f'{l}_end_minim.pdb'),
-                )
-
-            state = simulation.context.getState(getEnergy=True,
-                                                getPositions=True)
-            e_int = state.getPotentialEnergy().value_in_unit(
-                mmunit.kilojoules_per_mole)
-            pos = state.getPositions(asNumpy=True).value_in_unit(
-                mmunit.angstrom)
-
-            n_conf = -1
+        result = {}
+        # else:
+        opm_dyn = OpenMMDynamics()
+        opm_dyn.ostream.mute()
+        # platform settings for small molecule
+        opm_dyn.openmm_platform = "CPU"
+        # opm_dyn.create_system_from_molecule(mol, ff_gen)
+        if self.save_intermediates:
+            pdb_name = str(Path(self.folder_name) / f'conf_top_{l}.pdb')
         else:
-            opm_dyn = OpenMMDynamics()
-            opm_dyn.ostream.mute()
-            # platform settings for small molecule
-            opm_dyn.openmm_platform = "CPU"
-            # opm_dyn.create_system_from_molecule(mol, ff_gen)
-            pdb_name = self.folder_name + f'/conf_top_{l}.pdb'
+            pdb_name = f'topology_{getrandbits(32):08x}.pdb'
 
-            pdb = mmapp.PDBFile.writeFile(
-                topology,
-                init_pos * mmunit.angstrom,
-                pdb_name,
-            )
-            opm_dyn.pdb = mmapp.PDBFile(pdb_name)
-            opm_dyn.system = system
-            conformers_dict = opm_dyn.conformational_sampling(
-                ensemble='NVT',
-                nsteps=self.conformer_steps,
-                snapshots=self.conformer_snapshots,
-            )
-            n_conf = len(conformers_dict['energies'])
-            arg = np.argmin(conformers_dict['energies'])
-            e_int = conformers_dict['energies'][arg]
-            temp_mol = conformers_dict['molecules'][arg]
+        pdb_not_used = mmapp.PDBFile.writeFile(
+            topology,
+            init_pos * mmunit.angstrom,
+            pdb_name,
+        )
+        opm_dyn.pdb = mmapp.PDBFile(pdb_name)
+        opm_dyn.system = system
+
+        if conformer_search:
+            snapshots = self.conformer_snapshots
+        else:
+            snapshots = 1
+
+        conformers_dict = opm_dyn.conformational_sampling(
+            ensemble='NVT',
+            nsteps=self.mm_steps * snapshots,
+            snapshots=snapshots,
+            temperature=self.mm_temperature,
+        )
+        if not self.save_intermediates:
+            Path(pdb_name).unlink()
+
+        result = []
+        for e_int, temp_mol in zip(conformers_dict['energies'],
+                                   conformers_dict['molecules']):
             pos = temp_mol.get_coordinates_in_angstrom()
+            v, e1, e2 = self._recalc_mm_energy(pos, l, reasim, prosim)
+            avg_x = np.mean(pos[:, 0])
+            avg_y = np.mean(pos[:, 1])
+            avg_z = np.mean(pos[:, 2])
+            pos -= [avg_x, avg_y, avg_z]
+            xyz = temp_mol.get_xyz_string()
+            temp_result = {
+                'v': v,
+                'e1': e1,
+                'e2': e2,
+                'e_int': e_int,
+                'pos': pos,
+                'xyz': xyz
+            }
+            result.append(temp_result)
 
-        v, e1, e2 = self._recalc_mm_energy(pos, l, reasim, prosim)
-        avg_x = np.mean(pos[:, 0])
-        avg_y = np.mean(pos[:, 1])
-        avg_z = np.mean(pos[:, 2])
-        pos -= [avg_x, avg_y, avg_z]
-
-        return v, e1, e2, e_int, pos, n_conf
+        return result
 
     def _recalc_mm_energy(self, pos, l, rea_sim, pro_sim):
         # unit conversion from angstrom to nm
@@ -571,61 +862,142 @@ class TransitionStateGuesser():
 
         return em, e1, e2
 
-    def scan_scf(self, results=None):
+    def scan_qm(self, results=None):
+        """
+        Computes QM energies along the scan and refines the transition state
+        guess.
+
+        For each lambda the lowest max_qm_conformers MM conformers are
+        re-evaluated at the QM level (qm_xcfun/qm_basis, restricted or
+        unrestricted SCF chosen from the multiplicity, unless an SCF driver is
+        provided via self.scf_drv). Non-converging SCF calculations are retried
+        with looser thresholds and yield NaN if they still fail. When implicit
+        solvation is active the QM driver mirrors it via SMD (smd_solvent).
+
+        Per lambda the conformers are re-sorted so the lowest QM energy comes
+        first; across all lambda the structure with the highest such QM energy
+        is selected as the refined transition state guess and stored on
+        self.molecule. Requires that an MM scan ('scan') is already present in
+        results.
+
+        :param results:
+            Results dictionary to operate on. Defaults to self.results.
+
+        :return:
+            self.results updated with per-conformer 'qm_energy' values plus
+            'max_qm_xyz', 'max_qm_lambda' and 'min_qm_conformer_index'.
+        """
         if results is None:
             results = self.results
         assert_msg_critical(
-            'structures' in results.keys(),
-            'Could not find "structures" in results. Total keys: {results.keys()}',
+            'scan' in results.keys(),
+            f'Could not find "scan" in results. Total keys: {results.keys()}',
         )
-        structures = results['structures']
-        self._print_scf_header()
-        scf_energies = []
-        ref = 0
-        for i, l in enumerate(self.lambda_vec):
-            scf_E = self._get_scf_energy(structures[i])
-            if i == 0:
-                ref = scf_E
-                dif = 0
-            else:
-                dif = scf_E - ref
-            scf_energies.append(scf_E)
-            self._print_scf_iter(l, scf_E, dif)
-        self.ostream.print_blank()
 
-        max_scf_index = np.argmax(scf_energies)
-        max_scf_structure = structures[max_scf_index]
-        max_scf_energy = scf_energies[max_scf_index]
-        max_scf_lambda = self.lambda_vec[max_scf_index]
-        results = {
-            'scf_energies': scf_energies,
-            'max_scf_structure': max_scf_structure,
-            'max_scf_lambda': max_scf_lambda
-        }
-        self.ostream.print_info(
-            f"Found highest SCF E: {max_scf_energy:.3f} at Lambda: {max_scf_lambda}."
-        )
-        self.ostream.flush()
-        self.results.update(results)
+        self._print_qm_header()
+        ref = None
+        max_qm_energy = None
+        min_qm_conf_index = 0
+        try:
+            for l in results['scan'].keys():
 
-        self.molecule = Molecule.read_xyz_string(max_scf_structure)
-        self.molecule.set_multiplicity(self.mol_multiplicity)
-        self.molecule.set_charge(self.mol_charge)
-        self._save_results(self.results_file, self.results)
+                min_qm_conf_E = None
+                # min_conf_index = 0
+                scan = sorted(results['scan'][l], key=lambda x: x['v'])
+                results['scan'][l] = scan
+                # Pick out lowest 5 conformers from scan
+
+                scan_range = min(self.max_qm_conformers, len(scan))
+                for i, conformer in enumerate(scan[:scan_range]):
+                    qm_E = self._get_qm_energy(conformer['xyz'])
+
+                    results['scan'][l][i]['qm_energy'] = qm_E
+                    if math.isnan(qm_E):
+                        continue
+                    if min_qm_conf_E is None or qm_E < min_qm_conf_E:
+                        min_qm_conf_E = qm_E
+                        # min_conf_index = i
+
+                    if ref is None:
+                        ref = qm_E
+                    dif = qm_E - ref
+                    mm_E = results['scan'][l][i]['v']
+
+                    self._print_qm_iter(l, qm_E, mm_E, dif, i)
+
+                if max_qm_energy is None or min_qm_conf_E > max_qm_energy:
+                    max_qm_energy = min_qm_conf_E
+                    max_qm_lambda = l
+                    # min_qm_conf_index = min_conf_index
+                    # max_qm_xyz = scan[min_conf_index]['xyz']
+                qm_scan = results['scan'][l][:scan_range]
+                rest = results['scan'][l][scan_range:]
+                sorted_qm_scan = sorted(qm_scan, key=lambda x: x['qm_energy'])
+                results['scan'][l] = sorted_qm_scan + rest
+
+            self.ostream.print_blank()
+            min_qm_conf_index, _ = min(
+                enumerate(results['scan'][max_qm_lambda]),
+                key=lambda x: x[1].get('qm_energy', math.inf))
+            max_qm_xyz = results['scan'][max_qm_lambda][min_qm_conf_index][
+                'xyz']
+            results.update({
+                'max_qm_xyz': max_qm_xyz,
+                'max_qm_lambda': max_qm_lambda,
+                'min_qm_conformer_index': min_qm_conf_index,
+            })
+            self.ostream.print_info(
+                f"Found highest QM E: {max_qm_energy:.3f} at Lambda: {max_qm_lambda} and conformer index: {min_qm_conf_index}."
+            )
+            self.ostream.flush()
+            self.results.update(results)
+
+            self.molecule = Molecule.read_xyz_string(max_qm_xyz)
+            self.molecule.set_multiplicity(self.mol_multiplicity)
+            self.molecule.set_charge(self.mol_charge)
+        except Exception:
+            err_str = "The QM scan crashed. Saving results in self.results and raising exception"
+            self.ostream.print_warning(err_str)
+            self.ostream.flush()
+            self.results.update(results)
+            raise
+
+        if self.save_results_file:
+            self.save_results(self.results_file, self.results)
+
         return self.results
 
-    def _get_scf_energy(self, structure):
-        self.molecule = Molecule.read_xyz_string(structure)
+    def _get_qm_energy(self, xyz):
+        self.molecule = Molecule.read_xyz_string(xyz)
         self.molecule.set_multiplicity(self.mol_multiplicity)
         self.molecule.set_charge(self.mol_charge)
         if self.scf_drv is None:
-            scf_drv = ScfRestrictedDriver()
-            scf_drv.xcfun = self.scf_xcfun
+            if self.mol_multiplicity != 1:
+                scf_drv = ScfUnrestrictedDriver()
+            else:
+                scf_drv = ScfRestrictedDriver()
+            scf_drv.xcfun = self.qm_xcfun
             self.scf_drv = scf_drv
+
+            # When MM implicit solvation is active, mirror it on the QM driver via SMD.
+            if self.implicit_solvent_model is not None:
+
+                self.scf_drv.solvation_model = 'smd'
+                self.scf_drv.smd_solvent = self.smd_solvent
+
+        if self.implicit_solvent_model is not None:
+            if hasattr(
+                    self.scf_drv,
+                    'solvation_model') and self.scf_drv.solvation_model is None:
+                self.ostream.print_warning(
+                    'Implicit solvation turned on, but explicitly provided SCF '
+                    'driver has no solvation model activated. Continuing without QM solvation. '
+                    'Provide an SCF driver with a solvation model activated to enable QM solvation.'
+                )
 
         if self.mute_scf:
             self.scf_drv.ostream.mute()
-        basis = MolecularBasis.read(self.molecule, self.scf_basis)
+        basis = MolecularBasis.read(self.molecule, self.qm_basis)
         scf_results = self.scf_drv.compute(self.molecule, basis)
 
         if not self.scf_drv.is_converged:
@@ -636,68 +1008,217 @@ class TransitionStateGuesser():
             self.scf_drv.conv_thresh = 1.0e-4
             self.scf_drv.max_iter = 200
             scf_results = self.scf_drv.compute(self.molecule, basis)
+
+            if not self.scf_drv.is_converged:
+                self.ostream.print_warning(
+                    "SCF still did not converge. Returning NaN for current calculation"
+                )
+                self.ostream.flush()
+                return math.nan
         return scf_results['scf_energy'] * hartree_in_kjpermol()
 
     def show_results(self, ts_results=None, filename=None, **mol_show_kwargs):
-        """Show the results of the transition state guesser.
-        This function uses ipywidgets to create an interactive plot of the MM and SCF energies as a function of lambda.
+        """
+        Shows the results of the transition state guesser. This function uses
+        ipywidgets to create an interactive plot of the MM and SCF energies as a
+        function of lambda.
 
-        Args:
-            ts_results (dict, optional): The results of the transition state guesser. If none (default), uses the current results.
-            atom_indices (bool, optional): If true, shows the atom-indices of the molecule. Defaults to False.
+        The widget lets the user step through lambda values and conformers and
+        view the corresponding 3D structure, defaulting to the selected
+        transition state guess.
 
-        Raises:
-            ImportError: If ipywidgets is not installed, an ImportError is raised.
+        :param ts_results:
+            The results of the transition state guesser. If None (default), uses
+            self.results unless filename is given.
+        :param filename:
+            Path to an HDF5 results file to load instead of using
+            ts_results/self.results.
+        :param mol_show_kwargs:
+            Additional keyword arguments forwarded to Molecule.show (e.g.
+            atom_indices=True to label atoms).
+
+        :raises ImportError:
+            If ipywidgets is not installed.
+        :raises ValueError:
+            If no results are available and no filename is provided.
         """
 
         try:
             import ipywidgets
+            from IPython.display import display as ipy_display
         except ImportError:
             raise ImportError('ipywidgets is required for this functionality.')
 
-        if ts_results is None:
-            if self.results is not None and self.results != {}:
-                self.ostream.print_info("Loading self.results")
-                ts_results = self.results
-            else:
-                try:
-                    if filename is not None:
-                        self.results_file = filename
-                    self.ostream.print_info(
-                        f"Loading results from {self.results_file}")
-                    ts_results = self.load_results(self.results_file)
-                except Exception as e:
-                    raise e
+        ostream = OutputStream(sys.stdout)
 
-        mm_energies = ts_results.get('mm_energies', None)
-        structures = ts_results.get('structures', None)
-        lambda_vec = ts_results.get('lambda_vec', None)
-        scf_energies = ts_results.get('scf_energies', None)
-        if scf_energies is not None:
-            final_lambda = ts_results.get('max_scf_lambda', None)
+        if ts_results is None:
+            if filename is not None:
+                ostream.print_info(f"Loading results from {filename}")
+                ts_results = TransitionStateGuesser.load_results(
+                    filename,
+                    ostream,
+                )
+            else:
+                if self.results is None or 'scan' not in self.results.keys():
+                    raise ValueError(
+                        "No results provided. Provide either ts_results or filename."
+                    )
+                ts_results = self.results
+
+        scan = ts_results['scan']
+
+        if TransitionStateGuesser._has_qm_results(scan,
+                                                  ts_results['lambda_vec']):
+            final_lambda = round(float(ts_results.get('max_qm_lambda', 0)), 3)
         else:
-            final_lambda = ts_results.get('max_mm_lambda', None)
-        ipywidgets.interact(
-            self._show_iteration,
-            mm_energies=ipywidgets.fixed(mm_energies),
-            scf_energies=ipywidgets.fixed(scf_energies),
-            structures=ipywidgets.fixed(structures),
-            lambda_vec=ipywidgets.fixed(lambda_vec),
-            step=ipywidgets.SelectionSlider(
-                options=lambda_vec,
-                description='Lambda',
-                value=final_lambda,
-            ),
-            **mol_show_kwargs,
+            final_lambda = round(float(ts_results['max_mm_lambda']), 3)
+
+        forming_bonds = set(ts_results.get('forming_bonds', set()))
+        breaking_bonds = set(ts_results.get('breaking_bonds', set()))
+        bonds = set(ts_results.get('static_bonds', set()))
+
+        def _best_conformer_index(step):
+            best_index = 0
+            min_energy = None
+            if TransitionStateGuesser._has_qm_results(scan,
+                                                      ts_results['lambda_vec']):
+                for i, conf in enumerate(scan[step]):
+                    qm_E = conf.get('qm_energy', None)
+                    if min_energy is None or (qm_E is not None
+                                              and qm_E < min_energy):
+                        min_energy = qm_E
+                        best_index = i
+            else:
+                for i, conf in enumerate(scan[step]):
+                    if min_energy is None or conf['v'] < min_energy:
+                        min_energy = conf['v']
+                        best_index = i
+            return best_index
+
+        initial_best = _best_conformer_index(final_lambda)
+
+        rounded_lambda_vec = [
+            round(float(l), 3) for l in ts_results['lambda_vec']
+        ]
+        step_selector = ipywidgets.SelectionSlider(
+            options=rounded_lambda_vec,
+            description='Lambda',
+            value=final_lambda,
+        )
+        conformer_selector = ipywidgets.Dropdown(
+            options=list(range(1,
+                               len(scan[final_lambda]) + 1)),
+            description='Conf. ID',
+            value=initial_best + 1,
         )
 
-    def _show_iteration(
-        self,
-        mm_energies,
-        structures,
-        lambda_vec,
+        def _render_interact(step, conformer_id):
+            # Clamp conformer_id in case it exceeds available conformers for
+            # the current lambda.
+            n_conf = len(scan[step])
+            TransitionStateGuesser._show_conformer_iteration(
+                step,
+                min(conformer_id, n_conf),
+                rounded_lambda_vec,
+                scan,
+                bonds=bonds,
+                forming_bonds=forming_bonds,
+                breaking_bonds=breaking_bonds,
+                **mol_show_kwargs,
+            )
+
+        # Hide the output until the delayed update has populated it.  Keeping
+        # the output in the layout avoids a visible resize flicker when it is
+        # revealed.
+        out_widget = ipywidgets.Output()
+        out_widget.layout.visibility = 'hidden'
+        window = ipywidgets.VBox([
+            step_selector,
+            conformer_selector,
+            out_widget,
+        ])
+
+        lambda_change_in_progress = [False]
+
+        def _render_current_selection():
+            with out_widget:
+                out_widget.clear_output(wait=True)
+                _render_interact(step_selector.value, conformer_selector.value)
+
+        def _on_lambda_change(change):
+            lambda_change_in_progress[0] = True
+            try:
+                step = change['new']
+                options = list(range(1, len(scan[step]) + 1))
+                best = _best_conformer_index(step)
+                conformer_selector.options = options
+                conformer_selector.value = best + 1
+            finally:
+                lambda_change_in_progress[0] = False
+            _render_current_selection()
+
+        def _on_conformer_change(change):
+            if not lambda_change_in_progress[0]:
+                _render_current_selection()
+
+        step_selector.observe(_on_lambda_change, names='value')
+        conformer_selector.observe(_on_conformer_change, names='value')
+
+        ipy_display(window)
+
+        def _finish_render():
+            out_widget.layout.visibility = 'visible'
+
+        def _do_render():
+            try:
+                # Render once the widget output has reached the frontend, so
+                # py3Dmol's script runs against an existing output area.
+                _render_current_selection()
+            except Exception:
+                pass
+            finally:
+                _schedule_callback(_finish_render, delay=0.5)
+
+        def _schedule_callback(callback, delay=0.0):
+            try:
+                loop = _ip.kernel.io_loop
+                loop.call_later(delay, callback)
+                return
+            except Exception:
+                pass
+
+            if delay > 0.0:
+                time.sleep(delay)
+            callback()
+
+        # Schedule _do_render from a post_execute hook so the delay begins when
+        # the cell finishes and the widget output area has been sent to the
+        # frontend.
+        try:
+            from IPython import get_ipython as _get_ipython
+            _ip = _get_ipython()
+        except ImportError:
+            _ip = None
+
+        if _ip is not None:
+
+            def _on_post_execute():
+                _ip.events.unregister('post_execute', _on_post_execute)
+                _schedule_callback(_do_render, delay=0.3)
+
+            _ip.events.register('post_execute', _on_post_execute)
+        else:
+            _schedule_callback(_do_render, delay=0.3)
+
+    @staticmethod
+    def _show_conformer_iteration(
         step,
-        scf_energies=None,
+        conformer_id,
+        lambda_vec,
+        scan,
+        bonds=None,
+        forming_bonds=None,
+        breaking_bonds=None,
         **mol_show_kwargs,
     ):
         """
@@ -709,14 +1230,91 @@ class TransitionStateGuesser():
         except ImportError:
             raise ImportError('matplotlib is required for this functionality.')
 
-        rel_mm_energies = mm_energies - np.min(mm_energies)
+        mm_energies, _, _, _ = TransitionStateGuesser._get_best_mm_E_from_scan_dict(
+            scan)
+        mm_min = np.min(mm_energies)
+        rel_mm_energies = np.asarray(mm_energies) - mm_min
 
-        lam_index = np.where(lambda_vec == np.array(step))[0][0]
-        structure_i = structures[lam_index]
+        lam_index = lambda_vec.index(step)
+        xyz_i = scan[step][conformer_id - 1]['xyz']
         total_steps = len(rel_mm_energies) - 1
         x = np.linspace(0, lambda_vec[-1], 100)
         y = np.interp(x, lambda_vec, rel_mm_energies)
         fig, ax1 = plt.subplots(figsize=(6.5, 4))
+
+        if TransitionStateGuesser._has_qm_results(scan, lambda_vec):
+            qm_energies, _ = TransitionStateGuesser._get_best_qm_E_from_scan_dict(
+                scan)
+            qm_min = np.min(qm_energies)
+            rel_qm_energies = np.asarray(qm_energies) - qm_min
+            print("  {:>9} {:>18} {:>19}  ".format("conformer",
+                                                   "MM energy [kJ/mol]",
+                                                   "QM energy [kJ/mol]"))
+
+            for i, conf in enumerate(scan[step]):
+                conf_str = f"{i+1}"
+                mm_e = f"{conf['v'] - mm_min:.3f}"
+                qm_e_raw = conf.get('qm_energy', None)
+                if qm_e_raw is None:
+                    qm_e = ""
+                else:
+                    qm_e = f"{conf['qm_energy'] - qm_min:.3f}"
+
+                if i + 1 == conformer_id and len(scan[step]) > 1:
+                    conf_str_formatted = f"{'-' * (9 - (1 + len(str(conf_str))))} {conf_str}"
+                    mm_e_formatted = f"{'-' * (18 - (1 + len(str(mm_e))))} {mm_e}"
+                    qm_e_formatted = f"{'-' * (19 - (1 + len(str(qm_e))))} {qm_e}"
+                    print_str = "{:>1} {:>9} {:>18} {:>19} {:>1}".format(
+                        ">",
+                        conf_str_formatted,
+                        mm_e_formatted,
+                        qm_e_formatted,
+                        "<",
+                    )
+                else:
+                    print_str = "  {:>9} {:>18} {:>19}  ".format(
+                        conf_str,
+                        mm_e,
+                        qm_e,
+                    )
+                print(print_str)
+
+        else:
+            print("  {:>9} {:>19}  ".format("conformer", "MM energy [kJ/mol]"))
+            rel_qm_energies = None
+            for i, conf in enumerate(scan[step]):
+                conf_str = f"{i+1}"
+                mm_e = f"{conf['v'] - mm_min:.3f}"
+                if i + 1 == conformer_id and len(scan[step]) > 1:
+                    conf_str_formatted = f"{'-' * (9 - (1 + len(str(conf_str))))} {conf_str}"
+                    mm_e_formatted = f"{'-' * (18 - (1 + len(str(mm_e))))} {mm_e}"
+                    print_str = "{:>1} {:>9} {:>19} {:>1}".format(
+                        ">",
+                        conf_str_formatted,
+                        mm_e_formatted,
+                        "<",
+                    )
+                else:
+                    print_str = "  {:>9} {:>19}  ".format(conf_str, mm_e)
+                print(print_str)
+
+        # Collect all conformer MM energies for the stripe markers.
+        conf_x_mm, conf_y_mm = [], []
+        for lv in lambda_vec:
+            for conf in scan[lv]:
+                conf_x_mm.append(lv)
+                conf_y_mm.append(conf['v'] - mm_min)
+
+        # Collect all conformer QM energies for the stripe markers.
+        conf_x_qm, conf_y_qm = [], []
+        if rel_qm_energies is not None:
+            for lv in lambda_vec:
+                for conf in scan[lv]:
+                    qm_e = conf.get('qm_energy', None)
+                    if qm_e is not None and not math.isnan(qm_e):
+                        conf_x_qm.append(lv)
+                        conf_y_qm.append(qm_e - qm_min)
+
         ax1.plot(
             x,
             y,
@@ -728,79 +1326,107 @@ class TransitionStateGuesser():
             label='MM energy',
         )
         ax1.scatter(
+            conf_x_mm,
+            conf_y_mm,
+            marker='_',
+            color='darkcyan',
+            alpha=0.4,
+            s=100,
+            linewidths=2.0,
+            zorder=0.5,
+        )
+        ax1.scatter(
             lambda_vec,
             rel_mm_energies,
             color='black',
             alpha=0.7,
-            s=120 / math.log(total_steps, 10),
+            s=120,
             facecolors="none",
             edgecolor="darkcyan",
             zorder=1,
         )
+        selected_mm_e = scan[step][conformer_id - 1]['v'] - mm_min
         ax1.scatter(
             lambda_vec[lam_index],
-            rel_mm_energies[lam_index],
+            selected_mm_e,
             marker='o',
             color='darkcyan',
             alpha=1.0,
-            s=120 / math.log(total_steps, 10),
+            s=120,
             zorder=2,
         )
         ax1.set_xlabel(r'$\lambda$')
         ax1.set_ylabel('Relative MM energy [kJ/mol]')
 
-        if scf_energies is not None:
-            ax2 = ax1.twinx()
-            rel_scf_energies = scf_energies - np.min(scf_energies)
-            ax2.plot(
+        if rel_qm_energies is not None:
+            ax1.plot(
                 x,
-                np.interp(x, lambda_vec, rel_scf_energies),
+                np.interp(x, lambda_vec, rel_qm_energies),
                 color='darkred',
                 alpha=0.9,
                 linewidth=2.5,
                 linestyle='--',
                 zorder=0,
-                label='SCF energy',
+                label='QM energy',
             )
-            ax2.scatter(
+            ax1.scatter(
+                conf_x_qm,
+                conf_y_qm,
+                marker='_',
+                color='darkorange',
+                alpha=0.4,
+                s=100,
+                linewidths=2.0,
+                zorder=0.5,
+            )
+            ax1.scatter(
                 lambda_vec,
-                rel_scf_energies,
+                rel_qm_energies,
                 alpha=0.7,
-                s=120 / math.log(total_steps, 10),
+                s=120,
                 facecolors="none",
                 edgecolor="darkorange",
                 zorder=1,
             )
-            ax2.scatter(
+            selected_qm_e_raw = scan[step][conformer_id - 1].get(
+                'qm_energy', None)
+            if selected_qm_e_raw is not None and not math.isnan(
+                    selected_qm_e_raw):
+                selected_qm_e = selected_qm_e_raw - qm_min
+            else:
+                selected_qm_e = rel_qm_energies[lam_index]
+            ax1.scatter(
                 lambda_vec[lam_index],
-                rel_scf_energies[lam_index],
+                selected_qm_e,
                 marker='o',
                 color='darkorange',
                 alpha=1.0,
-                s=120 / math.log(total_steps, 10),
+                s=120 / math.log(max(2, total_steps), 10),
                 zorder=2,
             )
-            ax2.set_ylabel('Relative SCF energy [kJ/mol]')
+            ax1.set_ylabel('Relative QM energy [kJ/mol]')
 
         fig.legend(loc='upper right',
                    bbox_to_anchor=(1, 1),
                    bbox_transform=ax1.transAxes)
         ax1.set_title("Transition state finder")
-        # Ensure x-axis displays as integers
         ax1.set_xticks(lambda_vec[::2])
         fig.tight_layout()
         plt.show()
+        mol = Molecule.read_xyz_string(xyz_i)
+        offset = 0.07
+        add = 0.1
+        breaking_width = offset + add * (1 - step)
+        forming_width = offset + add * (step)
 
-        mol = Molecule.read_xyz_string(structure_i)
-
-        if self.reactant.bonds is not None and self.product.bonds is not None:
-            reactant_bonds = set(self.reactant.bonds.keys())
-            product_bonds = set(self.product.bonds.keys())
-            changing_bonds = list(self.forming_bonds) + list(
-                self.breaking_bonds)
+        if bonds is not None and (forming_bonds is not None
+                                  or breaking_bonds is not None):
             mol.show(
-                bonds=reactant_bonds | product_bonds,
-                dashed_bonds=changing_bonds,
+                bonds=bonds,
+                forming_bonds=list(forming_bonds),
+                breaking_bonds=list(breaking_bonds),
+                forming_width=forming_width,
+                breaking_width=breaking_width,
                 width=640,
                 height=360,
                 **mol_show_kwargs,
@@ -816,6 +1442,51 @@ class TransitionStateGuesser():
         return new_mol.get_xyz_string()
 
     @staticmethod
+    def _get_best_mm_E_from_scan_dict(scan):
+        V = []
+        E1 = []
+        E2 = []
+        conf_indices = []
+        for conf_scan in scan.values():
+            lowest_v = None
+            index = 0
+            for i, conf in enumerate(conf_scan):
+                if lowest_v is None or conf['v'] < lowest_v:
+                    lowest_v = conf['v']
+                    lowest_e1 = conf['e1']
+                    lowest_e2 = conf['e2']
+                    index = i
+            V.append(lowest_v)
+            E1.append(lowest_e1)
+            E2.append(lowest_e2)
+            conf_indices.append(index)
+
+        return V, E1, E2, conf_indices
+
+    @staticmethod
+    def _get_best_qm_E_from_scan_dict(scan):
+        qm_energies = []
+        conf_indices = []
+        for conf_scan in scan.values():
+            lowest_qm_e = None
+            index = 0
+            for i, conf in enumerate(conf_scan):
+                qm_e = conf.get('qm_energy', None)
+                if qm_e is not None and not math.isnan(qm_e):
+                    if lowest_qm_e is None or qm_e < lowest_qm_e:
+                        lowest_qm_e = qm_e
+                        index = i
+            qm_energies.append(lowest_qm_e)
+            conf_indices.append(index)
+
+        return qm_energies, conf_indices
+
+    @staticmethod
+    def _has_qm_results(scan, lambda_vec):
+        """Return True if qm_energy values are present in the scan dict."""
+        return scan[lambda_vec[0]][0].get('qm_energy', None) is not None
+
+    @staticmethod
     def _set_molecule_positions(molecule, positions):
         positions_au = positions / bohr_in_angstrom()
         assert molecule.number_of_atoms() == len(positions_au)
@@ -823,196 +1494,414 @@ class TransitionStateGuesser():
             molecule.set_atom_coordinates(i, positions_au[i])
         return molecule
 
-    def _save_results(self, fname, results):
-        self.ostream.print_info(f"Saving results to {self.results_file}")
-        self.ostream.flush()
-        if os.path.exists(fname):
-            self.ostream.print_warning(
-                f"File {fname} already exists. Overwriting it.")
-            self.ostream.flush()
-            os.remove(fname)
-        hf = h5py.File(fname, 'w')
-        lambda_vec = results.get('lambda_vec', None)
-        mm_energies = results.get('mm_energies', None)
-        max_mm_structure = results.get('max_mm_structure', None)
-        max_mm_lambda = results.get('max_mm_lambda', None)
-        scf_energies = results.get('scf_energies', None)
-        max_scf_structure = results.get('max_scf_structure', None)
-        max_scf_lambda = results.get('max_scf_lambda', None)
+    def save_results(self, fname, results):
+        """
+        Writes a results dictionary to an HDF5 file.
 
-        structures = results.get('structures', None)
+        Stores the forming/breaking/static bonds, the lambda vector, the
+        reactant and product force fields (and geometries), the selected MM (and
+        QM, if present) transition state guess, and the full per-lambda
+        conformer scan. The file can be reloaded with load_results.
 
-        reactant = self.reactant.get_forcefield_as_json(self.reactant)
-        product = self.product.get_forcefield_as_json(self.product)
-        rea_xyz = self.reactant.molecule.get_xyz_string()
-        pro_xyz = self.product.molecule.get_xyz_string()
+        :param fname:
+            Path of the HDF5 file to write.
+        :param results:
+            Results dictionary, as produced by scan_mm.
 
-        forming_bonds = results.get('forming_bonds', None)
-        breaking_bonds = results.get('breaking_bonds', None)
-
-        hf.create_dataset('reactant_ff', data=reactant)
-        hf.create_dataset('product_ff', data=product)
-        hf.create_dataset('reactant_xyz', data=rea_xyz)
-        hf.create_dataset('product_xyz', data=pro_xyz)
-
-        hf.create_dataset('mm_energies', data=mm_energies, dtype='f')
-        hf.create_dataset('lambda_vec', data=lambda_vec, dtype='f')
-        hf.create_dataset('max_mm_structure', data=[max_mm_structure])
-        hf.create_dataset('max_mm_lambda', data=max_mm_lambda, dtype='f')
-
-        hf.create_dataset('forming_bonds',
-                          data=np.array(np.array(list(forming_bonds)),
-                                        dtype='i'))
-        hf.create_dataset('breaking_bonds',
-                          data=np.array(np.array(list(breaking_bonds)),
-                                        dtype='i'))
-
-        dt = h5py.string_dtype(encoding='utf-8')
-        hf.create_dataset('structures', data=np.array(structures, dtype=dt))
-
-        if scf_energies is not None:
-            hf.create_dataset('scf_energies', data=scf_energies, dtype='f')
-            hf.create_dataset('max_scf_structure', data=[max_scf_structure])
-            hf.create_dataset('max_scf_lambda', data=max_scf_lambda, dtype='f')
-
-    def load_results(self, fname):
-        self.ostream.print_info(f"Loading results from {fname}")
+        :raises ValueError:
+            If the MM scan is incomplete, i.e. results is missing 'max_mm_xyz',
+            'max_mm_lambda' or 'min_mm_conformer_index'.
+        """
+        required_keys = {
+            'max_mm_xyz', 'max_mm_lambda', 'min_mm_conformer_index'
+        }
+        missing = required_keys - results.keys()
+        if missing:
+            raise ValueError("Cannot save results: the MM scan is incomplete. "
+                             f"Missing keys: {sorted(missing)}. "
+                             "Call scan_mm() before saving.")
+        self.ostream.print_info(f"Saving results to {fname}")
         self.ostream.flush()
 
-        hf = h5py.File(fname, 'r')
+        def _bonds_to_array(bonds):
+            # Always store as shape (N, 2) — even for empty sets — so that
+            # load_results can iterate rows uniformly regardless of set size.
+            if len(bonds) == 0:
+                return np.empty((0, 2), dtype='i')
+            return np.array(list(bonds), dtype='i')
+
+        with h5py.File(fname, 'w') as hf:
+            # breaking forming static bonds
+            hf.create_dataset('breaking_bonds',
+                              data=_bonds_to_array(results['breaking_bonds']))
+            hf.create_dataset('forming_bonds',
+                              data=_bonds_to_array(results['forming_bonds']))
+            hf.create_dataset('static_bonds',
+                              data=_bonds_to_array(results['static_bonds']))
+
+            # lambda vec
+            lambda_vec = results.get('lambda_vec', None)
+            hf.create_dataset('lambda_vec', data=lambda_vec, dtype='f')
+
+            # reactant and product
+            rea_ff = results['reactant'].get_forcefield_as_json(
+                results['reactant'])
+            pro_ff = results['product'].get_forcefield_as_json(
+                results['product'])
+            rea_xyz = results['reactant'].molecule.get_xyz_string()
+            pro_xyz = results['product'].molecule.get_xyz_string()
+            hf.create_dataset('reactant_ff', data=rea_ff)
+            hf.create_dataset('product_ff', data=pro_ff)
+            hf.create_dataset('reactant_xyz', data=rea_xyz)
+            hf.create_dataset('product_xyz', data=pro_xyz)
+
+            # max_mm_xyz max_mm_lambda min_mm_conformer_index
+            max_mm_xyz = results['max_mm_xyz']
+            max_mm_lambda = results['max_mm_lambda']
+            min_mm_conformer_index = results['min_mm_conformer_index']
+            hf.create_dataset('max_mm_xyz', data=[max_mm_xyz])
+            hf.create_dataset('max_mm_lambda', data=max_mm_lambda, dtype='f')
+            hf.create_dataset('min_mm_conformer_index',
+                              data=min_mm_conformer_index,
+                              dtype='i')
+
+            max_qm_xyz = results.get('max_qm_xyz', None)
+            max_qm_lambda = results.get('max_qm_lambda', None)
+            min_qm_conformer_index = results.get('min_qm_conformer_index', None)
+            if max_qm_xyz is not None:
+                hf.create_dataset('max_qm_xyz', data=[max_qm_xyz])
+                hf.create_dataset('max_qm_lambda',
+                                  data=max_qm_lambda,
+                                  dtype='f')
+                hf.create_dataset('min_qm_conformer_index',
+                                  data=min_qm_conformer_index,
+                                  dtype='i')
+
+            scan_grp = hf.create_group('scan')
+            for l, conf_scan in results['scan'].items():
+                l_grp = scan_grp.create_group(f'{round(l,3)}')
+                for i, conf in enumerate(conf_scan):
+                    conf_grp = l_grp.create_group(str(i))
+                    # v e1 e2 e_int xyz qm
+                    conf_grp.create_dataset('v', data=conf['v'], dtype='f')
+                    conf_grp.create_dataset('e1', data=conf['e1'], dtype='f')
+                    conf_grp.create_dataset('e2', data=conf['e2'], dtype='f')
+                    conf_grp.create_dataset('e_int',
+                                            data=conf['e_int'],
+                                            dtype='f')
+                    conf_grp.create_dataset('xyz', data=[conf['xyz']])
+                    qm_e = conf.get('qm_energy', None)
+                    if qm_e is not None:
+                        conf_grp.create_dataset('qm_energy',
+                                                data=qm_e,
+                                                dtype='f')
+
+    @staticmethod
+    def load_results(fname, ostream=None):
+        """
+        Loads a results dictionary previously written by save_results.
+
+        Reconstructs the bonds, lambda vector, reactant and product force field
+        generators (with their geometries), the MM (and QM, if present)
+        transition state guess, and the per-lambda conformer scan from an HDF5
+        file.
+
+        :param fname:
+            Path of the HDF5 file to read.
+        :param ostream:
+            Output stream for logging. Defaults to stdout.
+
+        :return:
+            The reconstructed results dictionary, in the same format as produced
+            by scan_mm/scan_qm.
+        """
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
+        ostream.print_info(f"Loading results from {fname}")
+        ostream.flush()
+
         results = {}
-        results['mm_energies'] = hf['mm_energies'][:]
-        results['lambda_vec'] = hf['lambda_vec'][:]
-        results['max_mm_structure'] = hf['max_mm_structure'][0].decode('utf-8')
-        results['max_mm_lambda'] = hf['max_mm_lambda'][()]
-        results['structures'] = [s.decode('utf-8') for s in hf['structures'][:]]
+        with h5py.File(fname, 'r') as hf:
+            # Bonds
+            results['breaking_bonds'] = {
+                tuple(map(int, b))
+                for b in hf['breaking_bonds'][()]
+            }
+            results['forming_bonds'] = {
+                tuple(map(int, b))
+                for b in hf['forming_bonds'][()]
+            }
+            results['static_bonds'] = {
+                tuple(map(int, b))
+                for b in hf['static_bonds'][()]
+            }
 
-        reactant_ff = hf['reactant_ff'][()]
-        product_ff = hf['product_ff'][()]
-        reactant_xyz = hf['reactant_xyz'][()].decode('utf-8')
-        product_xyz = hf['product_xyz'][()].decode('utf-8')
+            # Lambda vector
+            results['lambda_vec'] = [
+                round(float(l), 3) for l in hf['lambda_vec'][()]
+            ]
 
-        forming_bonds = hf['forming_bonds'][()]
-        breaking_bonds = hf['breaking_bonds'][()]
+            # Reactant and product forcefields and xyz
+            reactant_ff = MMForceFieldGenerator.load_forcefield_from_json_string(
+                hf['reactant_ff'][()])
+            product_ff = MMForceFieldGenerator.load_forcefield_from_json_string(
+                hf['product_ff'][()])
+            reactant_xyz = hf['reactant_xyz'][()].decode('utf-8')
+            product_xyz = hf['product_xyz'][()].decode('utf-8')
+            reactant_mol = Molecule.read_xyz_string(reactant_xyz)
+            product_mol = Molecule.read_xyz_string(product_xyz)
+            reactant_ff.molecule = reactant_mol
+            product_ff.molecule = product_mol
+            results['reactant'] = reactant_ff
+            results['product'] = product_ff
 
-        self.reactant = MMForceFieldGenerator.load_forcefield_from_json_string(
-            reactant_ff)
-        self.reactant.molecule = Molecule.read_xyz_string(reactant_xyz)
-        self.product = MMForceFieldGenerator.load_forcefield_from_json_string(
-            product_ff)
-        self.product.molecule = Molecule.read_xyz_string(product_xyz)
+            # Max/min xyzs and lambdas
+            results['max_mm_xyz'] = hf['max_mm_xyz'][()][0].decode('utf-8')
+            results['max_mm_lambda'] = hf['max_mm_lambda'][()]
+            results['min_mm_conformer_index'] = hf['min_mm_conformer_index'][()]
 
-        self.forming_bonds = set([tuple(bond) for bond in forming_bonds])
-        self.breaking_bonds = set([tuple(bond) for bond in breaking_bonds])
+            # Optional QM results
+            if 'max_qm_xyz' in hf:
+                results['max_qm_xyz'] = hf['max_qm_xyz'][()][0].decode('utf-8')
+                results['max_qm_lambda'] = hf['max_qm_lambda'][()]
+                results['min_qm_conformer_index'] = hf[
+                    'min_qm_conformer_index'][()]
 
-        if 'scf_energies' in hf:
-            results['scf_energies'] = hf['scf_energies'][:]
-            results['max_scf_structure'] = hf['max_scf_structure'][0].decode(
-                'utf-8')
-            results['max_scf_lambda'] = hf['max_scf_lambda'][()]
+            # Scan results
+            results['scan'] = {}
+            scan_grp = hf['scan']
+            for l in scan_grp:
+                l_grp = scan_grp[l]
+                conf_scan = []
+                for i in sorted(l_grp, key=lambda x: int(x)):
+                    conf_grp = l_grp[i]
+                    conf = {
+                        'v': conf_grp['v'][()],
+                        'e1': conf_grp['e1'][()],
+                        'e2': conf_grp['e2'][()],
+                        'e_int': conf_grp['e_int'][()],
+                        'xyz': conf_grp['xyz'][()][0].decode('utf-8')
+                    }
+                    if 'qm_energy' in conf_grp:
+                        conf['qm_energy'] = conf_grp['qm_energy'][()]
+                    conf_scan.append(conf)
+                results['scan'][round(float(l), 3)] = conf_scan
+
         return results
 
-    def _print_mm_header(self, conformer_search=False, lambda_vals=None):
+    @staticmethod
+    def _param(label, value, lw=24, vw=20):
+        """Format one parameter line with fixed label and value widths.
+
+        Because print_header centers text, all lines must be the same total
+        length to appear left-aligned relative to each other.
+        Total width = lw + len(' : ') + vw = 47 chars (default).
+        """
+        return f"{label:<{lw}} : {str(value):>{vw}}"
+
+    def _print_mm_header(self, conformer_search=False):
         self.ostream.print_blank()
-        if conformer_search is False:
-            if lambda_vals is None:
-                self.ostream.print_header("Starting MM scan")
-            else:
-                self.ostream.print_header(
-                    f"Starting MM scan for lambda values {lambda_vals}")
-            self.ostream.print_blank()
-            self.ostream.print_header("MM parameters:")
+        if conformer_search:
             self.ostream.print_header(
-                f"MD steps:              {self.mm_steps:>10}")
-            self.ostream.print_header(
-                f"MD temperature:        {self.mm_temperature:>8} K")
-            self.ostream.print_header(
-                f"MD step size:          {self.mm_step_size:>7} ps")
-            self.ostream.print_header(f"folder name: {self.folder_name:>20}")
-            self.ostream.print_header(
-                f"saving MD traj:        {str(self.save_mm_traj):>10}")
-            self.ostream.print_blank()
-            # self.ostream.print_header(
-            #     f"conf. search:   {str(conformer_search):>10}")
-            valstr = '{} | {} | {} | {}'.format(
-                'Lambda',
-                '    E1',
-                '    E2',
-                '     V',
-            )
+                "Starting MM Scan  (with conformer search)")
         else:
-            if lambda_vals is None:
-                self.ostream.print_header(
-                    "Starting MM scan with conformer search")
-            else:
-                self.ostream.print_header(
-                    f"Starting MM scan with conformer search for lambda values {lambda_vals}"
-                )
+            self.ostream.print_header("Starting MM Scan")
+        self.ostream.print_blank()
+
+        conf_snapshots = self.conformer_snapshots if conformer_search else 1
+        self.ostream.print_header(self._param("MD steps", self.mm_steps))
+        self.ostream.print_header(self._param("conf. snapshots",
+                                              conf_snapshots))
+        self.ostream.print_header(
+            self._param("MD temperature", f"{self.mm_temperature} K"))
+        self.ostream.print_header(
+            self._param("MD step size", f"{self.mm_step_size} ps"))
+        self.ostream.print_header(self._param("folder name", self.folder_name))
+        self.ostream.print_header(
+            self._param("saving MD traj", self.save_mm_traj))
+        if self.implicit_solvent_model is not None:
             self.ostream.print_header(
-                f"conf. steps:           {self.conformer_steps:>10}")
+                self._param("implicit solvent", self.implicit_solvent_model))
             self.ostream.print_header(
-                f"conf. snapshots:       {self.conformer_snapshots:>10}")
+                self._param("solvent dielectric",
+                            f"{self.solvent_dielectric:.2f}"))
             self.ostream.print_header(
-                f"MD temperature:        {self.mm_temperature:>8} K")
-            self.ostream.print_header(
-                f"MD step size:          {self.mm_step_size:>7} ps")
-            self.ostream.print_header(f"folder name: {self.folder_name:>20}")
-            self.ostream.print_header(
-                f"saving MD traj:        {str(self.save_mm_traj):>10}")
+                self._param("solute dielectric",
+                            f"{self.solute_dielectric:.2f}"))
+
+        if self._conformer_active_torsion is not None:
+            one_based = tuple(a + 1 for a in self._conformer_active_torsion)
             self.ostream.print_blank()
-            valstr = '{} | {} | {} | {} | {}'.format(
-                'Lambda',
-                '    E1',
-                '    E2',
-                '     V',
-                'n_conf',
-            )
+            self.ostream.print_header(self._param("conformational TS", "yes"))
+            self.ostream.print_header(
+                self._param("active torsion (1-idx)", str(one_based)))
+            self.ostream.print_header(
+                self._param("phi reactant",
+                            f"{self._conformer_phi_reactant:.1f} deg"))
+            self.ostream.print_header(
+                self._param("phi product",
+                            f"{self._conformer_phi_product:.1f} deg"))
+            self.ostream.print_header(
+                self._param("restraint k", f"{self.conformer_k:.1f} kJ/mol"))
+
+        self.ostream.print_blank()
+        valstr = '{} | {} | {} | {} | {}'.format(
+            'Lambda',
+            'E1 (kj/mol)',
+            'E2 (kj/mol)',
+            'V (kj/mol)',
+            'n_conf',
+        )
         self.ostream.print_header(valstr)
-        self.ostream.print_header(45 * '-')
+        self.ostream.print_header(60 * '-')
         self.ostream.flush()
 
-    def _print_mm_iter(self, l, e1, e2, v, e_int, n_conf=None):
-        if n_conf is None:
-            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}".format(l, e1, e2, v)
-        else:
-            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:7}".format(
-                l, e1, e2, v, n_conf)
+    def _print_mm_iter(self, l, e1, e2, v, n_conf=None):
+
+        valstr = "{:6.2f}   {:10.2f}   {:10.2f}   {:9.2f}   {:6}".format(
+            l, e1, e2, v, n_conf)
         self.ostream.print_header(valstr)
         self.ostream.flush()
 
-    def _print_scf_header(self):
+    def _print_qm_header(self):
         if self.mute_scf:
             self.ostream.print_info("Disable mute_scf to see detailed output.")
         self.ostream.print_blank()
-        self.ostream.print_header(f"Starting SCF scan")
+        self.ostream.print_header("Starting QM Scan")
         self.ostream.print_blank()
-        self.ostream.print_header("SCF parameters:")
-        self.ostream.print_header(f"basis:       {self.scf_basis:>10}")
-        self.ostream.print_header(f"DFT xc fun:  {self.scf_xcfun:>10}")
+
+        self.ostream.print_header(self._param("basis set", self.qm_basis))
+        self.ostream.print_header(
+            self._param("DFT xc functional", self.qm_xcfun))
+        self.ostream.print_header(
+            self._param("max conformers", self.max_qm_conformers))
+        if self.implicit_solvent_model is not None:
+            self.ostream.print_header(self._param("solvation", "SMD"))
+            self.ostream.print_header(
+                self._param("SMD solvent", self.smd_solvent))
+
         self.ostream.print_blank()
         self.ostream.flush()
-        valsltr = '{} | {} | {}'.format(
+        valsltr = '{} | {} | {} | {}'.format(
             'Lambda',
-            'SCF Energy',
-            'Difference',
+            'Conf. i',
+            'Rel. E (kJ/mol)',
+            'MM V (kJ/mol)',
         )
         self.ostream.print_header(valsltr)
-        self.ostream.print_header(40 * '-')
+        self.ostream.print_header(60 * '-')
         self.ostream.flush()
 
-    def _print_scf_iter(self, l, scf_E, dif):
-        valstr = "{:8.2f}  {:15.5f}  {:8.3f}".format(l, scf_E, dif)
+    def _print_qm_iter(self, l, qm_E, mm_E, dif, conf_index):
+
+        valstr = "{:6.2f}   {:7d}   {:15.3f}   {:14.3f}".format(
+            l, conf_index + 1, dif, mm_E)
         self.ostream.print_header(valstr)
         self.ostream.flush()
 
-    #todo add option for reading geometry (bond distances, angles, etc.) from transition state instead of averaging them
-    #todo add option for recalculating charges from ts_mol
+    def _detect_active_dihedral(self):
+        """
+        Identifies the dihedral that differs most between reactant and product.
+
+        Called when no bonds are forming or breaking (conformational TS).
+        Iterates over every dihedral in the reactant force field, one
+        representative per unique central bond, and picks the one with the
+        largest absolute angle difference between the two geometries.
+
+        :return:
+            A tuple (active_torsion, phi_reactant, phi_product) where
+            active_torsion is a 0-indexed (i, j, k, l) tuple and the angles are
+            in degrees.
+
+        :raises ValueError:
+            If no dihedral with |Δφ| > 20° is found.
+        """
+        threshold = 20.0  # degrees
+
+        max_delta = 0.0
+        active_torsion = None
+        best_phi_rea = None
+        best_phi_pro = None
+
+        # Deduplicate by central bond so each bond is measured exactly once.
+        seen_central = set()
+        for key in self.reactant.dihedrals:
+            central = tuple(sorted([key[1], key[2]]))
+            if central in seen_central:
+                continue
+            seen_central.add(central)
+
+            # get_dihedral_in_degrees expects 1-based indices
+            one_based = [idx + 1 for idx in key]
+            phi_rea = self.reactant.molecule.get_dihedral_in_degrees(one_based)
+            phi_pro = self.product.molecule.get_dihedral_in_degrees(one_based)
+
+            # Shortest-path difference, wrapped to (-180, 180]
+            delta = phi_pro - phi_rea
+            if delta > 180.0:
+                delta -= 360.0
+            elif delta <= -180.0:
+                delta += 360.0
+
+            if abs(delta) > max_delta:
+                max_delta = abs(delta)
+                active_torsion = key
+                best_phi_rea = phi_rea
+                best_phi_pro = phi_pro
+
+        if active_torsion is None or max_delta < threshold:
+            raise ValueError(
+                f"No dihedral with |Δφ| > {threshold:.0f}° found "
+                f"between reactant and product geometries "
+                f"(largest difference: {max_delta:.1f}°). "
+                "Verify that the two input geometries differ by a dihedral rotation."
+            )
+
+        assert best_phi_rea is not None
+        assert best_phi_pro is not None
+        self.ostream.print_info(f"Active torsion (1-indexed): "
+                                f"{tuple(a + 1 for a in active_torsion)}, "
+                                f"phi_reactant = {best_phi_rea:.1f}°, "
+                                f"phi_product = {best_phi_pro:.1f}°, "
+                                f"|Δφ| = {max_delta:.1f}°.")
+        self.ostream.flush()
+        return active_torsion, best_phi_rea, best_phi_pro
+
+    # todo add option for reading geometry (bond distances, angles, etc.) from transition state instead of averaging them
+    # todo add option for recalculating charges from ts_mol
     def get_ts_ffgen(self,
                      reaffgen=None,
                      proffgen=None,
                      l=0.5,
                      ts_mol=None,
                      recalculate=True):
+        """
+        Builds an interpolated force field at a given lambda.
+
+        Constructs a new MMForceFieldGenerator whose parameters are the
+        lambda-interpolation of the reactant and product force fields (the
+        force-field analogue of V = (1-lambda)*E_reactant + lambda*E_product):
+        bonds and angles are averaged with _average_params, dihedrals and
+        impropers are mixed with _mix_dihedrals, and atoms (charges, LJ
+        parameters, types) are merged with _merge_atoms. This is useful for
+        obtaining a single force field describing the transition state guess.
+
+        :param reaffgen:
+            Reactant force field. Defaults to self.reactant.
+        :param proffgen:
+            Product force field. Defaults to self.product.
+        :param l:
+            Interpolation parameter in [0, 1]. Defaults to 0.5.
+        :param ts_mol:
+            Molecule for the transition state geometry. Defaults to
+            self.molecule.
+        :param recalculate:
+            Whether to recalculate parameters from the molecule; requires ts_mol
+            to be set. Defaults to True.
+
+        :return:
+            The interpolated transition state force field.
+        """
         if reaffgen is None:
             reaffgen = self.reactant
         if proffgen is None:
@@ -1064,7 +1953,7 @@ class TransitionStateGuesser():
             if id in reaparams.keys() and id in proparams.keys():
                 reaparam = reaparams[id]
                 proparam = proparams[id]
-                #todo change this to measurement from molecule
+                # todo change this to measurement from molecule
                 eq = (1 -
                       l) * reaparam['equilibrium'] + l * proparam['equilibrium']
                 fc = (1 - l) * reaparam['force_constant'] + l * proparam[
@@ -1084,7 +1973,7 @@ class TransitionStateGuesser():
             else:
                 continue
             ts_params.update({id: copy.copy(param)})
-        if ts_params is {}:
+        if not ts_params:
             return None
         return ts_params
 
@@ -1093,7 +1982,7 @@ class TransitionStateGuesser():
         ts_params = {}
         for dict, scaling in zip([rea_dihedrals, pro_dihedrals], [1 - l, l]):
             for id, param in dict.items():
-                #todo reassign value of phase?
+                # todo reassign value of phase?
                 new_param = copy.copy(param)
                 if new_param.get('multiple'):
                     new_param['barrier'] = [

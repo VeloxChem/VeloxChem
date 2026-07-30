@@ -122,6 +122,10 @@ class CAtomCorePotential
     /// @brief Gets number of core electrons in atom core potential.
     /// @return The number of core electrons.
     auto number_of_core_electrons() const -> int;
+    
+    /// @brief Checks atom core potential is empty.
+    /// @return True if atom core potential is empty, False otherwise..
+    auto is_empty() const -> bool;
 
    private:
     

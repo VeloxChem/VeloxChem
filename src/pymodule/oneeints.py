@@ -33,9 +33,13 @@
 import numpy as np
 
 from .veloxchemlib import OverlapDriver
+from .veloxchemlib import OverlapGeom100Driver
 from .veloxchemlib import KineticEnergyDriver
+from .veloxchemlib import KineticEnergyGeom100Driver
 from .veloxchemlib import NuclearPotentialDriver
 from .veloxchemlib import NuclearPotentialGeom100Driver
+from .veloxchemlib import NuclearPotentialGeom010Driver
+from .veloxchemlib import EcpGradientDriver
 from .veloxchemlib import ElectricDipoleMomentDriver
 from .veloxchemlib import NuclearPotentialGeom200Driver
 from .veloxchemlib import NuclearPotentialGeom101Driver
@@ -114,6 +118,233 @@ def compute_nuclear_potential_integrals(molecule,
 
     # Note: factor -1.0 for electron charge
     return -1.0 * npot_mat.to_numpy()
+
+
+def compute_nuclear_potential_gradient(molecule,
+                                       basis,
+                                       D_total,
+                                       atom_list=None):
+    """
+    Computes nuclear potential gradient.
+
+    :param molecule:
+        The molecule.
+    :param basis:
+        The molecular basis set.
+    :param D_total:
+        The sum of spin-alpha and spin-beta density matrix.
+    :param atom_list:
+        The list of atoms to be computed.
+
+    :return:
+        The nuclear potential gradient.
+    """
+
+    natoms = molecule.number_of_atoms()
+
+    gradient = np.zeros((natoms, 3))
+
+    if atom_list is None:
+        atom_list = list(range(natoms))
+
+    npot_grad_100_drv = NuclearPotentialGeom100Driver()
+    npot_grad_010_drv = NuclearPotentialGeom010Driver()
+
+    mol_charges = molecule.get_effective_nuclear_charges(basis)
+    mol_coords = molecule.get_coordinates_in_bohr()
+
+    for iatom in atom_list:
+        gmats_100 = npot_grad_100_drv.compute(molecule, basis, iatom,
+                                              mol_coords, mol_charges)
+        gmats_010 = npot_grad_010_drv.compute(molecule, basis, iatom,
+                                              mol_charges[iatom])
+
+        for icart, label in enumerate(['X', 'Y', 'Z']):
+            gmat_100 = gmats_100.matrix_to_numpy(label)
+            gmat_010 = gmats_010.matrix_to_numpy(label)
+
+            gradient[iatom, icart] += np.sum(
+                (gmat_100 + gmat_100.T + gmat_010) * D_total)
+
+    # Note: factor -1.0 for electron charge
+    return -1.0 * gradient
+
+
+def compute_point_charge_gradient(molecule,
+                                  basis,
+                                  D_total,
+                                  charges,
+                                  coordinates,
+                                  atom_list=None):
+    """
+    Computes point charge contribution to molecular gradient.
+
+    :param molecule:
+        The molecule.
+    :param basis:
+        The molecular basis set.
+    :param D_total:
+        The sum of spin-alpha and spin-beta density matrix.
+    :param charges:
+        The point charges.
+    :param coordinates:
+        The coordinates of point charges.
+    :param atom_list:
+        The list of atoms to be computed.
+
+    :return:
+        The point charge contribution to molecular gradient.
+    """
+
+    natoms = molecule.number_of_atoms()
+
+    gradient = np.zeros((natoms, 3))
+
+    if atom_list is None:
+        atom_list = list(range(natoms))
+
+    npot_grad_100_drv = NuclearPotentialGeom100Driver()
+
+    for iatom in atom_list:
+        gmats_100 = npot_grad_100_drv.compute(molecule, basis, iatom,
+                                              coordinates, charges)
+
+        for icart, label in enumerate(['X', 'Y', 'Z']):
+            gmat_100 = gmats_100.matrix_to_numpy(label)
+            gradient[iatom, icart] += np.sum((gmat_100 + gmat_100.T) *
+                                             D_total)
+
+        gmats_100 = Matrices()
+
+    # Note: factor -1.0 for electron charge
+    return -1.0 * gradient
+
+
+def compute_ecp_gradient(molecule, basis, D_total, atom_list=None):
+    """
+    Computes ECP gradient.
+
+    :param molecule:
+        The molecule.
+    :param basis:
+        The molecular basis set.
+    :param D_total:
+        The sum of spin-alpha and spin-beta density matrix.
+    :param atom_list:
+        The list of atoms to be computed.
+
+    :return:
+        The nuclear potential gradient.
+    """
+
+    natoms = molecule.number_of_atoms()
+
+    gradient = np.zeros((natoms, 3))
+
+    if atom_list is None:
+        atom_list = list(range(natoms))
+
+    ecp_grad_drv = EcpGradientDriver()
+
+    core_electrons = basis.get_number_of_ecp_core_electrons()
+    ecp_atom_indices = [
+        idx for idx, nelec in enumerate(core_electrons) if nelec > 0
+    ]
+
+    for iatom in atom_list:
+        gmats_100 = ecp_grad_drv.compute_bra_grad(molecule, basis,
+                                                  ecp_atom_indices, iatom)
+        if iatom in ecp_atom_indices:
+            gmats_010 = ecp_grad_drv.compute_pot_grad(molecule, basis, iatom)
+
+        for i, label in enumerate(['X', 'Y', 'Z']):
+            gmat_100 = gmats_100.matrix_to_numpy(label)
+            if iatom in ecp_atom_indices:
+                gmat_010 = gmats_010.matrix_to_numpy(label)
+
+            # Note different signs for 100 and 010 contributions
+            gradient[iatom, i] += np.sum((gmat_100 + gmat_100.T) * D_total)
+            if iatom in ecp_atom_indices:
+                gradient[iatom, i] -= np.sum(gmat_010 * D_total)
+
+    return gradient
+
+
+def compute_overlap_gradient(molecule, basis, W_total, atom_list=None):
+    """
+    Computes overlap contribution to molecular gradient.
+
+    :param molecule:
+        The molecule.
+    :param basis:
+        The molecular basis set.
+    :param W_total:
+        The total energy-weighted density matrix.
+    :param atom_list:
+        The list of atoms to be computed.
+
+    :return:
+        The overlap contribution to molecular gradient.
+    """
+
+    natoms = molecule.number_of_atoms()
+
+    gradient = np.zeros((natoms, 3))
+
+    if atom_list is None:
+        atom_list = list(range(natoms))
+
+    ovl_grad_drv = OverlapGeom100Driver()
+
+    for iatom in atom_list:
+        gmats = ovl_grad_drv.compute(molecule, basis, iatom)
+
+        for icart, label in enumerate(['X', 'Y', 'Z']):
+            gmat = gmats.matrix_to_numpy(label)
+            gradient[iatom, icart] += np.sum((gmat + gmat.T) * W_total)
+
+        gmats = Matrices()
+
+    # Note: minus sign for energy-weighted density contribution
+    return -1.0 * gradient
+
+
+def compute_kinetic_energy_gradient(molecule, basis, D_total, atom_list=None):
+    """
+    Computes kinetic energy contribution to molecular gradient.
+
+    :param molecule:
+        The molecule.
+    :param basis:
+        The molecular basis set.
+    :param D_total:
+        The sum of spin-alpha and spin-beta density matrix.
+    :param atom_list:
+        The list of atoms to be computed.
+
+    :return:
+        The kinetic energy contribution to molecular gradient.
+    """
+
+    natoms = molecule.number_of_atoms()
+
+    gradient = np.zeros((natoms, 3))
+
+    if atom_list is None:
+        atom_list = list(range(natoms))
+
+    kin_grad_drv = KineticEnergyGeom100Driver()
+
+    for iatom in atom_list:
+        gmats = kin_grad_drv.compute(molecule, basis, iatom)
+
+        for icart, label in enumerate(['X', 'Y', 'Z']):
+            gmat = gmats.matrix_to_numpy(label)
+            gradient[iatom, icart] += np.sum((gmat + gmat.T) * D_total)
+
+        gmats = Matrices()
+
+    return gradient
 
 
 def compute_electric_dipole_integrals(molecule, basis, origin=(0.0, 0.0, 0.0)):

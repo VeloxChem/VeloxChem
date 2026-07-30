@@ -1,4 +1,3 @@
-from pathlib import Path
 import numpy as np
 
 from veloxchem import ThreeCenterOverlapDriver
@@ -15,7 +14,7 @@ class TestThreeCenterOverlapDriver:
 
         h2str = """
          H   0.0   0.0   0.0
-         H   0.3   0.2   1.0   
+         H   0.3   0.2   1.0
         """
         mol = Molecule.read_str(h2str, 'au')
 
@@ -34,10 +33,10 @@ class TestThreeCenterOverlapDriver:
 
         h1_bas = AtomBasis([
             h1_1s,
-        ], 'MINI-A', '', 1)
+        ], 'MINI-A', 1)
         h2_bas = AtomBasis([
             h2_1s,
-        ], 'MINI-B', '', 1)
+        ], 'MINI-B', 1)
         bas = MolecularBasis([h1_bas, h2_bas], [0, 1])
 
         return mol, bas

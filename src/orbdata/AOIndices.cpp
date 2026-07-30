@@ -61,18 +61,18 @@ getDimerAOIndices(const CMolecule& mol_1, const CMolecule& mol_2, const CMolecul
 
     for (int aoidx = 0, angl = 0; angl <= max_angl; angl++)
     {
-        int nao_1 = basis_1.number_of_basis_functions(angl);
+        const auto nao_1 = basis_1.number_of_basis_functions(angl);
 
-        int nao_2 = basis_2.number_of_basis_functions(angl);
+        const auto nao_2 = basis_2.number_of_basis_functions(angl);
 
         for (int s = -angl; s <= angl; s++)
         {
-            for (int i = 0; i < nao_1; i++, aoidx++)
+            for (int i = 0; i < static_cast<int>(nao_1); i++, aoidx++)
             {
                 aoinds_mol[0].push_back(aoidx);
             }
 
-            for (int i = 0; i < nao_2; i++, aoidx++)
+            for (int i = 0; i < static_cast<int>(nao_2); i++, aoidx++)
             {
                 aoinds_mol[1].push_back(aoidx);
             }

@@ -5,7 +5,7 @@ from veloxchem.outputstream import OutputStream
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.cppsolver import ComplexResponse
+from veloxchem.cppsolver import ComplexResponseSolver
 from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 
 
@@ -66,7 +66,7 @@ class TestQrfOperatorsFD:
 
                 # finite difference
 
-                lrf_plus = ComplexResponse(comm, ostream)
+                lrf_plus = ComplexResponseSolver(comm, ostream)
                 lrf_plus.frequencies = [wb]
                 lrf_plus.a_operator = op_a
                 lrf_plus.b_operator = op_b
@@ -77,7 +77,7 @@ class TestQrfOperatorsFD:
                 lrf_result_plus = lrf_plus.compute(molecule, basis,
                                                    scf_result_plus)
 
-                lrf_minus = ComplexResponse(comm, ostream)
+                lrf_minus = ComplexResponseSolver(comm, ostream)
                 lrf_minus.frequencies = [wb]
                 lrf_minus.a_operator = op_a
                 lrf_minus.b_operator = op_b

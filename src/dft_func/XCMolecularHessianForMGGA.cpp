@@ -255,7 +255,7 @@ integrateExcHessianForMetaGgaClosedShell(const CMolecule&        molecule,
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < gto_blocks.size(); i_block++)
+            for (int i_block = 0, idx = 0; i_block < static_cast<int>(gto_blocks.size()); i_block++)
             {
                 const auto& gto_block = gto_blocks[i_block];
 
@@ -1473,7 +1473,7 @@ integrateVxcFockGradientForMetaGgaClosedShell(const CMolecule&        molecule,
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < gto_blocks.size(); i_block++)
+            for (int i_block = 0, idx = 0; i_block < static_cast<int>(gto_blocks.size()); i_block++)
             {
                 const auto& gto_block = gto_blocks[i_block];
 

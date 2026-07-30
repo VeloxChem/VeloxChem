@@ -35,6 +35,8 @@
 #include <algorithm>
 #include <iterator>
 
+#include "StringFormat.hpp"
+
 namespace chem_elem {
 
 auto
@@ -58,7 +60,7 @@ label(const int id) -> std::string
 auto
 identifier(const std::string &name) -> int
 {
-    if (auto it = std::ranges::find(_names, name); it != _names.end())
+    if (auto it = std::ranges::find(_names, format::upper_case(name)); it != _names.end())
     {
         return static_cast<int>(std::distance(_names.begin(), it));
     }
