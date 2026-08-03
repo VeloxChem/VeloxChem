@@ -63,6 +63,7 @@ from .openqpscfdriver import OpenQPScfDriver
 from .openqpgradientdriver import OpenQPGradientDriver
 from .openqpexcitedstatesdriver import OpenQPExcitedStatesDriver
 from .openqpexcitedstategradientdriver import OpenQPExcitedStateGradientDriver
+from .openqpstatetracker import OpenQPMRSFStateTracker
 from .transitiondensitytracker import TransitionDensityTracker
 
 from .errorhandler import assert_msg_critical
@@ -1595,16 +1596,22 @@ class OpenMMDynamics:
             self.state_mode = 'excited'
             self.active_state_index = state_index
             self.driver_flag = 'OpenQP Excited-State Driver'
+            self.state_tracking_log = []
 
-            # State tracking is not available for OpenQP drivers (it relies on
-            # the Serenity transition-density tracker); the target state stays
-            # fixed at state_deriv_index throughout the dynamics.
             if track_state or state_tracker is not None:
-                warning = 'run_qmmm: state tracking is not supported for '
-                warning += 'OpenQP excited-state dynamics; using a fixed target '
-                warning += 'state.'
-                self.ostream.print_warning(warning)
-                self.ostream.flush()
+                if state_tracker is None:
+                    settings = state_tracking_settings or {}
+                    state_tracker = OpenQPMRSFStateTracker(
+                        nstates=self.grad_driver.nstates,
+                        target_state=state_index,
+                        minimum_overlap=settings.get(
+                            'minimum_overlap',
+                            settings.get('min_overlap', 0.5)),
+                        maximum_ambiguity_ratio=settings.get(
+                            'maximum_ambiguity_ratio', 0.8),
+                        failure_mode=settings.get('failure_mode', 'error'))
+
+                self.grad_driver.set_state_tracker(state_tracker)
 
         else:
             raise ValueError('Invalid QM driver. Please use a valid VeloxChem driver.')
@@ -1753,6 +1760,8 @@ class OpenMMDynamics:
                 print('Temperature:', temp, 'K')
                 print('Total Energy:', total)
                 print('-' * 60)   
+                self.simulation.saveState(state_file)
+                print(f'Simulation state saved as {state_file}')
 
             self.simulation.step(1)
 
@@ -2097,7 +2106,80 @@ class OpenMMDynamics:
             raise ValueError("Unsupported ensemble type. Please choose 'NVE', 'NVT', or 'NPT'.")
 
         return integrator
-    
+
+    def prepare_simulation(self,
+                           ensemble='NVE',
+                           temperature=298.15,
+                           friction=1.0,
+                           timestep=0.5,
+                           restart_file=None,
+                           initial_temperature=None):
+        """
+        Creates the OpenMM simulation object without propagating it.
+
+        :func:`run_qmmm` builds its simulation internally and immediately runs
+        the full loop, which leaves no way for an external driver to own the
+        propagation.  This method performs the same setup and stops, so that a
+        controller such as
+        :class:`LandauZenerSurfaceHoppingDynamics` can step the simulation
+        itself.  Existing :func:`run_md` and :func:`run_qmmm` workflows are
+        unaffected.
+
+        :param ensemble:
+            Type of ensemble; 'NVE', 'NVT' or 'NPT'. NVE is required for
+            surface-hopping production trajectories.
+        :param temperature:
+            Temperature in Kelvin, used by NVT and NPT integrators.
+        :param friction:
+            Friction coefficient in 1/ps.
+        :param timestep:
+            Timestep in femtoseconds.
+        :param restart_file:
+            Optional OpenMM state file to load.
+        :param initial_temperature:
+            Temperature in Kelvin used to draw initial velocities. Defaults to
+            ``temperature`` for NVT and NPT, and to 10 K for NVE, matching the
+            behaviour of :func:`run_qmmm`.
+
+        :return:
+            The created OpenMM Simulation object.
+        """
+
+        if self.system is None:
+            raise RuntimeError('System has not been created!')
+
+        self.ensemble = ensemble
+        self.temperature = temperature * unit.kelvin
+        self.friction = friction / unit.picosecond
+        self.timestep = timestep * unit.femtoseconds
+
+        integrator = (self.integrator if self.integrator is not None else
+                      self._create_integrator())
+
+        self.topology = self.pdb.topology
+        self.positions = self.pdb.positions
+
+        self.simulation = app.Simulation(self.topology,
+                                         self.system,
+                                         integrator,
+                                         platform=self._create_platform())
+
+        if restart_file is not None:
+            self.simulation.loadState(restart_file)
+        else:
+            self.simulation.context.setPositions(self.positions)
+
+            if initial_temperature is not None:
+                init_temp = initial_temperature * unit.kelvin
+            elif self.ensemble in ['NVT', 'NPT']:
+                init_temp = self.temperature
+            else:
+                init_temp = 10 * unit.kelvin
+
+            self.simulation.context.setVelocitiesToTemperature(init_temp)
+
+        return self.simulation
+
     # Methods to create a QM region/subregion in the system
     def _create_QM_residue(self, 
                            ff_gen,
@@ -2668,12 +2750,23 @@ class OpenMMDynamics:
 
         elif isinstance(self.qm_driver, OpenQPExcitedStatesDriver):
             # OpenQP excited-state (MRSF/SF-TDDFT) dynamics; the excited-state
-            # gradient driver computes the reference, excitation, and gradient.
+            # gradient driver computes the reference, native state assignment,
+            # selected energy, and selected gradient atomically.
             self.grad_driver.compute(new_molecule)
             gradient = self.grad_driver.get_gradient()
             total_energy_au = self.grad_driver.total_energy
             if total_energy_au is None:
                 total_energy_au = self.grad_driver.compute_energy(new_molecule)
+
+            tracking_result = getattr(self.grad_driver,
+                                      'last_tracking_result', None)
+            if tracking_result is not None:
+                self.active_state_index = int(
+                    tracking_result.selected_raw_root)
+                info = tracking_result.to_dict()
+                info['step'] = getattr(self, 'current_step', None)
+                self.state_tracking_log.append(info)
+
             potential_kjmol = float(total_energy_au) * hartree_in_kjpermol()
 
         elif isinstance(self.qm_driver, OpenQPScfDriver):
@@ -3020,4 +3113,3 @@ class OpenMMDynamics:
                     pos_restraint.addParticle(atom_idx, self.positions[atom_idx])
                     
         
-

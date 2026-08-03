@@ -31,6 +31,7 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from contextlib import contextmanager
+from copy import deepcopy
 from mpi4py import MPI
 import hashlib
 import os
@@ -43,11 +44,13 @@ import numpy as np
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
+from .openqpstatetracker import native_overlap_to_previous_current
 
 try:
     import oqp
     from oqp.molecule import Molecule as OQPMolecule
-    from oqp.library.single_point import SinglePoint, Gradient
+    from oqp.library.single_point import (SinglePoint, Gradient, LastStep,
+                                          BasisOverlap, NACME)
     from oqp.utils.input_checker import check_input_values
 except ImportError:
     pass
@@ -130,6 +133,11 @@ class OpenQPScfDriver:
         self._energies = None
         self._gradient = None
         self._scf_results = None
+
+        self.print_openqp_log = True
+        self.save_openqp_json = True
+        self._openqp_log_file = None
+        self._openqp_log_offset = 0
 
     @staticmethod
     def is_available():
@@ -393,7 +401,7 @@ class OpenQPScfDriver:
             need_gradient=need_gradient,
         )
 
-    def run_oqp(self, molecule, *, method, functional, scf_type, multiplicity,
+    def run_oqp(self, molecule, *, method, functional, scf_type, multiplicity, exc_multiplicity=1,
                 tdhf_type=None, nstate=1, grad_state=None, need_gradient=False):
         """
         Central OpenQP engine shared by all OpenQP drivers.
@@ -417,7 +425,7 @@ class OpenQPScfDriver:
         if rebuild:
             config = self._build_config(
                 molecule, method=method, functional=functional,
-                scf_type=scf_type, multiplicity=multiplicity,
+                scf_type=scf_type, multiplicity=multiplicity, exc_multiplicity=exc_multiplicity,
                 tdhf_type=tdhf_type, nstate=nstate, grad_state=grad_state)
             self._oqp_mol = self._new_oqp_molecule(config)
             self._calc_signature = calc_signature
@@ -437,25 +445,237 @@ class OpenQPScfDriver:
 
         mol = self._oqp_mol
 
-        # Reference (+ excitation) energy: recompute only when the geometry
-        # changed since the last SCF on this molecule.
-        if self._scf_geom_signature != geom_signature:
+        energy_recomputed = self._scf_geom_signature != geom_signature
+
+        if energy_recomputed:
             with self._openqp_output_context(mol):
                 try:
                     SinglePoint(mol).energy()
-                except SystemExit as exc:  # OpenQP exit() on non-convergence
+                except SystemExit as exc:
                     assert_msg_critical(
-                        False, 'OpenQPScfDriver: OpenQP calculation did not '
-                        'converge.')
+                        False,
+                        'OpenQPScfDriver: OpenQP calculation did not converge.')
                     raise exc
-            self._energies = list(np.array(mol.energies, dtype=float))
-            self._scf_geom_signature = geom_signature
 
         if need_gradient:
             with self._openqp_output_context(mol):
                 Gradient(mol).gradient()
 
+        # OpenQP applies D4 in LastStep, not in SinglePoint or Gradient.
+        if self.d4 and (energy_recomputed or need_gradient):
+            with self._openqp_output_context(mol):
+                d4_step = LastStep(mol)
+
+                if need_gradient:
+                    grad_list = mol.config['properties']['grad']
+                else:
+                    grad_list = None
+
+                d4_energy, d4_gradient = d4_step.get_dispersion(
+                    mol, grad_list)
+
+                # Do not add the energy twice when the SCF result was cached.
+                if energy_recomputed:
+                    d4_step.final_energy(d4_energy)
+
+                if need_gradient:
+                    d4_step.final_grad(d4_gradient, grad_list)
+
+        if energy_recomputed:
+            self._energies = list(np.asarray(mol.energies, dtype=float))
+            self._scf_geom_signature = geom_signature
+
         return mol
+                #mol = self._oqp_mol
+
+        ## Reference (+ excitation) energy: recompute only when the geometry
+        ## changed since the last SCF on this molecule.
+        #if self._scf_geom_signature != geom_signature:
+        #    with self._openqp_output_context(mol):
+        #        try:
+        #            SinglePoint(mol).energy()
+        #        except SystemExit as exc:  # OpenQP exit() on non-convergence
+        #            assert_msg_critical(
+        #                False, 'OpenQPScfDriver: OpenQP calculation did not '
+        #                'converge.')
+        #            raise exc
+        #    self._energies = list(np.array(mol.energies, dtype=float))
+        #    self._scf_geom_signature = geom_signature
+
+        #if need_gradient:
+        #    with self._openqp_output_context(mol):
+        #        Gradient(mol).gradient()
+        #
+        #self._save_openqp_results(mol)
+        #self._print_new_openqp_log()
+
+        #return mol
+
+    def run_oqp_tracked_mrsf(self,
+                             molecule,
+                             *,
+                             functional,
+                             multiplicity,
+                             nstate,
+                             tracker,
+                             exc_multiplicity=1):
+        """Runs one atomic, state-tracked MRSF energy/gradient calculation.
+
+        The OpenQP energy workflow is split deliberately.  ``BasisOverlap``
+        must align the current and previous MO spaces after the reference SCF
+        but before the current MRSF response calculation.  The native state
+        overlap is then assigned to persistent identities before the gradient
+        root is selected.  The reference is committed only after the selected
+        gradient succeeds.
+
+        :return:
+            ``(openqp_molecule, tracking_result)``.
+        """
+
+        if str(getattr(tracker, 'method_name', '')).lower() != \
+                'openqp_mrsf_native_overlap':
+            raise TypeError(
+                'OpenQPScfDriver.run_oqp_tracked_mrsf: invalid state tracker.')
+        if int(tracker.nstates) != int(nstate):
+            raise ValueError(
+                'OpenQPScfDriver.run_oqp_tracked_mrsf: tracker/root-count '
+                'mismatch.')
+
+        scf_type = 'rohf'
+        calc_signature = self._get_calc_signature(
+            molecule, 'tdhf', functional, scf_type, multiplicity, 'mrsf',
+            nstate)
+        geom_signature = self._get_geometry_signature(molecule)
+
+        # A fresh OpenQP molecule is required because the native overlap
+        # pipeline injects an immutable previous-geometry snapshot through the
+        # back-door interface between the reference and response stages.
+        #
+        # No gradient root is configured yet.  The root is only known after
+        # the response and the assignment, and passing a provisional one here
+        # would put a stale target into the OpenQP configuration.
+        config = self._build_config(
+            molecule,
+            method='tdhf',
+            functional=functional,
+            scf_type=scf_type,
+            multiplicity=multiplicity,
+            exc_multiplicity=exc_multiplicity,
+            tdhf_type='mrsf',
+            nstate=nstate,
+            grad_state=None)
+        mol = self._new_oqp_molecule(config)
+        self._oqp_mol = mol
+        self._calc_signature = calc_signature
+        self._active_geom_signature = geom_signature
+        self._scf_geom_signature = None
+
+        # Seed the triplet ROHF from the last optimizer-accepted orbitals.
+        # Without this the SCF restarts from an extended-Huckel guess at every
+        # geometry and can converge to a different ROHF solution, which makes
+        # the whole MRSF spectrum jump discontinuously between geometries that
+        # differ by less than 1e-3 Angstrom.  Only the *committed* payload is
+        # used, so a rejected nuclear trial never steers these orbitals, and
+        # the geometry is deliberately not taken from the payload.
+        had_committed_reference = bool(tracker.has_reference)
+        guess_payload = tracker.committed_guess_payload()
+        seeded_from_reference = guess_payload is not None
+        if seeded_from_reference:
+            # put_data() reports the config blocks that a tag-only snapshot
+            # does not carry; that chatter belongs in the OpenQP output
+            # channel, not on the VeloxChem console.
+            with self._openqp_output_context(mol):
+                mol.put_data(guess_payload)
+            # check_input_values() rejects guess.type=json without a restart
+            # file, so the type is switched after validation.  oqp.guess_json
+            # builds the density from the OQP::VEC_MO_* tags just injected,
+            # and guess.continue_geom stays False so the previous geometry is
+            # not reused.
+            mol.config['guess']['type'] = 'json'
+            mol.config['guess']['continue_geom'] = False
+
+        try:
+            with self._openqp_output_context(mol):
+                single_point = SinglePoint(mol)
+                reference_energy = single_point.reference()
+
+                if tracker.has_reference:
+                    mol.config['properties']['back_door'] = True
+                    mol.back_door = tracker.get_reference_payload()
+                    BasisOverlap(mol).overlap()
+
+                single_point.excitation(reference_energy)
+
+                state_energies = np.asarray(
+                    mol.energies[1:int(nstate) + 1], dtype=float)
+                if tracker.has_reference:
+                    NACME(mol).nacme()
+                    # The tagarray hands back Fortran memory read in C order,
+                    # so the delivered matrix is the index transpose of
+                    # s_st(previous, current).  Restore the documented
+                    # (previous, current) orientation before assigning.
+                    state_overlap = native_overlap_to_previous_current(
+                        mol.data['OQP::td_states_overlap'])
+                    tracking_result = tracker.evaluate(
+                        state_energies, state_overlap)
+                else:
+                    tracking_result = tracker.initialize_result(state_energies)
+
+                if (not tracking_result.is_reliable and
+                        tracker.failure_mode == 'error'):
+                    details = '; '.join(tracking_result.warnings)
+                    raise RuntimeError(
+                        'OpenQP MRSF state tracking is unreliable; the '
+                        f'gradient was not evaluated: {details}')
+
+                # The gradient target is written only now, after the response
+                # and the assignment, so energy and gradient always refer to
+                # the same newly assigned raw root.
+                selected_root = int(tracking_result.selected_raw_root)
+                mol.config['properties']['grad'] = [selected_root]
+
+                # Capture the aligned response state before Gradient runs.
+                # mol.get_data() materializes plain Python lists, so this is a
+                # value copy and later OpenQP mutations cannot reach it.
+                snapshot_xyz = np.asarray(mol.get_system(),
+                                          dtype=float).copy()
+                snapshot_data = deepcopy(mol.get_data())
+
+                Gradient(mol).gradient()
+
+                if self.d4:
+                    d4_step = LastStep(mol)
+                    grad_list = mol.config['properties']['grad']
+                    d4_energy, d4_gradient = d4_step.get_dispersion(
+                        mol, grad_list)
+                    d4_step.final_energy(d4_energy)
+                    d4_step.final_grad(d4_gradient, grad_list)
+
+        except SystemExit as exc:
+            assert_msg_critical(
+                False,
+                'OpenQPScfDriver: tracked OpenQP calculation did not converge.')
+            raise exc
+
+        tracking_result.state_energies = np.asarray(
+            mol.energies[1:int(nstate) + 1], dtype=float)
+        tracking_result.seeded_from_reference = seeded_from_reference
+        # Staged, not committed: the caller commits once the consumer (for a
+        # relaxed optimization, geomeTRIC) has accepted this nuclear step.
+        tracker.propose(tracking_result, snapshot_xyz, snapshot_data)
+
+        if not had_committed_reference:
+            # Bootstrap, committed exactly once.  The first geometry defines
+            # the persistent identity and is accepted by construction: there
+            # is no earlier reference to roll back to, and leaving it staged
+            # would make the next geometry re-initialize the identity from raw
+            # energy order instead of following the requested state.
+            tracker.commit()
+
+        self._energies = list(np.asarray(mol.energies, dtype=float))
+        self._scf_geom_signature = geom_signature
+
+        return mol, tracking_result
 
     def _new_oqp_molecule(self, config):
         """
@@ -485,10 +705,13 @@ class OpenQPScfDriver:
         with self._openqp_output_context(mol):
             oqp.oqp_banner(mol)
 
+        self._openqp_log_file = log
+        self._openqp_log_offset = 0
+
         return mol
 
     def _build_config(self, molecule, *, method, functional, scf_type,
-                      multiplicity, tdhf_type=None, nstate=1, grad_state=None):
+                      multiplicity, exc_multiplicity=1, tdhf_type=None, nstate=1, grad_state=None):
         """
         Builds an OpenQP configuration dictionary (ini-style, string values)
         from the VeloxChem molecule and the requested calculation settings.
@@ -529,6 +752,7 @@ class OpenQPScfDriver:
             config['tdhf'] = {
                 'type': str(tdhf_type),
                 'nstate': str(int(nstate)),
+                'multiplicity':str(int(exc_multiplicity))
             }
 
         return config
@@ -580,7 +804,31 @@ class OpenQPScfDriver:
             self.basis.lower(),
             int(molecule.get_charge()),
             tuple(molecule.get_labels()),
+            bool(self.d4),
         )
+        #return (
+        #    method,
+        #    functional.lower(),
+        #    scf_type,
+        #    int(multiplicity),
+        #    str(tdhf_type),
+        #    int(nstate),
+        #    self.basis.lower(),
+        #    int(molecule.get_charge()),
+        #    tuple(molecule.get_labels()),
+        #)
+
+
+    def get_openqp_log_file(self):
+        """Returns the current OpenQP log filename."""
+
+        if self.rank != mpi_master():
+            return None
+
+        if self._oqp_mol is None:
+            return None
+
+        return os.path.abspath(self._oqp_mol.log)
 
     @staticmethod
     def _get_geometry_signature(molecule):
@@ -633,6 +881,8 @@ class OpenQPScfDriver:
         self._energies = None
         self._gradient = None
         self._scf_results = None
+        self._openqp_log_file = None
+        self._openqp_log_offset = 0
 
     def print_title(self):
         """
@@ -650,6 +900,86 @@ class OpenQPScfDriver:
         self.ostream.print_reference('Reference:')
         self.ostream.print_reference(self.get_reference())
         self.ostream.flush()
+
+    def set_print_openqp_log(self, enabled=True):
+        """Echo detailed OpenQP output into the VeloxChem output."""
+        if self.rank == mpi_master():
+            self.print_openqp_log = bool(enabled)
+
+
+    def set_save_openqp_json(self, enabled=True):
+        """Write the complete OpenQP result bundle."""
+        if self.rank == mpi_master():
+            self.save_openqp_json = bool(enabled)
+
+
+    def get_openqp_log_file(self):
+        """Returns the current OpenQP log filename."""
+        if self.rank == mpi_master():
+            return self._openqp_log_file
+        return None
+
+
+    def _print_new_openqp_log(self):
+        """Print only new log content, avoiding duplication during optimization."""
+
+        if not self.print_openqp_log:
+            return
+
+        filename = self._openqp_log_file
+        if filename is None or not os.path.isfile(filename):
+            return
+
+        filesize = os.path.getsize(filename)
+        if filesize < self._openqp_log_offset:
+            self._openqp_log_offset = 0
+
+        with open(filename, 'rb') as logfile:
+            logfile.seek(self._openqp_log_offset)
+            text = logfile.read().decode('utf-8', errors='replace')
+            self._openqp_log_offset = logfile.tell()
+
+        if text:
+            self.ostream.print_header('OpenQP Detailed Output')
+            for line in text.splitlines():
+                self.ostream.print_info(line)
+            self.ostream.flush()
+
+
+    def _save_openqp_results(self, mol):
+        """Save OpenQP numerical results and its fully resolved configuration."""
+
+        if not self.save_openqp_json:
+            return None
+
+        # OpenQP's full numerical bundle, including internal arrays.
+        try:
+            mol.save_data(lean=False)
+        except TypeError:
+            # Compatibility with older OpenQP versions.
+            mol.save_data()
+
+        results_file = os.path.splitext(mol.log)[0] + '.json'
+        settings_file = os.path.splitext(mol.log)[0] + '.settings.json'
+
+        # mol.config contains the validated OpenQP settings, including defaults.
+        import json
+
+        def json_default(value):
+            if isinstance(value, np.ndarray):
+                return value.tolist()
+            if isinstance(value, np.generic):
+                return value.item()
+            return str(value)
+
+        with open(settings_file, 'w', encoding='utf-8') as outfile:
+            json.dump(mol.config, outfile, indent=2, default=json_default)
+
+        return {
+            'openqp_log_file': mol.log,
+            'openqp_results_file': results_file,
+            'openqp_settings_file': settings_file,
+        }
 
     @staticmethod
     def get_reference():

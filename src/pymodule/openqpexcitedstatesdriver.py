@@ -174,6 +174,7 @@ class OpenQPExcitedStatesDriver:
             functional=functional,
             scf_type=scf_type,
             multiplicity=multiplicity,
+            exc_multiplicity=self.tddft_multiplicity,
             tdhf_type=self.tddft_type,
             nstate=self.nstates,
         )

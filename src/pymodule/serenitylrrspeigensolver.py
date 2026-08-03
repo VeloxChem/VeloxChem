@@ -317,13 +317,17 @@ class SerenityLinearResponseSolver:
             
             with self.scf_driver._serenity_output_context():
                 self._lr_task.run()
-            
+
             transitions = self._get_serenity_transitions()
             eigvecs = self._get_serenity_excitation_vectors()
 
             rsp_results = self._build_rsp_results(transitions)
             rsp_results["exc_method"] = self.exc_method
             rsp_results["eigenvectors"] = eigvecs
+
+            controller = self._lr_task.getLRSCFControllers()[0]
+            if self.spinflip:
+                self._add_spinflip_metadata(rsp_results, controller)
 
             self._add_native_rsp_metadata(rsp_results, eigvecs)
             self._rsp_results = rsp_results
@@ -366,6 +370,7 @@ class SerenityLinearResponseSolver:
     def _get_rsp_signature(self):
         return (
             self.exc_method,
+            bool(self.spinflip),
             int(self.nstates),
             self.conv_thresh,
             self.max_cycles,
@@ -422,6 +427,173 @@ class SerenityLinearResponseSolver:
             return np.vstack((eigvecs_ser[0, :, :], eigvecs_ser[1, :, :]))
 
         return eigvecs_ser
+
+    def get_spinflip_metadata(self, controller=None):
+        """
+        Gets spin diagnostics for the current spin-flip roots.
+
+        Serenity exposes the change in spin squared relative to the
+        unrestricted reference.  This method adds the reference value and
+        classifies every root by the nearest physically compatible
+        multiplicity.
+
+        :param controller:
+            Optional LRSCF controller. Uses the controller of the latest
+            response task when omitted.
+
+        :return:
+            Dictionary containing ``delta_s2``, ``reference_s2``,
+            ``state_s2``, ``state_multiplicities`` and ``s2_deviation``.
+        """
+
+        assert_msg_critical(
+            self.spinflip,
+            'SerenityLinearResponseSolver: spin diagnostics requested for a '
+            'non-spin-flip calculation.')
+
+        if controller is None:
+            assert_msg_critical(
+                self._lr_task is not None,
+                'SerenityLinearResponseSolver: no LRSCF task is available for '
+                'spin diagnostics.')
+            controller = self._lr_task.getLRSCFControllers()[0]
+
+        assert_msg_critical(
+            hasattr(controller, 'getSpinSquared'),
+            'SerenityLinearResponseSolver: the Serenity Python bindings do '
+            'not expose LRSCFController.getSpinSquared().')
+
+        delta_s2 = np.asarray(
+            controller.getSpinSquared('isolated'), dtype=float).reshape(-1)
+        excitation_energies = np.asarray(
+            controller.getExcitationEnergies('isolated'),
+            dtype=float).reshape(-1)
+        assert_msg_critical(
+            delta_s2.size == excitation_energies.size,
+            'SerenityLinearResponseSolver: the number of Delta <S^2> values '
+            'does not match the number of spin-flip roots.')
+
+        reference_s2 = self._compute_reference_s2()
+        state_s2 = reference_s2 + delta_s2
+        assert_msg_critical(
+            np.all(np.isfinite(state_s2)),
+            'SerenityLinearResponseSolver: nonfinite spin-squared value in '
+            'the spin-flip spectrum.')
+
+        scf_results = self.scf_driver._scf_results
+        electron_count = None
+        if scf_results is not None:
+            occ_alpha = np.asarray(
+                scf_results.get('occ_alpha', []), dtype=float)
+            occ_beta = np.asarray(
+                scf_results.get('occ_beta', []), dtype=float)
+            if occ_alpha.size and occ_beta.size:
+                electron_count = int(
+                    np.rint(np.sum(occ_alpha) + np.sum(occ_beta)))
+
+        multiplicities, ideal_s2 = self._classify_multiplicities(
+            state_s2, electron_count)
+        s2_deviation = np.abs(state_s2 - ideal_s2)
+
+        return {
+            'delta_s2': delta_s2,
+            'reference_s2': float(reference_s2),
+            'state_s2': state_s2,
+            'state_multiplicities': multiplicities,
+            'ideal_state_s2': ideal_s2,
+            's2_deviation': s2_deviation,
+        }
+
+    def _add_spinflip_metadata(self, rsp_results, controller):
+        metadata = self.get_spinflip_metadata(controller)
+        rsp_results.update(metadata)
+
+        energies_ev = np.asarray(
+            controller.getExcitationEnergies('isolated'),
+            dtype=float).reshape(-1)
+        delta_s2 = metadata['delta_s2']
+        state_s2 = metadata['state_s2']
+        multiplicities = metadata['state_multiplicities']
+
+        self.scf_driver.ostream.print_blank()
+        self.scf_driver.ostream.print_header(
+            'Serenity Spin-Flip State Analysis')
+        self.scf_driver.ostream.print_header(34 * '=')
+        self.scf_driver.ostream.print_info(
+            f"Reference <S^2>: {metadata['reference_s2']:.6f}")
+        self.scf_driver.ostream.print_header(
+            ' State   Exc. energy / eV   Delta <S^2>      <S^2>   Mult.')
+
+        for index, (energy, delta, total, multiplicity) in enumerate(
+                zip(energies_ev, delta_s2, state_s2, multiplicities), start=1):
+            self.scf_driver.ostream.print_header(
+                f'{index:6d} {energy:18.6f} {delta:13.6f} '
+                f'{total:12.6f} {multiplicity:7d}')
+
+        self.scf_driver.ostream.print_blank()
+        self.scf_driver.ostream.flush()
+
+    def _compute_reference_s2(self):
+        """
+        Computes orbital-based spin squared for the unrestricted reference.
+        """
+
+        scf_results = self.scf_driver._scf_results
+        assert_msg_critical(
+            scf_results is not None,
+            'SerenityLinearResponseSolver: SCF results are unavailable for '
+            'the reference <S^2> calculation.')
+
+        required = ('C_alpha', 'C_beta', 'S', 'occ_alpha', 'occ_beta')
+        assert_msg_critical(
+            all(key in scf_results for key in required),
+            'SerenityLinearResponseSolver: incomplete SCF results for the '
+            'reference <S^2> calculation.')
+
+        coeff_alpha = np.asarray(scf_results['C_alpha'], dtype=float)
+        coeff_beta = np.asarray(scf_results['C_beta'], dtype=float)
+        overlap = np.asarray(scf_results['S'], dtype=float)
+        occ_alpha = np.asarray(scf_results['occ_alpha'], dtype=float)
+        occ_beta = np.asarray(scf_results['occ_beta'], dtype=float)
+
+        alpha_indices = np.flatnonzero(occ_alpha > 0.5)
+        beta_indices = np.flatnonzero(occ_beta > 0.5)
+        n_alpha = int(alpha_indices.size)
+        n_beta = int(beta_indices.size)
+        spin_z = 0.5 * (n_alpha - n_beta)
+
+        if n_alpha == 0 or n_beta == 0:
+            overlap_term = 0.0
+        else:
+            occupied_overlap = (
+                coeff_alpha[:, alpha_indices].T @ overlap @
+                coeff_beta[:, beta_indices])
+            overlap_term = float(np.sum(np.abs(occupied_overlap)**2))
+
+        # This symmetric UHF expression is equivalent to
+        # Sz(Sz + 1) + N_beta - overlap_term when N_alpha >= N_beta.
+        return float(spin_z**2 + 0.5 * (n_alpha + n_beta) - overlap_term)
+
+    @staticmethod
+    def _classify_multiplicities(state_s2, electron_count=None):
+        """
+        Classifies spin values by the nearest parity-compatible multiplicity.
+        """
+
+        state_s2 = np.asarray(state_s2, dtype=float).reshape(-1)
+        first_multiplicity = (
+            1 if electron_count is None or electron_count % 2 == 0 else 2)
+        candidates = np.arange(first_multiplicity,
+                               first_multiplicity + 10,
+                               2,
+                               dtype=int)
+        spins = 0.5 * (candidates - 1)
+        candidate_s2 = spins * (spins + 1.0)
+
+        distances = np.abs(state_s2[:, None] - candidate_s2[None, :])
+        nearest = np.argmin(distances, axis=1)
+
+        return candidates[nearest], candidate_s2[nearest]
     
     def _build_spinflip_effective_scf_results(self, eigvecs):
         scf = self.scf_driver._scf_results.copy()
@@ -684,6 +856,14 @@ class SerenityLinearResponseSolver:
         if 'oscillator_strengths_velocity' in rsp_results:
             h5_results['oscillator_strengths_velocity'] = np.array(
                 rsp_results['oscillator_strengths_velocity'], dtype=float)
+
+        for key in ('delta_s2', 'state_s2', 'state_multiplicities',
+                    'ideal_state_s2', 's2_deviation'):
+            if key in rsp_results:
+                h5_results[key] = np.asarray(rsp_results[key])
+
+        if 'reference_s2' in rsp_results:
+            h5_results['reference_s2'] = float(rsp_results['reference_s2'])
 
         # Native VeloxChem expects 1D rotatory_strengths. Serenity currently
         # exposes extra transition columns; verify their physical meaning before

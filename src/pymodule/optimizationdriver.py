@@ -486,6 +486,19 @@ class OptimizationDriver:
             except geometric.errors.HessianExit:
                 hessian_exit = True
 
+        # geomeTRIC's stdout carries the only record of a trust-radius
+        # collapse, which is otherwise invisible: the energy looks converged
+        # while the gradient stays large and the steps shrink to nothing.
+        if self.rank == mpi_master():
+            self.report_optimizer_stall(fg_out.getvalue())
+
+        # geomeTRIC returns from evaluateStep() as soon as the convergence
+        # criteria are met, before its accepted-step hook runs, so the final
+        # geometry would otherwise leave its tracking proposal staged.  This
+        # commits it exactly once; it is a no-op when nothing is staged or
+        # when the driver does not track states.
+        opt_engine.save_guess_files(None)
+
         # post-process and print results while temp_dir is still available
 
         if hessian_exit:
@@ -618,6 +631,49 @@ class OptimizationDriver:
             pass
 
         return opt_results
+
+    def report_optimizer_stall(self, geometric_output):
+        """
+        Warns when geomeTRIC stopped making progress instead of converging.
+
+        geomeTRIC halves its trust radius whenever a step turns out much worse
+        than its quadratic model predicted, and refuses to shrink below
+        ``tmin``.  On a surface that is discontinuous -- most commonly an
+        excited-state run following a fixed root number through a crossing --
+        every root flip looks like a catastrophic step, so the trust radius
+        ratchets down to ``tmin`` and the geometry freezes while the gradient
+        stays large.  That diagnosis lives only in geomeTRIC's stdout, which
+        this driver captures and discards, so surface it here.
+
+        :param geometric_output:
+            The captured geomeTRIC stdout.
+        """
+
+        if not geometric_output:
+            return
+
+        rejected = geometric_output.count('Rejecting step')
+        pinned = (geometric_output.count('trust below tmin') +
+                  geometric_output.count('displacement close to tmin'))
+
+        if not rejected and not pinned:
+            return
+
+        self.ostream.print_blank()
+        self.ostream.print_header('Optimizer Stall Warning')
+        self.ostream.print_header(23 * '=')
+        self.ostream.print_info(
+            f'geomeTRIC rejected {rejected} step(s) and hit the minimum '
+            f'trust radius {pinned} time(s).')
+        self.ostream.print_info(
+            'The trust radius collapses like this when the energy and the '
+            'gradient come from different surfaces, so the reported geometry '
+            'is where the optimizer froze rather than a stationary point.')
+        self.ostream.print_info(
+            'For an excited-state run, check whether the requested root '
+            'changes character along the path and enable state tracking.')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def conv_flags(self):
         """

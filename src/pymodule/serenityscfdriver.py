@@ -97,9 +97,12 @@ class SerenityScfDriver:
         self.ostream = ostream
 
         self.method = 'hf'
+        self.rohf_type = None
         self.scf_mode = 'auto'
         self.basis = '6-31GS'
         self.dft_functional = 'bp86'
+        
+        self.dispersion = None
 
         #custom functional part
         self.basic_functional = None
@@ -158,8 +161,15 @@ class SerenityScfDriver:
 
         label = str(method_label).strip().lower()
 
-        hf_aliases = {'hf', 'rhf', 'uhf', 'rohf'}
-        dft_aliases = {'dft', 'rks', 'uks', 'roks'}
+        if label in ('rohf', 'roks'):
+            assert_msg_critical(
+                False,
+                f'SerenityScfDriver: "{label}" does not select an open-shell '
+                'reference constraint; use set_rohf_type("CUHF") together '
+                f'with set_method("{"hf" if label == "rohf" else "dft"}").')
+
+        hf_aliases = {'hf', 'rhf', 'uhf'}
+        dft_aliases = {'dft', 'rks', 'uks'}
 
         if label in hf_aliases:
             self.method = 'hf'
@@ -213,6 +223,28 @@ class SerenityScfDriver:
                     raise ValueError('Missing mu for custom functional construction')
 
             self._invalidate_cache()
+
+    def set_rohf_type(self, rohf_type):
+        """
+        Sets the open-shell reference constraint (NONE, CUHF or SUHF).
+
+        CUHF constrains the unrestricted high-spin reference to <S^2> = S(S+1)
+        exactly, which is the ROHF-equivalent reference used by OpenQP.
+        """
+
+        if self.rank != mpi_master():
+            return
+
+        if rohf_type is None:
+            self.rohf_type = None
+        else:
+            label = str(rohf_type).strip().upper()
+            assert_msg_critical(
+                label in ('NONE', 'CUHF', 'SUHF'),
+                f'SerenityScfDriver: Invalid rohf_type "{rohf_type}"')
+            self.rohf_type = label
+
+        self._invalidate_cache()
 
     def set_scf_mode(self, scf_mode):
         """
@@ -461,16 +493,31 @@ class SerenityScfDriver:
         settings.grid.smallGridAccuracy = self.small_grid_accuracy
         settings.scf.maxCycles = self.max_cycles
 
+        # if mode == 'restricted':
+        #     settings.scfMode = spy.SCF_MODES.RESTRICTED
+        # else:
+        #     settings.scfMode = spy.SCF_MODES.UNRESTRICTED
         if mode == 'restricted':
             settings.scfMode = spy.SCF_MODES.RESTRICTED
+            assert_msg_critical(
+                self.rohf_type in (None, 'NONE'),
+                'SerenityScfDriver: rohf_type requires an unrestricted '
+                'open-shell reference.')
         else:
             settings.scfMode = spy.SCF_MODES.UNRESTRICTED
+            if self.rohf_type is not None and self.rohf_type != 'NONE':
+                assert_msg_critical(
+                    settings.spin != 0,
+                    'SerenityScfDriver: rohf_type requires multiplicity > 1.')
+                settings.scf.rohf = self.rohf_type
 
         if self.method == 'hf':
             settings.method = spy.ELECTRONIC_STRUCTURE_THEORIES.HF
         else:
             settings.method = spy.ELECTRONIC_STRUCTURE_THEORIES.DFT
             settings.dft.functional = self.dft_functional
+        if self.dispersion is not None:
+            settings.dft.dispersion = self.dispersion
 
         labels = list(molecule.get_labels())
         coords = np.array(molecule.get_coordinates_in_bohr(), dtype=float)
@@ -553,6 +600,7 @@ class SerenityScfDriver:
             self.method,
             self.basis.upper(),
             self.dft_functional.lower(),
+            self.rohf_type or 'NONE',
             int(molecule.get_charge()),
             int(molecule.get_multiplicity()),
             labels,
@@ -684,6 +732,7 @@ class SerenityScfDriver:
         scf_results = {
             'eri_thresh': 1.0e-12,
             'scf_type': scf_type,
+            'rohf_type': self.rohf_type or 'NONE',
             'scf_energy': float(self._energy),
             'restart': False,
             'filename': self.filename,

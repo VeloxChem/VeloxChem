@@ -37,6 +37,7 @@ from .errorhandler import assert_msg_critical
 from .gradientdriver import GradientDriver
 from .openqpscfdriver import OpenQPScfDriver
 from .openqpexcitedstatesdriver import OpenQPExcitedStatesDriver
+from .openqpstatetracker import OpenQPMRSFStateTracker
 
 
 class OpenQPExcitedStateGradientDriver(GradientDriver):
@@ -71,11 +72,32 @@ class OpenQPExcitedStateGradientDriver(GradientDriver):
                            OpenQPExcitedStatesDriver(openqp_scf_drv))
 
         self.state_deriv_index = 3
+        self.target_state_index = 3
         self.tddft_type = 'mrsf'
         self.nstates = 10
 
         self.excited_state_energy = None
         self.total_energy = None
+
+        # State tracking is opt-in so that existing fixed-root calculations
+        # retain their exact control flow.  A tracked calculation provides its
+        # energy and gradient atomically.
+        self.state_tracking = False
+        self.computes_energy_with_gradient = False
+        self.state_tracker = None
+        self.last_tracking_result = None
+        self.tracking_history = []
+        self._tracked_geometry_signature = None
+        self._input_keywords['gradient'].update({
+            'state_tracking':
+                ('bool', 'enable native OpenQP MRSF state tracking'),
+            'minimum_tracking_overlap':
+                ('float', 'minimum accepted target-state overlap'),
+            'maximum_ambiguity_ratio':
+                ('float', 'maximum accepted second/best overlap ratio'),
+            'tracking_failure':
+                ('str_lower', 'tracking failure policy: error or warn'),
+        })
 
         self.flag = 'OpenQP Excited-State Gradient Driver'
 
@@ -92,6 +114,13 @@ class OpenQPExcitedStateGradientDriver(GradientDriver):
             state > 0,
             'OpenQPExcitedStateGradientDriver: state index must be > 0')
         self.state_deriv_index = state
+        self.target_state_index = state
+        if self.state_tracker is not None:
+            self.state_tracker = self._new_state_tracker(
+                target_state=state)
+            self.last_tracking_result = None
+            self.tracking_history = []
+            self._tracked_geometry_signature = None
 
     def set_tddft_type(self, tddft_type):
         """
@@ -103,6 +132,10 @@ class OpenQPExcitedStateGradientDriver(GradientDriver):
             ttype in ('mrsf', 'sf', 'tda', 'rpa'),
             f'OpenQPExcitedStateGradientDriver: invalid tddft_type '
             f'"{tddft_type}"')
+        assert_msg_critical(
+            not self.state_tracking or ttype == 'mrsf',
+            'OpenQPExcitedStateGradientDriver: native state tracking is '
+            'available only for MRSF.')
         self.tddft_type = ttype
         self.exc_driver.set_tddft_type(ttype)
 
@@ -111,8 +144,131 @@ class OpenQPExcitedStateGradientDriver(GradientDriver):
         Sets the number of excited-state roots to compute.
         """
 
-        self.nstates = int(nstates)
+        new_nstates = int(nstates)
+        assert_msg_critical(
+            new_nstates > 0,
+            'OpenQPExcitedStateGradientDriver: nstates must be positive.')
+        assert_msg_critical(
+            not self.state_tracking or
+            new_nstates >= int(self.target_state_index),
+            'OpenQPExcitedStateGradientDriver: nstates must include the '
+            'persistent target state.')
+        changed = new_nstates != self.nstates
+        self.nstates = new_nstates
         self.exc_driver.set_nstates(nstates)
+        if changed and self.state_tracker is not None:
+            self.state_tracker = self._new_state_tracker()
+            self.last_tracking_result = None
+            self.tracking_history = []
+            self._tracked_geometry_signature = None
+
+    def enable_state_tracking(self,
+                              minimum_overlap=0.5,
+                              maximum_ambiguity_ratio=0.8,
+                              failure_mode='error'):
+        """Enables native OpenQP MRSF persistent-state tracking.
+
+        The currently configured ``state_deriv_index`` establishes the
+        persistent identity at the first geometry.  Subsequent
+        ``state_deriv_index`` values report the raw OpenQP root carrying that
+        identity.
+        """
+
+        assert_msg_critical(
+            self.tddft_type == 'mrsf',
+            'OpenQPExcitedStateGradientDriver: native state tracking is '
+            'available only for MRSF.')
+        assert_msg_critical(
+            int(self.nstates) >= int(self.target_state_index),
+            'OpenQPExcitedStateGradientDriver: nstates must include the '
+            'persistent target state.')
+
+        self.state_tracker = OpenQPMRSFStateTracker(
+            nstates=self.nstates,
+            target_state=self.target_state_index,
+            minimum_overlap=minimum_overlap,
+            maximum_ambiguity_ratio=maximum_ambiguity_ratio,
+            failure_mode=failure_mode)
+        self.state_tracking = True
+        self.computes_energy_with_gradient = True
+        self.last_tracking_result = None
+        self.tracking_history = []
+        self._tracked_geometry_signature = None
+
+    def disable_state_tracking(self):
+        """Disables tracking and restores the configured persistent root."""
+
+        self.state_tracking = False
+        self.computes_energy_with_gradient = False
+        self.state_tracker = None
+        self.last_tracking_result = None
+        self.tracking_history = []
+        self._tracked_geometry_signature = None
+        self.state_deriv_index = self.target_state_index
+
+    def set_state_tracker(self, tracker):
+        """Installs a configured :class:`OpenQPMRSFStateTracker`."""
+
+        assert_msg_critical(
+            isinstance(tracker, OpenQPMRSFStateTracker),
+            'OpenQPExcitedStateGradientDriver: invalid OpenQP state tracker.')
+        assert_msg_critical(
+            tracker.nstates == self.nstates,
+            'OpenQPExcitedStateGradientDriver: tracker nstates mismatch.')
+        assert_msg_critical(
+            tracker.target_state == self.target_state_index,
+            'OpenQPExcitedStateGradientDriver: tracker target-state mismatch.')
+        assert_msg_critical(
+            self.tddft_type == 'mrsf',
+            'OpenQPExcitedStateGradientDriver: native state tracking is '
+            'available only for MRSF.')
+
+        self.state_tracker = tracker
+        self.state_tracking = True
+        self.computes_energy_with_gradient = True
+        self.last_tracking_result = None
+        self.tracking_history = list(tracker.history)
+        self._tracked_geometry_signature = None
+        if tracker.has_reference:
+            self.state_deriv_index = tracker.selected_raw_root
+
+    def save_tracking_state(self, filename):
+        """Writes the complete OpenQP tracking restart state to JSON."""
+
+        assert_msg_critical(
+            self.state_tracker is not None,
+            'OpenQPExcitedStateGradientDriver: state tracking is not enabled.')
+        if self.rank == mpi_master():
+            self.state_tracker.save_state(filename)
+        self.comm.barrier()
+
+    def load_tracking_state(self, filename):
+        """Loads a JSON tracking restart into the current driver."""
+
+        if self.rank == mpi_master():
+            master_tracker = self._new_state_tracker()
+            master_tracker.load_state(filename)
+            state = master_tracker.state_dict()
+        else:
+            state = None
+
+        state = self.comm.bcast(state, root=mpi_master())
+        tracker = self._new_state_tracker()
+        tracker.load_state_dict(state)
+        self.set_state_tracker(tracker)
+
+    def _new_state_tracker(self, target_state=None):
+        """Rebuilds a tracker while retaining configured confidence options."""
+
+        old = self.state_tracker
+        return OpenQPMRSFStateTracker(
+            nstates=self.nstates,
+            target_state=(self.target_state_index if target_state is None else
+                          int(target_state)),
+            minimum_overlap=(0.5 if old is None else old.minimum_overlap),
+            maximum_ambiguity_ratio=(
+                0.8 if old is None else old.maximum_ambiguity_ratio),
+            failure_mode=('error' if old is None else old.failure_mode))
 
     def update_settings(self, grad_dict, rsp_dict=None, method_dict=None):
         """
@@ -156,6 +312,22 @@ class OpenQPExcitedStateGradientDriver(GradientDriver):
         if 'nstate' in rsp_dict:
             self.set_nstates(rsp_dict['nstate'])
 
+        tracking_value = grad_dict.get('state_tracking',
+                                       grad_dict.get('track_state', None))
+        if tracking_value is not None:
+            enabled = (tracking_value if isinstance(tracking_value, bool) else
+                       str(tracking_value).strip().lower() in
+                       ('1', 'true', 'yes', 'on'))
+            if enabled:
+                self.enable_state_tracking(
+                    minimum_overlap=float(
+                        grad_dict.get('minimum_tracking_overlap', 0.5)),
+                    maximum_ambiguity_ratio=float(
+                        grad_dict.get('maximum_ambiguity_ratio', 0.8)),
+                    failure_mode=grad_dict.get('tracking_failure', 'error'))
+            else:
+                self.disable_state_tracking()
+
     def compute(self, molecule, *args):
         """
         Performs the calculation of the OpenQP excited-state gradient.
@@ -164,21 +336,59 @@ class OpenQPExcitedStateGradientDriver(GradientDriver):
             The molecule.
         """
 
+        assert_msg_critical(
+            not (self.state_tracking and self.numerical),
+            'OpenQPExcitedStateGradientDriver: numerical gradients cannot '
+            'update a sequential state-tracking reference safely.')
+
+        computed_new = False
         if self.numerical:
             if self.rank == mpi_master():
                 self.compute_numerical(molecule)
             else:
                 self.gradient = None
         else:
+            # The reuse decision must be identical on every rank, otherwise
+            # the ranks disagree about entering the collective section below.
+            # Only the master owns the tracker, so it decides and broadcasts.
             if self.rank == mpi_master():
-                self.gradient = self._compute_analytical_master(molecule)
+                reuse = self._can_reuse_tracked_result(molecule)
+            else:
+                reuse = None
+            reuse = self.comm.bcast(reuse, root=mpi_master())
+
+            if self.rank == mpi_master():
+                if reuse:
+                    # compute_energy() already requested this exact tracked
+                    # evaluation against the same committed reference.
+                    pass
+                else:
+                    self.gradient = self._compute_analytical_master(molecule)
+                    computed_new = True
+                    if self.state_tracking:
+                        self._tracked_geometry_signature = (
+                            self._tracked_cache_key(molecule))
             else:
                 self.gradient = None
 
         self.gradient = self.comm.bcast(self.gradient, root=mpi_master())
 
+        if self.state_tracking:
+            payload = ((self.total_energy, self.excited_state_energy,
+                        self.state_deriv_index, self.last_tracking_result,
+                        computed_new)
+                       if self.rank == mpi_master() else None)
+            payload = self.comm.bcast(payload, root=mpi_master())
+            (self.total_energy, self.excited_state_energy,
+             self.state_deriv_index, self.last_tracking_result,
+             computed_new) = payload
+            if computed_new:
+                self.tracking_history.append(self.last_tracking_result)
+
         self.print_geometry(molecule)
         self.print_gradient(molecule, [self.state_deriv_index])
+        if self.state_tracking:
+            self._print_tracking_diagnostics(self.last_tracking_result)
 
         self.openqp_driver._invalidate_cache()
 
@@ -196,6 +406,17 @@ class OpenQPExcitedStateGradientDriver(GradientDriver):
             The excited-state total energy.
         """
 
+        if self.state_tracking:
+            if self.rank == mpi_master():
+                reuse = self._can_reuse_tracked_result(molecule)
+            else:
+                reuse = None
+            reuse = self.comm.bcast(reuse, root=mpi_master())
+            if not reuse:
+                self.compute(molecule, *args)
+            return (self.total_energy
+                    if self.rank == mpi_master() else None)
+
         if self.rank != mpi_master():
             return None
 
@@ -206,10 +427,96 @@ class OpenQPExcitedStateGradientDriver(GradientDriver):
 
         return self.total_energy
 
-    def _compute_analytical_master(self, molecule):
-        mol = self._run_state(molecule, need_gradient=True)
+    def _tracked_cache_key(self, molecule):
+        """Cache key for a tracked evaluation: geometry *and* reference.
 
-        state = self.state_deriv_index
+        Coordinates alone are not a sufficient key.  After a rejected
+        optimizer trial the committed reference is rolled back, so the same
+        coordinates evaluated against a different committed reference are a
+        different calculation and must not return the earlier proposal.
+        """
+
+        geometry_signature = self.openqp_driver._get_geometry_signature(
+            molecule)
+        revision = (self.state_tracker.reference_revision
+                    if self.state_tracker is not None else -1)
+
+        return (geometry_signature, int(revision))
+
+    def _can_reuse_tracked_result(self, molecule):
+        """Whether the cached tracked energy and gradient are still valid."""
+
+        if not self.state_tracking:
+            return False
+        if self.gradient is None or self.total_energy is None:
+            return False
+        if self._tracked_geometry_signature is None:
+            return False
+        # A staged-but-uncommitted proposal belongs to the cached result; once
+        # it is committed or rolled back the key changes with the revision.
+        return self._tracked_cache_key(molecule) == \
+            self._tracked_geometry_signature
+
+    def commit_tracking_reference(self):
+        """Commits the staged tracking proposal (accepted nuclear step).
+
+        Called from :class:`OptimizationEngine` through geomeTRIC's
+        accepted-step hook.  Returns ``True`` when the reference advanced.
+
+        An unreliable proposal is refused by the tracker, so a low-overlap or
+        ambiguous assignment never becomes the identity that later geometries
+        are measured against.
+        """
+
+        if not self.state_tracking or self.state_tracker is None:
+            return False
+
+        if self.rank == mpi_master():
+            committed = self.state_tracker.commit()
+            if not committed and self.state_tracker.rejected_commits:
+                self.ostream.print_info(
+                    'OpenQP MRSF tracking: refused to commit an unreliable '
+                    'assignment; the reference stays at the last accepted '
+                    'geometry.')
+                self.ostream.flush()
+        else:
+            committed = None
+
+        return self.comm.bcast(committed, root=mpi_master())
+
+    def rollback_tracking_reference(self):
+        """Discards the staged proposal (rejected nuclear trial).
+
+        Called from :class:`OptimizationEngine` through geomeTRIC's
+        rejected-step hook.  Returns ``True`` when a proposal was discarded.
+        """
+
+        if not self.state_tracking or self.state_tracker is None:
+            return False
+
+        if self.rank == mpi_master():
+            rolled_back = self.state_tracker.rollback()
+            if rolled_back:
+                # The cached proposal was tied to the discarded reference.
+                self._tracked_geometry_signature = None
+                self.ostream.print_info(
+                    'OpenQP MRSF tracking: nuclear trial rejected; the '
+                    'tracking reference was rolled back.')
+                self.ostream.flush()
+        else:
+            rolled_back = None
+
+        return self.comm.bcast(rolled_back, root=mpi_master())
+
+    def _compute_analytical_master(self, molecule):
+        if self.state_tracking:
+            mol, tracking_result = self._run_tracked_state(molecule)
+            state = int(tracking_result.selected_raw_root)
+            self.state_deriv_index = state
+            self.last_tracking_result = tracking_result
+        else:
+            mol = self._run_state(molecule, need_gradient=True)
+            state = self.state_deriv_index
         self.total_energy = float(mol.energies[state])
         self.excited_state_energy = float(mol.energies[state] - mol.energies[1])
 
@@ -217,6 +524,84 @@ class OpenQPExcitedStateGradientDriver(GradientDriver):
             (molecule.number_of_atoms(), 3))
 
         return gradient
+
+    def _run_tracked_state(self, molecule):
+        assert_msg_critical(
+            self.tddft_type == 'mrsf',
+            'OpenQPExcitedStateGradientDriver: native tracking requires MRSF.')
+        assert_msg_critical(
+            self.state_tracker is not None,
+            'OpenQPExcitedStateGradientDriver: missing state tracker.')
+
+        drv = self.openqp_driver
+        functional = drv.functional if drv.method == 'dft' else ''
+        return drv.run_oqp_tracked_mrsf(
+            molecule,
+            functional=functional,
+            multiplicity=3,
+            nstate=self.nstates,
+            tracker=self.state_tracker,
+            exc_multiplicity=getattr(self.exc_driver,
+                                     'tddft_multiplicity', 1))
+
+    def _print_tracking_diagnostics(self, result):
+        """Prints the complete root decision at the current geometry."""
+
+        if self.rank != mpi_master() or result is None:
+            return
+
+        hartree_to_ev = 27.211386245988
+        energies = np.asarray(result.state_energies, dtype=float)
+        reference_energy = float(energies[0])
+
+        self.ostream.print_header('OpenQP MRSF State Tracking')
+        self.ostream.print_info(
+            f'Persistent target identity : {result.target_tracked_root}')
+        self.ostream.print_info(
+            f'Previous raw root          : {result.previous_raw_root}')
+        self.ostream.print_info(
+            f'Selected gradient root     : {result.selected_raw_root}')
+        self.ostream.print_info(
+            'Tracked -> raw permutation : ' +
+            ' '.join(str(root) for root in result.tracked_to_raw))
+        self.ostream.print_info(
+            f'Target |overlap|           : {result.target_score:.8f}')
+        self.ostream.print_info(
+            f'Second-best |overlap|      : {result.second_score:.8f}')
+        self.ostream.print_info(
+            f'Ambiguity ratio            : {result.ambiguity_ratio:.8f}')
+        self.ostream.print_info(
+            f'Minimum assignment score   : {result.global_confidence:.8f}')
+        self.ostream.print_info(
+            f'Target assignment reliable : {result.is_reliable}')
+        self.ostream.print_info(
+            f'Raw root changed           : {result.root_changed}')
+        self.ostream.print_blank()
+        self.ostream.print_info(
+            'Raw  Tracked       Energy / Eh       Relative to S0 / eV')
+        for raw_idx, energy in enumerate(energies, start=1):
+            tracked_idx = int(
+                np.where(result.tracked_to_raw == raw_idx)[0][0] + 1)
+            relative_ev = (float(energy) - reference_energy) * hartree_to_ev
+            marker = ' <- gradient' if raw_idx == \
+                result.selected_raw_root else ''
+            self.ostream.print_info(
+                f'{raw_idx:3d}  {tracked_idx:7d}  {energy:18.10f}'
+                f'  {relative_ev:20.8f}{marker}')
+
+        if self.print_level >= 3 and not result.reference_initialized:
+            self.ostream.print_blank()
+            self.ostream.print_info(
+                'Absolute overlap matrix '
+                '(rows=persistent, columns=current raw):')
+            for row in np.asarray(result.similarity_matrix):
+                self.ostream.print_info(
+                    '  ' + ' '.join(f'{value:10.6f}' for value in row))
+
+        for warning in result.warnings:
+            self.ostream.print_info('Tracking note: ' + warning)
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def _run_state(self, molecule, need_gradient):
         drv = self.openqp_driver

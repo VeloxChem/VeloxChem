@@ -232,7 +232,30 @@ from .openqpscfdriver import OpenQPScfDriver
 from .openqpgradientdriver import OpenQPGradientDriver
 from .openqpexcitedstatesdriver import OpenQPExcitedStatesDriver
 from .openqpexcitedstategradientdriver import OpenQPExcitedStateGradientDriver
-from .transitiondensitytracker import TransitionDensityTracker
+from .openqpstatetracker import (OpenQPMRSFStateTracker,
+                                 OpenQPStateTrackingResult)
+from .transitiondensitytracker import (StateTrackingError,
+                                       StateTrackingResult,
+                                       StateTrackingStatus,
+                                       TransitionDensityTracker)
+
+# Landau-Zener surface hopping
+from .landauzener import (LandauZenerEventDetector, LandauZenerEvent,
+                          ThreePointGapFitter, FivePointGapFitter,
+                          create_gap_fitter, landau_zener_probability)
+from .surfacehoppingsettings import SurfaceHoppingSettings
+from .surfacehoppingtracker import (StateDescriptors, DescriptorStateTracker,
+                                    OverlapStateTracker,
+                                    IdentityStateTracker,
+                                    create_state_tracker)
+from .surfacehoppingprovider import (ElectronicStateProvider,
+                                     ElectronicStateResult,
+                                     VeloxChemStateProvider,
+                                     ExternalDriverStateProvider,
+                                     StateIndexConverter)
+from .surfacehoppingrescaler import SurfaceHopMomentumRescaler
+from .surfacehoppingdynamics import (LandauZenerSurfaceHoppingDynamics,
+                                     SurfaceHoppingError)
 
 # Python functions
 from .errorhandler import assert_msg_critical

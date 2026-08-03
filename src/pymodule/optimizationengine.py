@@ -44,6 +44,8 @@ from .molecule import Molecule
 from .profiler import Profiler
 from .inputparser import write_unparsed_input_to_hdf5
 from .errorhandler import assert_msg_critical
+from .transitiondensitytracker import (StateTrackingError,
+                                       StateTrackingStatus)
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -90,6 +92,8 @@ class OptimizationEngine(geometric.engine.Engine):
 
         self.opt_unparsed_input = None
         self.opt_current_step = 0
+        self._last_evaluated_coords = None
+        self._accepted_tracking_coords = None
 
     def lower(self):
         """
@@ -97,6 +101,150 @@ class OptimizationEngine(geometric.engine.Engine):
         """
 
         return 'custom engine'
+
+    def save_guess_files(self, dirname):
+        """
+        geomeTRIC hook fired once per *accepted* optimization step.
+
+        Excited-state drivers that follow a state across geometries stage
+        their new reference during ``calc_new`` and commit it here, so a
+        nuclear trial that geomeTRIC later rejects never becomes the
+        comparison point for the next geometry.
+
+        :param dirname:
+            The geomeTRIC scratch directory (unused; state is kept in memory).
+        """
+
+        commit = getattr(self.grad_drv, 'commit_tracking_reference', None)
+        if commit is not None:
+            commit()
+        if self._last_evaluated_coords is not None:
+            self._accepted_tracking_coords = self._last_evaluated_coords.copy()
+
+    def load_guess_files(self, dirname):
+        """
+        geomeTRIC hook fired when a trial step is *rejected*.
+
+        Discards the staged tracking reference so the next trial is still
+        compared against the last accepted geometry.
+
+        :param dirname:
+            The geomeTRIC scratch directory (unused; state is kept in memory).
+        """
+
+        rollback = getattr(self.grad_drv, 'rollback_tracking_reference', None)
+        if rollback is not None:
+            rollback()
+
+    def _compute_energy_gradient(self, molecule):
+        """Evaluates one molecule using the driver's atomic contract."""
+
+        if (getattr(self.grad_drv, 'computes_energy_with_gradient', False) and
+                not getattr(self.grad_drv, 'numerical', False)):
+            self.grad_drv.compute(molecule, *self.args)
+            energy = getattr(self.grad_drv, 'total_energy', None)
+            assert_msg_critical(
+                energy is not None,
+                'OptimizationEngine.calc_new: the combined energy-gradient '
+                'driver did not provide total_energy.')
+        else:
+            energy = self.grad_drv.compute_energy(molecule, *self.args)
+            self.grad_drv.compute(molecule, *self.args)
+        return energy, self.grad_drv.get_gradient()
+
+    def _molecule_at_coordinates(self, coords):
+        labels = self.molecule.get_labels()
+        atom_basis_labels = self.molecule.get_atom_basis_labels()
+        if self.rank == mpi_master():
+            molecule = Molecule(labels, np.asarray(coords).reshape(-1, 3),
+                                'au', atom_basis_labels)
+            molecule.set_charge(self.molecule.get_charge())
+            molecule.set_multiplicity(self.molecule.get_multiplicity())
+        else:
+            molecule = Molecule()
+        return self.comm.bcast(molecule, root=mpi_master())
+
+    def _retry_low_overlap(self, target_coords, initial_error):
+        """Retries LOW_OVERLAP by root expansion and segment subdivision."""
+
+        tracker = getattr(self.grad_drv, 'state_tracker', None)
+        begin_retry = getattr(self.grad_drv, 'begin_tracking_retry', None)
+        promote = getattr(
+            self.grad_drv, 'promote_tracking_reference_for_retry', None)
+        rollback = getattr(
+            self.grad_drv, 'rollback_tracking_reference', None)
+        if (tracker is None or begin_retry is None or promote is None or
+                self._accepted_tracking_coords is None):
+            raise initial_error
+
+        expansions = int(getattr(tracker, 'max_root_expansions', 0))
+        increment = int(getattr(tracker, 'root_window_increment', 0))
+        for attempt in range(expansions):
+            begin_retry()
+            response_driver = getattr(self.grad_drv, 'rsp_driver', None)
+            if response_driver is None or increment <= 0:
+                break
+            response_driver.set_nstates(
+                int(response_driver.nstates) + increment)
+            self.grad_drv.ostream.print_info(
+                'Serenity tracking LOW_OVERLAP: retrying with '
+                f'{response_driver.nstates} response roots '
+                f'(window retry {attempt + 1}/{expansions}).')
+            self.grad_drv.ostream.flush()
+            try:
+                return self._compute_energy_gradient(
+                    self._molecule_at_coordinates(target_coords))
+            except StateTrackingError as error:
+                if error.status is not StateTrackingStatus.LOW_OVERLAP:
+                    if rollback is not None:
+                        rollback()
+                    raise
+                initial_error = error
+
+        max_depth = int(getattr(tracker, 'max_subdivisions', 0))
+        if max_depth <= 0:
+            if rollback is not None:
+                rollback()
+            raise initial_error
+
+        begin_retry()
+        start = np.asarray(self._accepted_tracking_coords, dtype=float)
+        target = np.asarray(target_coords, dtype=float)
+        retry_count = {'value': 0}
+
+        def walk_segment(left, right, depth):
+            try:
+                return self._compute_energy_gradient(
+                    self._molecule_at_coordinates(right))
+            except StateTrackingError as error:
+                if (error.status is not StateTrackingStatus.LOW_OVERLAP or
+                        depth <= 0):
+                    raise
+                midpoint = 0.5 * (left + right)
+                retry_count['value'] += 1
+                self.grad_drv.ostream.print_info(
+                    'Serenity tracking LOW_OVERLAP: bisecting the accepted-to-'
+                    f'trial segment (level {max_depth - depth + 1}/'
+                    f'{max_depth}).')
+                self.grad_drv.ostream.flush()
+                walk_segment(left, midpoint, depth - 1)
+                assert_msg_critical(
+                    promote(),
+                    'OptimizationEngine: successful tracking midpoint did '
+                    'not stage a reference.')
+                return walk_segment(midpoint, right, depth - 1)
+
+        try:
+            energy, gradient = walk_segment(start, target, max_depth)
+        except Exception:
+            if rollback is not None:
+                rollback()
+            raise
+
+        if getattr(self.grad_drv, 'tracking_info', None) is not None:
+            self.grad_drv.tracking_info['adaptive_subdivisions'] = int(
+                retry_count['value'])
+        return energy, gradient
 
     def _validate_step_results(self, energy, gradient, natoms):
         """Validates optimizer step results before returning to geomeTRIC.
@@ -145,17 +293,7 @@ class OptimizationEngine(geometric.engine.Engine):
 
         start_time = tm.time()
 
-        labels = self.molecule.get_labels()
-        atom_basis_labels = self.molecule.get_atom_basis_labels()
-
-        if self.rank == mpi_master():
-            new_mol = Molecule(labels, coords.reshape(-1, 3), 'au',
-                               atom_basis_labels)
-            new_mol.set_charge(self.molecule.get_charge())
-            new_mol.set_multiplicity(self.molecule.get_multiplicity())
-        else:
-            new_mol = Molecule()
-        new_mol = self.comm.bcast(new_mol, root=mpi_master())
+        new_mol = self._molecule_at_coordinates(coords)
 
         title_txt = f'Optimization Step {self.opt_current_step}'
         self.grad_drv.ostream.print_header(title_txt)
@@ -164,9 +302,40 @@ class OptimizationEngine(geometric.engine.Engine):
         self.grad_drv.ostream.print_info('Computing energy and gradient...')
         self.grad_drv.ostream.flush()
 
-        energy = self.grad_drv.compute_energy(new_mol, *self.args)
-        self.grad_drv.compute(new_mol, *self.args)
-        gradient = self.grad_drv.get_gradient()
+        recovery_flag = hasattr(
+            self.grad_drv, '_tracking_recovery_active')
+        previous_recovery = getattr(
+            self.grad_drv, '_tracking_recovery_active', False)
+        if recovery_flag:
+            self.grad_drv._tracking_recovery_active = True
+        try:
+            try:
+                energy, gradient = self._compute_energy_gradient(new_mol)
+            except StateTrackingError as error:
+                if error.status is not StateTrackingStatus.LOW_OVERLAP:
+                    raise
+                try:
+                    energy, gradient = self._retry_low_overlap(coords, error)
+                except StateTrackingError as exhausted:
+                    tracker = getattr(self.grad_drv, 'state_tracker', None)
+                    policy = getattr(tracker, 'failure_policy', 'strict')
+                    if (exhausted.status is not
+                            StateTrackingStatus.LOW_OVERLAP or
+                            policy == 'strict'):
+                        raise
+                    rollback = getattr(
+                        self.grad_drv, 'rollback_tracking_reference', None)
+                    if rollback is not None:
+                        rollback()
+                    # Re-evaluate once from the committed reference so the
+                    # configured best-effort/adiabatic policy is applied only
+                    # after all bounded recovery attempts have failed.
+                    if recovery_flag:
+                        self.grad_drv._tracking_recovery_active = False
+                    energy, gradient = self._compute_energy_gradient(new_mol)
+        finally:
+            if recovery_flag:
+                self.grad_drv._tracking_recovery_active = previous_recovery
 
         if hasattr(self.grad_drv, "scf_driver") and isinstance(
                 self.grad_drv, ScfGradientDriver):
@@ -182,6 +351,10 @@ class OptimizationEngine(geometric.engine.Engine):
         energy, gradient = self._validate_step_results(
             energy, gradient, new_mol.number_of_atoms())
 
+        self._last_evaluated_coords = np.asarray(coords, dtype=float).copy()
+        if self.opt_current_step == 0:
+            # The first electronic evaluation defines the accepted baseline.
+            self._accepted_tracking_coords = self._last_evaluated_coords.copy()
         self.opt_current_step += 1
 
         if self.rank == mpi_master():
