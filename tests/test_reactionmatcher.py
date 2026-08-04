@@ -211,3 +211,25 @@ class TestReactionMatcher:
         # Input is one-indexed, but inner representation is zero-indexed
         assert breaking_bonds == {(1, 99)}
         assert forming_bonds == {(42, 99), (36, 101)}
+
+    @pytest.mark.timeconsuming
+    def test_gold_complex(self):
+        # 157-atom gold-catalyzed intermediate. The reactant and product are
+        # nearly isomorphic (2 breaking + 2 forming bonds) but heavily
+        # reordered, which used to make the matcher never finish. Guards the
+        # assist-id fingerprint search on a large system.
+        data_path = Path(__file__).parent / 'data'
+        rea = Molecule.read_xyz_file(str(data_path / 'reamatcher_au_rea.xyz'))
+        pro = Molecule.read_xyz_file(str(data_path / 'reamatcher_au_int.xyz'))
+
+        breaking_bonds, forming_bonds = self.run_graph_matcher(
+            rea=[rea],
+            pro=[pro],
+        )
+        assert breaking_bonds == {(110, 117), (126, 127)}
+        # Atoms 125 (C=O) and 126 (C-O-H) are the two resonance-equivalent
+        # oxygens of a carboxyl group on C124, so the forming bond to that
+        # carbon's oxygen may land on either one; both are minimal mappings.
+        option1 = forming_bonds == {(117, 126), (127, 152)}
+        option2 = forming_bonds == {(117, 125), (127, 152)}
+        assert option1 or option2

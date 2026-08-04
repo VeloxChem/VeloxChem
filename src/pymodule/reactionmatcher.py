@@ -41,7 +41,7 @@ import math
 
 from .outputstream import OutputStream
 from .veloxchemlib import mpi_master
-from collections import Counter
+from collections import Counter, defaultdict
 
 
 class ReactionMatcher:
@@ -75,7 +75,19 @@ class ReactionMatcher:
         self.rdFMCS_assist_assign = False
         self.rdRascalMCES_assist_assign = False
         self._reduce_hydrogen = False
-        self._assist_min_depth = 3
+        # Smallest neighborhood radius used when assigning assist ids. Starting
+        # at 1 is important for compact molecules: there, a large radius already
+        # reaches the reaction region, so only small neighborhoods still
+        # cross-match between reactant and product (measured: on a 102-atom
+        # complex, 53/58 heavy atoms cross-match at radius 1 but only 18 at
+        # radius 4).
+        self._assist_min_depth = 1
+        # Upper bound on the neighborhood radius. Keeping this small is what
+        # stops the assist search from running VF2 on near-whole-molecule
+        # subgraphs (which explode on large, symmetric molecules); the
+        # fingerprint refinement below propagates information globally
+        # regardless of this radius.
+        self._assist_max_depth = 5
 
         self.max_break_attempts_guess = 1e7
         self._breaking_depth = -1  # how many breaking edges to try
@@ -155,13 +167,12 @@ class ReactionMatcher:
             lg = math.lgamma(N + 1) - math.lgamma(N - depth + 1)
             return math.exp(lg)
 
-        while estimate_attempts(
-                N, _breaking_depth+1) < self.max_break_attempts_guess:
+        while estimate_attempts(N, _breaking_depth +
+                                1) < self.max_break_attempts_guess:
             _breaking_depth += 1
             if _breaking_depth == N:
                 break
         _breaking_depth = max(_breaking_depth, 1)
-
 
         self.ostream.print_info(
             f"Set max breaking depth to {_breaking_depth} from max breaking attempts {self.max_break_attempts_guess}"
@@ -344,146 +355,60 @@ class ReactionMatcher:
             return rea_graph, pro_graph, {}
 
     def _calculate_assist_ids(self, rea_graph, pro_graph):
-        # H_count = sum(
-        #     [1 for n in rea_graph.nodes if rea_graph.nodes[n]['elem'] == 1.0])
+        """Assign 'assist' ids: the partial reactant->product atom mapping of
+        the atoms that can be matched unambiguously from their local
+        environment, used to seed (and so keep tractable) the full graph match.
 
-        # # Upper bound for a starting guess. A linear molecule would need at least N/2 range to cover the entire molecule
-        # depth = int((len(rea_graph.nodes) - H_count) / 4)
+        Each still-unassigned heavy atom is fingerprinted by a rooted
+        Weisfeiler-Lehman hash of its radius-r neighborhood, with node labels
+        combining the element and any assist_id already assigned. Atoms are
+        then matched by fingerprint, growing r from 1 to _assist_max_depth:
 
-        # min_depth = 3
+          1. Unique matches: a fingerprint held by exactly one atom on each
+             side is an unambiguous pair. Commit it, re-fingerprint and repeat
+             - anchoring an atom relabels its neighbors and exposes further
+             unique matches (color refinement).
+          2. Symmetry breaking: what is left are symmetric atoms (equivalent
+             phenyls, methyls, ...) still sharing a fingerprint in buckets of
+             >1. Individualize the smallest matched bucket found across all
+             radii - any pairing within it is a locally valid isomorphism -
+             then re-run step 1 so the choice cascades. Repeat until no bucket
+             matches across reactant and product.
+
+        Every commit is verified with a real isomorphism check on the two
+        neighborhoods to guard against hash collisions. Scanning all radii (not
+        just the largest) matters on compact molecules, where a large radius
+        already reaches the reaction region. Reaction-region atoms have no
+        matching fingerprint across reactant and product, so they are never
+        assigned here and are left to the global search that determines the
+        broken/formed bonds.
+        """
         assisting_map = {}
-        rea_cc = list(nx.connected_components(rea_graph))
-        range_spans_cc = [False] * len(rea_cc)
 
-        depth = 1
+        rea_cc = list(nx.connected_components(rea_graph))
+        max_depth = 1
         for cc in rea_cc:
             dia = nx.diameter(rea_graph.subgraph(cc))
-            r = math.ceil(dia / 2)
-            if r > depth:
-                depth = r
-        depth += 1
+            max_depth = max(max_depth, math.ceil(dia / 2))
+        max_depth += 1
+        max_depth = min(max_depth, self._assist_max_depth)
+        min_depth = min(self._assist_min_depth, max_depth)
 
-        total_nodes = len(rea_graph.nodes)
-        step = 2 * total_nodes // 3
+        # Phase 1: commit only unambiguous (unique fingerprint) matches.
+        self._assign_unique_matches(rea_graph, pro_graph, assisting_map,
+                                    min_depth, max_depth)
 
-        while (math.gcd(step, total_nodes) != 1):
-            step -= 1
+        # Phase 2: break the leftover symmetry one atom at a time, re-refining
+        # after each individualization to let the choice propagate.
+        while self._individualize_one_match(rea_graph, pro_graph, assisting_map,
+                                            min_depth, max_depth):
+            self._assign_unique_matches(rea_graph, pro_graph, assisting_map,
+                                        min_depth, max_depth)
 
-        shuffled_indices = [(i * step) % total_nodes
-                            for i in range(total_nodes)]
-
-        while depth >= self._assist_min_depth:
-            for rea_id in shuffled_indices:
-
-                # Break early
-                if rea_graph.nodes[rea_id]['elem'] == 1.0:
-                    continue
-                if rea_graph.nodes[rea_id].get('assist_id', None) is not None:
-                    continue
-
-                rea_subgraph = self._get_range_subgraph(rea_graph, rea_id,
-                                                        depth)
-                cc_i = next(i for i, cc in enumerate(rea_cc) if rea_id in cc)
-                if len(rea_cc[cc_i]) == len(rea_subgraph.nodes):
-                    range_spans_cc[cc_i] = True
-                    if all(range_spans_cc):
-                        range_spans_cc = [False] * len(rea_cc)
-                        break
-                    continue
-
-                if self.verbose:
-                    self.ostream.print_info(
-                        f"Trying range {depth} around reactant atom {rea_id+self.print_starting_index}. Total nodes in subgraphs: {len(rea_subgraph.nodes)}"
-                    )
-                    self.ostream.flush()
-
-                # get subgraph around atom for range
-                for pro_id in shuffled_indices:
-                    if pro_graph.nodes[pro_id]['elem'] == 1.0:
-                        continue
-                    if rea_graph.nodes[rea_id]['elem'] != pro_graph.nodes[
-                            pro_id]['elem']:
-                        continue
-                    if pro_graph.nodes[pro_id].get('assist_id',
-                                                   None) is not None:
-                        continue
-
-                    pro_subgraph = self._get_range_subgraph(
-                        pro_graph, pro_id, depth)
-
-                    # isomorphism checks are pointless if the number of nodes differs
-                    if len(rea_subgraph.nodes) != len(pro_subgraph.nodes):
-                        continue
-
-                    GM = self.get_graph_matcher(rea_subgraph, pro_subgraph)
-                    if not GM.is_isomorphic():
-                        continue
-
-                    map = GM.mapping
-
-                    rea_dim_subgraph = self._get_range_subgraph(
-                        rea_graph, rea_id, depth - 1)
-                    pro_dim_subgraph = self._get_range_subgraph(
-                        pro_graph, pro_id, depth - 1)
-                    GM = self.get_graph_matcher(rea_dim_subgraph,
-                                                pro_dim_subgraph)
-                    if not GM.is_isomorphic():
-                        self.ostream.print_warning(
-                            "Found isomorphism on outer range, but not on inner range. This should not happen."
-                        )
-                        self.ostream.flush()
-                        continue
-
-                    map = {
-                        k: v
-                        for k, v in map.items() if k in rea_dim_subgraph.nodes
-                    }
-
-                    # map = GM.mapping
-                    assisting_map.update(map)
-                    self.ostream.print_info(
-                        f"Found matching subgraph between reactant atom {rea_id + self.print_starting_index} and product atom {pro_id + self.print_starting_index} at depth {depth} with mapping: {self._print_mapping(map)}."
-                    )
-                    self.ostream.flush()
-                    for rea_node, pro_node in map.items():
-
-                        # ids might be assigned multiple times. This shouldn't be a problem unless they differ
-                        rea_assist_id = rea_graph.nodes[rea_node].get(
-                            'assist_id', None)
-                        pro_assist_id = pro_graph.nodes[pro_node].get(
-                            'assist_id', None)
-
-                        if rea_assist_id != pro_assist_id:
-                            rea_neighbours = list(rea_graph.neighbors(rea_node))
-                            pro_neighbours = list(pro_graph.neighbors(pro_node))
-                            # pro_assist_id in H_indices of rea_neighbours
-                            single_neighbour = len(rea_neighbours) == 1 and len(
-                                pro_neighbours) == 1
-                            rea_neighbour_H_indices = rea_graph.nodes[
-                                rea_neighbours[0]].get('H_indices', [])
-
-                            if single_neighbour and pro_assist_id in rea_neighbour_H_indices:
-                                pass
-                            else:
-                                self.ostream.print_warning(
-                                    f"Conflict in previous assist ids, rea:{rea_assist_id+self.print_starting_index} != pro:{pro_assist_id+self.print_starting_index} on rea_node {rea_node+self.print_starting_index} and pro_node {pro_node+self.print_starting_index} this should not happen!"
-                                )
-
-                        rea_graph.nodes[rea_node]['assist_id'] = rea_node
-                        pro_graph.nodes[pro_node]['assist_id'] = rea_node
-                        rea_H_indices = rea_graph.nodes[rea_node].get(
-                            'H_indices')
-                        pro_H_indices = pro_graph.nodes[pro_node].get(
-                            'H_indices')
-                        if rea_H_indices is not None and pro_H_indices is not None:
-                            if len(rea_H_indices) == len(pro_H_indices):
-                                for i, j in zip(rea_H_indices, pro_H_indices):
-                                    if i in rea_graph.nodes and j in pro_graph.nodes:
-                                        rea_graph.nodes[i]['assist_id'] = i
-                                        pro_graph.nodes[j]['assist_id'] = i
-                                        assisting_map.update({i: j})
-                    break
-            depth -= 1
+        # Drop the scratch labels used for fingerprinting.
+        for graph in (rea_graph, pro_graph):
+            for n in graph.nodes:
+                graph.nodes[n].pop('_fp_label', None)
 
         sorted_assisting_map = {
             k: assisting_map[k]
@@ -494,6 +419,166 @@ class ReactionMatcher:
         )
         self.ostream.flush()
         return rea_graph, pro_graph, sorted_assisting_map
+
+    def _assign_unique_matches(self, rea_graph, pro_graph, assisting_map,
+                               min_depth, max_depth):
+        """Commit every reactant/product atom pair that shares a unique
+        neighborhood fingerprint, growing the radius from ``min_depth`` to
+        ``max_depth`` and refining to a fixpoint at each radius (committing an
+        anchor relabels its neighbors and can expose new unique matches).
+        """
+        for depth in range(min_depth, max_depth + 1):
+            while True:
+                rea_buckets = self._fingerprint_buckets(rea_graph, depth)
+                pro_buckets = self._fingerprint_buckets(pro_graph, depth)
+
+                committed = False
+                for fp, rea_nodes in rea_buckets.items():
+                    pro_nodes = pro_buckets.get(fp)
+                    # A fingerprint matched by exactly one atom on each side is
+                    # unambiguous; larger buckets are symmetric/ambiguous.
+                    if pro_nodes is None or len(rea_nodes) != 1 or len(
+                            pro_nodes) != 1:
+                        continue
+
+                    rea_id = rea_nodes[0]
+                    pro_id = pro_nodes[0]
+                    if not self._verify_ball_isomorphic(
+                            rea_graph, rea_id, pro_graph, pro_id, depth):
+                        continue
+
+                    self._commit_assist_match(rea_id, pro_id, rea_graph,
+                                              pro_graph, assisting_map, depth)
+                    committed = True
+
+                if not committed:
+                    break
+
+    def _individualize_one_match(self, rea_graph, pro_graph, assisting_map,
+                                 min_depth, max_depth):
+        """Break symmetry by committing a single pair from the smallest matched
+        ambiguous fingerprint bucket found across all radii. Returns True if a
+        pair was committed.
+
+        Scanning every radius from ``min_depth`` to ``max_depth`` (not just the
+        largest) is essential for compact molecules, where a large radius
+        already reaches the reaction region so only small neighborhoods still
+        cross-match between reactant and product. The smallest matched bucket -
+        across radii, ties broken by the smaller (more local) radius and then
+        the lowest atom index - is individualized first, so the most confident,
+        least-symmetric choice is made first and only genuinely equivalent
+        atoms are ever paired arbitrarily. Buckets whose fingerprint appears on
+        only one side (reaction-region atoms) are never touched.
+        """
+        best_key = None
+        best = None
+        for depth in range(min_depth, max_depth + 1):
+            rea_buckets = self._fingerprint_buckets(rea_graph, depth)
+            pro_buckets = self._fingerprint_buckets(pro_graph, depth)
+            for fp, rea_nodes in rea_buckets.items():
+                pro_nodes = pro_buckets.get(fp)
+                if not pro_nodes:
+                    continue
+                key = (len(rea_nodes) + len(pro_nodes), depth, min(rea_nodes))
+                if best_key is None or key < best_key:
+                    best_key = key
+                    best = (depth, sorted(rea_nodes), sorted(pro_nodes))
+
+        if best is None:
+            return False
+
+        depth, rea_nodes, pro_nodes = best
+        rea_id = rea_nodes[0]
+        for pro_id in pro_nodes:
+            if self._verify_ball_isomorphic(rea_graph, rea_id, pro_graph,
+                                            pro_id, depth):
+                self._commit_assist_match(rea_id, pro_id, rea_graph, pro_graph,
+                                          assisting_map, depth)
+                return True
+        return False
+
+    def _fingerprint_buckets(self, graph, depth):
+        """Group still-unassigned heavy atoms of ``graph`` by their rooted
+        neighborhood fingerprint at radius ``depth``.
+        """
+        buckets = defaultdict(list)
+        for node, fp in self._fingerprint_unassigned_heavy(graph,
+                                                           depth).items():
+            buckets[fp].append(node)
+        return buckets
+
+    def _verify_ball_isomorphic(self, rea_graph, rea_id, pro_graph, pro_id,
+                                depth):
+        """Confirm a candidate match with a real (but small, anchored)
+        isomorphism check on the two radius-``depth`` neighborhoods, guarding
+        against a Weisfeiler-Lehman fingerprint collision.
+        """
+        rea_sub = self._get_range_subgraph(rea_graph, rea_id, depth)
+        pro_sub = self._get_range_subgraph(pro_graph, pro_id, depth)
+        if len(rea_sub.nodes) != len(pro_sub.nodes):
+            return False
+        return self.get_graph_matcher(rea_sub, pro_sub).is_isomorphic()
+
+    def _fingerprint_unassigned_heavy(self, graph, depth):
+        """Return {node: fingerprint} for every still-unassigned heavy atom.
+
+        The fingerprint is a rooted Weisfeiler-Lehman hash of the atom's
+        radius-``depth`` neighborhood. Node labels combine the element with any
+        already-assigned assist_id, so anchors committed in earlier rounds
+        refine later fingerprints. The centre atom is labeled distinctly so the
+        neighborhood is compared as a rooted structure rather than an unlabeled
+        shape.
+        """
+        for n in graph.nodes:
+            aid = graph.nodes[n].get('assist_id', None)
+            graph.nodes[n]['_fp_label'] = f"{graph.nodes[n]['elem']}|{aid}"
+
+        fingerprints = {}
+        for n in graph.nodes:
+            if graph.nodes[n]['elem'] == 1.0:
+                continue
+            if graph.nodes[n].get('assist_id', None) is not None:
+                continue
+            sub = self._get_range_subgraph(graph, n, depth)
+            base = graph.nodes[n]['_fp_label']
+            graph.nodes[n]['_fp_label'] = base + '|ROOT'
+            fingerprints[n] = nx.weisfeiler_lehman_graph_hash(
+                sub, node_attr='_fp_label', iterations=depth + 1)
+            graph.nodes[n]['_fp_label'] = base
+        return fingerprints
+
+    def _commit_assist_match(self, rea_id, pro_id, rea_graph, pro_graph,
+                             assisting_map, depth):
+        """Record an unambiguous reactant/product atom match as an assist id,
+        propagating it to the hydrogens hanging off each matched heavy atom
+        (which are excluded from the heavy-atom search but share their parent's
+        identity). Reactant and product get the same assist_id value so
+        ``node_match`` can key off it later.
+        """
+        if rea_graph.nodes[rea_id].get('assist_id', None) is not None:
+            return
+        if pro_graph.nodes[pro_id].get('assist_id', None) is not None:
+            return
+
+        rea_graph.nodes[rea_id]['assist_id'] = rea_id
+        pro_graph.nodes[pro_id]['assist_id'] = rea_id
+        assisting_map[rea_id] = pro_id
+        self.ostream.print_info(
+            f"Matched reactant atom {rea_id + self.print_starting_index} to "
+            f"product atom {pro_id + self.print_starting_index} at radius "
+            f"{depth}.")
+        self.ostream.flush()
+
+        rea_H = rea_graph.nodes[rea_id].get('H_indices')
+        pro_H = pro_graph.nodes[pro_id].get('H_indices')
+        if rea_H is not None and pro_H is not None and len(rea_H) == len(pro_H):
+            for i, j in zip(rea_H, pro_H):
+                if (i in rea_graph.nodes and j in pro_graph.nodes
+                        and rea_graph.nodes[i].get('assist_id', None) is None
+                        and pro_graph.nodes[j].get('assist_id', None) is None):
+                    rea_graph.nodes[i]['assist_id'] = i
+                    pro_graph.nodes[j]['assist_id'] = i
+                    assisting_map[i] = j
 
     def _find_mapping(self, A, B, forced_breaking_edges, forced_forming_edges):
         """
@@ -660,26 +745,28 @@ class ReactionMatcher:
             N_changing_H_bonds.append(n_changing_H_bonds)
 
         if not maps:
-            self.ostream.print_info("No valid permutation found in brute force mapping.")
+            self.ostream.print_info(
+                "No valid permutation found in brute force mapping.")
             self.ostream.flush()
             return None, None, None
 
         # Best mapping: fewest changing bonds; tie-breaker: most H-bonds changing
         best_index = min(range(len(maps)),
-                         key=lambda i: (N_changing_bonds[i], -N_changing_H_bonds[i]))
+                         key=lambda i:
+                         (N_changing_bonds[i], -N_changing_H_bonds[i]))
 
         min_bonds = N_changing_bonds[best_index]
-        tied_indices = [i for i in range(len(maps)) if N_changing_bonds[i] == min_bonds]
+        tied_indices = [
+            i for i in range(len(maps)) if N_changing_bonds[i] == min_bonds
+        ]
         if len(tied_indices) > 1:
             self.ostream.print_info(
                 "Multiple mappings with same least changing bonds found, "
-                "picking the one with most H-bond changes."
-            )
+                "picking the one with most H-bond changes.")
             for i in tied_indices:
                 self.ostream.print_info(
                     f"Mapping {maps[i]} with breaking bonds: {breaking_edges_list[i]} "
-                    f"and forming bonds: {forming_edges_list[i]}"
-                )
+                    f"and forming bonds: {forming_edges_list[i]}")
         self.ostream.flush()
         self.ostream.print_info(
             f"Picking mapping {maps[best_index]} with breaking bonds: {breaking_edges_list[best_index]} and forming bonds: {forming_edges_list[best_index]}"
