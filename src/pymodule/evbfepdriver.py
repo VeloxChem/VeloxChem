@@ -818,7 +818,7 @@ class EvbFepDriver:
 
         if self.save_equil_data:
             equil_data_reporter = self._get_data_reporter(
-                str(self.data_folder), 'initial_equil_data.csv')
+                self.data_folder, 'initial_equil_data.csv')
             simulation.reporters.append(equil_data_reporter)
         if self.pdb is None:
             barostat = self._get_barostat(simulation)
