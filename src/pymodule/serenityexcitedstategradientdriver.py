@@ -92,6 +92,15 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         self.total_energy = None
         self.computes_energy_with_gradient = True
 
+        # The high-spin working-reference energy, taken directly from
+        # Serenity's ``system.getEnergy()``.  It is recorded explicitly rather
+        # than back-solved as ``total_energy - selected_excitation_energy``,
+        # because the driver invalidates the Serenity system cache after every
+        # ``compute`` and the reconstruction would then be the only remaining
+        # source.  The high-spin determinant is a working reference: it is
+        # never an SF dynamics surface.
+        self.reference_energy = None
+
         self.reference_s2 = None
         self.delta_s2 = None
         self.state_s2 = None
@@ -257,6 +266,7 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
                 'selected_excitation_energy':
                     self.selected_excitation_energy,
                 'total_energy': self.total_energy,
+                'reference_energy': self.reference_energy,
                 'reference_s2': self.reference_s2,
                 'delta_s2': self.delta_s2,
                 'state_s2': self.state_s2,
@@ -282,6 +292,7 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         self.selected_excitation_energy = (
             state_payload['selected_excitation_energy'])
         self.total_energy = state_payload['total_energy']
+        self.reference_energy = state_payload['reference_energy']
         self.reference_s2 = state_payload['reference_s2']
         self.delta_s2 = state_payload['delta_s2']
         self.state_s2 = state_payload['state_s2']
@@ -340,9 +351,9 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         self.excited_state_energy = eigenvalues
         self.selected_excitation_energy = self._extract_excitation_energy(
             rsp_results)
-        self.total_energy = float(
-            self.serenity_driver.get_energy() +
-            self.selected_excitation_energy)
+        self.reference_energy = float(self.serenity_driver.get_energy())
+        self.total_energy = float(self.reference_energy +
+                                  self.selected_excitation_energy)
 
         return self.total_energy
 
@@ -396,9 +407,9 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         self.excited_state_energy = excitation_energies
         self.selected_excitation_energy = float(
             excitation_energies[self.state_deriv_index - 1])
-        self.total_energy = float(
-            self.serenity_driver.get_energy() +
-            self.selected_excitation_energy)
+        self.reference_energy = float(self.serenity_driver.get_energy())
+        self.total_energy = float(self.reference_energy +
+                                  self.selected_excitation_energy)
         gradient = np.array(
             self.serenity_driver._system.getGeometry().getGradients(),
             dtype=float)

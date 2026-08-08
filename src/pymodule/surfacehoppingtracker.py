@@ -128,6 +128,14 @@ class TrackingResult:
         Full matrix used for the one-to-one assignment.  Rows are persistent
         tracked states at the previous geometry and columns are raw roots at
         the current geometry.
+    :param ambiguity_ratio:
+        Largest per-state ratio of the best rejected similarity to the
+        assigned one.  A value near one means the assignment could as well
+        have gone to another state.
+    :param descriptor:
+        Name of the electronic quantity the assignment was made from, or
+        ``'excitation_energy_continuity'`` when no electronic character was
+        available.  Production runs refuse the latter.
     """
 
     permutation: np.ndarray
@@ -138,6 +146,8 @@ class TrackingResult:
     method: str
     warnings: list = field(default_factory=list)
     similarity_matrix: np.ndarray = None
+    ambiguity_ratio: float = 0.0
+    descriptor: str = 'unspecified'
 
 
 def solve_assignment(similarity):
@@ -447,6 +457,220 @@ class DescriptorStateTracker(ElectronicStateTracker):
         return np.clip(similarity, 0.0, 1.0)
 
 
+def assignment_ambiguity(similarity, assignment):
+    """
+    Largest per-row ratio of the best rejected similarity to the assigned one.
+
+    A one-to-one assignment can be globally optimal and still be a coin flip:
+    two nearly degenerate states of similar character produce two nearly equal
+    entries in the same row.  The minimum assigned score does not see that,
+    so it is reported separately and enforced separately.
+
+    :param similarity:
+        Square similarity matrix; rows are persistent tracked states.
+    :param assignment:
+        Array with the assigned column for each row.
+
+    :return:
+        The ambiguity ratio in [0, inf); 0.0 for a one-state problem.
+    """
+
+    similarity = np.asarray(similarity, dtype=float)
+    assignment = np.asarray(assignment, dtype=int)
+    n = similarity.shape[0]
+
+    if n < 2:
+        return 0.0
+
+    worst = 0.0
+    for row in range(n):
+        assigned = float(similarity[row, assignment[row]])
+        alternatives = np.delete(similarity[row], assignment[row])
+        second = float(np.max(alternatives))
+        if assigned <= np.finfo(float).eps:
+            return float('inf')
+        worst = max(worst, second / assigned)
+
+    return float(worst)
+
+
+class BackendOverlapStateTracker(ElectronicStateTracker):
+    """
+    Production tracker driven by a backend's own cross-geometry state overlap.
+
+    The provider supplies, in :attr:`StateDescriptors.overlap_matrix`, the
+    matrix measured between the previously **accepted** geometry and the
+    current one, with *previous raw targets* in rows and *current raw targets*
+    in columns.  This tracker owns the only persistent state history in the
+    surface-hopping layer: the tracked-to-raw permutation at the previously
+    accepted geometry.  It reorders the supplied rows into tracked order
+    before solving the global assignment, exactly as
+    :class:`OpenQPMRSFStateTracker` does for the geometry-optimization path,
+    and both use the same :func:`assignment_similarity` metric.
+
+    The tracker is fail-closed.  A missing, malformed, wrongly sized or
+    ambiguous overlap produces ``is_reliable=False`` and leaves the accepted
+    permutation untouched; it never falls back onto excitation-energy order.
+
+    :param minimum_overlap:
+        Minimum accepted per-state ``|<Psi_i|Psi_j>|``.
+    :param maximum_ambiguity_ratio:
+        Maximum accepted ratio of the best rejected similarity to the
+        assigned one, per tracked state.
+    """
+
+    method_name = 'backend_overlap'
+
+    def __init__(self, minimum_overlap=0.5, maximum_ambiguity_ratio=0.8):
+
+        super().__init__(minimum_overlap=minimum_overlap)
+
+        self.maximum_ambiguity_ratio = float(maximum_ambiguity_ratio)
+
+        if not 0.0 <= self.maximum_ambiguity_ratio <= 1.0:
+            raise ValueError(
+                'BackendOverlapStateTracker: maximum_ambiguity_ratio must be '
+                'in [0, 1].')
+
+    @property
+    def tracked_to_raw(self):
+        """
+        :return:
+            The accepted tracked-to-raw permutation, or ``None`` before the
+            first geometry.
+        """
+
+        if self._reference is None:
+            return None
+
+        return np.asarray(self._reference['tracked_to_raw'], dtype=int)
+
+    def similarity_matrix(self, previous, current):
+        """
+        See :func:`ElectronicStateTracker.similarity_matrix`.
+
+        ``previous`` is the accepted permutation record rather than a
+        descriptor set, because this tracker measures character through the
+        backend rather than through stored descriptors.
+        """
+
+        from .surfacehoppingbackends import assignment_similarity
+
+        raw = assignment_similarity(current.overlap_matrix)
+        permutation = np.asarray(previous['tracked_to_raw'], dtype=int)
+
+        return raw[permutation, :]
+
+    def track(self, descriptors):
+        """
+        See :func:`ElectronicStateTracker.track`.
+        """
+
+        n_states = descriptors.n_states
+
+        if self._reference is None:
+            # The first geometry defines the persistent identities.  Tracked
+            # state t is raw target t; every later geometry is measured
+            # against this labelling through the backend overlap, never by
+            # re-sorting energies.
+            self._reference = {'tracked_to_raw': np.arange(n_states)}
+
+            return TrackingResult(
+                permutation=np.arange(n_states),
+                scores=np.ones(n_states),
+                confidence=1.0,
+                is_reliable=True,
+                swapped=False,
+                method=self.method_name,
+                warnings=['backend-overlap tracking reference initialized'],
+                similarity_matrix=np.eye(n_states),
+                ambiguity_ratio=0.0,
+                descriptor='initial_labelling')
+
+        accepted = np.asarray(self._reference['tracked_to_raw'], dtype=int)
+
+        if accepted.size != n_states:
+            return self._failed(
+                n_states, accepted,
+                f'the number of tracked states changed from {accepted.size} '
+                f'to {n_states}; the persistent identities are not defined '
+                'across that change')
+
+        if descriptors.overlap_matrix is None:
+            return self._failed(
+                n_states, accepted,
+                'the backend supplied no cross-geometry state overlap; '
+                'production tracking refuses to fall back on excitation-'
+                'energy order')
+
+        try:
+            similarity = self.similarity_matrix(self._reference, descriptors)
+        except ValueError as error:
+            return self._failed(n_states, accepted, str(error))
+
+        if similarity.shape != (n_states, n_states):
+            return self._failed(
+                n_states, accepted,
+                f'the backend overlap has shape {similarity.shape} but '
+                f'{n_states} tracked states are required')
+
+        permutation = solve_assignment(similarity)
+        scores = similarity[np.arange(n_states), permutation]
+        confidence = float(np.min(scores)) if n_states else 1.0
+        ambiguity = assignment_ambiguity(similarity, permutation)
+
+        reliable_overlap = confidence >= self.minimum_overlap
+        reliable_margin = ambiguity <= self.maximum_ambiguity_ratio
+        is_reliable = bool(reliable_overlap and reliable_margin)
+        swapped = bool(np.any(permutation != np.arange(n_states)))
+
+        warnings = []
+        if not reliable_overlap:
+            warnings.append(
+                f'backend state overlap {confidence:.6f} is below the '
+                f'configured minimum {self.minimum_overlap:.6f}')
+        if not reliable_margin:
+            warnings.append(
+                f'assignment ambiguity ratio {ambiguity:.6f} exceeds the '
+                f'configured maximum {self.maximum_ambiguity_ratio:.6f}')
+        if swapped:
+            warnings.append(
+                f'raw target reordering detected: {permutation.tolist()}')
+
+        if is_reliable:
+            # Only a reliable assignment becomes the identity that later
+            # geometries are measured against.
+            self._reference = {'tracked_to_raw': np.asarray(permutation,
+                                                            dtype=int)}
+
+        return TrackingResult(permutation=permutation,
+                              scores=scores,
+                              confidence=confidence,
+                              is_reliable=is_reliable,
+                              swapped=swapped,
+                              method=self.method_name,
+                              warnings=warnings,
+                              similarity_matrix=similarity,
+                              ambiguity_ratio=ambiguity,
+                              descriptor='backend_state_overlap')
+
+    def _failed(self, n_states, accepted, message):
+        """
+        Builds an unreliable result without advancing the accepted history.
+        """
+
+        return TrackingResult(permutation=np.asarray(accepted, dtype=int),
+                              scores=np.zeros(n_states),
+                              confidence=0.0,
+                              is_reliable=False,
+                              swapped=False,
+                              method=self.method_name,
+                              warnings=[message],
+                              similarity_matrix=None,
+                              ambiguity_ratio=float('inf'),
+                              descriptor='unavailable')
+
+
 class IdentityStateTracker(ElectronicStateTracker):
     """
     Non-tracker that keeps the raw energy ordering.
@@ -467,10 +691,37 @@ class IdentityStateTracker(ElectronicStateTracker):
 
 
 TRACKERS = {
+    'backend_overlap': BackendOverlapStateTracker,
     'transition_density': OverlapStateTracker,
     'descriptor': DescriptorStateTracker,
     'none': IdentityStateTracker,
 }
+
+#: Trackers that establish state identity from an electronic quantity and may
+#: be used in production.
+PRODUCTION_TRACKERS = frozenset({'backend_overlap', 'transition_density'})
+
+#: Trackers that cannot see a change of electronic character.  The descriptor
+#: tracker collapses onto excitation-energy continuity whenever no oscillator
+#: strength or transition dipole is available - which is the case for both
+#: production spin-flip backends - and the identity tracker is the raw energy
+#: ordering by construction.  Both are diagnostic tools; using either as the
+#: sole state-identity evidence is the silent energy-order fallback that
+#: production surface hopping must never perform.
+UNSAFE_TRACKERS = frozenset({'descriptor', 'none'})
+
+
+def is_production_tracker(method):
+    """
+    :param method:
+        A tracker name.
+
+    :return:
+        True when the named tracker establishes identity from an electronic
+        quantity rather than from energy ordering.
+    """
+
+    return str(method).lower() in PRODUCTION_TRACKERS
 
 
 def create_state_tracker(method, minimum_overlap=0.5, **kwargs):

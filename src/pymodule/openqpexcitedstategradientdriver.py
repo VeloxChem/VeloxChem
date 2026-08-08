@@ -79,6 +79,15 @@ class OpenQPExcitedStateGradientDriver(GradientDriver):
         self.excited_state_energy = None
         self.total_energy = None
 
+        # ``excited_state_energy`` is a *scalar* excitation energy of the
+        # selected root relative to the lowest MRSF target.  It can never be
+        # used to build a multi-state ladder.  The two attributes below carry
+        # what a multi-state consumer actually needs and are refreshed by
+        # every evaluation: the working-reference energy (diagnostics only)
+        # and the total target-state energies in raw target order.
+        self.reference_energy = None
+        self.target_state_energies = None
+
         # State tracking is opt-in so that existing fixed-root calculations
         # retain their exact control flow.  A tracked calculation provides its
         # energy and gradient atomically.
@@ -165,13 +174,20 @@ class OpenQPExcitedStateGradientDriver(GradientDriver):
     def enable_state_tracking(self,
                               minimum_overlap=0.5,
                               maximum_ambiguity_ratio=0.8,
-                              failure_mode='error'):
+                              failure_mode='error',
+                              guard_ground_state=True,
+                              max_stale_reference_steps=10):
         """Enables native OpenQP MRSF persistent-state tracking.
 
         The currently configured ``state_deriv_index`` establishes the
         persistent identity at the first geometry.  Subsequent
         ``state_deriv_index`` values report the raw OpenQP root carrying that
         identity.
+
+        ``guard_ground_state`` keeps an excited identity off the lowest raw
+        root; see :class:`OpenQPMRSFStateTracker`.  Leave it enabled for every
+        excited-state optimization -- without it a torsion scan that reaches
+        an S1/S0 conical intersection silently continues on S0.
         """
 
         assert_msg_critical(
@@ -188,7 +204,9 @@ class OpenQPExcitedStateGradientDriver(GradientDriver):
             target_state=self.target_state_index,
             minimum_overlap=minimum_overlap,
             maximum_ambiguity_ratio=maximum_ambiguity_ratio,
-            failure_mode=failure_mode)
+            failure_mode=failure_mode,
+            guard_ground_state=guard_ground_state,
+            max_stale_reference_steps=max_stale_reference_steps)
         self.state_tracking = True
         self.computes_energy_with_gradient = True
         self.last_tracking_result = None
@@ -268,7 +286,11 @@ class OpenQPExcitedStateGradientDriver(GradientDriver):
             minimum_overlap=(0.5 if old is None else old.minimum_overlap),
             maximum_ambiguity_ratio=(
                 0.8 if old is None else old.maximum_ambiguity_ratio),
-            failure_mode=('error' if old is None else old.failure_mode))
+            failure_mode=('error' if old is None else old.failure_mode),
+            guard_ground_state=(
+                True if old is None else old.guard_ground_state),
+            max_stale_reference_steps=(
+                10 if old is None else old.max_stale_reference_steps))
 
     def update_settings(self, grad_dict, rsp_dict=None, method_dict=None):
         """
@@ -324,7 +346,11 @@ class OpenQPExcitedStateGradientDriver(GradientDriver):
                         grad_dict.get('minimum_tracking_overlap', 0.5)),
                     maximum_ambiguity_ratio=float(
                         grad_dict.get('maximum_ambiguity_ratio', 0.8)),
-                    failure_mode=grad_dict.get('tracking_failure', 'error'))
+                    failure_mode=grad_dict.get('tracking_failure', 'error'),
+                    guard_ground_state=bool(
+                        grad_dict.get('guard_ground_state', True)),
+                    max_stale_reference_steps=grad_dict.get(
+                        'max_stale_reference_steps', 10))
             else:
                 self.disable_state_tracking()
 
@@ -421,11 +447,27 @@ class OpenQPExcitedStateGradientDriver(GradientDriver):
             return None
 
         mol = self._run_state(molecule, need_gradient=False)
+        self._record_state_energies(mol)
         self.total_energy = float(mol.energies[self.state_deriv_index])
         self.excited_state_energy = float(
             mol.energies[self.state_deriv_index] - mol.energies[1])
 
         return self.total_energy
+
+    def _record_state_energies(self, mol):
+        """Stores the working reference and the total target-state energies.
+
+        OpenQP returns ``nstate + 1`` entries: slot 0 is the high-spin ROHF
+        working reference and slots ``1 .. nstate`` are the total MRSF
+        target-state energies.  The working reference is diagnostics only and
+        is never a dynamics surface.
+        """
+
+        energies = np.asarray(mol.energies, dtype=float).reshape(-1)
+        n_targets = max(0, energies.size - 1)
+
+        self.reference_energy = float(energies[0]) if energies.size else None
+        self.target_state_energies = energies[1:1 + n_targets].copy()
 
     def _tracked_cache_key(self, molecule):
         """Cache key for a tracked evaluation: geometry *and* reference.
@@ -513,10 +555,16 @@ class OpenQPExcitedStateGradientDriver(GradientDriver):
             mol, tracking_result = self._run_tracked_state(molecule)
             state = int(tracking_result.selected_raw_root)
             self.state_deriv_index = state
+            # Set by OptimizationEngine on a constrained scan.  The tracker
+            # holds this same object in its history, so stamping it here is
+            # what later lets the history be aligned with the grid points.
+            tracking_result.scan_point = getattr(self, 'current_scan_point',
+                                                 None)
             self.last_tracking_result = tracking_result
         else:
             mol = self._run_state(molecule, need_gradient=True)
             state = self.state_deriv_index
+        self._record_state_energies(mol)
         self.total_energy = float(mol.energies[state])
         self.excited_state_energy = float(mol.energies[state] - mol.energies[1])
 
@@ -576,6 +624,45 @@ class OpenQPExcitedStateGradientDriver(GradientDriver):
             f'Target assignment reliable : {result.is_reliable}')
         self.ostream.print_info(
             f'Raw root changed           : {result.root_changed}')
+
+        if result.ground_state_raw_root is not None:
+            guard_text = ('on (S0 excluded from the assignment)'
+                          if result.ground_state_guarded else 'OFF')
+            self.ostream.print_info(
+                f'Ground-state raw root      : '
+                f'{result.ground_state_raw_root}  [guard {guard_text}]')
+        if result.ground_state_gap_ev is not None:
+            self.ostream.print_info(
+                f'Selected root above S0     : '
+                f'{result.ground_state_gap_ev:.6f} eV')
+        if result.ground_state_collision:
+            self.ostream.print_info(
+                'S1/S0 seam reached         : the tracked character sits on '
+                f'raw root {result.unguarded_raw_root} (the ground state)')
+
+        # Where this geometry's starting orbitals came from, and how far the
+        # comparison point has fallen behind.  Both are silent by default and
+        # both change what the numbers above mean.
+        self.ostream.print_info(
+            'SCF guess for this geometry: ' +
+            ('previous accepted geometry (committed tracking reference)'
+             if result.seeded_from_reference else
+             'OpenQP default (no reusable reference)'))
+        guess_info = getattr(self.openqp_driver, 'last_scf_guess_info', None)
+        if guess_info is not None and guess_info.get('seeded'):
+            # The reported number is the violation the Loewdin step removed,
+            # i.e. how far the previous geometry's orbitals were from
+            # orthonormal in *this* geometry's AO metric -- a measure of how
+            # far the geometry moved, not a residual error.
+            self.ostream.print_info(
+                f"  {guess_info['basis_functions']} orbitals re-orthonormalized"
+                ' (Loewdin) in this AO metric; largest violation removed: '
+                f"{guess_info['orthonormality_error']:.3e}")
+        if result.stale_reference_steps:
+            self.ostream.print_info(
+                'Reference age              : '
+                f'{result.stale_reference_steps} accepted step(s) behind '
+                '(commits refused); overlaps decay while it stays behind')
         self.ostream.print_blank()
         self.ostream.print_info(
             'Raw  Tracked       Energy / Eh       Relative to S0 / eV')

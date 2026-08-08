@@ -44,7 +44,9 @@ from .veloxchemlib import mpi_master, hartree_in_kjpermol, bohr_in_angstrom
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
-from .optimizationengine import OptimizationEngine
+from .optimizationengine import (OptimizationEngine,
+                                 _CONSTRAINT_ATOM_COUNT,
+                                 _internal_coordinate)
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
@@ -325,6 +327,9 @@ class OptimizationDriver:
                     self.ostream.flush()
 
         opt_engine = OptimizationEngine(self.grad_drv, molecule, *args)
+        # geomeTRIC's own scan banner goes to a logger that is captured into a
+        # buffer, so the engine reports the constrained coordinates itself.
+        opt_engine.set_constraints(self.constraints)
 
         # save unparsed opt_dict in opt_engine for later writing to checkpoint
         opt_keywords = {
@@ -406,13 +411,13 @@ class OptimizationDriver:
                             print(line, file=fh)
             constr_filename = constr_file.as_posix()
 
-            # self.ostream.print_info('The following constraints are passed to geomeTRIC:')
-            # self.ostream.print_blank()
-            # with constr_file.open('r') as fh:
-            #     for line in fh:
-            #         self.ostream.print_header(line.rstrip().ljust(104))
-            # self.ostream.print_blank()
-            # self.ostream.flush()
+            if self.rank == mpi_master():
+                self.ostream.print_info(
+                    'The following constraints are passed to geomeTRIC:')
+                for line in self.constraints:
+                    self.ostream.print_info(f'  {line.strip()}')
+                self.ostream.print_blank()
+                self.ostream.flush()
 
         else:
             constr_filename = None
@@ -895,29 +900,96 @@ class OptimizationDriver:
         self.ostream.print_blank()
 
         scans = []
+        geometries = []
 
-        for step, energy in zip(progress.comms, progress.qm_energies):
+        for step, energy, xyz in zip(progress.comms, progress.qm_energies,
+                                     progress.xyzs):
             if step.split()[:2] == ['Iteration', '0']:
                 scans.append([])
+                geometries.append([])
             scans[-1].append(energy)
+            geometries[-1].append(xyz)
 
         energies = [s[-1] for s in scans]
+        # geomeTRIC hands out Angstrom; the coordinate evaluator wants bohr.
+        final_xyzs = [
+            np.asarray(g[-1], dtype=float) / geometric.nifty.bohr2ang
+            for g in geometries
+        ]
 
         e_min = min(energies)
         relative_energies = [e - e_min for e in energies]
 
-        line = '{:>5s}{:>20s}  {:>25s}{:>30s}'.format(
-            'Scan', 'Energy (a.u.)', 'Relative Energy (a.u.)',
-            'Relative Energy (kJ/mol)')
+        # The scanned coordinate is what makes the table readable; without it
+        # the rows are unlabelled and the profile cannot be interpreted.
+        scan_values = self._scan_coordinate_values(final_xyzs)
+
+        if scan_values is None:
+            line = '{:>5s}{:>20s}  {:>25s}{:>30s}'.format(
+                'Scan', 'Energy (a.u.)', 'Relative Energy (a.u.)',
+                'Relative Energy (kJ/mol)')
+        else:
+            line = '{:>5s}{:>14s}{:>20s}  {:>25s}{:>30s}'.format(
+                'Scan', scan_values['header'], 'Energy (a.u.)',
+                'Relative Energy (a.u.)', 'Relative Energy (kJ/mol)')
         self.ostream.print_header(line)
         self.ostream.print_header('-' * len(line))
         for i, (e, rel_e) in enumerate(zip(energies, relative_energies)):
-            line = '{:>5d}{:22.12f}{:22.12f}   {:25.10f}     '.format(
-                i + 1, e, rel_e, rel_e * hartree_in_kjpermol())
+            if scan_values is None:
+                line = '{:>5d}{:22.12f}{:22.12f}   {:25.10f}     '.format(
+                    i + 1, e, rel_e, rel_e * hartree_in_kjpermol())
+            else:
+                line = ('{:>5d}{:14.3f}{:22.12f}{:22.12f}   '
+                        '{:25.10f}     ').format(
+                            i + 1, scan_values['values'][i], e, rel_e,
+                            rel_e * hartree_in_kjpermol())
             self.ostream.print_header(line)
 
         self.ostream.print_blank()
         self.ostream.flush()
+
+    def _scan_coordinate_values(self, coordinates_au):
+        """
+        Evaluates the scanned internal coordinate at each converged point.
+
+        :param coordinates_au:
+            One ``(natoms, 3)`` array in bohr per converged scan point.
+
+        :return:
+            A dictionary with a column ``header`` and the list of ``values``,
+            or ``None`` when no scan constraint can be interpreted.
+        """
+
+        for line in (self.constraints or []):
+            fields = str(line).strip().split()
+            if not fields or fields[0].lower() != 'scan':
+                continue
+            coordinate = fields[1].lower()
+            n_atoms = _CONSTRAINT_ATOM_COUNT.get(coordinate)
+            if n_atoms is None:
+                continue
+            try:
+                atoms = [int(value) - 1 for value in fields[2:2 + n_atoms]]
+            except ValueError:
+                continue
+            if len(atoms) != n_atoms:
+                continue
+
+            values = [
+                _internal_coordinate(coordinate, np.asarray(xyz), atoms)
+                for xyz in coordinates_au
+            ]
+            if any(value is None for value in values):
+                continue
+
+            unit = 'Ang' if coordinate == 'distance' else 'deg'
+            atom_text = '-'.join(str(index + 1) for index in atoms)
+            return {
+                'header': f'{coordinate[:4]} {atom_text} ({unit})',
+                'values': values,
+            }
+
+        return None
 
     def print_vib_analysis(self, filename, vdata_label):
         """

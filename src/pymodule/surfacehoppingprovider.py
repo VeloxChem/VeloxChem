@@ -33,9 +33,9 @@
 Electronic-state providers for surface-hopping dynamics.
 
 A provider owns the electronic-structure drivers and answers a single
-question: given a nuclear geometry and an active state, what are the tracked
-adiabatic state energies, the gradient of the active state, and the
-descriptors needed for state tracking?
+question: given a nuclear geometry and an active state, what are the native
+adiabatic state energies, the gradient of the active adiabatic root, and the
+descriptors needed to track electronic character?
 
 State-index convention
 ----------------------
@@ -43,11 +43,11 @@ State-index convention
 Three index conventions coexist and are converted in exactly one place, in
 :func:`StateIndexConverter`:
 
-``tracked dynamics-state index``
-    Persistent physical identity used by the controller, gap detector and hop
-    history.  0 is initially the ground state and 1 the initially selected
-    first excited state, but an excited tracked state may map to a different
-    raw root after reordering.
+``tracked character-label index``
+    Persistent wavefunction-character label used for diagnostics and
+    integrity checks.  It may map to a different raw root as adiabatic
+    eigenvectors exchange character.  It does not index the active surface,
+    gap detector or hop history.
 
 ``current raw response-root index``
     The state ordering returned at one geometry: 0 is the ground state and
@@ -76,8 +76,8 @@ from .surfacehoppingtracker import StateDescriptors
 
 class StateIndexConverter:
     """
-    Single point of conversion among tracked dynamics-state indices, current
-    raw response-root indices and excited-state-gradient driver indices.
+    Single point of conversion among tracked character labels, current raw
+    adiabatic-root indices and excited-state-gradient driver indices.
 
     No ``+1`` or ``-1`` state-index arithmetic may appear anywhere else in the
     surface-hopping layer.
@@ -90,7 +90,7 @@ class StateIndexConverter:
 
         :param permutation:
             One-dimensional array whose entry ``i`` is the current raw root
-            representing persistent tracked state ``i``.  Raw index 0 is the
+            carrying persistent character label ``i``. Raw index 0 is the
             ground state; raw indices 1..N are response roots 1..N.
 
         :return:
@@ -112,7 +112,7 @@ class StateIndexConverter:
     @staticmethod
     def tracked_to_raw(tracked_state, permutation):
         """
-        Maps a persistent tracked state to its current raw response root.
+        Maps a persistent character label to its current raw response root.
         """
 
         permutation = StateIndexConverter.validate_permutation(permutation)
@@ -127,7 +127,7 @@ class StateIndexConverter:
     @staticmethod
     def raw_to_tracked(raw_state, permutation):
         """
-        Maps a current raw response root to its persistent tracked state.
+        Maps a current raw response root to its persistent character label.
         """
 
         permutation = StateIndexConverter.validate_permutation(permutation)
@@ -222,8 +222,11 @@ class StateIndexConverter:
     @staticmethod
     def tracked_to_driver_index(tracked_state, permutation):
         """
-        Maps a persistent tracked state directly to the VeloxChem
-        derivative-state index at the current geometry.
+        Maps a character label to the VeloxChem derivative selector of the
+        raw root currently carrying that character.
+
+        This conversion is for diagnostics and explicit character analysis;
+        adiabatic dynamics requests the selector of its raw active root.
         """
 
         raw_state = StateIndexConverter.tracked_to_raw(tracked_state,
@@ -269,10 +272,21 @@ class ElectronicStateResult:
     :param active_raw_state:
         Current raw state index whose gradient was evaluated.
     :param active_tracked_state:
-        Persistent tracked identity represented by ``active_raw_state``.
+        Persistent character label represented by ``active_raw_state``.
     :param derivative_state_index:
-        One-based VeloxChem excited-state derivative index, or ``None`` for
-        the ground-state gradient driver.
+        Backend derivative selector of the active state.  For the
+        conventional linear-response providers this is the one-based
+        VeloxChem excited-state index, or ``None`` for the ground-state
+        gradient driver.  For a spin-flip backend it is the backend's own
+        selector, taken from :attr:`state_selectors`.
+    :param state_selectors:
+        Optional tuple with one backend derivative selector per raw state.
+        When present it is authoritative and no ``+1`` arithmetic is done
+        outside the adapter that produced it.  ``None`` selects the
+        conventional ground-plus-excitation convention.
+    :param snapshot:
+        Optional immutable :class:`ElectronicSnapshot` this result was built
+        from, carrying backend, method, units, fingerprints and provenance.
     """
 
     geometry: np.ndarray
@@ -290,6 +304,8 @@ class ElectronicStateResult:
     active_raw_state: int = None
     active_tracked_state: int = None
     derivative_state_index: int = None
+    state_selectors: tuple = None
+    snapshot: object = None
 
     def __post_init__(self):
         """
@@ -299,15 +315,52 @@ class ElectronicStateResult:
         if self.active_raw_state is None:
             self.active_raw_state = int(self.active_state)
 
-        if (self.derivative_state_index is None and
-                not StateIndexConverter.is_ground_state(self.active_raw_state)):
-            self.derivative_state_index = (
-                StateIndexConverter.raw_to_driver_index(self.active_raw_state))
+        if self.state_selectors is not None:
+            self.state_selectors = tuple(
+                int(value) for value in self.state_selectors)
+
+        if self.derivative_state_index is None:
+            self.derivative_state_index = self.selector_for(
+                self.active_raw_state)
+
+    def selector_for(self, raw_state):
+        """
+        Maps a raw state index to the backend derivative selector.
+
+        This is the single conversion point for the gradient request.  A
+        provider that declares :attr:`state_selectors` owns the arithmetic;
+        otherwise the conventional convention applies, in which raw state 0
+        is the ground state and has no excited-state derivative index.
+
+        :param raw_state:
+            Raw state index at the current geometry.
+
+        :return:
+            The backend derivative selector, or ``None`` for a conventional
+            ground state.
+        """
+
+        index = int(raw_state)
+
+        if self.state_selectors is None:
+            return StateIndexConverter.raw_to_driver_index(index)
+
+        assert_msg_critical(
+            0 <= index < len(self.state_selectors),
+            f'ElectronicStateResult: raw state {index} is outside the '
+            f'{len(self.state_selectors)} computed states.')
+
+        return int(self.state_selectors[index])
 
     def tracked_state_energies(self):
         """
         :return:
-            The state energies reordered into tracked identity order.
+            The state energies reordered into persistent character order.
+
+        This ordering is diagnostic.  Adiabatic surface-hopping gaps and
+        gradients must use :func:`adiabatic_state_energies` instead: following
+        character through an avoided crossing would silently switch the
+        nuclear force without a stochastic hop.
         """
 
         if self.state_permutation is None:
@@ -317,10 +370,15 @@ class ElectronicStateResult:
                           dtype=float)[np.asarray(self.state_permutation,
                                                   dtype=int)]
 
+    def adiabatic_state_energies(self):
+        """Returns energies in the backend's native adiabatic root order."""
+
+        return np.asarray(self.state_energies, dtype=float)
+
     def raw_to_tracked_permutation(self):
         """
         :return:
-            Array mapping each current raw state index to its tracked identity.
+            Array mapping each current raw root to its character label.
         """
 
         permutation = (np.arange(np.asarray(self.state_energies).size)
@@ -392,7 +450,7 @@ class ElectronicStateProvider:
     calculation.
 
     :param number_of_states:
-        Number of tracked adiabatic states including the ground state.
+        Number of adiabatic states including the ground state.
     :param geometry_tolerance:
         Two geometries closer than this, in bohr, are treated as identical for
         caching purposes.
@@ -459,9 +517,8 @@ class ElectronicStateProvider:
             Array of shape (n_atoms, 3) with the QM geometry in bohr.
         :param active_state:
             Current raw state index whose gradient is requested.  The
-            controller converts from its persistent tracked state before
-            calling the provider and corrects the request after the current
-            state permutation is known.
+            controller keeps this adiabatic-root index unchanged by character
+            tracking.
 
         :return:
             An :class:`ElectronicStateResult`.
@@ -536,6 +593,70 @@ class ElectronicStateProvider:
 
         raise NotImplementedError
 
+    # -- accepted-reference transaction ------------------------------------
+    #
+    # Providers that measure a cross-geometry electronic descriptor need the
+    # same accepted/trial chronology the controller already applies to the
+    # state tracker: a trial endpoint that is discarded by checkpoint-and-
+    # replay must not become the reference the replayed endpoint is measured
+    # against.  Providers without such a descriptor implement nothing.
+
+    def get_reference_state(self):
+        """
+        :return:
+            An opaque handle to the accepted electronic reference, or
+            ``None`` when the provider keeps no cross-geometry reference.
+        """
+
+        return None
+
+    def set_reference_state(self, reference):
+        """
+        Restores a previously captured accepted reference.
+
+        :param reference:
+            A handle returned by :func:`get_reference_state`.
+        """
+
+    def commit_reference(self):
+        """
+        Promotes the most recent evaluation to the accepted reference.
+
+        :return:
+            True when the accepted reference advanced.
+        """
+
+        return False
+
+    def rollback_reference(self):
+        """
+        Discards an evaluation that was not accepted.
+
+        :return:
+            True when a staged evaluation was discarded.
+        """
+
+        return False
+
+    def is_production_ready(self):
+        """
+        :return:
+            True when this provider supplies a validated cross-geometry
+            electronic descriptor and may be used for production surface
+            hopping.
+        """
+
+        return False
+
+    def describe(self):
+        """
+        :return:
+            A dictionary describing the electronic backend, for the run log
+            and the diagnostics records.
+        """
+
+        return {'backend': 'unspecified', 'method': 'unspecified'}
+
     def _cache_key(self, geometry, active_state):
         """
         Builds a cache key from a rounded geometry and the active state.
@@ -579,7 +700,7 @@ class VeloxChemStateProvider(ElectronicStateProvider):
     :param excited_gradient_driver:
         Excited-state gradient driver, e.g. :class:`TddftGradientDriver`.
     :param number_of_states:
-        Number of tracked states including the ground state.
+        Number of adiabatic states including the ground state.
     """
 
     def __init__(self, molecule_template, basis_label, scf_driver, rsp_driver,
@@ -873,6 +994,541 @@ class VeloxChemStateProvider(ElectronicStateProvider):
         return rounded.tobytes()
 
 
+class BackendStateProvider(ElectronicStateProvider):
+    """
+    Provider for spin-flip electronic backends with target-state semantics.
+
+    Neither MRSF-TDDFT nor SF-TDDFT fits the conventional
+    ground-plus-excitation contract: both produce a working reference of a
+    *different spin manifold* together with a set of physical target states,
+    the lowest of which normally lies below that reference.  This provider
+    therefore exposes **only** total target-state energies to the controller;
+    the working reference survives as provenance in
+    :attr:`ElectronicStateResult.ground_energy` and is never a dynamics
+    surface, never a Landau-Zener gap partner, never a hop candidate and
+    never an installed force.
+
+    All backend index arithmetic happens inside the adapter and arrives here
+    as :attr:`ElectronicSnapshot.derivative_selectors`, which this provider
+    copies verbatim onto the result.
+
+    :param adapter:
+        An :class:`ElectronicBackendAdapter`.
+    :param number_of_states:
+        Number of physical target states, which must match the adapter.
+    :param cache_size:
+        Number of retained snapshots; must cover the checkpoint-and-replay
+        chronology.
+    """
+
+    def __init__(self, adapter, number_of_states=None, cache_size=8):
+
+        from .surfacehoppingbackends import ElectronicBackendAdapter
+
+        assert_msg_critical(
+            isinstance(adapter, ElectronicBackendAdapter),
+            'BackendStateProvider: adapter must be an '
+            'ElectronicBackendAdapter.')
+
+        states = (adapter.number_of_states if number_of_states is None else
+                  int(number_of_states))
+
+        assert_msg_critical(
+            states == adapter.number_of_states,
+            'BackendStateProvider: the adapter computes '
+            f'{adapter.number_of_states} target states but {states} were '
+            'requested.')
+
+        super().__init__(states, cache_size=cache_size)
+
+        self.adapter = adapter
+        self.generation = 0
+
+        self._accepted_snapshot = None
+        self._pending_snapshot = None
+        self._snapshots = {}
+        self._gradients = {}
+        self._restart_reference = None
+
+    @property
+    def number_of_roots(self):
+        """
+        :return:
+            The number of target states.  A spin-flip backend has no
+            "ground state plus roots" split: every computed state is a target
+            state, so this equals :attr:`number_of_states`.
+        """
+
+        return self.number_of_states
+
+    def is_production_ready(self):
+        """
+        See :func:`ElectronicStateProvider.is_production_ready`.
+        """
+
+        return True
+
+    def describe(self):
+        """
+        See :func:`ElectronicStateProvider.describe`.
+        """
+
+        return dict(self.adapter.validate_startup())
+
+    def validate_startup(self):
+        """
+        Validates the installed backend before a trajectory starts.
+
+        :return:
+            A dictionary of validated capabilities.
+        """
+
+        capabilities = self.adapter.validate_startup()
+
+        assert_msg_critical(
+            int(capabilities['number_of_states']) == self.number_of_states,
+            'BackendStateProvider: the adapter reports a different number of '
+            'target states than the provider tracks.')
+
+        return capabilities
+
+    # -- accepted-reference transaction ------------------------------------
+
+    def get_reference_state(self):
+        """
+        See :func:`ElectronicStateProvider.get_reference_state`.
+
+        Snapshots are immutable, so the accepted reference is handed out by
+        reference rather than copied.
+        """
+
+        return self._accepted_snapshot
+
+    def set_reference_state(self, reference):
+        """
+        See :func:`ElectronicStateProvider.set_reference_state`.
+        """
+
+        self._accepted_snapshot = reference
+        self._pending_snapshot = None
+
+    def commit_reference(self):
+        """
+        See :func:`ElectronicStateProvider.commit_reference`.
+        """
+
+        if self._pending_snapshot is None:
+            return False
+
+        self._accepted_snapshot = self._pending_snapshot
+        self._pending_snapshot = None
+
+        return True
+
+    def rollback_reference(self):
+        """
+        See :func:`ElectronicStateProvider.rollback_reference`.
+        """
+
+        had_pending = self._pending_snapshot is not None
+        self._pending_snapshot = None
+
+        return had_pending
+
+    def restart_from(self, reference_payload):
+        """
+        Prepares a restart from a serialized accepted snapshot.
+
+        Native backend handles cannot be serialized, so the accepted
+        reference is *recomputed* at its stored geometry before the first
+        tracked step after a restart.  Tracking therefore never resumes with
+        an empty history, and never with an energy-order fallback.
+
+        :param reference_payload:
+            The dictionary written by
+            :func:`ElectronicSnapshot.to_restart_dict`, or ``None``.
+        """
+
+        from .surfacehoppingbackends import ElectronicSnapshot
+
+        if reference_payload is None:
+            self._restart_reference = None
+            self._accepted_snapshot = None
+            return
+
+        stored = ElectronicSnapshot.from_restart_dict(reference_payload)
+
+        assert_msg_critical(
+            stored.settings_fingerprint == self.adapter.settings_digest(),
+            'BackendStateProvider: the checkpoint was written with different '
+            'electronic settings than the current adapter; refusing to '
+            'resume a state-tracking chain across that change.')
+        assert_msg_critical(
+            stored.n_states == self.number_of_states,
+            'BackendStateProvider: the checkpoint tracks '
+            f'{stored.n_states} target states but the provider tracks '
+            f'{self.number_of_states}.')
+
+        self._restart_reference = stored
+        self._accepted_snapshot = None
+        self._pending_snapshot = None
+
+    def reference_restart_payload(self):
+        """
+        :return:
+            The serializable accepted reference, or ``None``.
+        """
+
+        if self._accepted_snapshot is None:
+            return None
+
+        return self._accepted_snapshot.to_restart_dict()
+
+    def clear_cache(self):
+        """
+        See :func:`ElectronicStateProvider.clear_cache`.
+
+        The generation counter is bumped so that no key built before the
+        clear can ever match a key built after it.
+        """
+
+        super().clear_cache()
+
+        for calculation_id in list(self._snapshots):
+            self.adapter.release(calculation_id)
+
+        self._snapshots.clear()
+        self._gradients.clear()
+        self.generation += 1
+
+    # -- evaluation --------------------------------------------------------
+
+    def compute(self, geometry, active_state):
+        """
+        See :func:`ElectronicStateProvider.compute`.
+
+        A cache hit stages the same snapshot as a fresh evaluation would, so
+        the accepted-reference chain cannot be broken by the repeated query
+        that checkpoint-and-replay makes at the replayed endpoint.
+        """
+
+        result = super().compute(geometry, active_state)
+
+        if result.snapshot is not None:
+            self._pending_snapshot = result.snapshot
+
+        return result
+
+    def _cache_key(self, geometry, active_state):
+        """
+        See :func:`ElectronicStateProvider._cache_key`.
+
+        The accepted reference and the provider generation are part of the
+        key: the same geometry compared against a different accepted
+        reference is a different calculation, and its cross-geometry overlap
+        must not be reused.
+        """
+
+        from .surfacehoppingbackends import geometry_fingerprint
+
+        accepted = (None if self._accepted_snapshot is None else
+                    self._accepted_snapshot.calculation_id)
+
+        return (int(active_state),
+                geometry_fingerprint(geometry),
+                self.adapter.settings_digest(),
+                accepted,
+                int(self.generation))
+
+    def _evaluate(self, geometry, active_state):
+        """
+        See :func:`ElectronicStateProvider._evaluate`.
+        """
+
+        from .surfacehoppingbackends import geometry_fingerprint
+
+        coordinates = np.asarray(geometry, dtype=float)
+        raw_state = int(active_state)
+
+        assert_msg_critical(
+            0 <= raw_state < self.number_of_states,
+            f'BackendStateProvider: raw target {raw_state} is outside the '
+            f'{self.number_of_states} tracked target states.')
+
+        self._resolve_restart_reference()
+
+        previous = self._accepted_snapshot
+        key = self._snapshot_key(geometry_fingerprint(coordinates))
+        cached = self._snapshots.get(key, None)
+
+        if cached is not None and self._snapshot_matches_reference(cached):
+            snapshot = cached
+            gradient = self._gradient_for(snapshot, raw_state)
+        else:
+            snapshot, gradient = self.adapter.compute_snapshot(
+                coordinates, previous_snapshot=previous,
+                gradient_hint=raw_state)
+
+            # Nothing is cached before the whole result has been validated,
+            # so a partial or unconverged calculation can never be served to
+            # a later step as if it were complete.
+            self._validate_snapshot(snapshot, previous)
+            assert_msg_critical(
+                gradient is not None and
+                np.all(np.isfinite(np.asarray(gradient, dtype=float))),
+                'BackendStateProvider: the backend returned a nonfinite '
+                'active-state gradient.')
+
+            self._store_snapshot(key, snapshot)
+            self._gradients[(snapshot.calculation_id, raw_state)] = np.array(
+                gradient, dtype=float, copy=True)
+
+        self.n_scf_calls = self.adapter.n_scf_calls
+        self.n_response_calls = self.adapter.n_response_calls
+        self.n_gradient_calls = self.adapter.n_gradient_calls
+
+        # Staged, not accepted.  The controller commits once the frame is
+        # part of the trajectory; a discarded trial endpoint is rolled back.
+        self._pending_snapshot = snapshot
+
+        return self._build_result(snapshot, raw_state, gradient)
+
+    def compute_state_gradient(self, geometry, state):
+        """
+        See :func:`ElectronicStateProvider.compute_state_gradient`.
+
+        The gradient is taken from the snapshot that already exists at this
+        geometry, so it always belongs to the same backend calculation as the
+        active energies.  A geometry with no snapshot is an error rather than
+        an opportunity to reuse another geometry's result.
+        """
+
+        from .surfacehoppingbackends import geometry_fingerprint
+
+        coordinates = np.asarray(geometry, dtype=float)
+        fingerprint = geometry_fingerprint(coordinates)
+        snapshot = self._snapshots.get(self._snapshot_key(fingerprint), None)
+
+        # The snapshot the controller is currently working with wins, so a
+        # gradient correction after tracking always belongs to the very
+        # calculation that produced the active energies.
+        if (self._pending_snapshot is not None and
+                self._pending_snapshot.geometry_fingerprint == fingerprint):
+            snapshot = self._pending_snapshot
+
+        assert_msg_critical(
+            snapshot is not None,
+            'BackendStateProvider: no validated electronic snapshot exists '
+            'at the requested gradient geometry; refusing to return a '
+            'gradient computed at a different geometry.')
+
+        gradient = self._gradient_for(snapshot, int(state))
+        self.n_gradient_calls = self.adapter.n_gradient_calls
+
+        return gradient
+
+    # -- internals ---------------------------------------------------------
+
+    def _snapshot_key(self, fingerprint):
+        """
+        Builds the snapshot cache key.
+
+        Everything that can change a *snapshot* participates: the adapter's
+        settings fingerprint (basis, functional, grid, convergence, state
+        count, backend version, adapter revision), the geometry contents and
+        atom order, and the provider generation.
+
+        The accepted reference is deliberately *not* part of this key.  It is
+        checked separately by :func:`_snapshot_matches_reference`, because the
+        controller advances the accepted reference between the electronic
+        evaluation and the later gradient corrections at the same geometry;
+        keying on it would make those corrections miss their own snapshot.
+        """
+
+        return (self.adapter.settings_digest(), fingerprint,
+                int(self.generation))
+
+    def _snapshot_matches_reference(self, snapshot):
+        """
+        Whether a cached snapshot was measured against the accepted reference.
+
+        The same geometry compared against a different accepted reference is
+        a different calculation, and its cross-geometry overlap must not be
+        reused.
+        """
+
+        accepted = (None if self._accepted_snapshot is None else
+                    self._accepted_snapshot.calculation_id)
+
+        return snapshot.previous_calculation_id == accepted
+
+    def _store_snapshot(self, key, snapshot):
+        """
+        Caches a fully validated snapshot, evicting the oldest entries and
+        releasing their native backend payloads.
+        """
+
+        self._snapshots[key] = snapshot
+
+        while len(self._snapshots) > self.cache_size:
+            dropped_key = next(iter(self._snapshots))
+            dropped = self._snapshots.pop(dropped_key)
+            if dropped.calculation_id not in {
+                    kept.calculation_id for kept in self._snapshots.values()}:
+                self.adapter.release(dropped.calculation_id)
+                for gradient_key in [
+                        entry for entry in self._gradients
+                        if entry[0] == dropped.calculation_id]:
+                    self._gradients.pop(gradient_key, None)
+
+    def _gradient_for(self, snapshot, raw_state):
+        """
+        Returns the gradient of one raw target of a snapshot.
+
+        Gradients are keyed by ``(calculation identity, raw target)``, so two
+        target states can never alias onto the same cached gradient.
+        """
+
+        assert_msg_critical(
+            0 <= int(raw_state) < self.number_of_states,
+            f'BackendStateProvider: raw target {raw_state} is outside the '
+            f'{self.number_of_states} tracked target states.')
+
+        key = (snapshot.calculation_id, int(raw_state))
+        cached = self._gradients.get(key, None)
+
+        if cached is None:
+            cached = np.asarray(
+                self.adapter.compute_gradient(snapshot, int(raw_state)),
+                dtype=float)
+            assert_msg_critical(
+                np.all(np.isfinite(cached)),
+                'BackendStateProvider: the backend returned a nonfinite '
+                f'gradient for raw target {raw_state}.')
+            self._gradients[key] = np.array(cached, dtype=float, copy=True)
+
+        return np.array(self._gradients[key], dtype=float, copy=True)
+
+    def _validate_snapshot(self, snapshot, previous):
+        """
+        Refuses a snapshot that cannot be used for production dynamics.
+        """
+
+        assert_msg_critical(
+            snapshot.n_states == self.number_of_states,
+            'BackendStateProvider: the backend returned '
+            f'{snapshot.n_states} target states but {self.number_of_states} '
+            'are required.')
+        assert_msg_critical(
+            snapshot.is_valid(),
+            'BackendStateProvider: the backend returned an unconverged or '
+            'nonfinite electronic result; it is not cached and not used.')
+        assert_msg_critical(
+            snapshot.settings_fingerprint == self.adapter.settings_digest(),
+            'BackendStateProvider: the returned snapshot does not carry the '
+            "adapter's current settings fingerprint.")
+
+        if previous is not None:
+            assert_msg_critical(
+                snapshot.overlap_to_previous is not None,
+                'BackendStateProvider: the backend produced no cross-geometry '
+                'electronic descriptor; production state tracking cannot '
+                'fall back on excitation-energy order.')
+            assert_msg_critical(
+                snapshot.previous_calculation_id == previous.calculation_id,
+                'BackendStateProvider: the cross-geometry overlap was '
+                'measured against a different snapshot than the accepted '
+                'reference.')
+            assert_msg_critical(
+                snapshot.overlap_to_previous.shape ==
+                (previous.n_states, snapshot.n_states),
+                'BackendStateProvider: the cross-geometry overlap has the '
+                'wrong shape for the accepted reference.')
+            assert_msg_critical(
+                snapshot.reference_multiplicity ==
+                previous.reference_multiplicity and
+                snapshot.target_manifold == previous.target_manifold,
+                'BackendStateProvider: the spin manifold changed between the '
+                'accepted and the current geometry.')
+
+    def _build_result(self, snapshot, raw_state, gradient):
+        """
+        Wraps a validated snapshot in the controller's result contract.
+
+        Only target-state total energies are exposed.  ``ground_energy``
+        carries the working reference for provenance and does not appear in
+        ``state_energies``.
+        """
+
+        target_energies = np.asarray(snapshot.target_energies, dtype=float)
+        response_energies = np.asarray(snapshot.response_energies, dtype=float)
+
+        descriptors = StateDescriptors(
+            excitation_energies=response_energies,
+            overlap_matrix=(None if snapshot.overlap_to_previous is None else
+                            np.asarray(snapshot.overlap_to_previous,
+                                       dtype=float)))
+
+        return ElectronicStateResult(
+            geometry=np.asarray(snapshot.geometry, dtype=float),
+            ground_energy=float(snapshot.reference_energy),
+            excitation_energies=response_energies,
+            state_energies=target_energies,
+            active_state=int(raw_state),
+            active_gradient=np.asarray(gradient, dtype=float),
+            state_descriptors=descriptors,
+            state_permutation=np.arange(self.number_of_states),
+            tracking_scores=np.ones(self.number_of_states),
+            scf_converged=bool(snapshot.scf_converged),
+            response_converged=bool(snapshot.response_converged),
+            gradient_converged=bool(
+                np.all(np.isfinite(np.asarray(gradient, dtype=float)))),
+            active_raw_state=int(raw_state),
+            state_selectors=snapshot.derivative_selectors,
+            snapshot=snapshot)
+
+    def _resolve_restart_reference(self):
+        """
+        Recomputes a restart reference before it is first needed.
+
+        This is the only place a snapshot is computed without becoming a
+        dynamics frame.  It restores the electronic reference the checkpoint
+        was tracking against, so the first step after a restart is measured
+        with the same descriptor chain as an uninterrupted run.
+        """
+
+        if self._restart_reference is None:
+            return
+
+        stored = self._restart_reference
+        self._restart_reference = None
+
+        snapshot, _ = self.adapter.compute_snapshot(
+            np.asarray(stored.geometry, dtype=float),
+            previous_snapshot=None,
+            gradient_hint=None)
+
+        self._validate_snapshot(snapshot, None)
+
+        # The recomputed reference must reproduce the checkpointed potentials
+        # or the restart is not continuing the same calculation.
+        deviation = float(np.max(np.abs(
+            np.asarray(snapshot.target_energies, dtype=float) -
+            np.asarray(stored.target_energies, dtype=float))))
+
+        assert_msg_critical(
+            deviation <= 1.0e-6,
+            'BackendStateProvider: the recomputed restart reference deviates '
+            f'from the checkpointed target-state energies by {deviation:.3e} '
+            'Hartree; the restart is not continuing the same calculation.')
+
+        # Keyed while the accepted reference is still the pre-restart one, so
+        # the entry cannot be mistaken for a snapshot measured against itself.
+        key = self._snapshot_key(snapshot.geometry_fingerprint)
+        self._accepted_snapshot = snapshot
+        self._store_snapshot(key, snapshot)
+
+
 class ExternalDriverStateProvider(ElectronicStateProvider):
     """
     Provider for the external excited-state backends that follow the
@@ -890,7 +1546,7 @@ class ExternalDriverStateProvider(ElectronicStateProvider):
     :param excited_gradient_driver:
         A Serenity or OpenQP excited-state gradient driver.
     :param number_of_states:
-        Number of tracked states including the ground state.
+        Number of adiabatic states including the ground state.
     :param ground_gradient_driver:
         Optional ground-state gradient driver, required only when the ground
         state is reachable by hopping.
@@ -907,10 +1563,49 @@ class ExternalDriverStateProvider(ElectronicStateProvider):
 
         super().__init__(number_of_states)
 
+        self._refuse_spin_flip_driver(excited_gradient_driver)
+
         self.molecule_template = molecule_template
         self.excited_gradient_driver = excited_gradient_driver
         self.ground_gradient_driver = ground_gradient_driver
         self.scf_driver = scf_driver
+
+    @staticmethod
+    def _refuse_spin_flip_driver(driver):
+        """
+        Refuses a spin-flip driver on the conventional provider path.
+
+        MRSF-TDDFT and SF-TDDFT do not satisfy this provider's contract.  Its
+        state ladder is ``E_reference + omega_i`` with ``omega_0 = 0``, which
+        silently turns the high-spin working reference into dynamics state 0
+        and treats the physical target states as excitations above it.  For
+        both spin-flip families the lowest target normally lies *below* that
+        reference, so the ladder is neither physical nor ordered.  Use
+        :class:`BackendStateProvider` with the matching backend adapter.
+
+        :param driver:
+            The excited-state gradient driver handed to this provider.
+        """
+
+        tddft_type = str(getattr(driver, 'tddft_type', '') or '').lower()
+
+        assert_msg_critical(
+            tddft_type not in ('mrsf', 'sf'),
+            'ExternalDriverStateProvider: the driver is configured for '
+            f'{tddft_type.upper()}-TDDFT, whose working reference belongs to '
+            'a different spin manifold than the target states. This provider '
+            'would expose that reference as dynamics state 0. Use '
+            'BackendStateProvider with OpenQPMRSFAdapter instead.')
+
+        response_driver = getattr(driver, 'rsp_driver', None)
+
+        assert_msg_critical(
+            not bool(getattr(response_driver, 'spinflip', False)),
+            'ExternalDriverStateProvider: the Serenity response driver has '
+            'spinflip enabled, so its roots are spin-flip target states and '
+            'not excitations above the high-spin reference. This provider '
+            'would prepend that reference as dynamics state 0. Use '
+            'BackendStateProvider with SerenitySFAdapter instead.')
 
     def build_molecule(self, geometry):
         """
@@ -1012,7 +1707,7 @@ class ExternalDriverStateProvider(ElectronicStateProvider):
             'ExternalDriverStateProvider: running on the ground state requires '
             'the excited-state driver to expose compute_energy(molecule) so '
             'that the excitation spectrum can be evaluated at the current '
-            'geometry; otherwise the tracked gaps would be stale.')
+                'geometry; otherwise the adiabatic gaps would be stale.')
 
         compute_energy(molecule)
         self.n_scf_calls += 1

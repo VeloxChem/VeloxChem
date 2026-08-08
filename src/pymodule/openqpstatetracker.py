@@ -75,6 +75,16 @@ _REQUIRED_SNAPSHOT_KEYS = (
 # assignment assumes and must surface rather than be silently clipped.
 _OVERLAP_MAGNITUDE_TOLERANCE = 1.0e-3
 
+_HARTREE_IN_EV = 27.211386245988
+
+# Refusing to commit an unreliable assignment keeps the reference at the last
+# accepted geometry -- correct for a handful of steps, self-defeating beyond
+# that: the geometry keeps moving while the comparison point does not, so the
+# overlaps decay and every later step is unreliable for that reason alone.
+# Once the streak reaches this length the comparison has stopped being
+# meaningful and the run must say so rather than keep producing assignments.
+_DEFAULT_MAX_STALE_REFERENCE_STEPS = 10
+
 
 def native_overlap_to_previous_current(state_overlap):
     """Reinterprets an OpenQP tagarray overlap as (previous, current).
@@ -151,6 +161,14 @@ class OpenQPStateTrackingResult:
     seeded_from_reference: bool = False
     ground_state_raw_root: int = None
     ground_state_collision: bool = False
+    ground_state_guarded: bool = False
+    unguarded_raw_root: int = None
+    ground_state_gap_ev: float = None
+    stale_reference_steps: int = 0
+    # Zero-based grid point of a constrained scan, stamped by the consumer.
+    # Without it the history cannot be aligned with the converged geometries:
+    # a scan produces many evaluations per grid point, not one.
+    scan_point: int = None
 
     def to_dict(self):
         """Returns a JSON-serializable diagnostics dictionary."""
@@ -183,6 +201,16 @@ class OpenQPStateTrackingResult:
                 (None if self.ground_state_raw_root is None else
                  int(self.ground_state_raw_root)),
             'ground_state_collision': bool(self.ground_state_collision),
+            'ground_state_guarded': bool(self.ground_state_guarded),
+            'unguarded_raw_root':
+                (None if self.unguarded_raw_root is None else
+                 int(self.unguarded_raw_root)),
+            'ground_state_gap_ev':
+                (None if self.ground_state_gap_ev is None else
+                 float(self.ground_state_gap_ev)),
+            'stale_reference_steps': int(self.stale_reference_steps),
+            'scan_point': (None if self.scan_point is None else
+                           int(self.scan_point)),
         }
 
 
@@ -203,6 +231,22 @@ class OpenQPMRSFStateTracker:
         ``"error"`` stops before evaluating a gradient when tracking is
         unreliable. ``"warn"`` continues with the globally optimal assignment
         and records a prominent warning.
+    :param guard_ground_state:
+        Removes the ground state -- the lowest-energy raw root -- from the set
+        of roots an *excited* persistent identity may be assigned to.  The
+        MRSF spectrum carries S0 as an ordinary root, so at an S1/S0 conical
+        intersection the tracked excited character transfers onto it and an
+        unguarded run then minimizes the ground state while reporting itself
+        as an excited-state optimization.  Guarding keeps the identity on the
+        lowest excited adiabatic root and reports the event through
+        ``ground_state_collision``; it does not by itself make the assignment
+        unreliable, because following the adiabatic S1 through the seam is the
+        defined behaviour of a relaxed excited-state scan.  Disable it only
+        when the ground state is deliberately being followed.
+    :param max_stale_reference_steps:
+        Length of the refused-commit streak after which :meth:`evaluate`
+        raises instead of comparing against an ever-more-distant reference.
+        ``None`` disables the check.
     """
 
     method_name = 'openqp_mrsf_native_overlap'
@@ -214,7 +258,9 @@ class OpenQPMRSFStateTracker:
                  minimum_overlap=0.5,
                  maximum_ambiguity_ratio=0.8,
                  failure_mode='error',
-                 guard_ground_state=True):
+                 guard_ground_state=True,
+                 max_stale_reference_steps=(
+                     _DEFAULT_MAX_STALE_REFERENCE_STEPS)):
 
         self.nstates = int(nstates)
         self.target_state = int(target_state)
@@ -222,6 +268,9 @@ class OpenQPMRSFStateTracker:
         self.maximum_ambiguity_ratio = float(maximum_ambiguity_ratio)
         self.failure_mode = str(failure_mode).strip().lower()
         self.guard_ground_state = bool(guard_ground_state)
+        self.max_stale_reference_steps = (
+            None if max_stale_reference_steps is None else
+            int(max_stale_reference_steps))
 
         if self.nstates < 1:
             raise ValueError(
@@ -250,6 +299,7 @@ class OpenQPMRSFStateTracker:
         self._pending = None
         self._reference_revision = 0
         self.rejected_commits = 0
+        self.consecutive_rejected_commits = 0
 
     @property
     def has_reference(self):
@@ -311,6 +361,7 @@ class OpenQPMRSFStateTracker:
         self._pending = None
         self._reference_revision = 0
         self.rejected_commits = 0
+        self.consecutive_rejected_commits = 0
 
     def get_reference_payload(self):
         """Returns a defensive copy for ``OpenQP Molecule.back_door``."""
@@ -355,6 +406,18 @@ class OpenQPMRSFStateTracker:
             raise RuntimeError(
                 'OpenQPMRSFStateTracker.evaluate: reference is not initialized.')
 
+        if (self.max_stale_reference_steps is not None and
+                self.consecutive_rejected_commits >=
+                self.max_stale_reference_steps):
+            raise RuntimeError(
+                'OpenQPMRSFStateTracker.evaluate: the tracking reference has '
+                f'not advanced for {self.consecutive_rejected_commits} '
+                'consecutive accepted steps. Every overlap since then was '
+                'measured against a geometry that far behind, so the '
+                'assignment is no longer meaningful. Reduce the step size, '
+                'lower minimum_overlap/raise maximum_ambiguity_ratio, or '
+                'restart the tracking from the current geometry.')
+
         energies = self._validate_energies(state_energies)
         signed = self._validate_overlap(state_overlap)
         # The metric itself is unchanged: absolute native overlap.  Magnitudes
@@ -364,15 +427,61 @@ class OpenQPMRSFStateTracker:
         # OpenQP rows are in the previous raw order.  Reorder those rows into
         # persistent-state order before solving the global assignment.
         similarity = raw_similarity[self._tracked_to_raw, :]
-        assignment = solve_assignment(similarity)
+        target_idx = self.target_state - 1
+
+        # An MRSF spectrum carries S0 as an ordinary root, so a tracked
+        # excited identity can be assigned onto the ground state at a conical
+        # intersection and then quietly minimize S0 instead.  The ground state
+        # is the lowest-energy raw root at this geometry; the raw order is not
+        # fixed along a path, so it is located by energy.
+        ground_raw = int(np.argmin(energies))
+        guarding = bool(self.guard_ground_state and
+                        self.target_state != 1 and
+                        self.nstates > 1)
+
+        # The unguarded solution is kept purely as a diagnostic: it is what
+        # tells the caller that the tracked character has actually reached the
+        # ground state, i.e. that the path has hit the S1/S0 seam.
+        unguarded_assignment = solve_assignment(similarity)
+        unguarded_raw = int(unguarded_assignment[target_idx])
+        ground_state_collision = bool(guarding and unguarded_raw == ground_raw)
+
+        if guarding:
+            # Forbid every *excited* persistent identity from the ground raw
+            # root.  Because the solution is a permutation this simultaneously
+            # pins persistent identity 1 -- the ground identity, fixed when the
+            # identities were initialized from the raw energy order -- onto it.
+            # Exclusion rather than post-hoc rejection is what the Serenity SF
+            # tracker does (TransitionDensityTracker.evaluate_overlap_matrix),
+            # and it is the only version that actually prevents an S0 gradient.
+            # solve_assignment rejects nonfinite weights, so the forbidden
+            # entries get a penalty that no feasible permutation can recover.
+            penalty = -float(self.nstates) * (float(np.max(similarity)) + 1.0)
+            guarded = similarity.copy()
+            guarded[np.arange(self.nstates) != 0, ground_raw] = penalty
+            assignment = solve_assignment(guarded)
+        else:
+            assignment = unguarded_assignment
+
+        # Scores are always read from the true overlaps, never from the
+        # penalized matrix, so the reported confidence is physical.
         scores = similarity[np.arange(self.nstates), assignment]
 
-        target_idx = self.target_state - 1
         previous_raw = int(self._tracked_to_raw[target_idx])
         selected_raw = int(assignment[target_idx])
         target_score = float(scores[target_idx])
 
-        alternatives = np.delete(similarity[target_idx], selected_raw)
+        # The runner-up is the best *feasible* alternative.  While guarding,
+        # the ground column is not a candidate the assignment could have
+        # chosen, so counting it would inflate the ambiguity ratio precisely
+        # in the CI region and reject an assignment that was never in doubt.
+        excluded = {selected_raw}
+        if guarding:
+            excluded.add(ground_raw)
+        alternatives = np.array([
+            similarity[target_idx, column]
+            for column in range(self.nstates) if column not in excluded
+        ])
         second_score = (float(np.max(alternatives))
                         if alternatives.size else 0.0)
         ambiguity_ratio = (second_score / target_score
@@ -404,22 +513,29 @@ class OpenQPMRSFStateTracker:
                 f'persistent root {self.target_state} moved from raw root '
                 f'{previous_raw + 1} to {selected_raw + 1}')
 
-        # An MRSF spectrum carries S0 as an ordinary root, so a tracked
-        # excited identity can be assigned onto the ground state at a conical
-        # intersection and then quietly minimize S0 instead.  The ground state
-        # is the lowest-energy raw root at this geometry; the raw order is not
-        # fixed along a path, so it is located by energy.
-        ground_raw = int(np.argmin(energies))
-        ground_state_collision = bool(
-            self.guard_ground_state and
-            self.target_state != 1 and
-            selected_raw == ground_raw)
+        # Without the guard the selection is free to land on S0; report it the
+        # same way so a deliberately unguarded run is still diagnosable.
+        if not guarding:
+            ground_state_collision = bool(self.target_state != 1 and
+                                          selected_raw == ground_raw)
+
+        gap_ev = float(
+            abs(energies[selected_raw] - energies[ground_raw]) * _HARTREE_IN_EV)
+
         if ground_state_collision:
-            is_reliable = False
             warnings.append(
-                f'persistent root {self.target_state} was assigned to raw '
-                f'root {ground_raw + 1}, which is the ground state at this '
-                'geometry; the tracked excited state has collapsed onto S0')
+                f'persistent root {self.target_state} carries the character of '
+                f'raw root {ground_raw + 1}, which is the ground state at this '
+                'geometry; the path has reached the S1/S0 seam')
+            if guarding:
+                warnings.append(
+                    f'S0 was excluded from the assignment; raw root '
+                    f'{selected_raw + 1} is the lowest excited adiabatic state '
+                    f'({gap_ev:.4f} eV above S0)')
+            else:
+                warnings.append(
+                    'the ground-state guard is disabled, so the gradient will '
+                    'be taken on S0 and the run will minimize the ground state')
 
         return OpenQPStateTrackingResult(
             step=self._step + 1,
@@ -440,7 +556,11 @@ class OpenQPMRSFStateTracker:
             signed_overlap_matrix=signed,
             warnings=warnings,
             ground_state_raw_root=ground_raw + 1,
-            ground_state_collision=ground_state_collision)
+            ground_state_collision=ground_state_collision,
+            ground_state_guarded=guarding,
+            unguarded_raw_root=unguarded_raw + 1,
+            ground_state_gap_ev=gap_ev,
+            stale_reference_steps=int(self.consecutive_rejected_commits))
 
     def propose(self, result, xyz, data):
         """Stages a finished evaluation as a *candidate* reference.
@@ -500,6 +620,7 @@ class OpenQPMRSFStateTracker:
         if not bool(result.is_reliable):
             self._pending = None
             self.rejected_commits += 1
+            self.consecutive_rejected_commits += 1
             return False
 
         self._previous_xyz = self._pending['xyz']
@@ -510,6 +631,7 @@ class OpenQPMRSFStateTracker:
         self.history.append(result)
         self._reference_revision += 1
         self._pending = None
+        self.consecutive_rejected_commits = 0
 
         return True
 
@@ -620,6 +742,7 @@ class OpenQPMRSFStateTracker:
         self._reference_revision = int(state.get('reference_revision', 0))
         self._pending = None
         self.rejected_commits = 0
+        self.consecutive_rejected_commits = 0
         # Historic diagnostics are intentionally retained as dictionaries.
         # New in-process entries remain strongly typed result objects.
         self.history = list(state.get('history', []))

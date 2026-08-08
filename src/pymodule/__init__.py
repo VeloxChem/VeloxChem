@@ -134,6 +134,9 @@ from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .optimizationdriver import OptimizationDriver
+from .scanplotter import (collect_scan_data, check_scan, plot_scan,
+                          save_scan_data, load_scan_data,
+                          write_scan_trajectory, pyramidalization)
 from .mointsdriver import MOIntegralsDriver
 from .mp2driver import Mp2Driver
 from .cpcmdriver import CpcmDriver
@@ -246,12 +249,24 @@ from .landauzener import (LandauZenerEventDetector, LandauZenerEvent,
 from .surfacehoppingsettings import SurfaceHoppingSettings
 from .surfacehoppingtracker import (StateDescriptors, DescriptorStateTracker,
                                     OverlapStateTracker,
+                                    BackendOverlapStateTracker,
                                     IdentityStateTracker,
-                                    create_state_tracker)
+                                    create_state_tracker,
+                                    is_production_tracker,
+                                    PRODUCTION_TRACKERS, UNSAFE_TRACKERS)
+from .surfacehoppingbackends import (ElectronicSnapshot,
+                                     ElectronicBackendAdapter,
+                                     OpenQPMRSFAdapter, SerenitySFAdapter,
+                                     BackendCapabilityError,
+                                     assignment_similarity,
+                                     create_backend_adapter,
+                                     create_backend_provider,
+                                     BACKEND_ADAPTERS)
 from .surfacehoppingprovider import (ElectronicStateProvider,
                                      ElectronicStateResult,
                                      VeloxChemStateProvider,
                                      ExternalDriverStateProvider,
+                                     BackendStateProvider,
                                      StateIndexConverter)
 from .surfacehoppingrescaler import SurfaceHopMomentumRescaler
 from .surfacehoppingdynamics import (LandauZenerSurfaceHoppingDynamics,

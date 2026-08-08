@@ -105,11 +105,14 @@ class SurfaceHoppingSettings:
     :param surface_hopping_method:
         Hopping model. Only ``'landau_zener'`` is currently implemented.
     :param number_of_states:
-        Total number of tracked adiabatic states, including the ground state.
+        Total number of native adiabatic states, including the ground state
+        for conventional ground-plus-excitation providers.
     :param initial_active_state:
-        Dynamics index of the initially active state. 0 is the ground state.
+        Native adiabatic-root index of the initially active state. 0 is the
+        ground state for conventional providers or the lowest target for a
+        spin-flip provider.
     :param allowed_transitions:
-        ``'adjacent'`` restricts hopping to the neighbouring tracked states;
+        ``'adjacent'`` restricts hopping to neighbouring adiabatic roots;
         ``'all'`` permits any pair involving the active state; a list of
         ``(a, b)`` pairs defines an explicit set.
     :param electronic_timestep:
@@ -125,10 +128,25 @@ class SurfaceHoppingSettings:
         Ceiling applied to the Landau-Zener exponent.
     :param minimum_fit_quality:
         Minimum accepted local-fit quality, in [0, 1].
+    :param electronic_backend:
+        Explicit electronic backend: ``'openqp_mrsf'``, ``'serenity_sf'`` or
+        ``'veloxchem_tda'``.  Production runs must name a spin-flip backend;
+        it is never inferred and never silently replaced.
     :param state_tracking_method:
-        ``'transition_density'``, ``'descriptor'`` or ``'none'``.
+        ``'backend_overlap'``, ``'transition_density'``, ``'descriptor'`` or
+        ``'none'``.  The last two cannot see a change of electronic
+        character and are refused in production; see
+        ``allow_unsafe_state_tracking``.
     :param minimum_tracking_overlap:
         Minimum accepted state-tracking confidence, in [0, 1].
+    :param maximum_tracking_ambiguity:
+        Maximum accepted ratio of the best rejected similarity to the
+        assigned one, per tracked state, in [0, 1].
+    :param allow_unsafe_state_tracking:
+        Opt-in switch that permits ``'descriptor'`` or ``'none'`` tracking
+        with a production backend.  Such a run establishes state identity
+        from excitation-energy order alone and is diagnostic only; it must
+        never be used for production data.
     :param momentum_rescaling:
         ``'global_qm'`` or ``'gap_gradient'``.
     :param rescaling_atoms:
@@ -166,8 +184,11 @@ class SurfaceHoppingSettings:
     minimum_curvature: float = 0.0
     maximum_lz_exponent: float = 700.0
     minimum_fit_quality: float = 0.0
+    electronic_backend: str = 'veloxchem_tda'
     state_tracking_method: str = 'descriptor'
     minimum_tracking_overlap: float = 0.5
+    maximum_tracking_ambiguity: float = 0.8
+    allow_unsafe_state_tracking: bool = False
     momentum_rescaling: str = 'global_qm'
     rescaling_atoms: object = 'qm'
     remove_translation: bool = True
@@ -186,11 +207,20 @@ class SurfaceHoppingSettings:
                         'allowed_transitions', 'electronic_timestep',
                         'gap_fit_points', 'gap_screening_threshold',
                         'minimum_curvature', 'maximum_lz_exponent',
-                        'minimum_fit_quality', 'state_tracking_method',
-                        'minimum_tracking_overlap', 'momentum_rescaling',
+                        'minimum_fit_quality', 'electronic_backend',
+                        'state_tracking_method',
+                        'minimum_tracking_overlap',
+                        'maximum_tracking_ambiguity',
+                        'allow_unsafe_state_tracking', 'momentum_rescaling',
                         'rescaling_atoms', 'remove_translation',
                         'remove_rotation', 'frustrated_hop_policy',
                         'hop_energy_tolerance')
+
+    #: Electronic backends the production driver may select.
+    PRODUCTION_BACKENDS = ('openqp_mrsf', 'serenity_sf')
+
+    #: Every accepted backend identifier.
+    VALID_BACKENDS = PRODUCTION_BACKENDS + ('veloxchem_tda',)
 
     @property
     def timestep_in_au(self):
@@ -281,10 +311,34 @@ class SurfaceHoppingSettings:
             '[0, 1].')
 
         assert_msg_critical(
+            0.0 <= float(self.maximum_tracking_ambiguity) <= 1.0,
+            'SurfaceHoppingSettings: maximum_tracking_ambiguity must lie in '
+            '[0, 1].')
+
+        assert_msg_critical(
             str(self.state_tracking_method).lower()
-            in ('transition_density', 'descriptor', 'none'),
+            in ('backend_overlap', 'transition_density', 'descriptor', 'none'),
             'SurfaceHoppingSettings: state_tracking_method must be one of '
-            'transition_density, descriptor, none.')
+            'backend_overlap, transition_density, descriptor, none.')
+
+        assert_msg_critical(
+            str(self.electronic_backend).lower() in self.VALID_BACKENDS,
+            'SurfaceHoppingSettings: electronic_backend must be one of ' +
+            ', '.join(self.VALID_BACKENDS) + '.')
+
+        if str(self.electronic_backend).lower() in self.PRODUCTION_BACKENDS:
+            assert_msg_critical(
+                str(self.state_tracking_method).lower() == 'backend_overlap'
+                or bool(self.allow_unsafe_state_tracking),
+                'SurfaceHoppingSettings: electronic_backend '
+                f'{self.electronic_backend} requires '
+                "state_tracking_method='backend_overlap'. The descriptor and "
+                'identity trackers establish state identity from excitation-'
+                'energy order alone, because neither spin-flip backend '
+                'exposes an oscillator strength or a transition dipole; that '
+                'is the silent energy-order fallback production surface '
+                'hopping must not perform. Set '
+                'allow_unsafe_state_tracking=True only for diagnostics.')
 
         assert_msg_critical(
             str(self.momentum_rescaling).lower()
@@ -353,11 +407,11 @@ class SurfaceHoppingSettings:
 
     def candidate_states(self, active_state):
         """
-        Returns the tracked states considered as hopping targets for a given
-        active state.
+        Returns the adiabatic roots considered as hopping targets for a given
+        active raw root.
 
         :param active_state:
-            Dynamics index of the active state.
+            Native adiabatic-root index of the active state.
 
         :return:
             A sorted list of candidate target-state indices.

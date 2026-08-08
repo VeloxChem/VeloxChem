@@ -38,8 +38,9 @@ chronology of a surface-hopping trajectory:
 
 1. save the complete OpenMM state at frame ``n``;
 2. propagate a trial step from ``n`` to ``n+1`` on the current surface;
-3. evaluate the electronic states at ``n+1`` and track their identities;
-4. detect whether a tracked gap had a local minimum at frame ``n``;
+3. evaluate the energy-ordered adiabatic states at ``n+1`` and diagnose their
+   character continuity;
+4. detect whether an adiabatic energy gap had a local minimum at frame ``n``;
 5. evaluate the Landau-Zener probability and draw a random number;
 6. keep the trial frame when no hop is selected;
 7. otherwise restore frame ``n``, rescale momenta, switch the active state,
@@ -58,6 +59,7 @@ from pathlib import Path
 import copy
 import json
 import pickle
+import sys
 import numpy as np
 
 from .veloxchemlib import hartree_in_kjpermol, bohr_in_angstrom
@@ -71,7 +73,8 @@ from .surfacehoppingsettings import (SurfaceHoppingSettings, AU_IN_FS,
                                      NM_IN_BOHR, NM_PER_PS_IN_AU_VELOCITY,
                                      AU_VELOCITY_IN_NM_PER_PS,
                                      AMU_IN_ELECTRON_MASS)
-from .surfacehoppingtracker import create_state_tracker
+from .surfacehoppingtracker import (create_state_tracker,
+                                    is_production_tracker)
 
 try:
     import openmm as mm
@@ -115,9 +118,14 @@ class TrajectoryFrame:
     :param detector_history:
         Gap histories and duplicate-event bookkeeping at this frame.
     :param state_permutation:
-        Mapping from persistent tracked states to raw roots at this frame.
+        Mapping from persistent character labels to raw roots at this frame.
     :param current_frame_in_detector:
         Whether the detector snapshot already contains this frame.
+    :param provider_reference:
+        The provider's accepted electronic reference at this frame.  A
+        backend that measures a cross-geometry descriptor needs the same
+        accepted/trial chronology as the tracker, so the reference is
+        captured and restored together with it.
     """
 
     step: int
@@ -132,6 +140,7 @@ class TrajectoryFrame:
     detector_history: object
     state_permutation: np.ndarray
     current_frame_in_detector: bool
+    provider_reference: object = None
 
 
 class LandauZenerSurfaceHoppingDynamics:
@@ -151,6 +160,8 @@ class LandauZenerSurfaceHoppingDynamics:
     :param ostream:
         Output stream for human-readable logging.
     """
+
+    _ACTIVE_STATE_INDEX_SPACE = 'adiabatic_raw'
 
     def __init__(self, openmm_dynamics, provider, settings=None, ostream=None):
 
@@ -173,11 +184,20 @@ class LandauZenerSurfaceHoppingDynamics:
         self.md = openmm_dynamics
         self.provider = provider
 
-        self.ostream = ostream if ostream is not None else OutputStream(None)
+        self.ostream = ostream if ostream is not None else OutputStream(sys.stdout)
+
+        self._validate_tracking_policy()
+
+        tracker_options = {}
+        if str(self.settings.state_tracking_method).lower() == \
+                'backend_overlap':
+            tracker_options['maximum_ambiguity_ratio'] = float(
+                self.settings.maximum_tracking_ambiguity)
 
         self.tracker = create_state_tracker(
             self.settings.state_tracking_method,
-            minimum_overlap=self.settings.minimum_tracking_overlap)
+            minimum_overlap=self.settings.minimum_tracking_overlap,
+            **tracker_options)
 
         # The controller saves exactly one frame per nuclear interval and
         # applies a hop at that frame.  The central frame of a gap window of
@@ -217,6 +237,7 @@ class LandauZenerSurfaceHoppingDynamics:
         self.current_step = 0
         self.diagnostics = []
         self._state_permutation = np.arange(self.settings.number_of_states)
+        self._tracked_spin_multiplicities = None
         self._current_frame_in_detector = False
 
         self._diagnostics_handle = None
@@ -227,6 +248,135 @@ class LandauZenerSurfaceHoppingDynamics:
         self._n_hops_accepted = 0
         self._n_hops_frustrated = 0
         self._n_hops_rejected = 0
+
+    def _validate_tracking_policy(self):
+        """
+        Enforces the production state-tracking policy before anything runs.
+
+        A production spin-flip backend exposes neither an oscillator strength
+        nor a transition dipole, so the descriptor tracker collapses onto
+        continuity of the excitation energy and the identity tracker is the
+        raw energy ordering by construction.  Using either as the sole
+        state-identity evidence is the silent energy-order fallback that this
+        controller must never perform, so it is refused unless the run is
+        explicitly marked as unsafe diagnostics.
+        """
+
+        method = str(self.settings.state_tracking_method).lower()
+        backend = str(self.settings.electronic_backend).lower()
+        production_backend = (
+            backend in SurfaceHoppingSettings.PRODUCTION_BACKENDS)
+        production_provider = bool(self.provider.is_production_ready())
+
+        if production_backend:
+            assert_msg_critical(
+                production_provider,
+                'LandauZenerSurfaceHoppingDynamics: electronic_backend '
+                f'{backend} was requested but the supplied provider does not '
+                'implement a production backend. Refusing to run native '
+                'VeloxChem TDA under a spin-flip backend label.')
+
+        if not (production_backend or production_provider):
+            return
+
+        assert_msg_critical(
+            is_production_tracker(method) or
+            bool(self.settings.allow_unsafe_state_tracking),
+            'LandauZenerSurfaceHoppingDynamics: production surface hopping '
+            f'refuses state_tracking_method={method!r}. Neither spin-flip '
+            'backend exposes an oscillator strength or a transition dipole, '
+            'so this tracker would assign state identity from excitation-'
+            "energy order alone. Use 'backend_overlap'.")
+
+        if not is_production_tracker(method):
+            self.ostream.print_warning(
+                'UNSAFE STATE TRACKING: allow_unsafe_state_tracking is set, '
+                f'so persistent identities come from {method!r} tracking, '
+                'which for this backend is excitation-energy continuity '
+                'alone. This run is diagnostics only and must not be used '
+                'for production data.')
+            self.ostream.flush()
+
+    def _validate_serenity_spin_policy(self, result, tracking):
+        """Validates spin sectors without renumbering Serenity raw roots.
+
+        Serenity's SF response contains singlet, triplet and sometimes
+        spin-incomplete roots in one energy-ordered ladder. The ladder and
+        its derivative selectors remain untouched, but without spin-orbit
+        coupling a production trajectory may only connect adiabatic roots of
+        the same multiplicity. The first accepted frame also fixes the spin
+        sector of every persistent character label; later frames must carry
+        the same sectors through their descriptor-based permutation.
+
+        :return:
+            Proposed character-ordered multiplicities, or ``None`` for a
+            backend whose target manifold is already spin-pure.
+        """
+
+        snapshot = getattr(result, 'snapshot', None)
+        if snapshot is None or str(snapshot.backend).lower() != 'serenity':
+            return None
+
+        metadata = snapshot.spin_metadata
+        if not isinstance(metadata, dict):
+            raise SurfaceHoppingError(
+                'Serenity SF returned no per-root spin metadata; production '
+                'dynamics cannot exclude spin-incompatible state identity or '
+                'hopping without spin-orbit coupling.')
+
+        n_states = int(self.settings.number_of_states)
+        multiplicities = np.asarray(
+            metadata.get('state_multiplicities', []), dtype=int).reshape(-1)
+        deviations = np.asarray(metadata.get('s2_deviation', []),
+                                dtype=float).reshape(-1)
+        tolerance = float(metadata.get('s2_tolerance', 0.5))
+
+        if (multiplicities.size != n_states or
+                deviations.size != n_states or
+                not np.all(np.isfinite(deviations))):
+            raise SurfaceHoppingError(
+                'Serenity SF returned incomplete or nonfinite per-root spin '
+                'metadata; production dynamics is refused.')
+
+        invalid = np.flatnonzero(deviations > tolerance)
+        if invalid.size:
+            roots = (invalid + 1).tolist()
+            raise SurfaceHoppingError(
+                'Serenity SF target root(s) '
+                f'{roots} are spin-incomplete: their <S^2> deviations exceed '
+                f'the configured tolerance {tolerance:.6f}. Increase the '
+                'response window or choose a compatible target ladder; these '
+                'roots cannot enter production surface hopping.')
+
+        permutation = np.asarray(tracking.permutation, dtype=int)
+        tracked = multiplicities[permutation]
+
+        incompatible = set()
+        for source in range(n_states):
+            for target in self.settings.candidate_states(source):
+                if multiplicities[source] != multiplicities[target]:
+                    incompatible.add(tuple(sorted((source, target))))
+
+        if incompatible:
+            pairs = sorted(incompatible)
+            raise SurfaceHoppingError(
+                'Serenity SF allowed_transitions contains spin-changing '
+                f'pair(s) {pairs} in adiabatic-root space, but no spin-orbit '
+                'coupling is implemented. Use an explicit list containing '
+                'only same-multiplicity adiabatic-root pairs.')
+
+        if (self._tracked_spin_multiplicities is not None and
+                not np.array_equal(tracked,
+                                   self._tracked_spin_multiplicities)):
+            raise SurfaceHoppingError(
+                'Serenity SF state tracking assigned a persistent character '
+                'label to an incompatible spin sector: accepted '
+                'multiplicities '
+                f'{self._tracked_spin_multiplicities.tolist()}, current '
+                f'{tracked.tolist()}. The electronic step is refused rather '
+                'than falling back to energy order.')
+
+        return np.array(tracked, dtype=int, copy=True)
 
     # ------------------------------------------------------------------
     # OpenMM state access
@@ -344,7 +494,10 @@ class LandauZenerSurfaceHoppingDynamics:
             detector_history=copy.deepcopy(
                 self.detector.get_history_snapshot()),
             state_permutation=np.array(self._state_permutation, copy=True),
-            current_frame_in_detector=bool(self._current_frame_in_detector))
+            current_frame_in_detector=bool(self._current_frame_in_detector),
+            # Electronic snapshots are immutable, so the accepted reference is
+            # captured by reference rather than copied.
+            provider_reference=self.provider.get_reference_state())
         # yapf: enable
 
     def restore_frame(self, frame):
@@ -376,6 +529,9 @@ class LandauZenerSurfaceHoppingDynamics:
             frame.detector_history))
         self._state_permutation = np.array(frame.state_permutation, copy=True)
         self._current_frame_in_detector = bool(frame.current_frame_in_detector)
+        # The discarded trial endpoint must not remain the electronic
+        # reference the replayed endpoint is measured against.
+        self.provider.set_reference_state(frame.provider_reference)
         self.install_force(frame.electronic_result.active_gradient)
 
     def install_force(self, gradient):
@@ -424,42 +580,69 @@ class LandauZenerSurfaceHoppingDynamics:
         """
 
         geometry = self.get_qm_geometry_in_bohr()
-        raw_state_hint = StateIndexConverter.tracked_to_raw(
-            self.active_state, self._state_permutation)
+        accepted_tracker_reference = copy.deepcopy(self.tracker._reference)
+        accepted_permutation = np.array(self._state_permutation, copy=True)
+        # ``active_state`` is an adiabatic raw-root index.  Character tracking
+        # must never redirect the gradient: doing so switches potential-energy
+        # surfaces without a Landau-Zener hop.
+        raw_state_hint = int(self.active_state)
+
+        def rollback_electronic_transaction():
+            """Restores both owners of accepted electronic-state history."""
+
+            self.provider.rollback_reference()
+            self.tracker._reference = copy.deepcopy(
+                accepted_tracker_reference)
+            self._state_permutation = np.array(accepted_permutation,
+                                               copy=True)
 
         try:
             result = self.provider.compute(geometry, raw_state_hint)
         except Exception as exc:
+            # A failed electronic step commits nothing: no accepted reference,
+            # no tracking history, no force.
+            rollback_electronic_transaction()
             raise SurfaceHoppingError(
                 f'electronic-structure calculation failed at step {step}: '
                 f'{exc}')
 
-        if not result.scf_converged:
-            raise SurfaceHoppingError(f'SCF did not converge at step {step}.')
-        if not result.response_converged:
-            raise SurfaceHoppingError(
-                f'the response calculation did not converge at step {step}.')
-        if not result.gradient_converged:
-            raise SurfaceHoppingError(
-                f'the active-state gradient failed at step {step}.')
-        if not result.is_valid():
-            raise SurfaceHoppingError(
-                f'nonfinite electronic energies or gradient at step {step}.')
+        try:
+            if not result.scf_converged:
+                raise SurfaceHoppingError(
+                    f'SCF did not converge at step {step}.')
+            if not result.response_converged:
+                raise SurfaceHoppingError(
+                    'the response calculation did not converge at step '
+                    f'{step}.')
+            if not result.gradient_converged:
+                raise SurfaceHoppingError(
+                    f'the active-state gradient failed at step {step}.')
+            if not result.is_valid():
+                raise SurfaceHoppingError(
+                    f'nonfinite electronic energies or gradient at step '
+                    f'{step}.')
 
-        tracking = self.tracker.track(result.state_descriptors)
+            tracking = self.tracker.track(result.state_descriptors)
 
-        if not tracking.is_reliable:
-            raise SurfaceHoppingError(
-                f'state tracking became ambiguous at step {step}: '
-                f'confidence {tracking.confidence:.3f} is below the '
-                f'threshold {self.settings.minimum_tracking_overlap:.3f}.')
+            if not tracking.is_reliable:
+                detail = '; '.join(tracking.warnings) or (
+                    f'confidence {tracking.confidence:.3f} is below the '
+                    f'threshold {self.settings.minimum_tracking_overlap:.3f}')
+                raise SurfaceHoppingError(
+                    f'state tracking became ambiguous at step {step} '
+                    f'({tracking.method}/{tracking.descriptor}): {detail}.')
+
+            proposed_spin_multiplicities = (
+                self._validate_serenity_spin_policy(result, tracking))
+        except SurfaceHoppingError:
+            rollback_electronic_transaction()
+            raise
 
         result.state_permutation = tracking.permutation
         result.tracking_scores = tracking.scores
         self._state_permutation = np.asarray(tracking.permutation, dtype=int)
 
-        active_raw_state = StateIndexConverter.tracked_to_raw(
-            self.active_state, self._state_permutation)
+        active_raw_state = int(self.active_state)
 
         if int(result.active_raw_state) != active_raw_state:
             try:
@@ -468,23 +651,40 @@ class LandauZenerSurfaceHoppingDynamics:
                         geometry, active_raw_state),
                     dtype=float)
             except Exception as exc:
+                rollback_electronic_transaction()
                 raise SurfaceHoppingError(
-                    'failed to correct the active-state gradient after state '
-                    f'tracking at step {step}: tracked state '
-                    f'{self.active_state} maps to raw root {active_raw_state}: '
+                    'failed to obtain the active adiabatic-state gradient at '
+                    f'step {step}: raw root {active_raw_state}: '
                     f'{exc}')
 
         result.active_state = active_raw_state
         result.active_raw_state = active_raw_state
-        result.active_tracked_state = int(self.active_state)
-        result.derivative_state_index = (
-            StateIndexConverter.raw_to_driver_index(active_raw_state))
+        result.active_tracked_state = StateIndexConverter.raw_to_tracked(
+            active_raw_state, self._state_permutation)
+        result.derivative_state_index = result.selector_for(active_raw_state)
         result.gradient_converged = bool(
             np.all(np.isfinite(result.active_gradient)))
 
         if not result.gradient_converged:
+            rollback_electronic_transaction()
             raise SurfaceHoppingError(
-                f'the tracked active-state gradient failed at step {step}.')
+                f'the active adiabatic-state gradient failed at step {step}.')
+
+        # Commit only after the active adiabatic-root gradient is finite and
+        # belongs to the same validated snapshot. Until this point the
+        # provider snapshot and the tracker's permutation are a single trial
+        # transaction; a failure in either half restores both accepted
+        # histories.
+        try:
+            self.provider.commit_reference()
+        except Exception as exc:
+            rollback_electronic_transaction()
+            raise SurfaceHoppingError(
+                f'failed to commit the electronic state at step {step}: '
+                f'{exc}')
+
+        if proposed_spin_multiplicities is not None:
+            self._tracked_spin_multiplicities = proposed_spin_multiplicities
 
         return result, tracking
 
@@ -534,15 +734,14 @@ class LandauZenerSurfaceHoppingDynamics:
         """
 
         result = frame.electronic_result
-        tracked_energies = result.tracked_state_energies()
+        adiabatic_energies = result.adiabatic_state_energies()
 
         source = int(event.source_state)
         target = int(event.target_state)
-        permutation = result.state_permutation
-        source_raw = StateIndexConverter.tracked_to_raw(source, permutation)
-        target_raw = StateIndexConverter.tracked_to_raw(target, permutation)
-        delta_energy = float(tracked_energies[target] -
-                             tracked_energies[source])
+        source_raw = source
+        target_raw = target
+        delta_energy = float(adiabatic_energies[target_raw] -
+                             adiabatic_energies[source_raw])
 
         indices = self.rescaling_atoms
         masses = self.get_masses_in_au(indices)
@@ -570,8 +769,7 @@ class LandauZenerSurfaceHoppingDynamics:
             'delta_energy': delta_energy,
             'source_raw_state': source_raw,
             'target_raw_state': target_raw,
-            'target_derivative_state_index':
-                StateIndexConverter.raw_to_driver_index(target_raw),
+            'target_derivative_state_index': result.selector_for(target_raw),
             'message': rescaling.message,
         }
 
@@ -606,9 +804,9 @@ class LandauZenerSurfaceHoppingDynamics:
         :param frame:
             The :class:`TrajectoryFrame` at the central frame.
         :param source:
-            Tracked index of the source state.
+            Adiabatic raw index of the source state.
         :param target:
-            Tracked index of the target state.
+            Adiabatic raw index of the target state.
         :param indices:
             Particle indices of the rescaling atom set.
 
@@ -617,14 +815,13 @@ class LandauZenerSurfaceHoppingDynamics:
         """
 
         geometry = frame.electronic_result.geometry
-        permutation = frame.electronic_result.state_permutation
-        source_raw = StateIndexConverter.tracked_to_raw(source, permutation)
-        target_raw = StateIndexConverter.tracked_to_raw(target, permutation)
+        source_raw = int(source)
+        target_raw = int(target)
 
         assert_msg_critical(
             int(frame.electronic_result.active_raw_state) == source_raw,
             'LandauZenerSurfaceHoppingDynamics: the saved source gradient '
-            'does not belong to the tracked source state.')
+            'does not belong to the adiabatic source state.')
 
         # yapf: disable
         try:
@@ -715,7 +912,7 @@ class LandauZenerSurfaceHoppingDynamics:
             if not self._current_frame_in_detector:
                 self.detector.push(
                     self.current_step, self.active_state,
-                    result.tracked_state_energies(),
+                    result.adiabatic_state_energies(),
                     self.settings.candidate_states(self.active_state))
                 self._current_frame_in_detector = True
 
@@ -928,7 +1125,7 @@ class LandauZenerSurfaceHoppingDynamics:
 
         # 4. gap history and event detection; the central frame is n
         self.detector.push(self.current_step, self.active_state,
-                           trial_result.tracked_state_energies(),
+                           trial_result.adiabatic_state_energies(),
                            self.settings.candidate_states(self.active_state))
         self._current_frame_in_detector = True
 
@@ -1007,7 +1204,7 @@ class LandauZenerSurfaceHoppingDynamics:
                 self.current_step)
             self.detector.push(
                 self.current_step, self.active_state,
-                replay_result.tracked_state_energies(),
+                replay_result.adiabatic_state_energies(),
                 self.settings.candidate_states(self.active_state))
             self._current_frame_in_detector = True
             self.detector.mark_processed(event)
@@ -1024,9 +1221,9 @@ class LandauZenerSurfaceHoppingDynamics:
         record['hop_outcome'] = 'accepted'
 
         record['electronic_energy_before'] = float(
-            result.tracked_state_energies()[event.source_state])
+            result.adiabatic_state_energies()[event.source_state])
         record['electronic_energy_after'] = float(
-            result.tracked_state_energies()[event.target_state])
+            result.adiabatic_state_energies()[event.target_state])
 
         target_raw = outcome['target_raw_state']
         # yapf: disable
@@ -1038,17 +1235,18 @@ class LandauZenerSurfaceHoppingDynamics:
         except Exception as exc:
             raise SurfaceHoppingError(
                 'failed to evaluate the accepted-hop target gradient at '
-                f'step {step}: tracked state {event.target_state} maps to '
-                f'raw root {target_raw}: {exc}')
+                f'step {step}: adiabatic raw root {target_raw}: {exc}')
         # yapf: enable
 
         hopped_result = copy.deepcopy(frame.electronic_result)
         hopped_result.active_gradient = target_gradient
         hopped_result.active_state = target_raw
         hopped_result.active_raw_state = target_raw
-        hopped_result.active_tracked_state = int(event.target_state)
-        hopped_result.derivative_state_index = (
-            StateIndexConverter.raw_to_driver_index(target_raw))
+        hopped_result.active_tracked_state = (
+            StateIndexConverter.raw_to_tracked(
+                target_raw, hopped_result.state_permutation))
+        hopped_result.derivative_state_index = hopped_result.selector_for(
+            target_raw)
         hopped_result.gradient_converged = bool(
             np.all(np.isfinite(target_gradient)))
 
@@ -1069,7 +1267,7 @@ class LandauZenerSurfaceHoppingDynamics:
             self.current_step)
 
         self.detector.push(self.current_step, self.active_state,
-                           replay_result.tracked_state_energies(),
+                           replay_result.adiabatic_state_energies(),
                            self.settings.candidate_states(self.active_state))
         self._current_frame_in_detector = True
 
@@ -1082,9 +1280,64 @@ class LandauZenerSurfaceHoppingDynamics:
         return replay_result, replay_tracking
 
     @staticmethod
+    def _electronic_provenance(result, tracking):
+        """
+        Backend and descriptor provenance of one electronic frame.
+
+        Every field needed to prove after the fact that the potentials were
+        target-state totals, that the working reference was excluded, and
+        that the persistent identity followed an electronic descriptor rather
+        than energy order.
+        """
+
+        snapshot = getattr(result, 'snapshot', None)
+
+        payload = {
+            'tracking_descriptor': getattr(tracking, 'descriptor',
+                                           'unspecified'),
+            'tracking_ambiguity_ratio': float(
+                getattr(tracking, 'ambiguity_ratio', 0.0)),
+            'tracking_warnings': list(getattr(tracking, 'warnings', [])),
+            'state_selectors': (None if result.state_selectors is None else
+                                [int(s) for s in result.state_selectors]),
+            'working_reference_energy': float(result.ground_energy),
+        }
+
+        if snapshot is None:
+            payload.update({
+                'electronic_backend': 'veloxchem',
+                'electronic_method': 'linear_response',
+                'backend_version': None,
+                'calculation_id': None,
+                'geometry_fingerprint': None,
+                'settings_fingerprint': None,
+                'energy_unit': 'hartree',
+                'gradient_unit': 'hartree/bohr',
+                'spin_metadata': None,
+            })
+            return payload
+
+        payload.update({
+            'electronic_backend': snapshot.backend,
+            'electronic_method': snapshot.method,
+            'backend_version': snapshot.backend_version,
+            'calculation_id': snapshot.calculation_id,
+            'previous_calculation_id': snapshot.previous_calculation_id,
+            'geometry_fingerprint': snapshot.geometry_fingerprint,
+            'settings_fingerprint': snapshot.settings_fingerprint,
+            'energy_unit': snapshot.energy_unit,
+            'gradient_unit': snapshot.gradient_unit,
+            'spin_metadata': snapshot.spin_metadata,
+            'response_energies':
+                np.asarray(snapshot.response_energies, dtype=float).tolist(),
+        })
+
+        return payload
+
+    @staticmethod
     def _record_force_state(record, result, suffix):
         """
-        Records which physical state owns the gradient installed in OpenMM.
+        Records which adiabatic root owns the gradient installed in OpenMM.
 
         ``suffix`` is ``before_replay`` for the central-frame force and
         ``after_replay`` for the retained endpoint force.
@@ -1105,6 +1358,7 @@ class LandauZenerSurfaceHoppingDynamics:
         """
 
         tracked_energies = result.tracked_state_energies()
+        adiabatic_energies = result.adiabatic_state_energies()
         raw_to_tracked = result.raw_to_tracked_permutation()
 
         record.update({
@@ -1122,7 +1376,7 @@ class LandauZenerSurfaceHoppingDynamics:
                                                      dtype=float).tolist(),
             'tracking_confidence': float(tracking.confidence),
             'tracking_method': tracking.method,
-            'active_tracked_state': int(self.active_state),
+            'active_tracked_state': int(result.active_tracked_state),
             'active_raw_root': int(result.active_raw_state),
             'derivative_state_index':
                 (None if result.derivative_state_index is None else int(
@@ -1134,14 +1388,15 @@ class LandauZenerSurfaceHoppingDynamics:
             'n_response_calls': int(self.provider.n_response_calls),
             'n_gradient_calls': int(self.provider.n_gradient_calls),
         })
+        record.update(self._electronic_provenance(result, tracking))
 
         record['active_state_energy'] = float(
-            tracked_energies[self.active_state])
+            adiabatic_energies[self.active_state])
         record['total_energy'] = (record['kinetic_energy'] +
                                   record['active_state_energy'])
         record['energy_gaps'] = [
-            abs(float(tracked_energies[i + 1] - tracked_energies[i]))
-            for i in range(len(tracked_energies) - 1)
+            abs(float(adiabatic_energies[i + 1] - adiabatic_energies[i]))
+            for i in range(len(adiabatic_energies) - 1)
         ]
         record['minimum_energy_gap'] = (float(min(record['energy_gaps']))
                                         if record['energy_gaps'] else None)
@@ -1196,7 +1451,7 @@ class LandauZenerSurfaceHoppingDynamics:
                 trial_tracking.similarity_matrix).tolist(),
             'tracking_confidence': float(trial_tracking.confidence),
             'tracking_method': trial_tracking.method,
-            'active_tracked_state': int(self.active_state),
+            'active_tracked_state': int(trial_result.active_tracked_state),
             'active_raw_root': int(trial_result.active_raw_state),
             'derivative_state_index':
                 (None if trial_result.derivative_state_index is None else int(
@@ -1279,9 +1534,9 @@ class LandauZenerSurfaceHoppingDynamics:
             record['temperature_kelvin'] = 0.0
 
         # 3. Active state energy
-        tracked_energies = trial_result.tracked_state_energies()
+        adiabatic_energies = trial_result.adiabatic_state_energies()
         active_idx = active_state
-        record['active_state_energy'] = float(tracked_energies[active_idx])
+        record['active_state_energy'] = float(adiabatic_energies[active_idx])
 
         # 4. Total energy
         record['total_energy'] = record['kinetic_energy'] + record[
@@ -1289,8 +1544,8 @@ class LandauZenerSurfaceHoppingDynamics:
 
         # 5. Energy gaps between states
         record['energy_gaps'] = [
-            abs(float(tracked_energies[i + 1] - tracked_energies[i]))
-            for i in range(len(tracked_energies) - 1)
+            abs(float(adiabatic_energies[i + 1] - adiabatic_energies[i]))
+            for i in range(len(adiabatic_energies) - 1)
         ]
 
         # 6. Minimum gap (useful for analysis)
@@ -1304,10 +1559,8 @@ class LandauZenerSurfaceHoppingDynamics:
                 frame.electronic_result.state_permutation, dtype=int)
             event_inverse = (
                 frame.electronic_result.raw_to_tracked_permutation())
-            source_raw = StateIndexConverter.tracked_to_raw(
-                event.source_state, event_permutation)
-            target_raw = StateIndexConverter.tracked_to_raw(
-                event.target_state, event_permutation)
+            source_raw = int(event.source_state)
+            target_raw = int(event.target_state)
             record.update({
                 'candidate_source_state': int(event.source_state),
                 'candidate_target_state': int(event.target_state),
@@ -1316,10 +1569,10 @@ class LandauZenerSurfaceHoppingDynamics:
                                                    dtype=int).tolist(),
                 'source_raw_root_at_event': int(source_raw),
                 'source_derivative_state_index_at_event':
-                    StateIndexConverter.raw_to_driver_index(source_raw),
+                    frame.electronic_result.selector_for(source_raw),
                 'target_raw_root_at_event': int(target_raw),
                 'target_derivative_state_index_at_event':
-                    StateIndexConverter.raw_to_driver_index(target_raw),
+                    frame.electronic_result.selector_for(target_raw),
                 'minimum_gap': float(event.minimum_gap),
                 'gap_curvature': float(event.gap_curvature),
                 'fitted_event_time': float(event.event_time * AU_IN_FS),
@@ -1331,6 +1584,9 @@ class LandauZenerSurfaceHoppingDynamics:
         if frame is not None:
             self._record_force_state(record, frame.electronic_result,
                                      'before_replay')
+
+        record.update(self._electronic_provenance(trial_result,
+                                                  trial_tracking))
 
         return record
 
@@ -1750,11 +2006,24 @@ class LandauZenerSurfaceHoppingDynamics:
                     dtype=float),
                 'box_vectors': box,
                 'active_state': int(self.active_state),
+                'active_state_index_space': self._ACTIVE_STATE_INDEX_SPACE,
                 'rng_state': self.rng.bit_generator.state,
                 'detector_history': self.detector.get_history_snapshot(),
                 'tracker_reference': self.tracker._reference,
+                # Native backend handles are not serializable, so only the
+                # portable description of the accepted electronic reference is
+                # written.  The provider recomputes it at restart, which keeps
+                # the descriptor chain unbroken instead of resuming with an
+                # empty tracking history.
+                'provider_reference':
+                    self.provider.reference_restart_payload()
+                    if hasattr(self.provider, 'reference_restart_payload')
+                    else None,
                 'state_permutation': np.asarray(self._state_permutation,
                                                 dtype=int),
+                'tracked_spin_multiplicities':
+                    None if self._tracked_spin_multiplicities is None else
+                    np.asarray(self._tracked_spin_multiplicities, dtype=int),
                 'current_frame_in_detector': bool(
                     self._current_frame_in_detector),
                 'diagnostics_path': diagnostics_path,
@@ -1821,6 +2090,30 @@ class LandauZenerSurfaceHoppingDynamics:
             'LandauZenerSurfaceHoppingDynamics: refusing to restart from a '
             'checkpoint written with incompatible surface-hopping settings.')
 
+        checkpoint_index_space = payload.get('active_state_index_space')
+        checkpoint_permutation = np.asarray(
+            payload.get('state_permutation',
+                        np.arange(self.settings.number_of_states)),
+            dtype=int)
+        if checkpoint_index_space is None:
+            # Legacy checkpoints stored active_state in persistent-character
+            # space. The two conventions are equivalent only while the
+            # tracked-to-raw mapping is the identity.
+            assert_msg_critical(
+                np.array_equal(
+                    checkpoint_permutation,
+                    np.arange(self.settings.number_of_states)),
+                'LandauZenerSurfaceHoppingDynamics: refusing a legacy '
+                'checkpoint with a non-identity state permutation because '
+                'its active_state is in the obsolete character-label index '
+                'space. Restart from an earlier identity-mapped checkpoint.')
+        else:
+            assert_msg_critical(
+                checkpoint_index_space == self._ACTIVE_STATE_INDEX_SPACE,
+                'LandauZenerSurfaceHoppingDynamics: checkpoint active-state '
+                f'index space {checkpoint_index_space!r} is incompatible '
+                f'with {self._ACTIVE_STATE_INDEX_SPACE!r}.')
+
         if payload.get('box_vectors') is not None:
             self.context.setPeriodicBoxVectors(*[
                 mm.Vec3(*row) * unit.nanometer for row in payload['box_vectors']
@@ -1836,12 +2129,17 @@ class LandauZenerSurfaceHoppingDynamics:
         self.rng.bit_generator.state = payload['rng_state']
         self.detector.set_history_snapshot(payload['detector_history'])
         self.tracker._reference = payload['tracker_reference']
+
+        if hasattr(self.provider, 'restart_from'):
+            self.provider.restart_from(payload.get('provider_reference'))
+
         # yapf: disable
-        self._state_permutation = np.asarray(
-            payload.get('state_permutation',
-                        np.arange(self.settings.number_of_states)),
-            dtype=int)
+        self._state_permutation = checkpoint_permutation
         # yapf: enable
+        stored_spin = payload.get('tracked_spin_multiplicities')
+        self._tracked_spin_multiplicities = (
+            None if stored_spin is None else
+            np.asarray(stored_spin, dtype=int))
         self._current_frame_in_detector = bool(
             payload.get('current_frame_in_detector', True))
         self._restart_diagnostics_path = payload.get('diagnostics_path')
