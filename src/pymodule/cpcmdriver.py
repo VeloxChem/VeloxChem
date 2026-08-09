@@ -985,7 +985,7 @@ class CpcmDriver:
 
         atom_coords = molecule.get_coordinates_in_bohr()
         natms = molecule.number_of_atoms()
-        two_sqrt_invpi = 2 / math.sqrt(math.pi)
+        two_sqrt_invpi = 2 / np.sqrt(np.pi)
 
         d2B_mat = np.zeros((grid.shape[0], natms, natms, natms, 3, 3))
         z = molecule.get_element_ids()
@@ -1023,10 +1023,8 @@ class CpcmDriver:
                                 d2B_mat[m, a, L, J, alpha,
                                         beta] += (factor1 * factor2 * unitf)
 
-        return (np.einsum("m,maijxy,a->ijxy", q, d2B_mat,
-                          z).transpose(0, 2, 1,
-                                       3).reshape(3 * natms,
-                                                  3 * natms))  # change this
+        return np.einsum("m,maijxy,a->ixjy", q, d2B_mat,
+                         z).reshape(3 * natms, 3 * natms)
 
     def hess_C(self, molecule, basis, grid, q, D):
         """
@@ -1064,7 +1062,7 @@ class CpcmDriver:
 
         return ana_200 + ana_101 + ana_020 + ana_110
 
-    def hessA_ii(self, molecule, grid, swf, q, eps=78.39):
+    def hess_Aii(self, molecule, grid, swf, q, eps=78.39, x=0):
         """
         Calculates the diagonal cavity-cavity hessian contribution.
 
@@ -1089,7 +1087,7 @@ class CpcmDriver:
         grid_coords = grid[:, :3]
         vdw_R = molecule.vdw_radii_to_numpy() * 1.2
         hessian = np.zeros((natms, 3, natms, 3))
-        scale_f = -(eps - 1) / (eps)
+        scale_f = -(eps - 1) / (eps + x)
 
         for k in range(grid.shape[0]):
             atm = int(grid[k, -1])
@@ -1171,7 +1169,7 @@ class CpcmDriver:
 
         return hessian.reshape(3 * natms, 3 * natms)
 
-    def hessA_ij(self, molecule, grid, q, eps=78.39):
+    def hess_Aij(self, molecule, grid, q, eps=78.39, x=0):
         """
         Calculates the off-diagonal cavity-cavity hessian contribution.
 
@@ -1191,7 +1189,7 @@ class CpcmDriver:
 
         natms = molecule.number_of_atoms()
         hess = np.zeros((3 * natms, 3 * natms))
-        scale_f = -(eps - 1) / (eps)
+        scale_f = -(eps - 1) / (eps + x)
 
         for m in range(grid.shape[0]):
             grid_coords_m = grid[m, :3].squeeze()
