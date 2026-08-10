@@ -391,6 +391,25 @@ void print_exchange_k_reuse_status(const std::string& tag,
     write_to_ablation_file(ss.str());
 }
 
+
+void print_exchange_resplit_timing(const std::string& tag,
+                                      const double old_ref_seconds,
+                                      const double rs_ref_seconds,
+                                      const double old_mp_seconds,
+                                      const double rs_mp_seconds)
+{
+    std::stringstream ss;
+    ss << "=== " << tag << " exchange resplit timing ===\n"
+       << "  old original = " << old_ref_seconds * 1.0e3 << " ms\n"
+       << "  RS original  = " << rs_ref_seconds * 1.0e3 << " ms\n"
+       << "  old MP       = " << old_mp_seconds * 1.0e3 << " ms\n"
+       << "  RS MP        = " << rs_mp_seconds * 1.0e3 << " ms\n"
+       << "  original RS speedup = " << old_ref_seconds / rs_ref_seconds << "\n"
+       << "  MP RS speedup       = " << old_mp_seconds / rs_mp_seconds << "\n"
+       << "===============================\n";
+    write_to_ablation_file(ss.str());
+}
+
 } // namespace
 
 namespace gpu {  // gpu namespace
@@ -9065,9 +9084,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_ss) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_ss, pair_counts_K_ss, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_ss)));
@@ -9076,6 +9092,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_ss) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_ss));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_ss));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_ss, pair_counts_K_ss, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_ss, d_pair_inds_k_for_K_ss, d_Q_K_ss, d_Q_K_ss, d_pair_displs_K_ss, d_pair_displs_K_ss, d_pair_counts_K_ss, d_pair_counts_K_ss,
@@ -9204,9 +9224,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_ss) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_ss, pair_counts_K_ss, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_ss)));
@@ -9215,6 +9232,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_ss) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_ss));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_ss));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_ss, pair_counts_K_ss, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_ss, d_pair_inds_k_for_K_ss, d_Q_K_ss, d_Q_K_sp, d_pair_displs_K_ss, d_pair_displs_K_sp, d_pair_counts_K_ss, d_pair_counts_K_sp,
@@ -9365,9 +9386,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_ss) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_ss, pair_counts_K_sp, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_ss)));
@@ -9376,6 +9394,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_ss) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_ss));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_ss));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_ss, pair_counts_K_sp, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_ss, d_pair_inds_k_for_K_ss, d_Q_K_sp, d_Q_K_ss, d_pair_displs_K_sp, d_pair_displs_K_ss, d_pair_counts_K_sp, d_pair_counts_K_ss,
@@ -9521,9 +9543,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_ss) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_ss, pair_counts_K_sp, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_ss)));
@@ -9532,6 +9551,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_ss) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_ss));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_ss));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_ss, pair_counts_K_sp, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_ss, d_pair_inds_k_for_K_ss, d_Q_K_sp, d_Q_K_sp, d_pair_displs_K_sp, d_pair_displs_K_sp, d_pair_counts_K_sp, d_pair_counts_K_sp,
@@ -9669,9 +9692,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_ss) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_ss, pair_counts_K_ss, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_ss)));
@@ -9680,6 +9700,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_ss) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_ss));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_ss));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_ss, pair_counts_K_ss, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_ss, d_pair_inds_k_for_K_ss, d_Q_K_ss, d_Q_K_sd, d_pair_displs_K_ss, d_pair_displs_K_sd, d_pair_counts_K_ss, d_pair_counts_K_sd,
@@ -9830,9 +9854,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_ss) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_ss, pair_counts_K_sd, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_ss)));
@@ -9841,6 +9862,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_ss) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_ss));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_ss));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_ss, pair_counts_K_sd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_ss, d_pair_inds_k_for_K_ss, d_Q_K_sd, d_Q_K_ss, d_pair_displs_K_sd, d_pair_displs_K_ss, d_pair_counts_K_sd, d_pair_counts_K_ss,
@@ -9994,9 +10019,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_ss) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_ss, pair_counts_K_sp, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_ss)));
@@ -10005,6 +10027,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_ss) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_ss));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_ss));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_ss, pair_counts_K_sp, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_ss, d_pair_inds_k_for_K_ss, d_Q_K_sp, d_Q_K_sd, d_pair_displs_K_sp, d_pair_displs_K_sd, d_pair_counts_K_sp, d_pair_counts_K_sd,
@@ -10167,9 +10193,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_ss) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_ss, pair_counts_K_sd, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_ss)));
@@ -10178,6 +10201,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_ss) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_ss));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_ss));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_ss, pair_counts_K_sd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_ss, d_pair_inds_k_for_K_ss, d_Q_K_sd, d_Q_K_sp, d_pair_displs_K_sd, d_pair_displs_K_sp, d_pair_counts_K_sd, d_pair_counts_K_sp,
@@ -10332,9 +10359,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_ss) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_ss, pair_counts_K_sd, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_ss)));
@@ -10343,6 +10367,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_ss) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_ss));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_ss));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_ss, pair_counts_K_sd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_ss, d_pair_inds_k_for_K_ss, d_Q_K_sd, d_Q_K_sd, d_pair_displs_K_sd, d_pair_displs_K_sd, d_pair_counts_K_sd, d_pair_counts_K_sd,
@@ -10524,9 +10552,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_sp) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sp, pair_counts_K_ss, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sp)));
@@ -10535,6 +10560,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_sp) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_sp));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_sp));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sp, pair_counts_K_ss, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_sp, d_pair_inds_k_for_K_sp, d_Q_K_ss, d_Q_K_ps, d_pair_displs_K_ss, d_pair_displs_K_ps, d_pair_counts_K_ss, d_pair_counts_K_ps,
@@ -10685,9 +10714,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_sp) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sp, pair_counts_K_ss, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sp)));
@@ -10696,6 +10722,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_sp) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_sp));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_sp));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sp, pair_counts_K_ss, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_sp, d_pair_inds_k_for_K_sp, d_Q_K_ss, d_Q_K_pp, d_pair_displs_K_ss, d_pair_displs_K_pp, d_pair_counts_K_ss, d_pair_counts_K_pp,
@@ -10846,9 +10876,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_sp) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sp, pair_counts_K_sp, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sp)));
@@ -10857,6 +10884,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_sp) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_sp));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_sp));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sp, pair_counts_K_sp, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_sp, d_pair_inds_k_for_K_sp, d_Q_K_sp, d_Q_K_ps, d_pair_displs_K_sp, d_pair_displs_K_ps, d_pair_counts_K_sp, d_pair_counts_K_ps,
@@ -11007,9 +11038,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_sp) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sp, pair_counts_K_sp, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sp)));
@@ -11018,6 +11046,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_sp) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_sp));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_sp));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sp, pair_counts_K_sp, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_sp, d_pair_inds_k_for_K_sp, d_Q_K_sp, d_Q_K_pp, d_pair_displs_K_sp, d_pair_displs_K_pp, d_pair_counts_K_sp, d_pair_counts_K_pp,
@@ -11171,9 +11203,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_sp) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sp, pair_counts_K_ss, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sp)));
@@ -11182,6 +11211,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_sp) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_sp));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_sp));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sp, pair_counts_K_ss, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_sp, d_pair_inds_k_for_K_sp, d_Q_K_ss, d_Q_K_pd, d_pair_displs_K_ss, d_pair_displs_K_pd, d_pair_counts_K_ss, d_pair_counts_K_pd,
@@ -11344,9 +11377,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_sp) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sp, pair_counts_K_sd, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sp)));
@@ -11355,6 +11385,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_sp) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_sp));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_sp));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sp, pair_counts_K_sd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_sp, d_pair_inds_k_for_K_sp, d_Q_K_sd, d_Q_K_ps, d_pair_displs_K_sd, d_pair_displs_K_ps, d_pair_counts_K_sd, d_pair_counts_K_ps,
@@ -11517,9 +11551,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_sp) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sp, pair_counts_K_sp, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sp)));
@@ -11528,6 +11559,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_sp) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_sp));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_sp));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sp, pair_counts_K_sp, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_sp, d_pair_inds_k_for_K_sp, d_Q_K_sp, d_Q_K_pd, d_pair_displs_K_sp, d_pair_displs_K_pd, d_pair_counts_K_sp, d_pair_counts_K_pd,
@@ -11690,9 +11725,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_sp) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sp, pair_counts_K_sd, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sp)));
@@ -11701,6 +11733,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_sp) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_sp));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_sp));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sp, pair_counts_K_sd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_sp, d_pair_inds_k_for_K_sp, d_Q_K_sd, d_Q_K_pp, d_pair_displs_K_sd, d_pair_displs_K_pp, d_pair_counts_K_sd, d_pair_counts_K_pp,
@@ -11863,9 +11899,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_sp) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sp, pair_counts_K_sd, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sp)));
@@ -11874,6 +11907,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_sp) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_sp));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_sp));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sp, pair_counts_K_sd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_sp, d_pair_inds_k_for_K_sp, d_Q_K_sd, d_Q_K_pd, d_pair_displs_K_sd, d_pair_displs_K_pd, d_pair_counts_K_sd, d_pair_counts_K_pd,
@@ -12083,9 +12120,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_pp) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_ps, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pp)));
@@ -12094,6 +12128,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_pp) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_pp));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_pp));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_ps, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_pp, d_pair_inds_k_for_K_pp, d_Q_K_ps, d_Q_K_ps, d_pair_displs_K_ps, d_pair_displs_K_ps, d_pair_counts_K_ps, d_pair_counts_K_ps,
@@ -12235,9 +12273,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_pp) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_ps, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pp)));
@@ -12246,6 +12281,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_pp) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_pp));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_pp));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_ps, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_pp, d_pair_inds_k_for_K_pp, d_Q_K_ps, d_Q_K_pp, d_pair_displs_K_ps, d_pair_displs_K_pp, d_pair_counts_K_ps, d_pair_counts_K_pp,
@@ -12400,9 +12439,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_pp) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_pp, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pp)));
@@ -12411,6 +12447,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_pp) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_pp));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_pp));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_pp, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_pp, d_pair_inds_k_for_K_pp, d_Q_K_pp, d_Q_K_ps, d_pair_displs_K_pp, d_pair_displs_K_ps, d_pair_counts_K_pp, d_pair_counts_K_ps,
@@ -12561,6 +12601,17 @@ computeFockOnGPU(const              CMolecule& molecule,
             // print_exchange_k_reuse_status("PPPP", pair_inds_k_for_K_pp);
 
             gpuSafe(gpuStreamSynchronize(stream));
+            double*   d_mat_K_mp           = nullptr;
+            double*   d_mat_K_ref          = nullptr;
+            gpuSafe(gpuMalloc(&d_mat_K_mp,           sizeof(double)   * pair_inds_count_for_K_pp));
+            gpuSafe(gpuMalloc(&d_mat_K_ref,           sizeof(double)   * pair_inds_count_for_K_pp));
+
+            constexpr uint32_t zero_threads = 256;
+            const dim3 zero_blocks((pair_inds_count_for_K_pp + zero_threads - 1) / zero_threads);
+            gpu::zeroData<<<zero_blocks, dim3(zero_threads), 0, stream>>>(d_mat_K_mp, pair_inds_count_for_K_pp);
+            gpu::zeroData<<<zero_blocks, dim3(zero_threads), 0, stream>>>(d_mat_K_ref, pair_inds_count_for_K_pp);
+            gpuSafe(gpuStreamSynchronize(stream));
+
             const double exchange_validation_start = omp_get_wtime();
             omptimers[thread_id].start("    K PPPP MP total");
 
@@ -12571,23 +12622,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                 TILE_DIM_Y_K);
             // omptimers[thread_id].stop("    K PPPP MP cuts layout");
 
-            double*   d_mat_K_mp           = nullptr;
-            double*   d_mat_K_ref          = nullptr;
-
             ensure_exchange_cut_workspace(
                 pp_cuts.total_cut_entries,
                 pp_cuts.displ_cuts.size());
             auto* const d_pp_prec_cut_flat   = d_exchange_prec_cut_flat;
             auto* const d_pp_screen_cut_flat = d_exchange_screen_cut_flat;
             auto* const d_pp_displ_cuts      = d_exchange_displ_cuts;
-
-            gpuSafe(gpuMalloc(&d_mat_K_mp,           sizeof(double)   * pair_inds_count_for_K_pp));
-            gpuSafe(gpuMalloc(&d_mat_K_ref,           sizeof(double)   * pair_inds_count_for_K_pp));
-
-            constexpr uint32_t zero_threads = 256;
-            const dim3 zero_blocks((pair_inds_count_for_K_pp + zero_threads - 1) / zero_threads);
-            gpu::zeroData<<<zero_blocks, dim3(zero_threads), 0, stream>>>(d_mat_K_mp, pair_inds_count_for_K_pp);
-            gpu::zeroData<<<zero_blocks, dim3(zero_threads), 0, stream>>>(d_mat_K_ref, pair_inds_count_for_K_pp);
 
             // Sync first to drain the stream, then time H2D alone.
             // gpuSafe(gpuStreamSynchronize(stream));
@@ -12758,9 +12798,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_pp) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_ps, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pp)));
@@ -12769,6 +12806,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_pp) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_pp));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_pp));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_ps, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_pp, d_pair_inds_k_for_K_pp, d_Q_K_ps, d_Q_K_pd, d_pair_displs_K_ps, d_pair_displs_K_pd, d_pair_counts_K_ps, d_pair_counts_K_pd,
@@ -12935,9 +12976,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_pp) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_pd, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pp)));
@@ -12946,6 +12984,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_pp) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_pp));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_pp));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_pd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_pp, d_pair_inds_k_for_K_pp, d_Q_K_pd, d_Q_K_ps, d_pair_displs_K_pd, d_pair_displs_K_ps, d_pair_counts_K_pd, d_pair_counts_K_ps,
@@ -13109,9 +13151,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_pp) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_pp, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pp)));
@@ -13120,6 +13159,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_pp) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_pp));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_pp));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_pp, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_pp, d_pair_inds_k_for_K_pp, d_Q_K_pp, d_Q_K_pd, d_pair_displs_K_pp, d_pair_displs_K_pd, d_pair_counts_K_pp, d_pair_counts_K_pd,
@@ -13274,9 +13317,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_pp) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_pd, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pp)));
@@ -13285,6 +13325,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_pp) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_pp));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_pp));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_pd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_pp, d_pair_inds_k_for_K_pp, d_Q_K_pd, d_Q_K_pp, d_pair_displs_K_pd, d_pair_displs_K_pp, d_pair_counts_K_pd, d_pair_counts_K_pp,
@@ -13434,9 +13478,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_pp) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_pd, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pp)));
@@ -13445,6 +13486,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_pp) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_pp));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_pp));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_pd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_pp, d_pair_inds_k_for_K_pp, d_Q_K_pd, d_Q_K_pd, d_pair_displs_K_pd, d_pair_displs_K_pd, d_pair_counts_K_pd, d_pair_counts_K_pd,
@@ -13644,9 +13689,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_sd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_ss, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sd)));
@@ -13655,6 +13697,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_sd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_sd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_ss, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_sd, d_pair_inds_k_for_K_sd, d_Q_K_ss, d_Q_K_ds, d_pair_displs_K_ss, d_pair_displs_K_ds, d_pair_counts_K_ss, d_pair_counts_K_ds,
@@ -13808,9 +13854,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_sd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_ss, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sd)));
@@ -13819,6 +13862,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_sd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_sd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_ss, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_sd, d_pair_inds_k_for_K_sd, d_Q_K_ss, d_Q_K_dp, d_pair_displs_K_ss, d_pair_displs_K_dp, d_pair_counts_K_ss, d_pair_counts_K_dp,
@@ -13981,9 +14028,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_sd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_sp, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sd)));
@@ -13992,6 +14036,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_sd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_sd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_sp, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_sd, d_pair_inds_k_for_K_sd, d_Q_K_sp, d_Q_K_ds, d_pair_displs_K_sp, d_pair_displs_K_ds, d_pair_counts_K_sp, d_pair_counts_K_ds,
@@ -14156,9 +14204,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_sd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_sp, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sd)));
@@ -14167,6 +14212,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_sd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_sd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_sp, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_sd, d_pair_inds_k_for_K_sd, d_Q_K_sp, d_Q_K_dp, d_pair_displs_K_sp, d_pair_displs_K_dp, d_pair_counts_K_sp, d_pair_counts_K_dp,
@@ -14330,9 +14379,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_sd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_ss, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sd)));
@@ -14341,6 +14387,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_sd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_sd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_ss, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_sd, d_pair_inds_k_for_K_sd, d_Q_K_ss, d_Q_K_dd, d_pair_displs_K_ss, d_pair_displs_K_dd, d_pair_counts_K_ss, d_pair_counts_K_dd,
@@ -14495,9 +14545,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_sd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_sd, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sd)));
@@ -14506,6 +14553,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_sd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_sd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_sd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_sd, d_pair_inds_k_for_K_sd, d_Q_K_sd, d_Q_K_ds, d_pair_displs_K_sd, d_pair_displs_K_ds, d_pair_counts_K_sd, d_pair_counts_K_ds,
@@ -14663,9 +14714,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_sd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_sp, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sd)));
@@ -14674,6 +14722,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_sd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_sd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_sp, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_sd, d_pair_inds_k_for_K_sd, d_Q_K_sp, d_Q_K_dd, d_pair_displs_K_sp, d_pair_displs_K_dd, d_pair_counts_K_sp, d_pair_counts_K_dd,
@@ -14840,9 +14892,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_sd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_sd, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sd)));
@@ -14851,6 +14900,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_sd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_sd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_sd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_sd, d_pair_inds_k_for_K_sd, d_Q_K_sd, d_Q_K_dp, d_pair_displs_K_sd, d_pair_displs_K_dp, d_pair_counts_K_sd, d_pair_counts_K_dp,
@@ -15014,9 +15067,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_sd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_sd, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sd)));
@@ -15025,6 +15075,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_sd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_sd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_sd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_sd, d_pair_inds_k_for_K_sd, d_Q_K_sd, d_Q_K_dd, d_pair_displs_K_sd, d_pair_displs_K_dd, d_pair_counts_K_sd, d_pair_counts_K_dd,
@@ -15139,6 +15193,303 @@ computeFockOnGPU(const              CMolecule& molecule,
 
 
 
+
+
+        // BEGIN GENERATED EXCHANGE RESPLIT COMPARISON SDDD
+        if (static_cast<uint32_t>(pair_inds_count_for_K_sd) > 0)
+        {
+            const auto rs_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_sd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(rs_cuts.total_cut_entries, rs_cuts.displ_cuts.size());
+            double *d_old_ref = nullptr, *d_rs_ref = nullptr;
+            double *d_old_mp = nullptr, *d_rs_mp = nullptr;
+            gpuSafe(gpuMalloc(&d_old_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sd)));
+            gpuSafe(gpuMalloc(&d_rs_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sd)));
+            gpuSafe(gpuMalloc(&d_old_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sd)));
+            gpuSafe(gpuMalloc(&d_rs_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sd)));
+            constexpr uint32_t rs_zero_threads = 256;
+            const dim3 rs_zero_blocks((static_cast<uint32_t>(pair_inds_count_for_K_sd) + rs_zero_threads - 1) / rs_zero_threads);
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_rs_ref, static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_old_mp, static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_rs_mp, static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, rs_cuts.displ_cuts.data(), rs_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+            build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
+                d_pair_inds_i_for_K_sd, d_pair_inds_k_for_K_sd, d_Q_K_sd, d_Q_K_dd, d_pair_displs_K_sd, d_pair_displs_K_dd, d_pair_counts_K_sd, d_pair_counts_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_sd), TILE_DIM_Y_K, TILE_DIM_X_K, dd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            gpuSafe(gpuStreamSynchronize(stream));
+            double rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockSDDD<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_sd,
+                d_pair_inds_k_for_K_sd,
+                static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                d_s_prim_info,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_sd,
+                d_Q_K_dd,
+                d_D_inds_K_sd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_sd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_sd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_sd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double old_ref_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockSDDD0_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_sd,
+                d_pair_inds_k_for_K_sd,
+                static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                d_s_prim_info,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_sd,
+                d_Q_K_dd,
+                d_D_inds_K_sd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_sd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_sd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_sd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockSDDD1_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_sd,
+                d_pair_inds_k_for_K_sd,
+                static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                d_s_prim_info,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_sd,
+                d_Q_K_dd,
+                d_D_inds_K_sd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_sd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_sd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_sd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double rs_ref_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockSDDD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_sd,
+                d_pair_inds_k_for_K_sd,
+                static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                d_s_prim_info,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_sd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_sd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_sd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_sd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockSDDD_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_sd,
+                d_pair_inds_k_for_K_sd,
+                static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                d_s_prim_info_f_K,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_sd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_sd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_sd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_sd_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double old_mp_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockSDDD0_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_sd,
+                d_pair_inds_k_for_K_sd,
+                static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                d_s_prim_info,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_sd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_sd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_sd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_sd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockSDDD1_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_sd,
+                d_pair_inds_k_for_K_sd,
+                static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                d_s_prim_info,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_sd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_sd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_sd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_sd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockSDDD0_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_sd,
+                d_pair_inds_k_for_K_sd,
+                static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                d_s_prim_info_f_K,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_sd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_sd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_sd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_sd_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockSDDD1_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_sd,
+                d_pair_inds_k_for_K_sd,
+                static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                d_s_prim_info_f_K,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_sd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_sd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_sd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_sd_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double rs_mp_seconds = omp_get_wtime() - rs_time_mark;
+            std::vector<double> h_old_ref(static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            gpuSafe(gpuMemcpy(h_old_ref.data(), d_old_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_rs_ref(static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            gpuSafe(gpuMemcpy(h_rs_ref.data(), d_rs_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_old_mp(static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            gpuSafe(gpuMemcpy(h_old_mp.data(), d_old_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_rs_mp(static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            gpuSafe(gpuMemcpy(h_rs_mp.data(), d_rs_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_sd), gpuMemcpyDeviceToHost));
+            gpuSafe(gpuFree(d_old_ref));
+            gpuSafe(gpuFree(d_rs_ref));
+            gpuSafe(gpuFree(d_old_mp));
+            gpuSafe(gpuFree(d_rs_mp));
+            check_J_against_ref("SDDD RS original vs old original", h_rs_ref, h_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            check_J_against_ref("SDDD old MP vs old original", h_old_mp, h_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            check_J_against_ref("SDDD RS MP vs RS original", h_rs_mp, h_rs_ref, static_cast<uint32_t>(pair_inds_count_for_K_sd));
+            print_exchange_resplit_timing("SDDD", old_ref_seconds, rs_ref_seconds, old_mp_seconds, rs_mp_seconds);
+        }
+        // END GENERATED EXCHANGE RESPLIT COMPARISON SDDD
         //omptimers[thread_id].stop("    K block SDDD");
 
         gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K, pair_inds_count_for_K_sd * sizeof(double), gpuMemcpyDeviceToHost, stream));
@@ -15235,9 +15586,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_pd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_ps, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd)));
@@ -15246,6 +15594,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_pd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_pd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_ps, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_ps, d_Q_K_ds, d_pair_displs_K_ps, d_pair_displs_K_ds, d_pair_counts_K_ps, d_pair_counts_K_ds,
@@ -15412,9 +15764,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_pd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_ps, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd)));
@@ -15423,6 +15772,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_pd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_pd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_ps, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_ps, d_Q_K_dp, d_pair_displs_K_ps, d_pair_displs_K_dp, d_pair_counts_K_ps, d_pair_counts_K_dp,
@@ -15589,9 +15942,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_pd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pp, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd)));
@@ -15600,6 +15950,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_pd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_pd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pp, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_pp, d_Q_K_ds, d_pair_displs_K_pp, d_pair_displs_K_ds, d_pair_counts_K_pp, d_pair_counts_K_ds,
@@ -15766,9 +16120,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_pd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_ps, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd)));
@@ -15777,6 +16128,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_pd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_pd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_ps, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_ps, d_Q_K_dd, d_pair_displs_K_ps, d_pair_displs_K_dd, d_pair_counts_K_ps, d_pair_counts_K_dd,
@@ -15943,9 +16298,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_pd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pd, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd)));
@@ -15954,6 +16306,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_pd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_pd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_pd, d_Q_K_ds, d_pair_displs_K_pd, d_pair_displs_K_ds, d_pair_counts_K_pd, d_pair_counts_K_ds,
@@ -16117,9 +16473,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_pd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pp, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd)));
@@ -16128,6 +16481,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_pd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_pd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pp, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_pp, d_Q_K_dp, d_pair_displs_K_pp, d_pair_displs_K_dp, d_pair_counts_K_pp, d_pair_counts_K_dp,
@@ -16282,9 +16639,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_pd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pp, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd)));
@@ -16293,6 +16647,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_pd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_pd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pp, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_pp, d_Q_K_dd, d_pair_displs_K_pp, d_pair_displs_K_dd, d_pair_counts_K_pp, d_pair_counts_K_dd,
@@ -16407,6 +16765,303 @@ computeFockOnGPU(const              CMolecule& molecule,
 
 
 
+
+
+        // BEGIN GENERATED EXCHANGE RESPLIT COMPARISON PPDD
+        if (static_cast<uint32_t>(pair_inds_count_for_K_pd) > 0)
+        {
+            const auto rs_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pp, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(rs_cuts.total_cut_entries, rs_cuts.displ_cuts.size());
+            double *d_old_ref = nullptr, *d_rs_ref = nullptr;
+            double *d_old_mp = nullptr, *d_rs_mp = nullptr;
+            gpuSafe(gpuMalloc(&d_old_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd)));
+            gpuSafe(gpuMalloc(&d_rs_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd)));
+            gpuSafe(gpuMalloc(&d_old_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd)));
+            gpuSafe(gpuMalloc(&d_rs_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd)));
+            constexpr uint32_t rs_zero_threads = 256;
+            const dim3 rs_zero_blocks((static_cast<uint32_t>(pair_inds_count_for_K_pd) + rs_zero_threads - 1) / rs_zero_threads);
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_rs_ref, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_old_mp, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_rs_mp, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, rs_cuts.displ_cuts.data(), rs_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+            build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
+                d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_pp, d_Q_K_dd, d_pair_displs_K_pp, d_pair_displs_K_dd, d_pair_counts_K_pp, d_pair_counts_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, pd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            gpuSafe(gpuStreamSynchronize(stream));
+            double rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockPPDD<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                pd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_pp,
+                d_Q_K_dd,
+                d_D_inds_K_pp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double old_ref_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockPPDD0_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                pd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_pp,
+                d_Q_K_dd,
+                d_D_inds_K_pp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockPPDD1_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                pd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_pp,
+                d_Q_K_dd,
+                d_D_inds_K_pp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double rs_ref_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockPPDD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPPDD_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pp_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double old_mp_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockPPDD0_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPPDD1_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPPDD0_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pp_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPPDD1_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pp_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double rs_mp_seconds = omp_get_wtime() - rs_time_mark;
+            std::vector<double> h_old_ref(static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpuSafe(gpuMemcpy(h_old_ref.data(), d_old_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_rs_ref(static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpuSafe(gpuMemcpy(h_rs_ref.data(), d_rs_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_old_mp(static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpuSafe(gpuMemcpy(h_old_mp.data(), d_old_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_rs_mp(static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpuSafe(gpuMemcpy(h_rs_mp.data(), d_rs_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd), gpuMemcpyDeviceToHost));
+            gpuSafe(gpuFree(d_old_ref));
+            gpuSafe(gpuFree(d_rs_ref));
+            gpuSafe(gpuFree(d_old_mp));
+            gpuSafe(gpuFree(d_rs_mp));
+            check_J_against_ref("PPDD RS original vs old original", h_rs_ref, h_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            check_J_against_ref("PPDD old MP vs old original", h_old_mp, h_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            check_J_against_ref("PPDD RS MP vs RS original", h_rs_mp, h_rs_ref, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            print_exchange_resplit_timing("PPDD", old_ref_seconds, rs_ref_seconds, old_mp_seconds, rs_mp_seconds);
+        }
+        // END GENERATED EXCHANGE RESPLIT COMPARISON PPDD
         //omptimers[thread_id].stop("    K block PPDD");
 
         // K: (PD|DP)
@@ -16447,9 +17102,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_pd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pd, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd)));
@@ -16458,6 +17110,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_pd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_pd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_pd, d_Q_K_dp, d_pair_displs_K_pd, d_pair_displs_K_dp, d_pair_counts_K_pd, d_pair_counts_K_dp,
@@ -16815,9 +17471,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_pd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pd, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd)));
@@ -16826,6 +17479,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_pd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_pd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_pd, d_Q_K_dd, d_pair_displs_K_pd, d_pair_displs_K_dd, d_pair_counts_K_pd, d_pair_counts_K_dd,
@@ -17507,6 +18164,1113 @@ computeFockOnGPU(const              CMolecule& molecule,
 
 
 
+
+
+        // BEGIN GENERATED EXCHANGE RESPLIT COMPARISON PDDD
+        if (static_cast<uint32_t>(pair_inds_count_for_K_pd) > 0)
+        {
+            const auto rs_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(rs_cuts.total_cut_entries, rs_cuts.displ_cuts.size());
+            double *d_old_ref = nullptr, *d_rs_ref = nullptr;
+            double *d_old_mp = nullptr, *d_rs_mp = nullptr;
+            gpuSafe(gpuMalloc(&d_old_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd)));
+            gpuSafe(gpuMalloc(&d_rs_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd)));
+            gpuSafe(gpuMalloc(&d_old_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd)));
+            gpuSafe(gpuMalloc(&d_rs_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd)));
+            constexpr uint32_t rs_zero_threads = 256;
+            const dim3 rs_zero_blocks((static_cast<uint32_t>(pair_inds_count_for_K_pd) + rs_zero_threads - 1) / rs_zero_threads);
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_rs_ref, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_old_mp, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_rs_mp, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, rs_cuts.displ_cuts.data(), rs_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+            build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
+                d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_pd, d_Q_K_dd, d_pair_displs_K_pd, d_pair_displs_K_dd, d_pair_counts_K_pd, d_pair_counts_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, dd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            gpuSafe(gpuStreamSynchronize(stream));
+            double rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockPDDD0<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_pd,
+                d_Q_K_dd,
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockPDDD1<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_pd,
+                d_Q_K_dd,
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockPDDD2<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_pd,
+                d_Q_K_dd,
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockPDDD3<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_pd,
+                d_Q_K_dd,
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockPDDD4<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_pd,
+                d_Q_K_dd,
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockPDDD5<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_pd,
+                d_Q_K_dd,
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockPDDD6<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_pd,
+                d_Q_K_dd,
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockPDDD7<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_pd,
+                d_Q_K_dd,
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double old_ref_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockPDDD0_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_pd,
+                d_Q_K_dd,
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockPDDD1_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_pd,
+                d_Q_K_dd,
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockPDDD2_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_pd,
+                d_Q_K_dd,
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockPDDD3_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_pd,
+                d_Q_K_dd,
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockPDDD4_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_pd,
+                d_Q_K_dd,
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double rs_ref_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockPDDD0_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD1_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD2_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD3_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD4_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD5_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD6_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD7_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD0_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD1_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD2_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD3_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD4_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD5_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD6_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD7_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double old_mp_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockPDDD0_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD1_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD2_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD3_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD4_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD0_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD1_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD2_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD3_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockPDDD4_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_pd,
+                d_pair_inds_k_for_K_pd,
+                static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_pd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_pd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_pd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_pd_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double rs_mp_seconds = omp_get_wtime() - rs_time_mark;
+            std::vector<double> h_old_ref(static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpuSafe(gpuMemcpy(h_old_ref.data(), d_old_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_rs_ref(static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpuSafe(gpuMemcpy(h_rs_ref.data(), d_rs_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_old_mp(static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpuSafe(gpuMemcpy(h_old_mp.data(), d_old_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_rs_mp(static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            gpuSafe(gpuMemcpy(h_rs_mp.data(), d_rs_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_pd), gpuMemcpyDeviceToHost));
+            gpuSafe(gpuFree(d_old_ref));
+            gpuSafe(gpuFree(d_rs_ref));
+            gpuSafe(gpuFree(d_old_mp));
+            gpuSafe(gpuFree(d_rs_mp));
+            check_J_against_ref("PDDD RS original vs old original", h_rs_ref, h_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            check_J_against_ref("PDDD old MP vs old original", h_old_mp, h_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            check_J_against_ref("PDDD RS MP vs RS original", h_rs_mp, h_rs_ref, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+            print_exchange_resplit_timing("PDDD", old_ref_seconds, rs_ref_seconds, old_mp_seconds, rs_mp_seconds);
+        }
+        // END GENERATED EXCHANGE RESPLIT COMPARISON PDDD
         //omptimers[thread_id].stop("    K block PDDD");
 
         gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K, pair_inds_count_for_K_pd * sizeof(double), gpuMemcpyDeviceToHost, stream));
@@ -17600,9 +19364,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_dd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_ds, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
@@ -17611,6 +19372,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_dd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_dd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_ds, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_ds, d_Q_K_ds, d_pair_displs_K_ds, d_pair_displs_K_ds, d_pair_counts_K_ds, d_pair_counts_K_ds,
@@ -17751,9 +19516,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_dd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_ds, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
@@ -17762,6 +19524,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_dd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_dd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_ds, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_ds, d_Q_K_dp, d_pair_displs_K_ds, d_pair_displs_K_dp, d_pair_counts_K_ds, d_pair_counts_K_dp,
@@ -17924,9 +19690,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_dd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dp, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
@@ -17935,6 +19698,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_dd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_dd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dp, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_dp, d_Q_K_ds, d_pair_displs_K_dp, d_pair_displs_K_ds, d_pair_counts_K_dp, d_pair_counts_K_ds,
@@ -18096,9 +19863,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_dd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_ds, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
@@ -18107,6 +19871,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_dd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_dd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_ds, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_ds, d_Q_K_dd, d_pair_displs_K_ds, d_pair_displs_K_dd, d_pair_counts_K_ds, d_pair_counts_K_dd,
@@ -18221,6 +19989,303 @@ computeFockOnGPU(const              CMolecule& molecule,
 
 
 
+
+
+        // BEGIN GENERATED EXCHANGE RESPLIT COMPARISON DSDD
+        if (static_cast<uint32_t>(pair_inds_count_for_K_dd) > 0)
+        {
+            const auto rs_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_ds, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(rs_cuts.total_cut_entries, rs_cuts.displ_cuts.size());
+            double *d_old_ref = nullptr, *d_rs_ref = nullptr;
+            double *d_old_mp = nullptr, *d_rs_mp = nullptr;
+            gpuSafe(gpuMalloc(&d_old_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            gpuSafe(gpuMalloc(&d_rs_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            gpuSafe(gpuMalloc(&d_old_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            gpuSafe(gpuMalloc(&d_rs_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            constexpr uint32_t rs_zero_threads = 256;
+            const dim3 rs_zero_blocks((static_cast<uint32_t>(pair_inds_count_for_K_dd) + rs_zero_threads - 1) / rs_zero_threads);
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_rs_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_old_mp, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_rs_mp, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, rs_cuts.displ_cuts.data(), rs_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+            build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
+                d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_ds, d_Q_K_dd, d_pair_displs_K_ds, d_pair_displs_K_dd, d_pair_counts_K_ds, d_pair_counts_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, sd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            gpuSafe(gpuStreamSynchronize(stream));
+            double rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDSDD<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_s_prim_info,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                sd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_ds,
+                d_Q_K_dd,
+                d_D_inds_K_ds,
+                d_D_inds_K_dd,
+                d_pair_displs_K_ds,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_ds,
+                d_pair_counts_K_dd,
+                d_pair_data_K_ds,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double old_ref_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDSDD0_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_s_prim_info,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                sd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_ds,
+                d_Q_K_dd,
+                d_D_inds_K_ds,
+                d_D_inds_K_dd,
+                d_pair_displs_K_ds,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_ds,
+                d_pair_counts_K_dd,
+                d_pair_data_K_ds,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDSDD1_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_s_prim_info,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                sd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_ds,
+                d_Q_K_dd,
+                d_D_inds_K_ds,
+                d_D_inds_K_dd,
+                d_pair_displs_K_ds,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_ds,
+                d_pair_counts_K_dd,
+                d_pair_data_K_ds,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double rs_ref_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDSDD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_s_prim_info,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_ds,
+                d_D_inds_K_dd,
+                d_pair_displs_K_ds,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_ds,
+                d_pair_counts_K_dd,
+                d_pair_data_K_ds,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDSDD_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_s_prim_info_f_K,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_ds,
+                d_D_inds_K_dd,
+                d_pair_displs_K_ds,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_ds,
+                d_pair_counts_K_dd,
+                d_pair_data_K_ds_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double old_mp_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDSDD0_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_s_prim_info,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_ds,
+                d_D_inds_K_dd,
+                d_pair_displs_K_ds,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_ds,
+                d_pair_counts_K_dd,
+                d_pair_data_K_ds,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDSDD1_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_s_prim_info,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_ds,
+                d_D_inds_K_dd,
+                d_pair_displs_K_ds,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_ds,
+                d_pair_counts_K_dd,
+                d_pair_data_K_ds,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDSDD0_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_s_prim_info_f_K,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_ds,
+                d_D_inds_K_dd,
+                d_pair_displs_K_ds,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_ds,
+                d_pair_counts_K_dd,
+                d_pair_data_K_ds_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDSDD1_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_s_prim_info_f_K,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_ds,
+                d_D_inds_K_dd,
+                d_pair_displs_K_ds,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_ds,
+                d_pair_counts_K_dd,
+                d_pair_data_K_ds_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double rs_mp_seconds = omp_get_wtime() - rs_time_mark;
+            std::vector<double> h_old_ref(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_old_ref.data(), d_old_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_rs_ref(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_rs_ref.data(), d_rs_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_old_mp(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_old_mp.data(), d_old_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_rs_mp(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_rs_mp.data(), d_rs_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            gpuSafe(gpuFree(d_old_ref));
+            gpuSafe(gpuFree(d_rs_ref));
+            gpuSafe(gpuFree(d_old_mp));
+            gpuSafe(gpuFree(d_rs_mp));
+            check_J_against_ref("DSDD RS original vs old original", h_rs_ref, h_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            check_J_against_ref("DSDD old MP vs old original", h_old_mp, h_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            check_J_against_ref("DSDD RS MP vs RS original", h_rs_mp, h_rs_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            print_exchange_resplit_timing("DSDD", old_ref_seconds, rs_ref_seconds, old_mp_seconds, rs_mp_seconds);
+        }
+        // END GENERATED EXCHANGE RESPLIT COMPARISON DSDD
         //omptimers[thread_id].stop("    K block DSDD");
 
         // K: (DD|DS)
@@ -18261,9 +20326,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_dd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dd, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
@@ -18272,6 +20334,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_dd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_dd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_dd, d_Q_K_ds, d_pair_displs_K_dd, d_pair_displs_K_ds, d_pair_counts_K_dd, d_pair_counts_K_ds,
@@ -18386,6 +20452,303 @@ computeFockOnGPU(const              CMolecule& molecule,
 
 
 
+
+
+        // BEGIN GENERATED EXCHANGE RESPLIT COMPARISON DDDS
+        if (static_cast<uint32_t>(pair_inds_count_for_K_dd) > 0)
+        {
+            const auto rs_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(rs_cuts.total_cut_entries, rs_cuts.displ_cuts.size());
+            double *d_old_ref = nullptr, *d_rs_ref = nullptr;
+            double *d_old_mp = nullptr, *d_rs_mp = nullptr;
+            gpuSafe(gpuMalloc(&d_old_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            gpuSafe(gpuMalloc(&d_rs_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            gpuSafe(gpuMalloc(&d_old_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            gpuSafe(gpuMalloc(&d_rs_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            constexpr uint32_t rs_zero_threads = 256;
+            const dim3 rs_zero_blocks((static_cast<uint32_t>(pair_inds_count_for_K_dd) + rs_zero_threads - 1) / rs_zero_threads);
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_rs_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_old_mp, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_rs_mp, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, rs_cuts.displ_cuts.data(), rs_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+            build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
+                d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_dd, d_Q_K_ds, d_pair_displs_K_dd, d_pair_displs_K_ds, d_pair_counts_K_dd, d_pair_counts_K_ds,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, ds_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            gpuSafe(gpuStreamSynchronize(stream));
+            double rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDDDS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_s_prim_info,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                ds_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_Q_K_ds,
+                d_D_inds_K_dd,
+                d_D_inds_K_ds,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_ds,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_ds,
+                d_pair_data_K_dd,
+                d_pair_data_K_ds,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double old_ref_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDDDS0_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_s_prim_info,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                ds_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_Q_K_ds,
+                d_D_inds_K_dd,
+                d_D_inds_K_ds,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_ds,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_ds,
+                d_pair_data_K_dd,
+                d_pair_data_K_ds,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDS1_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_s_prim_info,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                ds_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_Q_K_ds,
+                d_D_inds_K_dd,
+                d_D_inds_K_ds,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_ds,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_ds,
+                d_pair_data_K_dd,
+                d_pair_data_K_ds,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double rs_ref_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDDDS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_s_prim_info,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_ds,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_ds,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_ds,
+                d_pair_data_K_dd,
+                d_pair_data_K_ds,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_s_prim_info_f_K,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_ds,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_ds,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_ds,
+                d_pair_data_K_dd_f,
+                d_pair_data_K_ds_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double old_mp_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDDDS0_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_s_prim_info,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_ds,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_ds,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_ds,
+                d_pair_data_K_dd,
+                d_pair_data_K_ds,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDS1_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_s_prim_info,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_ds,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_ds,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_ds,
+                d_pair_data_K_dd,
+                d_pair_data_K_ds,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDS0_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_s_prim_info_f_K,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_ds,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_ds,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_ds,
+                d_pair_data_K_dd_f,
+                d_pair_data_K_ds_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDS1_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_s_prim_info_f_K,
+                d_s_prim_aoinds,
+                static_cast<uint32_t>(s_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_ds,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_ds,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_ds,
+                d_pair_data_K_dd_f,
+                d_pair_data_K_ds_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double rs_mp_seconds = omp_get_wtime() - rs_time_mark;
+            std::vector<double> h_old_ref(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_old_ref.data(), d_old_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_rs_ref(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_rs_ref.data(), d_rs_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_old_mp(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_old_mp.data(), d_old_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_rs_mp(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_rs_mp.data(), d_rs_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            gpuSafe(gpuFree(d_old_ref));
+            gpuSafe(gpuFree(d_rs_ref));
+            gpuSafe(gpuFree(d_old_mp));
+            gpuSafe(gpuFree(d_rs_mp));
+            check_J_against_ref("DDDS RS original vs old original", h_rs_ref, h_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            check_J_against_ref("DDDS old MP vs old original", h_old_mp, h_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            check_J_against_ref("DDDS RS MP vs RS original", h_rs_mp, h_rs_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            print_exchange_resplit_timing("DDDS", old_ref_seconds, rs_ref_seconds, old_mp_seconds, rs_mp_seconds);
+        }
+        // END GENERATED EXCHANGE RESPLIT COMPARISON DDDS
         //omptimers[thread_id].stop("    K block DDDS");
 
         // K: (DP|DP)
@@ -18421,9 +20784,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_dd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dp, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
@@ -18432,6 +20792,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_dd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_dd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dp, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_dp, d_Q_K_dp, d_pair_displs_K_dp, d_pair_displs_K_dp, d_pair_counts_K_dp, d_pair_counts_K_dp,
@@ -18747,9 +21111,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_dd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dp, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
@@ -18758,6 +21119,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_dd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_dd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dp, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_dp, d_Q_K_dd, d_pair_displs_K_dp, d_pair_displs_K_dd, d_pair_counts_K_dp, d_pair_counts_K_dd,
@@ -19358,6 +21723,1032 @@ computeFockOnGPU(const              CMolecule& molecule,
 
 
 
+
+
+        // BEGIN GENERATED EXCHANGE RESPLIT COMPARISON DPDD
+        if (static_cast<uint32_t>(pair_inds_count_for_K_dd) > 0)
+        {
+            const auto rs_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dp, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(rs_cuts.total_cut_entries, rs_cuts.displ_cuts.size());
+            double *d_old_ref = nullptr, *d_rs_ref = nullptr;
+            double *d_old_mp = nullptr, *d_rs_mp = nullptr;
+            gpuSafe(gpuMalloc(&d_old_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            gpuSafe(gpuMalloc(&d_rs_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            gpuSafe(gpuMalloc(&d_old_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            gpuSafe(gpuMalloc(&d_rs_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            constexpr uint32_t rs_zero_threads = 256;
+            const dim3 rs_zero_blocks((static_cast<uint32_t>(pair_inds_count_for_K_dd) + rs_zero_threads - 1) / rs_zero_threads);
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_rs_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_old_mp, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_rs_mp, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, rs_cuts.displ_cuts.data(), rs_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+            build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
+                d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_dp, d_Q_K_dd, d_pair_displs_K_dp, d_pair_displs_K_dd, d_pair_counts_K_dp, d_pair_counts_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, pd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            gpuSafe(gpuStreamSynchronize(stream));
+            double rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDPDD0<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                pd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dp,
+                d_Q_K_dd,
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDPDD1<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                pd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dp,
+                d_Q_K_dd,
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDPDD2<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                pd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dp,
+                d_Q_K_dd,
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDPDD3<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                pd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dp,
+                d_Q_K_dd,
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDPDD4<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                pd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dp,
+                d_Q_K_dd,
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDPDD5<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                pd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dp,
+                d_Q_K_dd,
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDPDD6<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                pd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dp,
+                d_Q_K_dd,
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double old_ref_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDPDD0_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                pd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dp,
+                d_Q_K_dd,
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDPDD1_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                pd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dp,
+                d_Q_K_dd,
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDPDD2_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                pd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dp,
+                d_Q_K_dd,
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDPDD3_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                pd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dp,
+                d_Q_K_dd,
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDPDD4_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                pd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dp,
+                d_Q_K_dd,
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double rs_ref_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDPDD0_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD1_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD2_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD3_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD4_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD5_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD6_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD0_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD1_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD2_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD3_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD4_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD5_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD6_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double old_mp_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDPDD0_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD1_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD2_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD3_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD4_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD0_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD1_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD2_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD3_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDPDD4_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dp,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dp_f,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double rs_mp_seconds = omp_get_wtime() - rs_time_mark;
+            std::vector<double> h_old_ref(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_old_ref.data(), d_old_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_rs_ref(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_rs_ref.data(), d_rs_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_old_mp(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_old_mp.data(), d_old_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_rs_mp(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_rs_mp.data(), d_rs_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            gpuSafe(gpuFree(d_old_ref));
+            gpuSafe(gpuFree(d_rs_ref));
+            gpuSafe(gpuFree(d_old_mp));
+            gpuSafe(gpuFree(d_rs_mp));
+            check_J_against_ref("DPDD RS original vs old original", h_rs_ref, h_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            check_J_against_ref("DPDD old MP vs old original", h_old_mp, h_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            check_J_against_ref("DPDD RS MP vs RS original", h_rs_mp, h_rs_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            print_exchange_resplit_timing("DPDD", old_ref_seconds, rs_ref_seconds, old_mp_seconds, rs_mp_seconds);
+        }
+        // END GENERATED EXCHANGE RESPLIT COMPARISON DPDD
         //omptimers[thread_id].stop("    K block DPDD");
 
         // K: (DD|DP)
@@ -19572,9 +22963,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_dd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dd, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
@@ -19583,6 +22971,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_dd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_dd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_dd, d_Q_K_dp, d_pair_displs_K_dd, d_pair_displs_K_dp, d_pair_counts_K_dd, d_pair_counts_K_dp,
@@ -20183,6 +23575,1113 @@ computeFockOnGPU(const              CMolecule& molecule,
 
 
 
+
+
+        // BEGIN GENERATED EXCHANGE RESPLIT COMPARISON DDDP
+        if (static_cast<uint32_t>(pair_inds_count_for_K_dd) > 0)
+        {
+            const auto rs_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(rs_cuts.total_cut_entries, rs_cuts.displ_cuts.size());
+            double *d_old_ref = nullptr, *d_rs_ref = nullptr;
+            double *d_old_mp = nullptr, *d_rs_mp = nullptr;
+            gpuSafe(gpuMalloc(&d_old_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            gpuSafe(gpuMalloc(&d_rs_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            gpuSafe(gpuMalloc(&d_old_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            gpuSafe(gpuMalloc(&d_rs_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            constexpr uint32_t rs_zero_threads = 256;
+            const dim3 rs_zero_blocks((static_cast<uint32_t>(pair_inds_count_for_K_dd) + rs_zero_threads - 1) / rs_zero_threads);
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_rs_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_old_mp, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_rs_mp, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, rs_cuts.displ_cuts.data(), rs_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+            build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
+                d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_dd, d_Q_K_dp, d_pair_displs_K_dd, d_pair_displs_K_dp, d_pair_counts_K_dd, d_pair_counts_K_dp,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, dp_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            gpuSafe(gpuStreamSynchronize(stream));
+            double rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDDDP0<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dp_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_Q_K_dp,
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDP1<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dp_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_Q_K_dp,
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDP2<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dp_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_Q_K_dp,
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDP3<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dp_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_Q_K_dp,
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDP4<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dp_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_Q_K_dp,
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDP5<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dp_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_Q_K_dp,
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDP6<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dp_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_Q_K_dp,
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double old_ref_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDDDP0_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dp_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_Q_K_dp,
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDP1_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dp_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_Q_K_dp,
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDP2_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dp_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_Q_K_dp,
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDP3_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dp_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_Q_K_dp,
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDP4_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dp_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_Q_K_dp,
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDP5_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dp_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_Q_K_dp,
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double rs_ref_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDDDP0_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP1_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP2_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP3_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP4_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP5_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP6_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP0_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd_f,
+                d_pair_data_K_dp_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP1_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd_f,
+                d_pair_data_K_dp_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP2_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd_f,
+                d_pair_data_K_dp_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP3_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd_f,
+                d_pair_data_K_dp_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP4_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd_f,
+                d_pair_data_K_dp_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP5_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd_f,
+                d_pair_data_K_dp_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP6_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd_f,
+                d_pair_data_K_dp_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double old_mp_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDDDP0_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP1_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP2_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP3_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP4_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP5_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd,
+                d_pair_data_K_dp,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP0_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd_f,
+                d_pair_data_K_dp_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP1_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd_f,
+                d_pair_data_K_dp_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP2_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd_f,
+                d_pair_data_K_dp_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP3_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd_f,
+                d_pair_data_K_dp_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP4_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd_f,
+                d_pair_data_K_dp_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDP5_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_p_prim_info_f_K,
+                d_p_prim_aoinds,
+                static_cast<uint32_t>(p_prim_count),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_D_inds_K_dp,
+                d_pair_displs_K_dd,
+                d_pair_displs_K_dp,
+                d_pair_counts_K_dd,
+                d_pair_counts_K_dp,
+                d_pair_data_K_dd_f,
+                d_pair_data_K_dp_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double rs_mp_seconds = omp_get_wtime() - rs_time_mark;
+            std::vector<double> h_old_ref(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_old_ref.data(), d_old_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_rs_ref(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_rs_ref.data(), d_rs_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_old_mp(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_old_mp.data(), d_old_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_rs_mp(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_rs_mp.data(), d_rs_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            gpuSafe(gpuFree(d_old_ref));
+            gpuSafe(gpuFree(d_rs_ref));
+            gpuSafe(gpuFree(d_old_mp));
+            gpuSafe(gpuFree(d_rs_mp));
+            check_J_against_ref("DDDP RS original vs old original", h_rs_ref, h_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            check_J_against_ref("DDDP old MP vs old original", h_old_mp, h_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            check_J_against_ref("DDDP RS MP vs RS original", h_rs_mp, h_rs_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            print_exchange_resplit_timing("DDDP", old_ref_seconds, rs_ref_seconds, old_mp_seconds, rs_mp_seconds);
+        }
+        // END GENERATED EXCHANGE RESPLIT COMPARISON DDDP
         //omptimers[thread_id].stop("    K block DDDP");
 
         // K: (DD|DD)
@@ -20593,9 +25092,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (static_cast<uint32_t>(pair_inds_count_for_K_dd) > 0)
         {
             gpuSafe(gpuStreamSynchronize(stream));
-            const double exchange_validation_start = omp_get_wtime();
-            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dd, TILE_DIM_Y_K);
-            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             double* d_mat_K_mp = nullptr;
             double* d_mat_K_ref = nullptr;
             gpuSafe(gpuMalloc(&d_mat_K_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
@@ -20604,6 +25100,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             const dim3 zero_blocks_mp((static_cast<uint32_t>(pair_inds_count_for_K_dd) + zero_threads_mp - 1) / zero_threads_mp);
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_mp, static_cast<uint32_t>(pair_inds_count_for_K_dd));
             gpu::zeroData<<<zero_blocks_mp, dim3(zero_threads_mp), 0, stream>>>(d_mat_K_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double exchange_validation_start = omp_get_wtime();
+            const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(exchange_cuts.total_cut_entries, exchange_cuts.displ_cuts.size());
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
                 d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_dd, d_Q_K_dd, d_pair_displs_K_dd, d_pair_displs_K_dd, d_pair_counts_K_dd, d_pair_counts_K_dd,
@@ -21758,6 +26258,2715 @@ computeFockOnGPU(const              CMolecule& molecule,
 
 
 
+
+
+        // BEGIN GENERATED EXCHANGE RESPLIT COMPARISON DDDD
+        if (static_cast<uint32_t>(pair_inds_count_for_K_dd) > 0)
+        {
+            const auto rs_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dd, TILE_DIM_Y_K);
+            ensure_exchange_cut_workspace(rs_cuts.total_cut_entries, rs_cuts.displ_cuts.size());
+            double *d_old_ref = nullptr, *d_rs_ref = nullptr;
+            double *d_old_mp = nullptr, *d_rs_mp = nullptr;
+            gpuSafe(gpuMalloc(&d_old_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            gpuSafe(gpuMalloc(&d_rs_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            gpuSafe(gpuMalloc(&d_old_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            gpuSafe(gpuMalloc(&d_rs_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd)));
+            constexpr uint32_t rs_zero_threads = 256;
+            const dim3 rs_zero_blocks((static_cast<uint32_t>(pair_inds_count_for_K_dd) + rs_zero_threads - 1) / rs_zero_threads);
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_rs_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_old_mp, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpu::zeroData<<<rs_zero_blocks, dim3(rs_zero_threads), 0, stream>>>(d_rs_mp, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, rs_cuts.displ_cuts.data(), rs_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+            build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
+                d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_dd, d_Q_K_dd, d_pair_displs_K_dd, d_pair_displs_K_dd, d_pair_counts_K_dd, d_pair_counts_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, dd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            gpuSafe(gpuStreamSynchronize(stream));
+            double rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDDDD0<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD1<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD2<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD3<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD4<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD5<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD6<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD7<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD8<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD9<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD10<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD11<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD12<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD13<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD14<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD15<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD16<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD17<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD18<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double old_ref_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDDDD0_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD1_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD2_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD3_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD4_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD5_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD6_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD7_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD8_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD9_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD10_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD11_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD12_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD13_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD14_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD15_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD16_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD17_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD18_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD19_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD20_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD21_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD22_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD23_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD24_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpu::computeExchangeFockDDDD25_RS<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_ref,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                dd_max_D,
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_Q_K_dd,
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                eri_threshold);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double rs_ref_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDDDD0_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD1_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD2_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD3_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD4_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD5_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD6_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD7_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD8_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD9_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD10_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD11_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD12_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD13_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD14_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD15_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD16_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD17_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD18_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD0_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD1_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD2_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD3_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD4_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD5_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD6_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD7_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD8_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD9_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD10_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD11_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD12_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD13_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD14_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD15_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD16_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD17_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD18_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_old_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double old_mp_seconds = omp_get_wtime() - rs_time_mark;
+            rs_time_mark = omp_get_wtime();
+            gpu::computeExchangeFockDDDD0_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD1_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD2_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD3_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD4_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD5_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD6_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD7_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD8_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD9_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD10_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD11_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD12_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD13_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD14_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD15_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD16_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD17_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD18_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD19_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD20_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD21_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD22_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD23_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD24_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD25_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd,
+                d_boys_func_table,
+                d_boys_func_ft,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD0_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD1_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD2_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD3_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD4_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD5_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD6_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD7_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD8_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD9_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD10_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD11_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD12_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD13_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD14_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD15_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD16_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD17_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD18_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD19_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD20_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD21_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD22_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD23_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD24_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpu::computeExchangeFockDDDD25_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+                d_rs_mp,
+                d_pair_inds_i_for_K_dd,
+                d_pair_inds_k_for_K_dd,
+                static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                d_d_prim_info_f_K,
+                d_d_prim_aoinds,
+                static_cast<uint32_t>(d_prim_count),
+                d_mat_D_full_AO,
+                static_cast<uint32_t>(cart_naos),
+                d_D_inds_K_dd,
+                d_pair_displs_K_dd,
+                d_pair_counts_K_dd,
+                d_pair_data_K_dd_f,
+                d_boys_func_table_f,
+                d_boys_func_ft_f,
+                omega,
+                d_exchange_prec_cut_flat,
+                d_exchange_screen_cut_flat,
+                d_exchange_displ_cuts);
+            gpuSafe(gpuStreamSynchronize(stream));
+            const double rs_mp_seconds = omp_get_wtime() - rs_time_mark;
+            std::vector<double> h_old_ref(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_old_ref.data(), d_old_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_rs_ref(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_rs_ref.data(), d_rs_ref, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_old_mp(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_old_mp.data(), d_old_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            std::vector<double> h_rs_mp(static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            gpuSafe(gpuMemcpy(h_rs_mp.data(), d_rs_mp, sizeof(double) * static_cast<uint32_t>(pair_inds_count_for_K_dd), gpuMemcpyDeviceToHost));
+            gpuSafe(gpuFree(d_old_ref));
+            gpuSafe(gpuFree(d_rs_ref));
+            gpuSafe(gpuFree(d_old_mp));
+            gpuSafe(gpuFree(d_rs_mp));
+            check_J_against_ref("DDDD RS original vs old original", h_rs_ref, h_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            check_J_against_ref("DDDD old MP vs old original", h_old_mp, h_old_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            check_J_against_ref("DDDD RS MP vs RS original", h_rs_mp, h_rs_ref, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+            print_exchange_resplit_timing("DDDD", old_ref_seconds, rs_ref_seconds, old_mp_seconds, rs_mp_seconds);
+        }
+        // END GENERATED EXCHANGE RESPLIT COMPARISON DDDD
         //omptimers[thread_id].stop("    K block DDDD");
 
         gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K, pair_inds_count_for_K_dd * sizeof(double), gpuMemcpyDeviceToHost, stream));
