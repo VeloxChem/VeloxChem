@@ -140,9 +140,9 @@ class EvbFepDriver:
         self.save_frames: int = 1000
         self.save_crash_pdb: bool = True
         self.save_crash_xml: bool = True
-        self.save_equil_traj: bool = True
+        self.save_equil_traj: bool = False
         self.save_equil_pdb: bool = False
-        self.save_equil_data: bool = True
+        self.save_equil_data: bool = False
         self.xml_crash_save_interval: int = 50
         self.pdb_crash_save_interval: int = 1
         self.pdb_equil_start_temp = 10  # kelvin
