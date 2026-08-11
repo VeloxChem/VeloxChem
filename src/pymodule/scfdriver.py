@@ -1074,6 +1074,10 @@ class ScfDriver:
                     'Initial Guess: Invalid input for unpaired electrons')
                 atom_index = int(m.group(1).strip()) - 1
                 num_unpaired_elec = float(m.group(2).strip())
+                assert_msg_critical(
+                    0 <= atom_index < natoms,
+                    f'Initial Guess: Invalid atom number {atom_index + 1} ' +
+                    f'for unpaired electrons (expecting 1-{natoms})')
                 unpaired_electrons_on_atoms[atom_index] = num_unpaired_elec
 
             sad_drv.set_number_of_unpaired_electrons_on_atoms(
