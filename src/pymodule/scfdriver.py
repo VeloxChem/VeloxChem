@@ -3013,7 +3013,7 @@ class ScfDriver:
                 e_b = self.molecular_orbitals.eb_to_numpy()
                 occ_b = self.molecular_orbitals.occb_to_numpy()
 
-                for col in range(mo_b.shape[1]):
+                for col in range(min(mo_b.shape[1], ref_mo_b.shape[1])):
                     if np.dot(mo_b[:, col], ref_mo_b[:, col]) < 0.0:
                         mo_b[:, col] *= -1.0
 

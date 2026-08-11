@@ -8,7 +8,7 @@ from mpi4py import MPI
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
-from veloxchem.molecularorbitals import molorb
+from veloxchem.molecularorbitals import MolecularOrbitals, molorb
 from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfrestopendriver import ScfRestrictedOpenDriver
@@ -458,6 +458,37 @@ class TestScfDriverMiscellaneous:
 
         if self.is_master():
             assert abs(-74.54939063506086 - scf_results["scf_energy"]) < 1.0e-8
+
+    def test_unrestricted_phase_update_with_fewer_reference_orbitals(self):
+
+        scf_drv = ScfUnrestrictedDriver()
+
+        ref_alpha = np.eye(3)[:, :2]
+        ref_beta = np.eye(3)[:, :2]
+        ref_energies = np.zeros(2)
+        ref_occupations = np.zeros(2)
+        scf_drv._ref_mol_orbs = MolecularOrbitals(
+            [ref_alpha, ref_beta], [ref_energies, ref_energies],
+            [ref_occupations, ref_occupations], molorb.unrest)
+
+        current_alpha = -np.eye(3)
+        current_beta = -np.eye(3)
+        current_energies = np.zeros(3)
+        current_occupations = np.zeros(3)
+        scf_drv._molecular_orbitals = MolecularOrbitals(
+            [current_alpha, current_beta],
+            [current_energies, current_energies],
+            [current_occupations, current_occupations], molorb.unrest)
+
+        scf_drv._update_mol_orbs_phase()
+
+        if self.is_master():
+            updated_alpha = scf_drv.molecular_orbitals.alpha_to_numpy()
+            updated_beta = scf_drv.molecular_orbitals.beta_to_numpy()
+            assert np.allclose(updated_alpha[:, :2], ref_alpha)
+            assert np.allclose(updated_beta[:, :2], ref_beta)
+            assert np.allclose(updated_alpha[:, 2], [0.0, 0.0, -1.0])
+            assert np.allclose(updated_beta[:, 2], [0.0, 0.0, -1.0])
 
     def test_user_supplied_start_orbitals_are_not_checkpoint_restart(
             self, tmp_path):
