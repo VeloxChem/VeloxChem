@@ -210,7 +210,7 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
         S_grad_omp[gpu_id] = CDenseMatrix(3, natoms);
     }
 
-#pragma omp parallel
+#pragma omp parallel num_threads(num_gpus_per_node)
     {
     auto thread_id = omp_get_thread_num();
 
@@ -753,7 +753,7 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
         T_grad_omp[gpu_id] = CDenseMatrix(3, natoms);
     }
 
-#pragma omp parallel
+#pragma omp parallel num_threads(num_gpus_per_node)
     {
     auto thread_id = omp_get_thread_num();
 
@@ -1308,7 +1308,7 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
         V_grad_omp[gpu_id] = CDenseMatrix(3, natoms);
     }
 
-#pragma omp parallel
+#pragma omp parallel num_threads(num_gpus_per_node)
     {
     auto thread_id = omp_get_thread_num();
 
@@ -1914,7 +1914,7 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
         V_grad_omp[gpu_id] = CDenseMatrix(3, natoms);
     }
 
-#pragma omp parallel
+#pragma omp parallel num_threads(num_gpus_per_node)
     {
     auto thread_id = omp_get_thread_num();
 
@@ -2634,10 +2634,13 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
     std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_map_i, cart_sph_map_j;
 
+#pragma omp parallel for collapse(2) schedule(dynamic)
     for (int64_t i_cgto = 0; i_cgto < naos; i_cgto++)
     {
         for (int64_t j_cgto = 0; j_cgto < naos; j_cgto++)
         {
+            const auto dens_ij = sph_dens_ptr[i_cgto * naos + j_cgto];
+
             for (const auto& i_cgto_cart_ind_coef : sph_cart_map[i_cgto])
             {
                 auto i_cgto_cart = i_cgto_cart_ind_coef.first;
@@ -2648,8 +2651,10 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                     auto j_cgto_cart = j_cgto_cart_ind_coef.first;
                     auto j_coef_cart = j_cgto_cart_ind_coef.second;
 
-                    cart_dens_ptr[i_cgto_cart * cart_naos + j_cgto_cart] += 
-                        sph_dens_ptr[i_cgto * naos + j_cgto] * i_coef_cart * j_coef_cart;
+                    const auto cart_contrib = dens_ij * i_coef_cart * j_coef_cart;
+
+#pragma omp atomic
+                    cart_dens_ptr[i_cgto_cart * cart_naos + j_cgto_cart] += cart_contrib;
                 }
             }
         }
@@ -2779,7 +2784,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     // std::cout << "-------------------------\n";
     // std::cout << timer.getSummary() << std::endl;
 
-#pragma omp parallel
+#pragma omp parallel num_threads(num_gpus_per_node)
     {
     auto thread_id = omp_get_thread_num();
 
@@ -2819,36 +2824,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
     timer.start("GTO block prep.");
 
-    // GTOs blocks and number of AOs
-
-    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
-
-    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
-
-    // gto blocks
-
-    int64_t s_prim_count = 0;
-    int64_t p_prim_count = 0;
-    int64_t d_prim_count = 0;
-
-    for (const auto& gto_block : gto_blocks)
-    {
-        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
-        const auto npgtos = gto_block.getNumberOfPrimitives();
-
-        const auto gto_ang = gto_block.getAngularMomentum();
-
-        if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
-        if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
-        if (gto_ang == 2) d_prim_count += npgtos * ncgtos;
-    }
-
-    // S gto block
-
-    std::vector<double>   s_prim_info(5 * s_prim_count);
-    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
-
-    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
+    // Reuse primitive info built serially before the parallel region; upload once per GPU.
 
     double*   d_s_prim_info;
     uint32_t* d_s_prim_aoinds;
@@ -2859,13 +2835,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
     gpuSafe(gpuMemcpy(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
 
-    // P gto block
-
-    std::vector<double>   p_prim_info(5 * p_prim_count);
-    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
-
-    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
-
     double*   d_p_prim_info;
     uint32_t* d_p_prim_aoinds;
 
@@ -2875,15 +2844,8 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
     gpuSafe(gpuMemcpy(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
 
-    // D gto block
-
-    std::vector<double>   d_prim_info(5 * d_prim_count);
-    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
-
     double*   d_d_prim_info;
     uint32_t* d_d_prim_aoinds;
-
-    gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
 
     gpuSafe(gpuMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
     gpuSafe(gpuMalloc(&d_d_prim_aoinds, d_prim_aoinds.size() * sizeof(uint32_t)));

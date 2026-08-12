@@ -39,9 +39,9 @@
 
 namespace boysfunc {
 
-auto getBoysFuncFactors() -> std::vector<double>;
+auto getBoysFuncFactors() -> const std::vector<double>&;
 
-auto getFullBoysFuncTable() -> std::vector<double>;
+auto getFullBoysFuncTable() -> const std::vector<double>&;
 
 auto getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>;
 

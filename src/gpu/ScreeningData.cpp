@@ -189,13 +189,12 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
     _Q_matrix_pd.zero();
     _Q_matrix_dd.zero();
 
-    // TODO distribute computation of Q matrices
-
     const double delta[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
     const int64_t d_cart_ind[6][2] = {{0,0}, {0,1}, {0,2}, {1,1}, {1,2}, {2,2}};
 
     // S-S and S-P block pairs
 
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < s_prim_count; i++)
     {
         const auto a_i = s_prim_info[i + s_prim_count * 0];
@@ -368,6 +367,7 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 
     // P-P gto block pair
 
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < p_prim_count; i++)
     {
         const auto a_i = p_prim_info[i + p_prim_count * 0];
@@ -618,6 +618,7 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 
     // D-D gto block pair
 
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < d_prim_count; i++)
     {
         const auto a_i = d_prim_info[i + d_prim_count * 0];
@@ -1376,12 +1377,21 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
         }
     }
 
+#pragma omp parallel sections
+    {
+#pragma omp section
     std::sort(sorted_ss_mat_Q.begin(), sorted_ss_mat_Q.end());
+#pragma omp section
     std::sort(sorted_sp_mat_Q.begin(), sorted_sp_mat_Q.end());
+#pragma omp section
     std::sort(sorted_sd_mat_Q.begin(), sorted_sd_mat_Q.end());
+#pragma omp section
     std::sort(sorted_pp_mat_Q.begin(), sorted_pp_mat_Q.end());
+#pragma omp section
     std::sort(sorted_pd_mat_Q.begin(), sorted_pd_mat_Q.end());
+#pragma omp section
     std::sort(sorted_dd_mat_Q.begin(), sorted_dd_mat_Q.end());
+    }
 
     const auto ss_prim_pair_count = static_cast<int64_t>(sorted_ss_mat_Q.size());
     const auto sp_prim_pair_count = static_cast<int64_t>(sorted_sp_mat_Q.size());
@@ -1495,7 +1505,7 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
     // auto nthreads = omp_get_max_threads();
     // auto num_threads_per_gpu = nthreads / _num_gpus_per_node;
 
-    #pragma omp parallel
+    #pragma omp parallel num_threads(_num_gpus_per_node)
     {
         auto thread_id = omp_get_thread_num();
 
@@ -1898,12 +1908,21 @@ CScreeningData::sortQD(const int64_t s_prim_count,
         }
     }
 
+#pragma omp parallel sections
+    {
+#pragma omp section
     std::sort(sorted_ss_mat_Q_D.begin(), sorted_ss_mat_Q_D.end());
+#pragma omp section
     std::sort(sorted_sp_mat_Q_D.begin(), sorted_sp_mat_Q_D.end());
+#pragma omp section
     std::sort(sorted_sd_mat_Q_D.begin(), sorted_sd_mat_Q_D.end());
+#pragma omp section
     std::sort(sorted_pp_mat_Q_D.begin(), sorted_pp_mat_Q_D.end());
+#pragma omp section
     std::sort(sorted_pd_mat_Q_D.begin(), sorted_pd_mat_Q_D.end());
+#pragma omp section
     std::sort(sorted_dd_mat_Q_D.begin(), sorted_dd_mat_Q_D.end());
+    }
 
     const auto ss_prim_pair_count = static_cast<int64_t>(sorted_ss_mat_Q_D.size());
     const auto sp_prim_pair_count = static_cast<int64_t>(sorted_sp_mat_Q_D.size());
@@ -1921,6 +1940,7 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
     _ss_pair_data = std::vector<double>(ss_prim_pair_count);
 
+#pragma omp parallel for schedule(static)
     for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
     {
         const auto& vals = sorted_ss_mat_Q_D[ss_prim_pair_count - 1 - ij];
@@ -1966,6 +1986,7 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
     _sp_pair_data = std::vector<double>(sp_prim_pair_count);
 
+#pragma omp parallel for schedule(static)
     for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
     {
         const auto& vals = sorted_sp_mat_Q_D[sp_prim_pair_count - 1 - ij];
@@ -2009,6 +2030,7 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
     _sd_pair_data = std::vector<double>(sd_prim_pair_count);
 
+#pragma omp parallel for schedule(static)
     for (int64_t ij = 0; ij < sd_prim_pair_count; ij++)
     {
         const auto& vals = sorted_sd_mat_Q_D[sd_prim_pair_count - 1 - ij];
@@ -2052,6 +2074,7 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
     _pp_pair_data = std::vector<double>(pp_prim_pair_count);
 
+#pragma omp parallel for schedule(static)
     for (int64_t ij = 0; ij < pp_prim_pair_count; ij++)
     {
         const auto& vals = sorted_pp_mat_Q_D[pp_prim_pair_count - 1 - ij];
@@ -2095,6 +2118,7 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
     _pd_pair_data = std::vector<double>(pd_prim_pair_count);
 
+#pragma omp parallel for schedule(static)
     for (int64_t ij = 0; ij < pd_prim_pair_count; ij++)
     {
         const auto& vals = sorted_pd_mat_Q_D[pd_prim_pair_count - 1 - ij];
@@ -2138,6 +2162,7 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
     _dd_pair_data = std::vector<double>(dd_prim_pair_count);
 
+#pragma omp parallel for schedule(static)
     for (int64_t ij = 0; ij < dd_prim_pair_count; ij++)
     {
         const auto& vals = sorted_dd_mat_Q_D[dd_prim_pair_count - 1 - ij];
@@ -2194,6 +2219,7 @@ CScreeningData::findMaxDensities(const int64_t s_prim_count,
 
     // S-S gto block pair and S-P gto block pair
 
+#pragma omp parallel for reduction(max:_ss_max_D) reduction(max:_sp_max_D) reduction(max:_sd_max_D)
     for (int64_t i = 0; i < s_prim_count; i++)
     {
         // S-S gto block pair
@@ -2238,6 +2264,7 @@ CScreeningData::findMaxDensities(const int64_t s_prim_count,
         }
     }
 
+#pragma omp parallel for reduction(max:_pp_max_D) reduction(max:_pd_max_D)
     for (int64_t i = 0; i < p_prim_count; i++)
     {
         // P-P gto block pair
@@ -2281,6 +2308,7 @@ CScreeningData::findMaxDensities(const int64_t s_prim_count,
         }    
     }
 
+#pragma omp parallel for reduction(max:_dd_max_D)
     for (int64_t i = 0; i < d_prim_count; i++)
     {
         // D-D gto block pair
@@ -2452,6 +2480,7 @@ auto CScreeningData::get_mat_Q_full(const int64_t s_prim_count, const int64_t p_
 
     mat_Q_full.zero();
 
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < s_prim_count; i++)
     {
         for (int64_t j = 0; j < s_prim_count; j++)
@@ -2485,6 +2514,7 @@ auto CScreeningData::get_mat_Q_full(const int64_t s_prim_count, const int64_t p_
         }
     }
 
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < p_prim_count * 3; i++)
     {
         auto i_full = s_prim_count + i;
@@ -2511,6 +2541,7 @@ auto CScreeningData::get_mat_Q_full(const int64_t s_prim_count, const int64_t p_
         }
     }
 
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < d_prim_count * 6; i++)
     {
         auto i_full = s_prim_count + p_prim_count * 3 + i;
@@ -2548,6 +2579,7 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count,
 
     mat_D_abs_full.zero();
 
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < s_prim_count; i++)
     {
         const auto i_cgto = s_prim_aoinds[i];
@@ -2595,6 +2627,7 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count,
         }
     }
 
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < p_prim_count * 3; i++)
     {
         const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
@@ -2631,6 +2664,7 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count,
         }
     }
 
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < d_prim_count * 6; i++)
     {
         const auto i_cgto = d_prim_aoinds[(i / 6) + d_prim_count * (i % 6)];
@@ -3431,12 +3465,21 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
         }
     }
 
+#pragma omp parallel sections
+    {
+#pragma omp section
     std::sort(sorted_ss_Qp_ik.begin(), sorted_ss_Qp_ik.end());
+#pragma omp section
     std::sort(sorted_sp_Qp_ik.begin(), sorted_sp_Qp_ik.end());
+#pragma omp section
     std::sort(sorted_sd_Qp_ik.begin(), sorted_sd_Qp_ik.end());
+#pragma omp section
     std::sort(sorted_pp_Qp_ik.begin(), sorted_pp_Qp_ik.end());
+#pragma omp section
     std::sort(sorted_pd_Qp_ik.begin(), sorted_pd_Qp_ik.end());
+#pragma omp section
     std::sort(sorted_dd_Qp_ik.begin(), sorted_dd_Qp_ik.end());
+    }
 
     const auto ss_pair_count_for_K = static_cast<int64_t>(sorted_ss_Qp_ik.size());
     const auto sp_pair_count_for_K = static_cast<int64_t>(sorted_sp_Qp_ik.size());
@@ -3517,7 +3560,7 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
     // auto nthreads = omp_get_max_threads();
     // auto num_threads_per_gpu = nthreads / _num_gpus_per_node;
 
-    #pragma omp parallel
+    #pragma omp parallel num_threads(_num_gpus_per_node)
     {
         auto thread_id = omp_get_thread_num();
 

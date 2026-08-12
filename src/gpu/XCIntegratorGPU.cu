@@ -1656,7 +1656,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
         mat_Vxc_omp[gpu_id] = CAOKohnShamMatrix(naos, naos, closedshell);
     }
 
-#pragma omp parallel
+#pragma omp parallel num_threads(num_gpus_per_node)
     {
     auto thread_id = omp_get_thread_num();
 
@@ -2026,7 +2026,7 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
         mat_Vxc_omp[gpu_id] = CAOKohnShamMatrix(naos, naos, closedshell);
     }
 
-#pragma omp parallel
+#pragma omp parallel num_threads(num_gpus_per_node)
     {
     auto thread_id = omp_get_thread_num();
 
@@ -2485,7 +2485,7 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
         mat_Fxc_omp[gpu_id] = CDenseMatrix(naos, naos);
     }
 
-#pragma omp parallel
+#pragma omp parallel num_threads(num_gpus_per_node)
     {
     auto thread_id = omp_get_thread_num();
 
@@ -2868,7 +2868,7 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
         mat_Fxc_omp[gpu_id] = CDenseMatrix(naos, naos);
     }
 
-#pragma omp parallel
+#pragma omp parallel num_threads(num_gpus_per_node)
     {
     auto thread_id = omp_get_thread_num();
 
@@ -3417,7 +3417,7 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
 
     auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
-#pragma omp parallel
+#pragma omp parallel num_threads(num_gpus_per_node)
     {
     auto thread_id = omp_get_thread_num();
 
@@ -3836,7 +3836,7 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
 
     auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
-#pragma omp parallel
+#pragma omp parallel num_threads(num_gpus_per_node)
     {
     auto thread_id = omp_get_thread_num();
 

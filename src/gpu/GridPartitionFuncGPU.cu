@@ -161,7 +161,7 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
     auto num_gpus_per_node = numGpusPerNode;
     // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
-#pragma omp parallel
+#pragma omp parallel num_threads(num_gpus_per_node)
     {
     auto thread_id = omp_get_thread_num();
 

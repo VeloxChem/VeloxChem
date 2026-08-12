@@ -271,13 +271,12 @@ CGradientScreeningData::_computeQMatrices(const CMolecule& molecule, const CMole
     _Q_matrix_pd.zero();
     _Q_matrix_dd.zero();
 
-    // TODO distribute computation of Q matrices
-
     const double delta[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
     const int64_t d_cart_ind[6][2] = {{0,0}, {0,1}, {0,2}, {1,1}, {1,2}, {2,2}};
 
     // S-S and S-P block pairs
 
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < s_prim_count; i++)
     {
         const auto a_i = s_prim_info[i + s_prim_count * 0];
@@ -450,6 +449,7 @@ CGradientScreeningData::_computeQMatrices(const CMolecule& molecule, const CMole
 
     // P-P gto block pair
 
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < p_prim_count; i++)
     {
         const auto a_i = p_prim_info[i + p_prim_count * 0];
@@ -700,6 +700,7 @@ CGradientScreeningData::_computeQMatrices(const CMolecule& molecule, const CMole
 
     // D-D gto block pair
 
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < d_prim_count; i++)
     {
         const auto a_i = d_prim_info[i + d_prim_count * 0];
@@ -1682,7 +1683,7 @@ CGradientScreeningData::_sortQ(const int64_t                s_prim_count,
     // auto nthreads = omp_get_max_threads();
     // auto num_threads_per_gpu = nthreads / _num_gpus_per_node;
 
-    #pragma omp parallel
+    #pragma omp parallel num_threads(_num_gpus_per_node)
     {
         auto thread_id = omp_get_thread_num();
 
@@ -3803,7 +3804,7 @@ auto CGradientScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
     // auto nthreads = omp_get_max_threads();
     // auto num_threads_per_gpu = nthreads / _num_gpus_per_node;
 
-    #pragma omp parallel
+    #pragma omp parallel num_threads(_num_gpus_per_node)
     {
         auto thread_id = omp_get_thread_num();
 
