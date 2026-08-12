@@ -489,7 +489,7 @@ class NonlinearSolver:
             profiler.set_timing_key('Nonlinear Fock')
 
         fock_drv = FockDriver(self.comm)
-        fock_drv._set_block_size_factor(self._block_size_factor)
+        fock_drv.set_block_size_factor(self._block_size_factor)
 
         screening = eri_dict['screening']
 

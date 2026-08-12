@@ -34,11 +34,12 @@ from pathlib import Path
 from datetime import datetime
 from collections import deque
 from copy import deepcopy
-import numpy as np
 import time as tm
 import math
 import sys
 import re
+
+import numpy as np
 
 from .oneeints import compute_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
@@ -774,7 +775,7 @@ class ScfDriver:
 
             if self.print_level > 1:
                 self.ostream.print_info(
-                    f'C-PCM grid with {self.cpcm_drv._cpcm_grid.shape[0]} points '
+                    f'C-PCM grid with {self.cpcm_drv.cpcm_grid.shape[0]} points '
                     + f'generated in {tm.time() - cpcm_grid_t0:.2f} sec.')
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -993,7 +994,6 @@ class ScfDriver:
             # second step
             self._first_step = False
 
-            self.diis_thresh = 1000.0
             self.conv_thresh = old_thresh
             self.max_iter = old_max_iter
 
@@ -1312,11 +1312,10 @@ class ScfDriver:
         """
 
         if self.restart and self.rank == mpi_master():
-            self.cpcm_drv._cpcm_q = read_cpcm_charges(
-                self.get_checkpoint_file())
+            self.cpcm_drv.cpcm_q = read_cpcm_charges(self.get_checkpoint_file())
 
-        self.cpcm_drv._cpcm_q = self.comm.bcast(self.cpcm_drv._cpcm_q,
-                                                root=mpi_master())
+        self.cpcm_drv.cpcm_q = self.comm.bcast(self.cpcm_drv.cpcm_q,
+                                               root=mpi_master())
 
     def validate_checkpoint(self, nuclear_charges, basis_set, scf_type):
         """
@@ -1539,7 +1538,7 @@ class ScfDriver:
                     xc_label = 'HF'
 
                 if self._pe:
-                    with open(str(self.pe_options['potfile']), 'r') as f_pot:
+                    with Path(self.pe_options['potfile']).open('r') as f_pot:
                         potfile_text = '\n'.join(f_pot.readlines())
                 else:
                     potfile_text = ''
@@ -1548,7 +1547,7 @@ class ScfDriver:
                             potfile_text)
                 self.molecular_orbitals.write_hdf5(checkpoint_file)
                 if self._cpcm:
-                    write_cpcm_charges(checkpoint_file, self.cpcm_drv._cpcm_q)
+                    write_cpcm_charges(checkpoint_file, self.cpcm_drv.cpcm_q)
 
                 scf_keywords = {
                     key: val[0]
@@ -1570,6 +1569,7 @@ class ScfDriver:
                 self.ostream.print_blank()
                 self.ostream.print_info('Checkpoint written to file: ' +
                                         checkpoint_file)
+                self.ostream.flush()
 
     def _comp_diis(self, molecule, ao_basis, den_mat, profiler):
         """
@@ -2480,7 +2480,7 @@ class ScfDriver:
         den_mat_for_fock = self.comm.bcast(den_mat_for_fock, root=mpi_master())
 
         fock_drv = FockDriver(self.comm)
-        fock_drv._set_block_size_factor(self._block_size_factor)
+        fock_drv.set_block_size_factor(self._block_size_factor)
 
         (fock_type, exchange_scaling_factor, need_omega, erf_k_coef,
          omega) = self._get_2e_fock_build_params()
@@ -2491,7 +2491,7 @@ class ScfDriver:
             fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
             fock_mat_np = fock_mat.to_numpy()
         elif self.ri_jk and fock_type != 'j' and (
-                self.molecular_orbitals._orbitals is not None):
+                not self.molecular_orbitals.is_empty()):
             fock_mat_j = self._ri_drv.compute_screened_j_fock(den_mat_for_fock,
                                                               'j',
                                                               verbose=False)
@@ -2565,7 +2565,7 @@ class ScfDriver:
         den_mat_for_Jab = self.comm.bcast(den_mat_for_Jab, root=mpi_master())
 
         fock_drv = FockDriver(self.comm)
-        fock_drv._set_block_size_factor(self._block_size_factor)
+        fock_drv.set_block_size_factor(self._block_size_factor)
 
         (fock_type, exchange_scaling_factor, need_omega, erf_k_coef,
          omega) = self._get_2e_fock_build_params()
@@ -2587,7 +2587,7 @@ class ScfDriver:
             fock_mat_b_np = J_ab_np.copy()
 
         else:
-            if self.ri_jk and (self.molecular_orbitals._orbitals is not None):
+            if self.ri_jk and (not self.molecular_orbitals.is_empty()):
                 fock_mat = self._ri_drv.compute_screened_j_fock(den_mat_for_Jab,
                                                                 'j',
                                                                 verbose=False)
@@ -3324,6 +3324,12 @@ class ScfDriver:
             # DIIS or second step in two level DIIS
             if self._num_iter > 0:
 
+                te = 0.0
+                diff_te = 0.0
+                e_grad = 0.0
+                max_grad = 0.0
+                diff_den = 0.0
+
                 if self._iter_data:
                     te = self._iter_data['energy']
                     diff_te = self._iter_data['diff_energy']
@@ -3588,7 +3594,7 @@ class ScfDriver:
             xc_label = 'HF'
 
         if self._pe:
-            with open(str(self.pe_options['potfile']), 'r') as f_pot:
+            with Path(self.pe_options['potfile']).open('r') as f_pot:
                 potfile_text = '\n'.join(f_pot.readlines())
         else:
             potfile_text = ''

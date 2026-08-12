@@ -125,6 +125,39 @@ class CpcmDriver:
         self.ostream.print_blank()
         self.ostream.flush()
 
+    @property
+    def cpcm_grid(self):
+        """
+        Returns the C-PCM surface grid.
+
+        :return:
+            The C-PCM surface grid.
+        """
+
+        return self._cpcm_grid
+
+    @property
+    def cpcm_q(self):
+        """
+        Returns the C-PCM surface charges.
+
+        :return:
+            The C-PCM surface charges.
+        """
+
+        return self._cpcm_q
+
+    @cpcm_q.setter
+    def cpcm_q(self, value):
+        """
+        Sets the C-PCM surface charges.
+
+        :param value:
+            The C-PCM surface charges.
+        """
+
+        self._cpcm_q = value
+
     def init(self, molecule, basis, do_nuclear=True):
         """
         Initialize the driver for energy calculations.
