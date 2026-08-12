@@ -141,7 +141,7 @@ class ScfDriver:
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
-        - memory_tracing: The flag for tracing memory allocation using
+        - memory_tracing: The flag for tracing memory allocation.
         - program_end_time: The end time of the program.
         - filename: The filename.
     """
@@ -334,7 +334,7 @@ class ScfDriver:
                 'memory_tracing': ('bool', 'trace memory allocation'),
                 'print_level': ('int', 'verbosity of output (1-3)'),
                 'guess_unpaired_electrons':
-                    ('str', 'unpaired electrons for initila guess'),
+                    ('str', 'unpaired electrons for initial guess'),
                 'point_charges': ('str', 'potential file for point charges'),
                 'qm_vdw_params': ('str', 'vdw parameter file for QM atoms'),
                 '_debug': ('bool', 'print debug info'),
@@ -507,7 +507,7 @@ class ScfDriver:
         :param scf_dict:
             The dictionary of scf input.
         :param method_dict:
-            The dicitonary of method settings.
+            The dictionary of method settings.
         """
 
         if method_dict is None:
@@ -613,6 +613,11 @@ class ScfDriver:
             The AO basis set.
         :param min_basis:
             The minimal AO basis set.
+
+        :return:
+            The dictionary of SCF results if SCF converges, None otherwise.
+            The dictionary is populated only on the master rank; other ranks
+            receive an empty dictionary.
         """
 
         profiler = Profiler()
@@ -1352,7 +1357,7 @@ class ScfDriver:
 
     def maximum_overlap(self, molecule, basis, orbitals, alpha_list, beta_list):
         """
-        Constraint the SCF calculation to find orbitals that maximize overlap
+        Constrains the SCF calculation to find orbitals that maximize overlap
         with a reference set.
 
         :param molecule:
@@ -1728,7 +1733,7 @@ class ScfDriver:
 
             iter_start_time = tm.time()
 
-            fock_mat, vxc_mat, e_emb, V_emb = self._comp_2e_fock(
+            fock_mat, vxc_mat, e_emb, V_emb = self._comp_2e_fock_single_comm(
                 den_mat, molecule, ao_basis, screener, e_grad, profiler)
 
             profiler.start_timer('ErrVec')
@@ -2369,7 +2374,7 @@ class ScfDriver:
 
         :param molecule:
             The molecule.
-        :param ao_basis:
+        :param basis:
             The AO basis set.
 
         :return:
@@ -2391,38 +2396,6 @@ class ScfDriver:
         npot_mat = self.comm.reduce(npot_mat, root=mpi_master())
 
         return npot_mat
-
-    def _comp_2e_fock(self,
-                      den_mat,
-                      molecule,
-                      basis,
-                      screener,
-                      e_grad=None,
-                      profiler=None):
-        """
-        Computes Fock/Kohn-Sham matrix (only 2e part).
-
-        :param den_mat:
-            The AO density matrix.
-        :param molecule:
-            The molecule.
-        :param basis:
-            The basis set.
-        :param screener:
-            The screening container object.
-        :param e_grad:
-            The electronic gradient.
-        :param profiler:
-            The profiler.
-
-        :return:
-            The Fock matrix, AO Kohn-Sham (Vxc) matrix, etc.
-        """
-
-        fock_mat, vxc_mat, e_emb, V_emb = self._comp_2e_fock_single_comm(
-            den_mat, molecule, basis, screener, e_grad, profiler)
-
-        return fock_mat, vxc_mat, e_emb, V_emb
 
     def _prepare_for_ri_fock_build(self, fock_type):
         """
@@ -2983,7 +2956,7 @@ class ScfDriver:
         :param ao_basis:
             The AO basis set.
         :param ovl_mat:
-            The overlap matrix..
+            The overlap matrix.
         """
 
         if self.rank == mpi_master():
@@ -3209,7 +3182,7 @@ class ScfDriver:
 
     def _print_header(self):
         """
-        Prints SCF calculation setup details to output stream,
+        Prints SCF calculation setup details to the output stream.
         """
 
         self.ostream.print_blank()
@@ -3306,7 +3279,7 @@ class ScfDriver:
 
     def _print_scf_finish(self, start_time):
         """
-        Prints SCF calculation finish message to output stream,
+        Prints SCF calculation finish message to the output stream.
 
         :param start_time:
             The start time of SCF calculation.
@@ -3337,7 +3310,7 @@ class ScfDriver:
 
     def _print_iter_data(self, i):
         """
-        Prints SCF iteration data to output stream,
+        Prints SCF iteration data to the output stream.
 
         :param i:
             The current SCF iteration.
