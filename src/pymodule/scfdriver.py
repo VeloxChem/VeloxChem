@@ -1372,6 +1372,18 @@ class ScfDriver:
         if self.rank == mpi_master():
             n_alpha = molecule.number_of_alpha_occupied_orbitals(basis)
             n_beta = molecule.number_of_beta_occupied_orbitals(basis)
+            n_mo = orbitals.number_of_mos()
+
+            for spin, occupation_list in [('alpha', alpha_list),
+                                          ('beta', beta_list)]:
+                error_prefix = f'ScfDriver.maximum_overlap: {spin} occupation list '
+                assert_msg_critical(
+                    len(set(occupation_list)) == len(occupation_list),
+                    error_prefix + 'contains duplicate orbital indices')
+                assert_msg_critical(
+                    all(0 <= index < n_mo for index in occupation_list),
+                    error_prefix +
+                    f'indices must be in the range [0, {n_mo})')
 
             # Reorder alpha to match beta
             if self.scf_type == 'restricted_openshell':
@@ -1386,7 +1398,6 @@ class ScfDriver:
             if self.scf_type == 'restricted':
                 assert_msg_critical(alpha_list == beta_list, err_excitations)
 
-            n_mo = orbitals.number_of_mos()
             mo_a = orbitals.alpha_to_numpy()
             mo_b = orbitals.beta_to_numpy()
 

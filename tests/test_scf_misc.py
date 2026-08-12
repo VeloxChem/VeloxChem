@@ -459,6 +459,34 @@ class TestScfDriverMiscellaneous:
         if self.is_master():
             assert abs(-74.54939063506086 - scf_results["scf_energy"]) < 1.0e-8
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='requires standard single-process assertions')
+    @pytest.mark.parametrize(
+        ('alpha_list', 'beta_list', 'error_pattern'), [
+            ([0, 1, 2, 3, 3], [0, 1, 2, 3, 4],
+             'alpha occupation list contains duplicate orbital indices'),
+            ([0, 1, 2, 3, 4], [-1, 1, 2, 3, 4],
+             r'beta occupation list indices must be in the range \[0, 7\)'),
+            ([0, 1, 2, 3, 7], [0, 1, 2, 3, 4],
+             r'alpha occupation list indices must be in the range \[0, 7\)'),
+        ])
+    def test_mom_rejects_invalid_occupation_indices(
+            self, alpha_list, beta_list, error_pattern):
+
+        molecule, basis = self.get_water_and_basis()
+        n_mo = basis.get_dimension_of_basis()
+        coefficients = np.eye(n_mo)
+        energies = np.zeros(n_mo)
+        occupations = np.zeros(n_mo)
+        orbitals = MolecularOrbitals(
+            [coefficients, coefficients], [energies, energies],
+            [occupations, occupations], molorb.unrest)
+
+        scf_drv = ScfUnrestrictedDriver(MPI.COMM_WORLD, OutputStream(None))
+        with pytest.raises(VeloxChemError, match=error_pattern):
+            scf_drv.maximum_overlap(molecule, basis, orbitals, alpha_list,
+                                    beta_list)
+
     def test_unrestricted_phase_update_with_fewer_reference_orbitals(self):
 
         scf_drv = ScfUnrestrictedDriver()
