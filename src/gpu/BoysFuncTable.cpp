@@ -40,54 +40,8 @@
 
 namespace boysfunc {  // boysfunc namespace
 
-auto
-getBoysFuncFactorsSize() -> int64_t
-{
-    return 28;
-}
-
-auto
-getBoysFuncFactors() -> std::vector<double>
-{
-    return std::vector<double>({1.0,        1.0 / 3.0,  1.0 / 5.0,  1.0 / 7.0,  1.0 / 9.0,  1.0 / 11.0, 1.0 / 13.0,
-                                1.0 / 15.0, 1.0 / 17.0, 1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0, 1.0 / 27.0,
-                                1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0, 1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
-                                1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0, 1.0 / 51.0, 1.0 / 53.0, 1.0 / 55.0});
-}
-
-auto
-getFullBoysFuncTableSize() -> int64_t
-{
-    return (28 + 1) * 121 * 7;
-}
-
-auto
-getFullBoysFuncTable() -> std::vector<double>
-{
-    // Boys function (tabulated for order 0-28)
-
-    std::vector<double> boys_func_table((28 + 1) * 121 * 7);
-
-    for (int64_t bf_order = 0; bf_order <= 28; bf_order++)
-    {
-        const auto bf_table = boysfunc::getBoysFuncTable(bf_order);
-
-        auto bf_data = boys_func_table.data() + bf_order * 121 * 7;
-
-        for (int64_t r = 0; r < 121; r++)
-        {
-            for (int64_t c = 0; c < 7; c++)
-            {
-                bf_data[r * 7 + c] = bf_table[r][c];
-            }
-        }
-    }
-
-    return boys_func_table;
-}
-
-auto
-getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
+constexpr std::array<std::array<double, 7>, 121>
+getBoysFuncTable(const int64_t N)
 {
     if (N == 0)
     {
@@ -939,8 +893,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -2.497946904023490e-07,
                                                         1.872597100565817e-08}}};
     }
-
-    if (N == 1)
+    else if (N == 1)
     {
         return std::array<std::array<double, 7>, 121>{{{3.333333333333333e-01,
                                                         -2.000000000000000e-01,
@@ -1790,8 +1743,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -1.123558260339490e-07,
                                                         9.787666450210211e-09}}};
     }
-
-    if (N == 2)
+    else if (N == 2)
     {
         return std::array<std::array<double, 7>, 121>{{{2.000000000000000e-01,
                                                         -1.428571428571428e-01,
@@ -2641,8 +2593,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -5.872599870126125e-08,
                                                         5.761723686860074e-09}}};
     }
-
-    if (N == 3)
+    else if (N == 3)
     {
         return std::array<std::array<double, 7>, 121>{{{1.428571428571428e-01,
                                                         -1.111111111111111e-01,
@@ -3492,8 +3443,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -3.457034212116045e-08,
                                                         3.725653100337909e-09}}};
     }
-
-    if (N == 4)
+    else if (N == 4)
     {
         return std::array<std::array<double, 7>, 121>{{{1.111111111111111e-01,
                                                         -9.090909090909091e-02,
@@ -4343,8 +4293,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -2.235391860202745e-08,
                                                         2.593907526579533e-09}}};
     }
-
-    if (N == 5)
+    else if (N == 5)
     {
         return std::array<std::array<double, 7>, 121>{{{9.090909090909091e-02,
                                                         -7.692307692307693e-02,
@@ -5194,8 +5143,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -1.556344515947719e-08,
                                                         1.914101241235777e-09}}};
     }
-
-    if (N == 6)
+    else if (N == 6)
     {
         return std::array<std::array<double, 7>, 121>{{{7.692307692307693e-02,
                                                         -6.666666666666667e-02,
@@ -6045,8 +5993,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -1.148460744741466e-08,
                                                         1.478779178329639e-09}}};
     }
-
-    if (N == 7)
+    else if (N == 7)
     {
         return std::array<std::array<double, 7>, 121>{{{6.666666666666667e-02,
                                                         -5.882352941176471e-02,
@@ -6896,8 +6843,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -8.872675069977830e-09,
                                                         1.184827132905392e-09}}};
     }
-
-    if (N == 8)
+    else if (N == 8)
     {
         return std::array<std::array<double, 7>, 121>{{{5.882352941176471e-02,
                                                         -5.263157894736842e-02,
@@ -8598,8 +8544,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -5.864176079983501e-09,
                                                         8.254120604753612e-10}}};
     }
-
-    if (N == 10)
+    else if (N == 10)
     {
         return std::array<std::array<double, 7>, 121>{{{4.761904761904762e-02,
                                                         -4.347826086956522e-02,
@@ -9449,8 +9394,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -4.952472362852174e-09,
                                                         7.105894002593601e-10}}};
     }
-
-    if (N == 11)
+    else if (N == 11)
     {
         return std::array<std::array<double, 7>, 121>{{{4.347826086956522e-02,
                                                         -4.000000000000000e-02,
@@ -10300,8 +10244,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -4.263536401556160e-09,
                                                         6.214925808353036e-10}}};
     }
-
-    if (N == 12)
+    else if (N == 12)
     {
         return std::array<std::array<double, 7>, 121>{{{4.000000000000000e-02,
                                                         -3.703703703703703e-02,
@@ -11151,8 +11094,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -3.728955485011821e-09,
                                                         5.507755025301678e-10}}};
     }
-
-    if (N == 13)
+    else if (N == 13)
     {
         return std::array<std::array<double, 7>, 121>{{{3.703703703703703e-02,
                                                         -3.448275862068965e-02,
@@ -12002,8 +11944,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -3.304653015181007e-09,
                                                         4.935443885460251e-10}}};
     }
-
-    if (N == 14)
+    else if (N == 14)
     {
         return std::array<std::array<double, 7>, 121>{{{3.448275862068965e-02,
                                                         -3.225806451612903e-02,
@@ -12853,8 +12794,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -2.961266331276158e-09,
                                                         4.464417868659761e-10}}};
     }
-
-    if (N == 15)
+    else if (N == 15)
     {
         return std::array<std::array<double, 7>, 121>{{{3.225806451612903e-02,
                                                         -3.030303030303030e-02,
@@ -13704,8 +13644,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -2.678650721195857e-09,
                                                         4.071035413747257e-10}}};
     }
-
-    if (N == 16)
+    else if (N == 16)
     {
         return std::array<std::array<double, 7>, 121>{{{3.030303030303030e-02,
                                                         -2.857142857142857e-02,
@@ -14555,8 +14494,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -2.442621248248354e-09,
                                                         3.738260004417330e-10}}};
     }
-
-    if (N == 17)
+    else if (N == 17)
     {
         return std::array<std::array<double, 7>, 121>{{{2.857142857142857e-02,
                                                         -2.702702702702703e-02,
@@ -15406,8 +15344,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -2.242956002650409e-09,
                                                         3.453559063069357e-10}}};
     }
-
-    if (N == 18)
+    else if (N == 18)
     {
         return std::array<std::array<double, 7>, 121>{{{2.702702702702703e-02,
                                                         -2.564102564102564e-02,
@@ -16257,8 +16194,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -2.072135437841614e-09,
                                                         3.207541386630984e-10}}};
     }
-
-    if (N == 19)
+    else if (N == 19)
     {
         return std::array<std::array<double, 7>, 121>{{{2.564102564102564e-02,
                                                         -2.439024390243903e-02,
@@ -17108,8 +17044,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -1.924524831978598e-09,
                                                         2.993051885825113e-10}}};
     }
-
-    if (N == 20)
+    else if (N == 20)
     {
         return std::array<std::array<double, 7>, 121>{{{2.439024390243903e-02,
                                                         -2.325581395348837e-02,
@@ -17959,8 +17894,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -1.795831131495069e-09,
                                                         2.804556812165197e-10}}};
     }
-
-    if (N == 21)
+    else if (N == 21)
     {
         return std::array<std::array<double, 7>, 121>{{{2.325581395348837e-02,
                                                         -2.222222222222222e-02,
@@ -18810,8 +18744,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -1.682734087299127e-09,
                                                         2.637717848318337e-10}}};
     }
-
-    if (N == 22)
+    else if (N == 22)
     {
         return std::array<std::array<double, 7>, 121>{{{2.222222222222222e-02,
                                                         -2.127659574468085e-02,
@@ -19661,8 +19594,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -1.582630708991002e-09,
                                                         2.489091623849680e-10}}};
     }
-
-    if (N == 23)
+    else if (N == 23)
     {
         return std::array<std::array<double, 7>, 121>{{{2.127659574468085e-02,
                                                         -2.040816326530612e-02,
@@ -20512,8 +20444,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -1.493454974309818e-09,
                                                         2.355914161429855e-10}}};
     }
-
-    if (N == 24)
+    else if (N == 24)
     {
         return std::array<std::array<double, 7>, 121>{{{2.040816326530612e-02,
                                                         -1.960784313725490e-02,
@@ -21363,8 +21294,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -1.413548496857919e-09,
                                                         2.235943868301909e-10}}};
     }
-
-    if (N == 25)
+    else if (N == 25)
     {
         return std::array<std::array<double, 7>, 121>{{{1.960784313725490e-02,
                                                         -1.886792452830189e-02,
@@ -22214,8 +22144,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -1.341566320981145e-09,
                                                         2.127345553387511e-10}}};
     }
-
-    if (N == 26)
+    else if (N == 26)
     {
         return std::array<std::array<double, 7>, 121>{{{1.886792452830189e-02,
                                                         -1.818181818181818e-02,
@@ -23065,8 +22994,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -1.276407332032513e-09,
                                                         2.028603632429071e-10}}};
     }
-
-    if (N == 27)
+    else if (N == 27)
     {
         return std::array<std::array<double, 7>, 121>{{{1.818181818181818e-02,
                                                         -1.754385964912281e-02,
@@ -23916,8 +23844,7 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -1.217162179457442e-09,
                                                         1.938456392615559e-10}}};
     }
-
-    if (N == 28)
+    else if (N == 28)
     {
         return std::array<std::array<double, 7>, 121>{{{1.754385964912281e-02,
                                                         -1.694915254237288e-02,
@@ -24767,12 +24694,35 @@ getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
                                                         -1.163073835569345e-09,
                                                         1.855845650838640e-10}}};
     }
+    else
+    {
+	    return {};
+    }
+}
 
-    return std::array<std::array<double, 7>, 121>();
+const std::array<double, getFullBoysFuncTableSize()> getFullBoysFuncTable()
+{
+    std::array<double, getFullBoysFuncTableSize()> localTable;
+
+    for (int64_t bf_order = 0; bf_order <= 28; bf_order++)
+    {
+        const auto bf_table = boysfunc::getBoysFuncTable(bf_order);
+
+        auto bf_data = localTable.data() + bf_order * 121 * 7;
+
+        for (int64_t r = 0; r < 121; r++)
+        {
+            for (int64_t c = 0; c < 7; c++)
+            {
+                bf_data[r * 7 + c] = bf_table[r][c];
+            }
+        }
+    }
+    return localTable;
 }
 
 auto
-getBoysFunction(const double fa, const uint32_t N, const double* bf_table, const double* ft) -> std::vector<double>
+getBoysFunction(const double fa, const uint32_t N, const double* bf_table, const double* ft) -> const std::vector<double>
 {
     std::vector<double> values(N + 1);
 

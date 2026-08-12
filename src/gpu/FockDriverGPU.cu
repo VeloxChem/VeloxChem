@@ -4238,26 +4238,31 @@ computeFockOnGPU(const              CMolecule& molecule,
     auto cart_dens_ptr = cart_dens_mat.values();
     auto sph_dens_ptr = densityMatrix.alphaDensity(0);
 
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_map_i, cart_sph_map_j;
+
+#pragma omp parallel for collapse(2) schedule(dynamic)
     for (int64_t i_cgto = 0; i_cgto < naos; i_cgto++)
     {
-        const auto& i_map = sph_cart_map[i_cgto];
-
         for (int64_t j_cgto = 0; j_cgto < naos; j_cgto++)
         {
-            const auto& j_map = sph_cart_map[j_cgto];
-
-            const double D_ij_sph = sph_dens_ptr[i_cgto * naos + j_cgto];
+            const auto D_ij_sph = sph_dens_ptr[i_cgto * naos + j_cgto];
 
             if (D_ij_sph == 0.0) continue;
 
-            for (const auto& [i_cgto_cart, i_coef_cart] : i_map)
+            for (const auto& i_cgto_cart_ind_coef : sph_cart_map[i_cgto])
             {
-                const int64_t i_cgto_cart_offset = i_cgto_cart * cart_naos;
-
-                for (const auto& [j_cgto_cart, j_coef_cart] : j_map)
+                auto i_cgto_cart = i_cgto_cart_ind_coef.first;
+                auto i_coef_cart = i_cgto_cart_ind_coef.second;    
+    
+                for (const auto& j_cgto_cart_ind_coef : sph_cart_map[j_cgto])
                 {
-                    cart_dens_ptr[i_cgto_cart_offset + j_cgto_cart] +=
-                        D_ij_sph * i_coef_cart * j_coef_cart;
+                    auto j_cgto_cart = j_cgto_cart_ind_coef.first;
+                    auto j_coef_cart = j_cgto_cart_ind_coef.second;
+
+                    const auto cart_contrib = D_ij_sph * i_coef_cart * j_coef_cart;
+
+#pragma omp atomic
+                    cart_dens_ptr[i_cgto_cart * cart_naos + j_cgto_cart] += cart_contrib;
                 }
             }
         }
@@ -4348,7 +4353,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
 
-    omptimers[thread_id].start("Boys func. prep.");
+    omptimers[gpu_id].start("Boys func. prep.");
 
     // Boys function (tabulated for order 0-28)
 
@@ -4357,45 +4362,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     omptimers[thread_id].stop("Boys func. prep.");
 
-    omptimers[thread_id].start("GTO block prep.");
+    omptimers[gpu_id].start("GTO block prep.");
 
-    // GTOs blocks and number of AOs
-
-    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
-
-    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
-
-    // gto blocks
-
-    int64_t s_prim_count = 0;
-    int64_t p_prim_count = 0;
-    int64_t d_prim_count = 0;
-
-    for (const auto& gto_block : gto_blocks)
-    {
-        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
-        const auto npgtos = gto_block.getNumberOfPrimitives();
-
-        const auto gto_ang = gto_block.getAngularMomentum();
-
-        if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
-        if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
-        if (gto_ang == 2) d_prim_count += npgtos * ncgtos;
-    }
-
-    // S, P and D gto blocks
-
-    std::vector<double>   s_prim_info(5 * s_prim_count);
-    std::vector<double>   p_prim_info(5 * p_prim_count);
-    std::vector<double>   d_prim_info(5 * d_prim_count);
-
-    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
-    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
-    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
-
-    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
-    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
-    gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
+    // Reuse primitive info built serially before the parallel region; upload once per GPU.
 
     // Boys function and GTO blocks on device
 
@@ -4456,13 +4425,13 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     
 
-    omptimers[thread_id].stop("GTO block prep.");
+    omptimers[gpu_id].stop("GTO block prep.");
 
 #pragma omp barrier
 
     // GTO block pairs
 
-    omptimers[thread_id].start("J prep.");
+    omptimers[gpu_id].start("J prep.");
 
     const auto& ss_first_inds_local = screening.get_ss_first_inds_local(gpu_id);
     const auto& sp_first_inds_local = screening.get_sp_first_inds_local(gpu_id);
@@ -4839,7 +4808,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     if (ss_prim_pair_count_local > 0)
     {
-        //omptimers[thread_id].start("  J block SS");
+        //omptimers[gpu_id].start("  J block SS");
 
         // zeroize J on device
 
@@ -5080,14 +5049,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             if (i != j) mat_Fock_omp[gpu_id].row(j_cgto)[i_cgto] += mat_J[ij] * prefac_coulomb;
         }
 
-        //omptimers[thread_id].stop("  J block SS");
+        //omptimers[gpu_id].stop("  J block SS");
     }
 
     // J: S-P block
 
     if (sp_prim_pair_count_local > 0)
     {
-        //omptimers[thread_id].start("  J block SP");
+        //omptimers[gpu_id].start("  J block SP");
 
         // zeroize J on device
 
@@ -5336,14 +5305,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        //omptimers[thread_id].stop("  J block SP");
+        //omptimers[gpu_id].stop("  J block SP");
     }
 
     // J: P-P block
 
     if (pp_prim_pair_count_local > 0)
     {
-        //omptimers[thread_id].start("  J block PP");
+        //omptimers[gpu_id].start("  J block PP");
 
         // zeroize J on device
 
@@ -5641,14 +5610,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        //omptimers[thread_id].stop("  J block PP");
+        //omptimers[gpu_id].stop("  J block PP");
     }
 
     // J: S-D block
 
     if (sd_prim_pair_count_local > 0)
     {
-        //omptimers[thread_id].start("  J block SD");
+        //omptimers[gpu_id].start("  J block SD");
 
         // zeroize J on device
 
@@ -5883,14 +5852,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        //omptimers[thread_id].stop("  J block SD");
+        //omptimers[gpu_id].stop("  J block SD");
     }
 
     // J: P-D block
 
     if (pd_prim_pair_count_local > 0)
     {
-        //omptimers[thread_id].start("  J block PD");
+        //omptimers[gpu_id].start("  J block PD");
 
         // zeroize J on device
 
@@ -6192,14 +6161,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        //omptimers[thread_id].stop("  J block PD");
+        //omptimers[gpu_id].stop("  J block PD");
     }
 
     // J: D-D block
 
     if (dd_prim_pair_count_local > 0)
     {
-        //omptimers[thread_id].start("  J block DD");
+        //omptimers[gpu_id].start("  J block DD");
 
         // zeroize J on device
 
@@ -6538,14 +6507,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        //omptimers[thread_id].stop("  J block DD");
+        //omptimers[gpu_id].stop("  J block DD");
     }
 
     }  // end of compute J
 
     gpuSafe(gpuStreamSynchronize(stream));
 
-    omptimers[thread_id].stop("J compute");
+    omptimers[gpu_id].stop("J compute");
 
 #pragma omp barrier
 
@@ -6637,7 +6606,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
 #pragma omp barrier
 
-    omptimers[thread_id].start("K prep.");
+    omptimers[gpu_id].start("K prep.");
 
     // K preparation
 
@@ -7024,7 +6993,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
 
-    omptimers[thread_id].stop("K prep.");
+    omptimers[gpu_id].stop("K prep.");
 
 #pragma omp barrier
 
@@ -7044,7 +7013,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     if (pair_inds_count_for_K_ss > 0)
     {
-        //omptimers[thread_id].start("  K block SS");
+        //omptimers[gpu_id].start("  K block SS");
 
         // zeroize K on device
 
@@ -7648,14 +7617,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0) * frac_exact_exchange * symm_pref;
         }
 
-        //omptimers[thread_id].stop("  K block SS");
+        //omptimers[gpu_id].stop("  K block SS");
     }
 
     // K: S-P block
 
     if (pair_inds_count_for_K_sp > 0)
     {
-        //omptimers[thread_id].start("  K block SP");
+        //omptimers[gpu_id].start("  K block SP");
 
         // zeroize K on device
 
@@ -8316,14 +8285,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        //omptimers[thread_id].stop("  K block SP");
+        //omptimers[gpu_id].stop("  K block SP");
     }
 
     // K: P-P block
 
     if (pair_inds_count_for_K_pp > 0)
     {
-        //omptimers[thread_id].start("  K block PP");
+        //omptimers[gpu_id].start("  K block PP");
 
         // zeroize K on device
 
@@ -8344,7 +8313,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (PS|PS)
         //     *  *
 
-        //omptimers[thread_id].start("    K block PSPS");
+        //omptimers[gpu_id].start("    K block PSPS");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_ps, TILE_DIM_Y_K);
@@ -8400,12 +8369,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block PSPS");
+        //omptimers[gpu_id].stop("    K block PSPS");
 
         // K: (PS|PP)
         //     *  *
 
-        //omptimers[thread_id].start("    K block PSPP");
+        //omptimers[gpu_id].start("    K block PSPP");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_ps, TILE_DIM_Y_K);
@@ -8469,12 +8438,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block PSPP");
+        //omptimers[gpu_id].stop("    K block PSPP");
 
         // K: (PP|PS)
         //     *  *
 
-        //omptimers[thread_id].start("    K block PPPS");
+        //omptimers[gpu_id].start("    K block PPPS");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_pp, TILE_DIM_Y_K);
@@ -8538,7 +8507,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block PPPS");
+        //omptimers[gpu_id].stop("    K block PPPS");
 
         // K: (PP|PP)
         //     *  *
@@ -8621,7 +8590,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (PS|PD)
         //     *  *
 
-        //omptimers[thread_id].start("    K block PSPD");
+        //omptimers[gpu_id].start("    K block PSPD");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_ps, TILE_DIM_Y_K);
@@ -8691,12 +8660,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block PSPD");
+        //omptimers[gpu_id].stop("    K block PSPD");
 
         // K: (PD|PS)
         //     *  *
 
-        //omptimers[thread_id].start("    K block PDPS");
+        //omptimers[gpu_id].start("    K block PDPS");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_pd, TILE_DIM_Y_K);
@@ -8766,12 +8735,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block PDPS");
+        //omptimers[gpu_id].stop("    K block PDPS");
 
         // K: (PP|PD)
         //     *  *
 
-        //omptimers[thread_id].start("    K block PPPD");
+        //omptimers[gpu_id].start("    K block PPPD");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_pp, TILE_DIM_Y_K);
@@ -8835,12 +8804,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block PPPD");
+        //omptimers[gpu_id].stop("    K block PPPD");
 
         // K: (PD|PP)
         //     *  *
 
-        //omptimers[thread_id].start("    K block PDPP");
+        //omptimers[gpu_id].start("    K block PDPP");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_pd, TILE_DIM_Y_K);
@@ -8904,12 +8873,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block PDPP");
+        //omptimers[gpu_id].stop("    K block PDPP");
 
         // K: (PD|PD)
         //     *  *
 
-        //omptimers[thread_id].start("    K block PDPD");
+        //omptimers[gpu_id].start("    K block PDPD");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pp, pair_counts_K_pd, TILE_DIM_Y_K);
@@ -8965,7 +8934,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block PDPD");
+        //omptimers[gpu_id].stop("    K block PDPD");
 
         gpuSafe(gpuMemcpyStaged(mat_K.data(), d_mat_K, pair_inds_count_for_K_pp * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
@@ -9002,14 +8971,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        //omptimers[thread_id].stop("  K block PP");
+        //omptimers[gpu_id].stop("  K block PP");
     }
 
     // K: S-D block
 
     if (pair_inds_count_for_K_sd > 0)
     {
-        //omptimers[thread_id].start("  K block SD");
+        //omptimers[gpu_id].start("  K block SD");
 
         // zeroize K on device
 
@@ -9237,7 +9206,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SP|DP)
         //     *  *
 
-        //omptimers[thread_id].start("    K block SPDP");
+        //omptimers[gpu_id].start("    K block SPDP");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_sp, TILE_DIM_Y_K);
@@ -9307,12 +9276,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block SPDP");
+        //omptimers[gpu_id].stop("    K block SPDP");
 
         // K: (SS|DD)
         //     *  *
 
-        //omptimers[thread_id].start("    K block SSDD");
+        //omptimers[gpu_id].start("    K block SSDD");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_ss, TILE_DIM_Y_K);
@@ -9376,12 +9345,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block SSDD");
+        //omptimers[gpu_id].stop("    K block SSDD");
 
         // K: (SD|DS)
         //     *  *
 
-        //omptimers[thread_id].start("    K block SDDS");
+        //omptimers[gpu_id].start("    K block SDDS");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_sd, TILE_DIM_Y_K);
@@ -9445,12 +9414,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block SDDS");
+        //omptimers[gpu_id].stop("    K block SDDS");
 
         // K: (SP|DD)
         //     *  *
 
-        //omptimers[thread_id].start("    K block SPDD");
+        //omptimers[gpu_id].start("    K block SPDD");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_sp, TILE_DIM_Y_K);
@@ -9520,12 +9489,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block SPDD");
+        //omptimers[gpu_id].stop("    K block SPDD");
 
         // K: (SD|DP)
         //     *  *
 
-        //omptimers[thread_id].start("    K block SDDP");
+        //omptimers[gpu_id].start("    K block SDDP");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_sd, TILE_DIM_Y_K);
@@ -9595,12 +9564,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block SDDP");
+        //omptimers[gpu_id].stop("    K block SDDP");
 
         // K: (SD|DD)
         //     *  *
 
-        //omptimers[thread_id].start("    K block SDDD");
+        //omptimers[gpu_id].start("    K block SDDD");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_sd, pair_counts_K_sd, TILE_DIM_Y_K);
@@ -9693,14 +9662,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        //omptimers[thread_id].stop("  K block SD");
+        //omptimers[gpu_id].stop("  K block SD");
     }
 
     // K: P-D block
 
     if (pair_inds_count_for_K_pd > 0)
     {
-        //omptimers[thread_id].start("  K block PD");
+        //omptimers[gpu_id].start("  K block PD");
 
         // zeroize K on device
 
@@ -9721,7 +9690,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (PS|DS)
         //     *  *
 
-        //omptimers[thread_id].start("    K block PSDS");
+        //omptimers[gpu_id].start("    K block PSDS");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_ps, TILE_DIM_Y_K);
@@ -9791,12 +9760,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block PSDS");
+        //omptimers[gpu_id].stop("    K block PSDS");
 
         // K: (PS|DP)
         //     *  *
 
-        //omptimers[thread_id].start("    K block PSDP");
+        //omptimers[gpu_id].start("    K block PSDP");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_ps, TILE_DIM_Y_K);
@@ -9866,12 +9835,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block PSDP");
+        //omptimers[gpu_id].stop("    K block PSDP");
 
         // K: (PP|DS)
         //     *  *
 
-        //omptimers[thread_id].start("    K block PPDS");
+        //omptimers[gpu_id].start("    K block PPDS");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pp, TILE_DIM_Y_K);
@@ -9941,12 +9910,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block PPDS");
+        //omptimers[gpu_id].stop("    K block PPDS");
 
         // K: (PS|DD)
         //     *  *
 
-        //omptimers[thread_id].start("    K block PSDD");
+        //omptimers[gpu_id].start("    K block PSDD");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_ps, TILE_DIM_Y_K);
@@ -10016,12 +9985,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block PSDD");
+        //omptimers[gpu_id].stop("    K block PSDD");
 
         // K: (PD|DS)
         //     *  *
 
-        //omptimers[thread_id].start("    K block PDDS");
+        //omptimers[gpu_id].start("    K block PDDS");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pd, TILE_DIM_Y_K);
@@ -10091,12 +10060,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block PDDS");
+        //omptimers[gpu_id].stop("    K block PDDS");
 
         // K: (PP|DP)
         //     *  *
 
-        //omptimers[thread_id].start("    K block PPDP");
+        //omptimers[gpu_id].start("    K block PPDP");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pp, TILE_DIM_Y_K);
@@ -10160,12 +10129,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block PPDP");
+        //omptimers[gpu_id].stop("    K block PPDP");
 
         // K: (PP|DD)
         //     *  *
 
-        //omptimers[thread_id].start("    K block PPDD");
+        //omptimers[gpu_id].start("    K block PPDD");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pp, TILE_DIM_Y_K);
@@ -10233,7 +10202,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (PD|DP)
         //     *  *
 
-        //omptimers[thread_id].start("    K block PDDP");
+        //omptimers[gpu_id].start("    K block PDDP");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pd, TILE_DIM_Y_K);
@@ -10297,12 +10266,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block PDDP");
+        //omptimers[gpu_id].stop("    K block PDDP");
 
         // K: (PD|DD)
         //     *  *
 
-        //omptimers[thread_id].start("    K block PDDD");
+        //omptimers[gpu_id].start("    K block PDDD");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_pd, pair_counts_K_pd, TILE_DIM_Y_K);
@@ -10561,14 +10530,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        //omptimers[thread_id].stop("  K block PD");
+        //omptimers[gpu_id].stop("  K block PD");
     }
 
     // K: D-D block
 
     if (pair_inds_count_for_K_dd > 0)
     {
-        //omptimers[thread_id].start("  K block DD");
+        //omptimers[gpu_id].start("  K block DD");
 
         // zeroize K on device
 
@@ -10788,7 +10757,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (DS|DD)
         //     *  *
 
-        //omptimers[thread_id].start("    K block DSDD");
+        //omptimers[gpu_id].start("    K block DSDD");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_ds, TILE_DIM_Y_K);
@@ -10856,7 +10825,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (DD|DS)
         //     *  *
 
-        //omptimers[thread_id].start("    K block DDDS");
+        //omptimers[gpu_id].start("    K block DDDS");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dd, TILE_DIM_Y_K);
@@ -10924,7 +10893,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (DP|DP)
         //     *  *
 
-        //omptimers[thread_id].start("    K block DPDP");
+        //omptimers[gpu_id].start("    K block DPDP");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dp, TILE_DIM_Y_K);
@@ -10980,12 +10949,12 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_displ_cuts);
         }
 
-        //omptimers[thread_id].stop("    K block DPDP");
+        //omptimers[gpu_id].stop("    K block DPDP");
 
         // K: (DP|DD)
         //     *  *
 
-        //omptimers[thread_id].start("    K block DPDD");
+        //omptimers[gpu_id].start("    K block DPDD");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dp, TILE_DIM_Y_K);
@@ -11212,7 +11181,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (DD|DP)
         //     *  *
 
-        //omptimers[thread_id].start("    K block DDDP");
+        //omptimers[gpu_id].start("    K block DDDP");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dd, TILE_DIM_Y_K);
@@ -11492,7 +11461,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (DD|DD)
         //     *  *
 
-        //omptimers[thread_id].start("    K block DDDD");
+        //omptimers[gpu_id].start("    K block DDDD");
 
         {
             const auto exchange_cuts = build_exchange_cut_layout(pair_inds_i_for_K_dd, pair_counts_K_dd, TILE_DIM_Y_K);
@@ -12163,7 +12132,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        //omptimers[thread_id].stop("  K block DD");
+        //omptimers[gpu_id].stop("  K block DD");
     }
 
     }

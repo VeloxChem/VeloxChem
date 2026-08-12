@@ -775,12 +775,21 @@ CScreeningData::_sortQ() -> void
         }
     }
 
+#pragma omp parallel sections
+    {
+#pragma omp section
     std::sort(sorted_ss_mat_Q.begin(), sorted_ss_mat_Q.end());
+#pragma omp section
     std::sort(sorted_sp_mat_Q.begin(), sorted_sp_mat_Q.end());
+#pragma omp section
     std::sort(sorted_sd_mat_Q.begin(), sorted_sd_mat_Q.end());
+#pragma omp section
     std::sort(sorted_pp_mat_Q.begin(), sorted_pp_mat_Q.end());
+#pragma omp section
     std::sort(sorted_pd_mat_Q.begin(), sorted_pd_mat_Q.end());
+#pragma omp section
     std::sort(sorted_dd_mat_Q.begin(), sorted_dd_mat_Q.end());
+    }
 
     const auto ss_prim_pair_count = static_cast<int64_t>(sorted_ss_mat_Q.size());
     const auto sp_prim_pair_count = static_cast<int64_t>(sorted_sp_mat_Q.size());
@@ -888,206 +897,212 @@ CScreeningData::_sortQ() -> void
 
         _dd_pair_data_local[gpu_id]   = std::vector<double>(dd_batch_size);
 
+        #pragma omp parallel num_threads(_num_gpus_per_node)
         {
-            auto gpu_rank = gpu_id + rank * _num_gpus_per_node;
-            auto gpu_count = nnodes * _num_gpus_per_node;
+            auto thread_id = omp_get_thread_num();
 
-            for (int64_t ij = gpu_rank, idx = 0; ij < ss_prim_pair_count; ij+=gpu_count, idx++)
+            if (thread_id < _num_gpus_per_node)
             {
-                const auto& vals = sorted_ss_mat_Q[ss_prim_pair_count - 1 - ij];
+                auto gpu_rank = gpu_id + rank * _num_gpus_per_node;
+                auto gpu_count = nnodes * _num_gpus_per_node;
 
-                auto Q_ij = std::get<0>(vals);
-                auto i    = std::get<1>(vals);
-                auto j    = std::get<2>(vals);
+                for (int64_t ij = gpu_rank, idx = 0; ij < ss_prim_pair_count; ij+=gpu_count, idx++)
+                {
+                    const auto& vals = sorted_ss_mat_Q[ss_prim_pair_count - 1 - ij];
 
-                _ss_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
-                _ss_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
-                _ss_mat_Q_local[gpu_id][idx]       = Q_ij;
+                    auto Q_ij = std::get<0>(vals);
+                    auto i    = std::get<1>(vals);
+                    auto j    = std::get<2>(vals);
 
-                // ij pair data:
+                    _ss_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
+                    _ss_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
+                    _ss_mat_Q_local[gpu_id][idx]       = Q_ij;
 
-                const auto a_i = s_prim_info[i + s_prim_count * 0];
-                const auto c_i = s_prim_info[i + s_prim_count * 1];
-                const auto x_i = s_prim_info[i + s_prim_count * 2];
-                const auto y_i = s_prim_info[i + s_prim_count * 3];
-                const auto z_i = s_prim_info[i + s_prim_count * 4];
+                    // ij pair data:
 
-                const auto a_j = s_prim_info[j + s_prim_count * 0];
-                const auto c_j = s_prim_info[j + s_prim_count * 1];
-                const auto x_j = s_prim_info[j + s_prim_count * 2];
-                const auto y_j = s_prim_info[j + s_prim_count * 3];
-                const auto z_j = s_prim_info[j + s_prim_count * 4];
+                    const auto a_i = s_prim_info[i + s_prim_count * 0];
+                    const auto c_i = s_prim_info[i + s_prim_count * 1];
+                    const auto x_i = s_prim_info[i + s_prim_count * 2];
+                    const auto y_i = s_prim_info[i + s_prim_count * 3];
+                    const auto z_i = s_prim_info[i + s_prim_count * 4];
 
-                const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+                    const auto a_j = s_prim_info[j + s_prim_count * 0];
+                    const auto c_j = s_prim_info[j + s_prim_count * 1];
+                    const auto x_j = s_prim_info[j + s_prim_count * 2];
+                    const auto y_j = s_prim_info[j + s_prim_count * 3];
+                    const auto z_j = s_prim_info[j + s_prim_count * 4];
 
-                const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
-                _ss_pair_data_local[gpu_id][idx] = S_ij_00;
-            }
+                    const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-            for (int64_t ij = gpu_rank, idx = 0; ij < sp_prim_pair_count; ij+=gpu_count, idx++)
-            {
-                const auto& vals = sorted_sp_mat_Q[sp_prim_pair_count - 1 - ij];
+                    _ss_pair_data_local[gpu_id][idx] = S_ij_00;
+                }
 
-                auto Q_ij = std::get<0>(vals);
-                auto i    = std::get<1>(vals);
-                auto j    = std::get<2>(vals);
+                for (int64_t ij = gpu_rank, idx = 0; ij < sp_prim_pair_count; ij+=gpu_count, idx++)
+                {
+                    const auto& vals = sorted_sp_mat_Q[sp_prim_pair_count - 1 - ij];
 
-                _sp_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
-                _sp_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
-                _sp_mat_Q_local[gpu_id][idx]       = Q_ij;
+                    auto Q_ij = std::get<0>(vals);
+                    auto i    = std::get<1>(vals);
+                    auto j    = std::get<2>(vals);
 
-                // ij pair data:
+                    _sp_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
+                    _sp_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
+                    _sp_mat_Q_local[gpu_id][idx]       = Q_ij;
 
-                const auto a_i = s_prim_info[i + s_prim_count * 0];
-                const auto c_i = s_prim_info[i + s_prim_count * 1];
-                const auto x_i = s_prim_info[i + s_prim_count * 2];
-                const auto y_i = s_prim_info[i + s_prim_count * 3];
-                const auto z_i = s_prim_info[i + s_prim_count * 4];
+                    // ij pair data:
 
-                const auto a_j = p_prim_info[j / 3 + p_prim_count * 0];
-                const auto c_j = p_prim_info[j / 3 + p_prim_count * 1];
-                const auto x_j = p_prim_info[j / 3 + p_prim_count * 2];
-                const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
-                const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
+                    const auto a_i = s_prim_info[i + s_prim_count * 0];
+                    const auto c_i = s_prim_info[i + s_prim_count * 1];
+                    const auto x_i = s_prim_info[i + s_prim_count * 2];
+                    const auto y_i = s_prim_info[i + s_prim_count * 3];
+                    const auto z_i = s_prim_info[i + s_prim_count * 4];
 
-                const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+                    const auto a_j = p_prim_info[j / 3 + p_prim_count * 0];
+                    const auto c_j = p_prim_info[j / 3 + p_prim_count * 1];
+                    const auto x_j = p_prim_info[j / 3 + p_prim_count * 2];
+                    const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
+                    const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
 
-                const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
-                _sp_pair_data_local[gpu_id][idx] = S_ij_00;
-            }
+                    const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-            for (int64_t ij = gpu_rank, idx = 0; ij < sd_prim_pair_count; ij+=gpu_count, idx++)
-            {
-                const auto& vals = sorted_sd_mat_Q[sd_prim_pair_count - 1 - ij];
+                    _sp_pair_data_local[gpu_id][idx] = S_ij_00;
+                }
 
-                auto Q_ij = std::get<0>(vals);
-                auto i    = std::get<1>(vals);
-                auto j    = std::get<2>(vals);
+                for (int64_t ij = gpu_rank, idx = 0; ij < sd_prim_pair_count; ij+=gpu_count, idx++)
+                {
+                    const auto& vals = sorted_sd_mat_Q[sd_prim_pair_count - 1 - ij];
 
-                _sd_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
-                _sd_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
-                _sd_mat_Q_local[gpu_id][idx]       = Q_ij;
+                    auto Q_ij = std::get<0>(vals);
+                    auto i    = std::get<1>(vals);
+                    auto j    = std::get<2>(vals);
 
-                // ij pair data:
+                    _sd_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
+                    _sd_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
+                    _sd_mat_Q_local[gpu_id][idx]       = Q_ij;
 
-                const auto a_i = s_prim_info[i + s_prim_count * 0];
-                const auto c_i = s_prim_info[i + s_prim_count * 1];
-                const auto x_i = s_prim_info[i + s_prim_count * 2];
-                const auto y_i = s_prim_info[i + s_prim_count * 3];
-                const auto z_i = s_prim_info[i + s_prim_count * 4];
+                    // ij pair data:
 
-                const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
-                const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
-                const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
-                const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
-                const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
+                    const auto a_i = s_prim_info[i + s_prim_count * 0];
+                    const auto c_i = s_prim_info[i + s_prim_count * 1];
+                    const auto x_i = s_prim_info[i + s_prim_count * 2];
+                    const auto y_i = s_prim_info[i + s_prim_count * 3];
+                    const auto z_i = s_prim_info[i + s_prim_count * 4];
 
-                const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+                    const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
+                    const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
+                    const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
+                    const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
+                    const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
 
-                const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
-                _sd_pair_data_local[gpu_id][idx] = S_ij_00;
-            }
+                    const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-            for (int64_t ij = gpu_rank, idx = 0; ij < pp_prim_pair_count; ij+=gpu_count, idx++)
-            {
-                const auto& vals = sorted_pp_mat_Q[pp_prim_pair_count - 1 - ij];
+                    _sd_pair_data_local[gpu_id][idx] = S_ij_00;
+                }
 
-                auto Q_ij = std::get<0>(vals);
-                auto i    = std::get<1>(vals);
-                auto j    = std::get<2>(vals);
+                for (int64_t ij = gpu_rank, idx = 0; ij < pp_prim_pair_count; ij+=gpu_count, idx++)
+                {
+                    const auto& vals = sorted_pp_mat_Q[pp_prim_pair_count - 1 - ij];
 
-                _pp_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
-                _pp_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
-                _pp_mat_Q_local[gpu_id][idx]       = Q_ij;
+                    auto Q_ij = std::get<0>(vals);
+                    auto i    = std::get<1>(vals);
+                    auto j    = std::get<2>(vals);
 
-                // ij pair data:
+                    _pp_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
+                    _pp_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
+                    _pp_mat_Q_local[gpu_id][idx]       = Q_ij;
 
-                const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
-                const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
-                const auto x_i = p_prim_info[i / 3 + p_prim_count * 2];
-                const auto y_i = p_prim_info[i / 3 + p_prim_count * 3];
-                const auto z_i = p_prim_info[i / 3 + p_prim_count * 4];
+                    // ij pair data:
 
-                const auto a_j = p_prim_info[j / 3 + p_prim_count * 0];
-                const auto c_j = p_prim_info[j / 3 + p_prim_count * 1];
-                const auto x_j = p_prim_info[j / 3 + p_prim_count * 2];
-                const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
-                const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
+                    const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
+                    const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
+                    const auto x_i = p_prim_info[i / 3 + p_prim_count * 2];
+                    const auto y_i = p_prim_info[i / 3 + p_prim_count * 3];
+                    const auto z_i = p_prim_info[i / 3 + p_prim_count * 4];
 
-                const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+                    const auto a_j = p_prim_info[j / 3 + p_prim_count * 0];
+                    const auto c_j = p_prim_info[j / 3 + p_prim_count * 1];
+                    const auto x_j = p_prim_info[j / 3 + p_prim_count * 2];
+                    const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
+                    const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
 
-                const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
-                _pp_pair_data_local[gpu_id][idx] = S_ij_00;
-            }
+                    const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-            for (int64_t ij = gpu_rank, idx = 0; ij < pd_prim_pair_count; ij+=gpu_count, idx++)
-            {
-                const auto& vals = sorted_pd_mat_Q[pd_prim_pair_count - 1 - ij];
+                    _pp_pair_data_local[gpu_id][idx] = S_ij_00;
+                }
 
-                auto Q_ij = std::get<0>(vals);
-                auto i    = std::get<1>(vals);
-                auto j    = std::get<2>(vals);
+                for (int64_t ij = gpu_rank, idx = 0; ij < pd_prim_pair_count; ij+=gpu_count, idx++)
+                {
+                    const auto& vals = sorted_pd_mat_Q[pd_prim_pair_count - 1 - ij];
 
-                _pd_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
-                _pd_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
-                _pd_mat_Q_local[gpu_id][idx]       = Q_ij;
+                    auto Q_ij = std::get<0>(vals);
+                    auto i    = std::get<1>(vals);
+                    auto j    = std::get<2>(vals);
 
-                // ij pair data:
+                    _pd_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
+                    _pd_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
+                    _pd_mat_Q_local[gpu_id][idx]       = Q_ij;
 
-                const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
-                const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
-                const auto x_i = p_prim_info[i / 3 + p_prim_count * 2];
-                const auto y_i = p_prim_info[i / 3 + p_prim_count * 3];
-                const auto z_i = p_prim_info[i / 3 + p_prim_count * 4];
+                    // ij pair data:
 
-                const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
-                const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
-                const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
-                const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
-                const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
+                    const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
+                    const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
+                    const auto x_i = p_prim_info[i / 3 + p_prim_count * 2];
+                    const auto y_i = p_prim_info[i / 3 + p_prim_count * 3];
+                    const auto z_i = p_prim_info[i / 3 + p_prim_count * 4];
 
-                const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+                    const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
+                    const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
+                    const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
+                    const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
+                    const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
 
-                const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
-                _pd_pair_data_local[gpu_id][idx] = S_ij_00;
-            }
+                    const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-            for (int64_t ij = gpu_rank, idx = 0; ij < dd_prim_pair_count; ij+=gpu_count, idx++)
-            {
-                const auto& vals = sorted_dd_mat_Q[dd_prim_pair_count - 1 - ij];
+                    _pd_pair_data_local[gpu_id][idx] = S_ij_00;
+                }
 
-                auto Q_ij = std::get<0>(vals);
-                auto i    = std::get<1>(vals);
-                auto j    = std::get<2>(vals);
+                for (int64_t ij = gpu_rank, idx = 0; ij < dd_prim_pair_count; ij+=gpu_count, idx++)
+                {
+                    const auto& vals = sorted_dd_mat_Q[dd_prim_pair_count - 1 - ij];
 
-                _dd_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
-                _dd_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
-                _dd_mat_Q_local[gpu_id][idx]       = Q_ij;
+                    auto Q_ij = std::get<0>(vals);
+                    auto i    = std::get<1>(vals);
+                    auto j    = std::get<2>(vals);
 
-                // ij pair data:
+                    _dd_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
+                    _dd_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
+                    _dd_mat_Q_local[gpu_id][idx]       = Q_ij;
 
-                const auto a_i = d_prim_info[i / 6 + d_prim_count * 0];
-                const auto c_i = d_prim_info[i / 6 + d_prim_count * 1];
-                const auto x_i = d_prim_info[i / 6 + d_prim_count * 2];
-                const auto y_i = d_prim_info[i / 6 + d_prim_count * 3];
-                const auto z_i = d_prim_info[i / 6 + d_prim_count * 4];
+                    // ij pair data:
 
-                const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
-                const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
-                const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
-                const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
-                const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
+                    const auto a_i = d_prim_info[i / 6 + d_prim_count * 0];
+                    const auto c_i = d_prim_info[i / 6 + d_prim_count * 1];
+                    const auto x_i = d_prim_info[i / 6 + d_prim_count * 2];
+                    const auto y_i = d_prim_info[i / 6 + d_prim_count * 3];
+                    const auto z_i = d_prim_info[i / 6 + d_prim_count * 4];
 
-                const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+                    const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
+                    const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
+                    const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
+                    const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
+                    const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
 
-                const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
-                _dd_pair_data_local[gpu_id][idx] = S_ij_00;
+                    const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+                    _dd_pair_data_local[gpu_id][idx] = S_ij_00;
+                }
             }
         }
     }
@@ -1283,12 +1298,21 @@ CScreeningData::sortQD(const int64_t s_prim_count,
         }
     }
 
+#pragma omp parallel sections
+    {
+#pragma omp section
     std::sort(sorted_ss_mat_Q_D.begin(), sorted_ss_mat_Q_D.end());
+#pragma omp section
     std::sort(sorted_sp_mat_Q_D.begin(), sorted_sp_mat_Q_D.end());
+#pragma omp section
     std::sort(sorted_sd_mat_Q_D.begin(), sorted_sd_mat_Q_D.end());
+#pragma omp section
     std::sort(sorted_pp_mat_Q_D.begin(), sorted_pp_mat_Q_D.end());
+#pragma omp section
     std::sort(sorted_pd_mat_Q_D.begin(), sorted_pd_mat_Q_D.end());
+#pragma omp section
     std::sort(sorted_dd_mat_Q_D.begin(), sorted_dd_mat_Q_D.end());
+    }
 
     const auto ss_prim_pair_count = static_cast<int64_t>(sorted_ss_mat_Q_D.size());
     const auto sp_prim_pair_count = static_cast<int64_t>(sorted_sp_mat_Q_D.size());
@@ -1304,6 +1328,7 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
     _ss_pair_data = std::vector<double>(ss_prim_pair_count);
 
+#pragma omp parallel for schedule(static)
     for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
     {
         const auto& vals = sorted_ss_mat_Q_D[ss_prim_pair_count - 1 - ij];
@@ -1347,6 +1372,7 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
     _sp_pair_data = std::vector<double>(sp_prim_pair_count);
 
+#pragma omp parallel for schedule(static)
     for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
     {
         const auto& vals = sorted_sp_mat_Q_D[sp_prim_pair_count - 1 - ij];
@@ -1390,6 +1416,7 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
     _sd_pair_data = std::vector<double>(sd_prim_pair_count);
 
+#pragma omp parallel for schedule(static)
     for (int64_t ij = 0; ij < sd_prim_pair_count; ij++)
     {
         const auto& vals = sorted_sd_mat_Q_D[sd_prim_pair_count - 1 - ij];
@@ -1433,6 +1460,7 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
     _pp_pair_data = std::vector<double>(pp_prim_pair_count);
 
+#pragma omp parallel for schedule(static)
     for (int64_t ij = 0; ij < pp_prim_pair_count; ij++)
     {
         const auto& vals = sorted_pp_mat_Q_D[pp_prim_pair_count - 1 - ij];
@@ -1476,6 +1504,7 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
     _pd_pair_data = std::vector<double>(pd_prim_pair_count);
 
+#pragma omp parallel for schedule(static)
     for (int64_t ij = 0; ij < pd_prim_pair_count; ij++)
     {
         const auto& vals = sorted_pd_mat_Q_D[pd_prim_pair_count - 1 - ij];
@@ -1519,6 +1548,7 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
     _dd_pair_data = std::vector<double>(dd_prim_pair_count);
 
+#pragma omp parallel for schedule(static)
     for (int64_t ij = 0; ij < dd_prim_pair_count; ij++)
     {
         const auto& vals = sorted_dd_mat_Q_D[dd_prim_pair_count - 1 - ij];
@@ -1575,6 +1605,7 @@ CScreeningData::findMaxDensities(const int64_t s_prim_count,
 
     // S-S gto block pair, S-P gto block pair and S-D gto block pair
 
+#pragma omp parallel for reduction(max:_ss_max_D) reduction(max:_sp_max_D) reduction(max:_sd_max_D)
     for (int64_t i = 0; i < s_prim_count; i++)
     {
         // S-S gto block pair
@@ -1619,6 +1650,7 @@ CScreeningData::findMaxDensities(const int64_t s_prim_count,
         }
     }
 
+#pragma omp parallel for reduction(max:_pp_max_D) reduction(max:_pd_max_D)
     for (int64_t i = 0; i < p_prim_count; i++)
     {
         // P-P gto block pair
@@ -1662,6 +1694,7 @@ CScreeningData::findMaxDensities(const int64_t s_prim_count,
         }    
     }
 
+#pragma omp parallel for reduction(max:_dd_max_D)
     for (int64_t i = 0; i < d_prim_count; i++)
     {
         // D-D gto block pair
@@ -1849,6 +1882,7 @@ auto CScreeningData::fill_mat_Q_and_D(const int64_t naos, const double* dens_ptr
     #pragma omp section
     {
 
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < s_prim_count; i++)
     {
         for (int64_t j = 0; j < s_prim_count; j++)
@@ -1900,6 +1934,7 @@ auto CScreeningData::fill_mat_Q_and_D(const int64_t naos, const double* dens_ptr
     #pragma omp section
     {
 
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < p_prim_count * 3; i++)
     {
         auto i_full = s_prim_count + i;
@@ -1939,6 +1974,7 @@ auto CScreeningData::fill_mat_Q_and_D(const int64_t naos, const double* dens_ptr
     #pragma omp section
     {
 
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < d_prim_count * 6; i++)
     {
         auto i_full = s_prim_count + p_prim_count * 3 + i;
@@ -1958,6 +1994,7 @@ auto CScreeningData::fill_mat_Q_and_D(const int64_t naos, const double* dens_ptr
     #pragma omp section
     {
 
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < s_prim_count; i++)
     {
         const auto i_cgto = s_prim_aoinds[i];
@@ -2027,6 +2064,7 @@ auto CScreeningData::fill_mat_Q_and_D(const int64_t naos, const double* dens_ptr
     #pragma omp section
     {
 
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < p_prim_count * 3; i++)
     {
         const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
@@ -2078,6 +2116,7 @@ auto CScreeningData::fill_mat_Q_and_D(const int64_t naos, const double* dens_ptr
     #pragma omp section
     {
 
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < d_prim_count * 6; i++)
     {
         const auto i_cgto = d_prim_aoinds[(i / 6) + d_prim_count * (i % 6)];
@@ -3046,74 +3085,83 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t  s_prim_count,
         _local_pair_inds_i_for_K_dd[gpu_id] = std::vector<uint32_t>(dd_batch_size);
         _local_pair_inds_k_for_K_dd[gpu_id] = std::vector<uint32_t>(dd_batch_size);
 
+        // auto nthreads = omp_get_max_threads();
+        // auto num_threads_per_gpu = nthreads / _num_gpus_per_node;
+
+        #pragma omp parallel num_threads(_num_gpus_per_node)
         {
-            auto gpu_rank = gpu_id + rank * _num_gpus_per_node;
-            auto gpu_count = nnodes * _num_gpus_per_node;
+            auto thread_id = omp_get_thread_num();
 
-            for (int64_t ik = gpu_rank, idx = 0; ik < ss_pair_count_for_K; ik+=gpu_count, idx++)
+            if (thread_id < _num_gpus_per_node)
             {
-                const auto& vals = ss_Qp_ik[ik];
+                auto gpu_rank = gpu_id + rank * _num_gpus_per_node;
+                auto gpu_count = nnodes * _num_gpus_per_node;
 
-                auto i = std::get<0>(vals);
-                auto k = std::get<1>(vals);
+                for (int64_t ik = gpu_rank, idx = 0; ik < ss_pair_count_for_K; ik+=gpu_count, idx++)
+                {
+                    const auto& vals = ss_Qp_ik[ik];
 
-                _local_pair_inds_i_for_K_ss[gpu_id][idx] = i;
-                _local_pair_inds_k_for_K_ss[gpu_id][idx] = k;
-            }
+                    auto i = std::get<0>(vals);
+                    auto k = std::get<1>(vals);
 
-            for (int64_t ik = gpu_rank, idx = 0; ik < sp_pair_count_for_K; ik+=gpu_count, idx++)
-            {
-                const auto& vals = sp_Qp_ik[ik];
+                    _local_pair_inds_i_for_K_ss[gpu_id][idx] = i;
+                    _local_pair_inds_k_for_K_ss[gpu_id][idx] = k;
+                }
 
-                auto i = std::get<0>(vals);
-                auto k = std::get<1>(vals);
+                for (int64_t ik = gpu_rank, idx = 0; ik < sp_pair_count_for_K; ik+=gpu_count, idx++)
+                {
+                    const auto& vals = sp_Qp_ik[ik];
 
-                _local_pair_inds_i_for_K_sp[gpu_id][idx] = i;
-                _local_pair_inds_k_for_K_sp[gpu_id][idx] = k;
-            }
+                    auto i = std::get<0>(vals);
+                    auto k = std::get<1>(vals);
 
-            for (int64_t ik = gpu_rank, idx = 0; ik < sd_pair_count_for_K; ik+=gpu_count, idx++)
-            {
-                const auto& vals = sd_Qp_ik[ik];
+                    _local_pair_inds_i_for_K_sp[gpu_id][idx] = i;
+                    _local_pair_inds_k_for_K_sp[gpu_id][idx] = k;
+                }
 
-                auto i = std::get<0>(vals);
-                auto k = std::get<1>(vals);
+                for (int64_t ik = gpu_rank, idx = 0; ik < sd_pair_count_for_K; ik+=gpu_count, idx++)
+                {
+                    const auto& vals = sd_Qp_ik[ik];
 
-                _local_pair_inds_i_for_K_sd[gpu_id][idx] = i;
-                _local_pair_inds_k_for_K_sd[gpu_id][idx] = k;
-            }
+                    auto i = std::get<0>(vals);
+                    auto k = std::get<1>(vals);
 
-            for (int64_t ik = gpu_rank, idx = 0; ik < pp_pair_count_for_K; ik+=gpu_count, idx++)
-            {
-                const auto& vals = pp_Qp_ik[ik];
+                    _local_pair_inds_i_for_K_sd[gpu_id][idx] = i;
+                    _local_pair_inds_k_for_K_sd[gpu_id][idx] = k;
+                }
 
-                auto i = std::get<0>(vals);
-                auto k = std::get<1>(vals);
+                for (int64_t ik = gpu_rank, idx = 0; ik < pp_pair_count_for_K; ik+=gpu_count, idx++)
+                {
+                    const auto& vals = pp_Qp_ik[ik];
 
-                _local_pair_inds_i_for_K_pp[gpu_id][idx] = i;
-                _local_pair_inds_k_for_K_pp[gpu_id][idx] = k;
-            }
+                    auto i = std::get<0>(vals);
+                    auto k = std::get<1>(vals);
 
-            for (int64_t ik = gpu_rank, idx = 0; ik < pd_pair_count_for_K; ik+=gpu_count, idx++)
-            {
-                const auto& vals = pd_Qp_ik[ik];
+                    _local_pair_inds_i_for_K_pp[gpu_id][idx] = i;
+                    _local_pair_inds_k_for_K_pp[gpu_id][idx] = k;
+                }
 
-                auto i = std::get<0>(vals);
-                auto k = std::get<1>(vals);
+                for (int64_t ik = gpu_rank, idx = 0; ik < pd_pair_count_for_K; ik+=gpu_count, idx++)
+                {
+                    const auto& vals = pd_Qp_ik[ik];
 
-                _local_pair_inds_i_for_K_pd[gpu_id][idx] = i;
-                _local_pair_inds_k_for_K_pd[gpu_id][idx] = k;
-            }
+                    auto i = std::get<0>(vals);
+                    auto k = std::get<1>(vals);
 
-            for (int64_t ik = gpu_rank, idx = 0; ik < dd_pair_count_for_K; ik+=gpu_count, idx++)
-            {
-                const auto& vals = dd_Qp_ik[ik];
+                    _local_pair_inds_i_for_K_pd[gpu_id][idx] = i;
+                    _local_pair_inds_k_for_K_pd[gpu_id][idx] = k;
+                }
 
-                auto i = std::get<0>(vals);
-                auto k = std::get<1>(vals);
+                for (int64_t ik = gpu_rank, idx = 0; ik < dd_pair_count_for_K; ik+=gpu_count, idx++)
+                {
+                    const auto& vals = dd_Qp_ik[ik];
 
-                _local_pair_inds_i_for_K_dd[gpu_id][idx] = i;
-                _local_pair_inds_k_for_K_dd[gpu_id][idx] = k;
+                    auto i = std::get<0>(vals);
+                    auto k = std::get<1>(vals);
+
+                    _local_pair_inds_i_for_K_dd[gpu_id][idx] = i;
+                    _local_pair_inds_k_for_K_dd[gpu_id][idx] = k;
+                }
             }
         }
     }
