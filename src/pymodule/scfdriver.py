@@ -2866,6 +2866,9 @@ class ScfDriver:
         """
         Computes electronic gradient using Fock/Kohn-Sham matrix.
 
+        Base-class placeholder; must be overridden by a concrete SCF driver
+        subclass.
+
         :param fock_mat:
             The Fock/Kohn-Sham matrix.
         :param ovl_mat:
@@ -2879,11 +2882,16 @@ class ScfDriver:
             The electronic gradient.
         """
 
-        return 0.0
+        raise NotImplementedError(
+            'ScfDriver._comp_gradient must be implemented by a concrete SCF ' +
+            'driver subclass')
 
     def _comp_density_change(self, den_mat, old_den_mat):
         """
         Computes norm of density change between two density matrices.
+
+        Base-class placeholder; must be overridden by a concrete SCF driver
+        subclass.
 
         :param den_mat:
             The current density matrix.
@@ -2894,11 +2902,16 @@ class ScfDriver:
             The norm of change between two density matrices.
         """
 
-        return 0.0
+        raise NotImplementedError(
+            'ScfDriver._comp_density_change must be implemented by a ' +
+            'concrete SCF driver subclass')
 
     def _store_diis_data(self, fock_mat, den_mat, ovl_mat, e_grad):
         """
         Stores Fock/Kohn-Sham and density matrices for current iteration.
+
+        Base-class placeholder; must be overridden by a concrete SCF driver
+        subclass.
 
         :param fock_mat:
             The Fock/Kohn-Sham matrix.
@@ -2910,12 +2923,17 @@ class ScfDriver:
             The electronic gradient.
         """
 
-        return
+        raise NotImplementedError(
+            'ScfDriver._store_diis_data must be implemented by a concrete ' +
+            'SCF driver subclass')
 
     def _get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         """
         Computes effective Fock/Kohn-Sham matrix in OAO basis by applying
         Lowdin or canonical orthogonalization to AO Fock/Kohn-Sham matrix.
+
+        Base-class placeholder; must be overridden by a concrete SCF driver
+        subclass.
 
         :param fock_mat:
             The Fock/Kohn-Sham matrix.
@@ -2928,11 +2946,16 @@ class ScfDriver:
             The effective Fock/Kohn-Sham matrix.
         """
 
-        return None
+        raise NotImplementedError(
+            'ScfDriver._get_effective_fock must be implemented by a concrete ' +
+            'SCF driver subclass')
 
     def _gen_molecular_orbitals(self, molecule, ao_basis, fock_mat, oao_mat):
         """
         Generates molecular orbital by diagonalizing Fock/Kohn-Sham matrix.
+
+        Base-class placeholder; must be overridden by a concrete SCF driver
+        subclass.
 
         :param molecule:
             The molecule.
@@ -2947,7 +2970,9 @@ class ScfDriver:
             The molecular orbitals.
         """
 
-        return MolecularOrbitals()
+        raise NotImplementedError(
+            'ScfDriver._gen_molecular_orbitals must be implemented by a ' +
+            'concrete SCF driver subclass')
 
     def _apply_mom(self, molecule, ao_basis, ovl_mat):
         """
