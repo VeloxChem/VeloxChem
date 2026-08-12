@@ -1708,6 +1708,10 @@ class ScfDriver:
 
         e_grad = None
 
+        use_level_shift_prev = False
+        use_level_shift = False
+        use_pfon = False
+
         if self.rank == mpi_master():
             self._print_scf_title()
 
@@ -1753,8 +1757,9 @@ class ScfDriver:
             profiler.stop_timer('CPCM')
             profiler.start_timer('ErrVec')
 
-            if (self.rank == mpi_master() and i > 0 and
-                    self.level_shifting > 0.0):
+            use_level_shift = (i > 0 and self.level_shifting > 0.0)
+
+            if self.rank == mpi_master() and use_level_shift:
 
                 self.ostream.print_info(
                     f'Applying level-shifting ({self.level_shifting:.2f}au)')
@@ -1850,7 +1855,11 @@ class ScfDriver:
 
             self._print_iter_data(i)
 
-            self._check_convergence(molecule, ao_basis, ovl_mat)
+            use_modified_orbitals = (
+                use_level_shift_prev or use_level_shift or use_pfon)
+
+            self._check_convergence(molecule, ao_basis, ovl_mat,
+                                    use_modified_orbitals)
 
             if self.is_converged:
                 break
@@ -1866,6 +1875,12 @@ class ScfDriver:
             profiler.stop_timer('EffFock')
 
             profiler.start_timer('NewMO')
+
+            # save the use of level-shifting for the next iteration's
+            # convergence check
+            use_level_shift_prev = use_level_shift
+
+            use_pfon = (self.pfon and self.pfon_temperature > 0)
 
             self._molecular_orbitals = self._gen_molecular_orbitals(
                 molecule, ao_basis, eff_fock_mat, oao_mat)
@@ -3070,7 +3085,8 @@ class ScfDriver:
 
         return nteri
 
-    def _check_convergence(self, molecule, ao_basis, ovl_mat):
+    def _check_convergence(self, molecule, ao_basis, ovl_mat,
+                           use_modified_orbitals):
         """
         Sets SCF convergence flag by checking if convergence condition for
         electronic gradient is fullfiled.
@@ -3081,9 +3097,17 @@ class ScfDriver:
             The AO basis set.
         :param ovl_mat:
             The overlap matrix.
+        :param use_modified_orbitals:
+            True when the Fock matrix or density entering the convergence
+            metric was modified by level shifting or pFON; the check is
+            then skipped (the metric is not trustworthy) and the SCF is
+            not declared converged.
         """
 
         self._is_converged = False
+
+        if use_modified_orbitals:
+            return
 
         if self._num_iter > 0:
 

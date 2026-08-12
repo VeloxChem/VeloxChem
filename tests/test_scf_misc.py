@@ -887,6 +887,48 @@ class TestScfDriverMiscellaneous:
             assert 'Applying level-shifting' in output
             assert 'Applying pseudo-FON' in output
 
+    @pytest.mark.parametrize(('modifier', 'expected_flags'),
+                             [('level_shifting', [False, True, True, False]),
+                              ('pfon', [False, True, False])])
+    def test_modified_orbitals_delay_convergence(self, monkeypatch, modifier,
+                                                 expected_flags):
+
+        molecule, basis = self.get_water_and_basis()
+        scf_drv = ScfRestrictedDriver(MPI.COMM_WORLD, OutputStream(None))
+        scf_drv.acc_type = 'diis'
+        scf_drv.conv_thresh = 1.0e-12
+        scf_drv._skip_writing_h5 = True
+
+        if modifier == 'level_shifting':
+            scf_drv.level_shifting = 0.5
+            scf_drv.level_shifting_delta = 0.5
+        else:
+            scf_drv.pfon = True
+            scf_drv.pfon_temperature = 100.0
+            scf_drv.pfon_delta_temperature = 100.0
+
+        convergence_checks = []
+
+        def mock_check_convergence(mol, basis_set, ovl,
+                                   use_modified_orbitals):
+            # mirror _check_convergence: do not declare convergence
+            # while the Fock matrix/density is modified
+            convergence_checks.append(use_modified_orbitals)
+            if use_modified_orbitals:
+                scf_drv._is_converged = False
+                return
+            scf_drv._is_converged = (len(convergence_checks) > 1)
+
+        monkeypatch.setattr(scf_drv, '_check_convergence',
+                            mock_check_convergence)
+
+        scf_drv.compute(molecule, basis)
+
+        assert scf_drv.is_converged
+        # each entry is the modified-orbitals flag passed on that call;
+        # convergence may only be accepted once the flag turns False
+        assert convergence_checks == expected_flags
+
     def test_density_damping_changes_real_scf_trajectory(self):
 
         molecule, basis = self.get_water_and_basis()
