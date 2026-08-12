@@ -1713,7 +1713,6 @@ class ScfDriver:
 
         e_grad = None
 
-        use_level_shift_prev = False
         use_level_shift = False
         use_pfon = False
 
@@ -1761,36 +1760,6 @@ class ScfDriver:
 
             profiler.stop_timer('CPCM')
             profiler.start_timer('ErrVec')
-
-            use_level_shift = (i > 0 and self.level_shifting > 0.0)
-
-            if self.rank == mpi_master() and use_level_shift:
-
-                self.ostream.print_info(
-                    f'Applying level-shifting ({self.level_shifting:.2f}au)')
-
-                C_alpha = self.molecular_orbitals.alpha_to_numpy()
-                nocc_a = molecule.number_of_alpha_occupied_orbitals(ao_basis)
-                fmo_a = np.linalg.multi_dot([C_alpha.T, fock_mat[0], C_alpha])
-                for idx in range(nocc_a, fmo_a.shape[0]):
-                    fmo_a[idx, idx] += self.level_shifting
-                fock_mat[0] = np.linalg.multi_dot(
-                    [S, C_alpha, fmo_a, C_alpha.T, S])
-
-                if self.scf_type != 'restricted':
-
-                    C_beta = self.molecular_orbitals.beta_to_numpy()
-                    nocc_b = molecule.number_of_beta_occupied_orbitals(ao_basis)
-                    fmo_b = np.linalg.multi_dot([C_beta.T, fock_mat[1], C_beta])
-                    for idx in range(nocc_b, fmo_b.shape[0]):
-                        fmo_b[idx, idx] += self.level_shifting
-                    fock_mat[1] = np.linalg.multi_dot(
-                        [S, C_beta, fmo_b, C_beta.T, S])
-
-            if self.level_shifting > 0.0 and i > 0:
-                self.level_shifting -= self.level_shifting_delta
-                if self.level_shifting < 0.0:
-                    self.level_shifting = 0.0
 
             if self.rank == mpi_master() and self.electric_field is not None:
                 efpot = sum([
@@ -1860,8 +1829,7 @@ class ScfDriver:
 
             self._print_iter_data(i)
 
-            use_modified_orbitals = (
-                use_level_shift_prev or use_level_shift or use_pfon)
+            use_modified_orbitals = (use_level_shift or use_pfon)
 
             self._check_convergence(molecule, ao_basis, ovl_mat,
                                     use_modified_orbitals)
@@ -1877,13 +1845,46 @@ class ScfDriver:
 
             eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
+            # Note: skip level-shifting for iteration 0 (fresh initial guess)
+            use_level_shift = (self._num_iter > 0 and self.level_shifting > 0.0)
+
+            if self.rank == mpi_master() and use_level_shift:
+
+                self.ostream.print_info(
+                    f'Applying level-shifting ({self.level_shifting:.2f}au)')
+
+                eff_fock_mat = list(eff_fock_mat)
+
+                C_alpha = self.molecular_orbitals.alpha_to_numpy()
+                nocc_a = molecule.number_of_alpha_occupied_orbitals(ao_basis)
+                fmo_a = np.linalg.multi_dot(
+                    [C_alpha.T, eff_fock_mat[0], C_alpha])
+                for idx in range(nocc_a, fmo_a.shape[0]):
+                    fmo_a[idx, idx] += self.level_shifting
+                eff_fock_mat[0] = np.linalg.multi_dot(
+                    [S, C_alpha, fmo_a, C_alpha.T, S])
+
+                if self.scf_type == 'unrestricted':
+
+                    C_beta = self.molecular_orbitals.beta_to_numpy()
+                    nocc_b = molecule.number_of_beta_occupied_orbitals(ao_basis)
+                    fmo_b = np.linalg.multi_dot(
+                        [C_beta.T, eff_fock_mat[1], C_beta])
+                    for idx in range(nocc_b, fmo_b.shape[0]):
+                        fmo_b[idx, idx] += self.level_shifting
+                    eff_fock_mat[1] = np.linalg.multi_dot(
+                        [S, C_beta, fmo_b, C_beta.T, S])
+
+                eff_fock_mat = tuple(eff_fock_mat)
+
+            if use_level_shift:
+                self.level_shifting -= self.level_shifting_delta
+                if self.level_shifting < 0.0:
+                    self.level_shifting = 0.0
+
             profiler.stop_timer('EffFock')
 
             profiler.start_timer('NewMO')
-
-            # save the use of level-shifting for the next iteration's
-            # convergence check
-            use_level_shift_prev = use_level_shift
 
             use_pfon = (self.pfon and self.pfon_temperature > 0)
 
