@@ -65,10 +65,50 @@ try:
 except ImportError:
     pass
 
-from .gbimplicitsolvent import GBImplicitSolvent
-
 
 class ReactionSystemBuilder():
+
+    @staticmethod
+    def assert_consistent_atom_ordering(states, context):
+        """Every state of a reaction path must use one and the same atom ordering.
+
+        Two independently built states carry the same atoms in a different
+        sequence. Nothing downstream notices: the trajectory, the systems and the
+        topology all index by position, so a permuted state silently scores every
+        frame against the wrong physical atom instead of failing. The ordering is
+        therefore verified wherever it could have diverged rather than assumed.
+
+        Args:
+            states: the state force fields, each with its molecule attached.
+            context: what is being checked, quoted in the error message.
+        """
+
+        reference = states[0].molecule
+        ref_elements = reference.get_element_ids()
+        ref_masses = reference.get_masses()
+        for k, state in enumerate(states[1:], start=1):
+            molecule = state.molecule
+            assert_msg_critical(
+                molecule.number_of_atoms() == reference.number_of_atoms(),
+                f"Atom ordering mismatch during {context}: state {k + 1} has "
+                f"{molecule.number_of_atoms()} atoms but state 1 has "
+                f"{reference.number_of_atoms()}")
+            elements = molecule.get_element_ids()
+            masses = molecule.get_masses()
+            for i, (ref_element, element) in enumerate(zip(ref_elements, elements)):
+                assert_msg_critical(
+                    int(ref_element) == int(element),
+                    f"Atom ordering mismatch during {context}: atom {i + 1} is "
+                    f"element {int(ref_element)} in state 1 but element "
+                    f"{int(element)} in state {k + 1}. All states of a reaction "
+                    "path must share one atom ordering.")
+            for i, (ref_mass, mass) in enumerate(zip(ref_masses, masses)):
+                assert_msg_critical(
+                    abs(ref_mass - mass) < 1e-6,
+                    f"Atom ordering mismatch during {context}: atom {i + 1} has "
+                    f"mass {ref_mass} in state 1 but {mass} in state {k + 1}")
+
+    from .gbimplicitsolvent import GBImplicitSolvent
 
     def __init__(self, comm=None, ostream=None):
         '''
@@ -202,6 +242,23 @@ class ReactionSystemBuilder():
         self.begin_index = 0
         self.water_model: str
 
+        # Multi-step bookkeeping. reactive_bonds is the union, over every step
+        # of the reaction path, of the bonds that form or break anywhere along
+        # it; bond_registry carries one path-global reference force constant per
+        # such pair (see ReactionForceFieldBuilder._build_reactive_bond_registry).
+        #
+        # Both stay None for an ordinary two-state build, in which case every
+        # pair set is derived from the reactant/product pair exactly as before.
+        # They are only populated through build_multi_step_systems, because the
+        # rules they select make each state's description depend on the whole
+        # path rather than on one pair - which is what keeps E_k identical no
+        # matter which step it is evaluated from, at the cost of differing in
+        # detail from the legacy two-state treatment (see _reactive_pairs).
+        self.reactive_bonds: set | None = None
+        self.bond_registry: dict | None = None
+        # All states of the path, in state order, when built multi-step.
+        self.states: list | None = None
+
         self.implicit_solvent_model: str | None = None
         self.solute_dielectric: float = 1.0
         self.solvent_dielectric: float = 78.39
@@ -268,9 +325,125 @@ class ReactionSystemBuilder():
         configuration: dict,
         constraints: list | None = None,
     ):
+        """Build the lambda-interpolated systems for a single reactant ->
+        product step, together with the two PES systems.
+
+        A one-step reaction is just the shortest reaction path, so this is a
+        wrapper over build_multi_step_systems that names the two PES systems
+        'reactant' and 'product' the way two-state callers expect.
+        """
+
+        step_systems, pes_systems, topology, positions = (
+            self.build_multi_step_systems(
+                [reactant, product],
+                lambda_vec,
+                configuration,
+                constraints,
+            ))
+
+        systems = dict(step_systems[0])
+        systems['reactant'] = pes_systems[0]
+        systems['product'] = pes_systems[1]
+
+        self.systems = systems
+        self.ostream.flush()
+        return self.systems, topology, positions
+
+    def build_multi_step_systems(
+        self,
+        states: list,
+        lambda_vec: list,
+        configuration: dict,
+        constraints: list | None = None,
+        reactive_bonds: set | None = None,
+        bond_registry: dict | None = None,
+    ):
+        """Build the systems for a reaction path of arbitrary length.
+
+        The environment (box, solvent, counterions, protein) is built exactly
+        once, from state 0, so every step shares one topology and one particle
+        ordering. Each step then gets its own lambda-interpolated systems, and
+        each state gets exactly one PES system - which is what makes E_k the
+        same quantity no matter which step it is evaluated from.
+
+        Args:
+            states: the N state force fields, all in one atom ordering.
+            lambda_vec: the lambda vector, shared by every step.
+            configuration: the configuration dict, as for build_systems.
+            constraints: constraints applied in every frame.
+            reactive_bonds: the union over all steps of the forming and breaking
+                bonds. Derived from the states if not given.
+            bond_registry: per reactive pair, the path-global reference force
+                constant (see ReactionForceFieldBuilder).
+
+        Returns:
+            tuple: list of per-step {lambda: System} dicts, {state index: PES
+            System}, the shared topology, and the initial positions.
+        """
+
+        assert_msg_critical(
+            len(states) >= 2,
+            f"At least two states are required, got {len(states)}")
+
+        ReactionSystemBuilder.assert_consistent_atom_ordering(
+            states, "multi-step system building")
+
+        if reactive_bonds is None:
+            reactive_bonds = set()
+            for left, right in zip(states[:-1], states[1:]):
+                reactive_bonds |= set(left.bonds) ^ set(right.bonds)
+        self.reactive_bonds = set(reactive_bonds)
+        self.bond_registry = bond_registry
+
+        system, nb_force, E_field = self._build_base_system(
+            states, configuration, constraints)
+
+        assert_msg_critical(
+            len(states) == 2 or not (self.CNT or self.graphene),
+            'ReactionSystemBuilder: CNT and graphene environments are not '
+            'supported for a reaction path of more than two states.')
+
+        step_systems = []
+        for step, (left, right) in enumerate(zip(states[:-1], states[1:])):
+            self.ostream.print_info(
+                f"Interpolating systems for step {step + 1} "
+                f"(state {step + 1} -> state {step + 2})")
+            self.ostream.flush()
+            self.reactant = left
+            self.product = right
+            step_systems.append(
+                self._interpolate_system(
+                    system,
+                    lambda_vec,
+                    nb_force,
+                    E_field,
+                ))
+
+        pes_systems = self._build_state_pes_systems(system, states, nb_force,
+                                                    E_field)
+
+        self.ostream.flush()
+        return step_systems, pes_systems, self.topology, self.positions
+
+    def _build_base_system(
+        self,
+        states: list,
+        configuration: dict,
+        constraints: list | None = None,
+    ):
+        """Build everything that does not depend on lambda or on the step: the
+        particles, the topology, the environment (box, solvent, protein) and the
+        electric field.
+
+        The solute is added from state 0, and the box is sized so that it holds
+        every state, since one and the same box has to serve the whole path.
+        """
 
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
+
+        reactant = states[0]
+        product = states[-1] if len(states) > 1 else states[0]
 
         for keyword, val in self.keywords.items():
             if keyword in configuration:
@@ -300,6 +473,7 @@ class ReactionSystemBuilder():
         self.data_folder = configuration.get("data_folder", self.data_folder)
         self.reactant = reactant
         self.product = product
+        self.states = list(states)
 
         if constraints is not None:
             self.constraints = constraints
@@ -377,16 +551,9 @@ class ReactionSystemBuilder():
             E_field = self._add_E_field(system, self.E_field)
 
         self.topology: mmapp.Topology = topology
-        self.systems = self._interpolate_system(
-            system,
-            lambda_vec,
-            nb_force,
-            E_field,
-        )
-        # Add all lambda dependent parameters
 
         self.ostream.flush()
-        return self.systems, self.topology, self.positions
+        return system, nb_force, E_field
 
     def _system_from_pdb(self):
         if self.pdb[-4:] == '.cif':
@@ -495,6 +662,12 @@ class ReactionSystemBuilder():
             if self.reactant.atoms[id].get('pdb') != 'sys':
                 self.reactant.atoms[id]['pdb'] = 'unmapped'
 
+        # The pdb tags are written onto state 0 but are read per atom index by
+        # every state (the solute is added once, and the nonbonded parameters of
+        # every state are set through the same reaction_atoms mapping), so they
+        # have to be mirrored onto the whole path.
+        self._mirror_pdb_tags()
+
         # Reconstruct the bonded terms (and 1-4 nonbonded exceptions) that
         # connect the reacting residue(s) to the surrounding PDB structure but
         # were dropped because the residue did not match an AMBER template.
@@ -502,8 +675,32 @@ class ReactionSystemBuilder():
             self._match_boundary_atoms(residues, mapping, system, res_atoms,
                                        reaction_atoms)
             self._print_boundary_summary()
+            # _match_boundary_atoms retags the resolved capping atoms as
+            # 'boundary' on state 0; mirror that too.
+            self._mirror_pdb_tags()
 
         return system, topology, system_mol, reaction_atoms
+
+    def _mirror_pdb_tags(self):
+        """Copy state 0's pdb tags ('sys' / 'unmapped' / 'boundary') onto every
+        other state of the path, by atom index."""
+
+        if self.states is None or len(self.states) < 2:
+            return
+
+        ReactionSystemBuilder.assert_consistent_atom_ordering(
+            self.states, "pdb tag mirroring")
+
+        reference = self.states[0]
+        for state in self.states[1:]:
+            if state is reference:
+                continue
+            for atom_id, atom in reference.atoms.items():
+                tag = atom.get('pdb')
+                if tag is None:
+                    state.atoms[atom_id].pop('pdb', None)
+                else:
+                    state.atoms[atom_id]['pdb'] = tag
 
     def _get_mapped_atom_ids_from_residues(self, residues):
         # create a graph of the residue
@@ -777,6 +974,8 @@ class ReactionSystemBuilder():
         if not self.boundary_atoms:
             return
 
+        states = self.states if self.states else [self.reactant, self.product]
+
         merged = {**reaction_atoms, **self.boundary_atoms}
 
         # Identify each individual junction (a covalent bond crossing from the
@@ -849,8 +1048,17 @@ class ReactionSystemBuilder():
                     pdb_torsions.add((p1, p2, p3, p4))
                     pdb_torsions.add((p4, p3, p2, p1))
 
-        def classify(rea_terms, pro_terms, pdb_lookup, key_list, term_type):
-            for key in set(rea_terms) | set(pro_terms):
+        def classify(term_attribute, pdb_lookup, key_list, term_type):
+            # A boundary term is only reconstructed if every state of the path
+            # parametrises it. For two states that is the reactant and the
+            # product; for a longer path every intermediate has to agree as
+            # well, since one and the same boundary force is interpolated
+            # through all of them.
+            all_terms = [getattr(state, term_attribute) for state in states]
+            union = set()
+            for terms in all_terms:
+                union |= set(terms)
+            for key in union:
                 # Fully within the reacting fragment -> handled by the regular
                 # reaction forces already.
                 if self._key_to_id(key, reaction_atoms) is not None:
@@ -859,10 +1067,16 @@ class ReactionSystemBuilder():
                 if atom_ids is None:
                     continue  # not resolvable even with the boundary atoms
 
-                if key not in rea_terms or key not in pro_terms:
+                missing = [
+                    index + 1 for index, terms in enumerate(all_terms)
+                    if key not in terms
+                ]
+                if missing:
+                    where = ("one side of the reaction" if len(states) == 2 else
+                             f"state(s) {missing}")
                     self.ostream.print_warning(
-                        f"Boundary {term_type} {key} is present on only one "
-                        "side of the reaction; skipping its reconstruction."
+                        f"Boundary {term_type} {key} is missing in {where}; "
+                        "skipping its reconstruction. "
                         "Breaking and forming bonds should be completely contained within the reacting fragment."
                     )
                     continue
@@ -877,14 +1091,12 @@ class ReactionSystemBuilder():
                     self._boundary_summary_entry(term_type, key, merged,
                                                  source))
 
-        classify(self.reactant.bonds, self.product.bonds, pdb_bonds,
-                 self._boundary_bond_keys, 'bond')
-        classify(self.reactant.angles, self.product.angles, pdb_angles,
-                 self._boundary_angle_keys, 'angle')
-        classify(self.reactant.dihedrals, self.product.dihedrals, pdb_torsions,
-                 self._boundary_torsion_keys, 'torsion')
-        classify(self.reactant.impropers, self.product.impropers, pdb_torsions,
-                 self._boundary_improper_keys, 'improper')
+        classify('bonds', pdb_bonds, self._boundary_bond_keys, 'bond')
+        classify('angles', pdb_angles, self._boundary_angle_keys, 'angle')
+        classify('dihedrals', pdb_torsions, self._boundary_torsion_keys,
+                 'torsion')
+        classify('impropers', pdb_torsions, self._boundary_improper_keys,
+                 'improper')
 
         # Cache the real (AMBER) nonbonded parameters of each boundary atom and
         # index the existing nonbonded exceptions, both needed to correct the
@@ -923,29 +1135,46 @@ class ReactionSystemBuilder():
             self._boundary_nb_exception_keys.append((other_id, bnd_id))
 
     def _boundary_term_params_str(self, term_type, key):
-        """Human-readable reactant->product parameter string for a boundary
-        term, used in both the console summary and the detailed log."""
+        """Human-readable per-state parameter string for a boundary term, used
+        in both the console summary and the detailed log.
+
+        Two states keep the reactant / product labels; a longer reaction path
+        gets one clause per state.
+        """
+
+        states = self.states if self.states else [self.reactant, self.product]
+        if len(states) == 2:
+            labels = ['reactant', 'product']
+        else:
+            labels = [f"state{index + 1}" for index in range(len(states))]
+
+        attribute = {
+            'bond': 'bonds',
+            'angle': 'angles',
+            'torsion': 'dihedrals',
+            'improper': 'impropers',
+        }[term_type]
+
         if term_type in ('bond', 'angle'):
-            rea = self.reactant.bonds if term_type == 'bond' \
-                else self.reactant.angles
-            pro = self.product.bonds if term_type == 'bond' \
-                else self.product.angles
-            a, b = rea[key], pro[key]
             unit = 'nm' if term_type == 'bond' else 'rad'
-            return (
-                f"reactant(eq {a['equilibrium']:.4f} {unit}, k {a['force_constant']:.1f}) "
-                f"product(eq {b['equilibrium']:.4f} {unit}, k {b['force_constant']:.1f}) "
-            )
-        rea = self.reactant.dihedrals if term_type == 'torsion' \
-            else self.reactant.impropers
-        pro = self.product.dihedrals if term_type == 'torsion' \
-            else self.product.impropers
 
-        def fmt(d):
-            return (f"per={d.get('periodicity')}, phase={d.get('phase')}, "
-                    f"barrier={d.get('barrier')}")
+            def fmt(d):
+                return (f"eq {d['equilibrium']:.4f} {unit}, "
+                        f"k {d['force_constant']:.1f}")
 
-        return f"reactant({fmt(rea[key])}) product({fmt(pro[key])})"
+            separator = ") "
+        else:
+
+            def fmt(d):
+                return (f"per={d.get('periodicity')}, phase={d.get('phase')}, "
+                        f"barrier={d.get('barrier')}")
+
+            separator = ") "
+
+        rendered = separator.join(
+            f"{label}({fmt(getattr(state, attribute)[key])}"
+            for label, state in zip(labels, states))
+        return rendered + (") " if term_type in ('bond', 'angle') else ")")
 
     def _atom_label(self, atom):
         return f"{atom.residue.name}{atom.residue.id}:{atom.name}"
@@ -1253,13 +1482,22 @@ class ReactionSystemBuilder():
     def _configure_pbc(self, system, topology, nb_force, box=None):
         if box is None:
             box = [-1., -1., -1.]
+        # One box has to hold every state of the path, so the extent is taken
+        # over all of them - a later state may well be more extended than the
+        # first, for instance once a fragment has left.
+        extents = [self.positions]
+        if self.states is not None and len(self.states) > 2:
+            extents = [
+                state.molecule.get_coordinates_in_angstrom()
+                for state in self.states
+            ]
+            # The solute geometries are compared among themselves; once solvent
+            # has been added self.positions covers the whole box and dominates.
+            extents.append(self.positions)
         minim = [
-            2 * self.padding + 0.1 *
-            (max(self.positions[:, 0]) - min(self.positions[:, 0])),
-            2 * self.padding + 0.1 *
-            (max(self.positions[:, 1]) - min(self.positions[:, 1])),
-            2 * self.padding + 0.1 *
-            (max(self.positions[:, 2]) - min(self.positions[:, 2]))
+            2 * self.padding +
+            0.1 * max(max(p[:, i]) - min(p[:, i]) for p in extents)
+            for i in range(3)
         ]
 
         dims = ['x', 'y', 'z']
@@ -2108,6 +2346,11 @@ class ReactionSystemBuilder():
         self.ostream.flush()
 
     def _interpolate_system(self, system, lambda_vec, nb_force, E_field_force):
+        """Lambda-interpolated integration systems for one step of the path.
+
+        Only the lambda systems: the potential energy surfaces belong to states
+        rather than to steps and are built by _build_state_pes_systems.
+        """
         systems = {}
         rea_charge = [atom['charge'] for atom in self.reactant.atoms.values()]
         rea_pdb_charge = [
@@ -2231,19 +2474,12 @@ class ReactionSystemBuilder():
                 )
 
             new_system = copy.deepcopy(system)
-            if lam == 0:
-                rea_system = copy.deepcopy(system)
-            if lam == 1:
-                pro_system = copy.deepcopy(system)
             # Add the bonded forces for the reaction system
             if not self.no_reactant:
                 self._add_reaction_forces(new_system, lam)
 
             self._add_frozen(new_system, lam)
             systems[lam] = new_system
-
-        self._add_reaction_forces(rea_system, 0, pes=True)
-        self._add_reaction_forces(pro_system, 1, pes=True)
 
         # Record the ordered solute/reaction-atom particle indices (same
         # mapping the nonbonded decomposition used to derive inline). Kept so a
@@ -2258,10 +2494,119 @@ class ReactionSystemBuilder():
         except (KeyError, AttributeError):
             self.reaction_atom_indices = []
 
-        systems['reactant'] = rea_system
-        systems['product'] = pro_system
         self.ostream.flush()
         return systems
+
+    def _build_state_pes_systems(self, system, states, nb_force,
+                                 E_field_force):
+        """One PES system per state, each a function of that state alone.
+
+        Because the reactive-pair set is path-global, evaluating the ordinary
+        pair machinery with the same state on both sides yields exactly the
+        single-state description that is wanted: every pair that reacts anywhere
+        along the path is a morse bond where the state has it bonded and a
+        soft-core nonbonded pair where it does not, while everything else is the
+        state's own harmonic bond, angle and torsion. E_k therefore does not
+        depend on the step it is evaluated from, which is the whole point.
+        """
+
+        assert_msg_critical(
+            self.reactive_bonds is not None,
+            "A path-global reactive bond set is required to build per-state "
+            "PES systems.")
+
+        gb_force = None
+        if self.implicit_solvent_model is not None:
+            gb_candidates = [
+                f for f in system.getForces()
+                if isinstance(f, mm.CustomGBForce)
+            ]
+            if gb_candidates:
+                gb_force = gb_candidates[0]
+
+        saved_reactant, saved_product = self.reactant, self.product
+        pes_systems = {}
+        try:
+            for index, state in enumerate(states):
+                self.reactant = state
+                self.product = state
+
+                offset_per_atom = self._charge_offset_per_atom(
+                    state, f"state {index + 1}")
+
+                if not self.no_reactant:
+                    for i, atom in enumerate(state.atoms.values()):
+                        if atom.get('pdb') in ('unmapped', 'boundary'):
+                            continue
+                        charge = atom["charge"] + offset_per_atom
+                        sigma = atom["sigma"]
+                        epsilon = atom["epsilon"]
+                        if sigma == 0:
+                            if epsilon == 0:
+                                sigma = 1
+                            else:
+                                raise ValueError(
+                                    "Sigma is 0 while epsilon is not, which will cause division by 0"
+                                )
+                        atom_index = self.reaction_atoms[i].index
+                        nb_force.setParticleParameters(atom_index, charge,
+                                                       sigma, epsilon)
+                        if gb_force is not None:
+                            gb_params = list(
+                                gb_force.getParticleParameters(atom_index))
+                            gb_params[0] = charge
+                            gb_force.setParticleParameters(
+                                atom_index, gb_params)
+
+                    self._fix_boundary_nonbonded_exceptions(nb_force, 0)
+
+                for i in range(system.getNumParticles()):
+                    charge = nb_force.getParticleParameters(i)[0]
+                    if E_field_force is not None:
+                        E_field_force.setParticleParameters(i, i, [charge])
+
+                state_system = copy.deepcopy(system)
+                self._add_reaction_forces(state_system, 0, pes=True)
+                pes_systems[index] = state_system
+        finally:
+            self.reactant, self.product = saved_reactant, saved_product
+
+        return pes_systems
+
+    def _charge_offset_per_atom(self, state, label):
+        """Per-atom charge offset that spreads the difference between a state's
+        formal charge and the charge its PDB-mapped atoms carry.
+
+        Factored out of _interpolate_system so a single state can be treated on
+        its own; the arithmetic is unchanged.
+        """
+
+        charges = [atom['charge'] for atom in state.atoms.values()]
+        pdb_charges = [
+            atom['charge'] for atom in state.atoms.values()
+            if atom.get('pdb') not in ('unmapped', 'boundary')
+        ]
+
+        if len(pdb_charges) == 0:
+            return 0
+
+        if not round(sum(charges), 5).is_integer():
+            self.ostream.print_warning(
+                f"Total charge of {label} is {sum(charges)} and is not "
+                "sufficiently close to a whole number, skipping charge offset")
+            return 0
+
+        formal_charge = int(round(sum(charges)))
+        offset = formal_charge - sum(pdb_charges)
+        offset_per_atom = offset / len(pdb_charges)
+        if abs(offset) > 0.01:
+            self.ostream.print_info(
+                f"Total charge of {label} is {formal_charge} but charge sum of the pdb atoms is {sum(pdb_charges)}"
+            )
+            self.ostream.print_info(
+                f"Applying an offset of {offset_per_atom:.4f} to {len(pdb_charges)} {label} pdb atoms"
+            )
+        return offset_per_atom
 
     def _add_reaction_forces(self, system, lam, pes=False):
 
@@ -2528,6 +2873,58 @@ class ReactionSystemBuilder():
             E_field_force.setForceGroup(EvbForceGroup.E_FIELD.value)
         return E_field_force
 
+    def _sorted_reactive_pairs(self):
+        """The reactive pairs in a deterministic order.
+
+        The forces below are built by iterating this, and OpenMM keeps bonds in
+        the order they were added, so iterating the set directly would make the
+        serialized system depend on how that set happened to be constructed.
+        """
+        return sorted(self._reactive_pairs())
+
+    def _reactive_pairs(self):
+        """The atom pairs treated as reactive for the current build.
+
+        With a path-global set supplied (multi-step), every pair that reacts
+        anywhere along the path counts as reactive in every step, so a given
+        state is described identically no matter which step it is seen from.
+        Without one, this is the reactant/product symmetric difference, i.e.
+        exactly the two-state behaviour.
+        """
+        if self.reactive_bonds is not None:
+            return self.reactive_bonds
+        return set(self.reactant.bonds) ^ set(self.product.bonds)
+
+    def _surrogate_bond_eq(self, key, state):
+        """Equilibrium length standing in for a pair that is not bonded in the
+        given state: the arithmetic mean of the two atoms' sigmas.
+
+        The sigmas are always read from the state in which the pair is
+        dissociated - the product for a breaking bond, the reactant for a
+        forming one. Reading both from the product (as this used to for the
+        forming case) evaluates the same quantity in two different states at the
+        two sides of a junction, which makes the integration Hamiltonian jump
+        where two steps of a reaction path meet.
+        """
+        s1 = state.atoms[key[0]]['sigma']
+        s2 = state.atoms[key[1]]['sigma']
+        return 0.5 * (s1 + s2)
+
+    def _surrogate_bond_fc(self, key, bonded_fc):
+        """Force constant of the surrogate bonded term for a dissociated pair.
+
+        With a registry, the path-global reference force constant is used, so
+        that the surrogate is the same in every step and the integration
+        Hamiltonian does not jump where two steps meet. Without one, the pair is
+        bonded in exactly one of the two states and its own force constant is
+        used, as before.
+        """
+        if self.bond_registry is not None and key in self.bond_registry:
+            fc = self.bond_registry[key]['fc_ref']
+        else:
+            fc = bonded_fc
+        return fc * self.bonded_integration_bond_fac
+
     def _create_static_harmonic_bond_forces(self, lam):
         """Creates the harmonic bond forces for all the bonds
         that are present in both the reactant and product states"""
@@ -2541,10 +2938,16 @@ class ReactionSystemBuilder():
             harmonic_force.setForceGroup(
                 EvbForceGroup.REA_HARM_BOND_STATIC.value)
 
+        reactive_pairs = self._reactive_pairs()
         bond_keys = list(set(self.reactant.bonds) | set(self.product.bonds))
         for key in bond_keys:
             atom_ids = self._key_to_id(key, self.reaction_atoms)
             if atom_ids is None:
+                continue
+            # A reactive pair is described by the morse force (PES) or the
+            # dynamic harmonic force (integration), even in a step where it
+            # happens to be bonded on both sides.
+            if key in reactive_pairs:
                 continue
             if key in self.reactant.bonds and key in self.product.bonds:
                 bondA = self.reactant.bonds[key]
@@ -2565,34 +2968,53 @@ class ReactionSystemBuilder():
 
         harmonic_force = mm.HarmonicBondForce()
         harmonic_force.setName("Dynamic reaction harmonic bond")
-        bond_keys = list(set(self.reactant.bonds) | set(self.product.bonds))
+        # Every reactive pair is described here during integration, including
+        # one that is bonded on both sides of this particular step (it is then
+        # simply interpolated) and one that is bonded on neither side (it gets
+        # the dissociated-pair surrogate at both ends). Both cases only arise
+        # for a multi-step path, and both are needed for the integration
+        # Hamiltonian to agree at the junction between two steps.
+        bond_keys = self._sorted_reactive_pairs()
         if not self.no_force_groups:
             harmonic_force.setForceGroup(
                 EvbForceGroup.REA_HARM_BOND_DYNAMIC.value)
         for key in bond_keys:
             atom_ids = self._key_to_id(key, self.reaction_atoms)
+            if atom_ids is None:
+                continue
             fcA = fcB = 0
             eqA = eqB = 1
-            if key in self.reactant.bonds and not key in self.product.bonds:
+            in_reactant = key in self.reactant.bonds
+            in_product = key in self.product.bonds
+            if in_reactant and in_product:
+                bondA = self.reactant.bonds[key]
+                bondB = self.product.bonds[key]
+                fcA = bondA['force_constant']
+                eqA = bondA['equilibrium']
+                fcB = bondB['force_constant']
+                eqB = bondB['equilibrium']
+            elif in_reactant and not in_product:
                 bondA = self.reactant.bonds[key]
                 fcA = bondA['force_constant']
                 eqA = bondA['equilibrium']
 
-                s1 = self.product.atoms[key[0]]['sigma']
-                s2 = self.product.atoms[key[1]]['sigma']
-                eqB = 0.5 * (s1 + s2)
-                fcB = fcA * self.bonded_integration_bond_fac
+                eqB = self._surrogate_bond_eq(key, self.product)
+                fcB = self._surrogate_bond_fc(key, fcA)
                 # if model_broken:
-            elif key not in self.reactant.bonds and key in self.product.bonds:
+            elif not in_reactant and in_product:
                 bondB = self.product.bonds[key]
                 fcB = bondB['force_constant']
                 eqB = bondB['equilibrium']
 
-                s1 = self.product.atoms[key[0]]['sigma']
-                s2 = self.product.atoms[key[1]]['sigma']
-                eqA = 0.5 * (s1 + s2)
-
-                fcA = fcB * self.bonded_integration_bond_fac
+                eqA = self._surrogate_bond_eq(key, self.reactant)
+                fcA = self._surrogate_bond_fc(key, fcB)
+            else:
+                # Bonded in neither state of this step: the pair reacts
+                # elsewhere along the path and stays dissociated here.
+                eqA = self._surrogate_bond_eq(key, self.reactant)
+                eqB = self._surrogate_bond_eq(key, self.product)
+                fcA = self._surrogate_bond_fc(key, 0.0)
+                fcB = fcA
 
             p = self.dynamic_bond_tightening
             eq = eqA * (1 - lam) + eqB * lam
@@ -2622,23 +3044,47 @@ class ReactionSystemBuilder():
         if not self.no_force_groups:
             morse_force.setForceGroup(EvbForceGroup.REA_MORSE_BOND.value)
 
-        bond_keys = list(set(self.reactant.bonds) | set(self.product.bonds))
+        bond_keys = self._sorted_reactive_pairs()
 
         for key in bond_keys:
 
-            breaking = key in self.reactant.bonds and not key in self.product.bonds
-            forming = not key in self.reactant.bonds and key in self.product.bonds
-            if not (breaking or forming):
+            in_reactant = key in self.reactant.bonds
+            in_product = key in self.product.bonds
+            breaking = in_reactant and not in_product
+            forming = not in_reactant and in_product
+            if not (breaking or forming or (in_reactant and in_product)):
+                # Reacts elsewhere along the path and is dissociated in both
+                # states of this step: no bonded term, the soft-core nonbonded
+                # pair interaction describes it.
+                continue
+
+            atom_ids = self._key_to_id(key, self.reaction_atoms)
+            if atom_ids is None:
+                continue
+
+            if in_reactant and in_product:
+                # Bonded on both sides of this step, but reactive elsewhere
+                # along the path, so it stays a morse bond here. Interpolating
+                # reproduces each state's own morse bond at the endpoints, which
+                # is what makes E_k independent of the step it comes from.
+                bondA = self.reactant.bonds[key]
+                bondB = self.product.bonds[key]
+                eq = (bondA['equilibrium'] * (1 - lam) +
+                      bondB['equilibrium'] * lam)
+                fc = (bondA['force_constant'] * (1 - lam) +
+                      bondB['force_constant'] * lam)
+                D = (self._morse_D(key, bondA) * (1 - lam) +
+                     self._morse_D(key, bondB) * lam)
+                self._add_morse_bond(morse_force, atom_ids, eq, fc, D)
                 continue
 
             if breaking:
                 bond = self.reactant.bonds[key]
                 scaling = 1 - lam
-            elif forming:
+            else:
                 bond = self.product.bonds[key]
                 scaling = lam
 
-            atom_ids = self._key_to_id(key, self.reaction_atoms)
             if not model_broken:
                 eq = bond['equilibrium']
                 fc = bond['force_constant'] * scaling
@@ -2662,7 +3108,8 @@ class ReactionSystemBuilder():
                 eq = eqA * (1 - lam) + eqB * lam
                 fc = fcA * (1 - lam) + fcB * lam
             self.ostream.flush()
-            self._add_morse_bond(morse_force, atom_ids, eq, fc, bond)
+            self._add_morse_bond(morse_force, atom_ids, eq, fc,
+                                 self._morse_D(key, bond))
 
         self.ostream.flush()
         return morse_force
@@ -2921,15 +3368,17 @@ class ReactionSystemBuilder():
                 fc,
             )
 
-    def _add_morse_bond(self, bond_force, atom_id, equil, fc, bond_dict):
+    def _morse_D(self, key, bond_dict):
+        """Dissociation energy of a bond, falling back to the default."""
         if "D" not in bond_dict.keys():
-            D = self.morse_D_default
             if self.verbose:
                 self.ostream.print_info(
-                    f"No D value associated with bond {atom_id[0]} {atom_id[1]}. Setting to default value {self.morse_D_default}"
+                    f"No D value associated with bond {key[0]} {key[1]}. Setting to default value {self.morse_D_default}"
                 )
-        else:
-            D = bond_dict["D"]
+            return self.morse_D_default
+        return bond_dict["D"]
+
+    def _add_morse_bond(self, bond_force, atom_id, equil, fc, D):
         a = math.sqrt(fc / (2 * D))
 
         if fc > 0:
@@ -3115,8 +3564,7 @@ class ReactionSystemBuilder():
         product_exceptions = self._create_exceptions_from_bonds(
             self.product.atoms, product_bonds)
 
-        changing_bonds = list(
-            (set(self.reactant.bonds) ^ set(self.product.bonds)))
+        changing_bonds = self._reactive_pairs()
 
         atom_keys = self.reactant.atoms.keys()
 
@@ -3394,12 +3842,15 @@ class ReactionSystemBuilder():
         else:
             return phi_in_radian
 
-    def save_systems_as_xml(self, systems: dict, folder: str):
+    def save_systems_as_xml(self, systems: dict, folder: str, prefix: str = ""):
         """Save the systems as xml files to the given folder.
 
         Args:
             systems (dict): The systems to save
             folder (str): The folder relative to the current working directory to save the systems to.
+            prefix (str): Prepended to every filename. Used to keep the lambda
+                systems of several steps of a reaction path apart in one shared
+                run folder, where the bare lambda values would collide.
         """
 
         assert_msg_critical('openmm' in sys.modules,
@@ -3411,9 +3862,9 @@ class ReactionSystemBuilder():
         path.mkdir(parents=True, exist_ok=True)
         for name, system in systems.items():
             if isinstance(name, float) or isinstance(name, int):
-                filename = f"{name:.3f}_sys.xml"
+                filename = f"{prefix}{name:.3f}_sys.xml"
             else:
-                filename = f"{name}_sys.xml"
+                filename = f"{prefix}{name}_sys.xml"
             with (path / filename).open(mode="w", encoding="utf-8") as output:
                 output.write(mm.XmlSerializer.serialize(system))
 
@@ -3429,11 +3880,21 @@ class ReactionSystemBuilder():
                       output,
                       indent=2)
 
-    def load_systems_from_xml(self, folder: str):
+    def load_systems_from_xml(self,
+                              folder: str,
+                              prefix: str = "",
+                              parse_lambda: bool = True):
         """Load the systems from xml files in the given folder.
 
         Args:
             folder (str): The folder relative to the current working directory to load the systems from.
+            prefix (str): Only files starting with this prefix are loaded, and
+                the prefix is stripped before the name is parsed. Selects one
+                step's systems out of a shared run folder.
+            parse_lambda (bool): Whether a name that looks like a number is
+                turned into a lambda value. Set False when the stripped names
+                are indices rather than lambdas ("state_0_sys.xml" leaves "0",
+                which would otherwise collide with lambda 0.0).
         Returns:
             dict: The loaded systems
         """
@@ -3446,16 +3907,20 @@ class ReactionSystemBuilder():
         self.ostream.print_info(f"Loading systems from {path}")
         self.ostream.flush()
         for file in path.iterdir():
-            if file.is_file() and file.name.endswith("_sys.xml"):
+            if file.is_file() and file.name.endswith(
+                    "_sys.xml") and file.name.startswith(prefix):
                 with file.open(mode="r", encoding="utf-8") as input:
-                    name = file.name[:-8]
-                    try:
-                        lam = float(name)
-                    except ValueError:
-                        self.ostream.print_info(
-                            f"Could not parse lambda value from filename {file.name}. Loading system with full name"
-                        )
+                    name = file.name[len(prefix):-8]
+                    if not parse_lambda:
                         lam = name
+                    else:
+                        try:
+                            lam = float(name)
+                        except ValueError:
+                            self.ostream.print_info(
+                                f"Could not parse lambda value from filename {file.name}. Loading system with full name"
+                            )
+                            lam = name
                     systems[lam] = mm.XmlSerializer.deserialize(input.read())
         return systems
 

@@ -14,7 +14,7 @@ from veloxchem.reaffbuilder import ReactionForceFieldBuilder
 
 from veloxchem.outputstream import OutputStream
 
-from test_evb_helper import evb_compare_dict, evb_data_dir
+from test_evb_helper import EvbTestHelper
 
 pytestmark = [pytest.mark.timeconsuming]
 
@@ -22,7 +22,7 @@ pytestmark = [pytest.mark.timeconsuming]
 class TestReactionForceFieldBuilder:
 
     def test_forcefield_builder(self):
-        data_dir = evb_data_dir()
+        data_dir = EvbTestHelper.evb_data_dir()
         # Build reactant and product force fields from unordered xyz inputs and
         # compare bonded parameters against the committed references.
         ffbuilder = ReactionForceFieldBuilder(ostream=OutputStream(None))
@@ -46,12 +46,12 @@ class TestReactionForceFieldBuilder:
             str(data_dir / 'evb_ethene_H2O_ff_data.json'),
             ostream=OutputStream(None))
 
-        evb_compare_dict(reactant.bonds, reactant_ref.bonds)
-        evb_compare_dict(reactant.angles, reactant_ref.angles)
-        evb_compare_dict(reactant.dihedrals, reactant_ref.dihedrals)
-        evb_compare_dict(reactant.impropers, reactant_ref.impropers)
+        EvbTestHelper.evb_compare_dict(reactant.bonds, reactant_ref.bonds)
+        EvbTestHelper.evb_compare_dict(reactant.angles, reactant_ref.angles)
+        EvbTestHelper.evb_compare_dict(reactant.dihedrals, reactant_ref.dihedrals)
+        EvbTestHelper.evb_compare_dict(reactant.impropers, reactant_ref.impropers)
 
-        evb_compare_dict(product.bonds, product_ref.bonds)
-        evb_compare_dict(product.angles, product_ref.angles)
-        evb_compare_dict(product.dihedrals, product_ref.dihedrals)
-        evb_compare_dict(product.impropers, product_ref.impropers)
+        EvbTestHelper.evb_compare_dict(product.bonds, product_ref.bonds)
+        EvbTestHelper.evb_compare_dict(product.angles, product_ref.angles)
+        EvbTestHelper.evb_compare_dict(product.dihedrals, product_ref.dihedrals)
+        EvbTestHelper.evb_compare_dict(product.impropers, product_ref.impropers)

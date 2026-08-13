@@ -18,96 +18,109 @@ from veloxchem.evbdriver import EvbDriver
 
 from veloxchem.outputstream import OutputStream
 
-from test_evb_helper import evb_chdir_tmp, evb_ff_pair
+from test_evb_helper import EvbTestHelper
 
 pytestmark = [pytest.mark.timeconsuming]
 
 pytest.importorskip('openmm')
 
 
-def _tiny_config(name, **overrides):
-    config = {
-        "name": name,
-        "temperature": 300.0,
-        "sample_steps": 20,
-        "write_step": 10,
-        "equil_NVT_steps": 2,
-        "equil_NPT_steps": 0,
-        "initial_equil_NVT_steps": 0,
-        "initial_equil_NPT_steps": 0,
-        "skip_initial_equil": True,
-        "step_size": 0.001,
-        "n_replicas": 1,
-    }
-    config.update(overrides)
-    return config
-
-
-def _seed_driver(ff_pair):
-    EVB = EvbDriver(ostream=OutputStream(None))
-    EVB.water_model = "cspce"
-    EVB.reactant = ff_pair.reactant
-    EVB.product = ff_pair.product
-    EVB.forming_bonds = set()
-    EVB.breaking_bonds = set()
-    return EVB
-
-
 # NOTE: use float lambda endpoints. The FEP driver formats lambda as f"{l:.3}",
 # which raises on integer 0/1 (evbfepdriver.py). Production always passes
 # np.linspace floats, so this is a latent bug rather than something under test.
-def _run_tiny_fep(ff_pair, config, lambdas=(0.0, 0.5, 1.0)):
-    EVB = _seed_driver(ff_pair)
-    EVB.build_systems(configurations=[config], Lambda=list(lambdas))
-    EVB.run_FEP()
-    return EVB, Path(EVB.system_confs[0]["data_folder"])
 
+class TinyFepFixtures:
+    """Shared setup for the cheap end-to-end FEP runs."""
 
-def _finite_energy_rows(csv_path):
-    """Return the number of data rows and assert every numeric cell is finite."""
-    with open(csv_path, newline="") as handle:
-        reader = csv.reader(handle)
-        rows = [row for row in reader if row]
-    # header + at least one data row
-    n_data = 0
-    for row in rows[1:]:
-        n_data += 1
-        for cell in row:
-            try:
-                val = float(cell)
-            except ValueError:
-                continue
-            assert math.isfinite(val), f"non-finite value {cell} in {csv_path}"
-    return n_data
+    @staticmethod
+    def _tiny_config(name, **overrides):
+        config = {
+            "name": name,
+            "temperature": 300.0,
+            "sample_steps": 20,
+            "write_step": 10,
+            "equil_NVT_steps": 2,
+            "equil_NPT_steps": 0,
+            "initial_equil_NVT_steps": 0,
+            "initial_equil_NPT_steps": 0,
+            "skip_initial_equil": True,
+            "step_size": 0.001,
+            "n_replicas": 1,
+        }
+        config.update(overrides)
+        return config
 
+    @staticmethod
+    def _seed_driver(ff_pair):
+        EVB = EvbDriver(ostream=OutputStream(None))
+        EVB.water_model = "cspce"
+        EVB.states = [ff_pair.reactant, ff_pair.product]
+        EVB.forming_bonds = [set()]
+        EVB.breaking_bonds = [set()]
+        return EVB
+
+    @staticmethod
+    def _run_tiny_fep(ff_pair, config, lambdas=(0.0, 0.5, 1.0)):
+        EVB = TinyFepFixtures._seed_driver(ff_pair)
+        EVB.build_systems(configurations=[config], Lambda=list(lambdas))
+        EVB.run_FEP()
+        return EVB, Path(EVB.system_confs[0]["data_folder"])
+
+    @staticmethod
+    def _finite_energy_rows(csv_path):
+        """Return the number of data rows and assert every numeric cell is finite."""
+        with open(csv_path, newline="") as handle:
+            reader = csv.reader(handle)
+            rows = [row for row in reader if row]
+        # header + at least one data row
+        n_data = 0
+        for row in rows[1:]:
+            n_data += 1
+            for cell in row:
+                try:
+                    val = float(cell)
+                except ValueError:
+                    continue
+                assert math.isfinite(val), f"non-finite value {cell} in {csv_path}"
+        return n_data
 
 class TestTinyFep:
 
-    @pytest.mark.parametrize("recalc_mode", ["inline", "deferred"])
-    def test_fep_smoke(self, recalc_mode):
-        config = _tiny_config(f"tiny_{recalc_mode}", recalc_mode=recalc_mode)
+    @pytest.mark.parametrize("recalc_mode", ["inline", "offload"])
+    def test_deprecated_recalc_modes_raise(self, recalc_mode):
+        # Only deferred recalculation is supported; the inline reporter and the
+        # asynchronous reporter worker are deprecated. Their implementations are
+        # still in the tree but must no longer be reachable.
+        config = TinyFepFixtures._tiny_config(f"tiny_{recalc_mode}", recalc_mode=recalc_mode)
 
-        with evb_chdir_tmp():
-            _, data_folder = _run_tiny_fep(evb_ff_pair(), config)
+        with EvbTestHelper.evb_chdir_tmp():
+            with pytest.raises(Exception, match="deprecated"):
+                TinyFepFixtures._run_tiny_fep(EvbTestHelper.evb_ff_pair(), config)
+
+    @pytest.mark.parametrize("recalc_mode", ["auto", "deferred"])
+    def test_fep_smoke(self, recalc_mode):
+        config = TinyFepFixtures._tiny_config(f"tiny_{recalc_mode}", recalc_mode=recalc_mode)
+
+        with EvbTestHelper.evb_chdir_tmp():
+            _, data_folder = TinyFepFixtures._run_tiny_fep(EvbTestHelper.evb_ff_pair(), config)
 
             energies = data_folder / "Energies.csv"
             combined = data_folder / "Data_combined.csv"
             assert energies.exists(), f"missing {energies}"
             assert combined.exists(), f"missing {combined}"
 
-            assert _finite_energy_rows(energies) > 0
-            assert _finite_energy_rows(combined) > 0
+            assert TinyFepFixtures._finite_energy_rows(energies) > 0
+            assert TinyFepFixtures._finite_energy_rows(combined) > 0
 
-    @pytest.mark.parametrize("recalc_mode", ["inline", "deferred"])
+    @pytest.mark.parametrize("recalc_mode", ["auto", "deferred"])
     def test_compute_force_groups(self, recalc_mode):
-        # recalc_mode='deferred' used to be incompatible with in-loop force
-        # groups; compute_force_groups() runs identically afterwards
-        # regardless of how sampling was done, since it replays the trajectory
-        # rather than hooking into the sampling loop.
-        config = _tiny_config(f"tiny_fg_{recalc_mode}", recalc_mode=recalc_mode)
+        # compute_force_groups() runs identically regardless of how sampling was
+        # done, since it replays the trajectory rather than hooking into the
+        # sampling loop.
+        config = TinyFepFixtures._tiny_config(f"tiny_fg_{recalc_mode}", recalc_mode=recalc_mode)
 
-        with evb_chdir_tmp():
-            EVB, data_folder = _run_tiny_fep(evb_ff_pair(), config)
+        with EvbTestHelper.evb_chdir_tmp():
+            EVB, data_folder = TinyFepFixtures._run_tiny_fep(EvbTestHelper.evb_ff_pair(), config)
 
             EVB.compute_force_groups()
 
@@ -117,9 +130,9 @@ class TestTinyFep:
             assert pro_file.exists(), f"missing {pro_file}"
 
             energies = data_folder / "Energies.csv"
-            n_energy_rows = _finite_energy_rows(energies)
-            n_rea_rows = _finite_energy_rows(rea_file)
-            n_pro_rows = _finite_energy_rows(pro_file)
+            n_energy_rows = TinyFepFixtures._finite_energy_rows(energies)
+            n_rea_rows = TinyFepFixtures._finite_energy_rows(rea_file)
+            n_pro_rows = TinyFepFixtures._finite_energy_rows(pro_file)
             assert n_rea_rows == n_energy_rows
             assert n_pro_rows == n_energy_rows
 
@@ -133,10 +146,10 @@ class TestTinyFep:
     def test_compute_force_groups_bonded_decomp(self):
         # Test if compute_force_groups(decompose_bonded=True) regenerates the bonded
         # decomposition systems and writes the expected files.
-        config = _tiny_config("tiny_fg_bonded_regen")
+        config = TinyFepFixtures._tiny_config("tiny_fg_bonded_regen")
 
-        with evb_chdir_tmp():
-            EVB, data_folder = _run_tiny_fep(evb_ff_pair(), config)
+        with EvbTestHelper.evb_chdir_tmp():
+            EVB, data_folder = TinyFepFixtures._run_tiny_fep(EvbTestHelper.evb_ff_pair(), config)
             run_folder = Path(EVB.system_confs[0]["run_folder"])
 
             EVB.compute_force_groups(decompose_bonded=True)
@@ -169,8 +182,8 @@ class TestTinyFep:
             "neutralize": False,
         }
 
-        with evb_chdir_tmp():
-            pair = evb_ff_pair()
+        with EvbTestHelper.evb_chdir_tmp():
+            pair = EvbTestHelper.evb_ff_pair()
             builder = ReactionSystemBuilder(ostream=OutputStream(None))
             builder.water_model = "cspce"
             _, topology, _ = builder.build_systems(pair.reactant, pair.product,
@@ -209,8 +222,8 @@ class TestTinyFep:
     #         "step_size": 0.001,
     #     }
 
-    #     with evb_chdir_tmp():
-    #         EVB = _seed_driver(evb_ff_pair())
+    #     with EvbTestHelper.evb_chdir_tmp():
+    #         EVB = TinyFepFixtures._seed_driver(EvbTestHelper.evb_ff_pair())
     #         EVB.build_systems(configurations=[config], Lambda=[0.0, 0.5, 1.0])
     #         conf = EVB.system_confs[0]
     #         data_folder = Path(conf["data_folder"])
@@ -240,7 +253,7 @@ class TestTinyFep:
 
     #         nb_file = data_folder / "NB_decompositions.csv"
     #         assert nb_file.exists(), f"missing {nb_file}"
-    #         assert _finite_energy_rows(nb_file) == 1
+    #         assert TinyFepFixtures._finite_energy_rows(nb_file) == 1
 
     #         # Reactant and product halves must be symmetric so the midpoint
     #         # split in _load_output_files lines columns up.

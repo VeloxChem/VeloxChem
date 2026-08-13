@@ -41,7 +41,7 @@ import json
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .evbreporter import (EvbReporter, EvbReporterClient, EvbReporterServer,
-                          EvbGpuRecalculator)
+                          EvbRecalculator)
 from .reactionsystembuilder import ReactionSystemBuilder
 from .errorhandler import assert_msg_critical, print_exception_if_debug
 from .reactionsystembuilder import EvbForceGroup
@@ -136,6 +136,14 @@ class EvbFepDriver:
         #                frames in one batched GPU pass read back from the trajectory
         self.recalc_mode: str = "auto"
 
+        # On a multi-step reaction path, whether every frame is scored on all
+        # of the path's potential energy surfaces ("all") or only on the two
+        # states flanking the step being sampled ("adjacent"). Scoring all of
+        # them costs one extra GPU context per state per batch and is what makes
+        # a later analysis over the whole path possible. Ignored for an ordinary
+        # two-state run.
+        self.pes_states_to_report: str = "all"
+
         self.debug: bool = False
         self.save_frames: int = 1000
         self.save_crash_pdb: bool = True
@@ -227,6 +235,9 @@ class EvbFepDriver:
                 "type": bool
             },
             "recalc_mode": {
+                "type": str
+            },
+            "pes_states_to_report": {
                 "type": str
             },
             "debug": {
@@ -432,41 +443,27 @@ class EvbFepDriver:
                                                  self.warmup_NPT_steps > 0 else
                                                  self.initial_equil_NPT_steps)
 
-        # Resolve the recalculation mode. "deferred" is orthogonal to rank count:
-        # it samples each window without recalculation and then re-scores that
-        # window's frames in one batched GPU pass, so it forces the synchronous
-        # single-master control flow (no reporter worker).
+        # Resolve the recalculation mode. Deferred - sample a whole window, then
+        # re-score its frames in one batched GPU pass - is the only supported
+        # mode; 'inline' and 'offload' are deprecated and refused here. Their
+        # implementations are still present but unreachable, see EvbReporter and
+        # the _async branches below.
         assert_msg_critical(
             self.recalc_mode in ("auto", "inline", "offload", "deferred"),
             f"Unknown recalc_mode '{self.recalc_mode}'. Expected one of "
             "'auto', 'inline', 'offload', 'deferred'.")
 
-        if self.recalc_mode == "auto":
-            if self.debug:
-                self._deferred = False
-                self._async = False
-            elif self.nodes > 1:
-                self._deferred = False
-                self._async = True
-            else:
-                self._deferred = True
-                self._async = False
-        elif self.recalc_mode == "deferred":
-            self._deferred = True
-            self._async = False
-        elif self.recalc_mode == "inline":
-            self._deferred = False
-            self._async = False
-        elif self.recalc_mode == "offload":
-            if self.nodes > 1:
-                self._deferred = False
-                self._async = True
-            else:
-                self._deferred = False
-                self._async = False
-                self.ostream.print_warning(
-                    "recalc_mode='offload' requires >1 MPI rank; falling back to "
-                    "in-process synchronous reporting.")
+        assert_msg_critical(
+            self.recalc_mode in ("auto", "deferred"),
+            f"recalc_mode='{self.recalc_mode}' is deprecated and no longer "
+            "supported. Only 'deferred' recalculation is maintained; use "
+            "recalc_mode='deferred' (or 'auto', which resolves to it).")
+
+        # 'auto' resolves to deferred unconditionally, including under debug and
+        # with more than one rank, both of which used to select a different
+        # mode.
+        self._deferred = True
+        self._async = False
 
         # Asynchronous reporting: with >=2 MPI ranks on the node, rank
         # (master+1) becomes a dedicated CPU reporter worker that owns the
@@ -482,9 +479,9 @@ class EvbFepDriver:
             # Guard combinations that a positions-only trajectory cannot serve.
             assert_msg_critical(
                 not (self.report_velocities or self.debug),
-                "recalc_mode='deferred' cannot report velocities: they are not "
-                "stored in the XTC trajectory. Use recalc_mode 'inline'/'offload'."
-            )
+                "Velocities cannot be reported: they are not stored in the XTC "
+                "trajectory that the frames are re-scored from. Set "
+                "report_velocities and debug to False.")
             if self.rank == mpi_master():
                 self.ostream.print_info(
                     "Running in deferred mode: sampling without recalculation, "
@@ -540,7 +537,17 @@ class EvbFepDriver:
 
         # Master path only: the initial positions are needed to seed the GPU
         # sampling (the reporter worker returned above and never uses them).
-        initial_positions = configuration["initial_positions"]
+        #
+        # A step of a longer reaction path starts from the serialized state the
+        # previous step ended its forward sweep on, which carries velocities and
+        # box vectors as well as positions - the box matters after an NPT
+        # equilibration, and bare positions would lose it.
+        self._initial_state_file = configuration.get("initial_state")
+        initial_positions = configuration.get("initial_positions")
+        assert_msg_critical(
+            initial_positions is not None or self._initial_state_file
+            is not None,
+            "Neither initial positions nor an initial state were provided.")
 
         # Global timer spanning all replicas / sweeps for total-progress ETA.
         self.timer = Timer(self.total_steps)
@@ -564,19 +571,41 @@ class EvbFepDriver:
         # Deferred mode: a single recalculator owns the Energies/Forces/NB
         # outputs across all windows and re-scores each window on the GPU after
         # its sampling context has been released.
-        self._gpu_recalc = None
+        self._recalc = None
         if self._deferred:
-            self._gpu_recalc = EvbGpuRecalculator(
+            n_states = configuration.get("n_states", 2)
+            self._recalc = EvbRecalculator(
                 self.data_folder,
                 self.systems,
                 self.topology,
                 lambda system: self._get_simulation(system, self.step_size),
                 report_forces=self.report_forces,
+                # A one-step reaction keeps the two-state naming and the
+                # Energies.csv layout it has always had; only a longer path
+                # switches to per-state columns tagged with the step.
+                n_states=(n_states if n_states > 2 else None),
+                step=(configuration.get("step") if n_states > 2 else None),
+                state_left=configuration.get("state_left", 0),
+                pes_states_to_report=self.pes_states_to_report,
             )
         self.timer.start()
 
-        positions = initial_positions * 0.1
-        velocities = None
+        self._final_state_written = False
+        if self._initial_state_file is not None:
+            with open(self._initial_state_file, encoding="utf-8") as state_file:
+                seed_state = mm.XmlSerializer.deserialize(state_file.read())
+            positions = seed_state.getPositions(asNumpy=True).value_in_unit(
+                mmunit.nanometer)
+            velocities = seed_state.getVelocities(asNumpy=True).value_in_unit(
+                mmunit.nanometer / mmunit.picosecond)
+            self._seed_box_vectors = seed_state.getPeriodicBoxVectors()
+            self.ostream.print_info(
+                f"Starting from the state in {self._initial_state_file}")
+            self.ostream.flush()
+        else:
+            positions = initial_positions * 0.1
+            velocities = None
+            self._seed_box_vectors = None
 
         # Initial equilibration, performed once on the l == 0 system. The
         # resulting positions / velocities seed the first forward sweep.
@@ -623,6 +652,17 @@ class EvbFepDriver:
             # Forward sweep (l: 0 -> 1), direction = 0.
             positions, velocities = self.run_FEP(forward_order, replica, 0,
                                                  positions, velocities)
+
+            # Save the lambda=1 endpoint of the first replica's forward sweep,
+            # so that the next step of a reaction path can start from an
+            # equilibrated configuration of the state the two steps share.
+            # Replica 0 is used so the choice is deterministic and available
+            # whatever n_replicas is. Only written for a reaction path: a
+            # serialized state of a solvated system is megabytes, and an
+            # ordinary two-state run has nothing to hand it to.
+            if (replica == 0 and forward_order[-1] == 1
+                    and configuration.get("n_states", 2) > 2):
+                self._save_final_state()
             # Backward sweep (l: 1 -> 0), direction = 1, seeded by the final
             # state of the forward sweep.
             positions, velocities = self.run_FEP(backward_order, replica, 1,
@@ -647,13 +687,16 @@ class EvbFepDriver:
             # Release the idle ranks that returned early in deferred mode.
             self.comm.Barrier()
 
-        if self._gpu_recalc is not None:
-            self._gpu_recalc.close()
+        if self._recalc is not None:
+            self._recalc.close()
 
         self._print_timing_summary(reporter_timing)
         self.ostream.flush()
 
     def _setup_shared_ring(self, queue_depth=3):
+        # DEPRECATED - unreachable, kept for reference, do not add features
+        # here. Only deferred recalculation is supported, so _async is never
+        # true and this is never called.
         """Allocate the master<->reporter shared-memory ring buffer.
 
         Collective over COMM_WORLD (all ranks call the Split). Only the master
@@ -699,6 +742,9 @@ class EvbFepDriver:
         self._queue_depth = queue_depth
 
     def _free_shared_ring(self):
+        # DEPRECATED - unreachable, kept for reference, do not add features
+        # here. Only deferred recalculation is supported, so _async is never
+        # true and this is never called.
         """Tear down the shared-memory window (participants only)."""
         if getattr(self, "_shm_win", None) is None:
             return
@@ -709,6 +755,9 @@ class EvbFepDriver:
         self._shm_win = None
 
     def _serve_reporter(self):
+        # DEPRECATED - unreachable, kept for reference, do not add features
+        # here. Only deferred recalculation is supported, so _async is never
+        # true and this is never called.
         """Reporter-worker entry point (non-master rank, async mode).
 
         Builds the CPU energy sims once and serves frames from the master until
@@ -777,12 +826,33 @@ class EvbFepDriver:
             state = self._sample(system, l, equil_state, replica, direction)
             positions = state.getPositions()
             velocities = state.getVelocities()
+            self._last_state = state
 
             pass_run_steps += window_steps
             self._print_progress(pass_timer, pass_run_steps, replica, dir_label,
                                  l)
 
         return positions, velocities
+
+    def _save_final_state(self):
+        """Serialize the last sampled state to final_state.xml.
+
+        Written at the lambda=1 end of the forward sweep, so that a following
+        step of a reaction path can be seeded with positions, velocities and box
+        vectors of the state the two steps have in common.
+        """
+
+        if getattr(self, "_last_state", None) is None:
+            self.ostream.print_warning(
+                "No sampled state available to save as the final state.")
+            return
+
+        path = self.data_folder / "final_state.xml"
+        with path.open("w", encoding="utf-8") as output:
+            output.write(mm.XmlSerializer.serialize(self._last_state))
+        self._final_state_written = True
+        self.ostream.print_info(f"Saved the lambda=1 configuration to {path}")
+        self.ostream.flush()
 
     def _print_progress(self, pass_timer, pass_run_steps, replica, dir_label,
                         l):
@@ -894,6 +964,13 @@ class EvbFepDriver:
 
     def _equilibrate(self, system, name, positions, velocities=None):
         simulation = self._get_simulation(system, self.equil_step_size)
+        # The box of a seeded state has to be restored before the positions are
+        # set: an NPT run in the previous step will have changed it away from
+        # the system's default, and the coordinates only make sense in it.
+        seed_box = getattr(self, "_seed_box_vectors", None)
+        if seed_box is not None:
+            simulation.context.setPeriodicBoxVectors(*seed_box)
+            self._seed_box_vectors = None
         simulation.context.setPositions(positions)
         if velocities is not None:
             simulation.context.setVelocities(velocities)
@@ -1160,7 +1237,7 @@ class EvbFepDriver:
         self._first_recalc_write = False
 
         t_recalc_start = time.perf_counter()
-        self._gpu_recalc.recalc_batch(frame_meta, frames, append)
+        self._recalc.recalc_batch(frame_meta, frames, append)
         t_recalc = time.perf_counter() - t_recalc_start
 
         self._pending_windows = []

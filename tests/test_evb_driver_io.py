@@ -15,7 +15,7 @@ from veloxchem.evbdriver import EvbDriver
 
 from veloxchem.outputstream import OutputStream
 
-from test_evb_helper import evb_chdir_tmp, evb_ff_pair
+from test_evb_helper import EvbTestHelper
 
 pytestmark = [pytest.mark.timeconsuming]
 
@@ -68,7 +68,7 @@ class TestH5RoundTrip:
                 "label": "abc",
             },
         }
-        with evb_chdir_tmp():
+        with EvbTestHelper.evb_chdir_tmp():
             EVB._save_dict_as_h5(data, "roundtrip")
             assert Path("roundtrip.h5").exists()
 
@@ -86,7 +86,7 @@ class TestOptionsJson:
 
     def test_create_and_merge(self):
         EVB = EvbDriver(ostream=OutputStream(None))
-        with evb_chdir_tmp():
+        with EvbTestHelper.evb_chdir_tmp():
             folder = Path("cfg_data")
             folder.mkdir()
             conf = {"data_folder": str(folder)}
@@ -108,15 +108,14 @@ class TestBuildAndLoad:
     def _seed_driver(self, ff_pair):
         EVB = EvbDriver(ostream=OutputStream(None))
         EVB.water_model = "cspce"
-        EVB.reactant = ff_pair.reactant
-        EVB.product = ff_pair.product
-        EVB.forming_bonds = set()
-        EVB.breaking_bonds = set()
+        EVB.states = [ff_pair.reactant, ff_pair.product]
+        EVB.forming_bonds = [set()]
+        EVB.breaking_bonds = [set()]
         return EVB
 
     def test_build_then_load(self):
-        with evb_chdir_tmp():
-            EVB = self._seed_driver(evb_ff_pair())
+        with EvbTestHelper.evb_chdir_tmp():
+            EVB = self._seed_driver(EvbTestHelper.evb_ff_pair())
             EVB.build_systems(configurations=["vacuum"], Lambda=[0, 0.4, 1])
 
             conf = EVB.system_confs[0]

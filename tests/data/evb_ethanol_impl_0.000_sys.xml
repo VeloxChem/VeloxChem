@@ -26,11 +26,11 @@
 				<Particle eps=".4510352" q="-.09614" sig=".3397709531243626"/>
 				<Particle eps=".4510352" q=".319699" sig=".3397709531243626"/>
 				<Particle eps=".389112" q="-.686984" sig=".3242871334030835"/>
-				<Particle eps=".0870272" q=".018626000000000007" sig=".2600176998764394"/>
-				<Particle eps=".0870272" q=".018626000000000007" sig=".2600176998764394"/>
-				<Particle eps=".0870272" q=".018626000000000007" sig=".2600176998764394"/>
-				<Particle eps=".0870272" q="-.003317999999999994" sig=".24219972551363267"/>
-				<Particle eps=".0870272" q="-.003317999999999994" sig=".24219972551363267"/>
+				<Particle eps=".0870272" q=".018626" sig=".2600176998764394"/>
+				<Particle eps=".0870272" q=".018626" sig=".2600176998764394"/>
+				<Particle eps=".0870272" q=".018626" sig=".2600176998764394"/>
+				<Particle eps=".0870272" q="-.0033179999999999993" sig=".24219972551363267"/>
+				<Particle eps=".0870272" q="-.0033179999999999993" sig=".24219972551363267"/>
 				<Particle eps=".019664800000000003" q=".414183" sig=".053792464601313685"/>
 			</Particles>
 			<Exceptions>
@@ -95,11 +95,11 @@
 				<Particle param1="-.09614" param2=".16099999999999998" param3=".07798096555129999" param4="2"/>
 				<Particle param1=".319699" param2=".16099999999999998" param3=".07798096555129999" param4="2"/>
 				<Particle param1="-.686984" param2=".141" param3=".15024593559611998" param4="1"/>
-				<Particle param1=".018626000000000007" param2=".111" param3=".12108480913262999" param4="0"/>
-				<Particle param1=".018626000000000007" param2=".111" param3=".12108480913262999" param4="0"/>
-				<Particle param1=".018626000000000007" param2=".111" param3=".12108480913262999" param4="0"/>
-				<Particle param1="-.003317999999999994" param2=".111" param3=".12108480913262999" param4="0"/>
-				<Particle param1="-.003317999999999994" param2=".111" param3=".12108480913262999" param4="0"/>
+				<Particle param1=".018626" param2=".111" param3=".12108480913262999" param4="0"/>
+				<Particle param1=".018626" param2=".111" param3=".12108480913262999" param4="0"/>
+				<Particle param1=".018626" param2=".111" param3=".12108480913262999" param4="0"/>
+				<Particle param1="-.0033179999999999993" param2=".111" param3=".12108480913262999" param4="0"/>
+				<Particle param1="-.0033179999999999993" param2=".111" param3=".12108480913262999" param4="0"/>
 				<Particle param1=".414183" param2=".111" param3=".12108480913262999" param4="0"/>
 			</Particles>
 			<Exclusions/>
@@ -134,9 +134,9 @@
 		</Force>
 		<Force forceGroup="12" name="Dynamic reaction harmonic bond" type="HarmonicBondForce" usesPeriodic="0" version="2">
 			<Bonds>
-				<Bond d=".1423" k="245517.11999999994" p1="1" p2="2"/>
 				<Bond d=".1097" k="314553.11999999994" p1="0" p2="3"/>
-				<Bond d=".21658" k="69000" p1="2" p2="3"/>
+				<Bond d=".1423" k="245517.11999999994" p1="1" p2="2"/>
+				<Bond d=".29215241663976144" k="69000" p1="2" p2="3"/>
 			</Bonds>
 		</Force>
 		<Force energy=" (1-l) * LjtotA   + l  * LjtotB; LjtotA     = A12 / r^12 - A6 / r^6;LjtotB     = B12 / r^12 - B6 / r^6;A12        = 4 * epsilonA * sigmaA ^ 12; B12        = 4 * epsilonB * sigmaB ^ 12; A6         = 4 * epsilonA * sigmaA ^ 6; B6         = 4 * epsilonB * sigmaB ^ 6; " forceGroup="2" name="Reaction internal lennard-jones" type="CustomBondForce" usesPeriodic="0" version="3">

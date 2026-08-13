@@ -134,8 +134,8 @@
 		</Force>
 		<Force forceGroup="12" name="Dynamic reaction harmonic bond" type="HarmonicBondForce" usesPeriodic="0" version="2">
 			<Bonds>
-				<Bond d=".3240506154971915" k="49103.42399999999" p1="1" p2="2"/>
 				<Bond d=".22405061549719155" k="62910.62399999999" p1="0" p2="3"/>
+				<Bond d=".3240506154971915" k="49103.42399999999" p1="1" p2="2"/>
 				<Bond d=".1" k="345000" p1="2" p2="3"/>
 			</Bonds>
 		</Force>

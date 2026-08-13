@@ -50,6 +50,12 @@ except ImportError:
 
 
 class EvbReporter:
+    # DEPRECATED as an OpenMM reporter - unreachable, kept for reference, do not
+    # add features here. Only deferred recalculation is supported, so nothing
+    # constructs this any more; EvbRecalculator re-scores whole windows
+    # instead. Its energies_header / format_energies_row static methods are NOT
+    # deprecated: they are the single definition of the Energies.csv layout and
+    # are used by EvbRecalculator.
 
     def __init__(
         self,
@@ -142,18 +148,57 @@ class EvbReporter:
             self._open_outputs(append)
 
     @staticmethod
-    def energies_header():
-        """Header line for Energies.csv (shared by every recalculation mode)."""
-        return ("Lambda, reactant PES, product PES, reactant integration, "
-                "product integration, Em, replica, direction \n")
+    def energies_header(state_names=None, step=None):
+        """Header line for Energies.csv.
+
+        Without state_names this is the two-state layout. On a reaction path the
+        row carries the step it belongs to and one column per state, because a
+        frame sampled in any step is scored on every state's potential energy
+        surface - which is only meaningful because those surfaces are built to
+        be the same quantity in every step.
+        """
+        if state_names is None:
+            return ("Lambda, reactant PES, product PES, reactant integration, "
+                    "product integration, Em, replica, direction \n")
+        columns = ["Lambda"]
+        if step is not None:
+            columns.append("step")
+        columns += [f"{name} PES" for name in state_names]
+        columns += [
+            "left integration", "right integration", "Em", "replica",
+            "direction"
+        ]
+        return ", ".join(columns) + " \n"
 
     @staticmethod
-    def format_energies_row(lambda_val, E1_pes, E2_pes, E1_int, E2_int, replica,
-                            direction):
-        """Format one Energies.csv row. Em is the EVB-mixed diabatic energy."""
+    def format_energies_row(lambda_val,
+                            E1_pes,
+                            E2_pes,
+                            E1_int,
+                            E2_int,
+                            replica,
+                            direction,
+                            state_energies=None,
+                            step=None):
+        """Format one Energies.csv row. Em is the EVB-mixed diabatic energy.
+
+        E1_pes / E2_pes are the two states flanking this step, and are what Em
+        mixes. state_energies, when given, holds every state's energy and is
+        written in place of the two flanking columns.
+        """
         Em = E1_pes * (1 - lambda_val) + E2_pes * lambda_val
-        return (f"{lambda_val}, {E1_pes:.10e}, {E2_pes:.10e}, {E1_int:.10e}, "
-                f"{E2_int:.10e}, {Em:.10e}, {replica}, {direction} \n")
+        cells = [f"{lambda_val}"]
+        if step is not None:
+            cells.append(f"{step}")
+        if state_energies is None:
+            cells += [f"{E1_pes:.10e}", f"{E2_pes:.10e}"]
+        else:
+            cells += [f"{energy:.10e}" for energy in state_energies]
+        cells += [
+            f"{E1_int:.10e}", f"{E2_int:.10e}", f"{Em:.10e}", f"{replica}",
+            f"{direction}"
+        ]
+        return ", ".join(cells) + " \n"
 
     @staticmethod
     def forces_header(num_atoms):
@@ -449,16 +494,16 @@ class EvbReporter:
                 mm.unit.kilojoules_per_mole)
 
 
-class EvbGpuRecalculator:
-    """Batched GPU recalculation of EVB energies for deferred mode.
+class EvbRecalculator:
+    """Batched recalculation of EVB energies for deferred mode.
 
-    Instead of re-scoring each sampled frame inline (blocking the GPU) or on a
-    dedicated CPU worker rank, deferred mode samples a whole lambda window first
-    and then hands the window's frames here. Because only one OpenMM context
-    should live on the GPU at a time, each system is built, evaluated over every
-    frame, and torn down before the next system is built - so the GPU holds a
-    single context at any moment. The output files (Energies / optional Forces)
-    match those the synchronous ``EvbReporter`` writes.
+    Deferred mode samples a whole lambda window first and then hands the
+    window's frames here, instead of re-scoring each frame as it is produced.
+    Each system is built, evaluated over every frame, and torn down before the
+    next one is built, so only a single OpenMM context is ever live - which is
+    what a GPU platform requires and costs nothing on any other. The platform
+    itself is chosen by the caller through ``simulation_factory``; nothing in
+    here is specific to one.
     """
 
     def __init__(self,
@@ -466,7 +511,11 @@ class EvbGpuRecalculator:
                  systems,
                  topology,
                  simulation_factory,
-                 report_forces=False):
+                 report_forces=False,
+                 n_states=None,
+                 step=None,
+                 state_left=0,
+                 pes_states_to_report='all'):
         # simulation_factory(system) -> a live mmapp.Simulation on the desired
         # (GPU) platform. The factory owns platform selection; this class only
         # ever builds one context at a time and tears it down before the next.
@@ -475,11 +524,39 @@ class EvbGpuRecalculator:
         self.num_atoms = topology.getNumAtoms()
         self._make_sim = simulation_factory
         self.report_forces = report_forces
+        self.step = step
 
-        # Same system selection as EvbReporter.simulations: the reactant/product
-        # PES and the two integration endpoints (0/1).
-        core_names = ['reactant', 'product', 0, 1]
-        self.core_names = [n for n in core_names if n in systems]
+        # On a reaction path the potential energy surfaces belong to states, not
+        # to steps: 'state_k' is one and the same system whichever step is being
+        # sampled, so E_1 ... E_N are directly comparable across all of the
+        # individual FEPs. 'all' scores every frame on every state;
+        # 'adjacent' scores only the two states flanking this step, which costs
+        # exactly what a plain two-state run costs.
+        self.state_names = None
+        if n_states is not None:
+            assert_msg_critical(
+                pes_states_to_report in ('all', 'adjacent'),
+                f"Unknown pes_states_to_report '{pes_states_to_report}'. "
+                "Expected 'all' or 'adjacent'.")
+            if pes_states_to_report == 'all':
+                indices = list(range(n_states))
+            else:
+                indices = [state_left, state_left + 1]
+            self.state_names = [f"state_{k}" for k in indices]
+            self.left_name = f"state_{state_left}"
+            self.right_name = f"state_{state_left + 1}"
+            core_names = self.state_names + [0, 1]
+        else:
+            # Two-state layout: the reactant/product PES and the two integration
+            # endpoints (0/1).
+            self.left_name = 'reactant'
+            self.right_name = 'product'
+            core_names = ['reactant', 'product', 0, 1]
+
+        self.core_names = []
+        for name in core_names:
+            if name in systems and name not in self.core_names:
+                self.core_names.append(name)
 
         self._opened = False
         self.E_out = None
@@ -491,7 +568,8 @@ class EvbGpuRecalculator:
         self.E_out = open(self.data_folder / "Energies.csv", mode)
         self.out_streams.append(self.E_out)
         if not append:
-            self.E_out.write(EvbReporter.energies_header())
+            self.E_out.write(
+                EvbReporter.energies_header(self.state_names, self.step))
         if self.report_forces:
             self.F_out = open(self.data_folder / "Forces.csv", mode)
             self.out_streams.append(self.F_out)
@@ -546,10 +624,21 @@ class EvbGpuRecalculator:
                 frame_meta, frames)
 
         for i, (lambda_val, replica, direction) in enumerate(frame_meta):
+            state_energies = None
+            if self.state_names is not None:
+                state_energies = [E[name][i] for name in self.state_names]
             self.E_out.write(
-                EvbReporter.format_energies_row(lambda_val, E['reactant'][i],
-                                                E['product'][i], E[0][i],
-                                                E[1][i], replica, direction))
+                EvbReporter.format_energies_row(
+                    lambda_val,
+                    E[self.left_name][i],
+                    E[self.right_name][i],
+                    E[0][i],
+                    E[1][i],
+                    replica,
+                    direction,
+                    state_energies=state_energies,
+                    step=self.step,
+                ))
             if self.report_forces:
                 self.F_out.write(
                     EvbReporter.format_forces_row(lambda_val, replica,
@@ -584,6 +673,9 @@ class EvbGpuRecalculator:
 
 
 class _EvbReporterMPI:
+    # DEPRECATED - unreachable, kept for reference, do not add features here.
+    # Only deferred recalculation is supported; EvbFepDriver.run_replicas
+    # refuses any other recalc_mode, so nothing constructs this any more.
     """Shared MPI protocol for the async EVB reporter client/server.
 
     Every message is a single float64 buffer whose word [0] is the message
@@ -618,6 +710,9 @@ class _EvbReporterMPI:
 
 
 class EvbReporterClient(_EvbReporterMPI):
+    # DEPRECATED - unreachable, kept for reference, do not add features here.
+    # Only deferred recalculation is supported; EvbFepDriver.run_replicas
+    # refuses any other recalc_mode, so nothing constructs this any more.
     """Producer-side OpenMM reporter for asynchronous EVB energy reporting.
 
     Attached to the GPU sampling simulation on the master rank. Both ranks live
@@ -776,6 +871,9 @@ class EvbReporterClient(_EvbReporterMPI):
 
 
 class EvbReporterServer(_EvbReporterMPI):
+    # DEPRECATED - unreachable, kept for reference, do not add features here.
+    # Only deferred recalculation is supported; EvbFepDriver.run_replicas
+    # refuses any other recalc_mode, so nothing constructs this any more.
     """Consumer-side worker for asynchronous EVB energy reporting.
 
     Builds the CPU energy-evaluation simulations once (multithreaded so it

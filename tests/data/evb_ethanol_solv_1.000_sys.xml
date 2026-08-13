@@ -1,9 +1,9 @@
 <?xml version="1.0" ?>
 <System openmmVersion="8.4" type="System" version="1">
 	<PeriodicBoxVectors>
-		<A x="3.3471945402211953" y="0" z="0"/>
-		<B x="0" y="3.3471945402211953" z="0"/>
-		<C x="0" y="0" z="3.3471945402211953"/>
+		<A x="3.3471945402212" y="0" z="0"/>
+		<B x="0" y="3.3471945402212" z="0"/>
+		<C x="0" y="0" z="3.3471945402212"/>
 	</PeriodicBoxVectors>
 	<Particles>
 		<Particle mass="12.01078"/>
@@ -15036,8 +15036,8 @@
 		<Force forceGroup="9" frequency="25" name="MonteCarloBarostat" pressure="1" randomSeed="0" temperature="300" type="MonteCarloBarostat" version="1"/>
 		<Force forceGroup="12" name="Dynamic reaction harmonic bond" type="HarmonicBondForce" usesPeriodic="0" version="2">
 			<Bonds>
-				<Bond d=".3240506154971915" k="49103.42399999999" p1="1" p2="2"/>
 				<Bond d=".22405061549719155" k="62910.62399999999" p1="0" p2="3"/>
+				<Bond d=".3240506154971915" k="49103.42399999999" p1="1" p2="2"/>
 				<Bond d=".1" k="345000" p1="2" p2="3"/>
 			</Bonds>
 		</Force>

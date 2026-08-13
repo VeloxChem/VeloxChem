@@ -1,9 +1,9 @@
 <?xml version="1.0" ?>
 <System openmmVersion="8.4" type="System" version="1">
 	<PeriodicBoxVectors>
-		<A x="3.3471945402211953" y="0" z="0"/>
-		<B x="0" y="3.3471945402211953" z="0"/>
-		<C x="0" y="0" z="3.3471945402211953"/>
+		<A x="3.3471945402212" y="0" z="0"/>
+		<B x="0" y="3.3471945402212" z="0"/>
+		<C x="0" y="0" z="3.3471945402212"/>
 	</PeriodicBoxVectors>
 	<Particles>
 		<Particle mass="12.01078"/>
@@ -3764,11 +3764,11 @@
 				<Particle eps=".4510352" q="-.09614" sig=".3397709531243626"/>
 				<Particle eps=".4510352" q=".319699" sig=".3397709531243626"/>
 				<Particle eps=".389112" q="-.686984" sig=".3242871334030835"/>
-				<Particle eps=".0870272" q=".018626000000000007" sig=".2600176998764394"/>
-				<Particle eps=".0870272" q=".018626000000000007" sig=".2600176998764394"/>
-				<Particle eps=".0870272" q=".018626000000000007" sig=".2600176998764394"/>
-				<Particle eps=".0870272" q="-.003317999999999994" sig=".24219972551363267"/>
-				<Particle eps=".0870272" q="-.003317999999999994" sig=".24219972551363267"/>
+				<Particle eps=".0870272" q=".018626" sig=".2600176998764394"/>
+				<Particle eps=".0870272" q=".018626" sig=".2600176998764394"/>
+				<Particle eps=".0870272" q=".018626" sig=".2600176998764394"/>
+				<Particle eps=".0870272" q="-.0033179999999999993" sig=".24219972551363267"/>
+				<Particle eps=".0870272" q="-.0033179999999999993" sig=".24219972551363267"/>
 				<Particle eps=".019664800000000003" q=".414183" sig=".053792464601313685"/>
 				<Particle eps=".649775" q="-.8476" sig=".31658"/>
 				<Particle eps=".064978" q=".4238" sig=".11658"/>
@@ -15036,9 +15036,9 @@
 		<Force forceGroup="9" frequency="25" name="MonteCarloBarostat" pressure="1" randomSeed="0" temperature="300" type="MonteCarloBarostat" version="1"/>
 		<Force forceGroup="12" name="Dynamic reaction harmonic bond" type="HarmonicBondForce" usesPeriodic="0" version="2">
 			<Bonds>
-				<Bond d=".1423" k="245517.11999999994" p1="1" p2="2"/>
 				<Bond d=".1097" k="314553.11999999994" p1="0" p2="3"/>
-				<Bond d=".21658" k="69000" p1="2" p2="3"/>
+				<Bond d=".1423" k="245517.11999999994" p1="1" p2="2"/>
+				<Bond d=".29215241663976144" k="69000" p1="2" p2="3"/>
 			</Bonds>
 		</Force>
 		<Force energy=" (1-l) * LjtotA   + l  * LjtotB; LjtotA     = A12 / r^12 - A6 / r^6;LjtotB     = B12 / r^12 - B6 / r^6;A12        = 4 * epsilonA * sigmaA ^ 12; B12        = 4 * epsilonB * sigmaB ^ 12; A6         = 4 * epsilonA * sigmaA ^ 6; B6         = 4 * epsilonB * sigmaB ^ 6; " forceGroup="2" name="Reaction internal lennard-jones" type="CustomBondForce" usesPeriodic="0" version="3">

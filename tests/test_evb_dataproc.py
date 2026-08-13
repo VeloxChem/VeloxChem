@@ -6,7 +6,7 @@ import pytest
 
 from veloxchem.outputstream import OutputStream
 
-from test_evb_helper import evb_compare_dict, evb_data_dir
+from test_evb_helper import EvbTestHelper
 
 pytestmark = [pytest.mark.timeconsuming]
 
@@ -42,7 +42,7 @@ class TestEvbDataProcessing:
     def test_data_processing(self):
         # Load canned simulation output and run the post-processing, comparing
         # against the reference results.
-        folder = evb_data_dir()
+        folder = EvbTestHelper.evb_data_dir()
         EVB = EvbDriver(ostream=OutputStream(None))
 
         input_results = self._load_canned_input(folder, EVB)
@@ -55,7 +55,7 @@ class TestEvbDataProcessing:
 
         reference_results = EVB._load_dict_from_h5(folder /
                                                    "evb_reference_results.h5")
-        evb_compare_dict(comp_results, reference_results)
+        EvbTestHelper.evb_compare_dict(comp_results, reference_results)
 
     def test_data_processing_mbar_agrees_with_bar(self):
         # fep_estimator="mbar" is a selectable alternative to the default
@@ -66,7 +66,7 @@ class TestEvbDataProcessing:
         # system, so they should agree to within a few kJ/mol even though the
         # alpha/H12 fit -- which itself calls _calculate_dGfep -- can differ
         # slightly between the two estimators).
-        folder = evb_data_dir()
+        folder = EvbTestHelper.evb_data_dir()
         EVB = EvbDriver(ostream=OutputStream(None))
 
         bar_input = self._load_canned_input(folder, EVB)

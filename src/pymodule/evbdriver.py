@@ -84,8 +84,18 @@ class EvbDriver:
         self.temperature: float = 300
         self.lambda_vec: list[float] = None
 
-        self.reactant: MMForceFieldGenerator = None
-        self.product: MMForceFieldGenerator = None
+        # The states of the reaction path, in order. A reactant -> product
+        # reaction is simply the shortest path, with two states and one step, so
+        # there is no separate single-step representation anywhere below.
+        # reactive_bonds and bond_registry describe the pairs that react
+        # anywhere along the path, which is what keeps the potential energy
+        # surfaces E_1 ... E_N consistent across all of the individual FEPs.
+        self.states: list[MMForceFieldGenerator] = []
+        self.reactive_bonds: set = set()
+        self.bond_registry: dict = {}
+        # Per step, one entry each; a one-step reaction has one entry.
+        self.forming_bonds: list[set] = []
+        self.breaking_bonds: list[set] = []
 
         self.results = None
         self.system_confs: list[dict] = []
@@ -97,6 +107,16 @@ class EvbDriver:
 
         self.ffbuilder = ReactionForceFieldBuilder(ostream=self.ostream)
         self.dataprocessing = EvbDataProcessing(ostream=self.ostream)
+
+    @property
+    def reactant(self):
+        """The first state of the path. Read-only: assign self.states."""
+        return self.states[0] if self.states else None
+
+    @property
+    def product(self):
+        """The last state of the path. Read-only: assign self.states."""
+        return self.states[-1] if self.states else None
 
     def build_and_run_default_water_EVB(
         self,
@@ -153,10 +173,81 @@ class EvbDriver:
             optimize_ff (bool): If True, does an mm optimization of the combined reactant and product after reparameterisation. Defaults to True.
         """
 
+        # A reactant -> product reaction is the shortest reaction path, so this
+        # only translates the two-state keyword names into the per-state and
+        # per-step lists the general builder takes.
+        per_state = {
+            'partial_charges':
+                ('reactant_partial_charges', 'product_partial_charges'),
+            'hessians': ('reactant_hessians', 'product_hessians'),
+            'total_multiplicities':
+                ('reactant_total_multiplicity', 'product_total_multiplicity'),
+        }
+        per_step = {
+            'forced_breaking_bonds': 'forced_breaking_bonds',
+            'forced_forming_bonds': 'forced_forming_bonds',
+            'mappings': 'product_mapping',
+        }
+
+        arguments = {}
+        for name, (rea_key, pro_key) in per_state.items():
+            if rea_key in kwargs or pro_key in kwargs:
+                default = -1 if name == 'total_multiplicities' else None
+                arguments[name] = [
+                    kwargs.pop(rea_key, default),
+                    kwargs.pop(pro_key, default),
+                ]
+        for name, key in per_step.items():
+            if key in kwargs:
+                arguments[name] = [kwargs.pop(key)]
+
+        results = self.build_ffs_from_molecules([reactant, product],
+                                                **arguments,
+                                                **kwargs)
+        self.product_mapping = results['mappings'][0]
+        return results
+
+    def build_ffs_from_molecules(self, states: list, **kwargs):
+        """Build matched force fields for a reaction path of arbitrary length.
+
+        Every state is brought into one and the same atom ordering, and the
+        bonds that react anywhere along the path are recorded so that each
+        state's potential energy surface is described identically in every step
+        it takes part in.
+
+        Args:
+            states (list): The states of the reaction path, in order. Each entry
+                is a Molecule or a list of Molecule fragments.
+            partial_charges (list): One entry per state; each None, a flat list
+                of charges, or one list of charges per fragment of that state.
+            hessians (list): One entry per state, for the Seminario method.
+            total_multiplicities (list): One entry per state; -1 to calculate.
+            forced_breaking_bonds (list): One entry per step (one fewer than the
+                number of states), each a set of 1-indexed atom pairs.
+            forced_forming_bonds (list): One entry per step.
+            mappings (list): One entry per step; a 1-indexed mapping from that
+                step's state to the next to skip reaction matching.
+        """
+
         self.ffbuilder.water_model = self.water_model
 
-        self.reactant, self.product, self.forming_bonds, self.breaking_bonds, self.reactants, self.products, self.product_mapping = self.ffbuilder.build_force_fields(
-            reactant=reactant, product=product, **kwargs)
+        results = self.ffbuilder.build_many_force_fields(states=states,
+                                                         **kwargs)
+
+        self.states = results['states']
+        self.forming_bonds = results['forming_bonds']
+        self.breaking_bonds = results['breaking_bonds']
+        self.reactive_bonds = results['reactive_bonds']
+        self.bond_registry = results['registry']
+        self.state_fragments = results['fragments']
+        self.state_mappings = results['mappings']
+
+        self.ostream.print_info(
+            f"Built force fields for {len(self.states)} states "
+            f"({len(self.states) - 1} steps) with "
+            f"{len(self.reactive_bonds)} reacting bonds in total.")
+        self.ostream.flush()
+        return results
 
     def build_systems(
         self,
@@ -239,16 +330,27 @@ class EvbDriver:
             data_folder_path.mkdir(parents=True)
             run_folder_path.mkdir(parents=True)
 
-            #
-            self.reactant.molecule.write_xyz_file(
+            # The ends of the path keep the reactant / product names, so a
+            # one-step reaction writes exactly the files it always has.
+            self.states[0].molecule.write_xyz_file(
                 str(data_folder_path / "reactant_struct.xyz"))
-            self.product.molecule.write_xyz_file(
+            self.states[-1].molecule.write_xyz_file(
                 str(data_folder_path / "product_struct.xyz"))
 
             MMForceFieldGenerator.save_forcefield_as_json(
-                self.reactant, str(data_folder_path / "reactant_ff_data.json"))
+                self.states[0],
+                str(data_folder_path / "reactant_ff_data.json"))
             MMForceFieldGenerator.save_forcefield_as_json(
-                self.product, str(data_folder_path / "product_ff_data.json"))
+                self.states[-1],
+                str(data_folder_path / "product_ff_data.json"))
+
+            if len(self.states) > 2:
+                for k, state in enumerate(self.states):
+                    state.molecule.write_xyz_file(
+                        str(data_folder_path / f"state_{k}_struct.xyz"))
+                    MMForceFieldGenerator.save_forcefield_as_json(
+                        state,
+                        str(data_folder_path / f"state_{k}_ff_data.json"))
 
             if conf.get('solvent', None) is None and conf.get('pressure',
                                                               -1) > 0:
@@ -262,23 +364,13 @@ class EvbDriver:
             self.ostream.print_blank()
             self.ostream.print_header(f"Building systems for {conf['name']}")
             self.ostream.flush()
-            systems, topology, initial_positions = system_builder.build_systems(
-                reactant=self.reactant,
-                product=self.product,
-                lambda_vec=self.lambda_vec,
-                configuration=conf,
-                constraints=constraints,
+
+            topology, initial_positions = self._build_step_confs(
+                conf,
+                system_builder,
+                constraints,
+                data_folder,
             )
-
-            conf["systems"] = systems
-            conf["topology"] = topology
-            conf["initial_positions"] = initial_positions
-            conf['forming_bonds'] = list(self.forming_bonds)
-            conf['breaking_bonds'] = list(self.breaking_bonds)
-
-            self.ostream.print_info(f"Saving files to {data_folder_path}")
-            self.ostream.flush()
-            system_builder.save_systems_as_xml(systems, conf["run_folder"])
 
             top_path = cwd / data_folder / "topology.cif"
 
@@ -289,9 +381,16 @@ class EvbDriver:
             )
 
             dump_conf = copy.copy(conf)
-            dump_conf.pop('systems')
-            dump_conf.pop('topology')
-            dump_conf.pop('initial_positions')
+            dump_conf.pop('systems', None)
+            dump_conf.pop('topology', None)
+            dump_conf.pop('initial_positions', None)
+            if 'steps' in dump_conf:
+                # The per-step dicts carry the same non-serialisable entries.
+                dump_conf['steps'] = [{
+                    key: value
+                    for key, value in step.items()
+                    if key not in ('systems', 'topology', 'initial_positions')
+                } for step in dump_conf['steps']]
             self.update_options_json(dump_conf, conf)
             self.update_options_json(
                 {
@@ -303,6 +402,96 @@ class EvbDriver:
         self.system_confs = configurations
 
         self.ostream.flush()
+
+    def _build_step_confs(self, conf, system_builder, constraints,
+                          data_folder):
+        """Build the systems of one configuration, step by step.
+
+        The environment is built once, so all steps share one topology, one
+        particle ordering and one run folder; each step then gets its own output
+        folder and its own configuration dict, which is what lets the FEP driver
+        run a step without knowing that it is part of a longer path.
+        """
+
+        cwd = Path.cwd()
+        n_states = len(self.states)
+        single_step = n_states == 2
+
+        step_systems, pes_systems, topology, initial_positions = (
+            system_builder.build_multi_step_systems(
+                states=self.states,
+                lambda_vec=self.lambda_vec,
+                configuration=conf,
+                constraints=constraints,
+                reactive_bonds=self.reactive_bonds,
+                bond_registry=self.bond_registry,
+            ))
+
+        self.ostream.print_info(f"Saving files to {cwd / data_folder}")
+        self.ostream.flush()
+
+        # A one-step reaction keeps the names it always had: no step prefix on
+        # the lambda systems, and 'reactant' / 'product' for the two surfaces.
+        # A longer path needs both, because the lambda values of different steps
+        # would otherwise collide in the one shared run folder.
+        def prefix_of(step):
+            return "" if single_step else f"step{step}_"
+
+        if single_step:
+            pes_by_name = {'reactant': pes_systems[0], 'product': pes_systems[1]}
+        else:
+            pes_by_name = {
+                f"state_{k}": system for k, system in pes_systems.items()
+            }
+
+        for step, systems in enumerate(step_systems):
+            system_builder.save_systems_as_xml(systems,
+                                               conf["run_folder"],
+                                               prefix=prefix_of(step))
+        system_builder.save_systems_as_xml(pes_by_name, conf["run_folder"])
+
+        steps = []
+        for step, systems in enumerate(step_systems):
+            if single_step:
+                step_folder = data_folder
+            else:
+                step_folder = str(Path(data_folder) / f"step_{step:02d}")
+                (cwd / step_folder).mkdir(parents=True, exist_ok=True)
+
+            step_conf = copy.copy(conf)
+            step_conf['step'] = step
+            step_conf['n_states'] = n_states
+            step_conf['state_left'] = step
+            step_conf['state_right'] = step + 1
+            step_conf['data_folder'] = step_folder
+            step_conf['run_folder'] = conf["run_folder"]
+            step_conf['system_prefix'] = prefix_of(step)
+            step_conf['forming_bonds'] = sorted(self.forming_bonds[step])
+            step_conf['breaking_bonds'] = sorted(self.breaking_bonds[step])
+            # Every state's PES system is visible to every step, so a frame
+            # sampled anywhere along the path can be scored on all of E_1..E_N.
+            step_conf['systems'] = {**systems, **pes_by_name}
+            step_conf['topology'] = topology
+            step_conf.pop('steps', None)
+            if not single_step:
+                step_conf['name'] = f"{conf['name']}_step_{step + 1}"
+            steps.append(step_conf)
+
+        # Only the first step starts from the built geometry; every later step
+        # is seeded with the equilibrated lambda=1 state of the one before it.
+        steps[0]['initial_positions'] = initial_positions
+
+        conf['n_states'] = n_states
+        conf['reactive_bonds'] = sorted(
+            [list(pair) for pair in self.reactive_bonds])
+        conf['steps'] = steps
+        conf['topology'] = topology
+        conf['initial_positions'] = initial_positions
+        conf['systems'] = steps[0]['systems'] if single_step else None
+        conf['forming_bonds'] = [sorted(bonds) for bonds in self.forming_bonds]
+        conf['breaking_bonds'] = [sorted(bonds) for bonds in self.breaking_bonds]
+
+        return topology, initial_positions
 
     def load_initialisation(self,
                             data_folder: str,
@@ -364,10 +553,9 @@ class EvbDriver:
         conf["run_folder"] = str(Path(data_folder) / "run")
 
         if load_systems:
-            sysbuilder = ReactionSystemBuilder(ostream=self.ostream)
-            systems = sysbuilder.load_systems_from_xml(
-                str(Path(data_folder) / "run"))
-            conf["systems"] = systems
+            systems = self._load_step_systems(conf)
+            conf["systems"] = conf['steps'][0]['systems'] if conf.get(
+                'steps') else systems
         else:
             systems = []
 
@@ -395,6 +583,11 @@ class EvbDriver:
             conf["initial_positions"] = pdb.getPositions(
                 asNumpy=True).value_in_unit(mmunit.nanometers)
 
+        # The steps recorded in options.json only carry names and folders; give
+        # them back the topology and the starting configuration that run_FEP
+        # needs, and point each one at its own output folder.
+        self._restore_step_confs(conf, data_folder, rename_data)
+
         self.system_confs.append(conf)
         self.ostream.print_info(
             f"Initialised configuration with {len(systems)} systems, temperatue {self.temperature} and Lambda vector {self.lambda_vec} from {data_folder}"
@@ -403,21 +596,96 @@ class EvbDriver:
             f"Current configurations: {[conf['name'] for conf in self.system_confs]}"
         )
 
-        #If there are any csv or xtc files in the data folder
-        if (any(Path(data_folder).glob("*.csv"))
-                or any(Path(data_folder).glob("*.xtc"))) and rename_data:
-            self.ostream.print_warning(
-                f"Found csv or xtc files in {data_folder}. These might be from a previous FEP run using the same folder. The files will be renamed with the prefix OLD_ to avoid overwriting them during the new FEP run."
-            )
-            for file in Path(data_folder).iterdir():
-                if file.is_file() and (file.name.endswith(".csv")
-                                       or file.name.endswith(".xtc")):
-                    new_name = file.parent / f"OLD_{file.name}"
-                    file.rename(new_name)
-                    self.ostream.print_info(
-                        f"Renamed {file.name} to {new_name.name}")
-
         self.ostream.flush()
+
+    def _load_step_systems(self, conf):
+        """Load every step's lambda systems plus the shared PES systems.
+
+        The steps share one run folder, so a step's lambda systems are selected
+        by the prefix they were saved under. A one-step reaction was saved
+        without a prefix and with the reactant / product names, exactly as it
+        always has been.
+        """
+
+        sysbuilder = ReactionSystemBuilder(ostream=self.ostream)
+        run_folder = conf['run_folder']
+        steps = conf.get('steps') or []
+        single_step = len(steps) <= 1
+
+        if single_step:
+            # One flat load: lambda systems and the two surfaces sit together
+            # under their own names.
+            systems = sysbuilder.load_systems_from_xml(run_folder)
+        else:
+            pes_systems = {
+                f"state_{name}": system
+                for name, system in sysbuilder.load_systems_from_xml(
+                    run_folder, prefix="state_", parse_lambda=False).items()
+            }
+            systems = pes_systems
+
+        for step_conf in steps:
+            if single_step:
+                step_conf['systems'] = systems
+            else:
+                step_conf['systems'] = {
+                    **sysbuilder.load_systems_from_xml(
+                        run_folder, prefix=step_conf['system_prefix']),
+                    **systems,
+                }
+        return systems
+
+    def _restore_step_confs(self, conf, data_folder, rename_data):
+        """Give the steps read back from options.json what run_FEP needs."""
+
+        steps = conf.get('steps')
+        if not steps:
+            return
+
+        data_folder = Path(data_folder)
+        for step, step_conf in enumerate(steps):
+            step_conf['run_folder'] = conf['run_folder']
+            if len(steps) == 1:
+                step_conf['data_folder'] = str(data_folder)
+            else:
+                step_conf['data_folder'] = str(data_folder /
+                                               f"step_{step:02d}")
+            if 'topology' in conf:
+                step_conf['topology'] = conf['topology']
+            if step > 0:
+                # Seeded from the preceding step's endpoint, written when that
+                # step runs; only step 0 starts from a stored configuration.
+                previous = (Path(step_conf['data_folder']).parent /
+                            f"step_{step - 1:02d}" / "final_state.xml")
+                if previous.is_file():
+                    step_conf['initial_state'] = str(previous)
+                    step_conf['skip_initial_equil'] = True
+            elif 'initial_positions' in conf:
+                step_conf['initial_positions'] = conf['initial_positions']
+            if 'skip_initial_equil' in conf and step == 0:
+                step_conf['skip_initial_equil'] = conf['skip_initial_equil']
+
+            if rename_data:
+                self._rename_existing_data(Path(step_conf['data_folder']))
+
+    def _rename_existing_data(self, folder: Path):
+        """Move any csv / xtc left over from an earlier run out of the way."""
+        if not folder.is_dir():
+            return
+        if not (any(folder.glob("*.csv")) or any(folder.glob("*.xtc"))):
+            return
+        self.ostream.print_warning(
+            f"Found csv or xtc files in {folder}. These might be from a "
+            "previous FEP run using the same folder. The files will be renamed "
+            "with the prefix OLD_ to avoid overwriting them during the new FEP "
+            "run.")
+        for file in folder.iterdir():
+            if file.is_file() and (file.name.endswith(".csv")
+                                   or file.name.endswith(".xtc")):
+                new_name = file.parent / f"OLD_{file.name}"
+                file.rename(new_name)
+                self.ostream.print_info(
+                    f"Renamed {file.name} to {new_name.name}")
 
     def load_results(
         self,
@@ -494,13 +762,47 @@ class EvbDriver:
             self.ostream.print_header(f"Running FEP for {conf['name']}")
             self.ostream.flush()
 
-            FEP = EvbFepDriver(ostream=self.ostream)
-            FEP.run_replicas(
-                Lambda=self.lambda_vec,
-                configuration=conf,
-                platform=platform,
-                platform_properties=platform_properties,
-            )
+            # Always a list of steps; a reactant -> product reaction has one.
+            step_confs = conf.get('steps', [conf])
+            for index, step_conf in enumerate(step_confs):
+                self.ostream.print_blank()
+                if len(step_confs) > 1:
+                    self.ostream.print_header(
+                        f"Step {step_conf['step'] + 1} of "
+                        f"{len(step_confs)}: state "
+                        f"{step_conf['state_left'] + 1} -> state "
+                        f"{step_conf['state_right'] + 1}")
+                    self.ostream.flush()
+
+                FEP = EvbFepDriver(ostream=self.ostream)
+                FEP.run_replicas(
+                    Lambda=self.lambda_vec,
+                    configuration=step_conf,
+                    platform=platform,
+                    platform_properties=platform_properties,
+                )
+
+                # Each step is sampled on its own, seeded by the equilibrated
+                # lambda=1 configuration the previous step ended its first
+                # forward sweep on. That configuration is a valid starting point
+                # because the two Hamiltonians are identical there by
+                # construction: lambda=1 of one step and lambda=0 of the next
+                # both describe the state they share.
+                if index + 1 < len(step_confs):
+                    final_state = (Path(step_conf['data_folder']) /
+                                   "final_state.xml")
+                    assert_msg_critical(
+                        final_state.is_file(),
+                        f"Step {step_conf['step'] + 1} did not write "
+                        f"{final_state}, so the next step has nothing to start "
+                        "from.")
+                    next_conf = step_confs[index + 1]
+                    next_conf['initial_state'] = str(final_state)
+                    next_conf['skip_initial_equil'] = True
+                    self.ostream.print_info(
+                        f"Seeding step {next_conf['step'] + 1} with the "
+                        f"lambda=1 configuration from {final_state}")
+                    self.ostream.flush()
 
     def compute_force_groups(self,
                              platform=None,
@@ -546,6 +848,13 @@ class EvbDriver:
         # recompute.
         if self.rank != mpi_master():
             return
+
+        assert_msg_critical(
+            len(self.states) <= 2,
+            "compute_force_groups is not available for a multi-step reaction "
+            "path: it writes one reactant/product decomposition per "
+            "configuration, which has no meaning once a configuration holds "
+            "several steps and several states.")
 
         for conf in self.system_confs:
             self.ostream.print_blank()
@@ -606,6 +915,17 @@ class EvbDriver:
                                                  lambda_sub_sample_ends,
                                                  time_sub_sample)
         self.ostream.flush()
+
+        multi_step = any(
+            "steps" in result
+            for result in results["configuration_results"].values())
+        assert_msg_critical(
+            not multi_step,
+            "compute_energy_profiles cannot yet fit a reaction path of more "
+            "than two states: EvbDataProcessing solves one two-state EVB "
+            "Hamiltonian per configuration, and a path has one per step. The "
+            "sampled output itself loads fine - call "
+            "_load_output_from_folders directly to get the per-step energies.")
 
         if alpha is not None:
             self.dataprocessing.alpha = alpha
@@ -692,40 +1012,55 @@ class EvbDriver:
         lambda_sub_sample_ends,
         time_sub_sample,
     ) -> dict:
-        reference_folder = self.system_confs[0]["data_folder"]
-        target_folders = [conf["data_folder"] for conf in self.system_confs[1:]]
+        """Read every configuration's sampled output back off disk.
 
-        reference_name = self.system_confs[0]["name"]
-        target_names = [conf["name"] for conf in self.system_confs[1:]]
+        Each step of a reaction path writes into its own folder, so the files
+        are read per step; options.json describes the whole configuration and is
+        read from the configuration folder. A one-step reaction keeps the flat
+        result shape it has always had, since that is what the analysis
+        consumes; a longer path nests its steps under 'steps', because there is
+        then no single unambiguous set of energies to put at the top level.
+        """
 
-        folders = [reference_folder] + target_folders
         results = {}
         cwd = Path.cwd()
 
         common_results = []
         specific_results = {}
-        for name, folder in zip([reference_name] + target_names, folders):
-            E_file = str(cwd / folder / "Energies.csv")
-            data_file = str(cwd / folder / "Data_combined.csv")
-            options_file = str(cwd / folder / "options.json")
-            fg_file = str(cwd / folder / "ForceGroups.csv")
-            rea_fg_file = str(cwd / folder / "ForceGroups_rea.csv")
-            pro_fg_file = str(cwd / folder / "ForceGroups_pro.csv")
-            decomp_file = str(cwd / folder / "NB_decompositions.csv")
-            specific, common = self._load_output_files(
-                E_file,
-                data_file,
-                options_file,
-                fg_file,
-                rea_fg_file,
-                pro_fg_file,
-                decomp_file,
-                lambda_sub_sample,
-                lambda_sub_sample_ends,
-                time_sub_sample,
-            )
-            specific_results.update({name: specific})
-            common_results.append(common)
+        for conf in self.system_confs:
+            options_file = str(cwd / conf["data_folder"] / "options.json")
+            # Always a list of steps; a reactant -> product reaction has one.
+            step_confs = conf.get("steps") or [conf]
+
+            step_results = []
+            for step_conf in step_confs:
+                folder = cwd / step_conf["data_folder"]
+                specific, common = self._load_output_files(
+                    str(folder / "Energies.csv"),
+                    str(folder / "Data_combined.csv"),
+                    options_file,
+                    str(folder / "ForceGroups.csv"),
+                    str(folder / "ForceGroups_rea.csv"),
+                    str(folder / "ForceGroups_pro.csv"),
+                    str(folder / "NB_decompositions.csv"),
+                    lambda_sub_sample,
+                    lambda_sub_sample_ends,
+                    time_sub_sample,
+                    state_left=step_conf.get("state_left"),
+                    state_right=step_conf.get("state_right"),
+                )
+                step_results.append(specific)
+                common_results.append(common)
+
+            if len(step_results) == 1:
+                specific_results[conf["name"]] = step_results[0]
+            else:
+                specific_results[conf["name"]] = {
+                    "steps": step_results,
+                    "n_states": conf.get("n_states", len(step_results) + 1),
+                    "options": step_results[0]["options"],
+                    "Temp_set": step_results[0]["Temp_set"],
+                }
 
         results.update({"configuration_results": specific_results})
         for common in common_results[1:]:
@@ -755,7 +1090,19 @@ class EvbDriver:
         lambda_sub_sample=1,
         lambda_sub_sample_ends=False,
         time_sub_sample=1,
+        state_left=None,
+        state_right=None,
     ):
+        """Read one step's sampled output.
+
+        Energies.csv is read by column name rather than by position, so a file
+        holding any number of potential energy surfaces is understood: a
+        reactant -> product run names its two 'reactant' / 'product', a longer
+        path names them 'state_0' ... 'state_N-1' and adds a 'step' column.
+        Every surface is returned in E_pes / E_pes_names, and E1_pes / E2_pes
+        are the two states flanking this step, which is what the two-state
+        analysis works with.
+        """
         with Path(options_file).open("r") as file:
             options = json.load(file)
         Lambda = options["Lambda"]
@@ -782,6 +1129,7 @@ class EvbDriver:
             Lambda = np.append(Lambda, 1)
 
         E_data = np.loadtxt(E_file, skiprows=1, delimiter=',').T
+        columns = self._parse_energies_header(E_file, E_data.shape[0])
         fg_data = []
         rea_fg_data = []
         pro_fg_data = []
@@ -790,25 +1138,46 @@ class EvbDriver:
 
         sub_indices = l_sub_indices[::time_sub_sample]
 
-        Lambda_frame = E_data[0, sub_indices]
-        E1_pes = E_data[1, sub_indices]
-        E2_pes = E_data[2, sub_indices]
-        E1_int = E_data[3, sub_indices]
-        E2_int = E_data[4, sub_indices]
-        E_m_pes = E_data[5, sub_indices]
-        # E_m_int = E_data[6, sub_indices]
+        def column(name, default=None):
+            index = columns.get(name)
+            return default if index is None else E_data[index, sub_indices]
 
-        # Columns 6/7 (replica, direction) were added later; older
-        # Energies.csv files (7 columns, e.g. canned test fixtures) don't
-        # have them, so only extract when present. direction: 0 = forward
-        # sweep (l: 0 -> 1), 1 = backward sweep (l: 1 -> 0), see
-        # EvbFepDriver.run_replicas.
-        if E_data.shape[0] >= 8:
-            replica_frame = E_data[6, sub_indices].astype(int)
-            direction_frame = E_data[7, sub_indices].astype(int)
-        else:
-            replica_frame = None
-            direction_frame = None
+        Lambda_frame = E_data[columns["Lambda"], sub_indices]
+
+        # Every potential energy surface in the file, in the order it was
+        # written. On a reaction path these are the whole path's states, so a
+        # frame sampled in one step carries the energies of all of them.
+        pes_names = [
+            name[:-len(" PES")] for name in columns if name.endswith(" PES")
+        ]
+        E_pes = np.array([column(f"{name} PES") for name in pes_names])
+
+        # The two states flanking this step. Named per state on a reaction path,
+        # 'reactant' / 'product' for a plain reactant -> product run; and with
+        # pes_states_to_report='adjacent' only these two are in the file at all,
+        # so they are picked by name rather than by position.
+        left_name, right_name = pes_names[0], pes_names[-1]
+        if state_left is not None and f"state_{state_left}" in pes_names:
+            left_name = f"state_{state_left}"
+        if state_right is not None and f"state_{state_right}" in pes_names:
+            right_name = f"state_{state_right}"
+
+        E1_pes = column(f"{left_name} PES")
+        E2_pes = column(f"{right_name} PES")
+
+        integration = [name for name in columns if name.endswith(" integration")]
+        E1_int = column(integration[0])
+        E2_int = column(integration[-1])
+
+        # 'Em' in files written by EvbReporter.format_energies_row; 'E_m_pes' in
+        # older ones, which also carry an E_m_int column that nothing reads.
+        E_m_pes = column("Em") if "Em" in columns else column("E_m_pes")
+
+        # replica / direction were added later; older Energies.csv files (e.g.
+        # canned test fixtures) don't have them. direction: 0 = forward sweep
+        # (l: 0 -> 1), 1 = backward (l: 1 -> 0), see EvbFepDriver.run_replicas.
+        replica_frame = column("replica")
+        direction_frame = column("direction")
 
         step, Ep, Ek, Temp, Vol, Dens = np.loadtxt(
             data_file,
@@ -831,10 +1200,26 @@ class EvbDriver:
             "Temp_set": Temp_set,
         }
 
+        # Only added when it says something E1_pes / E2_pes do not: with two
+        # surfaces in the file those are already both of them, and repeating
+        # them here would double the arrays in every saved h5.
+        if len(pes_names) > 2:
+            specific_result.update({
+                "E_pes": E_pes,
+                # Comma-joined rather than a list, for the same reason as
+                # E1_fg_names below: a numpy unicode array has no native h5
+                # representation.
+                "E_pes_names": ",".join(pes_names),
+            })
+
+        if "step" in columns:
+            specific_result["Step_frame"] = column("step").astype(int)
+            specific_result["step"] = int(specific_result["Step_frame"][0])
+
         if replica_frame is not None:
             specific_result.update({
-                "Replica_frame": replica_frame,
-                "Direction_frame": direction_frame,
+                "Replica_frame": replica_frame.astype(int),
+                "Direction_frame": direction_frame.astype(int),
             })
 
         if fg_file is not None and Path(fg_file).is_file():
@@ -888,6 +1273,32 @@ class EvbDriver:
             "Lambda_indices": lambda_indices,
         }
         return specific_result, common_result
+
+    @staticmethod
+    def _parse_energies_header(path, n_columns):
+        """Column name -> index for an Energies.csv.
+
+        Reading by name is what lets one loader handle a file with any number
+        of potential energy surfaces, and keeps files written before a column
+        was added readable. A file whose header does not match its width is
+        rejected rather than silently mis-indexed.
+        """
+        with Path(path).open("r") as file:
+            header = [cell.strip() for cell in file.readline().split(",")]
+
+        assert_msg_critical(
+            len(header) == n_columns,
+            f"{path} has {n_columns} columns but a header naming "
+            f"{len(header)}: {header}")
+
+        columns = {name: index for index, name in enumerate(header)}
+        assert_msg_critical(
+            "Lambda" in columns,
+            f"{path} has no Lambda column; header: {header}")
+        assert_msg_critical(
+            any(name.endswith(" PES") for name in columns),
+            f"{path} names no potential energy surface; header: {header}")
+        return columns
 
     @staticmethod
     def _parse_force_group_header(path):

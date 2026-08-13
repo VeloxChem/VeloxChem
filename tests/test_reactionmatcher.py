@@ -62,7 +62,8 @@ class TestReactionMatcher:
             forced_breaking_bonds=breaking_bonds,
             forced_forming_bonds=forming_bonds,
         )
-        return evb.breaking_bonds, evb.forming_bonds
+        # One step, so one entry in each per-step list.
+        return evb.breaking_bonds[0], evb.forming_bonds[0]
 
     def test_reactionmatcher(self):
         breaking_bonds, forming_bonds = self.run_graph_matcher(

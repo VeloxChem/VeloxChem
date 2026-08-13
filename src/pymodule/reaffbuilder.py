@@ -50,6 +50,7 @@ from .outputstream import OutputStream
 from .veloxchemlib import Point
 from .errorhandler import assert_msg_critical, print_exception_if_debug
 from .openmmdynamics import OpenMMDynamics
+from .reactionsystembuilder import ReactionSystemBuilder
 
 try:
     import openmm as mm
@@ -97,6 +98,11 @@ class ReactionForceFieldBuilder:
         self.hessian_xc_fun: str = 'B3LYP'
         self.hessian_basis = 'def2-SV_P_'
 
+        # Relative spread, (max - min) / mean, above which the averaged
+        # reference force constant of a reactive pair is reported as
+        # unrepresentative. See _build_reactive_bond_registry.
+        self.fc_ref_spread_warning: float = 0.5
+
     def _sub_ostream(self, silent):
         # Output stream to hand to a sub-driver. Never leave it to the driver
         # default: that opens a stream on whatever sys.stdout happens to be at
@@ -136,25 +142,217 @@ class ReactionForceFieldBuilder:
             tuple: reactant forcefield, product forcefield, forming bonds, breaking bonds, list of reactant forcefields, list of product forcefields, product mapping (0-indexed)
         """
 
-        reactant_ff, reactant_ffs, reactant_total_charge = self._create_combined_forcefield(
-            reactant,
-            reactant_partial_charges,
-            reactant_hessians,
-            "REA",
-            reactant_total_multiplicity,
+        # Two-state wrapper over the general N-state builder, so that there is
+        # exactly one implementation of matching / index-frame composition /
+        # reaction summarising. Only the argument marshalling lives here: the
+        # per-state arguments become two-element lists and the per-step ones
+        # single-element lists.
+        results = self.build_many_force_fields(
+            states=[reactant, product],
+            partial_charges=[reactant_partial_charges, product_partial_charges],
+            hessians=[reactant_hessians, product_hessians],
+            total_multiplicities=[
+                reactant_total_multiplicity, product_total_multiplicity
+            ],
+            forced_breaking_bonds=[forced_breaking_bonds],
+            forced_forming_bonds=[forced_forming_bonds],
+            mappings=[product_mapping],
+            _state_labels=["REA", "PRO"],
         )
 
-        product_ff, product_ffs, product_total_charge = self._create_combined_forcefield(
-            product,
-            product_partial_charges,
-            product_hessians,
-            "PRO",
-            product_total_multiplicity,
+        states = results['states']
+        return (
+            states[0],
+            states[1],
+            results['forming_bonds'][0],
+            results['breaking_bonds'][0],
+            results['fragments'][0],
+            results['fragments'][1],
+            results['mappings'][0],
         )
 
-        assert reactant_total_charge == product_total_charge, f"Total charge of reactants {reactant_total_charge} and products {product_total_charge} must match"
+    def build_many_force_fields(
+        self,
+        states: list,
+        partial_charges: list | None = None,
+        hessians: list | None = None,
+        total_multiplicities: list[int] | None = None,
+        forced_breaking_bonds: list | None = None,
+        forced_forming_bonds: list | None = None,
+        mappings: list | None = None,
+        _state_labels: list[str] | None = None,
+    ) -> dict:
+        """Create matched force fields for an arbitrary number of states along a
+        single reaction path (state 0 -> state 1 -> ... -> state N-1).
 
-        if not self.skip_reaction_matching and product_mapping is None:
+        Every state is brought into the atom ordering of state 0, so all states,
+        every step's systems and the shared topology are indexed identically.
+
+        Args:
+            states: N entries; each is a Molecule or a list of Molecule fragments.
+            partial_charges: N entries; each is None, a flat list of charges, or
+                one list of charges per fragment of that state.
+            hessians: N entries; each is None, an ndarray, or one per fragment.
+            total_multiplicities: N entries; -1 to use the calculated value.
+            forced_breaking_bonds: N-1 entries, one per step; each a set of
+                1-indexed atom pairs forced to break in that step.
+            forced_forming_bonds: N-1 entries, one per step.
+            mappings: N-1 entries; a 1-indexed mapping from state k to state k+1
+                to skip reaction matching for that step, or None.
+
+        Returns:
+            dict with keys 'states' (list of combined force fields), 'fragments'
+            (per state, the list of per-fragment force fields), 'forming_bonds'
+            and 'breaking_bonds' (per step), 'reactive_bonds' (the global union),
+            'registry' (see _build_reactive_bond_registry) and 'mappings'.
+        """
+
+        assert_msg_critical(
+            len(states) >= 2,
+            f"At least two states are required, got {len(states)}")
+
+        n_states = len(states)
+        n_steps = n_states - 1
+
+        partial_charges = self._per_state_argument(partial_charges, n_states,
+                                                   "partial_charges")
+        hessians = self._per_state_argument(hessians, n_states, "hessians")
+        total_multiplicities = self._per_state_argument(total_multiplicities,
+                                                        n_states,
+                                                        "total_multiplicities",
+                                                        default=-1)
+        forced_breaking_bonds = self._per_step_argument(forced_breaking_bonds,
+                                                        n_steps,
+                                                        "forced_breaking_bonds",
+                                                        default=())
+        forced_forming_bonds = self._per_step_argument(forced_forming_bonds,
+                                                       n_steps,
+                                                       "forced_forming_bonds",
+                                                       default=())
+        mappings = self._per_step_argument(mappings, n_steps, "mappings",
+                                           default=None)
+
+        if _state_labels is None:
+            _state_labels = [f"STATE{k + 1}" for k in range(n_states)]
+
+        state_ffs = []
+        fragment_ffs = []
+        total_charges = []
+        for k, state in enumerate(states):
+            ff, fragments, total_charge = self._create_combined_forcefield(
+                state,
+                partial_charges[k],
+                hessians[k],
+                _state_labels[k],
+                total_multiplicities[k],
+            )
+            state_ffs.append(ff)
+            fragment_ffs.append(fragments)
+            total_charges.append(total_charge)
+
+        for k, total_charge in enumerate(total_charges[1:], start=1):
+            assert_msg_critical(
+                total_charge == total_charges[0],
+                f"Total charge of state {k + 1} ({total_charge}) must match "
+                f"that of state 1 ({total_charges[0]})")
+
+        # Bring every state into state 0's atom ordering. The left operand of
+        # each match is already expressed in state 0's frame, so the mappings
+        # compose implicitly and no separate composition step is needed.
+        resolved_mappings = []
+        for step in range(n_steps):
+            mapping = self._match_step(
+                state_ffs[step],
+                state_ffs[step + 1],
+                forced_breaking_bonds[step],
+                forced_forming_bonds[step],
+                mappings[step],
+                step,
+                n_steps,
+            )
+            resolved_mappings.append(mapping)
+            if mapping is not None:
+                state_ffs[step + 1] = self._apply_mapping_to_forcefield(
+                    state_ffs[step + 1], mapping)
+                state_ffs[step + 1].molecule = self._apply_mapping_to_molecule(
+                    state_ffs[step + 1].molecule, mapping)
+
+        ReactionSystemBuilder.assert_consistent_atom_ordering(
+            state_ffs, "force field building")
+
+        forming_bonds = []
+        breaking_bonds = []
+        for step in range(n_steps):
+            step_label = None if n_steps == 1 else f"step {step + 1}"
+            formed, broken = self._summarise_reaction(state_ffs[step],
+                                                      state_ffs[step + 1],
+                                                      step_label=step_label)
+            forming_bonds.append(formed)
+            breaking_bonds.append(broken)
+
+            for bond in broken:
+                state_ffs[step].bonds[bond]['comment'] += ', broken in reaction'
+            for bond in formed:
+                state_ffs[step +
+                          1].bonds[bond]['comment'] += ', formed in reaction'
+
+        self.ostream.flush()
+
+        reactive_bonds = set()
+        for step in range(n_steps):
+            reactive_bonds |= set(forming_bonds[step])
+            reactive_bonds |= set(breaking_bonds[step])
+
+        registry = self._build_reactive_bond_registry(state_ffs, reactive_bonds)
+
+        self._optimize_states(state_ffs, forming_bonds, breaking_bonds)
+
+        return {
+            'states': state_ffs,
+            'fragments': fragment_ffs,
+            'forming_bonds': forming_bonds,
+            'breaking_bonds': breaking_bonds,
+            'reactive_bonds': reactive_bonds,
+            'registry': registry,
+            'mappings': resolved_mappings,
+        }
+
+    @staticmethod
+    def _per_state_argument(value, n_states, name, default=None):
+        """Normalise a per-state argument to a list of length n_states."""
+        if value is None:
+            return [default] * n_states
+        assert_msg_critical(
+            isinstance(value, list),
+            f"{name} must be a list with one entry per state")
+        assert_msg_critical(
+            len(value) == n_states,
+            f"{name} must have one entry per state: expected {n_states} "
+            f"entries, got {len(value)}")
+        return list(value)
+
+    @staticmethod
+    def _per_step_argument(value, n_steps, name, default=None):
+        """Normalise a per-step argument to a list of length n_steps."""
+        if value is None:
+            return [default] * n_steps
+        assert_msg_critical(
+            isinstance(value, list),
+            f"{name} must be a list with one entry per step")
+        assert_msg_critical(
+            len(value) == n_steps,
+            f"{name} must have one entry per step (one fewer than the number "
+            f"of states): expected {n_steps} entries, got {len(value)}")
+        return list(value)
+
+    def _match_step(self, state_ff, next_state_ff, forced_breaking_bonds,
+                    forced_forming_bonds, mapping, step, n_steps):
+        """Resolve the 0-indexed mapping that takes the next state into the
+        current state's (i.e. state 0's) atom ordering."""
+
+        step_insert = "" if n_steps == 1 else f" for step {step + 1}"
+
+        if not self.skip_reaction_matching and mapping is None:
             breaking_bonds_insert = "no forced breaking bonds"
             if len(forced_breaking_bonds) > 0:
                 breaking_bonds_insert = f"forced breaking bonds: {forced_breaking_bonds}"
@@ -163,7 +361,7 @@ class ReactionForceFieldBuilder:
             if len(forced_forming_bonds) > 0:
                 forming_bonds_insert = f"forced forming bonds: {forced_forming_bonds}"
 
-            msg = "Matching reactant and product force fields with "
+            msg = f"Matching reactant and product force fields{step_insert} with "
             msg += breaking_bonds_insert + " and " + forming_bonds_insert + "."
             self.ostream.print_info(msg)
             self.ostream.flush()
@@ -174,65 +372,114 @@ class ReactionForceFieldBuilder:
             forced_forming_bonds = {(bond[0] - 1, bond[1] - 1)
                                     for bond in forced_forming_bonds}
 
-            product_mapping = self._match_reactant_and_product(
-                reactant_ff.molecule,
-                product_ff.molecule,
+            mapping = self._match_reactant_and_product(
+                state_ff.molecule,
+                next_state_ff.molecule,
                 forced_breaking_bonds,
                 forced_forming_bonds,
             )
-        elif product_mapping is not None:
+        elif mapping is not None:
             self.ostream.print_info(
-                f"Skipping reaction matching because the mapping {product_mapping} is already provided"
+                f"Skipping reaction matching{step_insert} because the mapping {mapping} is already provided"
             )
-            product_mapping = {k - 1: v - 1 for k, v in product_mapping.items()}
+            mapping = {k - 1: v - 1 for k, v in mapping.items()}
         else:
-            self.ostream.print_info("Skipping reaction matching")
+            self.ostream.print_info(f"Skipping reaction matching{step_insert}")
         self.ostream.flush()
+        return mapping
 
-        if product_mapping is not None:
-            product_ff = ReactionForceFieldBuilder._apply_mapping_to_forcefield(
-                product_ff,
-                product_mapping,
-            )
+    def _build_reactive_bond_registry(self, state_ffs, reactive_bonds):
+        """Collect, for every pair that reacts anywhere along the path, which
+        states it is bonded in and one path-global reference force constant.
 
-            product_ff.molecule = ReactionForceFieldBuilder._apply_mapping_to_molecule(
-                product_ff.molecule,
-                product_mapping,
-            )
+        The reference force constant is the average over the states in which the
+        pair is bonded. It is only ever used for the surrogate bonded term that
+        stands in for a dissociated pair during integration - never for a
+        reported energy - but it has to be identical in every step, otherwise
+        the integration Hamiltonian jumps where two steps meet.
+        """
 
-        forming_bonds, breaking_bonds = self._summarise_reaction(
-            reactant_ff, product_ff)
+        registry = {}
+        for pair in sorted(reactive_bonds):
+            states_bonded = [
+                k for k, ff in enumerate(state_ffs) if pair in ff.bonds
+            ]
+            fc_per_state = {
+                k: state_ffs[k].bonds[pair]['force_constant']
+                for k in states_bonded
+            }
+            assert_msg_critical(
+                len(states_bonded) > 0,
+                f"Reactive pair {pair} is not bonded in any state")
 
-        for bond in breaking_bonds:
-            reactant_ff.bonds[bond]['comment'] += ', broken in reaction'
-        for bond in forming_bonds:
-            product_ff.bonds[bond]['comment'] += ', formed in reaction'
+            force_constants = list(fc_per_state.values())
+            fc_ref = float(np.mean(force_constants))
+            registry[pair] = {
+                'states_bonded': states_bonded,
+                'fc_per_state': fc_per_state,
+                'fc_ref': fc_ref,
+            }
 
+            if len(force_constants) > 1 and fc_ref > 0:
+                spread = (max(force_constants) - min(force_constants)) / fc_ref
+                if spread > self.fc_ref_spread_warning:
+                    per_state = ", ".join(
+                        f"state {k + 1}: {fc:.1f}"
+                        for k, fc in sorted(fc_per_state.items()))
+                    self.ostream.print_warning(
+                        f"Reactive bond {(pair[0] + 1, pair[1] + 1)} has force "
+                        f"constants that differ by {100 * spread:.0f}% between "
+                        f"the states it is bonded in ({per_state}). Using the "
+                        f"average {fc_ref:.1f} as the reference force constant "
+                        "for the dissociated-pair restraint; no single value "
+                        "represents these well.")
         self.ostream.flush()
+        return registry
 
-        if self.optimize_ff and (len(forming_bonds) > 0
-                                 or len(breaking_bonds) > 0):
-            # TODO this optimisation can likely be taken care of by the openmmdynamics class
-            reactant_ff.molecule = self._optimize_molecule(
-                reactant_ff.molecule.get_element_ids(),
-                reactant_ff,
-                forming_bonds,
-                note='reactant',
-            )
-            product_ff.molecule = self._optimize_molecule(
-                product_ff.molecule.get_element_ids(),
-                product_ff,
-                breaking_bonds,
-                note='product',
-            )
-            # if len(reactant_ffs) > 1:
-            # if len(product_ffs) > 1:
-        elif self.optimize_ff:
+    def _optimize_states(self, state_ffs, forming_bonds, breaking_bonds):
+        """Run the MM conformational optimisation for every state.
+
+        The pairs that are restrained for state k are those that react in an
+        adjacent step but are not bonded in state k itself, i.e. exactly the
+        forming bonds of the step starting at k and the breaking bonds of the
+        step ending at k. For two states this is the reactant's forming bonds
+        and the product's breaking bonds, as before.
+        """
+
+        if not self.optimize_ff:
+            return
+
+        n_states = len(state_ffs)
+        any_change = any(len(bonds) > 0 for bonds in forming_bonds) or any(
+            len(bonds) > 0 for bonds in breaking_bonds)
+        if not any_change:
             self.ostream.print_info(
                 "Skipping optimization of the force fields because no bonds are breaking or forming."
             )
+            return
 
-        return reactant_ff, product_ff, forming_bonds, breaking_bonds, reactant_ffs, product_ffs, product_mapping
+        for k, ff in enumerate(state_ffs):
+            changing_bonds = set()
+            if k < n_states - 1:
+                changing_bonds |= set(forming_bonds[k])
+            if k > 0:
+                changing_bonds |= set(breaking_bonds[k - 1])
+            changing_bonds = {
+                pair for pair in changing_bonds if pair not in ff.bonds
+            }
+
+            if n_states == 2:
+                note = 'reactant' if k == 0 else 'product'
+            else:
+                note = f'state {k + 1}'
+
+            # TODO this optimisation can likely be taken care of by the openmmdynamics class
+            ff.molecule = self._optimize_molecule(
+                ff.molecule.get_element_ids(),
+                ff,
+                changing_bonds,
+                note=note,
+            )
 
     def _create_combined_forcefield(
         self,
@@ -652,7 +899,7 @@ class ReactionForceFieldBuilder:
         new_parameters = dict(sorted(new_parameters.items()))
         return new_parameters
 
-    def _summarise_reaction(self, reactant, product):
+    def _summarise_reaction(self, reactant, product, step_label=None):
         """
         Summarises the reaction by printing the bonds that are being broken and formed.
 
@@ -663,7 +910,10 @@ class ReactionForceFieldBuilder:
         product_bonds = set(product.bonds)
         formed_bonds = product_bonds - reactant_bonds
         broken_bonds = reactant_bonds - product_bonds
-        self.ostream.print_header("Reaction summary")
+        if step_label is None:
+            self.ostream.print_header("Reaction summary")
+        else:
+            self.ostream.print_header(f"Reaction summary for {step_label}")
         self.ostream.print_header(f"{len(broken_bonds)} breaking bonds:")
 
         if len(broken_bonds) > 0:
