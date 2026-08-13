@@ -698,11 +698,17 @@ class ScfDriver:
         # check print level (verbosity of output)
         self.print_level = max(1, min(self.print_level, 3))
 
-        if self._uses_custom_initial_guess():
+        # Use the corresponding single-level DIIS variant for custom start
+        # orbitals or convergence modifiers such as level shifting, pFON, and
+        # density damping.
+        if (self._uses_custom_initial_guess() or self.level_shifting > 0.0 or
+                self.pfon or self.density_damping):
             if self.acc_type.upper() == 'L2_C2DIIS':
                 self.acc_type = 'C2DIIS'
             elif self.acc_type.upper() == 'L2_DIIS':
                 self.acc_type = 'DIIS'
+
+        if self._uses_custom_initial_guess():
             if self.restart and self.rank == mpi_master():
                 self._ref_mol_orbs = MolecularOrbitals.read_hdf5(
                     self.get_checkpoint_file())

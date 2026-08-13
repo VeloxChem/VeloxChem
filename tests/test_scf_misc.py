@@ -993,6 +993,32 @@ class TestScfDriverMiscellaneous:
         if self.is_master():
             self.assert_scf_results_close(scf_results, ref_results)
 
+    @pytest.mark.parametrize('acc_type, expected_acc_type', [
+        ('l2_diis', 'DIIS'),
+        ('l2_c2diis', 'C2DIIS'),
+    ])
+    @pytest.mark.parametrize(
+        'modifier', ['level_shifting', 'pfon', 'density_damping'])
+    def test_scf_modifiers_use_single_level_diis(
+            self, acc_type, expected_acc_type, modifier):
+
+        molecule, basis = self.get_water_and_basis()
+
+        def configure(driver):
+            driver.acc_type = acc_type
+            if modifier == 'level_shifting':
+                driver.level_shifting = 0.2
+            elif modifier == 'pfon':
+                driver.pfon = True
+                driver.pfon_temperature = 1000
+            elif modifier == 'density_damping':
+                driver.density_damping = True
+
+        scf_drv, _ = self.run_hf_scf(molecule, basis, configure)
+
+        assert scf_drv.is_converged
+        assert scf_drv.acc_type == expected_acc_type
+
     def test_apply_level_shifting_restricted(self):
 
         molecule, basis = self.get_water_and_basis()
