@@ -195,8 +195,8 @@ class ScfRestrictedOpenDriver(ScfDriver):
     def _get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         """
         Computes effective spin restricted open shell Fock/Kohn-Sham matrix
-        in OAO basis by applying Lowdin or canonical orthogonalization to AO
-        Fock/Kohn-Sham matrix. Overloaded base class method.
+        in the AO basis (by DIIS extrapolation of stored AO Fock/Kohn-Sham
+        matrices). Overloaded base class method.
 
         :param fock_mat:
             The Fock/Kohn-Sham matrix.

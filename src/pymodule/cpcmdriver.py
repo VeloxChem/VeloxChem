@@ -101,6 +101,13 @@ class CpcmDriver:
         self.custom_vdw_radii_verbose = True
         self.radii_scaling = 1.2
 
+        # CPCM grid, switching function, preconditioner, Bz vector, and charges
+        self._cpcm_grid = None
+        self._cpcm_sw_func = None
+        self._cpcm_precond = None
+        self._cpcm_Bzvec = None
+        self._cpcm_q = None
+
         # input keywords
         self.input_keywords = {
             'cpcm': {

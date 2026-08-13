@@ -1845,7 +1845,10 @@ class ScfDriver:
 
             eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
-            # Note: skip level-shifting for iteration 0 (fresh initial guess)
+            # Note: skip level-shifting only for the initial fresh guess (first
+            # SCF cycle, _num_iter == 0). For restart or user-supplied start
+            # orbitals, _num_iter starts at 1 and level shifting applies from
+            # the first iteration.
             use_level_shift = (self._num_iter > 0 and self.level_shifting > 0.0)
 
             if self.rank == mpi_master() and use_level_shift:
@@ -2903,8 +2906,8 @@ class ScfDriver:
 
     def _get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         """
-        Computes effective Fock/Kohn-Sham matrix in OAO basis by applying
-        Lowdin or canonical orthogonalization to AO Fock/Kohn-Sham matrix.
+        Computes effective Fock/Kohn-Sham matrix in the AO basis (e.g., by
+        DIIS extrapolation of stored AO Fock/Kohn-Sham matrices).
 
         Base-class placeholder; must be overridden by a concrete SCF driver
         subclass.
@@ -3325,18 +3328,11 @@ class ScfDriver:
             # DIIS or second step in two level DIIS
             if self._num_iter > 0:
 
-                te = 0.0
-                diff_te = 0.0
-                e_grad = 0.0
-                max_grad = 0.0
-                diff_den = 0.0
-
-                if self._iter_data:
-                    te = self._iter_data['energy']
-                    diff_te = self._iter_data['diff_energy']
-                    e_grad = self._iter_data['gradient_norm']
-                    max_grad = self._iter_data['max_gradient']
-                    diff_den = self._iter_data['diff_density']
+                te = self._iter_data['energy']
+                diff_te = self._iter_data['diff_energy']
+                e_grad = self._iter_data['gradient_norm']
+                max_grad = self._iter_data['max_gradient']
+                diff_den = self._iter_data['diff_density']
 
                 if self._num_iter == 1:
                     diff_te = 0.0
