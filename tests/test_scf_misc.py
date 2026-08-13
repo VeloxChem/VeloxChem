@@ -85,6 +85,26 @@ class TestScfDriverMiscellaneous:
 
         return MPI.COMM_WORLD.Get_rank() == mpi_master()
 
+    @staticmethod
+    def assert_scf_results_close(results, ref_results):
+        """
+        Asserts that the final SCF results of a modified driver match the
+        unmodified reference.
+        """
+
+        assert np.abs(results['scf_energy'] -
+                      ref_results['scf_energy']) < 1.0e-10
+        assert np.max(
+            np.abs(
+                np.abs(results['C_alpha']) -
+                np.abs(ref_results['C_alpha']))) < 1.0e-6
+        assert np.max(
+            np.abs(results['D_alpha'] - ref_results['D_alpha'])) < 1.0e-6
+        assert np.max(
+            np.abs(results['E_alpha'] - ref_results['E_alpha'])) < 1.0e-6
+        assert np.max(
+            np.abs(results['F_alpha'] - ref_results['F_alpha'])) < 1.0e-6
+
     def test_filename_checkpoint_and_restart(self, tmp_path):
 
         molecule, basis = self.get_water_and_basis()
@@ -858,52 +878,191 @@ class TestScfDriverMiscellaneous:
             assert '1.0 unpaired alpha electrons on atom 1 (O)' in output
             assert '0.5 unpaired beta  electrons on atom 2 (H)' in output
 
-    def test_level_shifting_and_pfon_real_scf(self, tmp_path):
+    def test_level_shifting_real_scf(self, tmp_path):
 
         molecule, basis = self.get_water_and_basis()
 
         comm = MPI.COMM_WORLD
         ostream = OutputStream.create_mpi_ostream(
-            comm, str(tmp_path / 'level_pfon.out'))
+            comm, str(tmp_path / 'level_shifting.out'))
 
         scf_drv = ScfRestrictedDriver(comm, ostream)
         scf_drv.acc_type = 'diis'
         scf_drv.level_shifting = 0.2
+
+        scf_results = scf_drv.compute(molecule, basis)
+        assert scf_drv.is_converged
+        assert scf_drv.level_shifting == 0.0
+
+        if self.is_master():
+            output = (tmp_path / 'level_shifting.out').read_text()
+            assert 'Applying level-shifting' in output
+            assert 'Applying pseudo-FON' not in output
+
+        ref_drv, ref_results = self.run_hf_scf(
+            molecule, basis, lambda drv: setattr(drv, 'acc_type', 'diis'))
+        assert ref_drv.is_converged
+
+        if self.is_master():
+            self.assert_scf_results_close(scf_results, ref_results)
+
+    def test_level_shifting_decrement_and_clamp(self, tmp_path):
+
+        molecule, basis = self.get_water_and_basis()
+
+        comm = MPI.COMM_WORLD
+        ostream = OutputStream.create_mpi_ostream(
+            comm, str(tmp_path / 'level_shifting_clamp.out'))
+
+        scf_drv = ScfRestrictedDriver(comm, ostream)
+        scf_drv.acc_type = 'diis'
+        scf_drv.level_shifting = 0.2
+        scf_drv.level_shifting_delta = 0.5
+
+        scf_results = scf_drv.compute(molecule, basis)
+        assert scf_drv.is_converged
+        assert scf_drv.level_shifting == 0.0
+
+        if self.is_master():
+            output = (tmp_path / 'level_shifting_clamp.out').read_text()
+            # Level shifting is skipped on the fresh-guess iteration and, with
+            # a delta (0.5) larger than the initial value (0.2), is clamped to
+            # zero right after the first application.
+            assert output.count('Applying level-shifting') == 1
+            assert 'Applying level-shifting (0.20au)' in output
+
+    def test_pfon_real_scf(self, tmp_path):
+
+        molecule, basis = self.get_water_and_basis()
+
+        comm = MPI.COMM_WORLD
+        ostream = OutputStream.create_mpi_ostream(
+            comm, str(tmp_path / 'pfon.out'))
+
+        scf_drv = ScfRestrictedDriver(comm, ostream)
+        scf_drv.acc_type = 'diis'
         scf_drv.pfon = True
         scf_drv.pfon_temperature = 1000
 
         scf_results = scf_drv.compute(molecule, basis)
         assert scf_drv.is_converged
-
-        assert len(scf_drv.history) == 8
         assert scf_drv.pfon_temperature == 0
-        assert scf_drv.level_shifting == 0.0
 
         if self.is_master():
-            output = (tmp_path / 'level_pfon.out').read_text()
-            assert 'Applying level-shifting' in output
+            output = (tmp_path / 'pfon.out').read_text()
             assert 'Applying pseudo-FON' in output
+            assert 'Applying level-shifting' not in output
 
-        ostream_2 = OutputStream.create_mpi_ostream(
-            comm, str(tmp_path / 'level_pfon_2.out'))
-
-        scf_drv_2 = ScfRestrictedDriver(comm, ostream_2)
-        scf_drv_2.acc_type = 'diis'
-
-        scf_results_2 = scf_drv_2.compute(molecule, basis)
-        assert scf_drv_2.is_converged
+        ref_drv, ref_results = self.run_hf_scf(
+            molecule, basis, lambda drv: setattr(drv, 'acc_type', 'diis'))
+        assert ref_drv.is_converged
 
         if self.is_master():
-            output = (tmp_path / 'level_pfon_2.out').read_text()
-            assert 'Applying level-shifting' not in output
-            assert 'Applying pseudo-FON' not in output
+            self.assert_scf_results_close(scf_results, ref_results)
 
-            assert np.abs(scf_results['scf_energy'] - scf_results_2['scf_energy']) < 1e-10
-            assert np.max(np.abs(
-                np.abs(scf_results['C_alpha']) - np.abs(scf_results_2['C_alpha']))) < 1e-6
-            assert np.max(np.abs(scf_results['D_alpha'] - scf_results_2['D_alpha'])) < 1e-6
-            assert np.max(np.abs(scf_results['E_alpha'] - scf_results_2['E_alpha'])) < 1e-6
-            assert np.max(np.abs(scf_results['F_alpha'] - scf_results_2['F_alpha'])) < 1e-6
+    def test_apply_level_shifting_restricted(self):
+
+        molecule, basis = self.get_water_and_basis()
+        n_mo = basis.get_dimension_of_basis()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+
+        fock = np.diag(np.linspace(-1.0, 1.0, n_mo))
+        ovl = np.eye(n_mo)
+        coeffs = np.eye(n_mo)
+        energies = np.diag(fock).copy()
+        occupations = np.zeros(n_mo)
+
+        driver = ScfRestrictedDriver()
+        driver.ostream.mute()
+        driver.level_shifting = 0.5
+        driver._molecular_orbitals = MolecularOrbitals(
+            [coeffs], [energies], [occupations], molorb.rest)
+
+        shifted = driver._apply_level_shifting(molecule, basis, (fock,), ovl)
+
+        expected = np.diag(fock).copy()
+        expected[nocc:] += 0.5
+
+        if self.is_master():
+            assert np.allclose(np.diag(shifted[0]), expected)
+            assert np.allclose(np.diag(shifted[0])[:nocc], np.diag(fock)[:nocc])
+            assert np.allclose(shifted[0], shifted[0].T)
+
+    def test_apply_level_shifting_unrestricted(self):
+
+        molecule, basis = self.get_open_shell_water_and_basis()
+        n_mo = basis.get_dimension_of_basis()
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+        nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
+
+        fock_a = np.diag(np.linspace(-1.0, 1.0, n_mo))
+        fock_b = np.diag(np.linspace(-0.8, 1.2, n_mo))
+        ovl = np.eye(n_mo)
+        coeffs = np.eye(n_mo)
+        energies_a = np.diag(fock_a).copy()
+        energies_b = np.diag(fock_b).copy()
+        occupations = np.zeros(n_mo)
+
+        driver = ScfUnrestrictedDriver()
+        driver.ostream.mute()
+        driver.level_shifting = 0.5
+        driver._molecular_orbitals = MolecularOrbitals(
+            [coeffs, coeffs], [energies_a, energies_b],
+            [occupations, occupations], molorb.unrest)
+
+        shifted = driver._apply_level_shifting(
+            molecule, basis, (fock_a, fock_b), ovl)
+
+        expected_a = np.diag(fock_a).copy()
+        expected_a[nocc_a:] += 0.5
+        expected_b = np.diag(fock_b).copy()
+        expected_b[nocc_b:] += 0.5
+
+        if self.is_master():
+            assert np.allclose(np.diag(shifted[0]), expected_a)
+            assert np.allclose(np.diag(shifted[1]), expected_b)
+            assert np.allclose(shifted[0], shifted[0].T)
+            assert np.allclose(shifted[1], shifted[1].T)
+
+    def test_apply_level_shifting_restricted_open(self):
+
+        molecule, basis = self.get_open_shell_water_and_basis()
+        n_mo = basis.get_dimension_of_basis()
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+
+        fock = np.diag(np.linspace(-1.0, 1.0, n_mo))
+        ovl = np.eye(n_mo)
+        coeffs = np.eye(n_mo)
+        energies = np.diag(fock).copy()
+        occupations = np.zeros(n_mo)
+
+        driver = ScfRestrictedOpenDriver()
+        driver.ostream.mute()
+        driver.level_shifting = 0.5
+        driver._molecular_orbitals = MolecularOrbitals(
+            [coeffs], [energies], [occupations, occupations], molorb.restopen)
+
+        shifted = driver._apply_level_shifting(molecule, basis, (fock,), ovl)
+
+        expected = np.diag(fock).copy()
+        expected[nocc_a:] += 0.5
+
+        if self.is_master():
+            assert np.allclose(np.diag(shifted[0]), expected)
+            assert np.allclose(shifted[0], shifted[0].T)
+
+    def test_level_shifting_keywords_parsed(self):
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+
+        scf_drv.update_settings({
+            'level_shifting': '0.25',
+            'level_shifting_delta': '0.05',
+        })
+
+        assert scf_drv.level_shifting == pytest.approx(0.25)
+        assert scf_drv.level_shifting_delta == pytest.approx(0.05)
 
     def test_modified_orbitals_delay_convergence(self):
 

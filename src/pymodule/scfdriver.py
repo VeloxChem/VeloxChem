@@ -1856,29 +1856,8 @@ class ScfDriver:
                 self.ostream.print_info(
                     f'Applying level-shifting ({self.level_shifting:.2f}au)')
 
-                eff_fock_mat = list(eff_fock_mat)
-
-                C_alpha = self.molecular_orbitals.alpha_to_numpy()
-                nocc_a = molecule.number_of_alpha_occupied_orbitals(ao_basis)
-                fmo_a = np.linalg.multi_dot(
-                    [C_alpha.T, eff_fock_mat[0], C_alpha])
-                for idx in range(nocc_a, fmo_a.shape[0]):
-                    fmo_a[idx, idx] += self.level_shifting
-                eff_fock_mat[0] = np.linalg.multi_dot(
-                    [S, C_alpha, fmo_a, C_alpha.T, S])
-
-                if self.scf_type == 'unrestricted':
-
-                    C_beta = self.molecular_orbitals.beta_to_numpy()
-                    nocc_b = molecule.number_of_beta_occupied_orbitals(ao_basis)
-                    fmo_b = np.linalg.multi_dot(
-                        [C_beta.T, eff_fock_mat[1], C_beta])
-                    for idx in range(nocc_b, fmo_b.shape[0]):
-                        fmo_b[idx, idx] += self.level_shifting
-                    eff_fock_mat[1] = np.linalg.multi_dot(
-                        [S, C_beta, fmo_b, C_beta.T, S])
-
-                eff_fock_mat = tuple(eff_fock_mat)
+                eff_fock_mat = self._apply_level_shifting(
+                    molecule, ao_basis, eff_fock_mat, ovl_mat)
 
             if use_level_shift:
                 self.level_shifting -= self.level_shifting_delta
@@ -2926,6 +2905,49 @@ class ScfDriver:
         raise NotImplementedError(
             'ScfDriver._get_effective_fock must be implemented by a concrete ' +
             'SCF driver subclass')
+
+    def _apply_level_shifting(self, molecule, ao_basis, fock_mat, ovl_mat):
+        """
+        Applies level shifting to the effective Fock/Kohn-Sham matrix.
+
+        The orbital energies of the virtual orbitals are raised by
+        ``level_shifting``, while the occupied orbital energies are left
+        unchanged. The shifting is performed in the molecular orbital basis and
+        the Fock/Kohn-Sham matrix is transformed back to the AO basis.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param fock_mat:
+            The effective Fock/Kohn-Sham matrix.
+        :param ovl_mat:
+            The overlap matrix.
+
+        :return:
+            The level-shifted Fock/Kohn-Sham matrix.
+        """
+
+        fock_mat = list(fock_mat)
+        S = ovl_mat
+
+        C_alpha = self.molecular_orbitals.alpha_to_numpy()
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(ao_basis)
+        fmo_a = np.linalg.multi_dot([C_alpha.T, fock_mat[0], C_alpha])
+        for idx in range(nocc_a, fmo_a.shape[0]):
+            fmo_a[idx, idx] += self.level_shifting
+        fock_mat[0] = np.linalg.multi_dot([S, C_alpha, fmo_a, C_alpha.T, S])
+
+        if self.scf_type == 'unrestricted':
+
+            C_beta = self.molecular_orbitals.beta_to_numpy()
+            nocc_b = molecule.number_of_beta_occupied_orbitals(ao_basis)
+            fmo_b = np.linalg.multi_dot([C_beta.T, fock_mat[1], C_beta])
+            for idx in range(nocc_b, fmo_b.shape[0]):
+                fmo_b[idx, idx] += self.level_shifting
+            fock_mat[1] = np.linalg.multi_dot([S, C_beta, fmo_b, C_beta.T, S])
+
+        return tuple(fock_mat)
 
     def _gen_molecular_orbitals(self, molecule, ao_basis, fock_mat, oao_mat):
         """
