@@ -906,6 +906,39 @@ class TestScfDriverMiscellaneous:
         if self.is_master():
             self.assert_scf_results_close(scf_results, ref_results)
 
+    def test_level_shift_smoothing_real_scf(self, monkeypatch):
+
+        molecule, basis = self.get_water_and_basis()
+
+        smoothing_calls = []
+        original_smooth = ScfRestrictedDriver._smooth_level_shift
+
+        def track_smoothing(driver, level_shift):
+            smoothing_calls.append(driver.level_shift_smoothing)
+            return original_smooth(driver, level_shift)
+
+        monkeypatch.setattr(ScfRestrictedDriver, '_smooth_level_shift',
+                            track_smoothing)
+
+        energies = {}
+        for smoothing in (0.0, 0.25):
+            def configure(driver, smoothing=smoothing):
+                driver.acc_type = 'diis'
+                driver.level_shifting = 0.2
+                driver.level_shift_smoothing = smoothing
+
+            scf_drv, scf_results = self.run_hf_scf(
+                molecule, basis, configure)
+            assert scf_drv.is_converged
+
+            if self.is_master():
+                energies[smoothing] = scf_results['scf_energy']
+
+        if self.is_master():
+            assert len(smoothing_calls) > 1
+            assert all(smoothing == 0.25 for smoothing in smoothing_calls)
+            assert energies[0.0] == pytest.approx(energies[0.25], abs=1.0e-10)
+
     def test_level_shifting_decrement_and_clamp(self, tmp_path):
 
         molecule, basis = self.get_water_and_basis()
@@ -919,7 +952,7 @@ class TestScfDriverMiscellaneous:
         scf_drv.level_shifting = 0.2
         scf_drv.level_shifting_delta = 0.5
 
-        scf_results = scf_drv.compute(molecule, basis)
+        scf_results_not_used = scf_drv.compute(molecule, basis)
         assert scf_drv.is_converged
         assert scf_drv.level_shifting == 0.0
 
@@ -1051,6 +1084,116 @@ class TestScfDriverMiscellaneous:
             assert np.allclose(np.diag(shifted[0]), expected)
             assert np.allclose(shifted[0], shifted[0].T)
 
+    def test_build_add_level_shift_restricted(self):
+
+        molecule, basis = self.get_water_and_basis()
+        n_mo = basis.get_dimension_of_basis()
+
+        fock = np.diag(np.linspace(-1.0, 1.0, n_mo))
+        ovl = np.eye(n_mo)
+        coeffs = np.eye(n_mo)
+        energies = np.diag(fock).copy()
+        occupations = np.zeros(n_mo)
+
+        driver = ScfRestrictedDriver()
+        driver.ostream.mute()
+        driver.level_shifting = 0.5
+        driver._molecular_orbitals = MolecularOrbitals(
+            [coeffs], [energies], [occupations], molorb.rest)
+
+        shifted = driver._apply_level_shifting(molecule, basis, (fock,), ovl)
+        level_shift = driver._build_level_shift(molecule, basis, ovl)
+        rebuilt = driver._add_level_shift((fock,), level_shift)
+
+        if self.is_master():
+            assert np.allclose(rebuilt[0], shifted[0])
+
+    def test_build_add_level_shift_unrestricted(self):
+
+        molecule, basis = self.get_open_shell_water_and_basis()
+        n_mo = basis.get_dimension_of_basis()
+
+        fock_a = np.diag(np.linspace(-1.0, 1.0, n_mo))
+        fock_b = np.diag(np.linspace(-0.8, 1.2, n_mo))
+        ovl = np.eye(n_mo)
+        coeffs = np.eye(n_mo)
+        energies_a = np.diag(fock_a).copy()
+        energies_b = np.diag(fock_b).copy()
+        occupations = np.zeros(n_mo)
+
+        driver = ScfUnrestrictedDriver()
+        driver.ostream.mute()
+        driver.level_shifting = 0.5
+        driver._molecular_orbitals = MolecularOrbitals(
+            [coeffs, coeffs], [energies_a, energies_b],
+            [occupations, occupations], molorb.unrest)
+
+        shifted = driver._apply_level_shifting(
+            molecule, basis, (fock_a, fock_b), ovl)
+        level_shift = driver._build_level_shift(molecule, basis, ovl)
+        rebuilt = driver._add_level_shift((fock_a, fock_b), level_shift)
+
+        if self.is_master():
+            assert np.allclose(rebuilt[0], shifted[0])
+            assert np.allclose(rebuilt[1], shifted[1])
+
+    def test_build_add_level_shift_restricted_open(self):
+
+        molecule, basis = self.get_open_shell_water_and_basis()
+        n_mo = basis.get_dimension_of_basis()
+
+        fock = np.diag(np.linspace(-1.0, 1.0, n_mo))
+        ovl = np.eye(n_mo)
+        coeffs = np.eye(n_mo)
+        energies = np.diag(fock).copy()
+        occupations = np.zeros(n_mo)
+
+        driver = ScfRestrictedOpenDriver()
+        driver.ostream.mute()
+        driver.level_shifting = 0.5
+        driver._molecular_orbitals = MolecularOrbitals(
+            [coeffs], [energies], [occupations, occupations], molorb.restopen)
+
+        shifted = driver._apply_level_shifting(molecule, basis, (fock,), ovl)
+        level_shift = driver._build_level_shift(molecule, basis, ovl)
+        rebuilt = driver._add_level_shift((fock,), level_shift)
+
+        if self.is_master():
+            assert np.allclose(rebuilt[0], shifted[0])
+
+    def test_smooth_level_shift_restricted(self):
+
+        driver = ScfRestrictedDriver()
+        driver.ostream.mute()
+        driver.level_shift_smoothing = 0.25
+
+        level_shift = (np.diag(np.arange(1.0, 5.0)),)
+
+        first = driver._smooth_level_shift(level_shift)
+        assert np.allclose(first[0], level_shift[0])
+
+        smaller = (0.5 * level_shift[0],)
+        second = driver._smooth_level_shift(smaller)
+        expected = 0.75 * smaller[0] + 0.25 * first[0]
+        assert np.allclose(second[0], expected)
+
+    def test_smooth_level_shift_unrestricted(self):
+
+        driver = ScfUnrestrictedDriver()
+        driver.ostream.mute()
+        driver.level_shift_smoothing = 0.25
+
+        level_shift = (np.diag([0.0, 1.0]), np.diag([0.0, 2.0]))
+
+        first = driver._smooth_level_shift(level_shift)
+        assert np.allclose(first[0], level_shift[0])
+        assert np.allclose(first[1], level_shift[1])
+
+        smaller = (0.5 * level_shift[0], 0.5 * level_shift[1])
+        second = driver._smooth_level_shift(smaller)
+        assert np.allclose(second[0], 0.75 * smaller[0] + 0.25 * first[0])
+        assert np.allclose(second[1], 0.75 * smaller[1] + 0.25 * first[1])
+
     def test_level_shifting_keywords_parsed(self):
 
         scf_drv = ScfRestrictedDriver()
@@ -1059,10 +1202,27 @@ class TestScfDriverMiscellaneous:
         scf_drv.update_settings({
             'level_shifting': '0.25',
             'level_shifting_delta': '0.05',
+            'level_shift_smoothing': '0.35',
         })
 
         assert scf_drv.level_shifting == pytest.approx(0.25)
         assert scf_drv.level_shifting_delta == pytest.approx(0.05)
+        assert scf_drv.level_shift_smoothing == pytest.approx(0.35)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_level_shift_smoothing_validation(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        for bad_value in (-0.1, 1.0, 1.5):
+            def configure(driver, bad_value=bad_value):
+                driver.level_shifting = 0.2
+                driver.level_shift_smoothing = bad_value
+
+            with pytest.raises(VeloxChemError,
+                               match="level_shift_smoothing"):
+                self.run_hf_scf(molecule, basis, configure)
 
     def test_modified_orbitals_delay_convergence(self):
 

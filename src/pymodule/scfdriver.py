@@ -172,6 +172,9 @@ class ScfDriver:
         self.level_shifting = 0.0
         self.level_shifting_delta = 0.01
 
+        # level-shift smoothing (exponential moving average)
+        self.level_shift_smoothing = 0.5
+
         # density damping
         self.density_damping = False
 
@@ -193,6 +196,9 @@ class ScfDriver:
         self._fock_matrices_alpha = deque()
         self._fock_matrices_beta = deque()
         self._fock_matrices_proj = deque()
+
+        self._level_shift_smooth_alpha = None
+        self._level_shift_smooth_beta = None
 
         self._density_matrices_alpha = deque()
         self._density_matrices_beta = deque()
@@ -320,6 +326,8 @@ class ScfDriver:
                 'pfon_nvir': ('int', 'number of virtual orbitals used in pFON'),
                 'level_shifting': ('float', 'level shifting parameter'),
                 'level_shifting_delta': ('float', 'level shifting delta'),
+                'level_shift_smoothing':
+                    ('float', 'level shift smoothing coefficient (0 <= smoothing < 1)'),
                 'density_damping': ('bool', 'use density damping'),
                 'conv_thresh': ('float', 'SCF convergence threshold'),
                 'eri_thresh': ('float', 'ERI screening threshold'),
@@ -1009,6 +1017,9 @@ class ScfDriver:
         self._density_matrices_alpha.clear()
         self._density_matrices_beta.clear()
 
+        self._level_shift_smooth_alpha = None
+        self._level_shift_smooth_beta = None
+
         profiler.end(self.ostream, scf_flag=True)
 
         if not self.is_converged:
@@ -1606,6 +1617,16 @@ class ScfDriver:
         self._density_matrices_alpha.clear()
         self._density_matrices_beta.clear()
 
+        self._level_shift_smooth_alpha = None
+        self._level_shift_smooth_beta = None
+
+        if self.level_shifting > 0.0:
+            assert_msg_critical(
+                self.level_shift_smoothing is not None and
+                0.0 <= self.level_shift_smoothing < 1.0,
+                'SCF driver: \'level_shift_smoothing\' must satisfy '
+                '0 <= smoothing < 1')
+
         ovl_mat, kin_mat, npot_mat, dipole_mats, ecp_mat = self._comp_one_ints(
             molecule, ao_basis)
 
@@ -1856,8 +1877,16 @@ class ScfDriver:
                 self.ostream.print_info(
                     f'Applying level-shifting ({self.level_shifting:.2f}au)')
 
-                eff_fock_mat = self._apply_level_shifting(
-                    molecule, ao_basis, eff_fock_mat, ovl_mat)
+                if self.level_shift_smoothing == 0.0:
+                    # Preserve the original level-shifting implementation
+                    eff_fock_mat = self._apply_level_shifting(
+                        molecule, ao_basis, eff_fock_mat, ovl_mat)
+                else:
+                    level_shift = self._build_level_shift(molecule, ao_basis,
+                                                          ovl_mat)
+                    level_shift_eff = self._smooth_level_shift(level_shift)
+                    eff_fock_mat = self._add_level_shift(eff_fock_mat,
+                                                         level_shift_eff)
 
             if use_level_shift:
                 self.level_shifting -= self.level_shifting_delta
@@ -2906,6 +2935,65 @@ class ScfDriver:
             'ScfDriver._get_effective_fock must be implemented by a concrete ' +
             'SCF driver subclass')
 
+    def _build_level_shift(self, molecule, ao_basis, ovl_mat):
+        """
+        Builds the level-shift correction matrix in the AO basis.
+
+        The orbital energies of the virtual orbitals are raised by
+        ``level_shifting``, while the occupied orbital energies are left
+        unchanged. The shifting is performed in the molecular orbital basis and
+        the resulting correction is transformed back to the AO basis.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param ovl_mat:
+            The overlap matrix.
+
+        :return:
+            The level-shift correction matrix (or alpha/beta tuple).
+        """
+
+        S = ovl_mat
+
+        C_alpha = self.molecular_orbitals.alpha_to_numpy()
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(ao_basis)
+        nmo_a = C_alpha.shape[1]
+        lmo_a = np.zeros((nmo_a, nmo_a))
+        for idx in range(nocc_a, nmo_a):
+            lmo_a[idx, idx] += self.level_shifting
+        L_alpha = np.linalg.multi_dot([S, C_alpha, lmo_a, C_alpha.T, S])
+
+        if self.scf_type == 'unrestricted':
+
+            C_beta = self.molecular_orbitals.beta_to_numpy()
+            nocc_b = molecule.number_of_beta_occupied_orbitals(ao_basis)
+            nmo_b = C_beta.shape[1]
+            lmo_b = np.zeros((nmo_b, nmo_b))
+            for idx in range(nocc_b, nmo_b):
+                lmo_b[idx, idx] += self.level_shifting
+            L_beta = np.linalg.multi_dot([S, C_beta, lmo_b, C_beta.T, S])
+
+            return (L_alpha, L_beta)
+
+        return (L_alpha,)
+
+    def _add_level_shift(self, fock_mat, level_shift):
+        """
+        Adds a level-shift correction to an effective Fock/Kohn-Sham matrix.
+
+        :param fock_mat:
+            The effective Fock/Kohn-Sham matrix tuple.
+        :param level_shift:
+            The level-shift correction matrix tuple.
+
+        :return:
+            The level-shifted Fock/Kohn-Sham matrix tuple.
+        """
+
+        return tuple(f + L for f, L in zip(fock_mat, level_shift))
+
     def _apply_level_shifting(self, molecule, ao_basis, fock_mat, ovl_mat):
         """
         Applies level shifting to the effective Fock/Kohn-Sham matrix.
@@ -2948,6 +3036,42 @@ class ScfDriver:
             fock_mat[1] = np.linalg.multi_dot([S, C_beta, fmo_b, C_beta.T, S])
 
         return tuple(fock_mat)
+
+    def _smooth_level_shift(self, level_shift):
+        """
+        Smooths the level-shift correction with an exponential moving average.
+
+        :param level_shift:
+            The current level-shift correction matrix tuple.
+
+        :return:
+            The smoothed level-shift correction matrix tuple.
+        """
+
+        smoothing = self.level_shift_smoothing
+
+        L_alpha = level_shift[0]
+
+        if self._level_shift_smooth_alpha is None:
+            L_smooth_alpha = L_alpha.copy()
+        else:
+            L_smooth_alpha = ((1.0 - smoothing) * L_alpha +
+                              smoothing * self._level_shift_smooth_alpha)
+        self._level_shift_smooth_alpha = L_smooth_alpha
+
+        if self.scf_type == 'unrestricted':
+            L_beta = level_shift[1]
+
+            if self._level_shift_smooth_beta is None:
+                L_smooth_beta = L_beta.copy()
+            else:
+                L_smooth_beta = ((1.0 - smoothing) * L_beta +
+                                 smoothing * self._level_shift_smooth_beta)
+            self._level_shift_smooth_beta = L_smooth_beta
+
+            return (L_smooth_alpha, L_smooth_beta)
+
+        return (L_smooth_alpha,)
 
     def _gen_molecular_orbitals(self, molecule, ao_basis, fock_mat, oao_mat):
         """
