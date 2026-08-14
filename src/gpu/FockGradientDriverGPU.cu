@@ -62,6 +62,7 @@
 #include "ScreeningData.hpp"
 #include "GradientScreeningData.hpp"
 #include "BoysFuncTable.hpp"
+#include "BoysFuncTableGpu.hpp"
 #include "FockGradientDriverGPU.hpp"
 #include "ErrorHandler.hpp"
 #include "GpuConstants.hpp"
@@ -2784,6 +2785,8 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     // std::cout << "-------------------------\n";
     // std::cout << timer.getSummary() << std::endl;
 
+    auto d_boys_device_tables = boysfunc::uploadFullBoysFuncTables(num_gpus_per_node, rank, total_num_gpus_per_compute_node);
+
 #pragma omp parallel num_threads(num_gpus_per_node)
     {
     auto thread_id = omp_get_thread_num();
@@ -2802,23 +2805,11 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
     timer.start("Boys func. prep.");
 
-    // Boys function (tabulated for order 0-28)
+    // Boys tables uploaded serially before the parallel region.
 
-    const auto boys_func_table = boysfunc::getFullBoysFuncTable();
-
-    double* d_boys_func_table;
-
-    gpuSafe(gpuMalloc(&d_boys_func_table, boys_func_table.size() * sizeof(double)));
-
-    gpuSafe(gpuMemcpy(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), gpuMemcpyHostToDevice));
-
-    const auto boys_func_ft = boysfunc::getBoysFuncFactors();
-
-    double* d_boys_func_ft;
-
-    gpuSafe(gpuMalloc(&d_boys_func_ft, boys_func_ft.size() * sizeof(double)));
-
-    gpuSafe(gpuMemcpy(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), gpuMemcpyHostToDevice));
+    const auto& d_boys_tables      = d_boys_device_tables[gpu_id];
+    double*       d_boys_func_table = d_boys_tables.table;
+    double*       d_boys_func_ft    = d_boys_tables.ft;
 
     timer.stop("Boys func. prep.");
 
@@ -24953,9 +24944,6 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
     screening.setExchangeTime(gpu_id, exchange_elapsed_time);
 
-    gpuSafe(gpuFree(d_boys_func_table));
-    gpuSafe(gpuFree(d_boys_func_ft));
-
     gpuSafe(gpuFree(d_s_prim_info));
     gpuSafe(gpuFree(d_s_prim_aoinds));
 
@@ -25058,6 +25046,8 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuFree(d_prim_cart_ao_to_atom_inds));
 
     }}
+
+    boysfunc::freeFullBoysFuncTables(num_gpus_per_node, rank, total_num_gpus_per_compute_node, d_boys_device_tables);
 
     CDenseMatrix Fock_grad_T (natoms, 3);
 

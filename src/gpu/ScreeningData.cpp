@@ -48,6 +48,25 @@
 
 #define MATH_CONST_PI 3.14159265358979323846
 
+namespace {
+
+using QDTuple = std::tuple<double, int64_t, int64_t, double, double>;
+using QpTuple = std::tuple<double, int64_t, int64_t>;
+
+auto computePrefixOffsets(const std::vector<int64_t>& counts) -> std::vector<int64_t>
+{
+    std::vector<int64_t> offsets(counts.size() + 1, 0);
+
+    for (size_t i = 0; i < counts.size(); i++)
+    {
+        offsets[i + 1] = offsets[i] + counts[i];
+    }
+
+    return offsets;
+}
+
+}  // namespace
+
 CScreeningData::CScreeningData(const CMolecule& molecule,
                                const CMolecularBasis& basis,
                                const int64_t num_gpus_per_node,
@@ -68,59 +87,11 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
 
     _computeQMatrices(molecule, basis);
 
-    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+    _sortQ(_s_prim_count, _p_prim_count, _d_prim_count, _s_prim_info, _p_prim_info, _d_prim_info);
 
-    int64_t s_prim_count = 0;
-    int64_t p_prim_count = 0;
-    int64_t d_prim_count = 0;
-
-    for (const auto& gto_block : gto_blocks)
-    {
-        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
-        const auto npgtos = gto_block.getNumberOfPrimitives();
-
-        const auto gto_ang = gto_block.getAngularMomentum();
-
-        if (gto_ang == 0)
-        {
-            s_prim_count += npgtos * ncgtos;
-        }
-        else if (gto_ang == 1)
-        {
-            p_prim_count += npgtos * ncgtos;
-        }
-        else if (gto_ang == 2)
-        {
-            d_prim_count += npgtos * ncgtos;
-        }
-    }
-
-    // S gto block
-
-    std::vector<double>   s_prim_info(5 * s_prim_count);
-    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
-
-    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
-
-    // P gto block
-
-    std::vector<double>   p_prim_info(5 * p_prim_count);
-    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
-
-    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
-
-    // D gto block
-
-    std::vector<double>   d_prim_info(5 * d_prim_count);
-    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
-
-    gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
-
-    _sortQ(s_prim_count, p_prim_count, d_prim_count, s_prim_info, p_prim_info, d_prim_info);
-
-    form_Q_and_D_inds_for_K(s_prim_count, p_prim_count, d_prim_count,
-                            s_prim_aoinds, p_prim_aoinds, d_prim_aoinds,
-                            s_prim_info, p_prim_info, d_prim_info);
+    form_Q_and_D_inds_for_K(_s_prim_count, _p_prim_count, _d_prim_count,
+                            _s_prim_aoinds, _p_prim_aoinds, _d_prim_aoinds,
+                            _s_prim_info, _p_prim_info, _d_prim_info);
 }
 
 auto
@@ -152,26 +123,34 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
         if (gto_ang == 2) d_prim_count += npgtos * ncgtos;
     }
 
+    _s_prim_count = s_prim_count;
+    _p_prim_count = p_prim_count;
+    _d_prim_count = d_prim_count;
+
     // S block
 
-    std::vector<double>   s_prim_info(5 * s_prim_count);
-    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+    _s_prim_info   = std::vector<double>(5 * s_prim_count);
+    _s_prim_aoinds = std::vector<uint32_t>(1 * s_prim_count);
 
-    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
+    gtoinfo::updatePrimitiveInfoForS(_s_prim_info.data(), _s_prim_aoinds.data(), s_prim_count, gto_blocks);
 
     // P block
 
-    std::vector<double>   p_prim_info(5 * p_prim_count);
-    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+    _p_prim_info   = std::vector<double>(5 * p_prim_count);
+    _p_prim_aoinds = std::vector<uint32_t>(3 * p_prim_count);
 
-    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
+    gtoinfo::updatePrimitiveInfoForP(_p_prim_info.data(), _p_prim_aoinds.data(), p_prim_count, gto_blocks);
 
     // D block
 
-    std::vector<double>   d_prim_info(5 * d_prim_count);
-    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+    _d_prim_info   = std::vector<double>(5 * d_prim_count);
+    _d_prim_aoinds = std::vector<uint32_t>(6 * d_prim_count);
 
-    gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
+    gtoinfo::updatePrimitiveInfoForD(_d_prim_info.data(), _d_prim_aoinds.data(), d_prim_count, gto_blocks);
+
+    const auto& s_prim_info = _s_prim_info;
+    const auto& p_prim_info = _p_prim_info;
+    const auto& d_prim_info = _d_prim_info;
 
     // GTO block pairs
 
@@ -1765,13 +1744,81 @@ CScreeningData::sortQD(const int64_t s_prim_count,
     // Coulomb: Q_bra*Q_ket*D_ket > ERI_threshold
     const double QD_threshold = eri_threshold / max_Q;
 
-    // S-S gto block pair and S-P gto block pair
+    // S-S, S-P, and S-D gto block pairs
 
+    std::vector<int64_t> ss_counts(s_prim_count, 0);
+    std::vector<int64_t> sp_counts(s_prim_count, 0);
+    std::vector<int64_t> sd_counts(s_prim_count, 0);
+
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < s_prim_count; i++)
     {
-        // S-S gto block pair
-
         const auto i_cgto = s_prim_aoinds[i];
+
+        int64_t ss_count = 0;
+        int64_t sp_count = 0;
+        int64_t sd_count = 0;
+
+        for (int64_t j = i; j < s_prim_count; j++)
+        {
+            const auto j_cgto = s_prim_aoinds[j];
+
+            const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
+            const auto Q_ij = _Q_matrix_ss.row(i)[j];
+            const auto QD_abs_ij = Q_ij * std::fabs(D_ij);
+
+            if ((QD_abs_ij > QD_threshold) && (Q_ij > _pair_threshold) && (std::fabs(D_ij) > _density_threshold)) ss_count++;
+        }
+
+        for (int64_t j = 0; j < p_prim_count; j++)
+        {
+            for (int64_t j_cart = 0; j_cart < 3; j_cart++)
+            {
+                const auto j_cgto = p_prim_aoinds[j + p_prim_count * j_cart];
+
+                const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
+                const auto Q_ij = _Q_matrix_sp.row(i)[j * 3 + j_cart];
+                const auto QD_abs_ij = Q_ij * std::fabs(D_ij);
+
+                if ((QD_abs_ij > QD_threshold) && (Q_ij > _pair_threshold) && (std::fabs(D_ij) > _density_threshold)) sp_count++;
+            }
+        }
+
+        for (int64_t j = 0; j < d_prim_count; j++)
+        {
+            for (int64_t j_cart = 0; j_cart < 6; j_cart++)
+            {
+                const auto j_cgto = d_prim_aoinds[j + d_prim_count * j_cart];
+
+                const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
+                const auto Q_ij = _Q_matrix_sd.row(i)[j * 6 + j_cart];
+                const auto QD_abs_ij = Q_ij * std::fabs(D_ij);
+
+                if ((QD_abs_ij > QD_threshold) && (Q_ij > _pair_threshold) && (std::fabs(D_ij) > _density_threshold)) sd_count++;
+            }
+        }
+
+        ss_counts[i] = ss_count;
+        sp_counts[i] = sp_count;
+        sd_counts[i] = sd_count;
+    }
+
+    const auto ss_offsets = computePrefixOffsets(ss_counts);
+    const auto sp_offsets = computePrefixOffsets(sp_counts);
+    const auto sd_offsets = computePrefixOffsets(sd_counts);
+
+    sorted_ss_mat_Q_D.resize(ss_offsets[s_prim_count]);
+    sorted_sp_mat_Q_D.resize(sp_offsets[s_prim_count]);
+    sorted_sd_mat_Q_D.resize(sd_offsets[s_prim_count]);
+
+#pragma omp parallel for schedule(static)
+    for (int64_t i = 0; i < s_prim_count; i++)
+    {
+        const auto i_cgto = s_prim_aoinds[i];
+
+        int64_t ss_pos = ss_offsets[i];
+        int64_t sp_pos = sp_offsets[i];
+        int64_t sd_pos = sd_offsets[i];
 
         for (int64_t j = i; j < s_prim_count; j++)
         {
@@ -1783,11 +1830,9 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
             if ((QD_abs_ij > QD_threshold) && (Q_ij > _pair_threshold) && (std::fabs(D_ij) > _density_threshold))
             {
-                sorted_ss_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i, j, Q_ij, D_ij));
+                sorted_ss_mat_Q_D[ss_pos++] = std::make_tuple(QD_abs_ij, i, j, Q_ij, D_ij);
             }
         }
-
-        // S-P gto block pair
 
         for (int64_t j = 0; j < p_prim_count; j++)
         {
@@ -1801,12 +1846,10 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
                 if ((QD_abs_ij > QD_threshold) && (Q_ij > _pair_threshold) && (std::fabs(D_ij) > _density_threshold))
                 {
-                    sorted_sp_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i, j * 3 + j_cart, Q_ij, D_ij));
+                    sorted_sp_mat_Q_D[sp_pos++] = std::make_tuple(QD_abs_ij, i, j * 3 + j_cart, Q_ij, D_ij);
                 }
             }
         }
-
-        // S-D gto block pair
 
         for (int64_t j = 0; j < d_prim_count; j++)
         {
@@ -1820,15 +1863,78 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
                 if ((QD_abs_ij > QD_threshold) && (Q_ij > _pair_threshold) && (std::fabs(D_ij) > _density_threshold))
                 {
-                    sorted_sd_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i, j * 6 + j_cart, Q_ij, D_ij));
+                    sorted_sd_mat_Q_D[sd_pos++] = std::make_tuple(QD_abs_ij, i, j * 6 + j_cart, Q_ij, D_ij);
                 }
             }
         }
     }
 
+    // P-P and P-D gto block pairs
+
+    std::vector<int64_t> pp_counts(p_prim_count, 0);
+    std::vector<int64_t> pd_counts(p_prim_count, 0);
+
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < p_prim_count; i++)
     {
-        // P-P gto block pair
+        int64_t pp_count = 0;
+        int64_t pd_count = 0;
+
+        for (int64_t j = i; j < p_prim_count; j++)
+        {
+            for (int64_t i_cart = 0; i_cart < 3; i_cart++)
+            {
+                const auto i_cgto = p_prim_aoinds[i + p_prim_count * i_cart];
+
+                const auto j_cart_start = (j == i ? i_cart : 0);
+
+                for (int64_t j_cart = j_cart_start; j_cart < 3; j_cart++)
+                {
+                    const auto j_cgto = p_prim_aoinds[j + p_prim_count * j_cart];
+
+                    const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
+                    const auto Q_ij = _Q_matrix_pp.row(i * 3 + i_cart)[j * 3 + j_cart];
+                    const auto QD_abs_ij = Q_ij * std::fabs(D_ij);
+
+                    if ((QD_abs_ij > QD_threshold) && (Q_ij > _pair_threshold) && (std::fabs(D_ij) > _density_threshold)) pp_count++;
+                }
+            }
+        }
+
+        for (int64_t j = 0; j < d_prim_count; j++)
+        {
+            for (int64_t i_cart = 0; i_cart < 3; i_cart++)
+            {
+                const auto i_cgto = p_prim_aoinds[i + p_prim_count * i_cart];
+
+                for (int64_t j_cart = 0; j_cart < 6; j_cart++)
+                {
+                    const auto j_cgto = d_prim_aoinds[j + d_prim_count * j_cart];
+
+                    const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
+                    const auto Q_ij = _Q_matrix_pd.row(i * 3 + i_cart)[j * 6 + j_cart];
+                    const auto QD_abs_ij = Q_ij * std::fabs(D_ij);
+
+                    if ((QD_abs_ij > QD_threshold) && (Q_ij > _pair_threshold) && (std::fabs(D_ij) > _density_threshold)) pd_count++;
+                }
+            }
+        }
+
+        pp_counts[i] = pp_count;
+        pd_counts[i] = pd_count;
+    }
+
+    const auto pp_offsets = computePrefixOffsets(pp_counts);
+    const auto pd_offsets = computePrefixOffsets(pd_counts);
+
+    sorted_pp_mat_Q_D.resize(pp_offsets[p_prim_count]);
+    sorted_pd_mat_Q_D.resize(pd_offsets[p_prim_count]);
+
+#pragma omp parallel for schedule(static)
+    for (int64_t i = 0; i < p_prim_count; i++)
+    {
+        int64_t pp_pos = pp_offsets[i];
+        int64_t pd_pos = pd_offsets[i];
 
         for (int64_t j = i; j < p_prim_count; j++)
         {
@@ -1848,13 +1954,11 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
                     if ((QD_abs_ij > QD_threshold) && (Q_ij > _pair_threshold) && (std::fabs(D_ij) > _density_threshold))
                     {
-                        sorted_pp_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i * 3 + i_cart, j * 3 + j_cart, Q_ij, D_ij));
+                        sorted_pp_mat_Q_D[pp_pos++] = std::make_tuple(QD_abs_ij, i * 3 + i_cart, j * 3 + j_cart, Q_ij, D_ij);
                     }
                 }
             }
         }
-    
-        // P-D gto block pair
 
         for (int64_t j = 0; j < d_prim_count; j++)
         {
@@ -1872,16 +1976,54 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
                     if ((QD_abs_ij > QD_threshold) && (Q_ij > _pair_threshold) && (std::fabs(D_ij) > _density_threshold))
                     {
-                        sorted_pd_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i * 3 + i_cart, j * 6 + j_cart, Q_ij, D_ij));
+                        sorted_pd_mat_Q_D[pd_pos++] = std::make_tuple(QD_abs_ij, i * 3 + i_cart, j * 6 + j_cart, Q_ij, D_ij);
                     }
                 }
             }
-        }    
+        }
     }
 
+    // D-D gto block pair
+
+    std::vector<int64_t> dd_counts(d_prim_count, 0);
+
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < d_prim_count; i++)
     {
-        // D-D gto block pair
+        int64_t dd_count = 0;
+
+        for (int64_t j = i; j < d_prim_count; j++)
+        {
+            for (int64_t i_cart = 0; i_cart < 6; i_cart++)
+            {
+                const auto i_cgto = d_prim_aoinds[i + d_prim_count * i_cart];
+
+                const auto j_cart_start = (j == i ? i_cart : 0);
+
+                for (int64_t j_cart = j_cart_start; j_cart < 6; j_cart++)
+                {
+                    const auto j_cgto = d_prim_aoinds[j + d_prim_count * j_cart];
+
+                    const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
+                    const auto Q_ij = _Q_matrix_dd.row(i * 6 + i_cart)[j * 6 + j_cart];
+                    const auto QD_abs_ij = Q_ij * std::fabs(D_ij);
+
+                    if ((QD_abs_ij > QD_threshold) && (Q_ij > _pair_threshold) && (std::fabs(D_ij) > _density_threshold)) dd_count++;
+                }
+            }
+        }
+
+        dd_counts[i] = dd_count;
+    }
+
+    const auto dd_offsets = computePrefixOffsets(dd_counts);
+
+    sorted_dd_mat_Q_D.resize(dd_offsets[d_prim_count]);
+
+#pragma omp parallel for schedule(static)
+    for (int64_t i = 0; i < d_prim_count; i++)
+    {
+        int64_t dd_pos = dd_offsets[i];
 
         for (int64_t j = i; j < d_prim_count; j++)
         {
@@ -1901,7 +2043,7 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
                     if ((QD_abs_ij > QD_threshold) && (Q_ij > _pair_threshold) && (std::fabs(D_ij) > _density_threshold))
                     {
-                        sorted_dd_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i * 6 + i_cart, j * 6 + j_cart, Q_ij, D_ij));
+                        sorted_dd_mat_Q_D[dd_pos++] = std::make_tuple(QD_abs_ij, i * 6 + i_cart, j * 6 + j_cart, Q_ij, D_ij);
                     }
                 }
             }
@@ -3410,58 +3552,173 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
 
     // ss, sp, sd blocks
 
+    std::vector<int64_t> ss_counts(s_prim_count, 0);
+    std::vector<int64_t> sp_counts(s_prim_count, 0);
+    std::vector<int64_t> sd_counts(s_prim_count, 0);
+
+#pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < s_prim_count; i++)
     {
+        int64_t ss_count = 0;
+        int64_t sp_count = 0;
+        int64_t sd_count = 0;
+
         for (int64_t k = i; k < s_prim_count; k++)
         {
             const auto Qp_ik = std::fabs(Q_prime.row(i)[k]);
 
-            if (Qp_ik > Q_prime_thresh) sorted_ss_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
+            if (Qp_ik > Q_prime_thresh) ss_count++;
         }
 
         for (int64_t k = 0; k < p_prim_count * 3; k++)
         {
             const auto Qp_ik = std::fabs(Q_prime.row(i)[s_prim_count + k]);
 
-            if (Qp_ik > Q_prime_thresh) sorted_sp_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
+            if (Qp_ik > Q_prime_thresh) sp_count++;
         }
 
         for (int64_t k = 0; k < d_prim_count * 6; k++)
         {
             const auto Qp_ik = std::fabs(Q_prime.row(i)[s_prim_count + p_prim_count * 3 + k]);
 
-            if (Qp_ik > Q_prime_thresh) sorted_sd_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
+            if (Qp_ik > Q_prime_thresh) sd_count++;
+        }
+
+        ss_counts[i] = ss_count;
+        sp_counts[i] = sp_count;
+        sd_counts[i] = sd_count;
+    }
+
+    const auto ss_offsets = computePrefixOffsets(ss_counts);
+    const auto sp_offsets = computePrefixOffsets(sp_counts);
+    const auto sd_offsets = computePrefixOffsets(sd_counts);
+
+    sorted_ss_Qp_ik.resize(ss_offsets[s_prim_count]);
+    sorted_sp_Qp_ik.resize(sp_offsets[s_prim_count]);
+    sorted_sd_Qp_ik.resize(sd_offsets[s_prim_count]);
+
+#pragma omp parallel for schedule(static)
+    for (int64_t i = 0; i < s_prim_count; i++)
+    {
+        int64_t ss_pos = ss_offsets[i];
+        int64_t sp_pos = sp_offsets[i];
+        int64_t sd_pos = sd_offsets[i];
+
+        for (int64_t k = i; k < s_prim_count; k++)
+        {
+            const auto Qp_ik = std::fabs(Q_prime.row(i)[k]);
+
+            if (Qp_ik > Q_prime_thresh) sorted_ss_Qp_ik[ss_pos++] = std::make_tuple(Qp_ik, i, k);
+        }
+
+        for (int64_t k = 0; k < p_prim_count * 3; k++)
+        {
+            const auto Qp_ik = std::fabs(Q_prime.row(i)[s_prim_count + k]);
+
+            if (Qp_ik > Q_prime_thresh) sorted_sp_Qp_ik[sp_pos++] = std::make_tuple(Qp_ik, i, k);
+        }
+
+        for (int64_t k = 0; k < d_prim_count * 6; k++)
+        {
+            const auto Qp_ik = std::fabs(Q_prime.row(i)[s_prim_count + p_prim_count * 3 + k]);
+
+            if (Qp_ik > Q_prime_thresh) sorted_sd_Qp_ik[sd_pos++] = std::make_tuple(Qp_ik, i, k);
         }
     }
 
     // pp, pd blocks
 
-    for (int64_t i = 0; i < p_prim_count * 3; i++)
+    const auto p_dim = p_prim_count * 3;
+
+    std::vector<int64_t> pp_counts(p_dim, 0);
+    std::vector<int64_t> pd_counts(p_dim, 0);
+
+#pragma omp parallel for schedule(static)
+    for (int64_t i = 0; i < p_dim; i++)
     {
-        for (int64_t k = i; k < p_prim_count * 3; k++)
+        int64_t pp_count = 0;
+        int64_t pd_count = 0;
+
+        for (int64_t k = i; k < p_dim; k++)
         {
             const auto Qp_ik = std::fabs(Q_prime.row(s_prim_count + i)[s_prim_count + k]);
 
-            if (Qp_ik > Q_prime_thresh) sorted_pp_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
+            if (Qp_ik > Q_prime_thresh) pp_count++;
         }
 
         for (int64_t k = 0; k < d_prim_count * 6; k++)
         {
-            const auto Qp_ik = std::fabs(Q_prime.row(s_prim_count + i)[s_prim_count + p_prim_count * 3 + k]);
+            const auto Qp_ik = std::fabs(Q_prime.row(s_prim_count + i)[s_prim_count + p_dim + k]);
 
-            if (Qp_ik > Q_prime_thresh) sorted_pd_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
+            if (Qp_ik > Q_prime_thresh) pd_count++;
+        }
+
+        pp_counts[i] = pp_count;
+        pd_counts[i] = pd_count;
+    }
+
+    const auto pp_offsets = computePrefixOffsets(pp_counts);
+    const auto pd_offsets = computePrefixOffsets(pd_counts);
+
+    sorted_pp_Qp_ik.resize(pp_offsets[p_dim]);
+    sorted_pd_Qp_ik.resize(pd_offsets[p_dim]);
+
+#pragma omp parallel for schedule(static)
+    for (int64_t i = 0; i < p_dim; i++)
+    {
+        int64_t pp_pos = pp_offsets[i];
+        int64_t pd_pos = pd_offsets[i];
+
+        for (int64_t k = i; k < p_dim; k++)
+        {
+            const auto Qp_ik = std::fabs(Q_prime.row(s_prim_count + i)[s_prim_count + k]);
+
+            if (Qp_ik > Q_prime_thresh) sorted_pp_Qp_ik[pp_pos++] = std::make_tuple(Qp_ik, i, k);
+        }
+
+        for (int64_t k = 0; k < d_prim_count * 6; k++)
+        {
+            const auto Qp_ik = std::fabs(Q_prime.row(s_prim_count + i)[s_prim_count + p_dim + k]);
+
+            if (Qp_ik > Q_prime_thresh) sorted_pd_Qp_ik[pd_pos++] = std::make_tuple(Qp_ik, i, k);
         }
     }
 
     // dd block
 
-    for (int64_t i = 0; i < d_prim_count * 6; i++)
-    {
-        for (int64_t k = i; k < d_prim_count * 6; k++)
-        {
-            const auto Qp_ik = std::fabs(Q_prime.row(s_prim_count + p_prim_count * 3 + i)[s_prim_count + p_prim_count * 3 + k]);
+    const auto d_dim = d_prim_count * 6;
 
-            if (Qp_ik > Q_prime_thresh) sorted_dd_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
+    std::vector<int64_t> dd_counts(d_dim, 0);
+
+#pragma omp parallel for schedule(static)
+    for (int64_t i = 0; i < d_dim; i++)
+    {
+        int64_t dd_count = 0;
+
+        for (int64_t k = i; k < d_dim; k++)
+        {
+            const auto Qp_ik = std::fabs(Q_prime.row(s_prim_count + p_dim + i)[s_prim_count + p_dim + k]);
+
+            if (Qp_ik > Q_prime_thresh) dd_count++;
+        }
+
+        dd_counts[i] = dd_count;
+    }
+
+    const auto dd_offsets = computePrefixOffsets(dd_counts);
+
+    sorted_dd_Qp_ik.resize(dd_offsets[d_dim]);
+
+#pragma omp parallel for schedule(static)
+    for (int64_t i = 0; i < d_dim; i++)
+    {
+        int64_t dd_pos = dd_offsets[i];
+
+        for (int64_t k = i; k < d_dim; k++)
+        {
+            const auto Qp_ik = std::fabs(Q_prime.row(s_prim_count + p_dim + i)[s_prim_count + p_dim + k]);
+
+            if (Qp_ik > Q_prime_thresh) sorted_dd_Qp_ik[dd_pos++] = std::make_tuple(Qp_ik, i, k);
         }
     }
 

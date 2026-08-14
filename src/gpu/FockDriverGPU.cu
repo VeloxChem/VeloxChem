@@ -61,6 +61,7 @@
 
 #include "ScreeningData.hpp"
 #include "BoysFuncTable.hpp"
+#include "BoysFuncTableGpu.hpp"
 #include "FockDriverGPU.hpp"
 #include "ElectricDipoleIntegrals.hpp"
 #include "LinearMomentumIntegrals.hpp"
@@ -3962,6 +3963,8 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     std::vector<CMultiTimer> omptimers(num_gpus_per_node);
 
+    auto d_boys_device_tables = boysfunc::uploadFullBoysFuncTables(num_gpus_per_node, rank, total_num_gpus_per_compute_node);
+
 #pragma omp parallel num_threads(num_gpus_per_node)
     {
     auto thread_id = omp_get_thread_num();
@@ -3980,19 +3983,11 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     omptimers[gpu_id].start("Boys func. prep.");
 
-    // Boys function (tabulated for order 0-28)
+    // Boys tables uploaded serially before the parallel region.
 
-    const auto boys_func_table = boysfunc::getFullBoysFuncTable();
-    const auto boys_func_ft    = boysfunc::getBoysFuncFactors();
-
-    double *d_data_boys_func;
-    gpuSafe(gpuMalloc(&d_data_boys_func, (boys_func_table.size() + boys_func_table.size()) * sizeof(double)));
-
-    double* d_boys_func_table = d_data_boys_func;
-    double* d_boys_func_ft = d_boys_func_table + boys_func_table.size();
-
-    gpuSafe(gpuMemcpy(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), gpuMemcpyHostToDevice));
+    const auto& d_boys_tables     = d_boys_device_tables[gpu_id];
+    double*       d_boys_func_table = d_boys_tables.table;
+    double*       d_boys_func_ft    = d_boys_tables.ft;
 
     omptimers[gpu_id].stop("Boys func. prep.");
 
@@ -10232,8 +10227,6 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     omptimers[gpu_id].start("K finalize");
 
-    gpuSafe(gpuFree(d_data_boys_func));
-
     gpuSafe(gpuFree(d_data_spd_prim_info));
     gpuSafe(gpuFree(d_data_spd_prim_aoinds));
 
@@ -10248,6 +10241,8 @@ computeFockOnGPU(const              CMolecule& molecule,
     omptimers[gpu_id].stop("K finalize");
     }
     }
+
+    boysfunc::freeFullBoysFuncTables(num_gpus_per_node, rank, total_num_gpus_per_compute_node, d_boys_device_tables);
 
     timer.stop("Compute Fockmat");
 

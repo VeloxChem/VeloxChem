@@ -229,6 +229,18 @@ class CGradientScreeningData
     std::vector<std::vector<double>> _local_D_ik_for_K_pd;
     std::vector<std::vector<double>> _local_D_ik_for_K_dd;
 
+    int64_t _s_prim_count{0};
+    int64_t _p_prim_count{0};
+    int64_t _d_prim_count{0};
+
+    std::vector<double>   _s_prim_info;
+    std::vector<double>   _p_prim_info;
+    std::vector<double>   _d_prim_info;
+
+    std::vector<uint32_t> _s_prim_aoinds;
+    std::vector<uint32_t> _p_prim_aoinds;
+    std::vector<uint32_t> _d_prim_aoinds;
+
     auto _computeQMatrices(const CMolecule& molecule, const CMolecularBasis& basis) -> void;
 
     auto _sortQ(const int64_t                s_prim_count,
