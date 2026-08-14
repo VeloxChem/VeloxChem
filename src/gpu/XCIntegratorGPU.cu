@@ -63,6 +63,51 @@
 
 namespace gpu {  // gpu namespace
 
+struct GpuBoxPrescreenData
+{
+    std::vector<std::vector<int64_t>> cgto_mask_blocks;
+    std::vector<std::vector<int64_t>> pre_ao_inds_blocks;
+    std::vector<int64_t>              aoinds;
+};
+
+static auto preScreenAllGridBoxes(const std::vector<CGtoBlock>& gto_blocks,
+                                    const CMolecularGrid&         molecularGrid,
+                                    const int64_t                 gto_deriv) -> std::vector<GpuBoxPrescreenData>
+{
+    const auto counts        = molecularGrid.getGridPointCounts();
+    const auto displacements = molecularGrid.getGridPointDisplacements();
+    const auto xcoords       = molecularGrid.getCoordinatesX();
+    const auto ycoords       = molecularGrid.getCoordinatesY();
+    const auto zcoords       = molecularGrid.getCoordinatesZ();
+
+    std::vector<GpuBoxPrescreenData> box_prescreen(counts.size());
+
+#pragma omp parallel for schedule(dynamic)
+    for (size_t box_id = 0; box_id < counts.size(); box_id++)
+    {
+        const auto npoints      = counts.data()[box_id];
+        const auto gridblockpos = displacements.data()[box_id];
+        const auto boxdim       = prescr::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+
+        auto& prescreen = box_prescreen[box_id];
+
+        for (const auto& gto_block : gto_blocks)
+        {
+            const auto pre_scr_info = prescr::preScreenGtoBlock(gto_block, gto_deriv, 1.0e-12, boxdim);
+
+            prescreen.cgto_mask_blocks.push_back(std::get<0>(pre_scr_info));
+            prescreen.pre_ao_inds_blocks.push_back(std::get<1>(pre_scr_info));
+
+            for (const auto nu : std::get<1>(pre_scr_info))
+            {
+                prescreen.aoinds.push_back(nu);
+            }
+        }
+    }
+
+    return box_prescreen;
+}
+
 __global__ void
 getSubDensityMatrix(double* d_den_mat, const double* d_den_mat_full, const uint32_t naos, const uint32_t* d_ao_inds, const uint32_t aocount)
 {
@@ -1656,7 +1701,10 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
         mat_Vxc_omp[gpu_id] = CAOKohnShamMatrix(naos, naos, closedshell);
     }
 
+    const auto box_prescreen = preScreenAllGridBoxes(gto_blocks, molecularGrid, 0);
+
 #pragma omp parallel num_threads(num_gpus_per_node)
+
     {
     auto thread_id = omp_get_thread_num();
 
@@ -1667,8 +1715,6 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
     // auto gpu_count = nnodes * num_gpus_per_node;
 
     gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
-
-    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     double* d_gto_info;
 
@@ -1765,33 +1811,13 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
         auto gridblockpos = displacements.data()[box_id];
 
-        // dimension of grid box
+        // prescreening (computed before the parallel region)
 
-        auto boxdim = prescr::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+        const auto& prescreen = box_prescreen[box_id];
 
-        // prescreening
-
-        std::vector<std::vector<int64_t>> cgto_mask_blocks, pre_ao_inds_blocks;
-
-        std::vector<int64_t> aoinds;
-
-        for (const auto& gto_block : gto_blocks)
-        {
-            // 0th order GTO derivative
-            auto pre_scr_info = prescr::preScreenGtoBlock(gto_block, 0, 1.0e-12, boxdim);
-
-            auto cgto_mask   = std::get<0>(pre_scr_info);
-            auto pre_ao_inds = std::get<1>(pre_scr_info);
-
-            cgto_mask_blocks.push_back(cgto_mask);
-
-            pre_ao_inds_blocks.push_back(pre_ao_inds);
-
-            for (const auto nu : pre_ao_inds)
-            {
-                aoinds.push_back(nu);
-            }
-        }
+        const auto& cgto_mask_blocks   = prescreen.cgto_mask_blocks;
+        const auto& pre_ao_inds_blocks = prescreen.pre_ao_inds_blocks;
+        const auto& aoinds             = prescreen.aoinds;
 
         const auto aocount = static_cast<int64_t>(aoinds.size());
 
@@ -2026,7 +2052,10 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
         mat_Vxc_omp[gpu_id] = CAOKohnShamMatrix(naos, naos, closedshell);
     }
 
+    const auto box_prescreen = preScreenAllGridBoxes(gto_blocks, molecularGrid, 1);
+
 #pragma omp parallel num_threads(num_gpus_per_node)
+
     {
     auto thread_id = omp_get_thread_num();
 
@@ -2037,8 +2066,6 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
     // auto gpu_count = nnodes * num_gpus_per_node;
 
     gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
-
-    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     double* d_gto_info;
 
@@ -2149,33 +2176,13 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
         auto gridblockpos = displacements.data()[box_id];
 
-        // dimension of grid box
+        // prescreening (computed before the parallel region)
 
-        auto boxdim = prescr::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+        const auto& prescreen = box_prescreen[box_id];
 
-        // prescreening
-
-        std::vector<std::vector<int64_t>> cgto_mask_blocks, pre_ao_inds_blocks;
-
-        std::vector<int64_t> aoinds;
-
-        for (const auto& gto_block : gto_blocks)
-        {
-            // 1st order GTO derivative
-            auto pre_scr_info = prescr::preScreenGtoBlock(gto_block, 1, 1.0e-12, boxdim);
-
-            auto cgto_mask   = std::get<0>(pre_scr_info);
-            auto pre_ao_inds = std::get<1>(pre_scr_info);
-
-            cgto_mask_blocks.push_back(cgto_mask);
-
-            pre_ao_inds_blocks.push_back(pre_ao_inds);
-
-            for (const auto nu : pre_ao_inds)
-            {
-                aoinds.push_back(nu);
-            }
-        }
+        const auto& cgto_mask_blocks   = prescreen.cgto_mask_blocks;
+        const auto& pre_ao_inds_blocks = prescreen.pre_ao_inds_blocks;
+        const auto& aoinds             = prescreen.aoinds;
 
         const auto aocount = static_cast<int64_t>(aoinds.size());
 
@@ -2485,7 +2492,10 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
         mat_Fxc_omp[gpu_id] = CDenseMatrix(naos, naos);
     }
 
+    const auto box_prescreen = preScreenAllGridBoxes(gto_blocks, molecularGrid, 0);
+
 #pragma omp parallel num_threads(num_gpus_per_node)
+
     {
     auto thread_id = omp_get_thread_num();
 
@@ -2496,8 +2506,6 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
     // auto gpu_count = nnodes * num_gpus_per_node;
 
     gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
-
-    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     double* d_gto_info;
 
@@ -2593,33 +2601,13 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
 
         auto gridblockpos = displacements.data()[box_id];
 
-        // dimension of grid box
+        // prescreening (computed before the parallel region)
 
-        auto boxdim = prescr::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+        const auto& prescreen = box_prescreen[box_id];
 
-        // prescreening
-
-        std::vector<std::vector<int64_t>> cgto_mask_blocks, pre_ao_inds_blocks;
-
-        std::vector<int64_t> aoinds;
-
-        for (const auto& gto_block : gto_blocks)
-        {
-            // 0th order GTO derivative
-            auto pre_scr_info = prescr::preScreenGtoBlock(gto_block, 0, 1.0e-12, boxdim);
-
-            auto cgto_mask   = std::get<0>(pre_scr_info);
-            auto pre_ao_inds = std::get<1>(pre_scr_info);
-
-            cgto_mask_blocks.push_back(cgto_mask);
-
-            pre_ao_inds_blocks.push_back(pre_ao_inds);
-
-            for (const auto nu : pre_ao_inds)
-            {
-                aoinds.push_back(nu);
-            }
-        }
+        const auto& cgto_mask_blocks   = prescreen.cgto_mask_blocks;
+        const auto& pre_ao_inds_blocks = prescreen.pre_ao_inds_blocks;
+        const auto& aoinds             = prescreen.aoinds;
 
         const auto aocount = static_cast<int64_t>(aoinds.size());
 
@@ -2868,7 +2856,10 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
         mat_Fxc_omp[gpu_id] = CDenseMatrix(naos, naos);
     }
 
+    const auto box_prescreen = preScreenAllGridBoxes(gto_blocks, molecularGrid, 1);
+
 #pragma omp parallel num_threads(num_gpus_per_node)
+
     {
     auto thread_id = omp_get_thread_num();
 
@@ -2879,8 +2870,6 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
     // auto gpu_count = nnodes * num_gpus_per_node;
 
     gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
-
-    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     double* d_gto_info;
 
@@ -3018,33 +3007,13 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
         auto gridblockpos = displacements.data()[box_id];
 
-        // dimension of grid box
+        // prescreening (computed before the parallel region)
 
-        auto boxdim = prescr::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+        const auto& prescreen = box_prescreen[box_id];
 
-        // prescreening
-
-        std::vector<std::vector<int64_t>> cgto_mask_blocks, pre_ao_inds_blocks;
-
-        std::vector<int64_t> aoinds;
-
-        for (const auto& gto_block : gto_blocks)
-        {
-            // 1st order GTO derivative
-            auto pre_scr_info = prescr::preScreenGtoBlock(gto_block, 1, 1.0e-12, boxdim);
-
-            auto cgto_mask   = std::get<0>(pre_scr_info);
-            auto pre_ao_inds = std::get<1>(pre_scr_info);
-
-            cgto_mask_blocks.push_back(cgto_mask);
-
-            pre_ao_inds_blocks.push_back(pre_ao_inds);
-
-            for (const auto nu : pre_ao_inds)
-            {
-                aoinds.push_back(nu);
-            }
-        }
+        const auto& cgto_mask_blocks   = prescreen.cgto_mask_blocks;
+        const auto& pre_ao_inds_blocks = prescreen.pre_ao_inds_blocks;
+        const auto& aoinds             = prescreen.aoinds;
 
         const auto aocount = static_cast<int64_t>(aoinds.size());
 
@@ -3417,7 +3386,10 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
 
     auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
+    const auto box_prescreen = preScreenAllGridBoxes(gto_blocks, molecularGrid, 1);
+
 #pragma omp parallel num_threads(num_gpus_per_node)
+
     {
     auto thread_id = omp_get_thread_num();
 
@@ -3428,8 +3400,6 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
     // auto gpu_count = nnodes * num_gpus_per_node;
 
     gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
-
-    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     double* d_gto_info;
 
@@ -3535,33 +3505,13 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
 
         auto gridblockpos = displacements.data()[box_id];
 
-        // dimension of grid box
+        // prescreening (computed before the parallel region)
 
-        auto boxdim = prescr::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+        const auto& prescreen = box_prescreen[box_id];
 
-        // prescreening
-
-        std::vector<std::vector<int64_t>> cgto_mask_blocks, pre_ao_inds_blocks;
-
-        std::vector<int64_t> aoinds;
-
-        for (const auto& gto_block : gto_blocks)
-        {
-            // 1st order GTO derivative
-            auto pre_scr_info = prescr::preScreenGtoBlock(gto_block, 1, 1.0e-12, boxdim);
-
-            auto cgto_mask   = std::get<0>(pre_scr_info);
-            auto pre_ao_inds = std::get<1>(pre_scr_info);
-
-            cgto_mask_blocks.push_back(cgto_mask);
-
-            pre_ao_inds_blocks.push_back(pre_ao_inds);
-
-            for (const auto nu : pre_ao_inds)
-            {
-                aoinds.push_back(nu);
-            }
-        }
+        const auto& cgto_mask_blocks   = prescreen.cgto_mask_blocks;
+        const auto& pre_ao_inds_blocks = prescreen.pre_ao_inds_blocks;
+        const auto& aoinds             = prescreen.aoinds;
 
         const auto aocount = static_cast<int64_t>(aoinds.size());
 
@@ -3836,7 +3786,10 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
 
     auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
+    const auto box_prescreen = preScreenAllGridBoxes(gto_blocks, molecularGrid, 2);
+
 #pragma omp parallel num_threads(num_gpus_per_node)
+
     {
     auto thread_id = omp_get_thread_num();
 
@@ -3847,8 +3800,6 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
     // auto gpu_count = nnodes * num_gpus_per_node;
 
     gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
-
-    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     double* d_gto_info;
 
@@ -3990,33 +3941,13 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
 
         auto gridblockpos = displacements.data()[box_id];
 
-        // dimension of grid box
+        // prescreening (computed before the parallel region)
 
-        auto boxdim = prescr::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+        const auto& prescreen = box_prescreen[box_id];
 
-        // prescreening
-
-        std::vector<std::vector<int64_t>> cgto_mask_blocks, pre_ao_inds_blocks;
-
-        std::vector<int64_t> aoinds;
-
-        for (const auto& gto_block : gto_blocks)
-        {
-            // 2nd order GTO derivative
-            auto pre_scr_info = prescr::preScreenGtoBlock(gto_block, 2, 1.0e-12, boxdim);
-
-            auto cgto_mask   = std::get<0>(pre_scr_info);
-            auto pre_ao_inds = std::get<1>(pre_scr_info);
-
-            cgto_mask_blocks.push_back(cgto_mask);
-
-            pre_ao_inds_blocks.push_back(pre_ao_inds);
-
-            for (const auto nu : pre_ao_inds)
-            {
-                aoinds.push_back(nu);
-            }
-        }
+        const auto& cgto_mask_blocks   = prescreen.cgto_mask_blocks;
+        const auto& pre_ao_inds_blocks = prescreen.pre_ao_inds_blocks;
+        const auto& aoinds             = prescreen.aoinds;
 
         const auto aocount = static_cast<int64_t>(aoinds.size());
 

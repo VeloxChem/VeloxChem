@@ -60,6 +60,7 @@
 #include <vector>
 
 #include "ScreeningData.hpp"
+#include "ScreeningJPrepGpu.hpp"
 #include "BoysFuncTable.hpp"
 #include "BoysFuncTableGpu.hpp"
 #include "FockDriverGPU.hpp"
@@ -3965,6 +3966,8 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     auto d_boys_device_tables = boysfunc::uploadFullBoysFuncTables(num_gpus_per_node, rank, total_num_gpus_per_compute_node);
 
+    auto j_prep_device_buffers = gpujprep::uploadJPrepForAllDevices(screening, num_gpus_per_node, rank, total_num_gpus_per_compute_node);
+
 #pragma omp parallel num_threads(num_gpus_per_node)
     {
     auto thread_id = omp_get_thread_num();
@@ -4093,210 +4096,97 @@ computeFockOnGPU(const              CMolecule& molecule,
     const auto& pd_pair_data = screening.get_pd_pair_data(); 
     const auto& dd_pair_data = screening.get_dd_pair_data(); 
 
-    const auto ss_prim_pair_count = static_cast<int64_t>(ss_first_inds.size());
-    const auto sp_prim_pair_count = static_cast<int64_t>(sp_first_inds.size());
-    const auto sd_prim_pair_count = static_cast<int64_t>(sd_first_inds.size());
-    const auto pp_prim_pair_count = static_cast<int64_t>(pp_first_inds.size());
-    const auto pd_prim_pair_count = static_cast<int64_t>(pd_first_inds.size());
-    const auto dd_prim_pair_count = static_cast<int64_t>(dd_first_inds.size());
+    const auto& j_prep = j_prep_device_buffers[gpu_id];
 
-    const auto max_prim_pair_count = std::max({ss_prim_pair_count, sp_prim_pair_count, sd_prim_pair_count,
-                                               pp_prim_pair_count, pd_prim_pair_count, dd_prim_pair_count});
+    const auto ss_prim_pair_count = j_prep.ss_prim_pair_count;
+    const auto sp_prim_pair_count = j_prep.sp_prim_pair_count;
+    const auto sd_prim_pair_count = j_prep.sd_prim_pair_count;
+    const auto pp_prim_pair_count = j_prep.pp_prim_pair_count;
+    const auto pd_prim_pair_count = j_prep.pd_prim_pair_count;
+    const auto dd_prim_pair_count = j_prep.dd_prim_pair_count;
 
-    const auto ss_prim_pair_count_local = static_cast<int64_t>(ss_first_inds_local.size());
-    const auto sp_prim_pair_count_local = static_cast<int64_t>(sp_first_inds_local.size());
-    const auto sd_prim_pair_count_local = static_cast<int64_t>(sd_first_inds_local.size());
-    const auto pp_prim_pair_count_local = static_cast<int64_t>(pp_first_inds_local.size());
-    const auto pd_prim_pair_count_local = static_cast<int64_t>(pd_first_inds_local.size());
-    const auto dd_prim_pair_count_local = static_cast<int64_t>(dd_first_inds_local.size());
+    const auto max_prim_pair_count = j_prep.max_prim_pair_count;
 
-    const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local,
-                                                     sd_prim_pair_count_local, pp_prim_pair_count_local,
-                                                     pd_prim_pair_count_local, dd_prim_pair_count_local});
+    const auto ss_prim_pair_count_local = j_prep.ss_prim_pair_count_local;
+    const auto sp_prim_pair_count_local = j_prep.sp_prim_pair_count_local;
+    const auto sd_prim_pair_count_local = j_prep.sd_prim_pair_count_local;
+    const auto pp_prim_pair_count_local = j_prep.pp_prim_pair_count_local;
+    const auto pd_prim_pair_count_local = j_prep.pd_prim_pair_count_local;
+    const auto dd_prim_pair_count_local = j_prep.dd_prim_pair_count_local;
+
+    const auto max_prim_pair_count_local = j_prep.max_prim_pair_count_local;
 
     std::vector<double> mat_J(max_prim_pair_count_local);
 
-    // sorted Q, D, and indices on device
+    double* d_data_mat_D_J = j_prep.d_data_mat_D_J;
+    double* d_mat_D        = j_prep.d_mat_D;
+    double* d_mat_J        = j_prep.d_mat_J;
 
-    double *d_data_mat_D_J;
-    gpuSafe(gpuMalloc(&d_data_mat_D_J, (max_prim_pair_count + max_prim_pair_count_local) * sizeof(double)));
+    double* d_data_mat_Q = j_prep.d_data_mat_Q;
+    double* d_ss_mat_Q   = j_prep.d_ss_mat_Q;
+    double* d_sp_mat_Q   = j_prep.d_sp_mat_Q;
+    double* d_sd_mat_Q   = j_prep.d_sd_mat_Q;
+    double* d_pp_mat_Q   = j_prep.d_pp_mat_Q;
+    double* d_pd_mat_Q   = j_prep.d_pd_mat_Q;
+    double* d_dd_mat_Q   = j_prep.d_dd_mat_Q;
 
-    double *d_mat_D = d_data_mat_D_J;
-    double *d_mat_J = d_mat_D + max_prim_pair_count;
+    uint32_t* d_data_first_second_inds = j_prep.d_data_first_second_inds;
+    uint32_t* d_ss_first_inds          = j_prep.d_ss_first_inds;
+    uint32_t* d_ss_second_inds         = j_prep.d_ss_second_inds;
+    uint32_t* d_sp_first_inds          = j_prep.d_sp_first_inds;
+    uint32_t* d_sp_second_inds         = j_prep.d_sp_second_inds;
+    uint32_t* d_sd_first_inds          = j_prep.d_sd_first_inds;
+    uint32_t* d_sd_second_inds         = j_prep.d_sd_second_inds;
+    uint32_t* d_pp_first_inds          = j_prep.d_pp_first_inds;
+    uint32_t* d_pp_second_inds         = j_prep.d_pp_second_inds;
+    uint32_t* d_pd_first_inds          = j_prep.d_pd_first_inds;
+    uint32_t* d_pd_second_inds         = j_prep.d_pd_second_inds;
+    uint32_t* d_dd_first_inds          = j_prep.d_dd_first_inds;
+    uint32_t* d_dd_second_inds         = j_prep.d_dd_second_inds;
 
-    double *d_data_mat_Q;
-    gpuSafe(gpuMalloc(&d_data_mat_Q, (ss_prim_pair_count +
-                                      sp_prim_pair_count +
-                                      sd_prim_pair_count +
-                                      pp_prim_pair_count +
-                                      pd_prim_pair_count +
-                                      dd_prim_pair_count) * sizeof(double)));
+    double* d_data_pair_data = j_prep.d_data_pair_data;
+    double* d_ss_pair_data    = j_prep.d_ss_pair_data;
+    double* d_sp_pair_data    = j_prep.d_sp_pair_data;
+    double* d_sd_pair_data    = j_prep.d_sd_pair_data;
+    double* d_pp_pair_data    = j_prep.d_pp_pair_data;
+    double* d_pd_pair_data    = j_prep.d_pd_pair_data;
+    double* d_dd_pair_data    = j_prep.d_dd_pair_data;
 
-    double *d_ss_mat_Q = d_data_mat_Q;
-    double *d_sp_mat_Q = d_ss_mat_Q + ss_prim_pair_count;
-    double *d_sd_mat_Q = d_sp_mat_Q + sp_prim_pair_count;
-    double *d_pp_mat_Q = d_sd_mat_Q + sd_prim_pair_count;
-    double *d_pd_mat_Q = d_pp_mat_Q + pp_prim_pair_count;
-    double *d_dd_mat_Q = d_pd_mat_Q + pd_prim_pair_count;
+    double* d_data_mat_Q_local = j_prep.d_data_mat_Q_local;
+    double* d_ss_mat_Q_local   = j_prep.d_ss_mat_Q_local;
+    double* d_sp_mat_Q_local   = j_prep.d_sp_mat_Q_local;
+    double* d_sd_mat_Q_local   = j_prep.d_sd_mat_Q_local;
+    double* d_pp_mat_Q_local   = j_prep.d_pp_mat_Q_local;
+    double* d_pd_mat_Q_local   = j_prep.d_pd_mat_Q_local;
+    double* d_dd_mat_Q_local   = j_prep.d_dd_mat_Q_local;
 
-    uint32_t *d_data_first_second_inds;
-    gpuSafe(gpuMalloc(&d_data_first_second_inds, (ss_prim_pair_count +
-                                                  ss_prim_pair_count +
-                                                  sp_prim_pair_count +
-                                                  sp_prim_pair_count +
-                                                  sd_prim_pair_count +
-                                                  sd_prim_pair_count +
-                                                  pp_prim_pair_count +
-                                                  pp_prim_pair_count +
-                                                  pd_prim_pair_count +
-                                                  pd_prim_pair_count +
-                                                  dd_prim_pair_count +
-                                                  dd_prim_pair_count) * sizeof(uint32_t)));
+    uint32_t* d_data_first_second_inds_local = j_prep.d_data_first_second_inds_local;
+    uint32_t* d_ss_first_inds_local          = j_prep.d_ss_first_inds_local;
+    uint32_t* d_ss_second_inds_local         = j_prep.d_ss_second_inds_local;
+    uint32_t* d_sp_first_inds_local          = j_prep.d_sp_first_inds_local;
+    uint32_t* d_sp_second_inds_local         = j_prep.d_sp_second_inds_local;
+    uint32_t* d_sd_first_inds_local          = j_prep.d_sd_first_inds_local;
+    uint32_t* d_sd_second_inds_local         = j_prep.d_sd_second_inds_local;
+    uint32_t* d_pp_first_inds_local          = j_prep.d_pp_first_inds_local;
+    uint32_t* d_pp_second_inds_local         = j_prep.d_pp_second_inds_local;
+    uint32_t* d_pd_first_inds_local          = j_prep.d_pd_first_inds_local;
+    uint32_t* d_pd_second_inds_local         = j_prep.d_pd_second_inds_local;
+    uint32_t* d_dd_first_inds_local          = j_prep.d_dd_first_inds_local;
+    uint32_t* d_dd_second_inds_local         = j_prep.d_dd_second_inds_local;
 
-    uint32_t *d_ss_first_inds  = d_data_first_second_inds;
-    uint32_t *d_ss_second_inds = d_ss_first_inds  + ss_prim_pair_count;
-    uint32_t *d_sp_first_inds  = d_ss_second_inds + ss_prim_pair_count;
-    uint32_t *d_sp_second_inds = d_sp_first_inds  + sp_prim_pair_count;
-    uint32_t *d_sd_first_inds  = d_sp_second_inds + sp_prim_pair_count;
-    uint32_t *d_sd_second_inds = d_sd_first_inds  + sd_prim_pair_count;
-    uint32_t *d_pp_first_inds  = d_sd_second_inds + sd_prim_pair_count;
-    uint32_t *d_pp_second_inds = d_pp_first_inds  + pp_prim_pair_count;
-    uint32_t *d_pd_first_inds  = d_pp_second_inds + pp_prim_pair_count;
-    uint32_t *d_pd_second_inds = d_pd_first_inds  + pd_prim_pair_count;
-    uint32_t *d_dd_first_inds  = d_pd_second_inds + pd_prim_pair_count;
-    uint32_t *d_dd_second_inds = d_dd_first_inds  + dd_prim_pair_count;
-
-    double *d_data_pair_data;
-    gpuSafe(gpuMalloc(&d_data_pair_data, (ss_pair_data.size() +
-                                          sp_pair_data.size() +
-                                          sd_pair_data.size() +
-                                          pp_pair_data.size() +
-                                          pd_pair_data.size() +
-                                          dd_pair_data.size()) * sizeof(double)));
-
-    double *d_ss_pair_data = d_data_pair_data;
-    double *d_sp_pair_data = d_ss_pair_data + ss_pair_data.size();
-    double *d_sd_pair_data = d_sp_pair_data + sp_pair_data.size();
-    double *d_pp_pair_data = d_sd_pair_data + sd_pair_data.size();
-    double *d_pd_pair_data = d_pp_pair_data + pp_pair_data.size();
-    double *d_dd_pair_data = d_pd_pair_data + pd_pair_data.size();
-
-    double *d_data_mat_Q_local;
-    gpuSafe(gpuMalloc(&d_data_mat_Q_local, (ss_prim_pair_count_local +
-                                            sp_prim_pair_count_local +
-                                            sd_prim_pair_count_local +
-                                            pp_prim_pair_count_local +
-                                            pd_prim_pair_count_local +
-                                            dd_prim_pair_count_local) * sizeof(double)));
-
-    double *d_ss_mat_Q_local = d_data_mat_Q_local;
-    double *d_sp_mat_Q_local = d_ss_mat_Q_local + ss_prim_pair_count_local;
-    double *d_sd_mat_Q_local = d_sp_mat_Q_local + sp_prim_pair_count_local;
-    double *d_pp_mat_Q_local = d_sd_mat_Q_local + sd_prim_pair_count_local;
-    double *d_pd_mat_Q_local = d_pp_mat_Q_local + pp_prim_pair_count_local;
-    double *d_dd_mat_Q_local = d_pd_mat_Q_local + pd_prim_pair_count_local;
-
-    uint32_t *d_data_first_second_inds_local;
-    gpuSafe(gpuMalloc(&d_data_first_second_inds_local, (ss_prim_pair_count_local +
-                                                        ss_prim_pair_count_local +
-                                                        sp_prim_pair_count_local +
-                                                        sp_prim_pair_count_local +
-                                                        sd_prim_pair_count_local +
-                                                        sd_prim_pair_count_local +
-                                                        pp_prim_pair_count_local +
-                                                        pp_prim_pair_count_local +
-                                                        pd_prim_pair_count_local +
-                                                        pd_prim_pair_count_local +
-                                                        dd_prim_pair_count_local +
-                                                        dd_prim_pair_count_local) * sizeof(uint32_t)));
-
-    uint32_t *d_ss_first_inds_local  = d_data_first_second_inds_local;
-    uint32_t *d_ss_second_inds_local = d_ss_first_inds_local  + ss_prim_pair_count_local;
-    uint32_t *d_sp_first_inds_local  = d_ss_second_inds_local + ss_prim_pair_count_local;
-    uint32_t *d_sp_second_inds_local = d_sp_first_inds_local  + sp_prim_pair_count_local;
-    uint32_t *d_sd_first_inds_local  = d_sp_second_inds_local + sp_prim_pair_count_local;
-    uint32_t *d_sd_second_inds_local = d_sd_first_inds_local  + sd_prim_pair_count_local;
-    uint32_t *d_pp_first_inds_local  = d_sd_second_inds_local + sd_prim_pair_count_local;
-    uint32_t *d_pp_second_inds_local = d_pp_first_inds_local  + pp_prim_pair_count_local;
-    uint32_t *d_pd_first_inds_local  = d_pp_second_inds_local + pp_prim_pair_count_local;
-    uint32_t *d_pd_second_inds_local = d_pd_first_inds_local  + pd_prim_pair_count_local;
-    uint32_t *d_dd_first_inds_local  = d_pd_second_inds_local + pd_prim_pair_count_local;
-    uint32_t *d_dd_second_inds_local = d_dd_first_inds_local  + dd_prim_pair_count_local;
-
-    double *d_data_pair_data_local;
-    gpuSafe(gpuMalloc(&d_data_pair_data_local, (ss_pair_data_local.size() +
-                                                sp_pair_data_local.size() +
-                                                sd_pair_data_local.size() +
-                                                pp_pair_data_local.size() +
-                                                pd_pair_data_local.size() +
-                                                dd_pair_data_local.size()) * sizeof(double)));
-
-    double *d_ss_pair_data_local = d_data_pair_data_local;
-    double *d_sp_pair_data_local = d_ss_pair_data_local + ss_pair_data_local.size();
-    double *d_sd_pair_data_local = d_sp_pair_data_local + sp_pair_data_local.size();
-    double *d_pp_pair_data_local = d_sd_pair_data_local + sd_pair_data_local.size();
-    double *d_pd_pair_data_local = d_pp_pair_data_local + pp_pair_data_local.size();
-    double *d_dd_pair_data_local = d_pd_pair_data_local + pd_pair_data_local.size();
-
-    gpuSafe(gpuMemcpy(d_ss_mat_Q, ss_mat_Q.data(), ss_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_mat_Q, sp_mat_Q.data(), sp_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_mat_Q, sd_mat_Q.data(), sd_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_mat_Q, pp_mat_Q.data(), pp_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_mat_Q, pd_mat_Q.data(), pd_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_mat_Q, dd_mat_Q.data(), dd_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice));
-
-    gpuSafe(gpuMemcpy(d_ss_first_inds,  ss_first_inds.data(),  ss_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_ss_second_inds, ss_second_inds.data(), ss_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_first_inds,  sp_first_inds.data(),  sp_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_second_inds, sp_second_inds.data(), sp_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_first_inds,  sd_first_inds.data(),  sd_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_second_inds, sd_second_inds.data(), sd_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_first_inds,  pp_first_inds.data(),  pp_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_second_inds, pp_second_inds.data(), pp_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_first_inds,  pd_first_inds.data(),  pd_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_second_inds, pd_second_inds.data(), pd_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_first_inds,  dd_first_inds.data(),  dd_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_second_inds, dd_second_inds.data(), dd_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-
-    gpuSafe(gpuMemcpy(d_ss_pair_data, ss_pair_data.data(), ss_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_pair_data, sp_pair_data.data(), sp_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_pair_data, sd_pair_data.data(), sd_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_pair_data, pp_pair_data.data(), pp_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_pair_data, pd_pair_data.data(), pd_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_pair_data, dd_pair_data.data(), dd_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice));
-
-    gpuSafe(gpuMemcpy(d_ss_mat_Q_local, ss_mat_Q_local.data(), ss_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_mat_Q_local, sp_mat_Q_local.data(), sp_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_mat_Q_local, sd_mat_Q_local.data(), sd_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_mat_Q_local, pp_mat_Q_local.data(), pp_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_mat_Q_local, pd_mat_Q_local.data(), pd_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_mat_Q_local, dd_mat_Q_local.data(), dd_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-
-    gpuSafe(gpuMemcpy(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-
-    gpuSafe(gpuMemcpy(d_ss_pair_data_local, ss_pair_data_local.data(), ss_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_pair_data_local, sp_pair_data_local.data(), sp_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_pair_data_local, sd_pair_data_local.data(), sd_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_pair_data_local, pp_pair_data_local.data(), pp_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_pair_data_local, pd_pair_data_local.data(), pd_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_pair_data_local, dd_pair_data_local.data(), dd_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice));
+    double* d_data_pair_data_local = j_prep.d_data_pair_data_local;
+    double* d_ss_pair_data_local   = j_prep.d_ss_pair_data_local;
+    double* d_sp_pair_data_local   = j_prep.d_sp_pair_data_local;
+    double* d_sd_pair_data_local   = j_prep.d_sd_pair_data_local;
+    double* d_pp_pair_data_local   = j_prep.d_pp_pair_data_local;
+    double* d_pd_pair_data_local   = j_prep.d_pd_pair_data_local;
+    double* d_dd_pair_data_local   = j_prep.d_dd_pair_data_local;
 
     mat_Fock_omp[gpu_id].zero();
 
     gpuSafe(gpuDeviceSynchronize());
 
-    omptimers[gpu_id].stop("J prep.");
+        omptimers[gpu_id].stop("J prep.");
 
     omptimers[gpu_id].start("J compute");
 
@@ -6692,13 +6582,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     omptimers[gpu_id].start("J finalize");
 
-    gpuSafe(gpuFree(d_data_mat_D_J));
-    gpuSafe(gpuFree(d_data_mat_Q));
-    gpuSafe(gpuFree(d_data_first_second_inds));
-    gpuSafe(gpuFree(d_data_pair_data));
-    gpuSafe(gpuFree(d_data_mat_Q_local));
-    gpuSafe(gpuFree(d_data_first_second_inds_local));
-    gpuSafe(gpuFree(d_data_pair_data_local));
+    gpujprep::freeJPrepDeviceData(gpu_id, rank, total_num_gpus_per_compute_node, j_prep_device_buffers[gpu_id]);
 
     omptimers[gpu_id].stop("J finalize");
 
