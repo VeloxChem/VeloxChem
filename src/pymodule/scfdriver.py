@@ -173,7 +173,10 @@ class ScfDriver:
         self.level_shifting_delta = 0.01
 
         # level-shift smoothing (exponential moving average)
-        self.level_shift_smoothing = 0.5
+        self.level_shift_smoothing = 0.7
+
+        self._level_shift_smooth_alpha = None
+        self._level_shift_smooth_beta = None
 
         # density damping
         self.density_damping = False
@@ -196,9 +199,6 @@ class ScfDriver:
         self._fock_matrices_alpha = deque()
         self._fock_matrices_beta = deque()
         self._fock_matrices_proj = deque()
-
-        self._level_shift_smooth_alpha = None
-        self._level_shift_smooth_beta = None
 
         self._density_matrices_alpha = deque()
         self._density_matrices_beta = deque()
