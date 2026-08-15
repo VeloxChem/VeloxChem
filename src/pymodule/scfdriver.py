@@ -631,6 +631,13 @@ class ScfDriver:
 
         profiler = Profiler()
 
+        # Reset energy terms that are only recomputed when the corresponding
+        # external potential is active. This makes repeated compute() calls
+        # on the same driver safe when point charges or the static electric
+        # field are removed between calculations.
+        self._nuc_mm_energy = 0.0
+        self._ef_nuc_energy = 0.0
+
         if min_basis is None:
             if basis.has_ecp():
                 min_basis_label = 'AO-START-GUESS-FOR-ECP'
