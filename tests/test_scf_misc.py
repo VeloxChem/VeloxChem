@@ -442,6 +442,62 @@ class TestScfDriverMiscellaneous:
         assert not scf_drv.is_converged
         assert scf_drv.scf_results is None
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    @pytest.mark.parametrize(
+        'configure, match',
+        [
+            (lambda drv: setattr(drv, 'max_iter', 0), 'max_iter'),
+            (lambda drv: setattr(drv, 'max_err_vecs', 0), 'max_err_vecs'),
+            (lambda drv: setattr(drv, 'conv_thresh', 0.0), 'conv_thresh'),
+            (lambda drv: setattr(drv, 'eri_thresh', 0.0), 'eri_thresh'),
+            (lambda drv: setattr(drv, 'eri_thresh_tight', 0.0),
+             'eri_thresh_tight'),
+            (lambda drv: setattr(drv, 'ovl_thresh', 0.0), 'ovl_thresh'),
+            (lambda drv: setattr(drv, 'pfon', True) or
+             setattr(drv, 'pfon_nocc', 0), 'pfon_nocc'),
+            (lambda drv: setattr(drv, 'pfon', True) or
+             setattr(drv, 'pfon_nvir', 0), 'pfon_nvir'),
+        ])
+    def test_invalid_scf_controls_raise(self, configure, match):
+
+        molecule, basis = self.get_water_and_basis()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        configure(scf_drv)
+
+        with pytest.raises(VeloxChemError, match=match):
+            scf_drv.compute(molecule, basis)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_invalid_cpcm_grid_per_sphere_raises(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.solvation_model = 'cpcm'
+        scf_drv.cpcm_grid_per_sphere = (110,)
+
+        with pytest.raises(VeloxChemError, match='cpcm_grid_per_sphere'):
+            scf_drv.compute(molecule, basis)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_invalid_guess_unpaired_electrons_raise(self):
+
+        molecule, basis = self.get_open_shell_water_and_basis()
+
+        scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.acc_type = 'DIIS'
+        scf_drv.guess_unpaired_electrons = 'O(invalid)'
+
+        with pytest.raises(ValueError):
+            scf_drv.compute(molecule, basis)
+
     def test_grid_level_consistency(self):
 
         molecule, basis = self.get_water_and_basis()

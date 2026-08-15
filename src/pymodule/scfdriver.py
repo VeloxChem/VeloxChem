@@ -648,6 +648,20 @@ class ScfDriver:
             ],
             f'SCF driver: Invalid acceleration type: {self.acc_type}')
 
+        for name in [
+                'max_iter', 'max_err_vecs', 'conv_thresh', 'eri_thresh',
+                'eri_thresh_tight', 'ovl_thresh'
+        ]:
+            assert_msg_critical(
+                getattr(self, name) > 0,
+                f'SCF driver: \'{name}\' must be greater than zero')
+
+        if self.pfon:
+            for name in ['pfon_nocc', 'pfon_nvir']:
+                assert_msg_critical(
+                    getattr(self, name) > 0,
+                    f'SCF driver: \'{name}\' must be greater than zero')
+
         if min_basis is None:
             if basis.has_ecp():
                 min_basis_label = 'AO-START-GUESS-FOR-ECP'
@@ -685,6 +699,12 @@ class ScfDriver:
         # check solvation model setup
         solvation_model_sanity_check(self)
         if self._cpcm:
+            assert_msg_critical(
+                len(self.cpcm_grid_per_sphere) == 2 and
+                self.cpcm_grid_per_sphere[0] > 0 and
+                self.cpcm_grid_per_sphere[1] > 0,
+                'SCF driver: \'cpcm_grid_per_sphere\' must contain two ' +
+                'positive integers')
             self.cpcm_drv = CpcmDriver(self.comm, self.ostream)
             self.cpcm_drv.grid_per_sphere = self.cpcm_grid_per_sphere
             self.cpcm_drv.epsilon = self.cpcm_epsilon
