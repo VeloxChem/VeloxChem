@@ -228,6 +228,63 @@ class TestScfDriverMiscellaneous:
             assert reused_results['scf_energy'] == pytest.approx(
                 ref_results['scf_energy'], abs=1.0e-10)
 
+    def test_checkpoint_point_charges_roundtrip(self, tmp_path):
+
+        molecule, basis = self.get_water_and_basis()
+
+        here = Path(__file__).parent
+        potfile = str(here / 'data' / 'pe_water.pot')
+        vdwfile = str(here / 'data' / 'pe_water.qm_vdw_params.txt')
+        filename = str(tmp_path / 'water_point_charges_roundtrip')
+
+        comm = MPI.COMM_WORLD
+        filename = comm.bcast(filename, root=mpi_master())
+        checkpoint_file = comm.bcast(Path(f'{filename}_scf.h5'),
+                                     root=mpi_master())
+
+        def configure(driver):
+            driver.filename = filename
+            driver.point_charges = potfile
+            driver.qm_vdw_params = vdwfile
+
+        scf_drv, scf_results = self.run_hf_scf(molecule, basis, configure)
+
+        assert scf_results is not None
+        assert isinstance(scf_drv.point_charges, np.ndarray)
+        assert isinstance(scf_drv.qm_vdw_params, np.ndarray)
+
+        if self.is_master():
+            assert checkpoint_file.is_file()
+            checkpoint_scf_input = read_unparsed_input_from_hdf5(
+                str(checkpoint_file), group_name='scf_settings')
+        else:
+            checkpoint_scf_input = None
+
+        checkpoint_scf_input = scf_drv.comm.bcast(checkpoint_scf_input,
+                                                  root=mpi_master())
+
+        assert isinstance(checkpoint_scf_input['point_charges'], np.ndarray)
+        assert isinstance(checkpoint_scf_input['qm_vdw_params'], np.ndarray)
+        assert np.array_equal(checkpoint_scf_input['point_charges'],
+                              scf_drv.point_charges)
+        assert np.array_equal(checkpoint_scf_input['qm_vdw_params'],
+                              scf_drv.qm_vdw_params)
+
+        new_drv = ScfRestrictedDriver()
+        new_drv.ostream.mute()
+        new_drv.checkpoint_file = str(checkpoint_file)
+        new_drv.read_settings(str(checkpoint_file))
+
+        assert isinstance(new_drv.point_charges, np.ndarray)
+        assert isinstance(new_drv.qm_vdw_params, np.ndarray)
+
+        new_results = new_drv.compute(molecule, basis)
+        assert new_results is not None
+
+        if self.is_master():
+            assert new_results['scf_energy'] == pytest.approx(
+                scf_results['scf_energy'], abs=1.0e-10)
+
     def test_compute_resets_electric_field_energy_on_reuse(self):
 
         molecule, basis = self.get_water_and_basis()

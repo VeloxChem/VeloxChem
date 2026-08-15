@@ -324,8 +324,9 @@ class ScfDriver:
                 'print_level': ('int', 'verbosity of output (1-3)'),
                 'guess_unpaired_electrons':
                     ('str', 'unpaired electrons for initial guess'),
-                'point_charges': ('str', 'potential file for point charges'),
-                'qm_vdw_params': ('str', 'vdw parameter file for QM atoms'),
+                'point_charges': ('raw', 'point-charge file path or array'),
+                'qm_vdw_params':
+                    ('raw', 'QM vdW parameter file path or array'),
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
