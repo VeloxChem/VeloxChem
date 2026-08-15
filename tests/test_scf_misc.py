@@ -200,6 +200,59 @@ class TestScfDriverMiscellaneous:
         assert scf_drv.checkpoint_file is None
         assert scf_drv.restart is False
 
+    def test_compute_resets_point_charge_energy_on_reuse(self, tmp_path):
+
+        molecule, basis = self.get_water_and_basis()
+
+        ref_drv = ScfRestrictedDriver()
+        ref_drv.ostream.mute()
+        ref_drv.acc_type = 'DIIS'
+        ref_results = ref_drv.compute(molecule, basis)
+        assert ref_results is not None
+
+        potfile = tmp_path / 'point_charges.pot'
+        potfile.write_text('1\nvalid\nQ 0.0 0.0 5.0 -0.1\n')
+
+        point_charge_drv = ScfRestrictedDriver()
+        point_charge_drv.ostream.mute()
+        point_charge_drv.acc_type = 'DIIS'
+        point_charge_drv.point_charges = str(potfile)
+        point_charge_results = point_charge_drv.compute(molecule, basis)
+        assert point_charge_results is not None
+
+        point_charge_drv.point_charges = None
+        reused_results = point_charge_drv.compute(molecule, basis)
+        assert reused_results is not None
+
+        if self.is_master():
+            assert reused_results['scf_energy'] == pytest.approx(
+                ref_results['scf_energy'], abs=1.0e-10)
+
+    def test_compute_resets_electric_field_energy_on_reuse(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        ref_drv = ScfRestrictedDriver()
+        ref_drv.ostream.mute()
+        ref_drv.acc_type = 'DIIS'
+        ref_results = ref_drv.compute(molecule, basis)
+        assert ref_results is not None
+
+        field_drv = ScfRestrictedDriver()
+        field_drv.ostream.mute()
+        field_drv.acc_type = 'DIIS'
+        field_drv.electric_field = (0.0, 0.001, 0.0)
+        field_results = field_drv.compute(molecule, basis)
+        assert field_results is not None
+
+        field_drv.electric_field = None
+        reused_results = field_drv.compute(molecule, basis)
+        assert reused_results is not None
+
+        if self.is_master():
+            assert reused_results['scf_energy'] == pytest.approx(
+                ref_results['scf_energy'], abs=1.0e-10)
+
     def test_checkpoint_writes_input_groups(self, tmp_path):
 
         molecule, basis = self.get_water_and_basis()
@@ -367,6 +420,27 @@ class TestScfDriverMiscellaneous:
 
         with pytest.raises(VeloxChemError, match="either ri_coulomb or ri_jk"):
             self.run_hf_scf(molecule, basis, configure)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_invalid_acc_type_does_not_return_stale_results(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.acc_type = 'DIIS'
+
+        scf_results = scf_drv.compute(molecule, basis)
+        assert scf_results is not None
+
+        scf_drv.acc_type = 'BAD'
+        with pytest.raises(VeloxChemError,
+                           match='Invalid acceleration type'):
+            scf_drv.compute(molecule, basis)
+
+        assert not scf_drv.is_converged
+        assert scf_drv.scf_results is None
 
     def test_grid_level_consistency(self):
 

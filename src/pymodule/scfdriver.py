@@ -631,12 +631,22 @@ class ScfDriver:
 
         profiler = Profiler()
 
-        # Reset energy terms that are only recomputed when the corresponding
-        # external potential is active. This makes repeated compute() calls
+        # Reset per-calculation state. This makes repeated compute() calls
         # on the same driver safe when point charges or the static electric
-        # field are removed between calculations.
+        # field are removed between calculations, and prevents a skipped SCF
+        # from returning stale converged results.
         self._nuc_mm_energy = 0.0
         self._ef_nuc_energy = 0.0
+        self._is_converged = False
+        self._scf_results = None
+        self._scf_energy = 0.0
+        self._num_iter = 0
+
+        assert_msg_critical(
+            isinstance(self.acc_type, str) and self.acc_type.upper() in [
+                'C2DIIS', 'DIIS', 'L2_C2DIIS', 'L2_DIIS'
+            ],
+            f'SCF driver: Invalid acceleration type: {self.acc_type}')
 
         if min_basis is None:
             if basis.has_ecp():
@@ -995,7 +1005,7 @@ class ScfDriver:
             self._comp_diis(molecule, basis, den_mat, profiler)
 
         # two level DIIS method
-        if self.acc_type.upper() in ['L2_C2DIIS', 'L2_DIIS']:
+        elif self.acc_type.upper() in ['L2_C2DIIS', 'L2_DIIS']:
 
             # first step
             self._first_step = True
@@ -1022,6 +1032,11 @@ class ScfDriver:
                 self._gen_l2_second_step_initial_density, molecule, basis,
                 val_basis, self._molecular_orbitals)
             self._comp_diis(molecule, basis, den_mat, profiler)
+
+        else:
+            assert_msg_critical(
+                False,
+                f'SCF driver: Invalid acceleration type: {self.acc_type}')
 
         self._fock_matrices_alpha.clear()
         self._fock_matrices_beta.clear()
