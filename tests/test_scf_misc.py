@@ -506,6 +506,27 @@ class TestScfDriverMiscellaneous:
         assert scf_results is None
         assert not scf_drv.is_converged
 
+    @pytest.mark.parametrize('acc_type', ['DIIS', 'L2_DIIS'])
+    def test_scf_history_matches_printed_iteration_table(self, acc_type):
+
+        molecule, basis = self.get_water_and_basis()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.acc_type = acc_type
+        scf_drv.max_iter = 2
+        scf_drv.conv_thresh = 1.0e-12
+
+        scf_results = scf_drv.compute(molecule, basis)
+
+        assert scf_results is None
+        assert len(scf_drv.history) == 2
+
+        assert scf_drv.history[0]['diff_energy'] == pytest.approx(0.0)
+        assert scf_drv.history[0]['diff_density'] == pytest.approx(0.0)
+        assert scf_drv.history[1]['diff_energy'] == pytest.approx(
+            scf_drv.history[1]['energy'] - scf_drv.history[0]['energy'])
+
     def test_scf_results_being_independent(self):
 
         molecule, basis = self.get_water_and_basis()
@@ -1359,7 +1380,7 @@ class TestScfDriverMiscellaneous:
 
         assert ref_results is None
         assert damped_results is None
-        assert len(ref_drv.history) == len(damped_drv.history) == 3
+        assert len(ref_drv.history) == len(damped_drv.history) == 2
 
         if self.is_master():
             ref_energies = np.array(

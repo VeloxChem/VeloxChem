@@ -1627,6 +1627,7 @@ class ScfDriver:
         self._scf_prop = FirstOrderProperties(self.comm, self.ostream)
 
         self._history = []
+        self._scf_energy = 0.0
 
         if not self._first_step:
             profiler.begin({
@@ -1854,6 +1855,12 @@ class ScfDriver:
 
             diff_e_scf = e_scf - self.scf_energy
 
+            if self._num_iter == 1:
+                # The first printed SCF iteration always reports zero energy
+                # and density changes. Store the same values in the history.
+                diff_e_scf = 0.0
+                diff_den = 0.0
+
             self._iter_data = {
                 'energy': e_scf,
                 'gradient_norm': e_grad,
@@ -1862,7 +1869,8 @@ class ScfDriver:
                 'diff_energy': diff_e_scf,
             }
 
-            self._history.append(self._iter_data)
+            if not self._first_step and self._num_iter > 0:
+                self._history.append(self._iter_data)
 
             # update density and energy
 
