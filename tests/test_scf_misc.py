@@ -716,44 +716,76 @@ class TestScfDriverMiscellaneous:
                                     beta_list)
 
     @pytest.mark.parametrize(
-        ('bad_spins', 'expected_shape'), [
-            (('alpha',), (3, 3)),
-            (('beta',), (3, 3)),
-            (('alpha', 'beta'), (3, 2)),
+        ('alpha_bad', 'beta_bad', 'expected_molist_a', 'expected_molist_b',
+         'expected_warning'), [
+            ([(4, 1.0)], [], [0, 1, 2, 3, 4], [0, 1, 2, 3, 4],
+             'alpha orbital trimming list is shorter by 1; '
+             're-admitting MO 5.'),
+            ([], [(4, 1.0)], [0, 1, 2, 3, 4], [0, 1, 2, 3, 4],
+             'beta orbital trimming list is shorter by 1; '
+             're-admitting MO 5.'),
+            ([(4, 1.0)], [(4, 1.0)], [0, 1, 2, 3], [0, 1, 2, 3], None),
+            ([(4, 1.0)], [(3, 1.0)], [0, 1, 2, 3], [0, 1, 2, 4], None),
+            ([(3, 2.0), (4, 1.0)], [(4, 1.0)], [0, 1, 2, 4],
+             [0, 1, 2, 3],
+             'alpha orbital trimming list is shorter by 1; '
+             're-admitting MO 5.'),
+            ([(3, 2.0), (4, 1.0)], [], [0, 1, 2, 3, 4], [0, 1, 2, 3, 4],
+             'alpha orbital trimming list is shorter by 2; '
+             're-admitting MOs 4, 5.'),
         ])
-    def test_delete_mos_unrest_uses_intersection_of_bad_columns(
-            self, bad_spins, expected_shape):
+    def test_delete_mos_unrest_matches_mo_list_lengths(
+            self, alpha_bad, beta_bad, expected_molist_a, expected_molist_b,
+            expected_warning, tmp_path):
 
-        scf_drv = ScfUnrestrictedDriver()
+        outfile = tmp_path / 'delete_mos_unrest.out'
+        ostream = OutputStream.create_mpi_ostream(MPI.COMM_WORLD,
+                                                  str(outfile))
+        scf_drv = ScfUnrestrictedDriver(MPI.COMM_WORLD, ostream)
         scf_drv.ovl_thresh = 1.0e-6
         fmax = 1.0 / np.sqrt(scf_drv.ovl_thresh)
 
-        orb_a = np.eye(3)
-        orb_b = np.eye(3)
-        for bad_spin in bad_spins:
-            if bad_spin == 'alpha':
-                orb_a[0, 2] = fmax
-            else:
-                orb_b[0, 2] = fmax
+        orb_a = np.eye(5)
+        orb_b = np.eye(5)
+        for col, factor in alpha_bad:
+            orb_a[0, col] = factor * fmax
+        for col, factor in beta_bad:
+            orb_b[0, col] = factor * fmax
 
-        eigs_a = np.array([-1.0, -0.5, 0.2])
-        eigs_b = np.array([-0.9, -0.4, 0.3])
+        eigs_a = np.array([-1.0, -0.8, -0.5, -0.2, 0.4])
+        eigs_b = np.array([-0.9, -0.7, -0.4, -0.1, 0.3])
 
         trimmed = scf_drv._delete_mos_unrest(orb_a, orb_b, eigs_a, eigs_b)
 
-        assert trimmed[0].shape == expected_shape
-        assert trimmed[1].shape == expected_shape
+        assert trimmed[0].shape == (5, len(expected_molist_a))
+        assert trimmed[1].shape == (5, len(expected_molist_b))
+        assert np.array_equal(trimmed[0], orb_a[:, expected_molist_a])
+        assert np.array_equal(trimmed[1], orb_b[:, expected_molist_b])
+        assert np.array_equal(trimmed[2], eigs_a[expected_molist_a])
+        assert np.array_equal(trimmed[3], eigs_b[expected_molist_b])
 
-        if expected_shape == (3, 3):
-            assert np.array_equal(trimmed[0], orb_a)
-            assert np.array_equal(trimmed[1], orb_b)
-            assert np.array_equal(trimmed[2], eigs_a)
-            assert np.array_equal(trimmed[3], eigs_b)
-        else:
-            assert np.array_equal(trimmed[0], np.eye(3)[:, :2])
-            assert np.array_equal(trimmed[1], np.eye(3)[:, :2])
-            assert np.array_equal(trimmed[2], eigs_a[:2])
-            assert np.array_equal(trimmed[3], eigs_b[:2])
+        if self.is_master():
+            scf_drv.ostream.close()
+            output = outfile.read_text()
+            if expected_warning is None:
+                assert 're-admitting' not in output
+            else:
+                assert expected_warning in output
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='requires standard single-process assertions')
+    def test_delete_mos_unrest_rejects_mismatched_column_counts(self):
+
+        scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ovl_thresh = 1.0e-6
+
+        orb_a = np.eye(4)
+        orb_b = np.eye(3)
+        eigs_a = np.zeros(4)
+        eigs_b = np.zeros(3)
+
+        with pytest.raises(VeloxChemError, match='different numbers of MOs'):
+            scf_drv._delete_mos_unrest(orb_a, orb_b, eigs_a, eigs_b)
 
     def test_unrestricted_phase_update_with_fewer_reference_orbitals(self):
 

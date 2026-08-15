@@ -3622,11 +3622,11 @@ class ScfDriver:
         Generates trimmed unrestricted molecular orbitals by deleting MOs with
         coefficients exceeding 1.0 / sqrt(ovl_thresh).
 
-        The same MO columns are removed from both spin blocks only when both
-        spins have a coefficient exceeding the threshold. A column flagged by
-        only one spin is retained in both spin blocks, preserving as many
-        orbitals as possible while keeping the number of alpha and beta MOs
-        consistent.
+        The alpha and beta trimming lists are kept independently. If they have
+        the same length, each spin block uses its own list. Otherwise, the
+        shorter list is extended with the deleted orbitals whose coefficients
+        are closest to the threshold, so that both spin blocks have the same
+        number of MOs. A warning is printed when this extension is performed.
 
         :param mol_orbs_a:
             The alpha molecular orbitals.
@@ -3646,17 +3646,53 @@ class ScfDriver:
 
         mvec_a = np.amax(np.abs(mol_orbs_a), axis=0)
         mvec_b = np.amax(np.abs(mol_orbs_b), axis=0)
-        # Delete the intersection of the alpha and beta deletion sets: a
-        # column is removed only when both spin blocks fail the threshold.
-        mvec = np.minimum(mvec_a, mvec_b)
 
-        molist = []
-        for i in range(mvec.shape[0]):
-            if mvec[i] < fmax:
-                molist.append(i)
+        assert_msg_critical(
+            mvec_a.shape[0] == mvec_b.shape[0],
+            'ScfDriver: alpha and beta orbital arrays have different numbers '
+            f'of MOs ({mvec_a.shape[0]} and {mvec_b.shape[0]})')
 
-        return (mol_orbs_a[:, molist], mol_orbs_b[:, molist],
-                mol_eigs_a[molist], mol_eigs_b[molist])
+        molist_a = []
+        for i in range(mvec_a.shape[0]):
+            if mvec_a[i] < fmax:
+                molist_a.append(i)
+
+        molist_b = []
+        for i in range(mvec_b.shape[0]):
+            if mvec_b[i] < fmax:
+                molist_b.append(i)
+
+        if len(molist_a) != len(molist_b):
+            if len(molist_a) > len(molist_b):
+                # Re-admit the deleted beta orbitals closest to the threshold
+                # first; ties are broken by the lower orbital index.
+                missing = [
+                    i for i in range(mvec_b.shape[0]) if i not in molist_b
+                ]
+                missing.sort(key=lambda i: (mvec_b[i], i))
+                readmitted = missing[:len(molist_a) - len(molist_b)]
+                molist_b = sorted(molist_b + readmitted)
+                spin = 'beta'
+            else:
+                # Re-admit the deleted alpha orbitals closest to the threshold
+                # first; ties are broken by the lower orbital index.
+                missing = [
+                    i for i in range(mvec_a.shape[0]) if i not in molist_a
+                ]
+                missing.sort(key=lambda i: (mvec_a[i], i))
+                readmitted = missing[:len(molist_b) - len(molist_a)]
+                molist_a = sorted(molist_a + readmitted)
+                spin = 'alpha'
+
+            warn_msg = f'ScfDriver: {spin} orbital trimming list is shorter '
+            warn_msg += f'by {len(readmitted)}; re-admitting '
+            warn_msg += f'MO{"s" if len(readmitted) != 1 else ""} '
+            warn_msg += ', '.join(str(i + 1) for i in sorted(readmitted)) + '.'
+            self.ostream.print_warning(warn_msg)
+            self.ostream.print_blank()
+
+        return (mol_orbs_a[:, molist_a], mol_orbs_b[:, molist_b],
+                mol_eigs_a[molist_a], mol_eigs_b[molist_b])
 
     def compute_s2(self, molecule, ao_basis, scf_results):
         """

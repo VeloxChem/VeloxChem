@@ -198,6 +198,8 @@ def test_unparsed_input_hdf5_roundtrip(tmpdir):
     write_unparsed_input_to_hdf5(h5file, input_dictionary, group_name='test')
     recovered = read_unparsed_input_from_hdf5(h5file, group_name='test')
 
+    assert recovered.keys() == input_dictionary.keys()
+
     for key, val in input_dictionary.items():
         if isinstance(val, np.ndarray):
             npt.assert_array_equal(recovered[key], val)
