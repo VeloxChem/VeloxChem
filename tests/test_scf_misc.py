@@ -658,6 +658,46 @@ class TestScfDriverMiscellaneous:
             scf_drv.maximum_overlap(molecule, basis, orbitals, alpha_list,
                                     beta_list)
 
+    @pytest.mark.parametrize(
+        ('bad_spins', 'expected_shape'), [
+            (('alpha',), (3, 3)),
+            (('beta',), (3, 3)),
+            (('alpha', 'beta'), (3, 2)),
+        ])
+    def test_delete_mos_unrest_uses_intersection_of_bad_columns(
+            self, bad_spins, expected_shape):
+
+        scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ovl_thresh = 1.0e-6
+        fmax = 1.0 / np.sqrt(scf_drv.ovl_thresh)
+
+        orb_a = np.eye(3)
+        orb_b = np.eye(3)
+        for bad_spin in bad_spins:
+            if bad_spin == 'alpha':
+                orb_a[0, 2] = fmax
+            else:
+                orb_b[0, 2] = fmax
+
+        eigs_a = np.array([-1.0, -0.5, 0.2])
+        eigs_b = np.array([-0.9, -0.4, 0.3])
+
+        trimmed = scf_drv._delete_mos_unrest(orb_a, orb_b, eigs_a, eigs_b)
+
+        assert trimmed[0].shape == expected_shape
+        assert trimmed[1].shape == expected_shape
+
+        if expected_shape == (3, 3):
+            assert np.array_equal(trimmed[0], orb_a)
+            assert np.array_equal(trimmed[1], orb_b)
+            assert np.array_equal(trimmed[2], eigs_a)
+            assert np.array_equal(trimmed[3], eigs_b)
+        else:
+            assert np.array_equal(trimmed[0], np.eye(3)[:, :2])
+            assert np.array_equal(trimmed[1], np.eye(3)[:, :2])
+            assert np.array_equal(trimmed[2], eigs_a[:2])
+            assert np.array_equal(trimmed[3], eigs_b[:2])
+
     def test_unrestricted_phase_update_with_fewer_reference_orbitals(self):
 
         scf_drv = ScfUnrestrictedDriver()

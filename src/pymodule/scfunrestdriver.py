@@ -273,9 +273,9 @@ class ScfUnrestrictedDriver(ScfDriver):
                 eff_fock_mat[0], tmat)
             eigs_b, orb_coefs_b = solve_in_orthogonal_basis(
                 eff_fock_mat[1], tmat)
-            orb_coefs_a, eigs_a = self._delete_mos(orb_coefs_a, eigs_a)
-            orb_coefs_b, eigs_b = self._delete_mos(orb_coefs_b, eigs_b)
-
+            (orb_coefs_a, orb_coefs_b, eigs_a,
+             eigs_b) = self._delete_mos_unrest(orb_coefs_a, orb_coefs_b, eigs_a,
+                                               eigs_b)
             occa = molecule.get_aufbau_alpha_occupation(eigs_a.size, ao_basis)
             occb = molecule.get_aufbau_beta_occupation(eigs_b.size, ao_basis)
 

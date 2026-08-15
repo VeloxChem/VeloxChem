@@ -3615,6 +3615,48 @@ class ScfDriver:
 
         return (mol_orbs[:, molist], mol_eigs[molist])
 
+    def _delete_mos_unrest(self, mol_orbs_a, mol_orbs_b, mol_eigs_a,
+                           mol_eigs_b):
+        """
+        Generates trimmed unrestricted molecular orbitals by deleting MOs with
+        coefficients exceeding 1.0 / sqrt(ovl_thresh).
+
+        The same MO columns are removed from both spin blocks only when both
+        spins have a coefficient exceeding the threshold. A column flagged by
+        only one spin is retained in both spin blocks, preserving as many
+        orbitals as possible while keeping the number of alpha and beta MOs
+        consistent.
+
+        :param mol_orbs_a:
+            The alpha molecular orbitals.
+        :param mol_orbs_b:
+            The beta molecular orbitals.
+        :param mol_eigs_a:
+            The alpha eigenvalues of molecular orbitals.
+        :param mol_eigs_b:
+            The beta eigenvalues of molecular orbitals.
+
+        :return:
+            The tuple (trimmed alpha orbitals, trimmed beta orbitals, trimmed
+            alpha eigenvalues, trimmed beta eigenvalues).
+        """
+
+        fmax = 1.0 / math.sqrt(self.ovl_thresh)
+
+        mvec_a = np.amax(np.abs(mol_orbs_a), axis=0)
+        mvec_b = np.amax(np.abs(mol_orbs_b), axis=0)
+        # Delete the intersection of the alpha and beta deletion sets: a
+        # column is removed only when both spin blocks fail the threshold.
+        mvec = np.minimum(mvec_a, mvec_b)
+
+        molist = []
+        for i in range(mvec.shape[0]):
+            if mvec[i] < fmax:
+                molist.append(i)
+
+        return (mol_orbs_a[:, molist], mol_orbs_b[:, molist],
+                mol_eigs_a[molist], mol_eigs_b[molist])
+
     def compute_s2(self, molecule, ao_basis, scf_results):
         """
         Computes expectation value of the S**2 operator.
