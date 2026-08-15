@@ -97,54 +97,33 @@ class ScfDriver:
         The output stream.
 
     Instance variables
-        - den_guess: The initial density guess driver.
         - acc_type: The type of SCF convergence accelerator.
         - max_err_vecs: The maximum number of error vectors.
         - max_iter: The maximum number of SCF iterations.
-        - first_step: The flag for first step in two-level DIIS convergence
-          acceleration.
         - conv_thresh: The SCF convergence threshold.
         - eri_thresh: The electron repulsion integrals screening threshold.
+        - eri_thresh_tight: The tightened ERI screening threshold.
         - ovl_thresh: The atomic orbitals linear dependency threshold.
-        - diis_thresh: The DIIS switch on threshold.
-        - iter_data: The dictionary of SCF iteration data (scf energy, scf
-          energy change, gradient, density change, etc.).
-        - is_converged: The flag for SCF convergence.
-        - scf_energy: The SCF energy.
-        - num_iter: The current number of SCF iterations.
-        - fock_matrices: The list of stored Fock/Kohn-Sham matrices.
-        - den_matrices: The list of stored density matrices.
-        - density: The current density matrix.
-        - mol_orbs: The current molecular orbitals.
-        - nuc_energy: The nuclear repulsion energy of molecule.
-        - comm: The MPI communicator.
-        - rank: The rank of MPI process.
-        - nodes: The number of MPI processes.
+        - diis_thresh: The DIIS switch-on threshold.
         - restart: The flag for restarting from checkpoint file.
         - checkpoint_file: The name of checkpoint file.
-        - ref_mol_orbs: The reference molecular orbitals read from checkpoint
-          file.
-        - scf_type: The type of SCF calculation (restricted, unrestricted, or
-          restricted_openshell).
-        - dft: The flag for running DFT.
-        - grid_level: The accuracy level of DFT grid.
         - xcfun: The XC functional.
-        - molgrid: The molecular grid.
-        - pe: The flag for running polarizable embedding calculation.
+        - grid_level: The accuracy level of DFT grid.
         - pe_options: The dictionary with options for polarizable embedding.
-        - pe_summary: The summary string for polarizable embedding.
         - dispersion: The flag for calculating D4 dispersion correction.
-        - d4_energy: The D4 dispersion correction to energy.
         - electric_field: The static electric field.
-        - ef_nuc_energy: The electric potential energy of the nuclei in the
-          static electric field.
-        - dipole_origin: The origin of the dipole operator.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
         - memory_tracing: The flag for tracing memory allocation.
+        - print_level: The verbosity level.
         - program_end_time: The end time of the program.
         - filename: The filename.
+
+        The ``scf_type``, ``comm``, ``rank``, ``nodes``, ``ostream``,
+        ``num_iter``, ``is_converged``, ``scf_energy``, ``density``,
+        ``molecular_orbitals``, ``scf_results``, and ``history`` properties
+        provide read-only access to calculation state.
     """
 
     def __init__(self, comm, ostream):
@@ -334,6 +313,7 @@ class ScfDriver:
                 'eri_thresh_tight':
                     ('float', 'tightened ERI screening threshold'),
                 'ovl_thresh': ('float', 'AO linear dependency threshold'),
+                'diis_thresh': ('float', 'DIIS switch-on threshold'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'filename': ('str', 'base name of output files'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
@@ -363,6 +343,8 @@ class ScfDriver:
                 'solvation_model': ('str', 'solvation model'),
                 'cpcm_grid_per_sphere':
                     ('seq_fixed_int', 'number of C-PCM grid points per sphere'),
+                'cpcm_radii_scaling':
+                    ('float', 'scaling factor for C-PCM vdW radii'),
                 'cpcm_cg_thresh':
                     ('float', 'threshold for solving C-PCM charges'),
                 'cpcm_epsilon':
@@ -718,8 +700,8 @@ class ScfDriver:
         # set up SMD Solvation Model
         # note that SMD also uses CPCM, but with a different scaling factor for radii
         if self._smd:
-            assert_msg_critical(self._cpcm,
-                                'type(self).__name__: CPCM is needed by SMD')
+            assert_msg_critical(
+                self._cpcm, f'{type(self).__name__}: CPCM is needed by SMD')
             self.smd_drv = SmdDriver(self.comm, self.ostream)
             self.smd_drv.solute = molecule
             self.smd_drv.solvent = self.smd_solvent
@@ -1482,7 +1464,8 @@ class ScfDriver:
 
     def set_start_orbitals(self, molecule, basis, array):
         """
-        Creates checkpoint file from numpy array containing starting orbitals.
+        Sets molecular orbitals from a numpy array and enables start-orbital
+        mode for the SCF calculation.
 
         :param molecule:
             The molecule.
@@ -3293,7 +3276,7 @@ class ScfDriver:
                            use_modified_orbitals):
         """
         Sets SCF convergence flag by checking if convergence condition for
-        electronic gradient is fullfiled.
+        electronic gradient is fulfilled.
 
         :param molecule:
             The molecule.
@@ -3560,7 +3543,7 @@ class ScfDriver:
 
     def get_scf_type_str(self):
         """
-        Gets string with type of SCF calculation (defined in derrived classes).
+        Gets string with type of SCF calculation (defined in derived classes).
 
         :return:
             The string with type of SCF calculation.
@@ -3609,7 +3592,7 @@ class ScfDriver:
 
     def _delete_mos(self, mol_orbs, mol_eigs):
         """
-        Generates trimmed molecular orbital by deleting MOs with coeficients
+        Generates trimmed molecular orbital by deleting MOs with coefficients
         exceeding 1.0 / sqrt(ovl_thresh).
 
         :param mol_orbs:

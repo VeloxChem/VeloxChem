@@ -1386,6 +1386,17 @@ class TestScfDriverMiscellaneous:
         assert scf_drv.level_shifting_delta == pytest.approx(0.05)
         assert scf_drv.level_shift_smoothing == pytest.approx(0.35)
 
+    def test_registered_scf_controls_parse(self):
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+
+        scf_drv.update_settings({'diis_thresh': '1.0e-2'},
+                                {'cpcm_radii_scaling': '1.1'})
+
+        assert scf_drv.diis_thresh == pytest.approx(1.0e-2)
+        assert scf_drv.cpcm_radii_scaling == pytest.approx(1.1)
+
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
     def test_level_shift_smoothing_validation(self):
