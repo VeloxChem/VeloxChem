@@ -738,21 +738,20 @@ class TestScfDriverMiscellaneous:
     @pytest.mark.parametrize(
         ('alpha_bad', 'beta_bad', 'expected_molist_a', 'expected_molist_b',
          'expected_warning'), [
-            ([(4, 1.0)], [], [0, 1, 2, 3, 4], [0, 1, 2, 3, 4],
-             'alpha orbital trimming list is shorter by 1; '
-             're-admitting MO 5.'),
-            ([], [(4, 1.0)], [0, 1, 2, 3, 4], [0, 1, 2, 3, 4],
-             'beta orbital trimming list is shorter by 1; '
-             're-admitting MO 5.'),
+            ([(4, 1.0)], [], [0, 1, 2, 3], [0, 1, 2, 3],
+             'beta orbital trimming list is longer by 1; '
+             'removing highest-energy retained MO 5.'),
+            ([], [(4, 1.0)], [0, 1, 2, 3], [0, 1, 2, 3],
+             'alpha orbital trimming list is longer by 1; '
+             'removing highest-energy retained MO 5.'),
             ([(4, 1.0)], [(4, 1.0)], [0, 1, 2, 3], [0, 1, 2, 3], None),
             ([(4, 1.0)], [(3, 1.0)], [0, 1, 2, 3], [0, 1, 2, 4], None),
-            ([(3, 2.0), (4, 1.0)], [(4, 1.0)], [0, 1, 2, 4],
-             [0, 1, 2, 3],
-             'alpha orbital trimming list is shorter by 1; '
-             're-admitting MO 5.'),
-            ([(3, 2.0), (4, 1.0)], [], [0, 1, 2, 3, 4], [0, 1, 2, 3, 4],
-             'alpha orbital trimming list is shorter by 2; '
-             're-admitting MOs 4, 5.'),
+            ([(3, 2.0), (4, 1.0)], [(4, 1.0)], [0, 1, 2], [0, 1, 2],
+             'beta orbital trimming list is longer by 1; '
+             'removing highest-energy retained MO 4.'),
+            ([(3, 2.0), (4, 1.0)], [], [0, 1, 2], [0, 1, 2],
+             'beta orbital trimming list is longer by 2; '
+             'removing highest-energy retained MOs 4, 5.'),
         ])
     def test_delete_mos_unrest_matches_mo_list_lengths(
             self, alpha_bad, beta_bad, expected_molist_a, expected_molist_b,
@@ -788,7 +787,7 @@ class TestScfDriverMiscellaneous:
             scf_drv.ostream.close()
             output = outfile.read_text()
             if expected_warning is None:
-                assert 're-admitting' not in output
+                assert 'removing highest-energy retained' not in output
             else:
                 assert expected_warning in output
 

@@ -3625,10 +3625,9 @@ class ScfDriver:
         coefficients exceeding 1.0 / sqrt(ovl_thresh).
 
         The alpha and beta trimming lists are kept independently. If they have
-        the same length, each spin block uses its own list. Otherwise, the
-        shorter list is extended with the deleted orbitals whose coefficients
-        are closest to the threshold, so that both spin blocks have the same
-        number of MOs. A warning is printed when this extension is performed.
+        different lengths, the highest-energy retained orbitals are removed
+        from the longer list so that both spin blocks have the same number of
+        MOs. A warning is printed when this additional trimming is performed.
 
         :param mol_orbs_a:
             The alpha molecular orbitals.
@@ -3665,31 +3664,23 @@ class ScfDriver:
                 molist_b.append(i)
 
         if len(molist_a) != len(molist_b):
-            if len(molist_a) > len(molist_b):
-                # Re-admit the deleted beta orbitals closest to the threshold
-                # first; ties are broken by the lower orbital index.
-                missing = [
-                    i for i in range(mvec_b.shape[0]) if i not in molist_b
-                ]
-                missing.sort(key=lambda i: (mvec_b[i], i))
-                readmitted = missing[:len(molist_a) - len(molist_b)]
-                molist_b = sorted(molist_b + readmitted)
-                spin = 'beta'
-            else:
-                # Re-admit the deleted alpha orbitals closest to the threshold
-                # first; ties are broken by the lower orbital index.
-                missing = [
-                    i for i in range(mvec_a.shape[0]) if i not in molist_a
-                ]
-                missing.sort(key=lambda i: (mvec_a[i], i))
-                readmitted = missing[:len(molist_b) - len(molist_a)]
-                molist_a = sorted(molist_a + readmitted)
-                spin = 'alpha'
+            target_count = min(len(molist_a), len(molist_b))
 
-            warn_msg = f'ScfDriver: {spin} orbital trimming list is shorter '
-            warn_msg += f'by {len(readmitted)}; re-admitting '
-            warn_msg += f'MO{"s" if len(readmitted) != 1 else ""} '
-            warn_msg += ', '.join(str(i + 1) for i in sorted(readmitted)) + '.'
+            if len(molist_a) > len(molist_b):
+                # Eigenvalues from eigh are in ascending order, so trimming
+                # the tail removes the highest-energy retained orbitals.
+                removed = molist_a[target_count:]
+                molist_a = molist_a[:target_count]
+                spin = 'alpha'
+            else:
+                removed = molist_b[target_count:]
+                molist_b = molist_b[:target_count]
+                spin = 'beta'
+
+            warn_msg = f'ScfDriver: {spin} orbital trimming list is longer '
+            warn_msg += f'by {len(removed)}; removing highest-energy retained '
+            warn_msg += f'MO{"s" if len(removed) != 1 else ""} '
+            warn_msg += ', '.join(str(i + 1) for i in removed) + '.'
             self.ostream.print_warning(warn_msg)
             self.ostream.print_blank()
 
