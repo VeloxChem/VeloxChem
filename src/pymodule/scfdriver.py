@@ -1010,27 +1010,29 @@ class ScfDriver:
         # two level DIIS method
         elif self.acc_type.upper() in ['L2_C2DIIS', 'L2_DIIS']:
 
-            # first step
-            self._first_step = True
-
+            # first step: temporarily use a looser threshold and fewer
+            # iterations for the reduced-basis calculation. Restore the
+            # user-facing settings even if this stage raises, so that the
+            # driver remains safe to reuse.
             old_thresh = self.conv_thresh
-            self.conv_thresh = 1.0e-3
-
             old_max_iter = self.max_iter
-            self.max_iter = 5
 
-            val_basis = basis.reduce_to_valence_basis()
-            den_mat = self._prepare_initial_density(
-                self._gen_l2_first_step_initial_density, molecule, val_basis,
-                min_basis)
-            self._comp_diis(molecule, val_basis, den_mat, profiler)
+            try:
+                self._first_step = True
+                self.conv_thresh = 1.0e-3
+                self.max_iter = 5
+
+                val_basis = basis.reduce_to_valence_basis()
+                den_mat = self._prepare_initial_density(
+                    self._gen_l2_first_step_initial_density, molecule,
+                    val_basis, min_basis)
+                self._comp_diis(molecule, val_basis, den_mat, profiler)
+            finally:
+                self._first_step = False
+                self.conv_thresh = old_thresh
+                self.max_iter = old_max_iter
 
             # second step
-            self._first_step = False
-
-            self.conv_thresh = old_thresh
-            self.max_iter = old_max_iter
-
             den_mat = self._prepare_initial_density(
                 self._gen_l2_second_step_initial_density, molecule, basis,
                 val_basis, self._molecular_orbitals)

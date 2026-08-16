@@ -555,6 +555,26 @@ class TestScfDriverMiscellaneous:
         with pytest.raises(ValueError):
             scf_drv.compute(molecule, basis)
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_l2_settings_restored_after_first_step_error(self):
+
+        molecule, basis = self.get_open_shell_water_and_basis()
+
+        scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.guess_unpaired_electrons = 'O(invalid)'
+
+        original_conv_thresh = scf_drv.conv_thresh
+        original_max_iter = scf_drv.max_iter
+
+        with pytest.raises(ValueError):
+            scf_drv.compute(molecule, basis)
+
+        assert scf_drv._first_step is False
+        assert scf_drv.conv_thresh == original_conv_thresh
+        assert scf_drv.max_iter == original_max_iter
+
     def test_grid_level_consistency(self):
 
         molecule, basis = self.get_water_and_basis()
