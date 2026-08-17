@@ -44,8 +44,7 @@ class KDiis:
     The Pulay error is the occupied-virtual orbital-gradient block represented
     in a fixed orthonormal AO frame. The same weights extrapolate the AO Fock
     matrices, after which first-order perturbation theory and a unitary orbital
-    rotation produce the next iterate without diagonalizing the full Fock
-    matrix.
+    rotation produce the next iterate.
     """
 
     def __init__(self,
@@ -70,7 +69,9 @@ class KDiis:
         self.fock_matrices = deque()
 
     def clear(self):
-        """Clears the Fock-matrix and orbital-gradient history."""
+        """
+        Clears the stored Fock matrices and orbital-gradient error vectors.
+        """
 
         self.error_vectors.clear()
         self.fock_matrices.clear()
@@ -85,12 +86,23 @@ class KDiis:
         """
         Produces the next restricted set of molecular orbitals.
 
+        :param fock_matrix:
+            The current AO Fock/Kohn-Sham matrix.
+        :param coefficients:
+            The current AO molecular-orbital coefficient matrix, with occupied
+            columns followed by virtual columns.
+        :param number_occupied:
+            The number of occupied molecular orbitals.
         :param overlap_matrix:
             The AO overlap matrix.
         :param oao_matrix:
             The orthogonalization matrix defining the fixed gradient frame.
+        :param level_shift:
+            The nonnegative shift added to occupied-virtual energy
+            denominators.
         :return:
-            A tuple containing updated coefficients and orbital energies.
+            A pair of one-element tuples containing the updated coefficient
+            matrix and orbital-energy array, respectively.
         """
 
         return self._update((fock_matrix,), (coefficients,), (number_occupied,),
@@ -109,12 +121,24 @@ class KDiis:
         A single Pulay system is built from the stacked spin gradients so the
         same coefficients extrapolate both spin Fock matrices.
 
+        :param fock_matrices:
+            The current alpha- and beta-spin AO Fock/Kohn-Sham matrices.
+        :param coefficients:
+            The current alpha- and beta-spin AO molecular-orbital coefficient
+            matrices, with occupied columns followed by virtual columns.
+        :param numbers_occupied:
+            The numbers of occupied alpha- and beta-spin molecular orbitals.
         :param overlap_matrix:
             The AO overlap matrix.
         :param oao_matrix:
             The orthogonalization matrix defining the fixed gradient frame.
+        :param level_shift:
+            The nonnegative shift added to occupied-virtual energy
+            denominators.
         :return:
-            Tuples containing updated coefficients and orbital energies.
+            A pair of two-element tuples containing the updated alpha- and
+            beta-spin coefficient matrices and orbital-energy arrays,
+            respectively.
         """
 
         return self._update(tuple(fock_matrices), tuple(coefficients),
@@ -123,7 +147,28 @@ class KDiis:
 
     def _update(self, fock_matrices, coefficients, numbers_occupied,
                 overlap_matrix, oao_matrix, level_shift):
-        """Updates one or two spin channels using a shared Pulay solve."""
+        """
+        Updates one or two spin channels using a shared Pulay solve.
+
+        :param fock_matrices:
+            The AO Fock/Kohn-Sham matrices for all spin channels.
+        :param coefficients:
+            The AO molecular-orbital coefficient matrices for the
+            corresponding spin channels.
+        :param numbers_occupied:
+            The numbers of occupied orbitals for the corresponding spin
+            channels.
+        :param overlap_matrix:
+            The AO overlap matrix.
+        :param oao_matrix:
+            The orthogonalization matrix defining the fixed gradient frame.
+        :param level_shift:
+            The nonnegative shift added to occupied-virtual energy
+            denominators.
+        :return:
+            A pair of tuples containing the updated coefficient matrices and
+            orbital-energy arrays for all spin channels.
+        """
 
         gradients = []
         for fock, coeff, nocc in zip(fock_matrices, coefficients,
@@ -167,7 +212,15 @@ class KDiis:
         return tuple(new_coefficients), tuple(new_energies)
 
     def _append_history(self, fock_matrices, error_vector):
-        """Appends one synchronized Fock-matrix and gradient entry."""
+        """
+        Appends one synchronized Fock-matrix and gradient entry.
+
+        :param fock_matrices:
+            The AO Fock/Kohn-Sham matrices for the current iteration.
+        :param error_vector:
+            The flattened, spin-stacked orbital-gradient error vector for the
+            current iteration.
+        """
 
         if len(self.error_vectors) == self.max_vectors:
             self.error_vectors.popleft()
@@ -178,7 +231,23 @@ class KDiis:
 
     def _first_order_update(self, fock_matrix, coefficients, number_occupied,
                             level_shift):
-        """Builds and applies the first-order occupied-virtual rotation."""
+        """
+        Builds and applies the first-order occupied-virtual rotation.
+
+        :param fock_matrix:
+            The extrapolated AO Fock/Kohn-Sham matrix for one spin channel.
+        :param coefficients:
+            The current AO molecular-orbital coefficient matrix, with occupied
+            columns followed by virtual columns.
+        :param number_occupied:
+            The number of occupied molecular orbitals.
+        :param level_shift:
+            The nonnegative shift added to occupied-virtual energy
+            denominators.
+        :return:
+            The rotated coefficient matrix and the diagonal Fock expectation
+            values in the rotated molecular-orbital basis.
+        """
 
         nmo = coefficients.shape[1]
         nocc = number_occupied
@@ -194,15 +263,15 @@ class KDiis:
             [coefficients.T, fock_matrix, coefficients])
 
         # Canonicalize only within the occupied and virtual spaces. These
-        # rotations do not alter the density and make the perturbative energy
-        # denominators well defined without a full Fock diagonalization.
+        # rotations do not alter the density and define the perturbative
+        # energy denominators in a semicanonical basis.
         occ_energies, occ_rotation = np.linalg.eigh(fock_mo[:nocc, :nocc])
         vir_energies, vir_rotation = np.linalg.eigh(fock_mo[nocc:, nocc:])
         block_rotation = np.zeros((nmo, nmo), dtype='float64')
         block_rotation[:nocc, :nocc] = occ_rotation
         block_rotation[nocc:, nocc:] = vir_rotation
 
-        semicanonical_coeff = coefficients @ block_rotation
+        semicanonical_coeff = np.matmul(coefficients, block_rotation)
         semicanonical_fock = np.linalg.multi_dot(
             [semicanonical_coeff.T, fock_matrix, semicanonical_coeff])
         gradient = semicanonical_fock[nocc:, :nocc]
@@ -223,7 +292,7 @@ class KDiis:
         generator[:nocc, nocc:] = -amplitudes.T
         rotation = self._exponential_skew_symmetric(generator)
 
-        new_coefficients = semicanonical_coeff @ rotation
+        new_coefficients = np.matmul(semicanonical_coeff, rotation)
         rotated_fock = np.linalg.multi_dot(
             [new_coefficients.T, fock_matrix, new_coefficients])
         energies = np.diag(rotated_fock).copy()
@@ -232,7 +301,15 @@ class KDiis:
 
     @staticmethod
     def _exponential_skew_symmetric(generator):
-        """Computes a stable real exponential of a skew-symmetric matrix."""
+        """
+        Computes a stable real exponential of a skew-symmetric matrix.
+
+        :param generator:
+            The real skew-symmetric orbital-rotation generator.
+        :return:
+            The real orthogonal matrix obtained by exponentiating the
+            generator.
+        """
 
         eigenvalues, eigenvectors = np.linalg.eigh(1.0j * generator)
         rotation = np.linalg.multi_dot([

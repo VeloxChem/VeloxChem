@@ -642,14 +642,17 @@ class ScfDriver:
 
         for name in [
                 'max_iter', 'max_err_vecs', 'conv_thresh', 'eri_thresh',
-                'eri_thresh_tight', 'ovl_thresh', 'kdiis_min_denominator',
-                'kdiis_max_rotation'
+                'eri_thresh_tight', 'ovl_thresh'
         ]:
             assert_msg_critical(
                 getattr(self, name) > 0,
                 f'SCF driver: \'{name}\' must be greater than zero')
 
         if self.acc_type.upper() == 'KDIIS':
+            for name in ['kdiis_min_denominator', 'kdiis_max_rotation']:
+                assert_msg_critical(
+                    getattr(self, name) > 0,
+                    f'SCF driver: \'{name}\' must be greater than zero')
             assert_msg_critical(
                 self.scf_type in ['restricted', 'unrestricted'],
                 'SCF driver: KDIIS is currently available only for '
@@ -660,8 +663,10 @@ class ScfDriver:
             assert_msg_critical(
                 not self.density_damping,
                 'SCF driver: KDIIS is incompatible with density damping')
+            mom_is_active = self.comm.bcast(self._mom is not None,
+                                            root=mpi_master())
             assert_msg_critical(
-                self._mom is None,
+                not mom_is_active,
                 'SCF driver: KDIIS is incompatible with maximum overlap '
                 'occupations')
 
@@ -1937,8 +1942,9 @@ class ScfDriver:
 
             profiler.start_timer('EffFock')
 
+            # Require one full diagonalization before the first KDIIS update.
             use_kdiis_update = (self.acc_type.upper() == 'KDIIS' and
-                                self._num_iter > 0 and
+                                i > 0 and
                                 e_grad < self.diis_thresh)
 
             if self.acc_type.upper() == 'KDIIS':
@@ -2048,6 +2054,21 @@ class ScfDriver:
                 iter_in_hours = (tm.time() - iter_start_time) / 3600
                 if self._need_graceful_exit(iter_in_hours):
                     self._graceful_exit(molecule, ao_basis)
+
+        # KDIIS orbital rotations do not diagonalize the Fock matrix. Use the
+        # final physical Fock to provide canonical MOs and orbital energies to
+        # checkpoints and downstream methods.
+        if self.acc_type.upper() == 'KDIIS' and self.is_converged:
+            self._molecular_orbitals = self._gen_molecular_orbitals(
+                molecule, ao_basis, fock_mat, oao_mat)
+            self._update_mol_orbs_phase()
+
+            if self.rank == mpi_master():
+                den_mat = self.molecular_orbitals.get_density(molecule)
+            else:
+                den_mat = None
+            den_mat = self.comm.bcast(den_mat, root=mpi_master())
+            self._density = tuple([x.copy() for x in den_mat])
 
         if not self._first_step:
             self.write_checkpoint(molecule, ao_basis)
@@ -3174,8 +3195,7 @@ class ScfDriver:
     def _gen_kdiis_orbitals(self, molecule, ao_basis, fock_mat, ovl_mat,
                             oao_mat, level_shift):
         """
-        Generates molecular orbitals with the diagonalization-free KDIIS
-        update.
+        Generates molecular orbitals using the KDIIS orbital update.
 
         :param molecule:
             The molecule.

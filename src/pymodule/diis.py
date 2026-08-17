@@ -30,9 +30,9 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from .mathutils import safe_solve
-
 import numpy as np
+
+from .mathutils import safe_solve
 
 
 def compute_pulay_weights(error_vectors, method_name='DIIS'):
@@ -78,7 +78,7 @@ def _build_error_gram_matrix(error_vectors):
     flat = [vec.reshape(-1) for vec in error_vectors]
     for i in range(dim):
         for j in range(i, dim):
-            value = np.vdot(flat[i], flat[j]).real
+            value = np.vdot(flat[i], flat[j])
             bmat[i, j] = value
             bmat[j, i] = value
     return bmat
@@ -217,13 +217,3 @@ class Diis:
             err = np.matmul(tmat.T, np.matmul(fds - fds.T, tmat))
             errs.append(err)
         return errs
-
-    def _build_bmatrix(self):
-        """
-        Builds the symmetric B matrix from flattened error vectors.
-
-        :return:
-            The B-matrix for the DIIS augmented system.
-        """
-
-        return _build_error_gram_matrix(self.error_vectors)

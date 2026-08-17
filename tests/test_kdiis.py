@@ -6,6 +6,7 @@ from veloxchem.errorhandler import VeloxChemError
 from veloxchem.kdiis import KDiis
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.molecule import Molecule
+from veloxchem.oneeints import compute_overlap_integrals
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfrestopendriver import ScfRestrictedOpenDriver
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
@@ -13,6 +14,28 @@ from veloxchem.veloxchemlib import mpi_master
 
 
 class TestKDiis:
+
+    @staticmethod
+    def assert_canonical_scf_results(results):
+
+        for spin in ('alpha', 'beta'):
+            coefficients = results[f'C_{spin}']
+            energies = results[f'E_{spin}']
+            occupations = results[f'occ_{spin}']
+            density = results[f'D_{spin}']
+            fock = results[f'F_{spin}']
+
+            fock_mo = np.linalg.multi_dot(
+                [coefficients.T, fock, coefficients])
+            off_diagonal = fock_mo - np.diag(np.diag(fock_mo))
+            occupied_coefficients = occupations * coefficients
+            orbital_density = occupied_coefficients @ occupied_coefficients.T
+
+            assert np.max(np.abs(off_diagonal)) < 1.0e-10
+            assert np.allclose(np.diag(fock_mo), energies, atol=1.0e-10,
+                               rtol=0.0)
+            assert np.allclose(density, orbital_density, atol=1.0e-12,
+                               rtol=0.0)
 
     @staticmethod
     def get_water_and_basis(charge=0, multiplicity=1):
@@ -105,6 +128,54 @@ class TestKDiis:
         assert driver.is_converged
         if driver.rank == mpi_master():
             assert abs(results['scf_energy'] - reference_energy) < 1.0e-8
+            self.assert_canonical_scf_results(results)
+
+    @pytest.mark.solvers
+    def test_restricted_custom_start_bootstrap(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        reference_driver = ScfRestrictedDriver()
+        reference_driver.ostream.mute()
+        reference_results = reference_driver.compute(molecule, basis)
+
+        if reference_driver.rank == mpi_master():
+            reference_orbitals = (
+                reference_driver.molecular_orbitals.alpha_to_numpy())
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+            rotation = np.eye(reference_orbitals.shape[1])
+            angle = 0.2
+            rotation[nocc - 1, nocc - 1] = np.cos(angle)
+            rotation[nocc - 1, nocc] = -np.sin(angle)
+            rotation[nocc, nocc - 1] = np.sin(angle)
+            rotation[nocc, nocc] = np.cos(angle)
+            perturbed_orbitals = reference_orbitals @ rotation
+            starts = [
+                perturbed_orbitals[:, :nocc],
+                reference_orbitals @ np.diag(
+                    np.linspace(0.8, 1.2, reference_orbitals.shape[1])),
+            ]
+            overlap = compute_overlap_integrals(molecule, basis)
+        else:
+            starts = [None, None]
+            overlap = None
+
+        for start_orbitals in starts:
+            driver = ScfRestrictedDriver()
+            driver.ostream.mute()
+            driver.acc_type = 'kdiis'
+            driver.max_iter = 80
+            driver.set_start_orbitals(molecule, basis, start_orbitals)
+            results = driver.compute(molecule, basis)
+
+            assert driver.is_converged
+            if driver.rank == mpi_master():
+                orbitals = driver.molecular_orbitals.alpha_to_numpy()
+                assert orbitals.shape == reference_orbitals.shape
+                assert np.allclose(orbitals.T @ overlap @ orbitals,
+                                   np.eye(orbitals.shape[1]))
+                assert results['scf_energy'] == pytest.approx(
+                    reference_results['scf_energy'], abs=1.0e-8)
 
     @pytest.mark.solvers
     @pytest.mark.parametrize('xcfun, reference_energy', [
@@ -125,6 +196,7 @@ class TestKDiis:
         assert driver.is_converged
         if driver.rank == mpi_master():
             assert abs(results['scf_energy'] - reference_energy) < 1.0e-8
+            self.assert_canonical_scf_results(results)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
@@ -136,12 +208,41 @@ class TestKDiis:
         driver.ostream.mute()
         driver.acc_type = 'kdiis'
         if modifier == 'mom':
-            driver._mom = (None, None)
+            if driver.rank == mpi_master():
+                driver._mom = (None, None)
         else:
             setattr(driver, modifier, True)
 
         with pytest.raises(VeloxChemError, match='KDIIS is incompatible'):
             driver.compute(molecule, basis)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    @pytest.mark.parametrize('parameter',
+                             ['kdiis_min_denominator', 'kdiis_max_rotation'])
+    def test_kdiis_parameters_must_be_positive(self, parameter):
+
+        molecule, basis = self.get_water_and_basis()
+        driver = ScfRestrictedDriver()
+        driver.ostream.mute()
+        driver.acc_type = 'kdiis'
+        setattr(driver, parameter, 0.0)
+
+        with pytest.raises(VeloxChemError, match=parameter):
+            driver.compute(molecule, basis)
+
+    @pytest.mark.solvers
+    def test_kdiis_parameters_are_ignored_by_diis(self):
+
+        molecule, basis = self.get_water_and_basis()
+        driver = ScfRestrictedDriver()
+        driver.ostream.mute()
+        driver.acc_type = 'diis'
+        driver.kdiis_min_denominator = 0.0
+        driver.kdiis_max_rotation = 0.0
+        driver.compute(molecule, basis)
+
+        assert driver.is_converged
 
     @pytest.mark.solvers
     def test_level_shift_is_applied_to_denominators(self):
