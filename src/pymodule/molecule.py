@@ -1436,6 +1436,195 @@ def _Molecule_write_xyz_file(self, xyz_filename):
         fh.write(self.get_xyz_string())
 
 
+def _add_molecule_to_viewer(mol,
+                            viewer,
+                            pane=None,
+                            atom_indices=False,
+                            atom_labels=False,
+                            gradient=None,
+                            starting_index=1,
+                            bonds=None,
+                            forming_bonds=None,
+                            breaking_bonds=None,
+                            forming_width=0.15,
+                            breaking_width=0.15,
+                            label_font_size=16):
+    """
+    Draws a molecule into an existing py3dmol viewer.
+
+    :param mol:
+        The molecule.
+    :param viewer:
+        The py3dmol viewer to draw into.
+    :param pane:
+        The (row, column) pane of a viewer grid to draw into. If None, draws
+        into the viewer itself.
+    :param atom_indices:
+        The flag for showing atom indices (1-based).
+    :param atom_labels:
+        The flag for showing atom labels. If provided with a list, will use
+        that list as labels.
+    :param gradient:
+        The molecular gradient.
+    :param starting_index:
+        The starting index for atom indices.
+    :param bonds:
+        A list of zero-indexed tuples with bonds to draw. If None, connectivity is based on
+        proximity.
+    :param forming_bonds:
+        A list of zero-indexed tuples with bonds to draw as green dashed lines.
+    :param breaking_bonds:
+        A list of zero-indexed tuples with bonds to draw as orange dashed lines.
+    :param forming_width:
+        The radius of forming bonds.
+    :param breaking_width:
+        The radius of breaking bonds.
+    :param label_font_size:
+        The font size for atom labels and indices.
+    """
+
+    # the pane of a viewer grid to draw into; empty for a single viewer
+    vkw = {} if pane is None else {'viewer': pane}
+
+    if forming_bonds is not None and breaking_bonds is not None:
+        dashed_bonds = forming_bonds + breaking_bonds
+    elif forming_bonds is not None:
+        dashed_bonds = forming_bonds
+    elif breaking_bonds is not None:
+        dashed_bonds = breaking_bonds
+    else:
+        dashed_bonds = None
+
+    if bonds is None:
+        viewer.addModel(mol.get_xyz_string(), **vkw)
+
+        if gradient is not None:
+            coords = mol.get_coordinates_in_bohr()
+            assert_msg_critical(coords.shape == gradient.shape,
+                                'Molecule.show: Invalid shape of gradient')
+
+            # use some scaling factor so that the length of gradient arrow
+            # looks reasonable
+            scaling_f = 50
+
+            for coord, grad in zip(coords, gradient):
+                center = coord * bohr_in_angstrom()
+                start = center
+                end = center + scaling_f * grad
+                viewer.addArrow(
+                    {
+                        'start': {
+                            'x': start[0],
+                            'y': start[1],
+                            'z': start[2],
+                        },
+                        'end': {
+                            'x': end[0],
+                            'y': end[1],
+                            'z': end[2],
+                        },
+                        'radius': 0.1,
+                        'color': 'green',
+                    }, **vkw)
+                viewer.addSphere(
+                    {
+                        'center': {
+                            'x': center[0],
+                            'y': center[1],
+                            'z': center[2],
+                        },
+                        'radius': 0.1,
+                        'color': 'green',
+                    }, **vkw)
+
+    else:
+        try:
+            from rdkit import Chem
+        except ImportError:
+            raise ImportError('Unable to import rdkit')
+
+        rdmol = Chem.MolFromXYZBlock(mol.get_xyz_string())
+        edit_mol = Chem.EditableMol(rdmol)
+
+        for bond in bonds:
+            if dashed_bonds is not None:
+                if bond in dashed_bonds or (bond[1],
+                                            bond[0]) in dashed_bonds:
+                    continue
+            edit_mol.AddBond(bond[0], bond[1], Chem.BondType.SINGLE)
+
+        sdf = Chem.MolToMolBlock(edit_mol.GetMol())
+        viewer.addModel(sdf, 'sdf', **vkw)
+
+    if dashed_bonds is not None:
+        coords = mol.get_coordinates_in_angstrom()
+        for bond in dashed_bonds:
+            p1 = coords[bond[0]]
+            p2 = coords[bond[1]]
+            if forming_bonds is not None and bond in forming_bonds:
+                colour = "#00a287"
+                radius = forming_width
+            elif breaking_bonds is not None and bond in breaking_bonds:
+                colour = "#ffa200"
+                radius = breaking_width
+            else:
+                continue
+            if radius >= 0.17:
+                dashed = False
+            else:
+                dashed = True
+
+            viewer.addCylinder(
+                {
+                    "start": {
+                        "x": p1[0],
+                        "y": p1[1],
+                        "z": p1[2]
+                    },
+                    "end": {
+                        "x": p2[0],
+                        "y": p2[1],
+                        "z": p2[2]
+                    },
+                    "color": colour,
+                    "dashed": dashed,
+                    "radius": radius,
+                    "fromCap": "round",
+                    "toCap": "round",
+                    "dashLength": 0.075,
+                    "gapLength": 0.35 + radius
+                }, **vkw)
+
+    if atom_indices or atom_labels:
+        coords = mol.get_coordinates_in_angstrom()
+        if isinstance(atom_labels, list):
+            labels = atom_labels
+            assert_msg_critical(
+                len(labels) == coords.shape[0],
+                'Molecule.show: Inconsistent number of atom_labels')
+        else:
+            labels = mol.get_labels()
+        for i in range(coords.shape[0]):
+            text = ''
+            if atom_labels:
+                text += f'{labels[i]}'
+            if atom_indices:
+                text += f'{i + starting_index}'
+            viewer.addLabel(
+                text, {
+                    'position': {
+                        'x': coords[i, 0],
+                        'y': coords[i, 1],
+                        'z': coords[i, 2],
+                    },
+                    'alignment': 'center',
+                    'fontColor': 0x000000,
+                    'backgroundColor': 0xffffff,
+                    'backgroundOpacity': 0.0,
+                    'fontSize': label_font_size,
+                }, **vkw)
+
+
 def _Molecule_show(self,
                    width=400,
                    height=300,
@@ -1487,140 +1676,92 @@ def _Molecule_show(self,
 
     viewer = py3Dmol.view(width=width, height=height)
 
-    if forming_bonds is not None and breaking_bonds is not None:
-        dashed_bonds = forming_bonds + breaking_bonds
-    elif forming_bonds is not None:
-        dashed_bonds = forming_bonds
-    elif breaking_bonds is not None:
-        dashed_bonds = breaking_bonds
+    _add_molecule_to_viewer(
+        self,
+        viewer,
+        atom_indices=atom_indices,
+        atom_labels=atom_labels,
+        gradient=gradient,
+        starting_index=starting_index,
+        bonds=bonds,
+        forming_bonds=forming_bonds,
+        breaking_bonds=breaking_bonds,
+        forming_width=forming_width,
+        breaking_width=breaking_width,
+        label_font_size=label_font_size,
+    )
+
+    viewer.setViewStyle({"style": "outline", "width": 0.05})
+    viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
+    viewer.zoomTo()
+    viewer.show()
+
+
+@staticmethod
+def _Molecule_show_grid(molecules,
+                        grid=None,
+                        linked=True,
+                        width=400,
+                        height=300,
+                        **show_kwargs):
+    """
+    Creates a grid of 3D views with py3dmol.
+
+    :param molecules:
+        A list of molecules, one per pane. An entry may itself be a list of
+        molecules, which are all drawn into the same pane.
+    :param grid:
+        A (rows, columns) tuple. Panes are filled row by row. If None, all
+        molecules are placed in a single row.
+    :param linked:
+        The flag for linking rotation and zoom of all panes.
+    :param width:
+        The width of a single pane.
+    :param height:
+        The height of a single pane.
+    :param show_kwargs:
+        Additional keyword arguments that are forwarded to every pane. See
+        Molecule.show for the full list.
+    """
+
+    entries = [
+        list(entry) if isinstance(entry, (list, tuple)) else [entry]
+        for entry in molecules
+    ]
+
+    assert_msg_critical(
+        len(entries) > 0, 'Molecule.show_grid: No molecules provided')
+
+    if grid is None:
+        n_rows, n_cols = 1, len(entries)
     else:
-        dashed_bonds = None
+        assert_msg_critical(
+            len(grid) == 2,
+            'Molecule.show_grid: grid must be a (rows, columns) tuple')
+        n_rows, n_cols = int(grid[0]), int(grid[1])
+        assert_msg_critical(
+            n_rows > 0 and n_cols > 0,
+            'Molecule.show_grid: grid must have positive dimensions')
+        assert_msg_critical(
+            n_rows * n_cols >= len(entries),
+            f'Molecule.show_grid: grid ({n_rows}, {n_cols}) is too small ' +
+            f'for {len(entries)} molecules')
 
-    if bonds is None:
-        viewer.addModel(self.get_xyz_string())
+    try:
+        import py3Dmol
+    except ImportError:
+        raise ImportError('Unable to import py3Dmol')
 
-        if gradient is not None:
-            coords = self.get_coordinates_in_bohr()
-            assert_msg_critical(coords.shape == gradient.shape,
-                                'Molecule.show: Invalid shape of gradient')
+    viewer = py3Dmol.view(viewergrid=(n_rows, n_cols),
+                          width=width * n_cols,
+                          height=height * n_rows,
+                          linked=linked)
 
-            # use some scaling factor so that the length of gradient arrow
-            # looks reasonable
-            scaling_f = 50
+    for i, entry in enumerate(entries):
+        pane = (i // n_cols, i % n_cols)
+        for mol in entry:
+            _add_molecule_to_viewer(mol, viewer, pane, **show_kwargs)
 
-            for coord, grad in zip(coords, gradient):
-                center = coord * bohr_in_angstrom()
-                start = center
-                end = center + scaling_f * grad
-                viewer.addArrow({
-                    'start': {
-                        'x': start[0],
-                        'y': start[1],
-                        'z': start[2],
-                    },
-                    'end': {
-                        'x': end[0],
-                        'y': end[1],
-                        'z': end[2],
-                    },
-                    'radius': 0.1,
-                    'color': 'green',
-                })
-                viewer.addSphere({
-                    'center': {
-                        'x': center[0],
-                        'y': center[1],
-                        'z': center[2],
-                    },
-                    'radius': 0.1,
-                    'color': 'green',
-                })
-
-    else:
-        try:
-            from rdkit import Chem
-        except ImportError:
-            raise ImportError('Unable to import rdkit')
-
-        rdmol = Chem.MolFromXYZBlock(self.get_xyz_string())
-        edit_mol = Chem.EditableMol(rdmol)
-
-        for bond in bonds:
-            if dashed_bonds is not None:
-                if bond in dashed_bonds or (bond[1],
-                                            bond[0]) in dashed_bonds:
-                    continue
-            edit_mol.AddBond(bond[0], bond[1], Chem.BondType.SINGLE)
-
-        sdf = Chem.MolToMolBlock(edit_mol.GetMol())
-        viewer.addModel(sdf, 'sdf')
-
-    if dashed_bonds is not None:
-        coords = self.get_coordinates_in_angstrom()
-        for bond in dashed_bonds:
-            p1 = coords[bond[0]]
-            p2 = coords[bond[1]]
-            if forming_bonds is not None and bond in forming_bonds:
-                colour = "#00a287"
-                radius = forming_width
-            elif breaking_bonds is not None and bond in breaking_bonds:
-                colour = "#ffa200"
-                radius = breaking_width
-            else:
-                continue
-            if radius >= 0.17:
-                dashed = False
-            else:
-                dashed = True
-
-            viewer.addCylinder({
-                "start": {
-                    "x": p1[0],
-                    "y": p1[1],
-                    "z": p1[2]
-                },
-                "end": {
-                    "x": p2[0],
-                    "y": p2[1],
-                    "z": p2[2]
-                },
-                "color": colour,
-                "dashed": dashed,
-                "radius": radius,
-                "fromCap": "round",
-                "toCap": "round",
-                "dashLength": 0.075,
-                "gapLength": 0.35 + radius
-            })
-
-    if atom_indices or atom_labels:
-        coords = self.get_coordinates_in_angstrom()
-        if isinstance(atom_labels, list):
-            labels = atom_labels
-            assert_msg_critical(
-                len(labels) == coords.shape[0],
-                'Molecule.show: Inconsistent number of atom_labels')
-        else:
-            labels = self.get_labels()
-        for i in range(coords.shape[0]):
-            text = ''
-            if atom_labels:
-                text += f'{labels[i]}'
-            if atom_indices:
-                text += f'{i + starting_index}'
-            viewer.addLabel(
-                text, {
-                    'position': {
-                        'x': coords[i, 0],
-                        'y': coords[i, 1],
-                        'z': coords[i, 2],
-                    },
-                    'alignment': 'center',
-                    'fontColor': 0x000000,
-                    'backgroundColor': 0xffffff,
-                    'backgroundOpacity': 0.0,
-                    'fontSize': label_font_size,
-                })
     viewer.setViewStyle({"style": "outline", "width": 0.05})
     viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
     viewer.zoomTo()
@@ -2126,6 +2267,7 @@ Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
 Molecule.read_gro_file = _Molecule_read_gro_file
 Molecule.read_pdb_file = _Molecule_read_pdb_file
 Molecule.show = _Molecule_show
+Molecule.show_grid = _Molecule_show_grid
 Molecule.draw_2d = _Molecule_draw_2d
 Molecule.read_smiles = _Molecule_read_smiles
 Molecule.read_molecule_string = _Molecule_read_molecule_string
