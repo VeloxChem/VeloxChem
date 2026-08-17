@@ -30,27 +30,24 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef TCOSValues_hpp
-#define TCOSValues_hpp
+#ifndef TCOscreeningcount_hpp
+#define TCOscreeningcount_hpp
 
+#include <tuple>
 #include <vector>
 
-#include "DenseMatrix.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 
 namespace onee {  // onee namespace
 
 auto
-computeTCOSValues(const CMolecule& molecule, 
-                  const CMolecularBasis& basis, 
-                  const double* point_coords, 
-                  const int npoints, 
-                  const double* point_exp, 
-                  const double* point_amp, 
-                  const double* D, 
-                  const int naos) -> std::vector<double>;
+countscreenedTCO(const CMolecule& molecule,
+                 const CMolecularBasis& basis,
+                 const double point_norm_const_max,
+                 const int naos,
+                 const double tco_tol) -> std::tuple<std::vector<int>, std::vector<int>>;
 
 }  // namespace onee
 
-#endif /* TCOSValues_hpp */
+#endif /* TCOscreeningcount_hpp */

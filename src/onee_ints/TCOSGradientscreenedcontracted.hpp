@@ -30,8 +30,8 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef TCOFValues_hpp
-#define TCOFValues_hpp
+#ifndef TCOSGradientscreenedcontracted_hpp
+#define TCOSGradientscreenedcontracted_hpp
 
 #include <vector>
 
@@ -42,16 +42,19 @@
 namespace onee {  // onee namespace
 
 auto
-computeTCOFValues(const CMolecule& molecule, 
-                  const CMolecularBasis& basis, 
-                  const double* point_coords, 
-                  const int npoints, 
-                  const double* point_exp, 
-                  const double* point_amp, 
-                  const double* point_norms,
-                  const double* D, 
-                  const int naos) -> std::vector<double>;
+computescreenedcontractedTCOSGradient(const CMolecule& molecule, 
+                                      const CMolecularBasis& basis, 
+                                      const double* point_coords, 
+                                      const int npoints, 
+                                      const double* point_exp, 
+                                      const double* point_amp,
+                                      const double* point_norm_const,
+                                      const double point_norm_const_max,
+                                      const int* point_atom_ids,
+                                      const double* D,
+                                      const int naos,
+                                      const double tco_tol) -> CDenseMatrix;
 
 }  // namespace onee
 
-#endif /* TCOFValues_hpp */
+#endif /* TCOSGradientscreenedcontracted_hpp */

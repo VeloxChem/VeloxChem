@@ -43,7 +43,8 @@ from .inputparser import parse_input
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check,
-                           rsp_results_solvation_sanity_check)
+                           rsp_results_solvation_sanity_check,
+                           gostshyp_sanity_check)
 
 
 class TddftOrbitalResponse(CphfSolver):
@@ -135,7 +136,7 @@ class TddftOrbitalResponse(CphfSolver):
             return None
 
     def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict,
-                    pe_dict, rsp_results):
+                    pe_dict, gostshyp_dict, rsp_results):
         """
         Computes the right-hand side (RHS) of the RPA orbital response equation
         including the necessary density matrices using molecular data.
@@ -170,6 +171,9 @@ class TddftOrbitalResponse(CphfSolver):
         solvation_model_sanity_check(self)
         rsp_results_solvation_sanity_check(self, rsp_results)
 
+        # check gostshyp setup
+        gostshyp_sanity_check(self)
+
         # TODO: replace with a sanity check?
         if self.rank == mpi_master():
             if 'eigenvectors' in rsp_results:
@@ -188,6 +192,9 @@ class TddftOrbitalResponse(CphfSolver):
 
         # PE information
         pe_dict = self._init_pe(molecule, basis, silent=True)
+
+        # GOSTSHYP information
+        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_tensors)
 
         # CPCM_information
         self._init_cpcm(molecule, basis)
@@ -347,7 +354,7 @@ class TddftOrbitalResponse(CphfSolver):
         gs_density = dft_dict['gs_density']
 
         fock_ao_rhs = self._comp_lr_fock(dm_ao_list, molecule, basis, eri_dict,
-                                         dft_dict, pe_dict, profiler)
+                                         dft_dict, pe_dict, gostshyp_dict, profiler)
 
         profiler.start_timer('Kxc')
 
@@ -502,6 +509,9 @@ class TddftOrbitalResponse(CphfSolver):
         # CPCM_information
         self._init_cpcm(molecule, basis)
 
+        # GOSTSHYP information
+        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_tensors)
+        
         profiler.stop_timer('Prep')
 
         profiler.start_timer('lambda')
@@ -591,7 +601,8 @@ class TddftOrbitalResponse(CphfSolver):
         profiler.stop_timer('lambda')
 
         fock_lambda = self._comp_lr_fock(lambda_ao_list, molecule, basis,
-                                         eri_dict, dft_dict, pe_dict, profiler)
+                                         eri_dict, dft_dict, pe_dict, 
+                                         gostshyp_dict, profiler)
 
         profiler.start_timer('Other')
 

@@ -1,26 +1,34 @@
 //
-//                              VELOXCHEM
-//         ----------------------------------------------------
-//                     An Electronic Structure Code
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
 //
-//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+//  SPDX-License-Identifier: BSD-3-Clause
 //
-//  SPDX-License-Identifier: LGPL-3.0-or-later
+//  Copyright 2018-2025 VeloxChem developers
 //
-//  This file is part of VeloxChem.
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
 //
-//  VeloxChem is free software: you can redistribute it and/or modify it under
-//  the terms of the GNU Lesser General Public License as published by the Free
-//  Software Foundation, either version 3 of the License, or (at your option)
-//  any later version.
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
 //
-//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-//  License for more details.
-//
-//  You should have received a copy of the GNU Lesser General Public License
-//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "TCOFValuesscreened.hpp"
 
@@ -51,6 +59,7 @@ computescreenedTCOFValues(const             CMolecule& molecule,
                           const double*     point_amp, 
                           const double*     point_norms,
                           const double*     point_norm_const,
+                          const double      point_norm_const_max,
                           const double*     D,
                           const int         naos,
                           const double      tco_tol) -> std::vector<double>
@@ -87,10 +96,7 @@ computescreenedTCOFValues(const             CMolecule& molecule,
         points_info[c + npoints * 8] = point_norm_const[c];
     }
 
-    double N_max = *std::max_element(points_info.begin() + npoints * 8, points_info.end());
-
-    // std::cout << "Max norm: " << N_max << "\n";
-    // std::cout << "TCO tol: " << tco_tol << "\n";
+    double N_max = point_norm_const_max;
 
     // gto blocks
 
@@ -358,26 +364,9 @@ computescreenedTCOFValues(const             CMolecule& molecule,
     const auto df_prim_pair_count = static_cast<int>(pair_inds_df.size());
     const auto ff_prim_pair_count = static_cast<int>(pair_inds_ff.size());
 
-    const auto max_prim_pair_count = std::max({
-            ss_prim_pair_count,
-            sp_prim_pair_count,
-            sd_prim_pair_count,
-            sf_prim_pair_count,
-            pp_prim_pair_count,
-            pd_prim_pair_count,
-            pf_prim_pair_count,
-            dd_prim_pair_count,
-            df_prim_pair_count,
-            ff_prim_pair_count
-    });
-
-    // screened pair counters per angular momentum block
-    int screened_ss = 0, screened_sp = 0, screened_sd = 0, screened_sf = 0,
-        screened_pp = 0, screened_pd = 0, screened_pf = 0,
-        screened_dd = 0, screened_df = 0, screened_ff = 0;
-
-
     const double delta[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
+
+    std::vector<std::vector<int>> m_n_l_ids{{{{0,0,0}}, {{0,1,1}}, {{0,2,2}}, {{1,0,0}}, {{1,1,1}}, {{1,2,2}}, {{2,0,0}}, {{2,1,1}}, {{2,2,2}}}};
 
     const int d_cart_inds[6][2] = {
         {0,0}, {0,1}, {0,2},
@@ -431,6 +420,10 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -455,12 +448,6 @@ computescreenedTCOFValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_ss++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {  
@@ -494,20 +481,16 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double p_type_tco_f_val = 0.0;
 
-        double p_type_tco_f_val = 0.0;
+            for (int idx = 0; idx < 9; idx++)
+            {
 
-        std::vector<std::vector<int>> m_n_l_inds{{0,0,0}, {0,1,1}, {0,2,2}, {1,0,0}, {1,1,1}, {1,2,2}, {2,0,0}, {2,1,1}, {2,2,2}};
+                auto m = m_n_l_ids[idx][0];
+                auto n = m_n_l_ids[idx][1];
+                auto l = m_n_l_ids[idx][2];
 
-        for (int idx = 0; idx < 9; idx++)
-        {
-
-            auto m = m_n_l_inds[idx][0];
-            auto n = m_n_l_inds[idx][1];
-            auto l = m_n_l_inds[idx][2];
-
-            p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
+                p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
 
                     (GC[m] * G_ij_00 * (GC[n] * GC[l] + 0.5 / (a_i + a_j + zeta_c) * delta[n][l]) + 0.5 / (a_i + a_j + zeta_c) * G_ij_00 * ( delta[m][n] * GC[l] + delta[m][l] * GC[n])  ) * (
 
@@ -517,7 +500,7 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
                     )
 
-            );
+                );
 
             }
 
@@ -566,6 +549,10 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -591,12 +578,6 @@ computescreenedTCOFValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_sp++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {  
@@ -631,20 +612,16 @@ computescreenedTCOFValues(const             CMolecule& molecule,
             const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double p_type_tco_f_val = 0.0;
 
-        double p_type_tco_f_val = 0.0;
+            for (int idx = 0; idx < 9; idx++)
+            {
 
-        std::vector<std::vector<int>> m_n_l_inds{{0,0,0}, {0,1,1}, {0,2,2}, {1,0,0}, {1,1,1}, {1,2,2}, {2,0,0}, {2,1,1}, {2,2,2}};
+                auto m = m_n_l_ids[idx][0];
+                auto n = m_n_l_ids[idx][1];
+                auto l = m_n_l_ids[idx][2];
 
-        for (int idx = 0; idx < 9; idx++)
-        {
-
-            auto m = m_n_l_inds[idx][0];
-            auto n = m_n_l_inds[idx][1];
-            auto l = m_n_l_inds[idx][2];
-
-            p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
+                p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
 
                     (GC[m] * GC[l] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[m][l] * G_ij_00) * (
 
@@ -678,7 +655,7 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
                     )
 
-            );
+                );
 
             }
 
@@ -728,6 +705,10 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -753,12 +734,6 @@ computescreenedTCOFValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_sd++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {  
@@ -794,20 +769,16 @@ computescreenedTCOFValues(const             CMolecule& molecule,
             const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double p_type_tco_f_val = 0.0;
 
-        double p_type_tco_f_val = 0.0;
+            for (int idx = 0; idx < 9; idx++)
+            {
 
-        std::vector<std::vector<int>> m_n_l_inds{{0,0,0}, {0,1,1}, {0,2,2}, {1,0,0}, {1,1,1}, {1,2,2}, {2,0,0}, {2,1,1}, {2,2,2}};
+                auto m = m_n_l_ids[idx][0];
+                auto n = m_n_l_ids[idx][1];
+                auto l = m_n_l_ids[idx][2];
 
-        for (int idx = 0; idx < 9; idx++)
-        {
-
-            auto m = m_n_l_inds[idx][0];
-            auto n = m_n_l_inds[idx][1];
-            auto l = m_n_l_inds[idx][2];
-
-            p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
+                p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
 
                     (GC[m] * GC[l] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[m][l] * G_ij_00) * (
 
@@ -872,7 +843,7 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
                     )
 
-            );
+                );
 
             }
 
@@ -923,6 +894,10 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -948,12 +923,6 @@ computescreenedTCOFValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_sf++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {  
@@ -990,20 +959,16 @@ computescreenedTCOFValues(const             CMolecule& molecule,
             const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double p_type_tco_f_val = 0.0;
 
-        double p_type_tco_f_val = 0.0;
+            for (int idx = 0; idx < 9; idx++)
+            {
 
-        std::vector<std::vector<int>> m_n_l_inds{{0,0,0}, {0,1,1}, {0,2,2}, {1,0,0}, {1,1,1}, {1,2,2}, {2,0,0}, {2,1,1}, {2,2,2}};
+                auto m = m_n_l_ids[idx][0];
+                auto n = m_n_l_ids[idx][1];
+                auto l = m_n_l_ids[idx][2];
 
-        for (int idx = 0; idx < 9; idx++)
-        {
-
-            auto m = m_n_l_inds[idx][0];
-            auto n = m_n_l_inds[idx][1];
-            auto l = m_n_l_inds[idx][2];
-
-            p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
+                p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
 
                     (GC[m] * GC[l] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[m][l] * G_ij_00) * (
 
@@ -1099,7 +1064,7 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
                     )
 
-            );
+                );
 
             }
 
@@ -1149,6 +1114,10 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -1175,12 +1144,6 @@ computescreenedTCOFValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_pp++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {  
@@ -1216,20 +1179,16 @@ computescreenedTCOFValues(const             CMolecule& molecule,
             const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double p_type_tco_f_val = 0.0;
 
-        double p_type_tco_f_val = 0.0;
+            for (int idx = 0; idx < 9; idx++)
+            {
 
-        std::vector<std::vector<int>> m_n_l_inds{{0,0,0}, {0,1,1}, {0,2,2}, {1,0,0}, {1,1,1}, {1,2,2}, {2,0,0}, {2,1,1}, {2,2,2}};
+                auto m = m_n_l_ids[idx][0];
+                auto n = m_n_l_ids[idx][1];
+                auto l = m_n_l_ids[idx][2];
 
-        for (int idx = 0; idx < 9; idx++)
-        {
-
-            auto m = m_n_l_inds[idx][0];
-            auto n = m_n_l_inds[idx][1];
-            auto l = m_n_l_inds[idx][2];
-
-            p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
+                p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
 
                     (GC[m] * GC[l] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[m][l] * G_ij_00) * (
 
@@ -1294,7 +1253,7 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
                     )
 
-            );
+                );
 
             }
 
@@ -1345,6 +1304,10 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -1371,12 +1334,6 @@ computescreenedTCOFValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_pd++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {  
@@ -1413,20 +1370,16 @@ computescreenedTCOFValues(const             CMolecule& molecule,
             const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double p_type_tco_f_val = 0.0;
 
-        double p_type_tco_f_val = 0.0;
+            for (int idx = 0; idx < 9; idx++)
+            {
 
-        std::vector<std::vector<int>> m_n_l_inds{{0,0,0}, {0,1,1}, {0,2,2}, {1,0,0}, {1,1,1}, {1,2,2}, {2,0,0}, {2,1,1}, {2,2,2}};
+                auto m = m_n_l_ids[idx][0];
+                auto n = m_n_l_ids[idx][1];
+                auto l = m_n_l_ids[idx][2];
 
-        for (int idx = 0; idx < 9; idx++)
-        {
-
-            auto m = m_n_l_inds[idx][0];
-            auto n = m_n_l_inds[idx][1];
-            auto l = m_n_l_inds[idx][2];
-
-            p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
+                p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
 
                     (GC[m] * GC[l] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[m][l] * G_ij_00) * (
 
@@ -1522,7 +1475,7 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
                     )
 
-            );
+                );
 
             }
 
@@ -1574,6 +1527,10 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -1600,12 +1557,6 @@ computescreenedTCOFValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_pf++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {  
@@ -1643,20 +1594,16 @@ computescreenedTCOFValues(const             CMolecule& molecule,
             const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double p_type_tco_f_val = 0.0;
 
-        double p_type_tco_f_val = 0.0;
+            for (int idx = 0; idx < 9; idx++)
+            {
 
-        std::vector<std::vector<int>> m_n_l_inds{{0,0,0}, {0,1,1}, {0,2,2}, {1,0,0}, {1,1,1}, {1,2,2}, {2,0,0}, {2,1,1}, {2,2,2}};
+                auto m = m_n_l_ids[idx][0];
+                auto n = m_n_l_ids[idx][1];
+                auto l = m_n_l_ids[idx][2];
 
-        for (int idx = 0; idx < 9; idx++)
-        {
-
-            auto m = m_n_l_inds[idx][0];
-            auto n = m_n_l_inds[idx][1];
-            auto l = m_n_l_inds[idx][2];
-
-            p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
+                p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
 
                     (GC[m] * GC[l] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[m][l] * G_ij_00) * (
 
@@ -1795,7 +1742,7 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
                     )
 
-            );
+                );
 
             }
 
@@ -1847,6 +1794,10 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -1873,12 +1824,6 @@ computescreenedTCOFValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_dd++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {  
@@ -1916,20 +1861,16 @@ computescreenedTCOFValues(const             CMolecule& molecule,
             const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double p_type_tco_f_val = 0.0;
 
-        double p_type_tco_f_val = 0.0;
+            for (int idx = 0; idx < 9; idx++)
+            {
 
-        std::vector<std::vector<int>> m_n_l_inds{{0,0,0}, {0,1,1}, {0,2,2}, {1,0,0}, {1,1,1}, {1,2,2}, {2,0,0}, {2,1,1}, {2,2,2}};
+                auto m = m_n_l_ids[idx][0];
+                auto n = m_n_l_ids[idx][1];
+                auto l = m_n_l_ids[idx][2];
 
-        for (int idx = 0; idx < 9; idx++)
-        {
-
-            auto m = m_n_l_inds[idx][0];
-            auto n = m_n_l_inds[idx][1];
-            auto l = m_n_l_inds[idx][2];
-
-            p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
+                p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
 
                     (GC[m] * GC[l] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[m][l] * G_ij_00) * (
 
@@ -2068,7 +2009,7 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
                     )
 
-            );
+                );
 
             }
 
@@ -2121,6 +2062,10 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -2147,12 +2092,6 @@ computescreenedTCOFValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_df++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {  
@@ -2191,20 +2130,16 @@ computescreenedTCOFValues(const             CMolecule& molecule,
             const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double p_type_tco_f_val = 0.0;
 
-        double p_type_tco_f_val = 0.0;
+            for (int idx = 0; idx < 9; idx++)
+            {
 
-        std::vector<std::vector<int>> m_n_l_inds{{0,0,0}, {0,1,1}, {0,2,2}, {1,0,0}, {1,1,1}, {1,2,2}, {2,0,0}, {2,1,1}, {2,2,2}};
+                auto m = m_n_l_ids[idx][0];
+                auto n = m_n_l_ids[idx][1];
+                auto l = m_n_l_ids[idx][2];
 
-        for (int idx = 0; idx < 9; idx++)
-        {
-
-            auto m = m_n_l_inds[idx][0];
-            auto n = m_n_l_inds[idx][1];
-            auto l = m_n_l_inds[idx][2];
-
-            p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
+                p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
 
                     (GC[m] * GC[l] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[m][l] * G_ij_00) * (
 
@@ -2418,7 +2353,7 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
                     )
 
-            );
+                );
 
             }
 
@@ -2472,6 +2407,10 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
         // product of density and cart-sph transformation coefficients
 
         double dens_coef_prod = 0.0;
@@ -2498,12 +2437,6 @@ computescreenedTCOFValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_ff++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {  
@@ -2543,20 +2476,16 @@ computescreenedTCOFValues(const             CMolecule& molecule,
             const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
+            double p_type_tco_f_val = 0.0;
 
-        double p_type_tco_f_val = 0.0;
+            for (int idx = 0; idx < 9; idx++)
+            {
 
-        std::vector<std::vector<int>> m_n_l_inds{{0,0,0}, {0,1,1}, {0,2,2}, {1,0,0}, {1,1,1}, {1,2,2}, {2,0,0}, {2,1,1}, {2,2,2}};
+                auto m = m_n_l_ids[idx][0];
+                auto n = m_n_l_ids[idx][1];
+                auto l = m_n_l_ids[idx][2];
 
-        for (int idx = 0; idx < 9; idx++)
-        {
-
-            auto m = m_n_l_inds[idx][0];
-            auto n = m_n_l_inds[idx][1];
-            auto l = m_n_l_inds[idx][2];
-
-            p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
+                p_type_tco_f_val += 2 * zeta_c * n_c[m] * S_ij_00 * N_c * p_c * (
 
                     (GC[m] * GC[l] * G_ij_00 + 0.5 / (a_i + a_j + zeta_c) * delta[m][l] * G_ij_00) * (
 
@@ -2909,7 +2838,7 @@ computescreenedTCOFValues(const             CMolecule& molecule,
 
                     )
 
-            );
+                );
 
             }
 
@@ -2929,20 +2858,6 @@ computescreenedTCOFValues(const             CMolecule& molecule,
             e_tilde_values[c] += e_tilde_values_omp[thread_id][c];
         }
     }
-
-
-    // print screening statistics
-    // std::cout << "computescreenedTCOFValues: screening statistics (screened / total pairs)\n";
-    // std::cout << "  S-S: " << screened_ss << " / " << ss_prim_pair_count << "\n";
-    // std::cout << "  S-P: " << screened_sp << " / " << sp_prim_pair_count << "\n";
-    // std::cout << "  S-D: " << screened_sd << " / " << sd_prim_pair_count << "\n";
-    // std::cout << "  S-F: " << screened_sf << " / " << sf_prim_pair_count << "\n";
-    // std::cout << "  P-P: " << screened_pp << " / " << pp_prim_pair_count << "\n";
-    // std::cout << "  P-D: " << screened_pd << " / " << pd_prim_pair_count << "\n";
-    // std::cout << "  P-F: " << screened_pf << " / " << pf_prim_pair_count << "\n";
-    // std::cout << "  D-D: " << screened_dd << " / " << dd_prim_pair_count << "\n";
-    // std::cout << "  D-F: " << screened_df << " / " << df_prim_pair_count << "\n";
-    // std::cout << "  F-F: " << screened_ff << " / " << ff_prim_pair_count << "\n";
 
     return e_tilde_values;
 }

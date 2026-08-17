@@ -46,7 +46,7 @@ from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
+                           solvation_model_sanity_check, gostshyp_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import check_rsp_hdf5, write_rsp_hdf5
 from .inputparser import parse_seq_fixed
@@ -332,6 +332,9 @@ class ComplexResponseTdaSolver(LinearSolver):
         # check solvation setup
         solvation_model_sanity_check(self)
 
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self)
+
         # check print level (verbosity of output)
         self.print_level = max(1, min(self.print_level, 3))
 
@@ -371,6 +374,9 @@ class ComplexResponseTdaSolver(LinearSolver):
 
         # CPCM information
         self._init_cpcm(molecule, basis)
+
+        # GOSTSHYP information
+        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_results)
 
         # right-hand side (gradient)
         if self.rank == mpi_master():
@@ -464,7 +470,7 @@ class ComplexResponseTdaSolver(LinearSolver):
                                               basis)
 
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
-                                      dft_dict, pe_dict)
+                                      dft_dict, pe_dict, gostshyp_dict)
 
             if self.rank == mpi_master():
                 sig_mat = self._get_sigmas(fock, scf_results, molecule, basis,
@@ -691,7 +697,7 @@ class ComplexResponseTdaSolver(LinearSolver):
                                               molecule, basis)
 
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
-                                      dft_dict, pe_dict)
+                                      dft_dict, pe_dict, gostshyp_dict)
 
             if self.rank == mpi_master():
                 sig_mat = self._get_sigmas(fock, scf_results, molecule, basis,

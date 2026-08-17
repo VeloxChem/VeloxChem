@@ -50,6 +50,7 @@ computescreenedTCOFValues(const CMolecule& molecule,
                   const double* point_amp, 
                   const double* point_norms,
                   const double* point_norm_const,
+                  const double point_norm_const_max,
                   const double* D,
                   const int naos,
                   const double tco_tol) -> std::vector<double>;

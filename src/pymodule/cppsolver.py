@@ -153,7 +153,7 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
         pe_sanity_check(self, molecule=molecule)
         # check solvation setup
         solvation_model_sanity_check(self)
-        # check gostshyp setup
+        # check GOSTSHYP setup
         gostshyp_sanity_check(self)
 
         # check print level (verbosity of output)
@@ -192,7 +192,6 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
         pe_dict = self._init_pe(molecule, basis)
         # CPCM information
         self._init_cpcm(molecule, basis)
-
         # GOSTSHYP information
         gostshyp_dict = self._init_gostshyp(molecule, basis, scf_results)
 
@@ -466,7 +465,8 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
 
                 if self._gostshyp:
                     valstr = '    *** GOSTSHYP information: A total number of '
-                    valstr += '{} grid points with negative amplitudes were excluded'.format(gostshyp_dict['neg_amps'])
+                    valstr += '{} grid points '.format(gostshyp_dict['neg_amps'])
+                    valstr += 'with negative amplitudes were excluded'
                     self.ostream.print_header(valstr)
                     self.ostream.print_blank()
 
@@ -487,6 +487,7 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                                                 relative_residual_norm,
                                                 molecule, basis, scf_results,
                                                 eri_dict, dft_dict, pe_dict,
+                                                gostshyp_dict,
                                                 profiler)
 
                 collapse_str = 'Collapsed reduced space: {:d}->{:d}'.format(

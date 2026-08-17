@@ -178,7 +178,6 @@ class LinearSolver:
         self.discretization = 'fixed'
         self.switching_thresh = 1.0e-8
         self.r_ext = 0.0
-        #self.tco_tol = self.conv_thresh * 1.0e8
 
         # solver setup
         self.conv_thresh = 1.0e-4
@@ -733,7 +732,11 @@ class LinearSolver:
 
         if self._gostshyp:
 
-            tco_tol = scf_results['conv_thresh'] * 1.0e8
+            if self.rank == mpi_master():
+                tco_tol = scf_results['conv_thresh'] * 1.0e-8
+            else:
+                tco_tol = None
+            tco_tol = self.comm.bcast(tco_tol, root=mpi_master())
 
             self.gostshyp_drv = GostshypDriver(molecule,
                                                basis,
@@ -762,7 +765,7 @@ class LinearSolver:
             # TODO: bcast D_alpha and D_beta separately
             gs_density = self.comm.bcast(gs_density, root=mpi_master())
             
-            neg_amps = self.gostshyp_drv._neg_p_amp
+            neg_amps = self.gostshyp_drv.num_neg_amp
 
         else:
             gs_density = None
@@ -1126,7 +1129,7 @@ class LinearSolver:
             else:
                 self._e2n_half_size_single_comm_unrestricted(
                     vecs_ger, vecs_ung, molecule, basis, scf_results, eri_dict,
-                    dft_dict, pe_dict, profiler)
+                    dft_dict, pe_dict, gostshyp_dict, profiler)
 
     def _e2n_half_size_subcomms(self,
                                 vecs_ger,
@@ -2187,9 +2190,9 @@ class LinearSolver:
                 dm = dens[idx]
                 
                 # Note: only closed shell density for now
-                fock_gost = self.gostshyp_drv.screened_gostshyp_resp_contrib(gs_dm * 2.0,
-                                                                             dm * 2.0,
-                                                                             tessellation_settings)
+                fock_gost = self.gostshyp_drv.gostshyp_resp_contrib(gs_dm * 2.0,
+                                                                    dm * 2.0,
+                                                                    tessellation_settings)
 
                 if comm_rank == mpi_master():
                     fock_arrays[idx] += fock_gost
@@ -2424,7 +2427,11 @@ class LinearSolver:
             if profiler is not None:
                 profiler.add_timing_info('FockCPCM', tm.time() - t0)
 
-        # Note: not validated
+        # TODO: validate GOSTSHYP implementation for unrestricted case
+        assert_msg_critical(
+            self._gostshyp is False,
+            'LinearSolver: GOSTSHYP is not supported for unrestricted case yet')
+
         if self._gostshyp:
 
             t0 = tm.time()

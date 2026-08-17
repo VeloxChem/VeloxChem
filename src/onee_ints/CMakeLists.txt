@@ -20,22 +20,15 @@ target_sources(vlxobjs
     OldOneElecIntsDrivers.cpp
     OverlapHessian101.cpp
     KineticEnergyHessian101.cpp
-    TCOSFock1GOST.cpp
     TCOSFock1GOSTscreened.cpp
-    TCOSValues.cpp
     TCOSValuesscreened.cpp
-    TCOPFock2GOST.cpp
     TCOPFock2GOSTscreened.cpp
-    TCOPValues.cpp
     TCOPValuesscreened.cpp
-    TCODValues.cpp
     TCODValuesscreened.cpp
-    TCOFValues.cpp
     TCOFValuesscreened.cpp
-    TCOSGradient.cpp
-    TCOSGradientscreened.cpp
-    TCOPGradient.cpp
-    TCOPGradientscreened.cpp
+    TCOSGradientscreenedcontracted.cpp
+    TCOPGradientscreenedcontracted.cpp
+    TCOscreeningcount.cpp
   )
 
 target_include_directories(vlxobjs

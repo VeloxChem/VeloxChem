@@ -435,7 +435,8 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
                 self._collapse_current_subspace(c_ger_all, c_ung_all, molecule,
                                                 basis, scf_results, eri_dict,
-                                                dft_dict, pe_dict, profiler)
+                                                dft_dict, pe_dict, 
+                                                gostshyp_dict, profiler)
 
                 collapse_str = 'Collapsed reduced space: {:d}->{:d}'.format(
                     self.collapsed_from_dim, self.collapsed_to_dim)

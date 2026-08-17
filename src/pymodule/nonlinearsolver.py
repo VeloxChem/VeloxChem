@@ -118,6 +118,9 @@ class NonlinearSolver:
         # static electric field
         self.electric_field = None
 
+        # pressure
+        self.pressure = None
+
         # solver setup
         self.conv_thresh = 1.0e-4
         self.max_iter = 150
@@ -289,6 +292,12 @@ class NonlinearSolver:
         if self.electric_field is not None:
             errmsg = 'NonlinearSolver: The \'electric field\' keyword is not '
             errmsg += 'supported in nonlinear response calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+        if self.pressure is not None:
+            errmsg = 'NonlinearSolver: The \'pressure\' keyword is not supported '
+            errmsg += 'in nonlinear response calculation.'
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 

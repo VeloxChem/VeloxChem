@@ -28,7 +28,6 @@
 
 #include <algorithm>
 #include <iostream>
-#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -52,15 +51,16 @@ computescreenedTCOPValues(const             CMolecule& molecule,
                           const double*     point_amp, 
                           const double*     point_norms,
                           const double*     point_norm_const,
+                          const double      point_norm_const_max,
                           const double*     D,
                           const int         naos,
-                          const double      tco_tol) -> std::tuple<std::vector<double>, std::vector<int>, std::vector<int>>
+                          const double      tco_tol) -> std::vector<double>
 {
     const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
 
     errors::assertMsgCritical(
             naos == gtofunc::getNumberOfAtomicOrbitals(gto_blocks),
-            std::string("computeTCOPValues: Inconsistent number of AOs"));
+            std::string("computescreenedTCOPValues: Inconsistent number of AOs"));
 
     auto nthreads = omp_get_max_threads();
 
@@ -88,11 +88,7 @@ computescreenedTCOPValues(const             CMolecule& molecule,
         points_info[c + npoints * 8] = point_norm_const[c];
     }
 
-    double N_max = *std::max_element(points_info.begin() + npoints * 8, points_info.end());
-
-    // std::cout << "Max norm: " << N_max << "\n";
-    // std::cout << "TCO tol: " << tco_tol << "\n";
-
+    double N_max = point_norm_const_max;
 
     // gto blocks
 
@@ -130,7 +126,7 @@ computescreenedTCOPValues(const             CMolecule& molecule,
         }
         else
         {
-            std::string errangmom("computeTCOPValues: Only implemented up to f-orbitals");
+            std::string errangmom("computescreenedTCOPValues: Only implemented up to f-orbitals");
 
             errors::assertMsgCritical(false, errangmom);
         }
@@ -360,25 +356,6 @@ computescreenedTCOPValues(const             CMolecule& molecule,
     const auto df_prim_pair_count = static_cast<int>(pair_inds_df.size());
     const auto ff_prim_pair_count = static_cast<int>(pair_inds_ff.size());
 
-    const auto max_prim_pair_count = std::max({
-            ss_prim_pair_count,
-            sp_prim_pair_count,
-            sd_prim_pair_count,
-            sf_prim_pair_count,
-            pp_prim_pair_count,
-            pd_prim_pair_count,
-            pf_prim_pair_count,
-            dd_prim_pair_count,
-            df_prim_pair_count,
-            ff_prim_pair_count
-    });
-
-    // screened pair counters per angular momentum block
-    int screened_ss = 0, screened_sp = 0, screened_sd = 0, screened_sf = 0,
-        screened_pp = 0, screened_pd = 0, screened_pf = 0,
-        screened_dd = 0, screened_df = 0, screened_ff = 0;
-
-
     const double delta[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
 
     const int d_cart_inds[6][2] = {
@@ -396,8 +373,6 @@ computescreenedTCOPValues(const             CMolecule& molecule,
     // auto-generated code begins here
 
     // S-S block
-
-    int zero_count = 0;
 
     #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
         
@@ -433,7 +408,11 @@ computescreenedTCOPValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
-        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
 
         // product of density and cart-sph transformation coefficients
 
@@ -459,25 +438,6 @@ computescreenedTCOPValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        // if (S_ij_00_norm == 0.0 && zero_count < 10)
-        // {
-        //     #pragma omp critical
-        //     {
-        //         std::cout << "S_ij_00_norm = 0: a_i=" << a_i 
-        //                 << " a_j=" << a_j 
-        //                 << " r2_ij=" << r2_ij 
-        //                 << " exp_arg=" << -a_i * a_j / (a_i + a_j) * r2_ij
-        //                 << std::endl;
-        //         zero_count++;
-        //     }
-        // }
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_ss++;
-            continue;
-        }
         
         for (int c = 0; c < npoints; c++)
         {  
@@ -572,7 +532,11 @@ computescreenedTCOPValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
-        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
 
         // product of density and cart-sph transformation coefficients
 
@@ -599,12 +563,6 @@ computescreenedTCOPValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_sp++;
-            continue;
-        }
         
         for (int c = 0; c < npoints; c++)
         {  
@@ -709,7 +667,11 @@ computescreenedTCOPValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
-        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
 
         // product of density and cart-sph transformation coefficients
 
@@ -736,12 +698,6 @@ computescreenedTCOPValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_sd++;
-            continue;
-        }
         
         for (int c = 0; c < npoints; c++)
         {  
@@ -853,7 +809,11 @@ computescreenedTCOPValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
-        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
 
         // product of density and cart-sph transformation coefficients
 
@@ -880,12 +840,6 @@ computescreenedTCOPValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_sf++;
-            continue;
-        }
         
         for (int c = 0; c < npoints; c++)
         {  
@@ -1004,7 +958,11 @@ computescreenedTCOPValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
-        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
 
         // product of density and cart-sph transformation coefficients
 
@@ -1032,12 +990,6 @@ computescreenedTCOPValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_pp++;
-            continue;
-        }
         
         for (int c = 0; c < npoints; c++)
         {  
@@ -1149,7 +1101,11 @@ computescreenedTCOPValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
-        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
 
         // product of density and cart-sph transformation coefficients
 
@@ -1177,12 +1133,6 @@ computescreenedTCOPValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_pd++;
-            continue;
-        }
         
         for (int c = 0; c < npoints; c++)
         {  
@@ -1303,7 +1253,11 @@ computescreenedTCOPValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
-        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
 
         // product of density and cart-sph transformation coefficients
 
@@ -1331,12 +1285,6 @@ computescreenedTCOPValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_pf++;
-            continue;
-        }
         
         for (int c = 0; c < npoints; c++)
         {  
@@ -1469,7 +1417,11 @@ computescreenedTCOPValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
-        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
 
         // product of density and cart-sph transformation coefficients
 
@@ -1497,12 +1449,6 @@ computescreenedTCOPValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_dd++;
-            continue;
-        }
         
         for (int c = 0; c < npoints; c++)
         {  
@@ -1636,7 +1582,11 @@ computescreenedTCOPValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
-        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
 
         // product of density and cart-sph transformation coefficients
 
@@ -1664,12 +1614,6 @@ computescreenedTCOPValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_df++;
-            continue;
-        }
         
         for (int c = 0; c < npoints; c++)
         {  
@@ -1824,7 +1768,11 @@ computescreenedTCOPValues(const             CMolecule& molecule,
 
         const auto zeta = a_i + a_j;
 
-        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);    
+        const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
 
         // product of density and cart-sph transformation coefficients
 
@@ -1852,12 +1800,6 @@ computescreenedTCOPValues(const             CMolecule& molecule,
         }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_ff++;
-            continue;
-        }
         
         for (int c = 0; c < npoints; c++)
         {  
@@ -2017,21 +1959,7 @@ computescreenedTCOPValues(const             CMolecule& molecule,
         }
     }
 
-
-    // screening statistics (screened / total primitive pairs), ordered as
-    // S-S, S-P, S-D, S-F, P-P, P-D, P-F, D-D, D-F, F-F
-
-    std::vector<int> screened_counts{
-            screened_ss, screened_sp, screened_sd, screened_sf,
-            screened_pp, screened_pd, screened_pf,
-            screened_dd, screened_df, screened_ff};
-
-    std::vector<int> total_counts{
-            ss_prim_pair_count, sp_prim_pair_count, sd_prim_pair_count, sf_prim_pair_count,
-            pp_prim_pair_count, pd_prim_pair_count, pf_prim_pair_count,
-            dd_prim_pair_count, df_prim_pair_count, ff_prim_pair_count};
-
-    return std::make_tuple(f_tilde_values, screened_counts, total_counts);
+    return f_tilde_values;
 }
 
 }  // namespace onee

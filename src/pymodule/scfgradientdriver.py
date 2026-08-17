@@ -177,10 +177,13 @@ class ScfGradientDriver(GradientDriver):
             write_unparsed_input_to_hdf5(checkpoint_file,
                                          unparse_input(self, grad_keywords),
                                          group_name='grad_settings')
-
+        
+        # note that if GOSTSHYP is used in combination with the numerical option,
+        # the number of negative amplitudes printed corresponds to the last 
+        # SCF calculation performed in the numerical gradient calculation
         if self.scf_driver._gostshyp:
             valstr = '*** GOSTSHYP information: A total number of '
-            valstr += '{} grid points with negative amplitudes were excluded ***'.format(self.scf_driver._gostshyp_drv._neg_p_amp)
+            valstr += '{} grid points with negative amplitudes were excluded ***'.format(self.scf_driver._gostshyp_drv.num_neg_amp)
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
 
@@ -427,7 +430,7 @@ class ScfGradientDriver(GradientDriver):
                                                 basis,
                                                 self.scf_driver.pressure,
                                                 self.scf_driver.pressure_units,
-                                                self.scf_driver.tco_tol,
+                                                self.scf_driver._tco_tol,
                                                 self.comm,
                                                 self.ostream)
 
@@ -438,7 +441,7 @@ class ScfGradientDriver(GradientDriver):
                                      'filename'         : self.scf_driver.filename,
                                      'r_ext'            : self.scf_driver.r_ext}
 
-            gostshyp_grad = self._gostshyp_drv.screened_gostshyp_grad_contrib(density_matrix, tessellation_settings)
+            gostshyp_grad = self._gostshyp_drv.gostshyp_grad_contrib(density_matrix, tessellation_settings)
 
             self.gradient += gostshyp_grad
 
@@ -970,13 +973,6 @@ class ScfGradientDriver(GradientDriver):
         else:
             # always try restarting scf for analytical calculation
             self.scf_driver.restart = True
-        
-        # reset pressure to input units
-        # this is needed if the scf_driver is called multiple times
-        # since the pressure is recalculated from input units to atomic units
-        # when the compute() method is called
-        if self.scf_driver._gostshyp:
-           self.scf_driver.pressure = self.scf_driver._pressure_in_input_units
 
         self.scf_driver.ostream.mute()
         new_scf_results_not_used = self.scf_driver.compute(molecule, basis)

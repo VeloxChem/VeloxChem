@@ -1,33 +1,45 @@
 #
-#                           VELOXCHEM 1.0-RC3
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
 import time as tm
 import math
 import sys
 from mpi4py import MPI
+
+try:
+    import scipy
+except ImportError:
+    pass
 
 from .veloxchemlib import gen_lebedev_grid
 from .veloxchemlib import mpi_master
@@ -155,7 +167,7 @@ class TessellationDriver:
 
         # create a scaled sphere for every unique atom type
         vdw_spheres = {
-            i: self.scale_sphere_occ(unit_sphere, i) for i in np.unique(vdw_radii)
+            i: self.scale_sphere(unit_sphere, i) for i in np.unique(vdw_radii)
         }
 
         unscaled_w = unit_sphere[:, 3] * 4.0 * np.pi
@@ -185,7 +197,7 @@ class TessellationDriver:
             sphere[4:7, :] += np.array(molecule.get_atom_coordinates(i))[:, None]
 
             # remove non-contributing points
-            contribution_mask, sw_functions = self.get_contribution_mask_occ(sphere,
+            contribution_mask, sw_functions = self.get_contribution_mask(sphere,
                 i, neighbors, molecule, vdw_radii, unscaled_w)
 
             contribution = np.vstack((sphere[:, contribution_mask],
@@ -197,91 +209,76 @@ class TessellationDriver:
         vdw_surface[3, :] *= vdw_surface[-1, :]
 
         return vdw_surface
-    
-    def comp_area_grad(self, molecule, tessellation, M):
+
+    def compute_area_grad(self, molecule, tessellation, coeff):
         
-        """Calculate the cavity (area/switching function) gradient wrt atom
+        """Calculate the cavity (area/switching function) gradient.
         
         Herbert, Lange, J. Chem. Phys. 133, 244111 (2010), Appendix C
 
-        :param molecule             : the VeloxChem Molecule object,
-        :param tessellation         : the tessellation data,
-        :param discretization       : the chosen discretization scheme,
-        :param tssf                 : the tessellation scaling factor,
-        :param M                    : the current atom index
+        :param molecule             : the molecule.
+        :param tessellation         : the tessellation data.
+        :param coeff                : the area gradient coefficients for all grid points.
 
-        :return                     : the area gradient for all grid points wrt atom
-        """    
+        :return                     : the area gradient contribution (natoms, 3).
+        """
 
-        # to ease comparison with the paper atom index is renamed M
+        assert_msg_critical(self.discretization.lower() != 'fixed',
+            'GOSTSHYP: Molecular gradient not available with the fixed discretization scheme. Use SWIG or ISWIG.') 
         
-        # move these to tessellation array
-        vdw_radii = molecule.vdw_radii_to_numpy() * self.tssf
-
-        areas = tessellation[3, :] # current areas
-        
+        radii = molecule.vdw_radii_to_numpy() * self.tssf + self.r_ext / bohr_in_angstrom()
+        coords = molecule.get_coordinates_in_bohr()
+        natoms = molecule.number_of_atoms()
         num_tes_points = tessellation.shape[1]
-        
-        # initialize array to store the area gradient per tessellation point wrt xyz coords of nuclei M
-        area_grad = np.zeros((3, num_tes_points))
-
-        # define parameters for computing zetas in the iswig scheme
-        iswig_input = tessellation[12:14, :]
-        iswig_input[1] += self.r_ext / bohr_in_angstrom()
+        areas = tessellation[3]
+        c = coeff * areas
+        parent_atom_ids = tessellation[11].astype(int)
 
         # define parameters used in the swig scheme
-        gamma = np.sqrt(14.0 / self.num_leb_points)
-        alpha = 0.5 + 1.0 / gamma - np.sqrt(1.0 / gamma**2 - 1.0 / 28.0)
+        if self.discretization.lower() == 'swig':
+            gamma = np.sqrt(14.0 / self.num_leb_points)
+            alpha = 0.5 + 1.0 / gamma - np.sqrt(1.0 / gamma**2 - 1.0 / 28.0)
+
+        # define parameters used in the iswig scheme
+        elif self.discretization.lower() == 'iswig':
+            iswig_input = tessellation[12:14, :].copy()
+            iswig_input[1] += self.r_ext / bohr_in_angstrom()
+            zetas = (self.get_zeta(self.num_leb_points)
+                     / (iswig_input[1] * np.sqrt(iswig_input[0])))
         
-        # array stating if the tessellation point belongs to a given atom or not (delta_iM)    
-        delta_iM = 1.0 * (tessellation[11] == np.full((num_tes_points), M))
+        # initialize array to store the area gradient
+        area_grad = np.zeros((natoms, 3))
+        T = np.zeros((3, num_tes_points))
 
-        for J, rad_J in enumerate(vdw_radii + self.r_ext / bohr_in_angstrom()): # gradient contains summation over all atoms
-            
+        for J in range(natoms):
+
             # distance vector between tessellation point and nuclei positions
-            diff = tessellation[4:7] - np.array(molecule.get_atom_coordinates(J))[:, None]  
-            # length of distance vector
-            distances = np.linalg.norm(diff, axis=0)
-    
-            # assert value of delta_JM
-            if (M == J):
-                delta_JM = 1.0
-            else:
-                delta_JM = 0.0
+            diff = tessellation[4:7] - coords[J][:, None]      # (3, npoints)
+            distances = np.linalg.norm(diff, axis=0)           # (npoints,)
+            norm_diff = diff / distances
 
-            # fixed case
-            assert_msg_critical(self.discretization.lower() != 'fixed',
-                     'GOSTSHYP: Molecular gradient not available with the fixed discretization scheme. Use SWIG or ISWIG.')                 
-
-            # swig case    
             if self.discretization.lower() == 'swig':
-
-                # arguments for elementary switching functions
-                sw_radius = rad_J * gamma
-                inner_J = rad_J - alpha * sw_radius
-
-                # compute elementary switching functions and derivatives of these for all tessellation points
-                elem_sw_funcs = [self.swig_elem_sw_func((d - inner_J) / sw_radius) for d in distances]
-                deriv_elem_sw_funcs = [self.swig_elem_sw_func_derivative((d - inner_J) / sw_radius) for d in distances]
-                diJ_grads = (diff / distances) * (delta_iM - delta_JM) / sw_radius #compute gradient of diJ measures
-
-                contrib = deriv_elem_sw_funcs * diJ_grads / elem_sw_funcs
-                area_grad += contrib
-
-            # iswig case    
+                sw_radius = radii[J] * gamma
+                inner_J   = radii[J] - alpha * sw_radius
+                x = (distances - inner_J) / sw_radius
+                t_J = (self.swig_elem_sw_func_derivative_array(x)
+                      / (self.swig_elem_sw_func_array(x) * sw_radius)) * norm_diff
+            
             elif self.discretization.lower() == 'iswig':
+                t_J = (self.iswig_elem_sw_func_derivative(distances, zetas, radii[J])
+                       / self.iswig_elem_sw_func_array(distances, zetas, radii[J])) * norm_diff
 
-                zeta = self.get_zeta(self.num_leb_points)                
-                zetas = zeta / (iswig_input[1] * np.sqrt(iswig_input[0])) # weights for unscaled spheres to be used
+            T += t_J
 
-                elem_sw_funcs = [self.iswig_elem_sw_func(x, z, rad_J) for x, z in zip(distances, zetas)]
-                deriv_elem_sw_funcs = [self.iswig_elem_sw_func_derivative(x, z, rad_J) for x, z in zip(distances, zetas)]
-                riJ_grads = diff / distances * (delta_iM - delta_JM)
+            area_grad[J] -= np.sum(c * t_J, axis=1) # summed over tessera axis
 
-                contrib = deriv_elem_sw_funcs * riJ_grads / elem_sw_funcs
-                area_grad += contrib
+        weighted_T = c * T # (3, npoints)
 
-        area_grad *= areas
+        # scatter contributions onto parent atom gradient
+        for d in range(3):
+            area_grad[:, d] += np.bincount(parent_atom_ids,
+                                           weights=weighted_T[d],
+                                           minlength=natoms)
         
         return area_grad
 
@@ -315,7 +312,7 @@ class TessellationDriver:
         return np.vstack((grid[:, 0], grid[:, 1],
                           grid[:, 2]))
     
-    def get_contribution_mask_occ(self, sphere, idx, neighbors, molecule, vdw_radii,
+    def get_contribution_mask(self, sphere, idx, neighbors, molecule, vdw_radii,
                               weights):
         """
         Masks grid points of a sphere that don't contribute to the van der Waals
@@ -390,6 +387,18 @@ class TessellationDriver:
 
         return mask, sw_funcs
 
+    @staticmethod
+    def erf_array(array):
+        """
+        Returns erf of an array.
+        """
+
+        if 'scipy' in sys.modules:
+            return scipy.special.erf(array)
+        else:
+            # slow alternative in case scipy is not available
+            return np.vectorize(math.erf)(array)
+
     def swig_elem_sw_func(self, x):
         """
         Returns the value for the SWIG elementary switching function.
@@ -407,6 +416,21 @@ class TessellationDriver:
             return 1.0
         else:
             return (10.0 * x**3 - 15.0 * x**4 + 6.0 * x**5)
+
+    def swig_elem_sw_func_array(self, x):
+        """
+        Returns the value for the SWIG elementary switching function of an array.
+
+        :param x:
+            The function argument.
+
+        :return:
+            The function value.
+        """
+        
+        x = np.clip(np.asarray(x, dtype=float), 0.0, 1.0)
+
+        return x**3 * (10.0 - 15.0 * x + 6.0 * x**2)
 
     def iswig_elem_sw_func(self, x, zeta, r_j):
         """
@@ -426,6 +450,25 @@ class TessellationDriver:
         return (1.0 - 0.5 * (math.erf(zeta * (r_j - x)) +
                              math.erf(zeta * (r_j + x))))
 
+        
+    def iswig_elem_sw_func_array(self, x, zeta, r_j):
+        """
+        Returns the value for the ISWIG elementary switching function of an array.
+
+        :param x:
+            The function argument.
+        :param zeta:
+            The zeta value.
+        :param r_j:
+            The radius of atom j.
+        
+        :return:
+            The function value.
+        """
+
+        return (1.0 - 0.5 * (self.erf_array(zeta * (r_j - x)) +
+                             self.erf_array(zeta * (r_j + x))))
+
     def swig_elem_sw_func_derivative(self, x):
         """
         Returns the value for the SWIG elementary switching function derivative wrt. x.
@@ -444,10 +487,28 @@ class TessellationDriver:
         else:
             return (30 * x**4 - 60 * x**3 + 30 * x**2)
 
+    def swig_elem_sw_func_derivative_array(self, x):
+        """
+        Returns the value for the SWIG elementary switching function derivative wrt. x of an array.
+
+        :param x:
+            The function argument.
+
+        :return:
+            The function value.
+        """
+
+        x = np.asarray(x, dtype=float)
+
+        inside = (x >= 0.0) & (x <= 1.0)
+
+        return np.where(inside, 30.0 * x**2 * (1.0 - x)**2, 0.0)
+
     def iswig_elem_sw_func_derivative(self, x, zeta, r_j):
 
         """
         Returns the value for the ISWIG elementary switching function derivative wrt. x.
+        Works for both scalar and array inputs.
 
         :param x:
             The function argument.
@@ -462,7 +523,7 @@ class TessellationDriver:
 
         return zeta / np.sqrt(np.pi) * (np.exp(-zeta**2 * (r_j - x)**2) + np.exp(-zeta**2 * (r_j + x)**2 ))
     
-    def scale_sphere_occ(self, grid, radius):
+    def scale_sphere(self, grid, radius):
         """
         Scales the unit sphere Lebedev grid to a sphere of a given radius.
 
@@ -544,8 +605,6 @@ class TessellationDriver:
                 # for ISWIG
                 zeta_j = zeta * (1.0 / (r_j * np.sqrt(weight)))
 
-
-                # TODO: OR statements?
                 if (self.discretization.lower() == 'fixed' and
                     d_ij <= (r_i + r_j)):
                     neighbors[i].append(j)
@@ -678,13 +737,9 @@ class TessellationDriver:
             for i in vdw_surface.T:
                 f.write(f"  x   {i[0]}  {i[1]}  {i[2]}    \n")
 
-    # TODO: Figure out where the visualization functions should go.
-
-    def visualize_grid_occ(self, molecule):
+    def visualize_grid(self, molecule):
         """
         Visualizes grid for surface discretization.
-
-        In addition, the outer cavity employed in OCC is also visualized.
 
         :param molecule:
             The molecule.
@@ -702,95 +757,14 @@ class TessellationDriver:
 
         num_points = grid.shape[0]
 
-        inner_grid_in_angstrom = grid[:, :3] * bohr_in_angstrom()
-
-        outer_grid_in_angstrom = grid[:, 4:7] * bohr_in_angstrom()
-
-        inner_grid_xyz_string = f'{num_points}\n\n'
-
-        outer_grid_xyz_string = f'{num_points}\n\n'
-
-        for i in range(num_points):
-            x, y, z = inner_grid_in_angstrom[i]
-            inner_grid_xyz_string += f'He {x} {y} {z}\n'
-
-        for i in range(num_points):
-            x, y, z = outer_grid_in_angstrom[i]
-            outer_grid_xyz_string += f'Ne {x} {y} {z}\n'
-
-        v = p3d.view(width=600, height=600)
-
-        v.addModel(molecule.get_xyz_string(), 'xyz')
-        v.setStyle({'stick': {}})
-
-        v.addModel(inner_grid_xyz_string, 'xyz')
-        v.setStyle({'elem': 'He'},
-                   {'sphere': {
-                       'radius': 0.05,
-                       'color': 'red',
-                       'opacity': 0.7
-                   }})
-        
-        v.addModel(outer_grid_xyz_string, 'xyz')
-        v.setStyle({'elem': 'Ne'},
-                   {'sphere': {
-                       'radius': 0.05,
-                       'color': 'blue',
-                       'opacity': 0.5
-                   }})
-
-        v.zoomTo()
-        v.show()
-
-    def visualize_grid_neg_amps(self, molecule, amps_mask):
-        """
-        Visualizes grid for surface discretization.
-        Intended use is to highlight any grid points associated with negative amplitudes.
-        Hence a SCF-calculation is needed.
-
-        :param molecule:
-            The molecule.
-        :param amps_mask:
-            For now, an 1D array of integers with 1 corresponding to p_j > 0 
-            and 0 to p_j < 0. Length should correspond to number of grid points.
-        """
-
-        grid = self.compute(molecule).T
-
-        try:
-            import py3Dmol as p3d
-        except ImportError:
-            raise ImportError('Unable to import py3Dmol.')
-
-        assert_msg_critical(grid.shape[1] == 15,
-                            'TessellationDriver.visualize_grid_neg_amps: Invalid grid size')
-        
-        assert_msg_critical(amps_mask.shape[0] == grid.shape[0],
-                    'TessellationDriver.visualize_grid_neg_amps: Size of amplitude mask does not match grid size.')
-
-        amps_mask = amps_mask > 0
-
-        num_points = np.sum(amps_mask)
-
-        grid_in_angstrom = grid[amps_mask, :3] * bohr_in_angstrom()
-
-        num_neg_amp = grid.shape[0] - num_points
-
-        grid_in_angstrom_neg_amp = grid[~amps_mask, :3] * bohr_in_angstrom()
-
+        grid_in_angstrom = grid[:, :3] * bohr_in_angstrom()
         grid_xyz_string = f'{num_points}\n\n'
-
-        grid_xyz_string_neg_amp = f'{num_neg_amp}\n\n'
 
         for i in range(num_points):
             x, y, z = grid_in_angstrom[i]
             grid_xyz_string += f'He {x} {y} {z}\n'
 
-        for i in range(num_neg_amp):
-            x, y, z = grid_in_angstrom_neg_amp[i]
-            grid_xyz_string_neg_amp += f'Ne {x} {y} {z}\n'
-
-        v = p3d.view(width=600, height=600)
+        v = p3d.view(width=2500, height=800)
 
         v.addModel(molecule.get_xyz_string(), 'xyz')
         v.setStyle({'stick': {}})
@@ -801,14 +775,6 @@ class TessellationDriver:
                        'radius': 0.05,
                        'color': 'red',
                        'opacity': 0.7
-                   }})
-        
-        v.addModel(grid_xyz_string_neg_amp, 'xyz')
-        v.setStyle({'elem': 'Ne'},
-                   {'sphere': {
-                       'radius': 0.05,
-                       'color': 'blue',
-                       'opacity': 0.8
                    }})
 
         v.zoomTo()

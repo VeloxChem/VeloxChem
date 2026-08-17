@@ -1,28 +1,36 @@
 //
-//                              VELOXCHEM
-//         ----------------------------------------------------
-//                     An Electronic Structure Code
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
 //
-//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+//  SPDX-License-Identifier: BSD-3-Clause
 //
-//  SPDX-License-Identifier: LGPL-3.0-or-later
+//  Copyright 2018-2025 VeloxChem developers
 //
-//  This file is part of VeloxChem.
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
 //
-//  VeloxChem is free software: you can redistribute it and/or modify it under
-//  the terms of the GNU Lesser General Public License as published by the Free
-//  Software Foundation, either version 3 of the License, or (at your option)
-//  any later version.
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
 //
-//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-//  License for more details.
-//
-//  You should have received a copy of the GNU Lesser General Public License
-//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "TCOSGradientscreened.hpp"
+#include "TCOSGradientscreenedcontracted.hpp"
 
 #include <omp.h>
 
@@ -45,42 +53,30 @@
 namespace onee {  // onee namespace
 
 auto
-computescreenedTCOSGradient(const             CMolecule& molecule, 
-                            const             CMolecularBasis& basis, 
-                            const double*     point_coords, 
-                            const int         npoints, 
-                            const double*     point_exp, 
-                            const double*     point_amp, 
-                            const double*     point_norm_const,
-                            const double*     D,
-                            const int         naos,
-                            const double      tco_tol) -> std::vector<CDenseMatrix>
+computescreenedcontractedTCOSGradient(const             CMolecule& molecule, 
+                                      const             CMolecularBasis& basis, 
+                                      const double*     point_coords, 
+                                      const int         npoints, 
+                                      const double*     point_exp, 
+                                      const double*     point_amp, 
+                                      const double*     point_norm_const,
+                                      const double      point_norm_const_max,
+                                      const int*        point_atom_ids,
+                                      const double*     D,
+                                      const int         naos,
+                                      const double      tco_tol) -> CDenseMatrix
 {
     const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
 
     errors::assertMsgCritical(
             naos == gtofunc::getNumberOfAtomicOrbitals(gto_blocks),
-            std::string("computescreenedTCOSGradient: Inconsistent number of AOs"));
+            std::string("computescreenedcontractedTCOSGradient: Inconsistent number of AOs"));
 
     auto natoms = molecule.number_of_atoms();
-
     auto nthreads = omp_get_max_threads();
 
-    std::vector<std::vector<CDenseMatrix>> tco_s_grad_omp(nthreads);
-
-    for (int thread_id = 0; thread_id < nthreads; thread_id++)
-
-        {
-            tco_s_grad_omp[thread_id] = std::vector<CDenseMatrix>(npoints);
-
-            for (int point = 0; point < npoints; point++)
-
-                {
-                    tco_s_grad_omp[thread_id][point] = CDenseMatrix(natoms, 3);
-
-                    tco_s_grad_omp[thread_id][point].zero();
-                }
-        }
+    std::vector<double> grad_omp(nthreads * natoms * 3, 0.0);
+    auto ptr_grad_omp = grad_omp.data();
 
     // points info
 
@@ -96,10 +92,7 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
         points_info[c + npoints * 5] = point_norm_const[c];
     }
 
-    double N_max = *std::max_element(points_info.begin() + npoints * 5, points_info.end());
-
-    // std::cout << "Max norm: " << N_max << "\n";
-    // std::cout << "TCO tol: " << tco_tol << "\n";
+    double N_max = point_norm_const_max;
 
     // gto blocks
 
@@ -146,7 +139,7 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
         }
         else
         {
-            std::string errangmom("computescreenedTCOSGradient: Only implemented up to f-orbitals");
+            std::string errangmom("computescreenedcontractedTCOSGradient: Only implemented up to f-orbitals");
 
             errors::assertMsgCritical(false, errangmom);
         }
@@ -397,25 +390,6 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
     const auto df_prim_pair_count = static_cast<int>(pair_inds_df.size());
     const auto ff_prim_pair_count = static_cast<int>(pair_inds_ff.size());
 
-    const auto max_prim_pair_count = std::max({
-            ss_prim_pair_count,
-            sp_prim_pair_count,
-            sd_prim_pair_count,
-            sf_prim_pair_count,
-            pp_prim_pair_count,
-            pd_prim_pair_count,
-            pf_prim_pair_count,
-            dd_prim_pair_count,
-            df_prim_pair_count,
-            ff_prim_pair_count
-    });
-
-    // screened pair counters per angular momentum block
-    int screened_ss = 0, screened_sp = 0, screened_sd = 0, screened_sf = 0,
-        screened_pp = 0, screened_pd = 0, screened_pf = 0,
-        screened_dd = 0, screened_df = 0, screened_ff = 0;
-
-
     const double delta[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
 
     const int d_cart_inds[6][2] = {
@@ -471,14 +445,12 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_ss++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {
@@ -488,6 +460,7 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
             const auto N_c = points_info[c + npoints * 5];
+            const auto atom_c = point_atom_ids[c];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -500,7 +473,6 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
             const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
 
             const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
-
 
 
 
@@ -549,8 +521,17 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
                         double D_sym = ((i == j) ? Dij : (Dij + Dji));
 
-                        tco_s_grad_omp[thread_id][c].row(i_atom)[m] += grad_i * coef_sph * D_sym;
-                        tco_s_grad_omp[thread_id][c].row(j_atom)[m] += grad_j * coef_sph * D_sym;
+                        const auto contrib_i = grad_i * coef_sph * D_sym;
+                        const auto contrib_j = grad_j * coef_sph * D_sym;
+
+                        const auto offset = thread_id * natoms * 3;
+
+                        ptr_grad_omp[offset + i_atom * 3 + m] += contrib_i;
+                        ptr_grad_omp[offset + j_atom * 3 + m] += contrib_j;
+
+                        // translational invariance
+
+                        ptr_grad_omp[offset + atom_c * 3 + m] -= (contrib_i + contrib_j);
                         
                     }
                 }
@@ -599,14 +580,12 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_sp++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {
@@ -616,6 +595,7 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
             const auto N_c = points_info[c + npoints * 5];
+            const auto atom_c = point_atom_ids[c];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -631,7 +611,6 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
 
             const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
-
 
 
             for (int m = 0; m < 3; m++)
@@ -691,8 +670,17 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
                         double D_sym = (Dij + Dji);
 
-                        tco_s_grad_omp[thread_id][c].row(i_atom)[m] += grad_i * coef_sph * D_sym;
-                        tco_s_grad_omp[thread_id][c].row(j_atom)[m] += grad_j * coef_sph * D_sym;
+                        const auto contrib_i = grad_i * coef_sph * D_sym;
+                        const auto contrib_j = grad_j * coef_sph * D_sym;
+
+                        const auto offset = thread_id * natoms * 3;
+
+                        ptr_grad_omp[offset + i_atom * 3 + m] += contrib_i;
+                        ptr_grad_omp[offset + j_atom * 3 + m] += contrib_j;
+
+                        // translational invariance
+
+                        ptr_grad_omp[offset + atom_c * 3 + m] -= (contrib_i + contrib_j);
                         
                     }
                 }
@@ -742,14 +730,12 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_sd++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {
@@ -759,6 +745,7 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
             const auto N_c = points_info[c + npoints * 5];
+            const auto atom_c = point_atom_ids[c];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -775,7 +762,6 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
             const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
             const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
-
 
 
             for (int m = 0; m < 3; m++)
@@ -840,8 +826,17 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
                         double D_sym = (Dij + Dji);
 
-                        tco_s_grad_omp[thread_id][c].row(i_atom)[m] += grad_i * coef_sph * D_sym;
-                        tco_s_grad_omp[thread_id][c].row(j_atom)[m] += grad_j * coef_sph * D_sym;
+                        const auto contrib_i = grad_i * coef_sph * D_sym;
+                        const auto contrib_j = grad_j * coef_sph * D_sym;
+
+                        const auto offset = thread_id * natoms * 3;
+
+                        ptr_grad_omp[offset + i_atom * 3 + m] += contrib_i;
+                        ptr_grad_omp[offset + j_atom * 3 + m] += contrib_j;
+
+                        // translational invariance
+
+                        ptr_grad_omp[offset + atom_c * 3 + m] -= (contrib_i + contrib_j);
                         
                     }
                 }
@@ -892,14 +887,12 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_sf++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {
@@ -909,6 +902,7 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
             const auto N_c = points_info[c + npoints * 5];
+            const auto atom_c = point_atom_ids[c];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -926,7 +920,6 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
             const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
             const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
             const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
-
 
 
             for (int m = 0; m < 3; m++)
@@ -1010,8 +1003,17 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
                         double D_sym = (Dij + Dji);
 
-                        tco_s_grad_omp[thread_id][c].row(i_atom)[m] += grad_i * coef_sph * D_sym;
-                        tco_s_grad_omp[thread_id][c].row(j_atom)[m] += grad_j * coef_sph * D_sym;
+                        const auto contrib_i = grad_i * coef_sph * D_sym;
+                        const auto contrib_j = grad_j * coef_sph * D_sym;
+
+                        const auto offset = thread_id * natoms * 3;
+
+                        ptr_grad_omp[offset + i_atom * 3 + m] += contrib_i;
+                        ptr_grad_omp[offset + j_atom * 3 + m] += contrib_j;
+
+                        // translational invariance
+
+                        ptr_grad_omp[offset + atom_c * 3 + m] -= (contrib_i + contrib_j);
                         
                     }
                 }
@@ -1061,14 +1063,12 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_pp++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {
@@ -1078,6 +1078,7 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
             const auto N_c = points_info[c + npoints * 5];
+            const auto atom_c = point_atom_ids[c];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1094,7 +1095,6 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
             const auto GA_0 = (a_j * rij[a0] + zeta_c * rci[a0]) / (a_i + a_j + zeta_c);
 
             const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
-
 
 
             for (int m = 0; m < 3; m++)
@@ -1163,8 +1163,17 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
                         double D_sym = ((i == j) ? Dij : (Dij + Dji));
 
-                        tco_s_grad_omp[thread_id][c].row(i_atom)[m] += grad_i * coef_sph * D_sym;
-                        tco_s_grad_omp[thread_id][c].row(j_atom)[m] += grad_j * coef_sph * D_sym;
+                        const auto contrib_i = grad_i * coef_sph * D_sym;
+                        const auto contrib_j = grad_j * coef_sph * D_sym;
+
+                        const auto offset = thread_id * natoms * 3;
+
+                        ptr_grad_omp[offset + i_atom * 3 + m] += contrib_i;
+                        ptr_grad_omp[offset + j_atom * 3 + m] += contrib_j;
+
+                        // translational invariance
+
+                        ptr_grad_omp[offset + atom_c * 3 + m] -= (contrib_i + contrib_j);
                         
                     }
                 }
@@ -1215,14 +1224,12 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_pd++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {
@@ -1232,6 +1239,7 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
             const auto N_c = points_info[c + npoints * 5];
+            const auto atom_c = point_atom_ids[c];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1249,7 +1257,6 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
             const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
             const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
-
 
 
             for (int m = 0; m < 3; m++)
@@ -1341,8 +1348,17 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
                         double D_sym = (Dij + Dji);
 
-                        tco_s_grad_omp[thread_id][c].row(i_atom)[m] += grad_i * coef_sph * D_sym;
-                        tco_s_grad_omp[thread_id][c].row(j_atom)[m] += grad_j * coef_sph * D_sym;
+                        const auto contrib_i = grad_i * coef_sph * D_sym;
+                        const auto contrib_j = grad_j * coef_sph * D_sym;
+
+                        const auto offset = thread_id * natoms * 3;
+
+                        ptr_grad_omp[offset + i_atom * 3 + m] += contrib_i;
+                        ptr_grad_omp[offset + j_atom * 3 + m] += contrib_j;
+
+                        // translational invariance
+
+                        ptr_grad_omp[offset + atom_c * 3 + m] -= (contrib_i + contrib_j);
                         
                     }
                 }
@@ -1394,14 +1410,12 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_pf++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {
@@ -1411,6 +1425,7 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
             const auto N_c = points_info[c + npoints * 5];
+            const auto atom_c = point_atom_ids[c];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1429,7 +1444,6 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
             const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
             const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
             const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
-
 
 
             for (int m = 0; m < 3; m++)
@@ -1543,8 +1557,17 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
                         double D_sym = (Dij + Dji);
 
-                        tco_s_grad_omp[thread_id][c].row(i_atom)[m] += grad_i * coef_sph * D_sym;
-                        tco_s_grad_omp[thread_id][c].row(j_atom)[m] += grad_j * coef_sph * D_sym;
+                        const auto contrib_i = grad_i * coef_sph * D_sym;
+                        const auto contrib_j = grad_j * coef_sph * D_sym;
+
+                        const auto offset = thread_id * natoms * 3;
+
+                        ptr_grad_omp[offset + i_atom * 3 + m] += contrib_i;
+                        ptr_grad_omp[offset + j_atom * 3 + m] += contrib_j;
+
+                        // translational invariance
+
+                        ptr_grad_omp[offset + atom_c * 3 + m] -= (contrib_i + contrib_j);
                         
                     }
                 }
@@ -1596,14 +1619,12 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_dd++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {
@@ -1613,6 +1634,7 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
             const auto N_c = points_info[c + npoints * 5];
+            const auto atom_c = point_atom_ids[c];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1631,7 +1653,6 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
             const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
             const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
-
 
 
             for (int m = 0; m < 3; m++)
@@ -1746,8 +1767,17 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
                         double D_sym = ((i == j) ? Dij : (Dij + Dji));
 
-                        tco_s_grad_omp[thread_id][c].row(i_atom)[m] += grad_i * coef_sph * D_sym;
-                        tco_s_grad_omp[thread_id][c].row(j_atom)[m] += grad_j * coef_sph * D_sym;
+                        const auto contrib_i = grad_i * coef_sph * D_sym;
+                        const auto contrib_j = grad_j * coef_sph * D_sym;
+
+                        const auto offset = thread_id * natoms * 3;
+
+                        ptr_grad_omp[offset + i_atom * 3 + m] += contrib_i;
+                        ptr_grad_omp[offset + j_atom * 3 + m] += contrib_j;
+
+                        // translational invariance
+
+                        ptr_grad_omp[offset + atom_c * 3 + m] -= (contrib_i + contrib_j);
                         
                     }
                 }
@@ -1800,14 +1830,12 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_df++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {
@@ -1817,6 +1845,7 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
             const auto N_c = points_info[c + npoints * 5];
+            const auto atom_c = point_atom_ids[c];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1836,7 +1865,6 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
             const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
             const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
             const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
-
 
 
             for (int m = 0; m < 3; m++)
@@ -2009,8 +2037,17 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
                         double D_sym = (Dij + Dji);
 
-                        tco_s_grad_omp[thread_id][c].row(i_atom)[m] += grad_i * coef_sph * D_sym;
-                        tco_s_grad_omp[thread_id][c].row(j_atom)[m] += grad_j * coef_sph * D_sym;
+                        const auto contrib_i = grad_i * coef_sph * D_sym;
+                        const auto contrib_j = grad_j * coef_sph * D_sym;
+
+                        const auto offset = thread_id * natoms * 3;
+
+                        ptr_grad_omp[offset + i_atom * 3 + m] += contrib_i;
+                        ptr_grad_omp[offset + j_atom * 3 + m] += contrib_j;
+
+                        // translational invariance
+
+                        ptr_grad_omp[offset + atom_c * 3 + m] -= (contrib_i + contrib_j);
                         
                     }
                 }
@@ -2064,14 +2101,12 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
+        if (N_max * S_ij_00_norm < tco_tol) continue;
+
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
-
-        if (N_max * S_ij_00_norm < tco_tol) {
-            #pragma omp atomic
-            screened_ff++;
-            continue;
-        }
 
         for (int c = 0; c < npoints; c++)
         {
@@ -2081,6 +2116,7 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
             const auto N_c = points_info[c + npoints * 5];
+            const auto atom_c = point_atom_ids[c];
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -2101,7 +2137,6 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
             const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
             const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
             const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
-
 
 
             for (int m = 0; m < 3; m++)
@@ -2368,8 +2403,17 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
                         double D_sym = ((i == j) ? Dij : (Dij + Dji));
 
-                        tco_s_grad_omp[thread_id][c].row(i_atom)[m] += grad_i * coef_sph * D_sym;
-                        tco_s_grad_omp[thread_id][c].row(j_atom)[m] += grad_j * coef_sph * D_sym;
+                        const auto contrib_i = grad_i * coef_sph * D_sym;
+                        const auto contrib_j = grad_j * coef_sph * D_sym;
+
+                        const auto offset = thread_id * natoms * 3;
+
+                        ptr_grad_omp[offset + i_atom * 3 + m] += contrib_i;
+                        ptr_grad_omp[offset + j_atom * 3 + m] += contrib_j;
+
+                        // translational invariance
+
+                        ptr_grad_omp[offset + atom_c * 3 + m] -= (contrib_i + contrib_j);
                         
                     }
                 }
@@ -2379,46 +2423,19 @@ computescreenedTCOSGradient(const             CMolecule& molecule,
 
     // auto-generated code ends here
 
-    std::vector<CDenseMatrix> TCOS_grad(npoints);
-
-    for (int c = 0; c < npoints; c++)
-
-            {
-                TCOS_grad[c] = CDenseMatrix(natoms, 3);
-
-                TCOS_grad[c].zero();
-            }
+    CDenseMatrix TCOS_grad(natoms, 3);
+    TCOS_grad.zero();
 
     for (int thread_id = 0; thread_id < nthreads; thread_id++)
     {
-        for (int c = 0; c < npoints; c++)
+        for (int a = 0; a < natoms; a++)
         {
-            for (int a = 0; a < natoms; a++)
-                {
-                    for (int d = 0; d < 3; d++)
-                    {
-                        TCOS_grad[c].row(a)[d] += tco_s_grad_omp[thread_id][c].row(a)[d];
-                    }
-                }
-
+            for (int d = 0; d < 3; d++)
+            {
+                TCOS_grad.row(a)[d] += grad_omp[thread_id * natoms * 3 + a * 3 + d];
+            }
         }
-
-        
     }
-
-
-    // print screening statistics
-    // std::cout << "computescreenedTCOSGradient: screening statistics (screened / total pairs)\n";
-    // std::cout << "  S-S: " << screened_ss << " / " << ss_prim_pair_count << "\n";
-    // std::cout << "  S-P: " << screened_sp << " / " << sp_prim_pair_count << "\n";
-    // std::cout << "  S-D: " << screened_sd << " / " << sd_prim_pair_count << "\n";
-    // std::cout << "  S-F: " << screened_sf << " / " << sf_prim_pair_count << "\n";
-    // std::cout << "  P-P: " << screened_pp << " / " << pp_prim_pair_count << "\n";
-    // std::cout << "  P-D: " << screened_pd << " / " << pd_prim_pair_count << "\n";
-    // std::cout << "  P-F: " << screened_pf << " / " << pf_prim_pair_count << "\n";
-    // std::cout << "  D-D: " << screened_dd << " / " << dd_prim_pair_count << "\n";
-    // std::cout << "  D-F: " << screened_df << " / " << df_prim_pair_count << "\n";
-    // std::cout << "  F-F: " << screened_ff << " / " << ff_prim_pair_count << "\n";
 
     return TCOS_grad;
 }

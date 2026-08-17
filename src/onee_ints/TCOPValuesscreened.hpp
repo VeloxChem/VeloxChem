@@ -33,7 +33,6 @@
 #ifndef TCOPValuesscreened_hpp
 #define TCOPValuesscreened_hpp
 
-#include <tuple>
 #include <vector>
 
 #include "DenseMatrix.hpp"
@@ -42,9 +41,6 @@
 
 namespace onee {  // onee namespace
 
-// Returns the tessellation-point values together with the primitive-pair
-// screening statistics (screened counts, total counts), both ordered as
-// [S-S, S-P, S-D, S-F, P-P, P-D, P-F, D-D, D-F, F-F].
 auto
 computescreenedTCOPValues(const CMolecule& molecule,
                           const CMolecularBasis& basis,
@@ -54,9 +50,10 @@ computescreenedTCOPValues(const CMolecule& molecule,
                           const double* point_amp,
                           const double* point_norms,
                           const double* point_norm_const,
+                          const double point_norm_const_max,
                           const double* D,
                           const int naos,
-                          const double tco_tol) -> std::tuple<std::vector<double>, std::vector<int>, std::vector<int>>;
+                          const double tco_tol) -> std::vector<double>;
 
 }  // namespace onee
 

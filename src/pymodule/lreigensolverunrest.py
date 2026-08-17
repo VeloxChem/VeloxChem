@@ -45,7 +45,7 @@ from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
+                           solvation_model_sanity_check, gostshyp_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import screened_eigh, symmetric_matrix_function
 from .checkpoint import check_rsp_hdf5
@@ -138,6 +138,9 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
         # check solvation
         solvation_model_sanity_check(self)
 
+        # check gostshyp
+        gostshyp_sanity_check(self)
+
         # check print level (verbosity of output)
         self.print_level = max(1, min(self.print_level, 3))
 
@@ -203,6 +206,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
 
         # CPCM_information
         self._init_cpcm(molecule, basis)
+
+        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_results)
 
         # For now, 'nonlinear' is not supported for unrestricted case.
         assert_msg_critical(
@@ -282,6 +287,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                                         eri_dict,
                                         dft_dict,
                                         pe_dict,
+                                        gostshyp_dict,
                                         profiler,
                                         method_type='unrestricted')
 
@@ -302,6 +308,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                                 eri_dict,
                                 dft_dict,
                                 pe_dict,
+                                gostshyp_dict,
                                 profiler,
                                 method_type='unrestricted')
 
@@ -427,7 +434,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
 
                 self._collapse_current_subspace(c_ger_all, c_ung_all, molecule,
                                                 basis, scf_results, eri_dict,
-                                                dft_dict, pe_dict, profiler)
+                                                dft_dict, pe_dict, gostshyp_dict, 
+                                                profiler)
 
                 collapse_str = 'Collapsed reduced space: {:d}->{:d}'.format(
                     self.collapsed_from_dim, self.collapsed_to_dim)
@@ -475,6 +483,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                                 eri_dict,
                                 dft_dict,
                                 pe_dict,
+                                gostshyp_dict,
                                 profiler,
                                 method_type='unrestricted')
 
@@ -1011,7 +1020,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
 
     def _collapse_current_subspace(self, c_ger, c_ung, molecule, basis,
                                    scf_results, eri_dict, dft_dict, pe_dict,
-                                   profiler):
+                                   gostshyp_dict, profiler):
         """
         Collapses the reduced space to retained Ritz vectors and rebuilds
         associated sigma data.
@@ -1035,6 +1044,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                             eri_dict,
                             dft_dict,
                             pe_dict,
+                            gostshyp_dict,
                             profiler,
                             method_type='unrestricted')
 

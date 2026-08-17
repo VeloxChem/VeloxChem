@@ -34,6 +34,7 @@ from pathlib import Path
 from datetime import datetime
 from collections import deque
 from copy import deepcopy
+from mpi4py import MPI
 import numpy as np
 import time as tm
 import math
@@ -64,6 +65,7 @@ from .sadguessdriver import SadGuessDriver
 from .firstorderprop import FirstOrderProperties
 from .cpcmdriver import CpcmDriver
 from .smddriver import SmdDriver
+from .gostshyp import GostshypDriver
 from .dispersionmodel import DispersionModel
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           unparse_input, write_unparsed_input_to_hdf5,
@@ -140,7 +142,6 @@ class ScfDriver:
         - discretization: The surface discretization method.
         - switching_thresh: The (I)SWIG switching function threshold.
         - r_ext: The extension radius for the outer cavity correction in angstrom.
-        - tco_tol: The screening tolerance for three-center overlap integrals.
         - dispersion: The flag for calculating D4 dispersion correction.
         - d4_energy: The D4 dispersion correction to energy.
         - electric_field: The static electric field.
@@ -269,7 +270,7 @@ class ScfDriver:
         self.discretization = 'fixed'
         self.switching_thresh = 1.0e-8
         self.r_ext = 0.0
-        self.tco_tol = self.conv_thresh * 1.0e8
+        self._tco_tol = self.conv_thresh * 1.0e-8
 
         # solvation model
         self.solvation_model = None
@@ -380,8 +381,6 @@ class ScfDriver:
                 'switching_thresh': ('float', 'switching function threshold'),
                 'r_ext': 
                     ('float', 'extension radius for outer cavity correction in angstrom'),
-                'tco_tol':
-                    ('float', 'screening threshold for three-center overlap integrals'),
                 'solvation_model': ('str', 'solvation model'),
                 'cpcm_grid_per_sphere':
                     ('seq_fixed_int', 'number of C-PCM grid points per sphere'),
@@ -568,7 +567,7 @@ class ScfDriver:
 
         pe_sanity_check(self, method_dict)
 
-        #gostshyp_sanity_check(self)
+        gostshyp_sanity_check(self)
 
         if self.electric_field is not None:
             assert_msg_critical(
@@ -685,7 +684,7 @@ class ScfDriver:
         pe_sanity_check(self)
 
         # check gostshyp setup
-        gostshyp_sanity_check(self)
+        gostshyp_sanity_check(self, basis)
 
         # check solvation model setup
         solvation_model_sanity_check(self)
@@ -994,12 +993,11 @@ class ScfDriver:
 
         # set up gostshyp method by creating a surface tessellation
         if self._gostshyp:
-            from .gostshyp import GostshypDriver
             self._gostshyp_drv = GostshypDriver(molecule, 
                                                 basis,
                                                 self.pressure,
                                                 self.pressure_units,
-                                                self.tco_tol,
+                                                self._tco_tol,
                                                 self.comm,
                                                 self.ostream)
 
@@ -1014,23 +1012,24 @@ class ScfDriver:
             tessellation = self._gostshyp_drv.generate_tessellation(
                                                         tessellation_settings)
 
-            tess_info = 'Van der Waals cavity with '
-            tess_info += '{0:d} grid points generated in {1:.2f} sec.'.format(
-                tessellation.shape[1], tm.time() - tess_t0)
-            self.ostream.print_info(tess_info)
-            self.ostream.print_blank()
-
-            if self.r_ext > 0:
-                occ_info = 'Using the Outer Cavity Correction with exterior radius of '
-                occ_info += '{:.2f} angstrom.'.format(self.r_ext)
-                self.ostream.print_info(occ_info)
+            if self.print_level > 1:
+                tess_info = 'Van der Waals cavity with '
+                tess_info += '{0:d} grid points generated in {1:.2f} sec.'.format(
+                    tessellation.shape[1], tm.time() - tess_t0)
+                self.ostream.print_info(tess_info)
                 self.ostream.print_blank()
 
-            area_info = 'The total surface area of the van der Waals cavity is '
-            area_info += '{:.2f} angstrom^2.'.format(
-                np.sum(np.sum(tessellation[3, :]) * bohr_in_angstrom()**2))
-            self.ostream.print_info(area_info)
-            self.ostream.print_blank()
+                if self.r_ext > 0:
+                    occ_info = 'Using the Outer Cavity Correction with exterior radius of '
+                    occ_info += '{:.2f} angstrom.'.format(self.r_ext)
+                    self.ostream.print_info(occ_info)
+                    self.ostream.print_blank()
+
+                area_info = 'The total surface area of the van der Waals cavity is '
+                area_info += '{:.2f} angstrom^2.'.format(
+                    np.sum(np.sum(tessellation[3, :]) * bohr_in_angstrom()**2))
+                self.ostream.print_info(area_info)
+                self.ostream.print_blank()
 
         # DIIS method
         if self.acc_type.upper() in ['C2DIIS', 'DIIS']:
@@ -2082,7 +2081,18 @@ class ScfDriver:
                     ]:
                         self._scf_results[key] = getattr(self, key)
 
-                # add gostshyp info
+                if self._gostshyp:
+                    # gostshyp info
+                    for key in [
+                            'pressure',
+                            'pressure_units',
+                            'num_leb_points',
+                            'tssf',
+                            'discretization',
+                            'switching_thresh',
+                            'r_ext',
+                    ]:
+                        self._scf_results[key] = getattr(self, key)
 
             else:
                 # non-master rank
@@ -2821,8 +2831,7 @@ class ScfDriver:
                 density_matrix = 2.0 * den_mat[0]
             else:
                 density_matrix = den_mat[0] + den_mat[1]
-            e_pr, V_pr = self._gostshyp_drv.screened_gostshyp_contrib(density_matrix)
-
+            e_pr, V_pr = self._gostshyp_drv.gostshyp_contrib(density_matrix)
         else:
             e_pr, V_pr = 0.0, None
 
@@ -3445,7 +3454,7 @@ class ScfDriver:
                     e_grad, max_grad, diff_den)
                 
                 if self._gostshyp:
-                    valstr += ' ' * 13 + '{:3d} '.format(self._gostshyp_drv._neg_p_amp)
+                    valstr += ' ' * 13 + '{:3d} '.format(self._gostshyp_drv.num_neg_amp)
 
                 self.ostream.print_header(valstr)
 

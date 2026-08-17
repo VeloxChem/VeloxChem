@@ -49,6 +49,7 @@ computescreenedFock1GOSTcontrib(const CMolecule& molecule,
                                 const double* point_exp,
                                 const double* point_amp,
                                 const double* point_norm_const,
+                                const double point_norm_const_max,
                                 const int naos,
                                 const double tco_tol) -> CDenseMatrix;
 

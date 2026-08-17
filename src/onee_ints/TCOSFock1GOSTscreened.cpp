@@ -60,6 +60,7 @@ computescreenedFock1GOSTcontrib(const CMolecule&            molecule,
                                 const double*               point_exp, 
                                 const double*               point_amp, 
                                 const double*               point_norm_const,
+                                const double                point_norm_const_max,
                                 const int                   naos,
                                 const double                tco_tol) ->
 CDenseMatrix
@@ -92,10 +93,7 @@ CDenseMatrix
         points_info[c + npoints * 5] = point_norm_const[c];
     }
 
-    double N_max = *std::max_element(points_info.begin() + npoints * 5, points_info.end());
-
-    // std::cout << "Max norm: " << N_max << "\n";
-    // std::cout << "TCO tol: " << tco_tol << "\n";
+    double N_max = point_norm_const_max;
 
     // gto blocks
 
@@ -376,13 +374,6 @@ CDenseMatrix
             ff_prim_pair_count
     });
 
-    // screened pair counters per angular momentum block
-    int screened_ss = 0, screened_sp = 0, screened_sd = 0, screened_sf = 0,
-        screened_pp = 0, screened_pd = 0, screened_pf = 0,
-        screened_dd = 0, screened_df = 0, screened_ff = 0;
-
-
-    // std::vector<double> tco_s(max_prim_pair_count);
     std::vector<double> three_center_overlap_s(max_prim_pair_count);
 
     const double delta[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
@@ -433,18 +424,19 @@ CDenseMatrix
         const auto zeta = a_i + a_j;
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         double tco_s_ij = 0.0;
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
         if (N_max * S_ij_00_norm < tco_tol) {
             three_center_overlap_s[ij] = tco_s_ij;
-            #pragma omp atomic
-            screened_ss++;
             continue;
         }
+
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         for (int c = 0; c < npoints; c++)
         {
@@ -549,18 +541,19 @@ CDenseMatrix
         const auto zeta = a_i + a_j;
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         double tco_s_ij = 0.0;
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
         if (N_max * S_ij_00_norm < tco_tol) {
             three_center_overlap_s[ij] = tco_s_ij;
-            #pragma omp atomic
-            screened_sp++;
             continue;
         }
+
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         for (int c = 0; c < npoints; c++)
         {
@@ -668,18 +661,19 @@ CDenseMatrix
         const auto zeta = a_i + a_j;
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         double tco_s_ij = 0.0;
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
         if (N_max * S_ij_00_norm < tco_tol) {
             three_center_overlap_s[ij] = tco_s_ij;
-            #pragma omp atomic
-            screened_sd++;
             continue;
         }
+
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         for (int c = 0; c < npoints; c++)
         {
@@ -793,18 +787,19 @@ CDenseMatrix
         const auto zeta = a_i + a_j;
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         double tco_s_ij = 0.0;
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
         if (N_max * S_ij_00_norm < tco_tol) {
             three_center_overlap_s[ij] = tco_s_ij;
-            #pragma omp atomic
-            screened_sf++;
             continue;
         }
+
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         for (int c = 0; c < npoints; c++)
         {
@@ -920,18 +915,19 @@ CDenseMatrix
         const auto zeta = a_i + a_j;
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         double tco_s_ij = 0.0;
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
         if (N_max * S_ij_00_norm < tco_tol) {
             three_center_overlap_s[ij] = tco_s_ij;
-            #pragma omp atomic
-            screened_pp++;
             continue;
         }
+
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         for (int c = 0; c < npoints; c++)
         {
@@ -1046,18 +1042,19 @@ CDenseMatrix
         const auto zeta = a_i + a_j;
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         double tco_s_ij = 0.0;
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
         if (N_max * S_ij_00_norm < tco_tol) {
             three_center_overlap_s[ij] = tco_s_ij;
-            #pragma omp atomic
-            screened_pd++;
             continue;
         }
+
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         for (int c = 0; c < npoints; c++)
         {
@@ -1176,18 +1173,19 @@ CDenseMatrix
         const auto zeta = a_i + a_j;
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         double tco_s_ij = 0.0;
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
         if (N_max * S_ij_00_norm < tco_tol) {
             three_center_overlap_s[ij] = tco_s_ij;
-            #pragma omp atomic
-            screened_pf++;
             continue;
         }
+
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         for (int c = 0; c < npoints; c++)
         {
@@ -1314,18 +1312,19 @@ CDenseMatrix
         const auto zeta = a_i + a_j;
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         double tco_s_ij = 0.0;
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
         if (N_max * S_ij_00_norm < tco_tol) {
             three_center_overlap_s[ij] = tco_s_ij;
-            #pragma omp atomic
-            screened_dd++;
             continue;
         }
+
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         for (int c = 0; c < npoints; c++)
         {
@@ -1453,18 +1452,19 @@ CDenseMatrix
         const auto zeta = a_i + a_j;
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         double tco_s_ij = 0.0;
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
         if (N_max * S_ij_00_norm < tco_tol) {
             three_center_overlap_s[ij] = tco_s_ij;
-            #pragma omp atomic
-            screened_df++;
             continue;
         }
+
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         for (int c = 0; c < npoints; c++)
         {
@@ -1602,18 +1602,19 @@ CDenseMatrix
         const auto zeta = a_i + a_j;
 
 
-        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         double tco_s_ij = 0.0;
 
         const auto S_ij_00_norm = std::pow(4 * a_i * a_j, 0.75) / std::pow(a_i + a_j, 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        // J. Chem. Theory Comput. (2025) 21 (2): 747-761
+
         if (N_max * S_ij_00_norm < tco_tol) {
             three_center_overlap_s[ij] = tco_s_ij;
-            #pragma omp atomic
-            screened_ff++;
             continue;
         }
+
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         for (int c = 0; c < npoints; c++)
         {
@@ -1733,20 +1734,6 @@ CDenseMatrix
     }
 
     // auto-generated code ends here
-
-
-    // print screening statistics
-    // std::cout << "computescreenedFock1GOSTcontrib: screening statistics (screened / total pairs)\n";
-    // std::cout << "  S-S: " << screened_ss << " / " << ss_prim_pair_count << "\n";
-    // std::cout << "  S-P: " << screened_sp << " / " << sp_prim_pair_count << "\n";
-    // std::cout << "  S-D: " << screened_sd << " / " << sd_prim_pair_count << "\n";
-    // std::cout << "  S-F: " << screened_sf << " / " << sf_prim_pair_count << "\n";
-    // std::cout << "  P-P: " << screened_pp << " / " << pp_prim_pair_count << "\n";
-    // std::cout << "  P-D: " << screened_pd << " / " << pd_prim_pair_count << "\n";
-    // std::cout << "  P-F: " << screened_pf << " / " << pf_prim_pair_count << "\n";
-    // std::cout << "  D-D: " << screened_dd << " / " << dd_prim_pair_count << "\n";
-    // std::cout << "  D-F: " << screened_df << " / " << df_prim_pair_count << "\n";
-    // std::cout << "  F-F: " << screened_ff << " / " << ff_prim_pair_count << "\n";
 
     return TCO_S;
 }
