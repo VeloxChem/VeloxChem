@@ -42,7 +42,6 @@ class Testhgreduced:
         thg.update_settings(rsp_settings, method_settings)
         thg_results = thg.compute(molecule, basis, scf_results)
 
-
         thgred = ThgReducedDriver(MPI.COMM_WORLD,OutputStream())
         thgred.ostream.mute()
         thgred.update_settings(rsp_settings, method_settings)

@@ -147,6 +147,10 @@ class TestEvb:
         EVB = EvbDriver()
         vac_conf = EVB.default_system_configurations("vacuum")
         wat_conf = EVB.default_system_configurations("water")
+        impl_conf = EVB.default_system_configurations("vacuum")
+        impl_conf['implicit_solvent_model'] = 'gbn'
+        impl_conf['solute_dielectric'] = 1.0
+        impl_conf['solvent_dielectric'] = 78.39
 
         # 0.4 is chosen instead of 0.5 because for lambda=0.4, 1-lambda=/=lambda
         Lambda = [0, 0.4, 1]
@@ -162,6 +166,15 @@ class TestEvb:
             product,
             Lambda,
             wat_conf,
+        )
+        system_builder = EvbSystemBuilder()
+        system_builder.ostream.mute()
+
+        impl_systems, impl_topology, impl_positions = system_builder.build_systems(
+            reactant,
+            product,
+            Lambda,
+            impl_conf,
         )
 
         # compare outputs with reference
@@ -190,6 +203,19 @@ class TestEvb:
         TestEvb._compare_systems(
             wat_systems[1],
             str(data_path / 'evb_ethanol_solv_1.000_sys.xml'),
+        )
+
+        TestEvb._compare_systems(
+            impl_systems[0],
+            str(data_path / 'evb_ethanol_impl_0.000_sys.xml'),
+        )
+        TestEvb._compare_systems(
+            impl_systems[0.4],
+            str(data_path / 'evb_ethanol_impl_0.400_sys.xml'),
+        )
+        TestEvb._compare_systems(
+            impl_systems[1],
+            str(data_path / 'evb_ethanol_impl_1.000_sys.xml'),
         )
 
     @staticmethod

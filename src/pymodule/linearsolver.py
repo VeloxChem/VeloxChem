@@ -222,9 +222,6 @@ class LinearSolver:
         self.serial_ratio = 0.05
         self.use_subcomms = False
 
-        # group label used to save the response results in a checkpoint file
-        self.group_label = 'rsp'
-
         # input keywords
         self._input_keywords = {
             'response': {
@@ -3763,7 +3760,7 @@ class LinearSolver:
 
         return ediag, sdiag
 
-    def get_nto(self, t_mat, mo_occ, mo_vir):
+    def _compute_nto(self, t_mat, mo_occ, mo_vir):
         """
         Gets the natural transition orbitals.
 
@@ -3801,7 +3798,7 @@ class LinearSolver:
 
         return nto_mo
 
-    def get_nto_unrestricted(self, t_mat, mo_occ, mo_vir):
+    def _compute_nto_unrestricted(self, t_mat, mo_occ, mo_vir):
         """
         Gets the natural transition orbitals.
 

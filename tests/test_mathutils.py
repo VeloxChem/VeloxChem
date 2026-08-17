@@ -7,6 +7,7 @@ from veloxchem.mathutils import safe_arccos, safe_arcsin
 from veloxchem.mathutils import (safe_solve, screened_eigh,
                                  symmetric_matrix_function,
                                  solve_in_orthogonal_basis)
+from veloxchem.errorhandler import VeloxChemError
 
 
 class TestMathUtils:
@@ -21,7 +22,7 @@ class TestMathUtils:
                         reason="pytest.raises only valid in serial")
     def test_safe_arccos_rejects_invalid_input(self):
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match="arccos: Invalid cosine value"):
             safe_arccos(1.0 + 1.0e-8)
 
@@ -35,7 +36,7 @@ class TestMathUtils:
                         reason="pytest.raises only valid in serial")
     def test_safe_arcsin_rejects_invalid_input(self):
 
-        with pytest.raises(AssertionError, match="arcsin: Invalid sine value"):
+        with pytest.raises(VeloxChemError, match="arcsin: Invalid sine value"):
             safe_arcsin(-1.0 - 1.0e-8)
 
     def test_safe_solve_matches_numpy_for_nonsingular_system(self):
@@ -87,9 +88,7 @@ class TestMathUtils:
 
         np.testing.assert_allclose(overlap_pinv, ref_pinv, atol=1.0e-12)
         np.testing.assert_allclose(np.linalg.multi_dot(
-            [overlap, overlap_pinv, overlap]),
-                                   overlap,
-                                   atol=1.0e-12)
+            [overlap, overlap_pinv, overlap]), overlap, atol=1.0e-12)
 
     def test_screened_eigh_keeps_square_eigensystem_when_no_screening_is_needed(
             self):
@@ -128,9 +127,7 @@ class TestMathUtils:
                                    np.eye(3),
                                    atol=1.0e-12)
         np.testing.assert_allclose(np.linalg.multi_dot(
-            [eigvecs, np.diag(eigvals), eigvecs.T]),
-                                   mat,
-                                   atol=1.0e-12)
+            [eigvecs, np.diag(eigvals), eigvecs.T]), mat, atol=1.0e-12)
 
     def test_screened_eigh_allows_disabling_screening(self):
 
@@ -175,9 +172,7 @@ class TestMathUtils:
 
         np.testing.assert_allclose(overlap_pinv, ref_pinv, atol=1.0e-12)
         np.testing.assert_allclose(np.linalg.multi_dot(
-            [overlap, overlap_pinv, overlap]),
-                                   overlap,
-                                   atol=1.0e-12)
+            [overlap, overlap_pinv, overlap]), overlap, atol=1.0e-12)
 
     def test_solve_in_orthogonal_basis_matches_direct_solution(self):
 
@@ -203,9 +198,7 @@ class TestMathUtils:
 
         np.testing.assert_allclose(eigvals, ref_eigvals, atol=1.0e-12)
         np.testing.assert_allclose(np.linalg.multi_dot(
-            [coeffs.T, overlap, coeffs]),
-                                   np.eye(3),
-                                   atol=1.0e-12)
+            [coeffs.T, overlap, coeffs]), np.eye(3), atol=1.0e-12)
         np.testing.assert_allclose(
             np.linalg.multi_dot([coeffs, np.diag(eigvals), coeffs.T]),
             np.linalg.multi_dot(
@@ -226,6 +219,4 @@ class TestMathUtils:
                                    np.eye(3),
                                    atol=1.0e-12)
         np.testing.assert_allclose(np.linalg.multi_dot(
-            [coeffs, np.diag(eigvals), coeffs.T]),
-                                   mat,
-                                   atol=1.0e-12)
+            [coeffs, np.diag(eigvals), coeffs.T]), mat, atol=1.0e-12)

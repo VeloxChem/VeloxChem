@@ -74,6 +74,7 @@ class TestCTNumbers:
         tda_results = tda_drv.compute(molecule, basis, scf_results)
 
         exc_drv = ExcitedStateAnalysisDriver()
+        exc_drv.analysis_type = "mulliken"
         exc_drv.ostream.mute()
 
         # add fragment dictionary to ExcitedStateAnalysisDriver
@@ -161,6 +162,7 @@ class TestCTNumbers:
         lreig_results = lreig_drv.compute(molecule, basis, scf_results)
 
         exc_drv = ExcitedStateAnalysisDriver()
+        exc_drv.analysis_type = "mulliken"
         exc_drv.ostream.mute()
 
         # add fragment dictionary to ExcitedStateAnalysisDriver
@@ -232,6 +234,7 @@ class TestCTNumbers:
         lreig_results = lreig_drv.compute(molecule, basis, scf_results)
 
         exc_drv = ExcitedStateAnalysisDriver()
+        exc_drv.analysis_type = "mulliken"
         exc_drv.ostream.mute()
         exc_drv.fragment_dict = fragment_dict
 
@@ -292,6 +295,7 @@ class TestCTNumbers:
         tda_results = tda_drv.compute(molecule, basis, scf_results)
 
         exc_drv = ExcitedStateAnalysisDriver()
+        exc_drv.analysis_type = "mulliken"
         exc_drv.ostream.mute()
         exc_drv.fragment_dict = fragment_dict
 
@@ -335,6 +339,67 @@ class TestCTNumbers:
 
         # perform analysis using scf and linear response from h5
         exc_drv = ExcitedStateAnalysisDriver()
+        exc_drv.analysis_type = "mulliken"
+        exc_drv.ostream.mute()
+
+        exc_drv.fragment_dict = fragment_dict
+
+        molecule, basis = read_molecule_and_basis(filename)
+        scf_res, rsp_res = exc_drv.read_from_h5(filename)
+
+        descriptor_dict_s1 = exc_drv.compute(molecule,
+                                             basis,
+                                             scf_res,
+                                             rsp_res,
+                                             state_index=1)
+
+        assert np.max(np.abs(descriptor_dict_s1["ct_matrix"] -
+                             ct_matrix)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["hole_participation_ratio"] -
+                   hole_participation_ratio)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["particle_participation_ratio"] -
+                   particle_participation_ratio)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_participation_ratio"] -
+                   avg_participation_ratio)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_hole_position"] -
+                   avg_hole_position)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_particle_position"] -
+                   avg_particle_position)) < 1.0e-06
+        assert np.max(
+            np.abs(descriptor_dict_s1["avg_difference_vector"] -
+                   avg_difference_vec)) < 1.0e-06
+        assert np.max(np.abs(descriptor_dict_s1["ct_length"] -
+                             ct_length)) < 1.0e-06
+
+    def test_lowdin_analysis_from_file(self):
+        here = Path(__file__).parent
+        filename = str(here / 'data' / 'acetic_acid.h5')
+        fragment_dict = {
+            "CH3": [1, 5, 6, 7],
+            "COOH": [2, 3, 4, 8],
+        }
+
+        # reference values
+        ct_matrix = np.array([
+            [0.0077972, 0.05471233],
+            [0.11902532, 0.81994655]
+        ])
+        hole_participation_ratio = 1.1325571
+        particle_participation_ratio = 1.2840218
+        avg_participation_ratio = 1.2082895
+        avg_hole_position = np.array([-1.77883271, 0.03979253, 2.05341404])
+        avg_particle_position = np.array([-1.29253462, 0.08706147, 1.60096523])
+        avg_difference_vec = np.array([0.48629809, 0.04726894, -0.45244881])
+        ct_length = 0.66590549
+
+        # perform analysis using scf and linear response from h5
+        exc_drv = ExcitedStateAnalysisDriver()
+        exc_drv.analysis_type = "lowdin"
         exc_drv.ostream.mute()
 
         exc_drv.fragment_dict = fragment_dict

@@ -1501,7 +1501,7 @@ class MMForceFieldGenerator:
 
         water_params = self.water_parameters[water_model.lower()]
 
-        labels = self.molecule.get_labels()
+        # labels = self.molecule.get_labels()
         atoms = self.atoms
 
         hydrogen_indices = [
@@ -2296,7 +2296,11 @@ class MMForceFieldGenerator:
                     try:
                         periodicity = int(dihedral_ff[3])
                     except ValueError:
-                        periodicity = int(float(dihedral_ff[3]))
+                        try:
+                            periodicity = int(float(dihedral_ff[3]))
+                        except ValueError:
+                            raise ValueError('Invalid periodicity value: '
+                                             f'{dihedral_ff[3]}') from None
 
                     dihedral_barriers.append(barrier)
                     dihedral_phases.append(phase)
@@ -3035,8 +3039,7 @@ class MMForceFieldGenerator:
                     dih['barrier'] = [k] + [0.0] * (len(dih['barrier']) - 1)
                     dih['comment'] = (
                         [dih['comment'][0] + ' from Hessian (PHF)'] +
-                        [c + ' zeroed by PHF' for c in dih['comment'][1:]]
-                    )
+                        [c + ' zeroed by PHF' for c in dih['comment'][1:]])
                 else:
                     dih['barrier'] = k
                     dih['comment'] += ' from Hessian (PHF)'

@@ -47,10 +47,8 @@ from .evbsystembuilder import EvbSystemBuilder
 from .evbfepdriver import EvbFepDriver
 from .reaffbuilder import ReactionForceFieldBuilder
 from .evbdataprocessing import EvbDataProcessing
-from .evbsystembuilder import EvbForceGroup
 from .solvationbuilder import SolvationBuilder
 from .errorhandler import assert_msg_critical
-from .sanitychecks import molecule_sanity_check
 
 try:
     import openmm as mm
@@ -60,12 +58,39 @@ except ImportError:
     pass
 
 
-class EvbDriver():
+class EvbDriver:
+    """
+    Driver for empirical valence bond (EVB) free-energy-perturbation
+    calculations: builds interpolated reactant/product force fields, builds the
+    OpenMM systems for a set of configurations, runs the FEP sampling and
+    computes the EVB energy profiles.
+
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
+
+    Instance variables
+        - temperature: The simulation temperature in K.
+        - Lambda: The lambda vector; assigned in build_systems if left as None.
+        - reactant: The reactant force field generator.
+        - product: The product force field generator.
+        - name: The label used when naming output data folders.
+        - results: The computed EVB results dictionary.
+        - system_confs: The list of system configurations to run FEP on.
+        - mute_scf: The flag for muting SCF output during force field building.
+        - water_model: The water model used for solvated configurations.
+        - ffbuilder: The reaction force field builder.
+        - comm: The MPI communicator.
+        - rank: The rank of MPI process.
+        - nodes: The number of MPI processes.
+        - ostream: The output stream.
+    """
 
     def __init__(self, comm=None, ostream=None):
-        '''
-        Initialize the EVB driver class.
-        '''
+        """
+        Initializes the EVB driver to default setup.
+        """
         if comm is None:
             comm = MPI.COMM_WORLD
 
@@ -106,6 +131,24 @@ class EvbDriver():
         barrier,
         free_energy,
     ):
+        """
+        Runs a complete EVB workflow with default vacuum and water settings.
+
+        Convenience entry point that chains the full pipeline: builds the
+        reactant and product force fields (with ordered input and molecule
+        optimisation), builds the vacuum (reference) and water systems, runs the
+        FEP sampling for both, and computes the EVB energy profiles calibrated
+        against the reference barrier and free energy.
+
+        :param reactant:
+            The reactant molecule or a list of reactant molecules.
+        :param product:
+            The product molecule or a list of product molecules.
+        :param barrier:
+            The reference reaction barrier in kJ/mol.
+        :param free_energy:
+            The reference reaction free energy in kJ/mol.
+        """
         self.ostream.print_blank()
         self.ostream.print_header("Building forcefields")
         self.ostream.flush()
@@ -135,23 +178,55 @@ class EvbDriver():
 
     def build_ff_from_molecules(self, reactant: Molecule | list[Molecule],
                                 product: Molecule | list[Molecule], **kwargs):
-        """_summary_
+        """
+        Builds the reactant and product force fields from molecules.
 
-        Args:
-            reactant (Molecule | list[Molecule]): The reactant molecule or a list of reactant molecules.
-            product (Molecule | list[Molecule]): The product molecule or a list of product molecules.
-            reactant_partial_charges (list[float], list[list[float]]): Partial charges for the reactant. Will be calculated if not provided. Defaults to None.
-            product_partial_charges (list[float], list[list[float]]): Partial charges for the product. Will be calculated if not provided. Defaults to None.
-            reparameterize (bool): If True, reparameterizes unknown force constants with the Seminario method. Defaults to True
-            reactant_hessians (np.ndarray, list[np.ndarray]): Hessians for the reactant for the Seminario method. Will be calculated if not provided. Defaults to None.
-            product_hessians (np.ndarray, list[np.ndarray]): Hessians for the product for the Seminario method. Will be calculated if not provided. Defaults to None.
-            mm_opt_constrain_bonds (list[tuple[int, int]]): Bonds to constrain during MM optimization.
-            reactant_total_multiplicity (int): Total multiplicity for the reactant to override calculated value. Defaults to -1.
-            product_total_multiplicity (int): Total multiplicity for the product to override calculated value. Defaults to -1.
-            breaking_bonds (list[tuple[int, int]]): List of bond(s) that is forced to break and is not allowed to recombine over the reaction. Defaults to None.
-            mute_ff_scf (bool): If True, mutes SCF output from RESP calculations. Has no effect if mute_ff_build is True. Defaults to True.
-            optimize_mol (bool): If True, does an xtb optimization of every provided molecule object before reparameterisation. Defaults to False.
-            optimize_ff (bool): If True, does an mm optimization of the combined reactant and product after reparameterisation. Defaults to True.
+        Delegates to self.ffbuilder.build_forcefields to construct the MM force
+        fields for the reactant and product, solve the atom-atom (reaction)
+        mapping and determine the forming and breaking bonds. The results are
+        stored on self.reactant, self.product, self.forming_bonds,
+        self.breaking_bonds, self.reactants, self.products and
+        self.product_mapping.
+
+        :param reactant:
+            The reactant molecule or a list of reactant molecules.
+        :param product:
+            The product molecule or a list of product molecules.
+        :param reactant_partial_charges:
+            Partial charges for the reactant. Will be calculated if not
+            provided. Defaults to None.
+        :param product_partial_charges:
+            Partial charges for the product. Will be calculated if not provided.
+            Defaults to None.
+        :param reparameterize:
+            If True, reparameterizes unknown force constants with the Seminario
+            method. Defaults to True.
+        :param reactant_hessians:
+            Hessians for the reactant for the Seminario method. Will be
+            calculated if not provided. Defaults to None.
+        :param product_hessians:
+            Hessians for the product for the Seminario method. Will be
+            calculated if not provided. Defaults to None.
+        :param mm_opt_constrain_bonds:
+            Bonds to constrain during MM optimization.
+        :param reactant_total_multiplicity:
+            Total multiplicity for the reactant to override calculated value.
+            Defaults to -1.
+        :param product_total_multiplicity:
+            Total multiplicity for the product to override calculated value.
+            Defaults to -1.
+        :param breaking_bonds:
+            List of bond(s) that is forced to break and is not allowed to
+            recombine over the reaction. Defaults to None.
+        :param mute_ff_scf:
+            If True, mutes SCF output from RESP calculations. Has no effect if
+            mute_ff_build is True. Defaults to True.
+        :param optimize_mol:
+            If True, does an xtb optimization of every provided molecule object
+            before reparameterisation. Defaults to False.
+        :param optimize_ff:
+            If True, does an mm optimization of the combined reactant and
+            product after reparameterisation. Defaults to True.
         """
 
         self.ffbuilder.water_model = self.water_model
@@ -165,14 +240,23 @@ class EvbDriver():
         Lambda: list[float] | np.ndarray = None,
         constraints: dict | list[dict] | None = None,
     ):
-        """Build OpenMM systems for the given configurations with interpolated forcefields for each lambda value. Saves the systems as xml files, the topology as a pdb file and the options as a json file to the disk.
+        """
+        Builds OpenMM systems for the given configurations with interpolated
+        forcefields for each lambda value. Saves the systems as xml files, the
+        topology as a pdb file and the options as a json file to the disk.
 
-        Args:
-            configurations (list[str] | list[dict]): The given configurations for which to perform an FEP. The first configuration will be regarded as the reference configuration. 
-            Lambda (list[float] | np.ndarray): The Lambda vector to be used for the FEP. Should start with 0, end with 1 and be monotonically increasing. 
-                Defaults to None, in which case default values will be assigned depending on if debugging is enabled or not.
-                If a string is given, the return value of default_system_configurations() will be used. See this function for default configurations.
-            constraints (dict | list[dict] | None, optional): Dictionary of harmonic bond, angle or (improper) torsion forces to apply over in every FEP frame. Defaults to None.
+        :param configurations:
+            The given configurations for which to perform an FEP. The first
+            configuration will be regarded as the reference configuration.
+        :param Lambda:
+            The Lambda vector to be used for the FEP. Should start with 0, end
+            with 1 and be monotonically increasing. Defaults to None, in which
+            case default values will be assigned depending on if debugging is
+            enabled or not. If a string is given, the return value of
+            default_system_configurations() will be used.
+        :param constraints:
+            Dictionary of harmonic bond, angle or (improper) torsion forces to
+            apply over in every FEP frame. Defaults to None.
         """
 
         assert_msg_critical('openmm' in sys.modules,
@@ -211,9 +295,9 @@ class EvbDriver():
         Lambda = [round(lam, 3) for lam in Lambda]
         self.Lambda = Lambda
 
-        #Per configuration
+        # Per configuration
         for conf in self.configurations:
-            #create folders,
+            # create folders,
             data_folder = f"EVB_{self.name}_{conf['name']}_data_{self.t_label}"
             while Path(data_folder).exists():
                 self.t_label += 1
@@ -223,7 +307,7 @@ class EvbDriver():
             conf["data_folder"] = data_folder
             conf["run_folder"] = run_folder
 
-            cwd = Path().cwd()
+            cwd = Path.cwd()
             data_folder_path = cwd / data_folder
             run_folder_path = cwd / run_folder
 
@@ -237,9 +321,9 @@ class EvbDriver():
                 str(data_folder_path / "product_struct.xyz"))
 
             MMForceFieldGenerator.save_forcefield(
-                self.reactant, str(data_folder_path / f"reactant_ff_data.json"))
+                self.reactant, str(data_folder_path / "reactant_ff_data.json"))
             MMForceFieldGenerator.save_forcefield(
-                self.product, str(data_folder_path / f"product_ff_data.json"))
+                self.product, str(data_folder_path / "product_ff_data.json"))
 
             if conf.get('solvent', None) is None and conf.get('pressure',
                                                               -1) > 0:
@@ -293,7 +377,6 @@ class EvbDriver():
 
         self.system_confs = configurations
 
-        self.create_viamd_environment_files()
         self.ostream.flush()
 
     def load_initialisation(self,
@@ -301,26 +384,36 @@ class EvbDriver():
                             name: str,
                             load_systems=False,
                             load_pdb=False):
-        """Load a configuration from a data folder for which the systems have already been generated, such that an FEP can be performed. 
-        The topology, initial positions, temperature and Lambda vector will be loaded from the data folder.
+        """
+        Loads a configuration from a data folder for which the systems have
+        already been generated, such that an FEP can be performed. The topology,
+        initial positions, temperature and Lambda vector will be loaded from the
+        data folder.
 
-        Args:
-            data_folder (str): The folder to load the data from
-            name (str): The name of the configuration. Can be arbitrary, but should be unique.
-            load_systems (bool, optional): If set to true, the systems will be loaded from the xml files. Used for debugging. Defaults to False.
-            lead_pdb (bool, optional): If set to true, the topology will be loaded from the pdb file. Used for debugging. Defaults to False.
+        :param data_folder:
+            The folder to load the data from.
+        :param name:
+            The name of the configuration. Can be arbitrary, but should be
+            unique.
+        :param load_systems:
+            If set to true, the systems will be loaded from the xml files. Used
+            for debugging. Defaults to False.
+        :param load_pdb:
+            If set to true, the topology will be loaded from the pdb file. Used
+            for debugging. Defaults to False.
         """
 
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbDriver.')
 
-        with open(str(Path(data_folder) / "options.json"), "r") as file:
+        options_path = Path(data_folder) / "options.json"
+        with options_path.open("r") as file:
             options = json.load(file)
             temperature = options["temperature"]
             Lambda = options["Lambda"]
         if self.Lambda != Lambda and self.Lambda is not None:
             self.ostream.print_warning(
-                f"Lambda vector in {data_folder}/options.json does not match the current Lambda vector. Overwriting current Lambda vector with the one from the file."
+                f"Lambda vector in {options_path} does not match the current Lambda vector. Overwriting current Lambda vector with the one from the file."
             )
 
         self.Lambda = Lambda
@@ -360,16 +453,21 @@ class EvbDriver():
         platform=None,
         platform_properties=None,
     ):
-        """Run the the FEP calculations for all configurations in self.system_confs.
+        """
+        Runs the FEP calculations for all configurations in self.system_confs.
 
-        Args:
-            equil_steps (int, optional): The amount of timesteps to equilibrate at the beginning af each Lambda frame. Equilibration is done with frozen H-bonds. Defaults to 5000.
-            sample_steps (int, optional): The amount of steps to sample. Defaults to 100000.
-            write_step (int, optional): Per how many steps to take a sample and save its data as well as the trajectory point. Defaults to 1000.
-            initial_equil_steps (int, optional): The amount of timesteps to add to the equilibration at the first Lambda frame. Defaults to 5000.
-            step_size (float, optional): The step size during the sampling in picoseconds. Defaults to 0.001.
-            equil_step_size (float, optional): The step size during the equilibration in picoseconds. Is typically larger then step_size as equilibration is done with frozen H-bonds. Defaults to 0.002.
-            initial_equil_step_size (float, optional): The step size during initial equilibration in picoseconds. Defaults to 0.002.
+        Requires that build_systems (or load_initialisation) has populated
+        self.system_confs. Sampling and equilibration parameters (e.g.
+        sample_steps, write_step, equil_NVT_steps, step_size) are read from each
+        configuration dict by EvbFepDriver, falling back to its defaults when
+        absent.
+
+        :param platform:
+            Name of the OpenMM platform to use (e.g. 'CUDA', 'OpenCL', 'CPU').
+            Defaults to None (OpenMM picks the fastest available platform).
+        :param platform_properties:
+            OpenMM platform-specific properties. Ignored with a warning if
+            platform is None. Defaults to None.
         """
 
         for conf in self.system_confs:
@@ -384,18 +482,29 @@ class EvbDriver():
                 platform_properties=platform_properties,
             )
 
-    def update_options_json(self, dict, conf):
+    def update_options_json(self, entries, conf):
+        """
+        Merges a dictionary into a configuration's options.json file.
 
-        cwd = Path().cwd()
+        Writes options.json in the configuration's data folder, creating it if
+        it does not yet exist or merging the given entries into the existing
+        file otherwise.
+
+        :param entries:
+            The key/value entries to write or merge in.
+        :param conf:
+            The configuration whose data_folder holds the options.json file.
+        """
+        cwd = Path.cwd()
         path = cwd / conf["data_folder"] / "options.json"
         if not path.exists():
-            with open(path, "w") as file:
-                json.dump(dict, file, indent=4)
+            with path.open("w") as file:
+                json.dump(entries, file, indent=4)
         else:
-            with open(path, "r") as file:
+            with path.open("r") as file:
                 options = json.load(file)
-            options.update(dict)
-            with open(path, "w") as file:
+            options.update(entries)
+            with path.open("w") as file:
                 json.dump(options, file, indent=4)
 
     def compute_energy_profiles(
@@ -411,14 +520,39 @@ class EvbDriver():
         alpha_guess=None,
         H12_guess=None,
     ):
-        """Compute the EVB energy profiles using the FEP results, print the results and save them to an h5 file
+        """
+        Computes the EVB energy profiles using the FEP results, prints the
+        results and saves them to an h5 file.
 
-        Args:
-            barrier (float): the reaction barrier in kJ/mol of the reference system
-            free_energy (float): the reaction free energy in kJ/mol of the reference system
-            lambda_sub_sample (int, optional): Factor with which the lambda vector will be subsampled. Setting this to two will discard every other lambda frame. Defaults to 1.
-            lambda_sub_sample_ends (bool, optional): If set to False, the lambda frames up to 0.1 and from 0.9 will not be subsampled. Defaults to False.
-            time_sub_sample (int, optional): Factor with which the time vector will be subsampled. Setting this to two will discard every other snapshot. Defaults to 1.
+        :param barrier:
+            The reaction barrier in kJ/mol of the reference system.
+        :param free_energy:
+            The reaction free energy in kJ/mol of the reference system.
+        :param lambda_sub_sample:
+            Factor with which the lambda vector will be subsampled. Setting this
+            to two will discard every other lambda frame. Defaults to 1.
+        :param lambda_sub_sample_ends:
+            If set to False, the lambda frames up to 0.1 and from 0.9 will not
+            be subsampled. Defaults to False.
+        :param time_sub_sample:
+            Factor with which the time vector will be subsampled. Setting this
+            to two will discard every other snapshot. Defaults to 1.
+        :param dE_range:
+            (min, max) range, in kJ/mol, for the energy-gap reaction coordinate
+            bins (200 bins). Defaults to None (automatic range).
+        :param alpha:
+            Fixed EVB gas-phase shift alpha. If given, it is used instead of
+            being fitted. Defaults to None.
+        :param H12:
+            Fixed EVB off-diagonal coupling element H12. If given, it is used
+            instead of being fitted. Defaults to None.
+        :param alpha_guess:
+            Initial guess for alpha when it is fitted. Defaults to None.
+        :param H12_guess:
+            Initial guess for H12 when it is fitted. Defaults to None.
+
+        :return:
+            The computed EVB results (also stored on self.results).
         """
         dp = EvbDataProcessing(ostream=self.ostream)
         results = self._load_output_from_folders(lambda_sub_sample,
@@ -426,10 +560,14 @@ class EvbDriver():
                                                  time_sub_sample)
         self.ostream.flush()
 
-        if alpha is not None: dp.alpha = alpha
-        if H12 is not None: dp.H12 = H12
-        if alpha_guess is not None: dp.alpha_guess = alpha_guess
-        if H12_guess is not None: dp.H12_guess = H12_guess
+        if alpha is not None:
+            dp.alpha = alpha
+        if H12 is not None:
+            dp.H12 = H12
+        if alpha_guess is not None:
+            dp.alpha_guess = alpha_guess
+        if H12_guess is not None:
+            dp.H12_guess = H12_guess
         if dE_range is not None:
             dp.coordinate_bins = np.linspace(dE_range[0], dE_range[1], 200)
 
@@ -442,11 +580,15 @@ class EvbDriver():
         return self.results
 
     def print_results(self, results: dict = None, file_name: str = None):
-        """Print EVB results. Uses the provided dictionary first, then tries to load it from the disk, and last it uses the results attribute of this object.
+        """
+        Prints EVB results. Uses the provided dictionary first, then tries to
+        load it from the disk, and last it uses the results attribute of this
+        object.
 
-        Args:
-            results (dict, optional): A dictionary with EVB results. Defaults to None.
-            file_name (str, optional): Filename of an h5 file containing EVB results. Defaults to None.
+        :param results:
+            A dictionary with EVB results. Defaults to None.
+        :param file_name:
+            Filename of an h5 file containing EVB results. Defaults to None.
         """
         if results is None:
             if file_name is None:
@@ -465,11 +607,18 @@ class EvbDriver():
                      results: dict = None,
                      file_name: str = None,
                      **kwargs):
-        """Plot EVB results. Uses the provided dictionary first, then tries to load it from the disk, and last it uses the results attribute of this object.
+        """
+        Plots EVB results. Uses the provided dictionary first, then tries to
+        load it from the disk, and last it uses the results attribute of this
+        object.
 
-        Args:
-            results (dict, optional): A dictionary with EVB results. Defaults to None.
-            file_name (str, optional): Filename of an h5 file containing EVB results. Defaults to None.
+        :param results:
+            A dictionary with EVB results. Defaults to None.
+        :param file_name:
+            Filename of an h5 file containing EVB results. Defaults to None.
+        :param kwargs:
+            Additional keyword arguments forwarded to
+            EvbDataProcessing.plot_results.
         """
         if results is None:
             if file_name is None:
@@ -497,7 +646,7 @@ class EvbDriver():
 
         folders = [reference_folder] + target_folders
         results = {}
-        cwd = Path().cwd()
+        cwd = Path.cwd()
 
         common_results = []
         specific_results = {}
@@ -553,7 +702,7 @@ class EvbDriver():
         lambda_sub_sample_ends=False,
         time_sub_sample=1,
     ):
-        with open(options_file, "r") as file:
+        with Path(options_file).open("r") as file:
             options = json.load(file)
         Lambda = options["Lambda"]
         Temp_set = options["temperature"]
@@ -629,7 +778,7 @@ class EvbDriver():
             decomp_data = np.loadtxt(decomp_file, skiprows=1, delimiter=',').T
             decomp_rea = decomp_data[decomp_data.shape[0] // 2:, :]
             decomp_pro = decomp_data[:decomp_data.shape[0] // 2, :]
-            with open(decomp_file, "r") as file:
+            with Path(decomp_file).open("r") as file:
                 decomp_names = file.readline().strip().split(",")
             decomp_names = [name.replace("_rea", "") for name in decomp_names]
             decomp_names = decomp_names[:len(decomp_names) // 2]
@@ -653,13 +802,14 @@ class EvbDriver():
 
     @staticmethod
     def _load_dict_from_h5(file):
-        """Load a dictionary from from an h5 file
+        """
+        Loads a dictionary from an h5 file.
 
-        Args:
-            file (path): The file to load the results from.
+        :param file:
+            The file to load the results from.
 
-        Returns:
-            dict: Dictionary with the results
+        :return:
+            Dictionary with the results.
         """
         with h5py.File(file, "r") as f:
 
@@ -678,10 +828,15 @@ class EvbDriver():
         return data
 
     def _save_dict_as_h5(self, data: dict, file_name: str, overwrite=True):
-        """Save the provided dictionary to an h5 file
+        """
+        Saves the provided dictionary to an h5 file.
 
-        Args:
-            results (dict): Dictionary to be saved.
+        :param data:
+            Dictionary to be saved.
+        :param file_name:
+            Name of the h5 file to write (without extension).
+        :param overwrite:
+            Unused; retained for backward compatibility. Defaults to True.
         """
         cwd = Path.cwd()
 
@@ -701,7 +856,8 @@ class EvbDriver():
                         group.create_dataset(
                             k,
                             data=np.array(list(v) if isinstance(v, set) else v))
-                    elif isinstance(v, (bool, int, float, str, bytes, np.generic)):
+                    elif isinstance(v,
+                                    (bool, int, float, str, bytes, np.generic)):
                         # np.generic covers numpy scalars (np.float64, np.int32, etc.)
                         group[k] = v
                     elif hasattr(v, '__dict__'):
@@ -720,112 +876,25 @@ class EvbDriver():
 
             save_group(data, file)
 
-    def create_viamd_environment_files(self):
-        for conf in self.system_confs:
-            base = ("[Files]\n"
-                    "MoleculeFile=./topology.pdb\n"
-                    "TrajectoryFile=./trajectory.xtc\n"
-                    "CoarseGrained=0\n"
-                    "\n"
-                    "[RenderSettings]\n"
-                    "SsaoEnabled=0\n"
-                    "DofEnabled=0\n"
-                    "\n"
-                    "[Representation]\n"
-                    "Name=Reaction\n"
-                    'Filter=resname("REA")\n'
-                    "Enabled=1\n"
-                    "Type=2\n"
-                    "ColorMapping=1\n"
-                    "Saturation=1.000000\n"
-                    "Param=1.000000,1.000000,1.000000,1.000000\n"
-                    "DynamicEval=0\n")
-
-            script = ("[Script]\n"
-                      'Text="""\n')
-            rea_script = 'rea = resname("REA");'
-            sol_script = ""
-            if conf.get("solvent", None) is not None:
-
-                sol_script = (
-                    f'sol = resname("SOL");\n'
-                    'close_sol = (within(5, rea) and resname("SOL"));\n')
-            pdb_script = ""
-            if conf.get('pdb', None) is not None:
-                resids = [
-                    res['residue'] for res in conf.get("pdb_active_res", [])
-                ]
-
-                if len(resids) > 0:
-                    s = "".join([f" or resid({id})" for id in resids])
-                    rea_script = rea_script[:-1] + s + ";"
-                pdb_script = "pocket = residue(protein and within(3,rea)) and not element('H');\n"
-            script += rea_script + "\n"
-            script += sol_script + "\n"
-            script += pdb_script + "\n"
-
-            script += '"""'
-
-            solvent_rep = ("[Representation]\n"
-                           "Name=Solvent\n"
-                           "Filter=close_sol\n"
-                           "Enabled=1\n"
-                           "Type=1\n"
-                           "ColorMapping=1\n"
-                           "Saturation=1.000000\n"
-                           "Param=0.354000,1.000000,1.000000,1.000000\n"
-                           "DynamicEval=1\n")
-
-            protein_rep = ("[Representation]\n"
-                           "Name=Protein\n"
-                           "Filter=protein\n"
-                           "Enabled=1\n"
-                           "Type=4\n"
-                           "ColorMapping=8\n"
-                           "StaticColor=1.000000,1.000000,1.000000,1.000000\n"
-                           "Saturation=1.000000\n"
-                           "Param=1.000000,1.000000,1.000000,1.000000\n"
-                           "DynamicEval=0\n"
-                           "\n"
-                           "[Representation]\n"
-                           "Name=pocket\n"
-                           "Filter=pocket\n"
-                           "Enabled=1\n"
-                           "Type=0\n"
-                           "ColorMapping=1\n"
-                           "StaticColor=1.000000,1.000000,1.000000,1.000000\n"
-                           "Saturation=0.570000\n"
-                           "Param=1.000000,1.000000,1.000000,1.000000\n"
-                           "DynamicEval=0\n")
-
-            carbon_rep = ("[Representation]\n"
-                          "Name=Carbon\n"
-                          'Filter=resname("CCC")\n'
-                          "Enabled=1\n"
-                          "Type=2\n"
-                          "ColorMapping=1\n"
-                          "Saturation=1.000000\n"
-                          "Param=1.000000,1.000000,1.000000,1.000000\n"
-                          "DynamicEval=0\n")
-
-            string = base + "\n"
-            if conf.get("solvent", None) is not None:
-                string += solvent_rep + "\n"
-            if conf.get('pdb', None) is not None:
-                string += protein_rep + "\n"
-            if conf.get('CNT', False) or conf.get('graphene', False):
-                string += carbon_rep + "\n"
-
-            string += script + "\n"
-
-            with open(f"{conf['data_folder']}/workspace.via", "w") as file:
-                file.write(string)
-
     def default_system_configurations(self, name: str) -> dict:
-        """Return a dictionary with a default configuration. Options not given in the dictionary will be set to default values in the build_systems function.
+        """
+        Returns a dictionary with a default configuration. Options not given in
+        the dictionary will be set to default values in the build_systems
+        function.
 
-        Args:
-            name (string): The name of the configuration to be used. Options are "vacuum", "water", "CNT", "graphene", "E_field", "no_reactant"
+        CNT and graphene environments are also supported, but are not presets
+        returned here. They are enabled by adding the configuration keys
+        "CNT"/"graphene" (with "CNT_radius_nm"/"graphene_size_nm") to a
+        configuration dict, which are consumed by EvbSystemBuilder.
+
+        :param name:
+            The name of the configuration to be used. Accepted values are
+            "vacuum"/"vacuum_NVT", "vacuum_NVE", "debug", "water"/"water_NPT",
+            "water_NVT", "E_field", "no_reactant", "ts_guesser", or any solvent
+            name recognised by SolvationBuilder.
+
+        :raises ValueError:
+            If name is not a known configuration or solvent.
         """
         if name == "vacuum" or name == "vacuum_NVT":
             conf = {
@@ -900,7 +969,8 @@ class EvbDriver():
             }
         else:
             try:
-                solvent = SolvationBuilder()._solvent_properties(name)
+                solvent_prop_not_used = SolvationBuilder()._solvent_properties(
+                    name)
                 conf = {
                     "name": name,
                     "solvent": name,
@@ -909,7 +979,8 @@ class EvbDriver():
                     "padding": 1.5,
                     "ion_count": 0,
                 }
-            except:
+            except ValueError:
+                # _solvent_properties raises ValueError for unrecognized names
                 raise ValueError(f"Unknown system configuration {name}")
 
         return conf

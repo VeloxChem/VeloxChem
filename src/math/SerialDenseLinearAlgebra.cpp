@@ -272,7 +272,7 @@ serialMultAB(CSubMatrix& matrixC, const CSubMatrix& matrixA, const CSubMatrix& m
     
     Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematC(C, ncrow, nccol);
     
-    ematC.noalias() = ematC + ematA * ematB;
+    ematC.noalias() += ematA * ematB;
 }
 
 auto
@@ -318,7 +318,7 @@ serialMultAtB(CSubMatrix& matrixC, const CSubMatrix& matrixA, const CSubMatrix& 
     
     Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematC(C, ncrow, nccol);
     
-    ematC.noalias() = ematC + ematA.transpose() * ematB;
+    ematC.noalias() += ematA.transpose() * ematB;
 }
 
 

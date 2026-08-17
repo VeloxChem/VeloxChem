@@ -21,7 +21,7 @@ class TestProjectedPECPDriver:
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         return mol, bas
-        
+
     def get_tzvpp_data(self):
 
         costr = """
@@ -37,14 +37,14 @@ class TestProjectedPECPDriver:
     def test_projected_ecp_auh2_svp(self):
 
         mol_auh2, bas_svp = self.get_svp_data()
-        
-        lpot = BaseCorePotential([ 10.45202000, 5.22601000, 4.78982000, 2.39491000],
+
+        lpot = BaseCorePotential([10.45202000, 5.22601000, 4.78982000, 2.39491000],
                                  [261.19958038, 26.96249604, -30.49008890, -5.17107381],
                                  [2, 2, 2, 2])
-                                 
+
         ecp_drv = ProjectedECPDriver()
         ecp_mat = ecp_drv.compute(mol_auh2, bas_svp, lpot, 1, 0)
-        
+
         # load reference overlap data
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'auh2.def2svp.au.ecp.only.p.npy')
@@ -53,7 +53,7 @@ class TestProjectedPECPDriver:
         # dimension of molecular basis
         indexes = np.triu_indices(4)
         basdims = [0, 10, 25, 35, 42]
-        
+
         # check individual overlap submatrices
         for i, j in zip(indexes[0], indexes[1]):
             # bra side
@@ -75,27 +75,27 @@ class TestProjectedPECPDriver:
         fref = SubMatrix([0, 0, 42, 42])
         fref.set_values(np.ascontiguousarray(ref_mat))
         assert fmat == fref
-        
+
     def test_projected_ecp_auh2_tzvpp(self):
 
         mol_auh2, bas_tzvpp = self.get_tzvpp_data()
-        
-        lpot = BaseCorePotential([ 10.45202000, 5.22601000, 4.78982000, 2.39491000],
+
+        lpot = BaseCorePotential([10.45202000, 5.22601000, 4.78982000, 2.39491000],
                                  [261.19958038, 26.96249604, -30.49008890, -5.17107381],
                                  [2, 2, 2, 2])
-                                 
+
         ecp_drv = ProjectedECPDriver()
         ecp_mat = ecp_drv.compute(mol_auh2, bas_tzvpp, lpot, 1, 0)
-        
+
         # load reference overlap data
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'auh2.def2tzvpp.au.ecp.only.p.npy')
         ref_mat = np.load(npyfile)
-        
+
         # dimension of molecular basis
         indexes = np.triu_indices(5)
         basdims = [0, 12, 36, 61, 75, 84]
-        
+
         # check individual overlap submatrices
         for i, j in zip(indexes[0], indexes[1]):
             # bra side
@@ -117,4 +117,3 @@ class TestProjectedPECPDriver:
         fref = SubMatrix([0, 0, 84, 84])
         fref.set_values(np.ascontiguousarray(ref_mat))
         assert fmat == fref
-

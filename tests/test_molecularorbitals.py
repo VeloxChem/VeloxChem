@@ -6,6 +6,7 @@ import pytest
 from mpi4py import MPI
 
 from veloxchem.molecularorbitals import MolecularOrbitals, molorb
+from veloxchem.errorhandler import VeloxChemError
 
 
 class TestMolecularOrbitals:
@@ -118,11 +119,11 @@ class TestMolecularOrbitals:
                         reason='skip pytest.raises for multiple MPI processes')
     def test_constructor_rejects_invalid_inputs(self):
 
-        with pytest.raises(AssertionError, match='Invalid orbitals type'):
+        with pytest.raises(VeloxChemError, match='Invalid orbitals type'):
             MolecularOrbitals([np.eye(2)], [np.zeros(2)], [np.zeros(2)], 'rest')
 
         with pytest.raises(
-                AssertionError,
+                VeloxChemError,
                 match='Inconsistent orbitals, energies or occupation numbers'):
             MolecularOrbitals([np.eye(2)], [np.zeros(2)],
                               [np.zeros(2), np.zeros(2)], molorb.unrest)
@@ -168,7 +169,7 @@ class TestMolecularOrbitals:
 
         mol_orbs = self.make_restricted()
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Invalid molecular orbitals type'):
             mol_orbs.get_density(None, 'unrestricted')
 
@@ -255,7 +256,7 @@ class TestMolecularOrbitals:
             handle.create_dataset('beta_orbitals', data=np.eye(2))
             handle.create_dataset('scf_type', data=np.bytes_(['unrestricted']))
 
-        with pytest.raises(AssertionError, match='beta_energies not found'):
+        with pytest.raises(VeloxChemError, match='beta_energies not found'):
             MolecularOrbitals.read_hdf5(str(filename))
 
     def test_create_nto_and_is_nto(self):
@@ -275,7 +276,7 @@ class TestMolecularOrbitals:
                         reason='skip pytest.raises for multiple MPI processes')
     def test_create_nto_rejects_inconsistent_lambdas(self):
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Inconsistent number of lambda values'):
             MolecularOrbitals.create_nto([np.eye(3)],
                                          [np.array([-0.4, 0.1, 0.4])],

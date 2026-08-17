@@ -101,3 +101,22 @@ phenol,PHN,H3,H
 phenol,PHN,CO,C
 phenol,PHN,O,O
 phenol,PHN,HO,H
+sodium ion,Na,Na,Na
+sodium ion,NA,NA,Na
+sodium ion,Na+,Na+,Na
+chloride ion,Cl,Cl,Cl
+chloride ion,CL,CL,Cl
+chloride ion,Cl-,Cl-,Cl
+potassium ion,K,K,K
+potassium ion,K+,K+,K
+calcium ion,Ca,Ca,Ca
+calcium ion,Ca2+,Ca2+,Ca
+magnesium ion,Mg,Mg,Mg
+magnesium ion,MG,MG,Mg
+magnesium ion,Mg2+,Mg2+,Mg
+zinc ion,Zn,Zn,Zn
+zinc ion,ZN,ZN,Zn
+zinc ion,Zn2+,Zn2+,Zn
+bromide ion,Br,Br,Br
+bromide ion,BR,BR,Br
+bromide ion,Br-,Br-,Br

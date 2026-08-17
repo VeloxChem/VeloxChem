@@ -37,10 +37,10 @@ class TestPoint:
     def test_length(self):
 
         r_a = Point([1.0, 2.2, 3.8])
-        l = r_a.length()
+        length = r_a.length()
 
         tol = 1.0e-12
-        assert mt.isclose(l,
+        assert mt.isclose(length,
                           4.5033320996790809631713604879153,
                           rel_tol=tol,
                           abs_tol=tol)

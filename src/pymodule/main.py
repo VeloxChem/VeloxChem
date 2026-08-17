@@ -32,6 +32,9 @@
 
 from mpi4py import MPI
 from datetime import datetime, timedelta
+import traceback
+import sys
+import os
 
 from .veloxchemlib import mpi_master
 from .mpitask import MpiTask
@@ -56,6 +59,7 @@ from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
+from .rspordspec import OpticalRotatoryDispersionSpectrum
 from .rspc6 import C6
 from .rsprixs import RIXS
 from .rspshg import SHG
@@ -74,8 +78,9 @@ from .trajectorydriver import TrajectoryDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
+from .xpsdriver import XPSDriver
 from .cli import cli
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, VeloxChemError
 
 
 def select_scf_driver(task, scf_type):
@@ -195,6 +200,16 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     ]:
         rsp_prop = CircularDichroismSpectrum(rsp_dict, method_dict)
 
+    elif prop_type in [
+            'optical rotatory dispersion (cpp)',
+            'optical rotatory dispersion(cpp)',
+            'optical rotation (cpp)',
+            'optical rotation(cpp)',
+            'ord (cpp)',
+            'ord(cpp)',
+    ]:
+        rsp_prop = OpticalRotatoryDispersionSpectrum(rsp_dict, method_dict)
+
     elif prop_type == 'c6':
         rsp_prop = C6(rsp_dict, method_dict)
 
@@ -259,6 +274,23 @@ def updated_dict_with_eri_settings(settings_dict, scf_drv):
 def main():
     """
     Runs VeloxChem with command line arguments.
+    """
+    try:
+        return _main_body()
+    except VeloxChemError as e:
+        sys.stdout.flush()
+        sys.stderr.flush()
+        if os.environ.get("VLX_DEBUG"):
+            traceback.print_exc()
+        else:
+            print(f'* VeloxChemError * {e}', file=sys.stderr)
+            print("(set VLX_DEBUG=1 for full traceback)", file=sys.stderr)
+        return 1
+
+
+def _main_body():
+    """
+    Implementation of main.
     """
 
     program_start_time = datetime.now()
@@ -354,7 +386,12 @@ def main():
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
         'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'uscf_gradient',
         'hessian', 'optimize', 'response', 'pulses', 'visualization', 'loprop',
-        'pe force field', 'vibrational', 'polarizability_gradient'
+        'pe force field', 'vibrational', 'polarizability_gradient', 'xps'
+    ]
+
+    run_scf_only = task_type in [
+        'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
+        'wave function'
     ]
 
     scf_type = 'restricted'
@@ -414,12 +451,15 @@ def main():
                 density = scf_drv.density
 
                 if not scf_drv.is_converged:
-                    return
+                    return 1
 
                 if (scf_drv.electric_field is not None and
                         task.molecule.get_charge() != 0):
-                    task.finish()
-                    return
+                    if not run_scf_only:
+                        task.ostream.print_warning(
+                            'Charged molecule in electric field: stopping after SCF.')
+                        task.finish()
+                        return 0
 
     # Gradient
 
@@ -697,7 +737,7 @@ def main():
         rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
         if not rsp_prop.is_converged:
-            return
+            return 1
 
         # Calculate the excited-state gradient if requested
 
@@ -809,6 +849,34 @@ def main():
         mp2_drv.update_settings(mp2_dict, method_dict)
         mp2_drv.compute(task.molecule, task.ao_basis, scf_results)
 
+    # XPS
+
+    if task_type == 'xps':
+        assert_msg_critical(
+            not use_xtb,
+            'XPS task is not supported with xTB; please use an SCF/DFT method.')
+
+        xps_dict = (dict(task.input_dict['xps'])
+                    if 'xps' in task.input_dict else {})
+        xps_dict['filename'] = task.input_dict['filename']
+
+        xps_drv = XPSDriver(task.mpi_comm, task.ostream)
+        xps_drv.update_settings(xps_dict, method_dict)
+        element = xps_dict['element'] if 'element' in xps_dict else None
+
+        assert_msg_critical(
+            'elements' not in xps_dict,
+            'XPS task uses only element in the xps input group')
+
+        assert_msg_critical(element is not None,
+                            'XPS task requires element in the xps input group')
+
+        xps_results = xps_drv.compute(task.molecule,
+                                      task.ao_basis,
+                                      scf_drv,
+                                      element=element)
+        xps_drv.print_results(xps_results)
+
     # Cube file
 
     if task_type == 'visualization':
@@ -861,3 +929,4 @@ def main():
     # All done
 
     task.finish()
+    return 0

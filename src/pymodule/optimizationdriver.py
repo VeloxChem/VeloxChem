@@ -504,10 +504,15 @@ class OptimizationDriver:
                     final_mol.get_string(title='Final Geometry'))
 
                 is_scan_job = False
+
                 if self.constraints:
+                    # save constraints
+                    opt_results['constraints'] = deepcopy(self.constraints)
+                    # check for scan
                     for line in self.constraints:
                         key = line.strip().split()[0]
-                        is_scan_job = (key == 'scan')
+                        if key == 'scan':
+                            is_scan_job = True
 
                 if is_scan_job:
                     self.print_scan_result(m)
@@ -522,9 +527,8 @@ class OptimizationDriver:
                         all_energies[-1].append(energy)
                         all_coords_au[-1].append(xyz / geometric.nifty.bohr2ang)
 
-                    opt_results['scan_energies'] = [
-                        opt_energies[-1] for opt_energies in all_energies
-                    ]
+                    opt_results['scan_energies'] = np.array(
+                        [opt_energies[-1] for opt_energies in all_energies])
                     opt_results['scan_coordinates_au'] = np.array(
                         [opt_coords_au[-1] for opt_coords_au in all_coords_au])
 
@@ -536,7 +540,7 @@ class OptimizationDriver:
                 elif self.irc:
                     self.print_irc_result(m)
 
-                    opt_results['irc_energies'] = list(m.qm_energies)
+                    opt_results['irc_energies'] = np.array(m.qm_energies)
                     opt_results['ts_index'] = int(np.argmax(m.qm_energies))
 
                     opt_coordinates_au = [
@@ -546,11 +550,13 @@ class OptimizationDriver:
                         self._get_xyz_string(labels, coords_au)
                         for coords_au in opt_coordinates_au
                     ]
+                    opt_results['irc_coordinates_au'] = np.array(
+                        opt_coordinates_au)
 
                 else:
                     self.print_opt_result(m)
 
-                    opt_results['opt_energies'] = list(m.qm_energies)
+                    opt_results['opt_energies'] = np.array(m.qm_energies)
 
                     opt_coordinates_au = [
                         xyz / geometric.nifty.bohr2ang for xyz in m.xyzs
@@ -600,7 +606,8 @@ class OptimizationDriver:
             # conservative choice of disabling restart
             # since geometry is likely changed during an opt calculation
             vib_drv.cphf_dict = {'restart': False}
-            vib_results_not_used = vib_drv.compute(molecule, args[0])
+            vib_drv.vib_results_txt_file = f'{vib_drv.filename}-vib-results.out'
+            vib_results_not_used = vib_drv.compute(final_mol, args[0])
             # restore Hessian option
             if self.hessian == 'never':
                 need_scf_postopt_hessian = False
@@ -893,7 +900,7 @@ class OptimizationDriver:
             else:
                 delta_e = 0.0
                 rmsd, maxd = 0.0, 0.0
-            
+
             rel_e_ts = (energies[i] - e_ts) * hartree_in_kjpermol()
             status = '<- TS' if i == ts_index else ''
 
@@ -1366,7 +1373,7 @@ class OptimizationDriver:
             plt.plot(x, y, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
         else:
             plt.plot(irc_points, rel_energies_kJ, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
-        
+
         # Plot all IRC points
         plt.scatter(irc_points,
                     rel_energies_kJ,
@@ -1376,18 +1383,18 @@ class OptimizationDriver:
                     facecolors='darkcyan',
                     edgecolor='darkcyan',
                     zorder=1)
-        
+
         # Highlight transition state
         plt.scatter(ts_index,
-                rel_energies_kJ[ts_index],
-                color='#993399',
-                alpha=0.7,
-                s=80,
-                edgecolor='#993399',
-                linewidth=1.5,
-                zorder=2,
-                label='TS')
-        
+                    rel_energies_kJ[ts_index],
+                    color='#993399',
+                    alpha=0.7,
+                    s=80,
+                    edgecolor='#993399',
+                    linewidth=1.5,
+                    zorder=2,
+                    label='TS')
+
         plt.xlabel('IRC point')
         plt.ylabel('Energy - E(TS) [kJ/mol]')
         plt.title("Intrinsic Reaction Coordinate")
@@ -1465,7 +1472,7 @@ class OptimizationDriver:
             plt.plot(x, y, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
         else:
             plt.plot(irc_points, rel_energies_kJ, color='black', alpha=0.9, linewidth=2.5, ls='-', zorder=0)
-        
+
         # Plot all IRC points
         plt.scatter(irc_points,
                     rel_energies_kJ,
@@ -1475,18 +1482,18 @@ class OptimizationDriver:
                     facecolors="none",
                     edgecolor="darkcyan",
                     zorder=1)
-        
+
         # Highlight transition state
         plt.scatter(ts_index,
-                rel_energies_kJ[ts_index],
-                color='#993399',
-                alpha=0.7,
-                s=80,
-                edgecolor='#993399',
-                linewidth=1.5,
-                zorder=2,
-                label='TS')
-        
+                    rel_energies_kJ[ts_index],
+                    color='#993399',
+                    alpha=0.7,
+                    s=80,
+                    edgecolor='#993399',
+                    linewidth=1.5,
+                    zorder=2,
+                    label='TS')
+
         # Highlight current point
         plt.scatter(point,
                     rel_energies_kJ[point],
@@ -1495,7 +1502,7 @@ class OptimizationDriver:
                     alpha=1.0,
                     s=120,
                     zorder=3)
-        
+
         plt.xlabel('IRC point')
         plt.ylabel('Energy - E(TS) [kJ/mol]')
         plt.title("Intrinsic Reaction Coordinate")

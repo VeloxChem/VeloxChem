@@ -11,10 +11,10 @@ from mpi4py import MPI
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
-from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.resultsio import read_results
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.vibrationalanalysis import VibrationalAnalysis
+from veloxchem.errorhandler import VeloxChemError
 
 
 class TestScfVibrationalAnalysisDriver:
@@ -233,7 +233,6 @@ class TestScfVibrationalAnalysisDriver:
     def test_vibrational_analysis_writes_outputs_and_hdf5(self, tmp_path):
 
         molecule = self._get_water_molecule()
-        basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
         synced_base_name = MPI.COMM_WORLD.bcast(
             str(tmp_path / 'synthetic-vib')
             if MPI.COMM_WORLD.Get_rank() == mpi_master() else None,
@@ -287,9 +286,9 @@ class TestScfVibrationalAnalysisDriver:
                 'dipole_gradient': vib_drv.dipole_gradient,
                 'ir_intensities': vib_drv.ir_intensities,
                 'number_of_external_frequencies': len(vib_drv.frequencies),
-                'external_frequencies': vib_drv.frequencies,
+                'external_frequencies': np.array(vib_drv.frequencies),
                 'raman_activities': vib_drv.raman_activities,
-                'polarizability_gradient': vib_drv.polarizability_gradient,
+                'polarizability_gradient': np.array(list(vib_drv.polarizability_gradient.values())),
                 'raman_type': 'normal',
                 'depolarization_ratios': vib_drv.depol_ratio,
             }
@@ -308,13 +307,11 @@ class TestScfVibrationalAnalysisDriver:
                 assert hf['vib'].attrs['value_type'] == 'dict'
                 assert hf['vib/normal_modes'].shape == (6, 3, 3)
                 assert hf['vib/number_of_modes'].attrs['value_type'] == 'int'
-                assert hf['vib/external_frequencies'].attrs['value_type'] == (
-                    'tuple')
+                assert hf['vib/external_frequencies'].attrs['value_type'] == 'ndarray'
                 assert hf['vib/raman_type'].attrs['value_type'] == 'str'
 
                 polgrad_group = hf['vib/polarizability_gradient']
-                assert polgrad_group.attrs['value_type'] == 'dict'
-                assert polgrad_group.attrs['dict_storage'] == 'entries'
+                assert polgrad_group.attrs['value_type'] == 'ndarray'
 
             recovered = read_results(str(direct_h5_file), 'vib')
             assert recovered['number_of_modes'] == len(vib_drv.vib_frequencies)
@@ -322,14 +319,13 @@ class TestScfVibrationalAnalysisDriver:
             np.testing.assert_allclose(recovered['hessian'], vib_drv.hessian)
             np.testing.assert_allclose(recovered['normal_modes'],
                                        vib_drv.normal_modes.reshape(6, 3, 3))
-            assert recovered['external_frequencies'] == vib_drv.frequencies
+            np.testing.assert_allclose(recovered['external_frequencies'],
+                                       np.array(vib_drv.frequencies))
             np.testing.assert_allclose(recovered['raman_activities'],
                                        vib_drv.raman_activities)
-            assert recovered['polarizability_gradient'].keys() == (
-                vib_drv.polarizability_gradient.keys())
-            for key in recovered['polarizability_gradient']:
+            for key_idx, key in enumerate(vib_drv.polarizability_gradient):
                 np.testing.assert_allclose(
-                    recovered['polarizability_gradient'][key],
+                    recovered['polarizability_gradient'][key_idx],
                     vib_drv.polarizability_gradient[key])
 
             assert wrapped_h5_file.is_file()
@@ -439,7 +435,7 @@ class TestScfVibrationalAnalysisDriver:
         assert fake_view.shown is True
 
         with redirect_stdout(io.StringIO()):
-            with pytest.raises(AssertionError,
+            with pytest.raises(VeloxChemError,
                                match='No IR intensities available'):
                 vib_drv.print_info(
                     {
@@ -452,7 +448,7 @@ class TestScfVibrationalAnalysisDriver:
                     info_type='ir')
 
         with redirect_stdout(io.StringIO()):
-            with pytest.raises(AssertionError,
+            with pytest.raises(VeloxChemError,
                                match='No Raman activities available'):
                 vib_drv.print_info(
                     {
@@ -465,7 +461,7 @@ class TestScfVibrationalAnalysisDriver:
                     info_type='raman')
 
         with redirect_stdout(io.StringIO()):
-            with pytest.raises(AssertionError, match='Invalid plot type'):
+            with pytest.raises(VeloxChemError, match='Invalid plot type'):
                 vib_drv.print_info(
                     {
                         'molecule_xyz_string': molecule.get_xyz_string(),
@@ -476,7 +472,7 @@ class TestScfVibrationalAnalysisDriver:
                     },
                     info_type='unsupported')
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='molecule only has 1 normal modes'):
             vib_drv.animate(vib_results, mode=2)
 
@@ -489,7 +485,7 @@ class TestScfVibrationalAnalysisDriver:
         vib_drv = self._get_synthetic_vibanalysis()
         molecule = self._get_water_molecule()
 
-        with pytest.raises(AssertionError, match='Invalid plot type'):
+        with pytest.raises(VeloxChemError, match='Invalid plot type'):
             vib_drv.plot(
                 {
                     'molecule_xyz_string': molecule.get_xyz_string(),

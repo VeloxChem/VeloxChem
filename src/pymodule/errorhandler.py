@@ -31,7 +31,27 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
-from sys import stderr
+import os
+import sys
+import traceback
+
+
+class VeloxChemError(RuntimeError):
+    """
+    Exception raised for critical errors in VeloxChem.
+    """
+
+
+def print_exception_if_debug():
+    """
+    Prints traceback of the current exception to stderr if VLX_DEBUG
+    environment variable is set.
+
+    Intended for use in broad except blocks to aid diagnostic without
+    affecting normal output.
+    """
+    if os.environ.get('VLX_DEBUG'):
+        traceback.print_exc()
 
 
 def assert_msg_critical(condition, msg=''):
@@ -44,11 +64,16 @@ def assert_msg_critical(condition, msg=''):
     :param msg:
         The error message.
     """
-    if __debug__ and MPI.COMM_WORLD.Get_size() == 1:
-        assert condition, msg
+    if MPI.COMM_WORLD.Get_size() == 1:
+        if not condition:
+            sys.stdout.flush()
+            sys.stderr.flush()
+            raise VeloxChemError(msg)
     else:
         if not condition:
-            stderr.write(' **** Critical Error (process {}) **** {}\n'.format(
-                MPI.COMM_WORLD.Get_rank(), msg))
-            stderr.flush()
+            if os.environ.get('VLX_DEBUG'):
+                traceback.print_stack()
+            print(f'**** Critical Error (process {MPI.COMM_WORLD.Get_rank()}) **** {msg}',
+                  file=sys.stderr)
+            sys.stderr.flush()
             MPI.COMM_WORLD.Abort()
