@@ -200,8 +200,9 @@ export_oneeints(py::module& m)
                const py::array_t<double>& dipole_coords,
                const py::array_t<double>& D) -> py::array_t<double> {
                 std::string errstyle("compute_electric_field_values: Expecting contiguous numpy arrays");
-                auto        c_style = py::detail::check_flags(dipole_coords.ptr(), py::array::c_style);
-                errors::assertMsgCritical(c_style, errstyle);
+                auto        c_style_1 = py::detail::check_flags(dipole_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(D.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2), errstyle);
                 std::string errsize("compute_electric_field_values: Inconsistent dimension of dipole coordinates");
                 errors::assertMsgCritical(dipole_coords.shape(1) == 3, errsize);
                 std::string errshape("compute_electric_dipole_values: Expecting square matrix D");
@@ -226,7 +227,8 @@ export_oneeints(py::module& m)
                 std::string errstyle("compute_electric_field_potential_gradient: Expecting contiguous numpy arrays");
                 auto        c_style_1 = py::detail::check_flags(dipole_coords.ptr(), py::array::c_style);
                 auto        c_style_2 = py::detail::check_flags(dipole_moments.ptr(), py::array::c_style);
-                errors::assertMsgCritical((c_style_1 && c_style_2), errstyle);
+                auto        c_style_3 = py::detail::check_flags(D.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3), errstyle);
                 std::string errsize("compute_electric_field_potential_gradient: Inconsistent dimension of dipole coordinates/moments");
                 errors::assertMsgCritical(dipole_coords.shape(1) == 3, errsize);
                 errors::assertMsgCritical(dipole_moments.shape(1) == 3, errsize);
@@ -278,9 +280,10 @@ export_oneeints(py::module& m)
                const py::array_t<double>& D,
                const int                  atom_idx) -> py::array_t<double> {
                 std::string errstyle("compute_electric_field_potential_gradient_for_mm: Expecting contiguous numpy arrays");
-                auto        c_style = py::detail::check_flags(dipole_coords.ptr(), py::array::c_style);
-                errors::assertMsgCritical(c_style, errstyle);
-                std::string errsize("compute_electric_field_potential_gradient_for_mm: Inconsistent dimension of dipole coordinates/moments");
+                auto        c_style_1 = py::detail::check_flags(dipole_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(D.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2), errstyle);
+                std::string errsize("compute_electric_field_potential_gradient_for_mm: Inconsistent dimension of dipole coordinates");
                 errors::assertMsgCritical(dipole_coords.shape(1) == 3, errsize);
                 std::string errshape("compute_electric_field_potential_gradient_for_mm: Expecting square matrix D");
                 errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
@@ -305,7 +308,8 @@ export_oneeints(py::module& m)
                 std::string errstyle("compute_electric_field_potential_hessian: Expecting contiguous numpy arrays");
                 auto        c_style_1 = py::detail::check_flags(dipole_coords.ptr(), py::array::c_style);
                 auto        c_style_2 = py::detail::check_flags(dipole_moments.ptr(), py::array::c_style);
-                errors::assertMsgCritical((c_style_1 && c_style_2), errstyle);
+                auto        c_style_3 = py::detail::check_flags(D.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3), errstyle);
                 std::string errsize("compute_electric_field_potential_hessian: Inconsistent dimension of dipole coordinates/moments");
                 errors::assertMsgCritical(dipole_coords.shape(1) == 3, errsize);
                 errors::assertMsgCritical(dipole_moments.shape(1) == 3, errsize);

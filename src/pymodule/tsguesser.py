@@ -47,6 +47,7 @@ from .errorhandler import assert_msg_critical
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .molecule import Molecule
 from .scfrestdriver import ScfRestrictedDriver
+from .scfunrestdriver import ScfUnrestrictedDriver
 from .molecularbasis import MolecularBasis
 from .reaffbuilder import ReactionForceFieldBuilder
 from .evbsystembuilder import EvbSystemBuilder
@@ -62,11 +63,43 @@ except ImportError:
 
 
 class TransitionStateGuesser:
+    """
+    Generates a transition state guess from reactant and product structures by
+    interpolating their force fields (V = (1-lambda)*E_reactant + lambda*E_product),
+    sampling a structure at each lambda and selecting the highest-energy
+    structure along the approximate reaction path. The guess can optionally be
+    refined with a QM scan.
+
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
+
+    Instance variables
+        - molecule: The current molecule (the transition state guess after a scan).
+        - results: The dictionary holding the scan results.
+        - lambda_vector: The lambda values sampled along the reaction path.
+        - mm_temperature: The temperature in K for the MM sampling.
+        - mm_steps: The number of MD steps per sampling run.
+        - conformer_snapshots: The number of conformer snapshots per lambda.
+        - do_qm_scan: The flag for running a QM scan after the MM scan.
+        - qm_xcfun: The exchange-correlation functional for the QM scan.
+        - qm_basis: The basis set for the QM scan.
+        - max_qm_conformers: The number of lowest conformers evaluated per lambda.
+        - implicit_solvent_model: The implicit solvation model, or None for vacuum.
+        - active_torsion: The explicit active torsion for a conformational TS.
+        - save_intermediates: The flag for writing intermediate files to disk.
+        - save_results_file: The flag for writing the HDF5 results file.
+        - comm: The MPI communicator.
+        - rank: The rank of MPI process.
+        - nodes: The number of MPI processes.
+        - ostream: The output stream.
+    """
 
     def __init__(self, comm=None, ostream=None):
-        '''
-        Initialize the Transition State Guesser class.
-        '''
+        """
+        Initializes the Transition State Guesser to default setup.
+        """
         if comm is None:
             comm = MPI.COMM_WORLD
 
@@ -152,6 +185,9 @@ class TransitionStateGuesser:
         self.max_qm_conformers = 5
         self.mute_scf = True
 
+        self.mol_multiplicity = 1
+        self.mol_charge = 0
+
         self.sys_builder_configuration = {
             "name": "vacuum",
             "bonded_integration": True,
@@ -160,8 +196,6 @@ class TransitionStateGuesser:
             "soft_core_coulomb_int": False,
             "soft_core_lj_int": False,
         }
-
-        self._reaction_matcher_assist_min_depth = None
 
         self.ffbuilder = ReactionForceFieldBuilder(ostream=self.ostream)
         self.ffbuilder.calculate_resp = False
@@ -173,20 +207,39 @@ class TransitionStateGuesser:
         constraints=None,
         **build_forcefields_kwargs,
     ):
-        """Find a guess for the transition state using a force field scan.
+        """
+        Finds a guess for the transition state using a force field scan.
 
-        Args:
-            reactant (Molecule | list[Molecule]): The reactant molecule or a list of reactant molecules.
-            product (Molecule | list[Molecule]): The product molecule or a list of product molecules.
-            constraints: list of constraints to be applied during the scan.
-            **build_forcefields_kwargs: Additional keyword arguments to be passed to the force field builder.
+        Builds the reactant and product force fields, interpolates them over a
+        range of lambda values (V = (1-lambda)*E_reactant + lambda*E_product),
+        samples a structure at each lambda with the structure mapping potential,
+        and selects the highest-energy sampled structure as the transition state
+        guess. When do_qm_scan is True a QM scan refines the selection. The
+        guessed transition state geometry is stored on self.molecule and in the
+        returned dictionary under 'max_mm_xyz' (and 'max_qm_xyz' if a QM scan was
+        run).
 
-        Returns:
-            dict: molecule object of the guessed transition state and a dictionary with the results of the scan.
+        :param reactant:
+            The reactant molecule or a list of reactant molecules.
+        :param product:
+            The product molecule or a list of product molecules.
+        :param constraints:
+            List of constraints to be applied during the scan.
+        :param build_forcefields_kwargs:
+            Additional keyword arguments to be passed to the force field builder.
+
+        :return:
+            The results of the scan, including the forming/breaking/static
+            bonds, the reactant and product force fields, the per-lambda scan
+            data, and the transition state guess geometry ('max_mm_xyz' and, if
+            a QM scan was run, 'max_qm_xyz').
         """
         self.results = {}
         # Build forcefields and systems
-        self.ffbuilder.calculate_resp = self.implicit_solvent_model is not None
+        if self.implicit_solvent_model is not None:
+            self.ostream.print_info(
+                "Forcing RESP charge calculation for implicit solvent model.")
+            self.ffbuilder.calculate_resp = True
         self.build_forcefields(reactant, product, **build_forcefields_kwargs)
         self.build_systems(constraints)
 
@@ -200,15 +253,35 @@ class TransitionStateGuesser:
         return self.results
 
     def build_forcefields(self, reactant, product, **build_forcefields_kwargs):
+        """
+        Builds the reactant and product force fields and maps the reaction.
+
+        Delegates to ReactionForceFieldBuilder to construct the GAFF/UFF force
+        fields for the reactant and product, solve the atom-atom (reaction)
+        mapping, and determine which bonds are forming and breaking. The charge
+        and multiplicity are taken from the mapped reactant and stored on
+        self.molecule, self.mol_charge and self.mol_multiplicity.
+
+        :param reactant:
+            The reactant molecule or a list of reactant molecules.
+        :param product:
+            The product molecule or a list of product molecules.
+        :param build_forcefields_kwargs:
+            Additional keyword arguments forwarded to
+            ReactionForceFieldBuilder.build_forcefields (e.g. explicitly
+            specified forming/breaking bonds).
+
+        :return:
+            self.results updated with 'breaking_bonds', 'forming_bonds',
+            'static_bonds', 'reactant' and 'product' (the reactant and product
+            force field generators).
+        """
         if self.mute_ff_build:
             self.ostream.print_info(
                 "Building forcefields. Disable mute_ff_build to see detailed output."
             )
             self.ostream.flush()
             self.ostream.mute()
-
-        if self._reaction_matcher_assist_min_depth is not None:
-            self.ffbuilder._reaction_matcher_assist_min_depth = int(self._reaction_matcher_assist_min_depth)
 
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_forcefields(
             reactant=reactant,
@@ -257,7 +330,27 @@ class TransitionStateGuesser:
         return self.results
 
     def build_systems(self, constraints=None):
+        """
+        Builds the interpolated OpenMM systems for every lambda value.
 
+        Rounds the lambda vector to three decimals and uses EvbSystemBuilder to
+        build one OpenMM System per lambda using the structure mapping potential
+        (forming/breaking bonds modelled as harmonic potentials so that
+        intermediate geometries are reasonable), together with the reactant and
+        product systems used to evaluate the interpolated energy V. The
+        resulting systems and shared topology are stored on self.systems and
+        self.topology. Must be called after build_forcefields.
+
+        When no bonds are forming or breaking the reaction is treated as a
+        conformational transition state: the active dihedral (auto-detected via
+        _detect_active_dihedral, or taken from self.active_torsion) is replaced
+        by a periodic restraint whose minimum shifts from the reactant to the
+        product dihedral as lambda goes from 0 to 1.
+
+        :param constraints:
+            Optional list of constraints applied to every system during the
+            scan.
+        """
         self.lambda_vector = [round(l, 3) for l in self.lambda_vector]
         self.ostream.print_info(
             f"Rounding lambda vector to 3 decimal places: {self.lambda_vector}")
@@ -355,7 +448,32 @@ class TransitionStateGuesser:
         self.results.update({'lambda_vec': self.lambda_vector})
 
     def scan_mm(self):
+        """
+        Runs the MM scan over lambda and selects the MM transition state guess.
 
+        For each lambda the structure is optimised, briefly sampled with NVT
+        molecular dynamics and re-optimised using the structure mapping
+        potential; the interpolated MM energy
+        V = (1-lambda)*E_reactant + lambda*E_product is then evaluated. The
+        structure from one lambda seeds the next. The scan can optionally be run
+        in both directions (mm_scan_backward) and can trigger additional
+        conformer searches everywhere (force_conformer_search), around the
+        energy peak (peak_conformer_search) and/or at detected discontinuities
+        (discont_conformer_search). Conformers within
+        mm_conformer_equivalence_threshold kJ/mol of one another are discarded.
+
+        Per lambda the lowest-MM-energy conformer is kept; across all lambda the
+        structure with the highest such energy is selected as the transition
+        state guess and stored on self.molecule.
+
+        Requires build_systems to have been called. If the scan raises, partial
+        results are stored in self.results before re-raising. When
+        save_results_file is True the results are written to HDF5.
+
+        :return:
+            self.results updated with 'scan' (per-lambda conformer data),
+            'max_mm_xyz', 'max_mm_lambda' and 'min_mm_conformer_index'.
+        """
         self.folder = Path.cwd() / self.folder_name
 
         # pdbs are saved in angstrom
@@ -745,6 +863,30 @@ class TransitionStateGuesser:
         return em, e1, e2
 
     def scan_qm(self, results=None):
+        """
+        Computes QM energies along the scan and refines the transition state
+        guess.
+
+        For each lambda the lowest max_qm_conformers MM conformers are
+        re-evaluated at the QM level (qm_xcfun/qm_basis, restricted or
+        unrestricted SCF chosen from the multiplicity, unless an SCF driver is
+        provided via self.scf_drv). Non-converging SCF calculations are retried
+        with looser thresholds and yield NaN if they still fail. When implicit
+        solvation is active the QM driver mirrors it via SMD (smd_solvent).
+
+        Per lambda the conformers are re-sorted so the lowest QM energy comes
+        first; across all lambda the structure with the highest such QM energy
+        is selected as the refined transition state guess and stored on
+        self.molecule. Requires that an MM scan ('scan') is already present in
+        results.
+
+        :param results:
+            Results dictionary to operate on. Defaults to self.results.
+
+        :return:
+            self.results updated with per-conformer 'qm_energy' values plus
+            'max_qm_xyz', 'max_qm_lambda' and 'min_qm_conformer_index'.
+        """
         if results is None:
             results = self.results
         assert_msg_critical(
@@ -830,23 +972,19 @@ class TransitionStateGuesser:
         self.molecule.set_multiplicity(self.mol_multiplicity)
         self.molecule.set_charge(self.mol_charge)
         if self.scf_drv is None:
-            scf_drv = ScfRestrictedDriver()
+            if self.mol_multiplicity != 1:
+                scf_drv = ScfUnrestrictedDriver()
+            else:
+                scf_drv = ScfRestrictedDriver()
             scf_drv.xcfun = self.qm_xcfun
             self.scf_drv = scf_drv
 
-            # When MM implicit solvation is active, mirror it on the QM driver via
-            # SMD.  Duck-type on solvation_model: SCF drivers expose it, XTB does
-            # not.  If the attribute is absent we warn and skip rather than error.
+            # When MM implicit solvation is active, mirror it on the QM driver via SMD.
             if self.implicit_solvent_model is not None:
-                if hasattr(self.scf_drv, 'solvation_model'):
-                    self.scf_drv.solvation_model = 'smd'
-                    self.scf_drv.smd_solvent = self.smd_solvent
-                else:
-                    self.ostream.print_warning(
-                        'QM driver does not support SMD solvation. '
-                        'Implicit solvation will not be applied to the QM scan. '
-                        'Use an SCF driver instead of XTB to enable SMD.')
-                    self.ostream.flush()
+
+                self.scf_drv.solvation_model = 'smd'
+                self.scf_drv.smd_solvent = self.smd_solvent
+
         if self.implicit_solvent_model is not None:
             if hasattr(
                     self.scf_drv,
@@ -880,15 +1018,29 @@ class TransitionStateGuesser:
         return scf_results['scf_energy'] * hartree_in_kjpermol()
 
     def show_results(self, ts_results=None, filename=None, **mol_show_kwargs):
-        """Show the results of the transition state guesser.
-        This function uses ipywidgets to create an interactive plot of the MM and SCF energies as a function of lambda.
+        """
+        Shows the results of the transition state guesser. This function uses
+        ipywidgets to create an interactive plot of the MM and SCF energies as a
+        function of lambda.
 
-        Args:
-            ts_results (dict, optional): The results of the transition state guesser. If none (default), uses the current results.
-            atom_indices (bool, optional): If true, shows the atom-indices of the molecule. Defaults to False.
+        The widget lets the user step through lambda values and conformers and
+        view the corresponding 3D structure, defaulting to the selected
+        transition state guess.
 
-        Raises:
-            ImportError: If ipywidgets is not installed, an ImportError is raised.
+        :param ts_results:
+            The results of the transition state guesser. If None (default), uses
+            self.results unless filename is given.
+        :param filename:
+            Path to an HDF5 results file to load instead of using
+            ts_results/self.results.
+        :param mol_show_kwargs:
+            Additional keyword arguments forwarded to Molecule.show (e.g.
+            atom_indices=True to label atoms).
+
+        :raises ImportError:
+            If ipywidgets is not installed.
+        :raises ValueError:
+            If no results are available and no filename is provided.
         """
 
         try:
@@ -1179,7 +1331,7 @@ class TransitionStateGuesser:
             marker='_',
             color='darkcyan',
             alpha=0.4,
-            s=30 / math.log(min(2, total_steps), 10),
+            s=100,
             linewidths=2.0,
             zorder=0.5,
         )
@@ -1188,7 +1340,7 @@ class TransitionStateGuesser:
             rel_mm_energies,
             color='black',
             alpha=0.7,
-            s=50 / math.log(min(2, total_steps), 10),
+            s=120,
             facecolors="none",
             edgecolor="darkcyan",
             zorder=1,
@@ -1200,7 +1352,7 @@ class TransitionStateGuesser:
             marker='o',
             color='darkcyan',
             alpha=1.0,
-            s=50 / math.log(min(2, total_steps), 10),
+            s=120,
             zorder=2,
         )
         ax1.set_xlabel(r'$\lambda$')
@@ -1223,7 +1375,7 @@ class TransitionStateGuesser:
                 marker='_',
                 color='darkorange',
                 alpha=0.4,
-                s=30 / math.log(min(2, total_steps), 10),
+                s=100,
                 linewidths=2.0,
                 zorder=0.5,
             )
@@ -1231,7 +1383,7 @@ class TransitionStateGuesser:
                 lambda_vec,
                 rel_qm_energies,
                 alpha=0.7,
-                s=50 / math.log(min(2, total_steps), 10),
+                s=120,
                 facecolors="none",
                 edgecolor="darkorange",
                 zorder=1,
@@ -1249,7 +1401,7 @@ class TransitionStateGuesser:
                 marker='o',
                 color='darkorange',
                 alpha=1.0,
-                s=120 / math.log(min(2, total_steps), 10),
+                s=120 / math.log(max(2, total_steps), 10),
                 zorder=2,
             )
             ax1.set_ylabel('Relative QM energy [kJ/mol]')
@@ -1343,6 +1495,23 @@ class TransitionStateGuesser:
         return molecule
 
     def save_results(self, fname, results):
+        """
+        Writes a results dictionary to an HDF5 file.
+
+        Stores the forming/breaking/static bonds, the lambda vector, the
+        reactant and product force fields (and geometries), the selected MM (and
+        QM, if present) transition state guess, and the full per-lambda
+        conformer scan. The file can be reloaded with load_results.
+
+        :param fname:
+            Path of the HDF5 file to write.
+        :param results:
+            Results dictionary, as produced by scan_mm.
+
+        :raises ValueError:
+            If the MM scan is incomplete, i.e. results is missing 'max_mm_xyz',
+            'max_mm_lambda' or 'min_mm_conformer_index'.
+        """
         required_keys = {
             'max_mm_xyz', 'max_mm_lambda', 'min_mm_conformer_index'
         }
@@ -1429,6 +1598,23 @@ class TransitionStateGuesser:
 
     @staticmethod
     def load_results(fname, ostream=None):
+        """
+        Loads a results dictionary previously written by save_results.
+
+        Reconstructs the bonds, lambda vector, reactant and product force field
+        generators (with their geometries), the MM (and QM, if present)
+        transition state guess, and the per-lambda conformer scan from an HDF5
+        file.
+
+        :param fname:
+            Path of the HDF5 file to read.
+        :param ostream:
+            Output stream for logging. Defaults to stdout.
+
+        :return:
+            The reconstructed results dictionary, in the same format as produced
+            by scan_mm/scan_qm.
+        """
         if ostream is None:
             ostream = OutputStream(sys.stdout)
         ostream.print_info(f"Loading results from {fname}")
@@ -1614,19 +1800,21 @@ class TransitionStateGuesser:
         self.ostream.flush()
 
     def _detect_active_dihedral(self):
-        """Identify the dihedral that differs most between reactant and product.
+        """
+        Identifies the dihedral that differs most between reactant and product.
 
         Called when no bonds are forming or breaking (conformational TS).
         Iterates over every dihedral in the reactant force field, one
         representative per unique central bond, and picks the one with the
         largest absolute angle difference between the two geometries.
 
-        Returns a tuple (active_torsion, phi_reactant, phi_product) where
-        active_torsion is a 0-indexed (i, j, k, l) tuple and the angles are
-        in degrees.
+        :return:
+            A tuple (active_torsion, phi_reactant, phi_product) where
+            active_torsion is a 0-indexed (i, j, k, l) tuple and the angles are
+            in degrees.
 
-        Raises:
-            ValueError: if no dihedral with |Δφ| > 20° is found.
+        :raises ValueError:
+            If no dihedral with |Δφ| > 20° is found.
         """
         threshold = 20.0  # degrees
 
@@ -1687,6 +1875,33 @@ class TransitionStateGuesser:
                      l=0.5,
                      ts_mol=None,
                      recalculate=True):
+        """
+        Builds an interpolated force field at a given lambda.
+
+        Constructs a new MMForceFieldGenerator whose parameters are the
+        lambda-interpolation of the reactant and product force fields (the
+        force-field analogue of V = (1-lambda)*E_reactant + lambda*E_product):
+        bonds and angles are averaged with _average_params, dihedrals and
+        impropers are mixed with _mix_dihedrals, and atoms (charges, LJ
+        parameters, types) are merged with _merge_atoms. This is useful for
+        obtaining a single force field describing the transition state guess.
+
+        :param reaffgen:
+            Reactant force field. Defaults to self.reactant.
+        :param proffgen:
+            Product force field. Defaults to self.product.
+        :param l:
+            Interpolation parameter in [0, 1]. Defaults to 0.5.
+        :param ts_mol:
+            Molecule for the transition state geometry. Defaults to
+            self.molecule.
+        :param recalculate:
+            Whether to recalculate parameters from the molecule; requires ts_mol
+            to be set. Defaults to True.
+
+        :return:
+            The interpolated transition state force field.
+        """
         if reaffgen is None:
             reaffgen = self.reactant
         if proffgen is None:
