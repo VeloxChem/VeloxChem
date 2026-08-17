@@ -75,13 +75,14 @@ from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import screened_eigh
+from .kdiis import KDiis
 from .checkpoint import write_cpcm_charges, read_cpcm_charges
 from .resultsio import create_hdf5, write_scf_results_to_hdf5
 
 
 class ScfDriver:
     """
-    Implements SCF method with DIIS and two-level DIIS convergence
+    Implements SCF method with DIIS, KDIIS, and two-level DIIS convergence
     accelerators.
 
     # vlxtag: RHF, Energy
@@ -105,6 +106,8 @@ class ScfDriver:
         - eri_thresh_tight: The tightened ERI screening threshold.
         - ovl_thresh: The atomic orbitals linear dependency threshold.
         - diis_thresh: The DIIS switch-on threshold.
+        - kdiis_min_denominator: The minimum KDIIS energy denominator.
+        - kdiis_max_rotation: The maximum KDIIS orbital rotation amplitude.
         - restart: The flag for restarting from checkpoint file.
         - checkpoint_file: The name of checkpoint file.
         - xcfun: The XC functional.
@@ -164,6 +167,8 @@ class ScfDriver:
         self.conv_thresh = 1.0e-6
         self.ovl_thresh = 1.0e-6
         self.diis_thresh = 1000.0
+        self.kdiis_min_denominator = 1.0e-4
+        self.kdiis_max_rotation = 0.2
         self.eri_thresh = 1.0e-12
         self.eri_thresh_tight = 1.0e-13
 
@@ -181,6 +186,7 @@ class ScfDriver:
 
         self._density_matrices_alpha = deque()
         self._density_matrices_beta = deque()
+        self._kdiis = None
 
         # density matrix and molecular orbitals
         self._density = None
@@ -314,6 +320,10 @@ class ScfDriver:
                     ('float', 'tightened ERI screening threshold'),
                 'ovl_thresh': ('float', 'AO linear dependency threshold'),
                 'diis_thresh': ('float', 'DIIS switch-on threshold'),
+                'kdiis_min_denominator':
+                    ('float', 'minimum KDIIS energy denominator'),
+                'kdiis_max_rotation':
+                    ('float', 'maximum KDIIS orbital rotation amplitude'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'filename': ('str', 'base name of output files'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
@@ -626,18 +636,34 @@ class ScfDriver:
         self._num_iter = 0
 
         assert_msg_critical(
-            isinstance(self.acc_type, str) and self.acc_type.upper() in [
-                'C2DIIS', 'DIIS', 'L2_C2DIIS', 'L2_DIIS'
-            ],
+            isinstance(self.acc_type, str) and self.acc_type.upper()
+            in ['C2DIIS', 'DIIS', 'KDIIS', 'L2_C2DIIS', 'L2_DIIS'],
             f'SCF driver: Invalid acceleration type: {self.acc_type}')
 
         for name in [
                 'max_iter', 'max_err_vecs', 'conv_thresh', 'eri_thresh',
-                'eri_thresh_tight', 'ovl_thresh'
+                'eri_thresh_tight', 'ovl_thresh', 'kdiis_min_denominator',
+                'kdiis_max_rotation'
         ]:
             assert_msg_critical(
                 getattr(self, name) > 0,
                 f'SCF driver: \'{name}\' must be greater than zero')
+
+        if self.acc_type.upper() == 'KDIIS':
+            assert_msg_critical(
+                self.scf_type in ['restricted', 'unrestricted'],
+                'SCF driver: KDIIS is currently available only for '
+                'restricted and unrestricted SCF')
+            assert_msg_critical(
+                not self.pfon,
+                'SCF driver: KDIIS is incompatible with pFON occupations')
+            assert_msg_critical(
+                not self.density_damping,
+                'SCF driver: KDIIS is incompatible with density damping')
+            assert_msg_critical(
+                self._mom is None,
+                'SCF driver: KDIIS is incompatible with maximum overlap '
+                'occupations')
 
         if self.pfon:
             for name in ['pfon_nocc', 'pfon_nvir']:
@@ -997,7 +1023,7 @@ class ScfDriver:
             self._nuc_mm_energy = self.comm.allreduce(self._nuc_mm_energy)
 
         # DIIS method
-        if self.acc_type.upper() in ['C2DIIS', 'DIIS']:
+        if self.acc_type.upper() in ['C2DIIS', 'DIIS', 'KDIIS']:
             den_mat = self._prepare_initial_density(
                 self._gen_single_step_initial_density, molecule, basis,
                 min_basis)
@@ -1049,6 +1075,7 @@ class ScfDriver:
 
         self._density_matrices_alpha.clear()
         self._density_matrices_beta.clear()
+        self._kdiis = None
 
         self._level_shift_smooth_alpha = None
         self._level_shift_smooth_beta = None
@@ -1652,6 +1679,12 @@ class ScfDriver:
         self._density_matrices_alpha.clear()
         self._density_matrices_beta.clear()
 
+        if self.acc_type.upper() == 'KDIIS':
+            self._kdiis = KDiis(self.max_err_vecs, self.kdiis_min_denominator,
+                                self.kdiis_max_rotation)
+        else:
+            self._kdiis = None
+
         self._level_shift_smooth_alpha = None
         self._level_shift_smooth_beta = None
 
@@ -1904,31 +1937,49 @@ class ScfDriver:
 
             profiler.start_timer('EffFock')
 
-            self._store_diis_data(fock_mat, den_mat, ovl_mat, e_grad)
+            use_kdiis_update = (self.acc_type.upper() == 'KDIIS' and
+                                self._num_iter > 0 and
+                                e_grad < self.diis_thresh)
 
-            eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
+            if self.acc_type.upper() == 'KDIIS':
+                # KDIIS owns its synchronized Fock/gradient history. Before
+                # it starts, perform the one full diagonalization needed to
+                # bootstrap an orthonormal molecular-orbital basis.
+                if self.rank == mpi_master():
+                    eff_fock_mat = tuple(fock_mat)
+                else:
+                    eff_fock_mat = None
+            else:
+                self._store_diis_data(fock_mat, den_mat, ovl_mat, e_grad)
+                eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat,
+                                                        oao_mat)
 
             # Note: skip level-shifting only for the initial fresh guess (first
             # SCF cycle, _num_iter == 0). For restart or user-supplied start
             # orbitals, _num_iter starts at 1 and level shifting applies from
             # the first iteration.
             use_level_shift = (self._num_iter > 0 and self.level_shifting > 0.0)
+            kdiis_level_shift = (self.level_shifting
+                                 if use_level_shift else 0.0)
 
             if self.rank == mpi_master() and use_level_shift:
 
                 self.ostream.print_info(
                     f'Applying level-shifting ({self.level_shifting:.2f}au)')
 
-                if self.level_shift_smoothing == 0.0:
+                # In KDIIS the shift belongs in the perturbative
+                # occupied-virtual energy denominator.
+                if (not use_kdiis_update and
+                        self.level_shift_smoothing == 0.0):
                     # Preserve the original level-shifting implementation
                     eff_fock_mat = self._apply_level_shifting(
                         molecule, ao_basis, eff_fock_mat, ovl_mat)
-                else:
-                    level_shift = self._build_level_shift(molecule, ao_basis,
-                                                          ovl_mat)
+                elif not use_kdiis_update:
+                    level_shift = self._build_level_shift(
+                        molecule, ao_basis, ovl_mat)
                     level_shift_eff = self._smooth_level_shift(level_shift)
-                    eff_fock_mat = self._add_level_shift(eff_fock_mat,
-                                                         level_shift_eff)
+                    eff_fock_mat = self._add_level_shift(
+                        eff_fock_mat, level_shift_eff)
 
             if use_level_shift:
                 self.level_shifting -= self.level_shifting_delta
@@ -1941,8 +1992,13 @@ class ScfDriver:
 
             use_pfon = (self.pfon and self.pfon_temperature > 0)
 
-            self._molecular_orbitals = self._gen_molecular_orbitals(
-                molecule, ao_basis, eff_fock_mat, oao_mat)
+            if use_kdiis_update:
+                self._molecular_orbitals = self._gen_kdiis_orbitals(
+                    molecule, ao_basis, eff_fock_mat, ovl_mat, oao_mat,
+                    kdiis_level_shift)
+            else:
+                self._molecular_orbitals = self._gen_molecular_orbitals(
+                    molecule, ao_basis, eff_fock_mat, oao_mat)
 
             if self.pfon:
                 self.pfon_temperature -= self.pfon_delta_temperature
@@ -3115,6 +3171,60 @@ class ScfDriver:
 
         return (L_smooth_alpha,)
 
+    def _gen_kdiis_orbitals(self, molecule, ao_basis, fock_mat, ovl_mat,
+                            oao_mat, level_shift):
+        """
+        Generates molecular orbitals with the diagonalization-free KDIIS
+        update.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param fock_mat:
+            The current AO Fock/Kohn-Sham matrices.
+        :param ovl_mat:
+            The AO overlap matrix.
+        :param oao_mat:
+            The orthogonalization matrix defining the fixed KDIIS frame.
+        :param level_shift:
+            The shift added to occupied-virtual energy denominators.
+        :return:
+            The updated molecular orbitals on the master rank.
+        """
+
+        if self.rank != mpi_master():
+            return MolecularOrbitals()
+
+        nmo = self.molecular_orbitals.number_of_mos()
+
+        if self.scf_type == 'restricted':
+            coefficients = self.molecular_orbitals.alpha_to_numpy()
+            nocc = molecule.number_of_alpha_occupied_orbitals(ao_basis)
+            new_coefficients, new_energies = self._kdiis.update_restricted(
+                fock_mat[0], coefficients, nocc, ovl_mat, oao_mat, level_shift)
+            occupations = molecule.get_aufbau_alpha_occupation(nmo, ao_basis)
+            return MolecularOrbitals([new_coefficients[0]], [new_energies[0]],
+                                     [occupations], molorb.rest)
+
+        if self.scf_type == 'unrestricted':
+            coefficients = (self.molecular_orbitals.alpha_to_numpy(),
+                            self.molecular_orbitals.beta_to_numpy())
+            numbers_occupied = (
+                molecule.number_of_alpha_occupied_orbitals(ao_basis),
+                molecule.number_of_beta_occupied_orbitals(ao_basis))
+            new_coefficients, new_energies = self._kdiis.update_unrestricted(
+                fock_mat, coefficients, numbers_occupied, ovl_mat, oao_mat,
+                level_shift)
+            occupations = (molecule.get_aufbau_alpha_occupation(nmo, ao_basis),
+                           molecule.get_aufbau_beta_occupation(nmo, ao_basis))
+            return MolecularOrbitals(list(new_coefficients), list(new_energies),
+                                     list(occupations), molorb.unrest)
+
+        assert_msg_critical(
+            False, 'SCF driver: KDIIS orbital update is not implemented for '
+            f'{self.scf_type} SCF')
+
     def _gen_molecular_orbitals(self, molecule, ao_basis, fock_mat, oao_mat):
         """
         Generates molecular orbital by diagonalizing Fock/Kohn-Sham matrix.
@@ -3572,8 +3682,7 @@ class ScfDriver:
 
     def _get_acc_type(self):
         """
-        Gets string with type of SCF convergence accelerator (DIIS or two level
-        DIIS).
+        Gets string with type of SCF convergence accelerator.
 
         :return:
             The string with type of SCF convergence accelerator.
@@ -3584,6 +3693,9 @@ class ScfDriver:
 
         if self.acc_type.upper() == 'DIIS':
             return 'Direct Inversion of Iterative Subspace'
+
+        if self.acc_type.upper() == 'KDIIS':
+            return 'Kollmar Direct Inversion of Iterative Subspace'
 
         if self.acc_type.upper() == 'L2_C2DIIS':
             return 'Two Level C2-DIIS'

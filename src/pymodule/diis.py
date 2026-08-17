@@ -35,6 +35,55 @@ from .mathutils import safe_solve
 import numpy as np
 
 
+def compute_pulay_weights(error_vectors, method_name='DIIS'):
+    """
+    Computes normalized Pulay weights for a sequence of error vectors.
+
+    :param error_vectors:
+        The error vectors defining the iterative subspace.
+    :param method_name:
+        The method name used in error messages.
+    :return:
+        The weights normalized to sum to unity.
+    :raises ValueError:
+        If no error vectors are provided.
+    """
+
+    if len(error_vectors) == 0:
+        raise ValueError(f'{method_name}: no error vectors available')
+
+    if len(error_vectors) == 1:
+        return np.array([1.0], dtype='float64')
+
+    bmat = _build_error_gram_matrix(error_vectors)
+    dim = bmat.shape[0]
+    aug = np.zeros((dim + 1, dim + 1), dtype='float64')
+    aug[:dim, :dim] = bmat
+    aug[:dim, dim] = -1.0
+    aug[dim, :dim] = -1.0
+
+    rhs = np.zeros(dim + 1, dtype='float64')
+    rhs[dim] = -1.0
+
+    return safe_solve(aug, rhs)[:dim]
+
+
+def _build_error_gram_matrix(error_vectors):
+    """
+    Builds the symmetric Gram matrix for a sequence of error vectors.
+    """
+
+    dim = len(error_vectors)
+    bmat = np.zeros((dim, dim), dtype='float64')
+    flat = [vec.reshape(-1) for vec in error_vectors]
+    for i in range(dim):
+        for j in range(i, dim):
+            value = np.vdot(flat[i], flat[j]).real
+            bmat[i, j] = value
+            bmat[j, i] = value
+    return bmat
+
+
 class Diis:
     """
     Conventional DIIS driver that solves the augmented linear system.
@@ -141,26 +190,7 @@ class Diis:
             If no error vectors have been collected.
         """
 
-        if len(self.error_vectors) == 0:
-            raise ValueError('DIIS: no error vectors available')
-
-        if len(self.error_vectors) == 1:
-            return np.array([1.0], dtype='float64')
-
-        bmat = self._build_bmatrix()
-        dim = bmat.shape[0]
-        aug = np.zeros((dim + 1, dim + 1), dtype='float64')
-        aug[:dim, :dim] = bmat
-        aug[:dim, dim] = -1.0
-        aug[dim, :dim] = -1.0
-
-        rhs = np.zeros(dim + 1, dtype='float64')
-        rhs[dim] = -1.0
-
-        sol = safe_solve(aug, rhs)
-
-        weights = sol[:dim]
-        return weights
+        return compute_pulay_weights(self.error_vectors)
 
     def _collect_error_matrices(self, fock_matrices, density_matrices,
                                 overlap_matrix, oao_matrix):
@@ -196,12 +226,4 @@ class Diis:
             The B-matrix for the DIIS augmented system.
         """
 
-        dim = len(self.error_vectors)
-        bmat = np.zeros((dim, dim), dtype='float64')
-        flat = [vec.reshape(-1) for vec in self.error_vectors]
-        for i in range(dim):
-            for j in range(i, dim):
-                value = np.vdot(flat[i], flat[j])
-                bmat[i, j] = value
-                bmat[j, i] = value
-        return bmat
+        return _build_error_gram_matrix(self.error_vectors)
