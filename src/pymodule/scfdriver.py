@@ -1773,6 +1773,7 @@ class ScfDriver:
 
         use_level_shift = False
         use_pfon = False
+        use_density_damping = False
 
         if self.rank == mpi_master():
             self._print_scf_title()
@@ -1894,10 +1895,11 @@ class ScfDriver:
 
             self._print_iter_data(i)
 
-            use_modified_orbitals = (use_level_shift or use_pfon)
+            use_scf_modifier = (
+                use_level_shift or use_pfon or use_density_damping)
 
             self._check_convergence(molecule, ao_basis, ovl_mat,
-                                    use_modified_orbitals)
+                                    use_scf_modifier)
 
             if self.is_converged:
                 break
@@ -1967,6 +1969,9 @@ class ScfDriver:
             den_mat = self.comm.bcast(den_mat, root=mpi_master())
 
             # Note: skip density_damping for iteration 0
+            # Track whether density damping actually modified the density;
+            # this is used to skip the next convergence check.
+            use_density_damping = False
             if self.density_damping and self._num_iter > 0:
                 if e_grad < 1.0e-2:
                     den_damp = 1.0
@@ -1984,6 +1989,7 @@ class ScfDriver:
                                               self._density[idx] +
                                               den_damp * den_mat[idx])
                     den_mat = tuple(damped_den_mat)
+                    use_density_damping = True
 
             profiler.stop_timer('NewDens')
 
@@ -3278,7 +3284,7 @@ class ScfDriver:
         return nteri
 
     def _check_convergence(self, molecule, ao_basis, ovl_mat,
-                           use_modified_orbitals):
+                           use_scf_modifier):
         """
         Sets SCF convergence flag by checking if convergence condition for
         electronic gradient is fulfilled.
@@ -3289,16 +3295,16 @@ class ScfDriver:
             The AO basis set.
         :param ovl_mat:
             The overlap matrix.
-        :param use_modified_orbitals:
-            True when the Fock matrix or density entering the convergence
-            metric was modified by level shifting or pFON; the check is
-            then skipped (the metric is not trustworthy) and the SCF is
-            not declared converged.
+        :param use_scf_modifier:
+            True when the Fock matrix, orbitals, or density entering the
+            convergence metric was modified by level shifting, pFON, or
+            density damping; the check is then skipped (the metric is not
+            trustworthy) and the SCF is not declared converged.
         """
 
         self._is_converged = False
 
-        if use_modified_orbitals:
+        if use_scf_modifier:
             return
 
         if self._num_iter > 0:

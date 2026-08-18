@@ -1598,7 +1598,7 @@ class TestScfDriverMiscellaneous:
                                match="level_shift_smoothing"):
                 self.run_hf_scf(molecule, basis, configure)
 
-    def test_modified_orbitals_delay_convergence(self):
+    def test_scf_modifier_delay_convergence(self):
 
         molecule, basis = self.get_water_and_basis()
         scf_drv = ScfRestrictedDriver(MPI.COMM_WORLD, OutputStream(None))
@@ -1611,6 +1611,45 @@ class TestScfDriverMiscellaneous:
 
         scf_drv._check_convergence(molecule, basis, None, False)
         assert scf_drv.is_converged
+
+    def test_density_damping_marks_next_convergence_check(self, monkeypatch):
+
+        molecule, basis = self.get_water_and_basis()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.acc_type = 'diis'
+        scf_drv.density_damping = True
+        scf_drv.max_iter = 3
+        scf_drv.conv_thresh = 1.0e-12
+
+        # Control the damping branch independently of the numerical SCF
+        # trajectory. A gradient above 1.0e-2 activates damping, while the
+        # subsequent smaller gradient makes den_damp equal to 1.0 and clears
+        # the modifier flag for the next convergence check.
+        def controlled_gradient(*args):
+            gradient_norm = (2.0e-2
+                             if scf_drv._num_iter <= 1 else 1.0e-3)
+            return gradient_norm, gradient_norm
+
+        monkeypatch.setattr(scf_drv, '_comp_gradient', controlled_gradient)
+
+        calls = []
+        original_check = scf_drv._check_convergence
+
+        def tracked_check(molecule, ao_basis, ovl_mat, use_scf_modifier):
+            calls.append((scf_drv._num_iter, use_scf_modifier))
+            return original_check(molecule, ao_basis, ovl_mat,
+                                  use_scf_modifier)
+
+        monkeypatch.setattr(scf_drv, '_check_convergence', tracked_check)
+
+        scf_drv.compute(molecule, basis)
+
+        # The fresh-guess cycle is not damped. Damping after iteration 1 marks
+        # iteration 2, and the undamped update after iteration 2 clears the
+        # marker for iteration 3.
+        assert calls == [(0, False), (1, False), (2, True), (3, False)]
 
     def test_density_damping_changes_real_scf_trajectory(self):
 
