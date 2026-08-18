@@ -286,6 +286,7 @@ class ScfDriver:
         self._debug = False
         self._block_size_factor = 8
         self._xcfun_ldstaging = 1024
+        self.trim_mos = True
 
         # may be used in rare cases when user wants to skip the writing of h5
         self._skip_writing_h5 = False
@@ -330,6 +331,7 @@ class ScfDriver:
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
+                'trim_mos': ('bool', 'trim molecular orbitals'),
             },
             'method_settings': {
                 'ri_coulomb': ('bool', 'use RI-J approximation'),

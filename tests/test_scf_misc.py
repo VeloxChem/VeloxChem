@@ -791,6 +791,44 @@ class TestScfDriverMiscellaneous:
             else:
                 assert expected_warning in output
 
+    @pytest.mark.parametrize(
+        ('driver_cls', 'open_shell', 'delete_mos_method'), [
+            (ScfRestrictedDriver, False, '_delete_mos'),
+            (ScfRestrictedOpenDriver, True, '_delete_mos'),
+            (ScfUnrestrictedDriver, True, '_delete_mos_unrest'),
+        ])
+    def test_mo_trimming_calls_can_be_disabled_via_input(
+            self, driver_cls, open_shell, delete_mos_method, monkeypatch):
+
+        if open_shell:
+            molecule, basis = self.get_open_shell_water_and_basis()
+        else:
+            molecule, basis = self.get_water_and_basis()
+
+        scf_drv = driver_cls(MPI.COMM_WORLD, OutputStream(None))
+        assert scf_drv.trim_mos is True
+
+        scf_drv.update_settings({'trim_mos': 'no'})
+        assert scf_drv.trim_mos is False
+
+        def fail_if_called(*args):
+            pytest.fail(f'{delete_mos_method} should not be called')
+
+        monkeypatch.setattr(scf_drv, delete_mos_method, fail_if_called)
+
+        n_mos = basis.get_dimension_of_basis()
+        fock = np.diag(np.linspace(-1.0, 1.0, n_mos))
+        if driver_cls is ScfUnrestrictedDriver:
+            eff_fock_mat = (fock, fock)
+        else:
+            eff_fock_mat = (fock,)
+
+        mol_orbs = scf_drv._gen_molecular_orbitals(
+            molecule, basis, eff_fock_mat, np.eye(n_mos))
+
+        if self.is_master():
+            assert mol_orbs.number_of_mos() == n_mos
+
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='requires standard single-process assertions')
     def test_delete_mos_unrest_rejects_mismatched_column_counts(self):

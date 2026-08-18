@@ -248,7 +248,8 @@ class ScfRestrictedDriver(ScfDriver):
         if self.rank == mpi_master():
             tmat = oao_mat
             eigs, orb_coefs = solve_in_orthogonal_basis(eff_fock_mat[0], tmat)
-            orb_coefs, eigs = self._delete_mos(orb_coefs, eigs)
+            if self.trim_mos:
+                orb_coefs, eigs = self._delete_mos(orb_coefs, eigs)
 
             occa = molecule.get_aufbau_alpha_occupation(eigs.size, ao_basis)
 
