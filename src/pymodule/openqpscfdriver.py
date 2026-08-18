@@ -44,7 +44,9 @@ import numpy as np
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
-from .openqpstatetracker import native_overlap_to_previous_current
+from .openqpstatetracker import (native_overlap_to_previous_current,
+                                 normalized_mrsf_response_overlap,
+                                 select_mrsf_assignment_overlap)
 
 try:
     import oqp
@@ -723,6 +725,30 @@ class OpenQPScfDriver:
             self._energies = list(np.asarray(mol.energies, dtype=float))
             self._scf_geom_signature = geom_signature
 
+        if self.rank == mpi_master():
+            # Save the complete OpenQP numerical result bundle and the fully
+            # resolved OpenQP configuration.
+            if self.save_openqp_json:
+                saved_files = self._save_openqp_results(mol)
+                if saved_files is not None:
+                    self.ostream.print_blank()
+                    self.ostream.print_header('OpenQP Output Files')
+                    self.ostream.print_info(
+                        f'Log file      : '
+                        f'{saved_files["openqp_log_file"]}'
+                    )
+                    self.ostream.print_info(
+                        f'Results JSON  : '
+                        f'{saved_files["openqp_results_file"]}'
+                    )
+                    self.ostream.print_info(
+                        f'Settings JSON : '
+                        f'{saved_files["openqp_settings_file"]}'
+                    )
+                    self.ostream.flush()
+            # Echo everything that OpenQP wrote to its detailed logfile.
+            if self.print_openqp_log:
+                self._print_new_openqp_log()
         return mol
                 #mol = self._oqp_mol
 
@@ -963,6 +989,17 @@ class OpenQPScfDriver:
                 state_energies = np.asarray(
                     mol.energies[1:int(nstate) + 1], dtype=float)
                 if tracker.has_reference:
+                    # Independent character descriptor from the MRSF response
+                    # amplitudes. BasisOverlap has already aligned the current
+                    # MO space, and the old response was loaded with the
+                    # committed reference. Compute this before NACME.align_x
+                    # applies its phase correction. Absolute assignments are
+                    # phase invariant, and retaining the signed pre-correction
+                    # matrix gives an unmodified audit record.
+                    response_overlap = normalized_mrsf_response_overlap(
+                        mol.data['OQP::td_bvec_mo_old'],
+                        mol.data['OQP::td_bvec_mo'],
+                        int(nstate))
                     NACME(mol).nacme()
                     # The tagarray hands back Fortran memory read in C order,
                     # so the delivered matrix is the index transpose of
@@ -971,7 +1008,8 @@ class OpenQPScfDriver:
                     state_overlap = native_overlap_to_previous_current(
                         mol.data['OQP::td_states_overlap'])
                     tracking_result = tracker.evaluate(
-                        state_energies, state_overlap)
+                        state_energies, state_overlap,
+                        response_overlap=response_overlap)
                 else:
                     tracking_result = tracker.initialize_result(state_energies)
 
@@ -1049,8 +1087,10 @@ class OpenQPScfDriver:
         This is the multi-state entry point used by surface hopping.  It
         differs from :meth:`run_oqp_tracked_mrsf` in exactly one way: it makes
         no persistent-state decision.  It returns the *complete* MRSF energy
-        array and, when a previous payload is supplied, OpenQP's native state
-        overlap in ``(previous, current)`` orientation.  Which raw target the
+        array and, when a previous payload is supplied, a conditioned state
+        descriptor in ``(previous, current)`` orientation.  The native OpenQP
+        overlap and normalized MRSF response-vector overlap are subjected to
+        the same selection rule as the optimization path. Which raw target the
         dynamics wants is decided afterwards, by the surface-hopping state
         tracker, and only then is a gradient requested through
         :meth:`compute_oqp_state_gradient`.
@@ -1077,7 +1117,8 @@ class OpenQPScfDriver:
         :return:
             A dictionary with the OpenQP molecule, the full ``energies``
             array, the response energies, the geometry and data snapshot, and
-            the native ``overlap`` or ``None``.
+            the selected ``overlap`` or ``None``, both candidate descriptors,
+            their spectral norms, and the overlap-selection provenance.
         """
 
         n_states = int(nstate)
@@ -1135,13 +1176,29 @@ class OpenQPScfDriver:
                 single_point.excitation(reference_energy)
 
                 overlap = None
+                native_overlap = None
+                response_overlap = None
+                overlap_selection = None
                 if previous_payload is not None:
+                    # BasisOverlap has aligned the current MO space. Build the
+                    # independent response descriptor before NACME.align_x
+                    # applies its phase correction, matching the optimization
+                    # path exactly.
+                    response_overlap = normalized_mrsf_response_overlap(
+                        mol.data['OQP::td_bvec_mo_old'],
+                        mol.data['OQP::td_bvec_mo'],
+                        n_states)
                     NACME(mol).nacme()
                     # The tagarray hands back Fortran memory read in C order,
                     # so the delivered matrix is the index transpose of
                     # s_st(previous, current).
-                    overlap = native_overlap_to_previous_current(
+                    native_overlap = native_overlap_to_previous_current(
                         mol.data['OQP::td_states_overlap'])
+                    overlap_selection = select_mrsf_assignment_overlap(
+                        native_overlap,
+                        response_overlap=response_overlap,
+                        nstates=n_states)
+                    overlap = overlap_selection.selected_overlap
 
                 # Captured before any gradient runs, exactly as the tracked
                 # optimization path does, so the payload describes the aligned
@@ -1166,11 +1223,30 @@ class OpenQPScfDriver:
                 snapshot_data['OQP::td_energies'],
                 dtype=float).reshape(-1)[:n_states]
 
+        overlap_source = None
+        native_spectral_norm = None
+        selected_spectral_norm = None
+        overlap_is_conditioned = None
+        overlap_warnings = ()
+        if overlap_selection is not None:
+            overlap_source = overlap_selection.overlap_source
+            native_spectral_norm = overlap_selection.native_spectral_norm
+            selected_spectral_norm = overlap_selection.selected_spectral_norm
+            overlap_is_conditioned = overlap_selection.is_conditioned
+            overlap_warnings = overlap_selection.warnings
+
         return {
             'molecule': mol,
             'energies': energies,
             'response_energies': response_energies,
             'overlap': overlap,
+            'overlap_source': overlap_source,
+            'native_overlap': native_overlap,
+            'response_overlap': response_overlap,
+            'native_spectral_norm': native_spectral_norm,
+            'selected_spectral_norm': selected_spectral_norm,
+            'overlap_is_conditioned': overlap_is_conditioned,
+            'overlap_warnings': overlap_warnings,
             'xyz': snapshot_xyz,
             'data': snapshot_data,
             'scf_converged': True,

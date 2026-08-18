@@ -87,7 +87,7 @@ class OptimizationDriver:
     Instance variables
         - rank: The rank of MPI process.
         - coordsys: The coordinate system.
-        - constraints: The constraints.
+        - : The constraints.
         - check_interval: The interval (number of steps) for checking
           coordinate system.
         - max_iter: The maximum number of optimization steps.
@@ -132,6 +132,11 @@ class OptimizationDriver:
 
         self.keep_files = False
 
+        # Optional durable record of every evaluated (accepted and rejected)
+        # optimizer geometry.  This is separate from geomeTRIC scratch, which
+        # normally lives in a temporary directory and is removed at the end.
+        self.intermediate_data_directory = None
+
         self.filename = None
 
         self.restart = True
@@ -153,6 +158,8 @@ class OptimizationDriver:
                 'hessian': ('str_lower', 'hessian flag'),
                 'ref_xyz': ('str', 'reference geometry'),
                 'keep_files': ('bool', 'flag to keep output files'),
+                'intermediate_data_directory':
+                    ('str', 'directory for per-step geometries and diagnostics'),
                 'restart': ('bool', 'flag to restart from checkpoint'),
                 'conv_maxiter':
                     ('bool', 'consider converged if max_iter is reached'),
@@ -393,6 +400,10 @@ class OptimizationDriver:
             filename = Path(base_fname).name
             filename = str(temp_path / f'{filename}_{self.rank}')
 
+        if self.intermediate_data_directory is not None:
+            opt_engine.set_intermediate_data_directory(
+                self.intermediate_data_directory)
+
         if self.constraints:
             constr_file = Path(filename + '.constr.txt')
             constr_dict = {'freeze': [], 'set': [], 'scan': []}
@@ -612,6 +623,10 @@ class OptimizationDriver:
                                            opt_results)
 
             opt_results = self.comm.bcast(opt_results, root=mpi_master())
+
+        if opt_engine.intermediate_data_directory is not None:
+            opt_results['intermediate_data_directory'] = \
+                opt_engine.intermediate_data_directory
 
         # post-opt Hessian
 
@@ -1113,6 +1128,9 @@ class OptimizationDriver:
         lines.append('IRC                     :    ' +
                      ('Yes' if self.irc else 'No'))
         lines.append('Hessian                 :    ' + self.hessian)
+        if self.intermediate_data_directory is not None:
+            lines.append('Intermediate Data       :    ' +
+                         str(self.intermediate_data_directory))
 
         maxlen = max([len(line.split(':')[0]) * 2 for line in lines])
         for line in lines:

@@ -849,7 +849,9 @@ class TransitionDensityTracker:
         run can be assigned onto S0 and then simply minimize the ground state.
         The ground state is identified by energy rather than by a fixed number
         because the raw root order changes along a path; ``ground_state_root``
-        pins it explicitly when a spectrum needs that.
+        pins it explicitly when a spectrum needs that. Ordinary TDA/TDDFT
+        spectra contain excited roots only, so their lowest excitation must not
+        be mistaken for S0.
 
         :param energies_ev:
             Excitation energies of the current roots.
@@ -864,6 +866,9 @@ class TransitionDensityTracker:
         if self.ground_state_root is not None:
             index = self.ground_state_root - 1
             return index if 0 <= index < n_current else None
+
+        if not bool(getattr(self.lrresp_driver, 'spinflip', False)):
+            return None
 
         energies = np.asarray(energies_ev, dtype=float).reshape(-1)
         if energies.size != n_current or not np.any(np.isfinite(energies)):

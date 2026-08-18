@@ -292,6 +292,19 @@ class ElectronicSnapshot:
     :param previous_calculation_id:
         Identifier of the snapshot ``overlap_to_previous`` was measured
         against.  Reversing the pair is a different quantity.
+    :param overlap_source:
+        Name of the conditioned descriptor selected for assignment.
+    :param native_overlap_matrix:
+        Signed native OpenQP MRSF overlap retained for provenance.
+    :param response_overlap_matrix:
+        Signed normalized MRSF response-vector overlap, when available.
+    :param native_spectral_norm:
+        Largest singular value of the native overlap.
+    :param selected_spectral_norm:
+        Largest singular value of :attr:`overlap_to_previous`.
+    :param overlap_is_conditioned:
+        Whether the selected overlap satisfies the shared OpenQP conditioning
+        criterion.
     :param spin_metadata:
         Backend spin diagnostics per raw target (``<S^2>``, inferred
         multiplicity), or ``None``.
@@ -330,6 +343,12 @@ class ElectronicSnapshot:
 
     overlap_to_previous: np.ndarray = None
     previous_calculation_id: str = None
+    overlap_source: str = None
+    native_overlap_matrix: np.ndarray = None
+    response_overlap_matrix: np.ndarray = None
+    native_spectral_norm: float = None
+    selected_spectral_norm: float = None
+    overlap_is_conditioned: bool = None
 
     spin_metadata: dict = None
     scf_converged: bool = True
@@ -512,6 +531,12 @@ def build_snapshot(*,
                    response_energies=None,
                    overlap_to_previous=None,
                    previous_calculation_id=None,
+                   overlap_source=None,
+                   native_overlap_matrix=None,
+                   response_overlap_matrix=None,
+                   native_spectral_norm=None,
+                   selected_spectral_norm=None,
+                   overlap_is_conditioned=None,
                    spin_metadata=None,
                    scf_converged=True,
                    response_converged=True,
@@ -583,6 +608,26 @@ def build_snapshot(*,
             'build_snapshot: an overlap must name the snapshot it was '
             'measured against.')
 
+        for name, matrix in (
+                ('native overlap', native_overlap_matrix),
+                ('response-vector overlap', response_overlap_matrix)):
+            if matrix is None:
+                continue
+            candidate = np.asarray(matrix, dtype=float)
+            assert_msg_critical(
+                candidate.shape == overlap.shape and
+                np.all(np.isfinite(candidate)),
+                f'build_snapshot: the {name} provenance must be finite and '
+                'have the selected overlap shape.')
+
+        for name, value in (
+                ('native spectral norm', native_spectral_norm),
+                ('selected spectral norm', selected_spectral_norm)):
+            if value is not None:
+                assert_msg_critical(
+                    np.isfinite(float(value)) and float(value) >= 0.0,
+                    f'build_snapshot: the {name} is invalid.')
+
     return ElectronicSnapshot(
         backend=str(backend),
         method=str(method),
@@ -605,6 +650,16 @@ def build_snapshot(*,
         overlap_to_previous=_frozen(overlap_to_previous),
         previous_calculation_id=(None if previous_calculation_id is None else
                                  str(previous_calculation_id)),
+        overlap_source=(None if overlap_source is None else
+                        str(overlap_source)),
+        native_overlap_matrix=_frozen(native_overlap_matrix),
+        response_overlap_matrix=_frozen(response_overlap_matrix),
+        native_spectral_norm=(None if native_spectral_norm is None else
+                              float(native_spectral_norm)),
+        selected_spectral_norm=(None if selected_spectral_norm is None else
+                                float(selected_spectral_norm)),
+        overlap_is_conditioned=(None if overlap_is_conditioned is None else
+                                bool(overlap_is_conditioned)),
         spin_metadata=(None if spin_metadata is None else dict(spin_metadata)),
         scf_converged=bool(scf_converged),
         response_converged=bool(response_converged),
@@ -798,9 +853,11 @@ class OpenQPMRSFAdapter(ElectronicBackendAdapter):
 
     One ``compute_snapshot`` performs a triplet ROHF reference, the MRSF
     response, and - once a previous accepted snapshot exists - OpenQP's own
-    ``OQP::td_states_overlap``.  Gradients of individual target states are
-    then taken from the *same* OpenQP molecule, so a gradient can never
-    belong to a different response calculation than its energy.
+    ``OQP::td_states_overlap`` plus an independent normalized response-vector
+    overlap.  The optimizer's shared conditioning selector chooses the matrix
+    used for assignment. Gradients of individual target states are then taken
+    from the *same* OpenQP molecule, so a gradient can never belong to a
+    different response calculation than its energy.
 
     :param molecule_template:
         Molecule supplying labels, charge and the triplet working reference.
@@ -816,7 +873,7 @@ class OpenQPMRSFAdapter(ElectronicBackendAdapter):
 
     backend = 'openqp'
     method = 'mrsf-tddft'
-    adapter_revision = '1'
+    adapter_revision = '2'
     target_manifold = 'singlet'
 
     #: OpenQP MRSF requires a high-spin triplet ROHF working reference.
@@ -929,7 +986,8 @@ class OpenQPMRSFAdapter(ElectronicBackendAdapter):
             'number_of_states': self.number_of_states,
             'multi_state_total_energies': True,
             'state_specific_gradients': True,
-            'cross_geometry_descriptor': 'openqp_native_mrsf_overlap',
+            'cross_geometry_descriptor':
+                'conditioned_openqp_mrsf_overlap_with_response_fallback',
         }
 
     def compute_snapshot(self, geometry, previous_snapshot=None,
@@ -968,12 +1026,34 @@ class OpenQPMRSFAdapter(ElectronicBackendAdapter):
                 'followed by one total energy per MRSF target state.')
 
         overlap = native.get('overlap', None)
+        overlap_selection = None
         if previous_snapshot is not None:
             if overlap is None:
                 raise BackendCapabilityError(
                     'OpenQPMRSFAdapter: OpenQP did not return a native state '
                     'overlap against the previous accepted geometry; '
                     'production state tracking cannot proceed.')
+
+            # Apply the exact selector used by the optimization tracker even
+            # when a test/downgraded driver only returns the candidate matrices.
+            # This also verifies the provenance returned by the production
+            # driver before a gradient can be evaluated.
+            from .openqpstatetracker import select_mrsf_assignment_overlap
+
+            native_overlap = native.get('native_overlap', None)
+            if native_overlap is None:
+                native_overlap = overlap
+            overlap_selection = select_mrsf_assignment_overlap(
+                native_overlap,
+                response_overlap=native.get('response_overlap', None),
+                nstates=self.number_of_states)
+            overlap = overlap_selection.selected_overlap
+            if not overlap_selection.is_conditioned:
+                details = '; '.join(overlap_selection.warnings)
+                raise BackendCapabilityError(
+                    'OpenQPMRSFAdapter: no conditioned cross-geometry MRSF '
+                    f'descriptor is available; refusing state assignment: '
+                    f'{details}')
             self.n_overlap_calls += 1
 
         snapshot = build_snapshot(
@@ -998,8 +1078,22 @@ class OpenQPMRSFAdapter(ElectronicBackendAdapter):
             previous_calculation_id=(
                 None if previous_snapshot is None else
                 previous_snapshot.calculation_id),
+            overlap_source=(None if overlap_selection is None else
+                            overlap_selection.overlap_source),
+            native_overlap_matrix=(None if overlap_selection is None else
+                                   overlap_selection.native_overlap),
+            response_overlap_matrix=(None if overlap_selection is None else
+                                     overlap_selection.response_overlap),
+            native_spectral_norm=(None if overlap_selection is None else
+                                  overlap_selection.native_spectral_norm),
+            selected_spectral_norm=(None if overlap_selection is None else
+                                    overlap_selection.selected_spectral_norm),
+            overlap_is_conditioned=(None if overlap_selection is None else
+                                    overlap_selection.is_conditioned),
             scf_converged=bool(native.get('scf_converged', True)),
-            response_converged=bool(native.get('response_converged', True)))
+            response_converged=bool(native.get('response_converged', True)),
+            warnings=(overlap_selection.warnings if
+                      overlap_selection is not None else ()))
 
         self._store_native(snapshot, native)
 
@@ -1025,7 +1119,7 @@ class OpenQPMRSFAdapter(ElectronicBackendAdapter):
 
     def state_overlap(self, previous_snapshot, current_snapshot):
         """
-        Returns the stored native overlap of an ordered snapshot pair.
+        Returns the stored conditioned overlap of an ordered snapshot pair.
 
         OpenQP builds the state overlap *inside* the response calculation, by
         injecting the previous MO/response payload between the reference SCF
@@ -1040,7 +1134,7 @@ class OpenQPMRSFAdapter(ElectronicBackendAdapter):
             current_snapshot.previous_calculation_id ==
             previous_snapshot.calculation_id,
             'OpenQPMRSFAdapter: the requested overlap pair does not match the '
-            'pair the native overlap was computed for; reversing or '
+            'pair the conditioned overlap was computed for; reversing or '
             're-pairing snapshots is a different quantity.')
 
         return np.asarray(current_snapshot.overlap_to_previous, dtype=float)

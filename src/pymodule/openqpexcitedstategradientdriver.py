@@ -624,6 +624,17 @@ class OpenQPExcitedStateGradientDriver(GradientDriver):
             f'Target assignment reliable : {result.is_reliable}')
         self.ostream.print_info(
             f'Raw root changed           : {result.root_changed}')
+        self.ostream.print_info(
+            f'Assignment overlap source  : {result.overlap_source}')
+        if result.native_spectral_norm is not None:
+            self.ostream.print_info(
+                f'Native overlap spectral norm: '
+                f'{result.native_spectral_norm:.8f}')
+        if (result.selected_spectral_norm is not None and
+                result.overlap_source != 'native_state_overlap'):
+            self.ostream.print_info(
+                f'Selected overlap spectral norm: '
+                f'{result.selected_spectral_norm:.8f}')
 
         if result.ground_state_raw_root is not None:
             guard_text = ('on (S0 excluded from the assignment)'

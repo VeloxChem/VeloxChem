@@ -43,7 +43,7 @@ state-similarity matrix
 .. math::
 
     O_{ij} = \\left| \\langle \\Psi_i(t) | \\Psi_j(t+\\Delta t) \\rangle
-             \\right|^2
+             \\right|
 
 or a documented approximation to it, subject to a one-to-one constraint solved
 with the Hungarian algorithm.
@@ -83,8 +83,11 @@ class StateDescriptors:
         common basis.  Only meaningful when the molecular-orbital bases at the
         two geometries have been aligned.
     :param overlap_matrix:
-        Optional precomputed |<Psi_i|Psi_j>|^2 matrix supplied directly by a
+        Optional precomputed |<Psi_i|Psi_j>| matrix supplied directly by a
         rigorous provider, of shape (n_states, n_states).
+    :param overlap_source:
+        Provenance label for :attr:`overlap_matrix`.  OpenQP uses either its
+        native state overlap or the normalized MRSF response-vector fallback.
     """
 
     excitation_energies: np.ndarray
@@ -92,6 +95,7 @@ class StateDescriptors:
     transition_dipoles: np.ndarray = None
     excitation_vectors: np.ndarray = None
     overlap_matrix: np.ndarray = None
+    overlap_source: str = None
 
     @property
     def n_states(self):
@@ -321,7 +325,7 @@ class OverlapStateTracker(ElectronicStateTracker):
     electronic-structure provider.
 
     The provider must populate :attr:`StateDescriptors.overlap_matrix` with
-    ``|<Psi_i(t)|Psi_j(t+dt)>|^2`` evaluated with properly aligned molecular
+    ``|<Psi_i(t)|Psi_j(t+dt)>|`` evaluated with properly aligned molecular
     orbital bases, or populate :attr:`StateDescriptors.excitation_vectors`
     with response vectors already expressed in a common basis.
     """
@@ -643,6 +647,10 @@ class BackendOverlapStateTracker(ElectronicStateTracker):
             self._reference = {'tracked_to_raw': np.asarray(permutation,
                                                             dtype=int)}
 
+        descriptor = (str(descriptors.overlap_source)
+                      if descriptors.overlap_source else
+                      'backend_state_overlap')
+
         return TrackingResult(permutation=permutation,
                               scores=scores,
                               confidence=confidence,
@@ -652,7 +660,7 @@ class BackendOverlapStateTracker(ElectronicStateTracker):
                               warnings=warnings,
                               similarity_matrix=similarity,
                               ambiguity_ratio=ambiguity,
-                              descriptor='backend_state_overlap')
+                              descriptor=descriptor)
 
     def _failed(self, n_states, accepted, message):
         """
@@ -791,4 +799,5 @@ def _permute_descriptors(descriptors, permutation):
         oscillator_strengths=take(descriptors.oscillator_strengths),
         transition_dipoles=take(descriptors.transition_dipoles),
         excitation_vectors=take(descriptors.excitation_vectors),
-        overlap_matrix=None)
+        overlap_matrix=None,
+        overlap_source=descriptors.overlap_source)

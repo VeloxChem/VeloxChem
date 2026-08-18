@@ -364,6 +364,7 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         mode = self.serenity_driver._current_scf_mode
         requested_state = int(self.state_deriv_index)
         grad_task = self._run_excited_gradient_task(mode)
+        tracking_applied = False
 
         if self.rsp_driver.spinflip:
             self._update_spin_metadata(
@@ -372,15 +373,30 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
             if self.enforce_same_multiplicity:
                 selected_state = self._select_same_multiplicity_state(
                     molecule, grad_task, mode, requested_state)
-                if selected_state != requested_state:
-                    self.state_deriv_index = selected_state
-                    grad_task = self._run_excited_gradient_task(mode)
-                    self._update_spin_metadata(
-                        grad_task.getLRSCFController())
+                tracking_applied = self.state_tracker is not None
+            elif self.state_tracker is not None:
+                selected_state = self._select_tracked_state(
+                    grad_task, mode, requested_state)
+                tracking_applied = True
             else:
                 selected_state = requested_state
+        elif self.state_tracker is not None:
+            # Ordinary TDA/TDDFT has no interleaved spin manifolds, but its raw
+            # roots can still exchange character. Select the continuation from
+            # the transition-density overlap before finalizing the energy and
+            # gradient, without applying any spin/multiplicity filter.
+            selected_state = self._select_tracked_state(
+                grad_task, mode, requested_state)
+            tracking_applied = True
         else:
             selected_state = requested_state
+
+        if selected_state != requested_state:
+            self.state_deriv_index = selected_state
+            grad_task = self._run_excited_gradient_task(mode)
+            if self.rsp_driver.spinflip:
+                self._update_spin_metadata(
+                    grad_task.getLRSCFController())
 
         self.state_deriv_index = int(selected_state)
         if self.rsp_driver.spinflip:
@@ -420,9 +436,7 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         self._last_tracking_mode = mode
         self._last_tracking_molecule = molecule
 
-        if (self.rsp_driver.spinflip and
-                self.enforce_same_multiplicity and
-                self.state_tracker is not None):
+        if tracking_applied:
             if (self.tracking_info is not None and
                     self.tracking_info.get(
                         'reference_update_recommended', False) and
@@ -440,7 +454,7 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
             self._tracking_applied_in_compute = True
 
         if self.tracking_info is not None:
-            self.tracking_info.update({
+            tracking_update = {
                 'step': int(len(self.tracking_history)),
                 'evaluation_id': int(self._tracking_evaluation_counter),
                 'gradient_root': int(self.state_deriv_index),
@@ -454,12 +468,19 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
                 'gradient_rms': float(np.sqrt(np.mean(gradient**2))),
                 'state_excitation_energies':
                     np.asarray(self.excited_state_energy, dtype=float).copy(),
-                'state_multiplicities':
-                    np.asarray(self.state_multiplicities, dtype=int).copy(),
-                'state_s2': np.asarray(self.state_s2, dtype=float).copy(),
-                's2_deviation':
-                    np.asarray(self.s2_deviation, dtype=float).copy(),
-            })
+                'state_excitation_energies_hartree':
+                    np.asarray(self.excited_state_energy, dtype=float).copy(),
+            }
+            if self.rsp_driver.spinflip:
+                tracking_update.update({
+                    'state_multiplicities': np.asarray(
+                        self.state_multiplicities, dtype=int).copy(),
+                    'state_s2': np.asarray(
+                        self.state_s2, dtype=float).copy(),
+                    's2_deviation': np.asarray(
+                        self.s2_deviation, dtype=float).copy(),
+                })
+            self.tracking_info.update(tracking_update)
             self._tracking_evaluation_counter += 1
             self._print_tracking_diagnostics(self.tracking_info)
 
@@ -630,6 +651,9 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         selected_index = selected_state - 1
         info = result.to_dict()
         info.update({
+            'tracking_framework': 'serenity_spinflip',
+            'overlap_source': 'serenity_transition_density_overlap',
+            'multiplicity_filter_applied': True,
             'target_multiplicity': int(self.target_multiplicity),
             'selected_state': int(selected_state),
             'selected_multiplicity':
@@ -652,10 +676,58 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
 
         return int(selected_state)
 
-    def _tracking_candidate_metadata(self, controller, spin_compatible):
+    def _select_tracked_state(self, grad_task, mode, requested_state):
+        """Selects a response root without multiplicity filtering.
+
+        Ordinary TDA/TDDFT always uses this path. Spin-flip can also use it when
+        ``enforce_same_multiplicity`` is disabled. No approximate ``<S^2>``
+        classification or multiplicity mask is constructed here.
+        """
+
+        controller = grad_task.getLRSCFController()
+        energies = np.asarray(
+            controller.getExcitationEnergies('isolated'),
+            dtype=float).reshape(-1)
+        assert_msg_critical(
+            1 <= int(requested_state) <= energies.size,
+            'SerenityExcitedStateGradientDriver: requested state index is '
+            'outside the ordinary TDA/TDDFT spectrum.')
+
+        candidate_metadata = self._tracking_candidate_metadata(
+            controller, nstates=energies.size)
+        result = self.state_tracker.track(
+            self.serenity_driver._system,
+            controller,
+            mode,
+            active_reference_state=int(requested_state),
+            allowed_states=None,
+            candidate_metadata=candidate_metadata,
+        )
+        selected_state, result = self._apply_tracking_failure_policy(result)
+        info = result.to_dict()
+        framework = ('serenity_spinflip' if self.rsp_driver.spinflip else
+                     'serenity_tddft')
+        info.update({
+            'tracking_framework': framework,
+            'overlap_source': 'serenity_transition_density_overlap',
+            'multiplicity_filter_applied': False,
+            'selected_state': int(selected_state),
+            'reference_updated': False,
+            'reference_staged': False,
+        })
+        self.tracking_info = info
+        return int(selected_state)
+
+    def _tracking_candidate_metadata(self, controller, spin_compatible=None,
+                                     nstates=None):
         """Builds per-root diagnostics, including optional solver metadata."""
 
-        nstates = int(np.asarray(self.state_s2).size)
+        if nstates is None:
+            if spin_compatible is not None:
+                nstates = int(np.asarray(spin_compatible).size)
+            else:
+                nstates = int(np.asarray(
+                    controller.getExcitationEnergies('isolated')).size)
         residuals = self._optional_controller_vector(
             controller,
             ('getResidualNorms', 'getResiduals', 'getEigenpairResiduals'),
@@ -666,15 +738,19 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
             ('getConvergedRoots', 'getRootConvergence'),
             nstates,
         )
-        return {
+        metadata = {
             'solver_residual': residuals,
             'solver_converged': converged,
-            's2': np.asarray(self.state_s2, dtype=float),
-            'inferred_multiplicity': np.asarray(
-                self.state_multiplicities, dtype=int),
-            's2_deviation': np.asarray(self.s2_deviation, dtype=float),
-            'spin_compatible': np.asarray(spin_compatible, dtype=bool),
         }
+        if spin_compatible is not None:
+            metadata.update({
+                's2': np.asarray(self.state_s2, dtype=float),
+                'inferred_multiplicity': np.asarray(
+                    self.state_multiplicities, dtype=int),
+                's2_deviation': np.asarray(self.s2_deviation, dtype=float),
+                'spin_compatible': np.asarray(spin_compatible, dtype=bool),
+            })
+        return metadata
 
     @staticmethod
     def _optional_controller_vector(controller, method_names, nstates):
@@ -723,12 +799,13 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
             self._print_provisional_warning(provisional)
             return int(selected_state), provisional
 
-        # Adiabatic fallback: energy-order the inferred target-spin roots.  No
-        # rotated diabatic state is constructed; a real Serenity raw-root
-        # gradient is always requested.
+        # Adiabatic fallback: energy-order the spin-compatible roots for SF, or
+        # all eligible response roots for ordinary TDA/TDDFT. No rotated
+        # diabatic state is constructed; a real Serenity raw-root gradient is
+        # always requested.
         candidates = [
             row for row in diagnostics['candidate_table']
-            if row['eligible'] and row['spin_compatible'] is True and
+            if row['eligible'] and row.get('spin_compatible') is not False and
             row['excitation_energy_ev'] is not None
         ]
         if not candidates:
@@ -741,8 +818,11 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
             'selected_by_overlap': int(result['new_state']),
             'reference_update_recommended': True,
         })
+        spinflip = bool(getattr(getattr(self, 'rsp_driver', None),
+                               'spinflip', False))
+        manifold = 'inferred target-spin ' if spinflip else ''
         diagnostics['warnings'] = list(diagnostics['warnings']) + [
-            'ADIABATIC: following the lowest-energy inferred target-spin '
+            'ADIABATIC: following the lowest-energy ' + manifold +
             f'raw root {selected_state}'
         ]
         provisional = StateTrackingResult(status, diagnostics)
@@ -834,7 +914,12 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
     def _print_tracking_diagnostics(self, info):
         """Prints one Serenity transition-density tracking decision."""
 
-        self.ostream.print_header('Serenity Spin-Flip State Tracking')
+        spinflip = bool(getattr(getattr(self, 'rsp_driver', None),
+                               'spinflip', False))
+        title = ('Serenity Spin-Flip State Tracking'
+                 if spinflip else
+                 'Serenity TDA/TDDFT State Tracking')
+        self.ostream.print_header(title)
         self.ostream.print_info(
             f"Status                     : {info.get('status', 'CONFIDENT')}")
         self.ostream.print_info(
@@ -889,21 +974,34 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
                          for state in info['gradient_task_roots']))
 
         if info.get('candidate_table'):
-            self.ostream.print_info(
-                'Candidates: raw  energy/eV residual conv       <S^2> mult '
-                'raw-overlap norm-overlap eligible exclusion')
+            has_spin = any(
+                row.get('s2') is not None or
+                row.get('inferred_multiplicity') is not None
+                for row in info['candidate_table'])
+            if has_spin:
+                self.ostream.print_info(
+                    'Candidates: raw  energy/eV residual conv       <S^2> mult '
+                    'raw-overlap norm-overlap eligible exclusion')
+            else:
+                self.ostream.print_info(
+                    'Candidates: raw  energy/eV residual conv '
+                    'raw-overlap norm-overlap eligible exclusion')
             for row in info['candidate_table']:
                 def value(key, fmt):
                     item = row.get(key)
                     return 'n/a' if item is None else format(item, fmt)
 
-                self.ostream.print_info(
+                prefix = (
                     f"  {row['raw_root']:3d} "
                     f"{value('excitation_energy_ev', '.8f'):>12s} "
                     f"{value('solver_residual', '.3e'):>8s} "
-                    f"{str(row.get('solver_converged')):>5s} "
-                    f"{value('s2', '.6f'):>10s} "
-                    f"{str(row.get('inferred_multiplicity')):>4s} "
+                    f"{str(row.get('solver_converged')):>5s} ")
+                if has_spin:
+                    prefix += (
+                        f"{value('s2', '.6f'):>10s} "
+                        f"{str(row.get('inferred_multiplicity')):>4s} ")
+                self.ostream.print_info(
+                    prefix +
                     f"{value('raw_overlap', '.8f'):>11s} "
                     f"{value('normalized_overlap', '.8f'):>12s} "
                     f"{str(row['eligible']):>8s} "
@@ -989,13 +1087,11 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
             self.tracking_info = None
             return None
 
-        # Spin-flip calculations with multiplicity enforcement are tracked as
-        # part of compute(), so energy, gradient, root and spin diagnostics are
-        # selected atomically. OpenMM may still call track_state() afterwards;
-        # return the already completed decision instead of tracking twice.
-        if (self.rsp_driver.spinflip and
-                self.enforce_same_multiplicity and
-                self._tracking_applied_in_compute):
+        # Analytical calculations now track as part of compute(), so energy,
+        # gradient and root are selected atomically for both ordinary TDDFT and
+        # spin-flip. OpenMM may still call track_state() afterwards; return the
+        # completed decision instead of tracking twice.
+        if self._tracking_applied_in_compute:
             if update_reference:
                 self.commit_tracking_reference()
             return self.tracking_info

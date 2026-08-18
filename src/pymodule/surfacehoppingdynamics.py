@@ -248,6 +248,13 @@ class LandauZenerSurfaceHoppingDynamics:
         self._n_hops_accepted = 0
         self._n_hops_frustrated = 0
         self._n_hops_rejected = 0
+        # While one nuclear interval is provisional, keep the last fully
+        # accepted frame available for fail-closed rollback.  In particular,
+        # an overlap/tracking failure occurs only after OpenMM has already
+        # propagated to the rejected endpoint; checkpointing that endpoint
+        # together with the previous electronic reference would create a
+        # nuclear/electronic mismatch on restart.
+        self._abort_frame = None
 
     def _validate_tracking_policy(self):
         """
@@ -861,7 +868,8 @@ class LandauZenerSurfaceHoppingDynamics:
             save_freq=1,
             print_freq=1):
         """
-        Runs a surface-hopping trajectory using OpenMM's PDBReporter for trajectory output.
+        Runs a surface-hopping trajectory and writes only retained endpoints
+        to the optional PDB trajectory.
 
         :param nsteps:
             Number of nuclear steps to propagate.
@@ -870,8 +878,8 @@ class LandauZenerSurfaceHoppingDynamics:
         :param diagnostics_file:
             Overrides :attr:`SurfaceHoppingSettings.diagnostics_file`.
         :param traj_file:
-            Path to the PDB trajectory file. If provided, a PDBReporter will be
-            added to write frames at save_freq frequency.
+            Path to the PDB trajectory file. If provided, accepted endpoints
+            are written at ``save_freq`` frequency.
         :param save_freq:
             Frequency (in steps) for writing PDB frames. Default: 1 (every step).
         :param print_freq:
@@ -883,15 +891,19 @@ class LandauZenerSurfaceHoppingDynamics:
         checkpoint_file = checkpoint_file or self.settings.checkpoint_file
         diagnostics_file = (diagnostics_file or self.settings.diagnostics_file)
 
-        # Add PDBReporter if trajectory file is specified
+        # Keep trajectory output under the controller's transaction.  An
+        # OpenMM PDBReporter attached to ``simulation.reporters`` fires during
+        # every provisional trial/replay step and therefore archives frames
+        # that the electronic transaction later discards.  Write only after
+        # _advance_one_step() has accepted the endpoint.
+        trajectory_handle = None
+        trajectory_app = None
         if traj_file:
             try:
                 import openmm.app as app
-                # Clear any existing reporters to avoid duplicates
-                self.md.simulation.reporters.clear()
-                # Add our PDB reporter
-                self.md.simulation.reporters.append(
-                    app.PDBReporter(traj_file, save_freq))
+                trajectory_handle = open(traj_file, 'w', encoding='utf-8')
+                trajectory_app = app
+                app.PDBFile.writeHeader(self.md.topology, trajectory_handle)
                 self.ostream.print_info(
                     f"PDB trajectory will be written to: {traj_file}")
             except ImportError:
@@ -899,8 +911,13 @@ class LandauZenerSurfaceHoppingDynamics:
                     'PDBReporter requires OpenMM.app module. '
                     'Trajectory writing disabled.')
             except Exception as exc:
-                self.ostream.print_warning(f'Failed to add PDBReporter: {exc}. '
-                                           'Trajectory writing disabled.')
+                self.ostream.print_warning(
+                    f'Failed to initialize PDB trajectory output: {exc}. '
+                    'Trajectory writing disabled.')
+                if trajectory_handle is not None:
+                    trajectory_handle.close()
+                    trajectory_handle = None
+                    trajectory_app = None
 
         self._check_ensemble()
         self._check_nuclear_timestep()
@@ -928,16 +945,45 @@ class LandauZenerSurfaceHoppingDynamics:
 
                 record = self.diagnostics[-1]
 
+                if (trajectory_handle is not None and
+                        self.current_step % int(save_freq) == 0):
+                    try:
+                        endpoint = self.context.getState(getPositions=True)
+                        trajectory_app.PDBFile.writeModel(
+                            self.md.topology,
+                            endpoint.getPositions(),
+                            trajectory_handle,
+                            modelIndex=self.current_step)
+                        trajectory_handle.flush()
+                    except Exception as exc:
+                        self.ostream.print_warning(
+                            f'Failed to write PDB trajectory endpoint: {exc}. '
+                            'Trajectory writing disabled.')
+                        trajectory_handle.close()
+                        trajectory_handle = None
+                        trajectory_app = None
+
                 # Periodic formatted output
                 if print_freq > 0 and self.current_step % print_freq == 0:
                     self.print_snapshot(record)
 
         except SurfaceHoppingError:
+            if self._abort_frame is not None:
+                abort_frame = self._abort_frame
+                self._abort_frame = None
+                self.restore_frame(abort_frame)
+                self.current_step = int(abort_frame.step)
             if self.settings.checkpoint_interval:
                 self._write_checkpoint(checkpoint_file, best_effort=True)
             raise
         finally:
             self._close_diagnostics()
+            if trajectory_handle is not None:
+                try:
+                    trajectory_app.PDBFile.writeFooter(
+                        self.md.topology, trajectory_handle)
+                finally:
+                    trajectory_handle.close()
 
         return self.diagnostics
 
@@ -1113,6 +1159,7 @@ class LandauZenerSurfaceHoppingDynamics:
 
         # 1. save the complete state at frame n
         frame = self.save_frame(step, result)
+        self._abort_frame = frame
 
         # 2. trial propagation from n to n+1 on the current surface
         self.install_force(result.active_gradient)
@@ -1137,6 +1184,7 @@ class LandauZenerSurfaceHoppingDynamics:
             self.install_force(trial_result.active_gradient)
             self._record_force_state(record, trial_result, 'after_replay')
             self._finish_step(record, checkpoint_file)
+            self._abort_frame = None
             return trial_result, trial_tracking
 
         # The hop is applied at the saved frame, so the detector's central
@@ -1164,6 +1212,7 @@ class LandauZenerSurfaceHoppingDynamics:
             self.install_force(trial_result.active_gradient)
             self._record_force_state(record, trial_result, 'after_replay')
             self._finish_step(record, checkpoint_file)
+            self._abort_frame = None
             return trial_result, trial_tracking
 
         # 7. restore frame n and attempt the hop there
@@ -1214,6 +1263,7 @@ class LandauZenerSurfaceHoppingDynamics:
             self._record_force_state(record, replay_result, 'after_replay')
             self._finish_step(record, checkpoint_file)
 
+            self._abort_frame = None
             return replay_result, replay_tracking
 
         # Accepted hop: install the target-state force at frame n and replay.
@@ -1277,6 +1327,7 @@ class LandauZenerSurfaceHoppingDynamics:
         self._record_force_state(record, replay_result, 'after_replay')
         self._finish_step(record, checkpoint_file)
 
+        self._abort_frame = None
         return replay_result, replay_tracking
 
     @staticmethod
@@ -1314,8 +1365,21 @@ class LandauZenerSurfaceHoppingDynamics:
                 'energy_unit': 'hartree',
                 'gradient_unit': 'hartree/bohr',
                 'spin_metadata': None,
+                'overlap_source': None,
+                'selected_overlap_matrix': None,
+                'native_overlap_matrix': None,
+                'response_overlap_matrix': None,
+                'native_spectral_norm': None,
+                'selected_spectral_norm': None,
+                'overlap_is_conditioned': None,
+                'electronic_warnings': [],
             })
             return payload
+
+        def matrix_or_none(matrix):
+            if matrix is None:
+                return None
+            return np.asarray(matrix, dtype=float).tolist()
 
         payload.update({
             'electronic_backend': snapshot.backend,
@@ -1330,6 +1394,17 @@ class LandauZenerSurfaceHoppingDynamics:
             'spin_metadata': snapshot.spin_metadata,
             'response_energies':
                 np.asarray(snapshot.response_energies, dtype=float).tolist(),
+            'overlap_source': snapshot.overlap_source,
+            'selected_overlap_matrix':
+                matrix_or_none(snapshot.overlap_to_previous),
+            'native_overlap_matrix':
+                matrix_or_none(snapshot.native_overlap_matrix),
+            'response_overlap_matrix':
+                matrix_or_none(snapshot.response_overlap_matrix),
+            'native_spectral_norm': snapshot.native_spectral_norm,
+            'selected_spectral_norm': snapshot.selected_spectral_norm,
+            'overlap_is_conditioned': snapshot.overlap_is_conditioned,
+            'electronic_warnings': list(snapshot.warnings),
         })
 
         return payload
@@ -1358,7 +1433,6 @@ class LandauZenerSurfaceHoppingDynamics:
         """
 
         tracked_energies = result.tracked_state_energies()
-        adiabatic_energies = result.adiabatic_state_energies()
         raw_to_tracked = result.raw_to_tracked_permutation()
 
         record.update({
@@ -1389,17 +1463,73 @@ class LandauZenerSurfaceHoppingDynamics:
             'n_gradient_calls': int(self.provider.n_gradient_calls),
         })
         record.update(self._electronic_provenance(result, tracking))
+        self._update_endpoint_observables(record, result)
 
-        record['active_state_energy'] = float(
-            adiabatic_energies[self.active_state])
-        record['total_energy'] = (record['kinetic_energy'] +
-                                  record['active_state_energy'])
-        record['energy_gaps'] = [
-            abs(float(adiabatic_energies[i + 1] - adiabatic_energies[i]))
-            for i in range(len(adiabatic_energies) - 1)
-        ]
-        record['minimum_energy_gap'] = (float(min(record['energy_gaps']))
-                                        if record['energy_gaps'] else None)
+    def _kinetic_energy_au(self, all_velocities_nm_ps):
+        """Returns the rescaling atom set's kinetic energy in Hartree."""
+
+        indices = self.rescaling_atoms
+        masses_au = self.get_masses_in_au(indices)
+        velocities_au = (np.asarray(all_velocities_nm_ps, dtype=float)[indices]
+                         * NM_PER_PS_IN_AU_VELOCITY)
+
+        return float(0.5 * np.sum(
+            masses_au * np.sum(velocities_au**2, axis=1)))
+
+    def _temperature_kelvin(self, kinetic_energy_au):
+        """Converts the reported atom set's kinetic energy to temperature."""
+
+        n_atoms = len(self.rescaling_atoms)
+        n_dof = 3 * n_atoms - 6
+        if n_atoms <= 2:
+            n_dof = 3 * n_atoms - 5
+        if n_dof <= 0:
+            return 0.0
+
+        ke_joule = (float(kinetic_energy_au) * hartree_in_kjpermol() *
+                    1000.0 / 6.02214076e23)
+        k_B = 1.380649e-23
+
+        return float(2.0 * ke_joule / (n_dof * k_B))
+
+    def _update_endpoint_observables(self, record, result):
+        """Synchronizes all reported energy terms at the retained endpoint.
+
+        Electronic energies in a step record belong to the propagated or
+        replayed endpoint.  Kinetic energy must be read from that same OpenMM
+        state; combining it with the saved central-frame velocity produces a
+        quantity that is not the total energy at either time, especially
+        across an accepted hop.
+        """
+
+        state = self.context.getState(getVelocities=True)
+        velocity_unit = unit.nanometer / unit.picosecond
+        velocities_nm_ps = np.asarray(
+            state.getVelocities(asNumpy=True).value_in_unit(velocity_unit),
+            dtype=float)
+        kinetic_energy = self._kinetic_energy_au(velocities_nm_ps)
+        adiabatic_energies = result.adiabatic_state_energies()
+        active_energy = float(adiabatic_energies[self.active_state])
+
+        record.update({
+            'endpoint_step': int(self.current_step),
+            'endpoint_time': float(
+                state.getTime().value_in_unit(unit.femtosecond)),
+            'endpoint_active_state': int(self.active_state),
+            'energy_observation_frame': 'retained_endpoint',
+            'kinetic_energy': kinetic_energy,
+            'temperature_kelvin': self._temperature_kelvin(kinetic_energy),
+            'active_state_energy': active_energy,
+            'total_energy': kinetic_energy + active_energy,
+            'energy_gaps': [
+                abs(float(adiabatic_energies[i + 1] -
+                          adiabatic_energies[i]))
+                for i in range(len(adiabatic_energies) - 1)
+            ],
+        })
+        record['minimum_energy_gap'] = (
+            float(min(record['energy_gaps']))
+            if record['energy_gaps'] else None)
 
     def _new_record(self, step, frame, trial_result, trial_tracking, event,
                     n_candidates):
@@ -1436,6 +1566,8 @@ class LandauZenerSurfaceHoppingDynamics:
             'trajectory_id': self.settings.trajectory_id,
             'step': int(step),
             'time': float(time_fs),
+            'central_step': (None if frame is None else int(frame.step)),
+            'central_time': (None if frame is None else float(frame.time_fs)),
             'active_state': int(active_state),
             'raw_state_energies':
                 np.asarray(trial_result.state_energies).tolist(),
@@ -1501,58 +1633,16 @@ class LandauZenerSurfaceHoppingDynamics:
         }
         # yapf: enable
 
-        # 1. Kinetic Energy.  With a saved frame this is the kinetic energy at
-        # the central frame; without one it is the current context state, so
-        # that the pre-trajectory snapshot reports a real total energy.
-        rescaling_indices = self.rescaling_atoms
-
+        # Preserve the central kinetic energy as explicit event provenance.
+        # The legacy/public kinetic_energy field is populated below from the
+        # retained endpoint so it is synchronized with the electronic terms.
         if frame is not None:
-            all_velocities_nm_ps = frame.velocities_nm_ps
+            record['central_kinetic_energy'] = self._kinetic_energy_au(
+                frame.velocities_nm_ps)
         else:
-            state = self.context.getState(getVelocities=True)
-            velocity_unit = unit.nanometer / unit.picosecond
-            all_velocities_nm_ps = np.asarray(
-                state.getVelocities(asNumpy=True).value_in_unit(velocity_unit),
-                dtype=float)
+            record['central_kinetic_energy'] = None
 
-        masses_au = self.get_masses_in_au(rescaling_indices)
-        velocities_au = (all_velocities_nm_ps[rescaling_indices] *
-                         NM_PER_PS_IN_AU_VELOCITY)
-        ke_au = 0.5 * np.sum(masses_au * np.sum(velocities_au**2, axis=1))
-        record['kinetic_energy'] = float(ke_au)
-
-        # 2. Temperature (from KE, NVE ensemble)
-        n_atoms = len(rescaling_indices)
-        n_dof = 3 * n_atoms - 6
-        if n_atoms <= 2:
-            n_dof = 3 * n_atoms - 5
-        if n_dof > 0:
-            ke_joule = ke_au * hartree_in_kjpermol() * 1000.0 / 6.02214076e23
-            k_B = 1.380649e-23
-            record['temperature_kelvin'] = float(2.0 * ke_joule / (n_dof * k_B))
-        else:
-            record['temperature_kelvin'] = 0.0
-
-        # 3. Active state energy
-        adiabatic_energies = trial_result.adiabatic_state_energies()
-        active_idx = active_state
-        record['active_state_energy'] = float(adiabatic_energies[active_idx])
-
-        # 4. Total energy
-        record['total_energy'] = record['kinetic_energy'] + record[
-            'active_state_energy']
-
-        # 5. Energy gaps between states
-        record['energy_gaps'] = [
-            abs(float(adiabatic_energies[i + 1] - adiabatic_energies[i]))
-            for i in range(len(adiabatic_energies) - 1)
-        ]
-
-        # 6. Minimum gap (useful for analysis)
-        if len(record['energy_gaps']) > 0:
-            record['minimum_energy_gap'] = float(min(record['energy_gaps']))
-        else:
-            record['minimum_energy_gap'] = None
+        self._update_endpoint_observables(record, trial_result)
 
         if event is not None:
             event_permutation = np.asarray(

@@ -415,7 +415,8 @@ class ElectronicStateResult:
             oscillator_strengths=take(descriptors.oscillator_strengths),
             transition_dipoles=take(descriptors.transition_dipoles),
             excitation_vectors=take(descriptors.excitation_vectors),
-            overlap_matrix=None)
+            overlap_matrix=None,
+            overlap_source=descriptors.overlap_source)
 
     def is_valid(self):
         """
@@ -1444,6 +1445,19 @@ class BackendStateProvider(ElectronicStateProvider):
                 (previous.n_states, snapshot.n_states),
                 'BackendStateProvider: the cross-geometry overlap has the '
                 'wrong shape for the accepted reference.')
+            if (snapshot.backend == 'openqp' and
+                    snapshot.method == 'mrsf-tddft'):
+                assert_msg_critical(
+                    snapshot.overlap_is_conditioned is True and
+                    snapshot.overlap_source in (
+                        'native_state_overlap',
+                        'mrsf_response_vector_overlap') and
+                    snapshot.native_overlap_matrix is not None and
+                    snapshot.native_spectral_norm is not None and
+                    snapshot.selected_spectral_norm is not None,
+                    'BackendStateProvider: the OpenQP MRSF snapshot lacks a '
+                    'conditioned overlap-selection decision and its required '
+                    'provenance; state assignment cannot proceed safely.')
             assert_msg_critical(
                 snapshot.reference_multiplicity ==
                 previous.reference_multiplicity and
@@ -1467,7 +1481,8 @@ class BackendStateProvider(ElectronicStateProvider):
             excitation_energies=response_energies,
             overlap_matrix=(None if snapshot.overlap_to_previous is None else
                             np.asarray(snapshot.overlap_to_previous,
-                                       dtype=float)))
+                                       dtype=float)),
+            overlap_source=snapshot.overlap_source)
 
         return ElectronicStateResult(
             geometry=np.asarray(snapshot.geometry, dtype=float),

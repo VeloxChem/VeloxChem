@@ -75,6 +75,14 @@ _REQUIRED_SNAPSHOT_KEYS = (
 # assignment assumes and must surface rather than be silently clipped.
 _OVERLAP_MAGNITUDE_TOLERANCE = 1.0e-3
 
+# For two orthonormal state spaces every singular value of their cross-overlap
+# is at most one.  OpenQP's approximate MRSF many-electron overlap is normally
+# only a few parts in 1e-3 above that limit.  A substantially larger value
+# means that the matrix cannot be used as a state-space metric.  This occurs,
+# for example, for the azobenzene S1 bend/torsion point where the largest
+# singular value is 2.44 even though every individual entry is below one.
+_OVERLAP_SPECTRAL_TOLERANCE = 5.0e-2
+
 _HARTREE_IN_EV = 27.211386245988
 
 # Refusing to commit an unreliable assignment keeps the reference at the last
@@ -130,6 +138,168 @@ def native_overlap_to_previous_current(state_overlap):
     return np.ascontiguousarray(overlap.T)
 
 
+def normalized_mrsf_response_overlap(previous_response,
+                                      current_response,
+                                      nstates):
+    """Builds a normalized MRSF response-vector cross overlap.
+
+    OpenQP exposes ``OQP::td_bvec_mo`` with its Fortran dimensions reported to
+    Python.  As in OpenQP's own :meth:`NACME.align_x`, the state vectors are
+    recovered with ``reshape(nstates, -1)``.  ``BasisOverlap`` has already
+    aligned the current MO phases/order before the current response is solved,
+    so these vectors provide an independent character descriptor when the
+    approximate many-electron state overlap is not a valid overlap operator.
+
+    The returned convention is the tracker convention: previous raw roots in
+    rows and current raw roots in columns.
+    """
+
+    count = int(nstates)
+    if count < 1:
+        raise ValueError(
+            'normalized_mrsf_response_overlap: nstates must be positive.')
+
+    previous = np.asarray(previous_response, dtype=float)
+    current = np.asarray(current_response, dtype=float)
+    if previous.size != current.size or previous.size % count != 0:
+        raise ValueError(
+            'normalized_mrsf_response_overlap: incompatible response-vector '
+            f'sizes {previous.size} and {current.size} for {count} states.')
+    if not (np.all(np.isfinite(previous)) and np.all(np.isfinite(current))):
+        raise ValueError(
+            'normalized_mrsf_response_overlap: nonfinite response vectors.')
+
+    previous = previous.reshape((count, -1))
+    current = current.reshape((count, -1))
+    previous_norm = np.linalg.norm(previous, axis=1)
+    current_norm = np.linalg.norm(current, axis=1)
+    threshold = np.finfo(float).eps
+    if np.any(previous_norm <= threshold) or np.any(current_norm <= threshold):
+        raise ValueError(
+            'normalized_mrsf_response_overlap: zero-norm response vector.')
+
+    overlap = previous @ current.T
+    overlap /= previous_norm[:, None] * current_norm[None, :]
+    return np.ascontiguousarray(overlap)
+
+
+def _validated_mrsf_overlap(state_overlap, nstates, descriptor):
+    """Validates one candidate OpenQP MRSF assignment descriptor."""
+
+    count = int(nstates)
+    overlap = np.asarray(state_overlap, dtype=float)
+    if overlap.size != count * count:
+        raise ValueError(
+            f'OpenQP MRSF {descriptor} overlap has size {overlap.size}, '
+            f'expected {count * count}.')
+    overlap = overlap.reshape((count, count))
+    if not np.all(np.isfinite(overlap)):
+        raise ValueError(
+            f'OpenQP MRSF {descriptor} overlap contains nonfinite values.')
+
+    # Never clip: a magnitude above one means that the descriptor is not a
+    # normalized state overlap. Hiding it would silently corrupt assignment.
+    largest = float(np.max(np.abs(overlap))) if overlap.size else 0.0
+    if largest > 1.0 + _OVERLAP_MAGNITUDE_TOLERANCE:
+        raise ValueError(
+            f'OpenQP MRSF {descriptor} overlap has magnitude '
+            f'{largest:.6f}, which exceeds one by more than the accepted '
+            f'tolerance {_OVERLAP_MAGNITUDE_TOLERANCE:.1e}. The overlap is '
+            'not normalized.')
+
+    return np.ascontiguousarray(overlap)
+
+
+@dataclass(frozen=True)
+class OpenQPMRSFOverlapSelection:
+    """Conditioning decision shared by optimization and surface hopping."""
+
+    selected_overlap: np.ndarray
+    overlap_source: str
+    native_overlap: np.ndarray
+    response_overlap: np.ndarray = None
+    native_spectral_norm: float = None
+    selected_spectral_norm: float = None
+    is_conditioned: bool = False
+    warnings: tuple = field(default_factory=tuple)
+
+
+def select_mrsf_assignment_overlap(native_overlap,
+                                   response_overlap=None,
+                                   nstates=None):
+    """Selects a conditioned MRSF descriptor for state assignment.
+
+    The native OpenQP matrix is retained when its largest singular value is at
+    most ``1.05``.  Otherwise the normalized response-vector overlap is used,
+    when available.  Both optimization and surface hopping call this function,
+    so the physical validity criterion and fallback cannot drift apart.
+
+    :return:
+        An :class:`OpenQPMRSFOverlapSelection` retaining both descriptors and
+        their conditioning provenance.
+    """
+
+    native_array = np.asarray(native_overlap, dtype=float)
+    if nstates is None:
+        if (native_array.ndim != 2 or
+                native_array.shape[0] != native_array.shape[1]):
+            raise ValueError(
+                'OpenQP MRSF native overlap must be square when nstates is '
+                'not supplied.')
+        nstates = int(native_array.shape[0])
+
+    native_signed = _validated_mrsf_overlap(
+        native_array, nstates, 'native state')
+    native_spectral_norm = float(
+        np.linalg.svd(native_signed, compute_uv=False)[0])
+    native_is_conditioned = bool(
+        native_spectral_norm <= 1.0 + _OVERLAP_SPECTRAL_TOLERANCE)
+
+    response_signed = None
+    selected = native_signed
+    overlap_source = 'native_state_overlap'
+    warnings = []
+
+    if not native_is_conditioned:
+        warnings.append(
+            'native state-overlap matrix is not a valid overlap operator: '
+            f'largest singular value {native_spectral_norm:.6f} exceeds '
+            f'{1.0 + _OVERLAP_SPECTRAL_TOLERANCE:.6f}')
+        if response_overlap is not None:
+            response_signed = _validated_mrsf_overlap(
+                response_overlap, nstates, 'response-vector')
+            selected = response_signed
+            overlap_source = 'mrsf_response_vector_overlap'
+            warnings.append(
+                'using normalized MRSF response-vector overlap for the '
+                'assignment; the native matrix is retained for diagnostics')
+    elif response_overlap is not None:
+        # Retain the independent descriptor even when it is not selected.
+        response_signed = _validated_mrsf_overlap(
+            response_overlap, nstates, 'response-vector')
+
+    selected_spectral_norm = float(
+        np.linalg.svd(selected, compute_uv=False)[0])
+    selected_is_conditioned = bool(
+        selected_spectral_norm <= 1.0 + _OVERLAP_SPECTRAL_TOLERANCE)
+
+    if not selected_is_conditioned and overlap_source != 'native_state_overlap':
+        warnings.append(
+            f'{overlap_source} is not a valid overlap operator: largest '
+            f'singular value {selected_spectral_norm:.6f} exceeds '
+            f'{1.0 + _OVERLAP_SPECTRAL_TOLERANCE:.6f}')
+
+    return OpenQPMRSFOverlapSelection(
+        selected_overlap=selected,
+        overlap_source=overlap_source,
+        native_overlap=native_signed,
+        response_overlap=response_signed,
+        native_spectral_norm=native_spectral_norm,
+        selected_spectral_norm=selected_spectral_norm,
+        is_conditioned=selected_is_conditioned,
+        warnings=tuple(warnings))
+
+
 @dataclass
 class OpenQPStateTrackingResult:
     """Result of one MRSF persistent-state assignment.
@@ -169,6 +339,13 @@ class OpenQPStateTrackingResult:
     # Without it the history cannot be aligned with the converged geometries:
     # a scan produces many evaluations per grid point, not one.
     scan_point: int = None
+    # Descriptor actually used for the assignment.  The native matrix remains
+    # available even when its conditioning forces the response-vector fallback.
+    overlap_source: str = 'native_state_overlap'
+    native_overlap_matrix: np.ndarray = None
+    response_overlap_matrix: np.ndarray = None
+    native_spectral_norm: float = None
+    selected_spectral_norm: float = None
 
     def to_dict(self):
         """Returns a JSON-serializable diagnostics dictionary."""
@@ -211,6 +388,19 @@ class OpenQPStateTrackingResult:
             'stale_reference_steps': int(self.stale_reference_steps),
             'scan_point': (None if self.scan_point is None else
                            int(self.scan_point)),
+            'overlap_source': str(self.overlap_source),
+            'native_overlap_matrix':
+                (None if self.native_overlap_matrix is None else
+                 self.native_overlap_matrix.astype(float).tolist()),
+            'response_overlap_matrix':
+                (None if self.response_overlap_matrix is None else
+                 self.response_overlap_matrix.astype(float).tolist()),
+            'native_spectral_norm':
+                (None if self.native_spectral_norm is None else
+                 float(self.native_spectral_norm)),
+            'selected_spectral_norm':
+                (None if self.selected_spectral_norm is None else
+                 float(self.selected_spectral_norm)),
         }
 
 
@@ -393,9 +583,10 @@ class OpenQPMRSFStateTracker:
             similarity_matrix=np.eye(self.nstates),
             signed_overlap_matrix=None,
             warnings=['OpenQP MRSF tracking reference initialized.'],
-            reference_initialized=True)
+            reference_initialized=True,
+            overlap_source='initial_energy_order')
 
-    def evaluate(self, state_energies, state_overlap):
+    def evaluate(self, state_energies, state_overlap, response_overlap=None):
         """Assigns current raw roots to the previous persistent identities.
 
         ``state_overlap`` must have previous raw roots in rows and current raw
@@ -419,8 +610,18 @@ class OpenQPMRSFStateTracker:
                 'restart the tracking from the current geometry.')
 
         energies = self._validate_energies(state_energies)
-        signed = self._validate_overlap(state_overlap)
-        # The metric itself is unchanged: absolute native overlap.  Magnitudes
+        overlap_selection = select_mrsf_assignment_overlap(
+            state_overlap, response_overlap=response_overlap,
+            nstates=self.nstates)
+        native_signed = overlap_selection.native_overlap
+        response_signed = overlap_selection.response_overlap
+        signed = overlap_selection.selected_overlap
+        overlap_source = overlap_selection.overlap_source
+        native_spectral_norm = overlap_selection.native_spectral_norm
+        selected_spectral_norm = overlap_selection.selected_spectral_norm
+        selected_is_conditioned = overlap_selection.is_conditioned
+
+        # The assignment metric is the absolute selected overlap.  Magnitudes
         # above one are rejected in _validate_overlap rather than clipped.
         raw_similarity = np.abs(signed)
 
@@ -491,9 +692,10 @@ class OpenQPMRSFStateTracker:
         reliable_overlap = target_score >= self.minimum_overlap
         reliable_ratio = (
             ambiguity_ratio <= self.maximum_ambiguity_ratio)
-        is_reliable = bool(reliable_overlap and reliable_ratio)
+        is_reliable = bool(
+            reliable_overlap and reliable_ratio and selected_is_conditioned)
 
-        warnings = []
+        warnings = list(overlap_selection.warnings)
         if not reliable_overlap:
             warnings.append(
                 f'target overlap {target_score:.6f} is below the configured '
@@ -560,7 +762,12 @@ class OpenQPMRSFStateTracker:
             ground_state_guarded=guarding,
             unguarded_raw_root=unguarded_raw + 1,
             ground_state_gap_ev=gap_ev,
-            stale_reference_steps=int(self.consecutive_rejected_commits))
+            stale_reference_steps=int(self.consecutive_rejected_commits),
+            overlap_source=overlap_source,
+            native_overlap_matrix=native_signed,
+            response_overlap_matrix=response_signed,
+            native_spectral_norm=native_spectral_norm,
+            selected_spectral_norm=selected_spectral_norm)
 
     def propose(self, result, xyz, data):
         """Stages a finished evaluation as a *candidate* reference.
@@ -759,28 +966,8 @@ class OpenQPMRSFStateTracker:
         return energies.copy()
 
     def _validate_overlap(self, state_overlap):
-        overlap = np.asarray(state_overlap, dtype=float)
-        if overlap.size != self.nstates * self.nstates:
-            raise ValueError(
-                'OpenQPMRSFStateTracker: native overlap has size '
-                f'{overlap.size}, expected {self.nstates * self.nstates}.')
-        overlap = overlap.reshape((self.nstates, self.nstates))
-        if not np.all(np.isfinite(overlap)):
-            raise ValueError(
-                'OpenQPMRSFStateTracker: nonfinite native state overlap.')
-
-        # Never clip: a magnitude above one means the overlap is not a
-        # normalized state overlap, and hiding it would silently corrupt the
-        # assignment instead of reporting a broken native quantity.
-        largest = float(np.max(np.abs(overlap)))
-        if largest > 1.0 + _OVERLAP_MAGNITUDE_TOLERANCE:
-            raise ValueError(
-                'OpenQPMRSFStateTracker: native state overlap has magnitude '
-                f'{largest:.6f}, which exceeds one by more than the accepted '
-                f'tolerance {_OVERLAP_MAGNITUDE_TOLERANCE:.1e}. The overlap '
-                'is not a normalized state overlap.')
-
-        return overlap.copy()
+        return _validated_mrsf_overlap(
+            state_overlap, self.nstates, 'native state')
 
     def _validate_snapshot(self, data):
         if not isinstance(data, dict):

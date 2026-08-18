@@ -87,9 +87,9 @@ class SerenityLinearResponseSolver:
         self.max_subspace_dimension = None
 
         # 'none' avoids missing RI auxiliary basis failures in minimal setups.
-        self.densfit_j = 'none'
-        self.grid_accuracy = 7
-        self.small_grid_accuracy = 7
+        self.densfit_j = serenity_scf_drv.densfit_j
+        self.grid_accuracy = serenity_scf_drv.grid_accuracy
+        self.small_grid_accuracy = serenity_scf_drv.small_grid_accuracy
 
         self._lr_task = None
         self._rsp_results = None

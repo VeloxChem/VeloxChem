@@ -44,6 +44,7 @@ from .molecule import Molecule
 from .profiler import Profiler
 from .inputparser import write_unparsed_input_to_hdf5
 from .errorhandler import assert_msg_critical
+from .optimizationsteprecorder import OptimizationStepRecorder
 from .transitiondensitytracker import (StateTrackingError,
                                        StateTrackingStatus)
 
@@ -157,6 +158,8 @@ class OptimizationEngine(geometric.engine.Engine):
         self.opt_current_step = 0
         self._last_evaluated_coords = None
         self._accepted_tracking_coords = None
+        self.intermediate_data_directory = None
+        self._step_recorder = None
 
         # Constraint reporting.  geomeTRIC logs its own "Scan i/N" banner
         # through a logger that VeloxChem captures into a buffer, so nothing
@@ -165,6 +168,37 @@ class OptimizationEngine(geometric.engine.Engine):
         # of every evaluated geometry.
         self._constraints = []
         self._scan_point_index = 0
+
+    def set_intermediate_data_directory(self, directory):
+        """Enables durable per-evaluation optimization records.
+
+        Only the MPI master writes.  Every optimization allocates a new
+        ``run_NNNN`` child, so restarting a failed scan point never overwrites
+        the structures and overlap decisions from the previous attempt.
+        """
+
+        if directory is None or not str(directory).strip():
+            self.intermediate_data_directory = None
+            self._step_recorder = None
+            return None
+
+        if self.rank == mpi_master():
+            recorder = OptimizationStepRecorder.create(
+                directory,
+                self.molecule.get_labels(),
+                type(self.grad_drv).__name__)
+            run_directory = str(recorder.run_directory)
+            self._step_recorder = recorder
+        else:
+            run_directory = None
+        run_directory = self.comm.bcast(run_directory, root=mpi_master())
+        self.intermediate_data_directory = run_directory
+
+        if self.rank == mpi_master():
+            self.grad_drv.ostream.print_info(
+                'Intermediate optimization data: ' + run_directory)
+            self.grad_drv.ostream.flush()
+        return run_directory
 
     def lower(self):
         """
@@ -315,8 +349,12 @@ class OptimizationEngine(geometric.engine.Engine):
         """
 
         commit = getattr(self.grad_drv, 'commit_tracking_reference', None)
+        committed = None
         if commit is not None:
-            commit()
+            committed = commit()
+        if self.rank == mpi_master() and self._step_recorder is not None:
+            self._step_recorder.mark_active(
+                'accepted', tracking_reference_advanced=committed)
         if self._last_evaluated_coords is not None:
             self._accepted_tracking_coords = self._last_evaluated_coords.copy()
 
@@ -332,8 +370,57 @@ class OptimizationEngine(geometric.engine.Engine):
         """
 
         rollback = getattr(self.grad_drv, 'rollback_tracking_reference', None)
+        rolled_back = None
         if rollback is not None:
-            rollback()
+            rolled_back = rollback()
+        if self.rank == mpi_master() and self._step_recorder is not None:
+            self._step_recorder.mark_active(
+                'rejected',
+                tracking_reference_advanced=(
+                    False if rollback is not None else None))
+
+    def _tracking_record(self):
+        """Returns backend-neutral tracking diagnostics for one evaluation."""
+
+        result = getattr(self.grad_drv, 'last_tracking_result', None)
+        if result is not None:
+            to_dict = getattr(result, 'to_dict', None)
+            return to_dict() if to_dict is not None else result
+        return getattr(self.grad_drv, 'tracking_info', None)
+
+    def _electronic_record(self):
+        """Collects common state-energy/root metadata from the gradient driver."""
+
+        record = {}
+        for attribute in (
+                'total_energy', 'reference_energy', 'excited_state_energy',
+                'selected_excitation_energy', 'target_state_energies',
+                'state_deriv_index', 'target_state_index'):
+            value = getattr(self.grad_drv, attribute, None)
+            if value is not None:
+                record[attribute] = value
+
+        tracker = getattr(self.grad_drv, 'state_tracker', None)
+        if tracker is not None:
+            revision = getattr(tracker, 'reference_revision', None)
+            if revision is not None:
+                record['tracking_reference_revision'] = int(revision)
+        return record
+
+    def _record_intermediate_step(self, coords, energy, gradient):
+        """Writes the just-completed optimizer evaluation on the master rank."""
+
+        if self.rank != mpi_master() or self._step_recorder is None:
+            return
+        scan_point = self._scan_point_index if self._constraints else None
+        self._step_recorder.record_evaluation(
+            self.opt_current_step,
+            coords,
+            energy,
+            gradient,
+            self._electronic_record(),
+            tracking=self._tracking_record(),
+            scan_point=scan_point)
 
     def _compute_energy_gradient(self, molecule):
         """Evaluates one molecule using the driver's atomic contract."""
@@ -560,6 +647,8 @@ class OptimizationEngine(geometric.engine.Engine):
         energy, gradient = self._validate_step_results(
             energy, gradient, new_mol.number_of_atoms())
 
+        self._record_intermediate_step(coords, energy, gradient)
+
         self._last_evaluated_coords = np.asarray(coords, dtype=float).copy()
         if self.opt_current_step == 0:
             # The first electronic evaluation defines the accepted baseline.
@@ -615,6 +704,11 @@ class OptimizationEngine(geometric.engine.Engine):
 
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
+                continue
+            if key == '_step_recorder':
+                # A copied geomeTRIC engine (for example for a Hessian helper)
+                # must not race the live optimizer for the same step paths.
+                setattr(new_engine, key, None)
                 continue
             setattr(new_engine, key, deepcopy(val))
 
