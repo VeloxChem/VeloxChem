@@ -38,8 +38,8 @@ from .veloxchemlib import mpi_master, hartree_in_ev
 from .errorhandler import assert_msg_critical
 from .serenityscfdriver import SerenityScfDriver
 
-from .resultsio import write_lr_rsp_results_to_hdf5
-from .resultsio import write_rsp_solution
+from .resultsio import write_rsp_results_to_hdf5
+from .resultsio import write_rsp_full_solution_to_hdf5
 from .resultsio import write_scf_results_to_hdf5
 
 try:
@@ -772,7 +772,7 @@ class SerenityLinearResponseSolver:
             eigvecs = eigvecs.reshape(-1, 1)
 
         for state in range(eigvecs.shape[1]):
-            write_rsp_solution(fname, f"S{state + 1}", eigvecs[:, state])
+            write_rsp_full_solution_to_hdf5(fname, f"S{state + 1}", eigvecs[:, state])
         
     def _write_final_hdf5(self, molecule, rsp_results):
         final_h5_fname = self.scf_driver.get_final_h5py_file()
@@ -800,7 +800,7 @@ class SerenityLinearResponseSolver:
             self.scf_driver.write_final_hdf5(final_h5_fname, molecule)
             h5_results = self._build_hdf5_rsp_results(rsp_results)
 
-        write_lr_rsp_results_to_hdf5(final_h5_fname, h5_results)
+        write_rsp_results_to_hdf5(final_h5_fname, h5_results)
 
     def _build_hdf5_rsp_results(self, rsp_results):
         transitions = np.array(rsp_results.get('transitions', []), dtype=float)
