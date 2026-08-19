@@ -208,6 +208,7 @@ from .excitedstateanalysisdriver import ExcitedStateAnalysisDriver
 from .valetanalyzer import ValetAnalyzer
 from .evbdriver import EvbDriver
 from .reaffbuilder import ReactionForceFieldBuilder
+from .metalsiteffbuilder import MetalSiteForceFieldBuilder
 from .evbsystembuilder import EvbSystemBuilder
 from .evbsystembuilder import EvbForceGroup
 from .evbfepdriver import EvbFepDriver

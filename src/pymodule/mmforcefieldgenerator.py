@@ -2861,7 +2861,8 @@ class MMForceFieldGenerator:
                        hessian=None,
                        reparameterize_all=False,
                        reparameterize_keys=None,
-                       method='seminario'):
+                       method='seminario',
+                       average_metal_terms=True):
         """
         Reparameterizes force-field parameters using a QM Hessian matrix.
 
@@ -2895,6 +2896,15 @@ class MMForceFieldGenerator:
             dicts by set membership.
         :param method:
             Parameterization method: ``'seminario'`` (default) or ``'phf'``.
+        :param average_metal_terms:
+            If True (default), bonds and angles involving a metal centre are
+            averaged over equivalent atoms like any other term, which is the
+            desired behaviour whenever the equivalent metal-ligand bonds really
+            are identical (e.g. in a MOF).  Set to False in a strained or 
+            low-symmetry site where two ligands can be topologically
+            equivalent while sitting at genuinely different distances from the
+            metal, such as a metallo-enzyme. Only used by the ``'seminario'`` 
+            method.
         """
 
         assert_msg_critical(
@@ -3067,7 +3077,20 @@ class MMForceFieldGenerator:
             self.ostream.print_blank()
             self.ostream.flush()
 
+            # Optionally exclude terms involving a metal centre from the
+            # averaging over equivalent atoms below (see average_metal_terms).
+            if average_metal_terms:
+                is_metal = [False] * self.molecule.number_of_atoms()
+            else:
+                atomtypeidentifier = AtomTypeIdentifier(self.comm)
+                is_metal = [
+                    atomtypeidentifier.element_id_is_metal(elem_id)
+                    for elem_id in self.molecule.get_element_ids()
+                ]
+
             # Reparameterize bonds
+
+            reparameterized_bonds = []
 
             for i, j in self.bonds:
 
@@ -3090,11 +3113,22 @@ class MMForceFieldGenerator:
                 self.bonds[(i, j)]['force_constant'] = new_force_constant
                 self.bonds[(i, j)]['comment'] += ' from Hessian'
 
+                reparameterized_bonds.append((i, j))
+
             # Average over equivalent bonds
+            #
+            # Only bonds that were actually reparameterized above take part:
+            # averaging a freshly fitted value together with an untouched
+            # (e.g. still guessed) one would corrupt both.
 
             uniq_bonds_data = {}
 
-            for (i, j), bond in self.bonds.items():
+            for i, j in reparameterized_bonds:
+                if is_metal[i] or is_metal[j]:
+                    continue
+
+                bond = self.bonds[(i, j)]
+
                 eq_atoms_ij = tuple(
                     sorted([
                         self.atoms[i]['equivalent_atom'],
@@ -3124,6 +3158,8 @@ class MMForceFieldGenerator:
 
             # Reparameterize angles
 
+            reparameterized_angles = []
+
             for i, j, k in self.angles:
 
                 if not reparameterize_all:
@@ -3148,11 +3184,20 @@ class MMForceFieldGenerator:
                 self.angles[(i, j, k)]['force_constant'] = new_force_constant
                 self.angles[(i, j, k)]['comment'] += ' from Hessian'
 
+                reparameterized_angles.append((i, j, k))
+
             # Average over equivalent angles
+            #
+            # Same restriction as for the bonds above.
 
             uniq_angles_data = {}
 
-            for (i, j, k), angle in self.angles.items():
+            for i, j, k in reparameterized_angles:
+                if is_metal[i] or is_metal[j] or is_metal[k]:
+                    continue
+
+                angle = self.angles[(i, j, k)]
+
                 eq_atoms_ijk = sorted([
                     self.atoms[i]['equivalent_atom'],
                     self.atoms[k]['equivalent_atom']
