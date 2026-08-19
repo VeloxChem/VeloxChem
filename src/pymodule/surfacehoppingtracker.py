@@ -32,13 +32,13 @@
 """
 Electronic-state tracking for surface-hopping dynamics.
 
-The root index returned by a TDA/TDDFT eigensolver is an energy ordering, not
-a persistent physical state identity: two roots that cross between consecutive
-geometries swap indices without anything physical happening.  Feeding raw root
-indices into a Landau-Zener gap history therefore produces spurious events.
+The root index returned by a TDA/TDDFT eigensolver is an instantaneous energy
+ordering, not a persistent electronic-character label.  Near an avoided
+crossing, two raw adiabatic roots can exchange character even though the
+energy-ordered surfaces themselves remain well defined.
 
-This module assigns a persistent identity to each root by maximizing a
-state-similarity matrix
+This module records that character bookkeeping by maximizing a state-similarity
+matrix
 
 .. math::
 
@@ -46,7 +46,10 @@ state-similarity matrix
              \\right|
 
 or a documented approximation to it, subject to a one-to-one constraint solved
-with the Hungarian algorithm.
+with the Hungarian algorithm.  In adiabatic Landau-Zener surface hopping the
+result is a continuity/integrity diagnostic: raw roots still index forces,
+energy gaps and hop source/target states.  A reliable non-identity permutation
+does not itself switch the active surface.
 
 The module is deliberately free of VeloxChem driver imports so that trackers
 can be unit tested against synthetic descriptors.
@@ -684,8 +687,10 @@ class IdentityStateTracker(ElectronicStateTracker):
     Non-tracker that keeps the raw energy ordering.
 
     Provided only for reference calculations and for reproducing the legacy
-    fixed-root behaviour.  It cannot detect root reordering and will therefore
-    generate spurious Landau-Zener events at state crossings.
+    fixed-root behaviour.  It cannot diagnose electronic-character exchange or
+    loss of continuity, so it is unsafe as the integrity gate of a production
+    trajectory.  Like every tracker, it does not redefine the raw adiabatic
+    indices consumed by the Landau-Zener detector.
     """
 
     method_name = 'none'

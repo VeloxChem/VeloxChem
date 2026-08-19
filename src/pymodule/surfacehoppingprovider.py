@@ -32,10 +32,21 @@
 """
 Electronic-state providers for surface-hopping dynamics.
 
-A provider owns the electronic-structure drivers and answers a single
-question: given a nuclear geometry and an active state, what are the native
-adiabatic state energies, the gradient of the active adiabatic root, and the
-descriptors needed to track electronic character?
+A provider answers a single question: given a nuclear geometry and an active
+state, what are the native adiabatic state energies, the gradient of the
+active adiabatic root, and the descriptors needed to track electronic
+character?
+
+Driver construction is deliberately *not* a provider responsibility.  A
+normal input script constructs and configures its SCF, response and gradient
+drivers first, hands the appropriate configured driver to an electronic
+backend adapter, and finally hands that adapter to
+:class:`BackendStateProvider`.  The provider owns only trajectory-facing
+state: bounded caches, accepted/trial reference transactions and validated
+conversion of backend snapshots into :class:`ElectronicStateResult` objects.
+This keeps basis sets, functionals, convergence controls, scratch paths and
+output policy visible in the input script, just as they are for an ordinary
+single-point or optimization calculation.
 
 State-index convention
 ----------------------
@@ -1015,14 +1026,12 @@ class BackendStateProvider(ElectronicStateProvider):
 
     :param adapter:
         An :class:`ElectronicBackendAdapter`.
-    :param number_of_states:
-        Number of physical target states, which must match the adapter.
     :param cache_size:
         Number of retained snapshots; must cover the checkpoint-and-replay
         chronology.
     """
 
-    def __init__(self, adapter, number_of_states=None, cache_size=8):
+    def __init__(self, adapter, cache_size=8):
 
         from .surfacehoppingbackends import ElectronicBackendAdapter
 
@@ -1031,16 +1040,12 @@ class BackendStateProvider(ElectronicStateProvider):
             'BackendStateProvider: adapter must be an '
             'ElectronicBackendAdapter.')
 
-        states = (adapter.number_of_states if number_of_states is None else
-                  int(number_of_states))
-
-        assert_msg_critical(
-            states == adapter.number_of_states,
-            'BackendStateProvider: the adapter computes '
-            f'{adapter.number_of_states} target states but {states} were '
-            'requested.')
-
-        super().__init__(states, cache_size=cache_size)
+        # The adapter is the single source of truth for the physical target
+        # ladder.  Repeating number_of_states in this constructor used to make
+        # it possible to configure the same dependency twice.  The controller
+        # still validates the provider against SurfaceHoppingSettings at its
+        # own boundary.
+        super().__init__(adapter.number_of_states, cache_size=cache_size)
 
         self.adapter = adapter
         self.generation = 0

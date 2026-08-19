@@ -43,7 +43,7 @@ All quantities are in atomic units:
     * gap curvature                 : Hartree / (atomic time unit)**2
 
 With hbar = 1 the adiabatic Landau-Zener hopping probability evaluated at a
-local minimum of the tracked adiabatic energy gap Z_ab(t) = |E_b - E_a| reads
+local minimum of the raw adiabatic energy gap Z_ab(t) = |E_b - E_a| reads
 
 .. math::
 
@@ -68,7 +68,8 @@ DEFAULT_EXPONENT_CLIP = 700.0
 @dataclass
 class GapFitResult:
     """
-    Result of a local fit of a tracked energy gap around a candidate minimum.
+    Result of a local fit of a raw adiabatic energy gap around a candidate
+    minimum.
 
     :param minimum_gap:
         Interpolated minimum gap Z_c, in Hartree.
@@ -165,7 +166,7 @@ def landau_zener_probability(minimum_gap,
 
 class GapMinimumFitter:
     """
-    Base class for local fits of a tracked energy gap around a minimum.
+    Base class for local fits of a raw adiabatic energy gap around a minimum.
 
     Subclasses implement :func:`fit` and declare how many uniformly spaced
     samples they consume via :attr:`n_points`.  The dynamics controller only
@@ -357,12 +358,14 @@ def create_gap_fitter(name):
 
 class LandauZenerEventDetector:
     """
-    Detects local minima of tracked adiabatic energy gaps and converts them
+    Detects local minima of raw adiabatic energy gaps and converts them
     into validated :class:`LandauZenerEvent` objects.
 
-    The detector is purely numerical: it consumes tracked state energies in
-    Hartree, keyed by persistent (tracked) state index, and knows nothing
-    about wavefunctions, OpenMM or VeloxChem drivers.
+    The detector is purely numerical: it consumes state energies in raw
+    adiabatic-root order, keyed by raw source/target indices, and knows nothing
+    about character labels, wavefunctions, OpenMM or VeloxChem drivers.  State
+    tracking may gate an event through ``tracking_quality`` but does not
+    permute these energies or indices.
 
     :param timestep:
         The uniform electronic timestep, in atomic time units.
@@ -446,7 +449,7 @@ class LandauZenerEventDetector:
         state are no longer meaningful.
 
         :param state:
-            Tracked state index.
+            Raw adiabatic state index.
         """
 
         state = int(state)
@@ -459,16 +462,16 @@ class LandauZenerEventDetector:
 
     def push(self, step, active_state, state_energies, candidate_states):
         """
-        Appends one frame of tracked energies to the gap history.
+        Appends one frame of raw adiabatic energies to the gap history.
 
         :param step:
             Integer index of the electronic frame.
         :param active_state:
-            Tracked index of the currently active state.
+            Raw adiabatic index of the currently active state.
         :param state_energies:
-            Mapping or sequence of tracked state energies, in Hartree.
+            Mapping or sequence of raw adiabatic state energies, in Hartree.
         :param candidate_states:
-            Iterable of tracked indices considered as hopping targets.
+            Iterable of raw adiabatic indices considered as hopping targets.
         """
 
         active_state = int(active_state)

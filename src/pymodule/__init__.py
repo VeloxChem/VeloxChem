@@ -243,6 +243,7 @@ from .transitiondensitytracker import (StateTrackingError,
                                        TransitionDensityTracker)
 
 # Landau-Zener surface hopping
+from .wignersampling import WignerSamplingDriver
 from .landauzener import (LandauZenerEventDetector, LandauZenerEvent,
                           ThreePointGapFitter, FivePointGapFitter,
                           create_gap_fitter, landau_zener_probability)

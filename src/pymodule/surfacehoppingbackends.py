@@ -1808,6 +1808,12 @@ def create_backend_adapter(backend,
     """
     Builds a configured backend adapter by name.
 
+    This is an optional convenience factory.  Input scripts that need the
+    usual VeloxChem driver-level control should construct the drivers
+    themselves and instantiate :class:`OpenQPMRSFAdapter` or
+    :class:`SerenitySFAdapter` directly.  The adapters and
+    ``BackendStateProvider`` never require this factory.
+
     This is the single place a production driver selects its electronic
     backend.  There is no default and no fallback: an unknown name is an
     error, and a name that is installed but unusable raises
@@ -1934,6 +1940,12 @@ def create_backend_provider(backend, molecule_template, number_of_states,
                             cache_size=8, **kwargs):
     """
     Builds a production :class:`BackendStateProvider` by backend name.
+
+    This convenience path constructs drivers internally.  For explicit
+    dependency injection, construct the native driver stack in the input
+    script, pass it to the matching adapter, and call
+    ``BackendStateProvider(adapter)``.  Both setup paths produce the same
+    runtime provider and do not change the surface-hopping controller.
 
     See :func:`create_backend_adapter` for the keyword arguments.
 
