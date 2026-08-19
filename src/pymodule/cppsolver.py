@@ -45,7 +45,8 @@ from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
 from .checkpoint import check_rsp_hdf5
 from .inputparser import parse_seq_fixed
-from .resultsio import write_rsp_solution_with_multiple_keys
+from .resultsio import (clear_group_in_hdf5, write_rsp_full_solution_to_hdf5,
+                        write_rsp_results_to_hdf5)
 
 
 class ComplexResponseSolver(ComplexResponseSolverBase):
@@ -556,10 +557,12 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                     # final h5 file for response solutions
                     if self.filename is not None:
                         final_h5_fname = f'{self.filename}.h5'
+                        # clear stale group in final h5
+                        clear_group_in_hdf5(final_h5_fname, 'rsp')
                     else:
                         final_h5_fname = None
 
-                for bop, w in solutions:
+                for op_w_ind, (bop, w) in enumerate(solutions):
                     x = self.get_full_solution_vector(solutions[(bop, w)])
 
                     if self.rank == mpi_master():
@@ -570,15 +573,10 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                             if self.is_imag(self.a_operator):
                                 rsp_funcs[(aop, bop, w)] *= -1.0
 
-                        # write to h5 file for response solutions
+                        # write solutions to h5 file
                         if (self.save_solutions and final_h5_fname is not None):
-                            solution_keys = [
-                                '{:s}_{:s}_{:.8f}'.format(aop, bop, w)
-                                for aop in self.a_components
-                            ]
-                            write_rsp_solution_with_multiple_keys(
-                                final_h5_fname, solution_keys, x,
-                                self.group_label)
+                            write_rsp_full_solution_to_hdf5(
+                                final_h5_fname, x, op_w_ind, len(solutions))
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
@@ -587,16 +585,31 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                             'Response solution vectors written to file: ' +
                             final_h5_fname)
                         self.ostream.print_blank()
+                        self.ostream.flush()
 
                     ret_dict = {
                         'a_operator': self.a_operator,
                         'a_components': self.a_components,
                         'b_operator': self.b_operator,
                         'b_components': self.b_components,
-                        'frequencies': list(self.frequencies),
+                        'frequencies': np.array(self.frequencies),
                         'response_functions': rsp_funcs,
                         'solutions': solutions,
+                        'molecular_mass_amu': float(sum(molecule.get_masses())),
                     }
+
+                    if (self.save_solutions and
+                            final_h5_fname is not None):
+                        full_solutions_keys = [
+                            '{:s}_{:.8f}'.format(bop, w)
+                            for bop, w in solutions
+                        ]
+                        write_rsp_results_to_hdf5(
+                            final_h5_fname,
+                            {'full_solutions_keys': full_solutions_keys})
+
+                    # add rsp type
+                    ret_dict.update({'rsp_type': 'cpp'})
 
                     self._print_results(ret_dict)
 
@@ -816,20 +829,39 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
         assert_msg_critical(self.property in ['absorption', 'ecd'],
                             'get_cpp_property_densities: Invalid CPP property')
 
-        assert_msg_critical(
-            ('x', w) in cpp_results['solutions'] and
-            ('y', w) in cpp_results['solutions'] and
-            ('z', w) in cpp_results['solutions'],
-            f'get_cpp_property_densities: Could not find frequency {w} in ' +
-            'CPP results')
+        if 'solutions' in cpp_results:
+            assert_msg_critical(
+                ('x', w) in cpp_results['solutions'] and
+                ('y', w) in cpp_results['solutions'] and
+                ('z', w) in cpp_results['solutions'],
+                f'get_cpp_property_densities: Could not find frequency {w} in ' +
+                'CPP results')
 
-        # solution vectors
-        cpp_solution_vector_x = self.get_full_solution_vector(
-            cpp_results['solutions'][('x', w)])
-        cpp_solution_vector_y = self.get_full_solution_vector(
-            cpp_results['solutions'][('y', w)])
-        cpp_solution_vector_z = self.get_full_solution_vector(
-            cpp_results['solutions'][('z', w)])
+            # solution vectors
+            cpp_solution_vector_x = self.get_full_solution_vector(
+                cpp_results['solutions'][('x', w)])
+            cpp_solution_vector_y = self.get_full_solution_vector(
+                cpp_results['solutions'][('y', w)])
+            cpp_solution_vector_z = self.get_full_solution_vector(
+                cpp_results['solutions'][('z', w)])
+
+        else:
+            if self.rank == mpi_master():
+                assert_msg_critical(
+                    f'x_{w:.8f}' in cpp_results and
+                    f'y_{w:.8f}' in cpp_results and
+                    f'z_{w:.8f}' in cpp_results,
+                    f'get_cpp_property_densities: Could not find frequency {w} in ' +
+                    'CPP results')
+
+                # solution vectors
+                cpp_solution_vector_x = cpp_results[f'x_{w:.8f}']
+                cpp_solution_vector_y = cpp_results[f'y_{w:.8f}']
+                cpp_solution_vector_z = cpp_results[f'z_{w:.8f}']
+            else:
+                cpp_solution_vector_x = None
+                cpp_solution_vector_y = None
+                cpp_solution_vector_z = None
 
         # property gradient for a operator
         a_prop_grad = self.get_complex_prop_grad(self.a_operator,

@@ -43,7 +43,8 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
 from .checkpoint import check_rsp_hdf5
-from .resultsio import write_rsp_solution_with_multiple_keys
+from .resultsio import (clear_group_in_hdf5, write_rsp_full_solution_to_hdf5,
+                        write_rsp_results_to_hdf5)
 
 
 class LinearResponseSolver(LinearResponseSolverBase):
@@ -533,10 +534,12 @@ class LinearResponseSolver(LinearResponseSolverBase):
                     # final h5 file for response solutions
                     if self.filename is not None:
                         final_h5_fname = f'{self.filename}.h5'
+                        # clear stale group in final h5
+                        clear_group_in_hdf5(final_h5_fname, 'rsp')
                     else:
                         final_h5_fname = None
 
-                for bop, w in solutions:
+                for op_w_ind, (bop, w) in enumerate(solutions):
                     x = self.get_full_solution_vector(solutions[(bop, w)])
 
                     if self.rank == mpi_master():
@@ -547,15 +550,10 @@ class LinearResponseSolver(LinearResponseSolverBase):
                             if self.is_imag(self.a_operator):
                                 rsp_funcs[(aop, bop, w)] *= -1.0
 
-                        # write to h5 file for response solutions
+                        # write solutions to h5 file
                         if (self.save_solutions and final_h5_fname is not None):
-                            solution_keys = [
-                                '{:s}_{:s}_{:.8f}'.format(aop, bop, w)
-                                for aop in self.a_components
-                            ]
-                            write_rsp_solution_with_multiple_keys(
-                                final_h5_fname, solution_keys, x,
-                                self.group_label)
+                            write_rsp_full_solution_to_hdf5(
+                                final_h5_fname, x, op_w_ind, len(solutions))
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
@@ -564,17 +562,42 @@ class LinearResponseSolver(LinearResponseSolverBase):
                             'Response solution vectors written to file: ' +
                             final_h5_fname)
                         self.ostream.print_blank()
+                        self.ostream.flush()
 
-                    self._print_results(rsp_funcs, self.ostream)
-
-                    return {
+                    ret_dict = {
                         'a_operator': self.a_operator,
                         'a_components': self.a_components,
                         'b_operator': self.b_operator,
                         'b_components': self.b_components,
+                        'frequencies': np.array(self.frequencies),
                         'response_functions': rsp_funcs,
                         'solutions': solutions,
                     }
+
+                    if (self.save_solutions and
+                            final_h5_fname is not None):
+                        full_solutions_keys = [
+                            '{:s}_{:.8f}'.format(bop, w)
+                            for bop, w in solutions
+                        ]
+                        write_rsp_results_to_hdf5(
+                            final_h5_fname,
+                            {'full_solutions_keys': full_solutions_keys})
+
+                    # add rsp type
+                    ret_dict.update({'rsp_type': 'lr'})
+
+                    self._print_results(rsp_funcs, self.ostream)
+
+                    if final_h5_fname is not None:
+                        h5_ret_dict = {
+                            key: value
+                            for key, value in ret_dict.items()
+                            if key != 'solutions'
+                        }
+                        write_rsp_results_to_hdf5(final_h5_fname, h5_ret_dict)
+
+                    return ret_dict
                 else:
                     # non-master rank
                     return {'solutions': solutions}

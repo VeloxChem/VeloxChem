@@ -209,7 +209,8 @@ class EmbeddingIntegralDriver:
                                              dipole_coords=coordinates,
                                              density=density_matrix)
 
-    def electronic_electrostatic_energy_gradients(self,
+    def electronic_electrostatic_energy_gradients(
+            self,
             multipole_coordinates: np.ndarray,
             multipole_orders: np.ndarray,
             multipoles: list[np.ndarray],
@@ -250,11 +251,10 @@ class EmbeddingIntegralDriver:
             density=density_matrix)
         return op
 
-
     def electronic_induction_energy_gradients(self,
-                                             induced_dipoles:np.ndarray,
-                                             coordinates: np.ndarray,
-                                             density_matrix: np.ndarray) -> np.ndarray:
+                                              induced_dipoles:np.ndarray,
+                                              coordinates: np.ndarray,
+                                              density_matrix: np.ndarray) -> np.ndarray:
         """Calculate the electronic induction energy gradients.
 
         Args:
@@ -384,10 +384,10 @@ class EmbeddingIntegralDriver:
         return op
 
     def electronic_electrostatic_fock_gradient(self,
-                                                multipole_coordinates: np.ndarray,
-                                                multipole_orders: np.ndarray,
-                                                multipoles: list[np.ndarray],
-                                                i: int):
+                                               multipole_coordinates: np.ndarray,
+                                               multipole_orders: np.ndarray,
+                                               multipoles: list[np.ndarray],
+                                               i: int):
         """Calculate the electronic electrostatic fock gradient.
 
         Args:
@@ -476,7 +476,6 @@ class EmbeddingIntegralDriver:
                                                         dipole_coords=coordinates,
                                                         dipole_moments=induced_dipoles,
                                                         density=density_matrix)
-
 
 
 class PolarizableEmbedding:
@@ -585,9 +584,9 @@ class PolarizableEmbedding:
                 # Handle single or multiple quantum/classical subsystems
                 self.simulation_box = simulation_box
                 self.quantum_subsystem = quantum_subsystems if len(quantum_subsystems) > 1 else \
-                quantum_subsystems[0] if quantum_subsystems else None
+                    quantum_subsystems[0] if quantum_subsystems else None
                 self.classical_subsystem = classical_subsystems if len(classical_subsystems) > 1 else \
-                classical_subsystems[0] if classical_subsystems else None
+                    classical_subsystems[0] if classical_subsystems else None
 
         elif "objects" in self.options['inputs']:
             # Directly use the provided objects
@@ -758,6 +757,7 @@ class PolarizableEmbeddingLRS(PolarizableEmbedding):
 
         return -1.0 * f_elec_ind
 
+
 class PolarizableEmbeddingGrad(PolarizableEmbedding):
     """
     Subclass for Gradient (Grad) calculations utilizing polarizable embedding.
@@ -872,6 +872,7 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
                 solver=self._solver,
                 mic=self._mic,
                 box=self.simulation_box.box)
+
     def compute_pe_fock_gradient_contributions(self, i):
 
         es_fock_grad = electrostatic_interactions.compute_electronic_electrostatic_fock_gradient(
@@ -895,10 +896,10 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
             density_matrix=density_matrix,
             classical_subsystem=self.classical_subsystem,
             integral_driver=self._integral_driver
-            )
+        )
         e_es_nuc_hess = electrostatic_interactions.compute_electrostatic_nuclear_hessian(
             quantum_subsystem=self.quantum_subsystem,
-            classical_subsystem= self.classical_subsystem)
+            classical_subsystem=self.classical_subsystem)
         # TODO: double check density_matrix
         e_ind_hess = induction_interactions.compute_induction_energy_hessian(
             density_matrix=(-1.0) * density_matrix,
@@ -910,5 +911,5 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
             mic=self._mic,
             box=self.simulation_box.box,
             solver=self._solver
-            )
+        )
         return e_es_elec_hess + e_es_nuc_hess + e_ind_hess + self._e_vdw_hess

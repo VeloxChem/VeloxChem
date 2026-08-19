@@ -317,6 +317,30 @@ def _gen_basis_key(elem_name, basis_dict):
     return basis_key
 
 
+def _get_atom_bas_label(basis_name, atom_basis_labels, idx):
+    """
+    Gets atom basis label.
+
+    :param basis_name:
+        The name of the basis set.
+    :param atom_basis_labels:
+        The list of atom basis labels.
+    :param idx:
+        The index of the atom.
+    :return:
+        The atom basis label.
+    """
+
+    if basis_name.upper() in ['AO-START-GUESS', 'AO-START-GUESS-FOR-ECP']:
+        atom_bas_label = basis_name.upper()
+    else:
+        atom_bas_label = atom_basis_labels[idx].upper()
+        if atom_bas_label == '':
+            atom_bas_label = basis_name.upper()
+
+    return atom_bas_label
+
+
 @staticmethod
 def _MolecularBasis_read(molecule,
                          basis_name,
@@ -359,7 +383,9 @@ def _MolecularBasis_read(molecule,
     need_def2_ecp = False
     ecp_elem_id_mininum = 37
     for idx, elem_id in enumerate(molecule.get_identifiers()):
-        if elem_id >= ecp_elem_id_mininum:
+        atom_bas_label = _get_atom_bas_label(basis_name, atom_basis_labels, idx)
+        if (elem_id >= ecp_elem_id_mininum) and (
+                atom_bas_label.startswith('DEF2-')):
             need_def2_ecp = True
             break
 
@@ -382,12 +408,7 @@ def _MolecularBasis_read(molecule,
     mol_basis = MolecularBasis()
 
     for idx, elem_id in enumerate(molecule.get_identifiers()):
-        if basis_name.upper() in ['AO-START-GUESS', 'AO-START-GUESS-FOR-ECP']:
-            atom_bas_label = basis_name.upper()
-        else:
-            atom_bas_label = atom_basis_labels[idx].upper()
-            if atom_bas_label == '':
-                atom_bas_label = basis_name.upper()
+        atom_bas_label = _get_atom_bas_label(basis_name, atom_basis_labels, idx)
 
         basis_key = _gen_basis_key(atom_basis_elements[idx],
                                    basis_dict[atom_bas_label])
@@ -407,19 +428,13 @@ def _MolecularBasis_read(molecule,
             atom_basis = _read_atom_basis(basis_dict[atom_bas_label][basis_key],
                                           basis_elem_id, atom_bas_label)
 
-        if need_def2_ecp and elem_id >= ecp_elem_id_mininum:
-            if basis_name.upper() not in [
-                    'AO-START-GUESS', 'AO-START-GUESS-FOR-ECP'
-            ]:
-                assert_msg_critical(
-                    atom_bas_label.lower().startswith('def2-'),
-                    'MolecularBasis: ECP is only implemented for the def2- ' +
-                    'series basis set.')
-                elem_name = atom_basis_elements[idx]
-                ecp_key = 'atomecp_{}'.format(elem_name.lower())
-                atom_ecp = _read_atom_ecp(basis_dict['DEF2-ECP'][ecp_key],
-                                          elem_id, 'DEF2-ECP')
-                atom_basis.set_ecp_potential(atom_ecp)
+        if need_def2_ecp and (elem_id >= ecp_elem_id_mininum) and (
+                atom_bas_label.startswith('DEF2-')):
+            elem_name = atom_basis_elements[idx]
+            ecp_key = 'atomecp_{}'.format(elem_name.lower())
+            atom_ecp = _read_atom_ecp(basis_dict['DEF2-ECP'][ecp_key], elem_id,
+                                      'DEF2-ECP')
+            atom_basis.set_ecp_potential(atom_ecp)
 
         mol_basis.add(atom_basis)
 

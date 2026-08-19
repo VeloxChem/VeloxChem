@@ -1,13 +1,12 @@
 import numpy as np
 import pytest
 
-from veloxchem.veloxchemlib import mpi_master, hartree_in_ev
+from veloxchem.veloxchemlib import mpi_master, hartree_in_ev, fine_structure_constant
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.lreigensolver import LinearResponseEigenSolver
-from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.rixsdriver import RixsDriver
+
 
 @pytest.mark.solvers
 class TestRIXS:
@@ -53,7 +52,8 @@ class TestRIXS:
         rixs_res = rixs_drv.compute(mol, bas, scf_results)
 
         if scf_drv.rank == mpi_master():
-            assert np.allclose(ref_xsection, rixs_res['cross_sections'][:,0], 
+            ref_xsection = np.array(ref_xsection) * fine_structure_constant()**4
+            assert np.allclose(ref_xsection, rixs_res['cross_sections'][:,0],
                                rtol=1e-5, atol=1e-8)
 
     def test_hf_svp_rpa_rsa(self):
@@ -99,7 +99,7 @@ class TestRIXS:
         ])
 
         self.run_rixs('b3lyp', 'def2-svp', ref_xsection, 1, 20, ncorestates=2, nvir=16, nvalence=1, tda=True)
-    
+
     def test_hf_svp_rpa_2s(self):
 
         ref_xsection = np.array([
@@ -133,7 +133,7 @@ class TestRIXS:
             7.465709298, 4.980095871, 0.690127094, 0.003739568, 0.427996885,
             0.003540102
         ])
-        
+
         self.run_rixs('b3lyp', 'def2-svp', ref_xsection, 1, 20, ncorestates=4, tda=False)
 
     def test_b3lyp_svp_tda_2s(self):
@@ -147,7 +147,7 @@ class TestRIXS:
         ])
 
         self.run_rixs('b3lyp', 'def2-svp', ref_xsection, 1, 20, ncorestates=4, tda=True)
-        
+
     def test_hf_svp_rpa_fulldiag(self):
 
         ref_xsection = np.array([

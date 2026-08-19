@@ -1,11 +1,11 @@
 from mpi4py import MPI
 import numpy as np
-from pathlib import Path
 import pytest
 
 from veloxchem.molecule import Molecule
 from veloxchem.mmforcefieldgenerator import MMForceFieldGenerator
 from veloxchem.solvationbuilder import SolvationBuilder
+from veloxchem.errorhandler import VeloxChemError
 
 pytest.importorskip("rdkit")
 
@@ -326,7 +326,7 @@ class TestSolvationBuilder:
         target_density = _target_density_for_count(solute, solvent, 1, box)
         builder = SolvationBuilder(ostream=RecordingOutput())
 
-        def fake_perform_equilibration(water_model=None, steps=None):
+        def fake_perform_equilibration(water_model=None, steps=None, write_log=False):
             raise ValueError('missing forcefield include')
 
         monkeypatch.setattr(builder, 'perform_equilibration',
@@ -342,8 +342,8 @@ class TestSolvationBuilder:
                         box=box)
 
         assert builder.equilibration_flag is False
+        assert 'Attempting equilibration of the system' in builder.ostream.infos
         assert 'Equilibration skipped due to missing files' in builder.ostream.infos
-        assert 'Equilibrating the system' not in builder.ostream.infos
 
     def test_unlink_if_exists_handles_present_and_missing_files(self, tmp_path):
 
@@ -363,7 +363,7 @@ class TestSolvationBuilder:
         builder = SolvationBuilder(ostream=RecordingOutput())
         builder.ion_name = 'Ca'
 
-        with pytest.raises(AssertionError, match='Unsupported counterion'):
+        with pytest.raises(VeloxChemError, match='Unsupported counterion'):
             builder._counterion_molecules()
 
     def test_solvate_reports_neutral_solute_when_neutralization_is_requested(
@@ -418,7 +418,7 @@ class TestSolvationBuilder:
         solvent = _make_water()
         builder = SolvationBuilder(ostream=RecordingOutput())
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='available solvent volume must be positive'):
             builder.solvate(solute,
                             solvent='other',
@@ -434,7 +434,7 @@ class TestSolvationBuilder:
         solvent = _make_water()
         builder = SolvationBuilder(ostream=RecordingOutput())
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='target density must be positive'):
             builder.solvate(solute,
                             solvent='other',
@@ -474,7 +474,7 @@ class TestSolvationBuilder:
         solvents = [_make_water(), _make_molecule('CO')]
         builder = SolvationBuilder(ostream=RecordingOutput())
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='proportions must be positive'):
             builder.custom_solvate(solute,
                                    solvents=solvents,
@@ -487,7 +487,7 @@ class TestSolvationBuilder:
         solvents = [_make_water(), _make_molecule('CO')]
         builder = SolvationBuilder(ostream=RecordingOutput())
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='available solvent volume must be positive'):
             builder.custom_solvate(solute,
                                    solvents=solvents,
@@ -500,7 +500,7 @@ class TestSolvationBuilder:
         solvents = [_make_water(), _make_molecule('CO')]
         builder = SolvationBuilder(ostream=RecordingOutput())
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='too small to fit any solvent molecules'):
             builder.custom_solvate(solute,
                                    solvents=solvents,
@@ -513,7 +513,7 @@ class TestSolvationBuilder:
         hydrogen = _make_molecule('[H][H]')
         builder = SolvationBuilder(ostream=RecordingOutput())
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='at least one non-hydrogen atom'):
             builder.custom_solvate(solute,
                                    solvents=[hydrogen],
@@ -799,7 +799,7 @@ class TestSolvationBuilder:
 
         assert builder.equilibration_flag is True
         assert (tmp_path / 'equilibrated_system.pdb').exists()
-        assert 'Equilibrating the system' in builder.ostream.infos
+        assert 'Attempting equilibration of the system' in builder.ostream.infos
         assert 'Duration: 0.001 ps' in builder.ostream.infos
 
     def test_perform_equilibration_supports_itself_for_non_water_system(
@@ -848,6 +848,29 @@ class TestSolvationBuilder:
         assert not (tmp_path / 'system.gro').exists()
         assert not (tmp_path / 'system.top').exists()
 
+    def test_perform_equilibration_supports_counterions(self, tmp_path):
+
+        pytest.importorskip("openmm")
+
+        np.random.seed(0)
+        solute = _make_fluoride_solute()
+        solvent = _make_water()
+        box = [25.0, 25.0, 25.0]
+        target_density = _target_density_for_count(solute, solvent, 2, box)
+        builder = SolvationBuilder(ostream=RecordingOutput())
+        builder.workdir = tmp_path
+
+        builder.solvate(solute,
+                        solvent='other',
+                        solvent_molecule=solvent,
+                        target_density=target_density,
+                        neutralize=True,
+                        box=box)
+        builder.perform_equilibration(steps=1)
+
+        assert (tmp_path / 'equilibrated_system.pdb').exists()
+        assert builder.added_counterions == 1
+
     def test_perform_equilibration_requires_water_model_for_pure_water_itself(
             self):
 
@@ -863,5 +886,5 @@ class TestSolvationBuilder:
                         neutralize=False,
                         box=box)
 
-        with pytest.raises(AssertionError, match='water_model must be provided'):
+        with pytest.raises(VeloxChemError, match='water_model must be provided'):
             builder.perform_equilibration()

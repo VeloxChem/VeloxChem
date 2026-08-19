@@ -99,8 +99,6 @@ class TestMatrix:
         bobj = pickle.dumps(mat_a)
         mat_b = pickle.loads(bobj)
 
-        #print(mat_a.full_matrix().to_numpy())
-        #print(mat_b.full_matrix().to_numpy())
         assert mat_a == mat_b
 
     def test_sum_op(self):

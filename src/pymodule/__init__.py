@@ -161,11 +161,13 @@ from .tpatransitiondriver import TpaTransitionDriver
 from .threepatransitiondriver import ThreePATransitionDriver
 from .tpafulldriver import TpaFullDriver
 from .tpareddriver import TpaReducedDriver
+from .tpareddriver import TpaReducedDriver as TpaDriver
 from .espchargesdriver import EspChargesDriver
 from .respchargesdriver import RespChargesDriver
 from .rspproperty import ResponseProperty
 from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
+from .rspordspec import OpticalRotatoryDispersionSpectrum
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .rspc6 import C6
@@ -174,12 +176,14 @@ from .rsptpa import TPA
 from .rspthg import THG
 from .rspthgred import ThgReduced
 from .rixsdriver import RixsDriver
+from .xpsdriver import XPSDriver
 from .localizationdriver import LocalizationDriver
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .peforcefieldgenerator import PEForceFieldGenerator
 from .firstorderpropdriver import FirstOrderPropertyDriver
 from .firstorderprop import FirstOrderProperties
+from .excitedstatemomentdriver import ExcitedStateMomentDriver
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .tddftgradientdriver import TddftGradientDriver
 from .hessiandriver import HessianDriver
@@ -214,14 +218,20 @@ from .evbdataprocessing import EvbDataProcessing
 from .evbreporter import EvbReporter
 from .imforcefieldgenerator import IMForceFieldGenerator
 from .imdatabasepointcollecter import IMDatabasePointCollecter
+from .openmmimdynamics import OpenMMIMDynamics
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
-from .mofbuilder import MofBuilder
+from .mofbuilder.core.builder import MetalOrganicFrameworkBuilder as MofBuilder
+from .imtrustradiusoptimizer import IMTrustRadiusOptimizer
 from .conformergenerator import ConformerGenerator
 from .tsguesser import TransitionStateGuesser
 from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
+from .orbitallocalization import OrbitalLocalizationDriver
+from .ensembleparser import EnsembleParser
+from .ensembledriver import EnsembleDriver
+from .spectrumaverager import SpectrumAverager
 # for backward compatibility only
 from .cppsolver import ComplexResponseSolver as ComplexResponse
 from .tdacppsolver import ComplexResponseTdaSolver as ComplexResponseTDA
@@ -284,6 +294,9 @@ from .oneeints import compute_linear_momentum_integrals
 from .oneeints import compute_angular_momentum_integrals
 from .resultsio import read_molecule_and_basis, read_results
 
+# Version
+from ._version import __version__
+
 # Environment variable: basis set path, number of OpenMP threads
 from .environment import (set_vlxbasispath, get_basis_path, set_vlxdatapath,
                           get_data_path, set_omp_num_threads)
@@ -291,5 +304,3 @@ from .environment import (set_vlxbasispath, get_basis_path, set_vlxdatapath,
 set_vlxbasispath()
 set_vlxdatapath()
 set_omp_num_threads()
-
-__version__ = "1.0rc4"
