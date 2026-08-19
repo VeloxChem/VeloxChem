@@ -32,6 +32,7 @@
 
 from mpi4py import MPI
 from pathlib import Path
+from copy import deepcopy
 import numpy as np
 import tempfile
 import json
@@ -73,6 +74,11 @@ class MetalSiteForceFieldBuilder:
     Seminario method. The fitted parameters can then be injected into a
     protein force field for the whole enzyme.
 
+    Only settings are kept on the object. Everything a step produces - the
+    binding modes, the truncated active site, the connectivity matrix and the
+    force field - is returned by the method that builds it and passed to the
+    methods that need it, so a call site shows exactly what each step consumes.
+
     :param comm:
         The MPI communicator.
     :param ostream:
@@ -108,12 +114,6 @@ class MetalSiteForceFieldBuilder:
           hydrogens in addition to the beta carbons.
         - average_metal_terms: The flag for averaging the fitted metal terms
           over equivalent atoms.
-        - binding_modes: The coordination topology of the metal centers.
-        - active_site: The truncated QM cluster and its mapping back to the
-          structure.
-        - connectivity_matrix: The connectivity matrix of the cluster.
-        - forcefield: The force field generator carrying the fitted terms.
-        - results: The results of the last complete run.
         - comm: The MPI communicator.
         - rank: The rank of the MPI process.
         - nodes: The number of MPI processes.
@@ -128,7 +128,7 @@ class MetalSiteForceFieldBuilder:
     # formal charges and the coordination rules have only been checked against
     # zinc sites, so anything else is rejected instead of silently treated as
     # if it behaved the same way.
-    SUPPORTED_METAL_ELEMENTS = ('Zn',)
+    SUPPORTED_METAL_ELEMENTS = ('Zn', )
 
     # Formal charges assumed for bare metal ions. Only used for the cluster
     # charge bookkeeping, which is checked rather than trusted.
@@ -244,13 +244,6 @@ class MetalSiteForceFieldBuilder:
         # genuinely different distances, and that asymmetry is the signal
         self.average_metal_terms = False
 
-        # results
-        self.binding_modes = None
-        self.active_site = None
-        self.connectivity_matrix = None
-        self.forcefield = None
-        self.results = None
-
     def compute(self, structure):
         """
         Runs the complete pipeline on a structure.
@@ -269,7 +262,7 @@ class MetalSiteForceFieldBuilder:
             The path to a PDB or mmCIF file.
 
         :return:
-            The results dictionary, also stored in self.results.
+            The results dictionary.
         """
 
         assert_msg_critical('openmm' in sys.modules,
@@ -278,35 +271,39 @@ class MetalSiteForceFieldBuilder:
         self._print_header(structure)
 
         topology, positions = self.load_structure(structure)
-        self.suggest_binding_modes(topology, positions)
-        self._print_binding_modes()
+        binding_modes = self.suggest_binding_modes(topology, positions)
+        self._print_binding_modes(binding_modes)
 
-        topology, positions = self.protonate(topology, positions)
-        self.extract_active_site(topology, positions)
-        self.build_connectivity(topology)
-        self._print_active_site()
+        topology, positions, binding_modes = self.protonate(
+            topology, positions, binding_modes)
+        active_site = self.extract_active_site(topology, positions,
+                                               binding_modes)
+        connectivity_matrix = self.build_connectivity(topology, active_site,
+                                                      binding_modes)
+        self._print_active_site(active_site, binding_modes, connectivity_matrix)
 
         # anything supplied through the settings is validated against the
         # cluster and replaces the step that would have produced it
-        geometry = self._resolve_optimized_geometry()
-        hessian = self._resolve_hessian()
-        charges = self._resolve_partial_charges()
+        geometry = self._resolve_optimized_geometry(active_site)
+        hessian = self._resolve_hessian(active_site)
+        charges = self._resolve_partial_charges(active_site)
 
         if geometry is not None:
-            self.active_site['molecule'] = geometry
             self.ostream.print_info(
                 'Using the supplied optimized geometry; skipping the '
                 'constrained optimization.')
             self.ostream.flush()
         elif self.do_qm_optimization:
-            self.optimize_active_site()
+            geometry = self.optimize_active_site(active_site)
 
-        molecule = self.active_site['molecule']
+        if geometry is not None:
+            active_site['molecule'] = geometry
 
-        atom_pairs, atoms = self.extract_pairs(
-            self.connectivity_matrix,
-            self.active_site['metal_indices'],
-            bond_count=2)
+        molecule = active_site['molecule']
+
+        atom_pairs, atoms = self.extract_pairs(connectivity_matrix,
+                                               active_site['metal_indices'],
+                                               bond_count=2)
 
         if hessian is not None:
             self.ostream.print_info(
@@ -317,7 +314,7 @@ class MetalSiteForceFieldBuilder:
                 f'Hessian restricted to {len(atom_pairs)} atom pairs over '
                 f'{len(atoms)} of {molecule.number_of_atoms()} atoms.')
             self.ostream.flush()
-            hessian = self.compute_hessian(atom_pairs)
+            hessian = self.compute_hessian(active_site, atom_pairs)
 
         if charges is not None:
             self.ostream.print_info(
@@ -325,24 +322,23 @@ class MetalSiteForceFieldBuilder:
                 'calculation.')
             self.ostream.flush()
         elif self.do_resp:
-            charges = self.compute_resp_charges()
+            charges = self.compute_resp_charges(active_site)
 
-        self.build_forcefield(hessian, charges)
-        self._print_metal_parameters()
+        forcefield = self.build_forcefield(active_site, connectivity_matrix,
+                                           hessian, charges)
+        self._print_metal_parameters(active_site, forcefield)
 
-        self.results = {
+        return {
             'topology': topology,
             'positions': positions,
-            'binding_modes': self.binding_modes,
-            'active_site': self.active_site,
-            'connectivity_matrix': self.connectivity_matrix,
+            'binding_modes': binding_modes,
+            'active_site': active_site,
+            'connectivity_matrix': connectivity_matrix,
             'atom_pairs': atom_pairs,
             'hessian': hessian,
             'partial_charges': charges,
-            'forcefield': self.forcefield,
+            'forcefield': forcefield,
         }
-
-        return self.results
 
     def load_structure(self, structure):
         """
@@ -456,7 +452,7 @@ class MetalSiteForceFieldBuilder:
             The positions as an (N, 3) numpy array in Angstrom.
 
         :return:
-            The binding modes dictionary, also stored in self.binding_modes.
+            The binding modes dictionary.
         """
 
         positions = np.asarray(positions)
@@ -469,12 +465,18 @@ class MetalSiteForceFieldBuilder:
                 continue
             symbol = atom.element.symbol
             metals.append({
-                'index': atom.index,
-                'element': symbol,
-                'chain': atom.residue.chain.id,
-                'resid': atom.residue.id,
-                'res_index': atom.residue.index,
-                'formal_charge': self.metal_formal_charges.get(symbol, 2),
+                'index':
+                atom.index,
+                'element':
+                symbol,
+                'chain':
+                atom.residue.chain.id,
+                'resid':
+                atom.residue.id,
+                'res_index':
+                atom.residue.index,
+                'formal_charge':
+                self.metal_formal_charges.get(symbol, 2),
             })
 
         assert_msg_critical(
@@ -495,10 +497,11 @@ class MetalSiteForceFieldBuilder:
                 continue
 
             distances = {
-                metal['index']: float(
+                metal['index']:
+                float(
                     np.linalg.norm(positions[atom.index] -
-                                   positions[metal['index']])
-                ) for metal in metals
+                                   positions[metal['index']]))
+                for metal in metals
             }
             closest = min(distances.values())
             if closest > self.report_cutoff:
@@ -519,13 +522,20 @@ class MetalSiteForceFieldBuilder:
             ])
 
             contacts.append({
-                'residue': label,
-                'res_name': atom.residue.name,
-                'res_index': atom.residue.index,
-                'chain': atom.residue.chain.id,
-                'atom': atom.name,
-                'index': atom.index,
-                'metals': bonded_to,
+                'residue':
+                label,
+                'res_name':
+                atom.residue.name,
+                'res_index':
+                atom.residue.index,
+                'chain':
+                atom.residue.chain.id,
+                'atom':
+                atom.name,
+                'index':
+                atom.index,
+                'metals':
+                bonded_to,
                 'distances': [round(distances[i], 3) for i in bonded_to],
             })
 
@@ -541,15 +551,15 @@ class MetalSiteForceFieldBuilder:
         self._assign_binding_modes(ligands, notes)
 
         for metal in metals:
-            n_ligands = sum(
-                1 for ligand in ligands if metal['index'] in ligand['metals'])
+            n_ligands = sum(1 for ligand in ligands
+                            if metal['index'] in ligand['metals'])
             if n_ligands < 3:
                 notes.append(
                     f'metal {metal["element"]} (index {metal["index"]}) has '
                     f'only {n_ligands} ligand(s) within the primary cutoff; '
                     'check for a missing bridging ligand or water')
 
-        self.binding_modes = {
+        binding_modes = {
             'metals': metals,
             'ligands': ligands,
             'variants': {},
@@ -560,7 +570,7 @@ class MetalSiteForceFieldBuilder:
             'notes': notes,
         }
 
-        return self.binding_modes
+        return binding_modes
 
     @staticmethod
     def _assign_binding_modes(ligands, notes):
@@ -586,8 +596,8 @@ class MetalSiteForceFieldBuilder:
                 else:
                     ligand['mode'] = 'monodentate'
 
-            monodentate = all(
-                ligand['mode'] == 'monodentate' for ligand in group)
+            monodentate = all(ligand['mode'] == 'monodentate'
+                              for ligand in group)
 
             if len(group) >= 2 and monodentate:
                 metals_hit = {ligand['metals'][0] for ligand in group}
@@ -608,7 +618,7 @@ class MetalSiteForceFieldBuilder:
                     'this essentially impossible, so treat it as an artifact '
                     'and edit the binding modes')
 
-    def save_binding_modes(self, filename):
+    def save_binding_modes(self, filename, binding_modes):
         """
         Writes the binding modes to a JSON file for review.
 
@@ -616,13 +626,8 @@ class MetalSiteForceFieldBuilder:
             The name of the JSON file.
         """
 
-        assert_msg_critical(
-            self.binding_modes is not None,
-            'MetalSiteForceFieldBuilder.save_binding_modes: no binding modes '
-            'available. Run suggest_binding_modes first.')
-
         if self.rank == mpi_master():
-            Path(filename).write_text(json.dumps(self.binding_modes, indent=2))
+            Path(filename).write_text(json.dumps(binding_modes, indent=2))
 
     def load_binding_modes(self, filename):
         """
@@ -632,7 +637,7 @@ class MetalSiteForceFieldBuilder:
             The name of the JSON file.
 
         :return:
-            The binding modes dictionary, also stored in self.binding_modes.
+            The binding modes dictionary.
         """
 
         binding_modes = json.loads(Path(filename).read_text())
@@ -644,39 +649,102 @@ class MetalSiteForceFieldBuilder:
         self._check_supported_metals(binding_modes.get('metals', []),
                                      'load_binding_modes')
 
-        self.binding_modes = binding_modes
+        return binding_modes
 
-        return self.binding_modes
+    def _histidine_variant(self, residue, positions, metal_positions):
+        """
+        Chooses the tautomer of a coordinating histidine.
 
-    def suggest_variants(self, topology):
+        The choice is made only between the two ring nitrogens, on whichever
+        of them sits closest to a metal, and the tautomer is then set so that
+        this nitrogen carries no hydrogen. Ring carbons are ignored even when
+        one of them is nearer to the metal than either nitrogen.
+
+        :param residue:
+            The histidine residue.
+        :param positions:
+            The positions as an (N, 3) numpy array in Angstrom.
+        :param metal_positions:
+            The positions of the metal centers.
+
+        :return:
+            The tuple of the variant name and a note, or None for no note.
+        """
+
+        def closest_metal_distance(atom):
+            return min(
+                float(np.linalg.norm(positions[atom.index] - metal_position))
+                for metal_position in metal_positions)
+
+        sidechain = [
+            atom for atom in residue.atoms()
+            if atom.name not in self.BACKBONE_ATOM_NAMES and atom.name != 'CA'
+        ]
+        ring_nitrogens = {
+            atom.name: atom
+            for atom in sidechain if atom.name in ('ND1', 'NE2')
+        }
+
+        if len(ring_nitrogens) < 2:
+            return 'HID', (
+                f'{residue.name}{residue.id} does not have both ring '
+                'nitrogens; defaulting to HID, please check')
+
+        distances = {
+            name: closest_metal_distance(atom)
+            for name, atom in ring_nitrogens.items()
+        }
+        coordinating = min(distances, key=distances.get)
+
+        # the coordinating nitrogen is the one that must not carry a hydrogen
+        variant = 'HIE' if coordinating == 'ND1' else 'HID'
+
+        note = None
+        nearest = min(sidechain, key=closest_metal_distance)
+        if nearest.name not in ('ND1', 'NE2'):
+            note = (
+                f'{residue.name}{residue.id} has {nearest.name} closer to a '
+                f'metal ({closest_metal_distance(nearest):.2f} A) than either '
+                f'ring nitrogen (ND1 {distances["ND1"]:.2f} A, NE2 '
+                f'{distances["NE2"]:.2f} A); the tautomer was still chosen '
+                'from the nitrogens, but the geometry looks distorted')
+
+        return variant, note
+
+    def suggest_variants(self, topology, positions, binding_modes):
         """
         Chooses a protonation variant for each coordinating residue.
 
-        Automated pKa predictors are not parameterized on metal-coordinating
-        residues, so the rules used here are deterministic: coordinating
-        carboxylates are deprotonated, a coordinating cysteine is a thiolate,
+        coordinating carboxylates are deprotonated
+        a coordinating cysteine is a thiolate
         and the histidine tautomer is set so that the coordinating nitrogen
         carries no hydrogen. Entries in self.protonation_overrides win over
         the rules.
 
         :param topology:
             The OpenMM topology.
+        :param positions:
+            The positions as an (N, 3) numpy array in Angstrom.
+        :param binding_modes:
+            The binding modes. Not modified; anything worth recording is
+            returned as a note.
 
         :return:
-            The dictionary mapping residue index to variant name.
+            The tuple of the residue index to variant mapping and a list of
+            notes for review.
         """
 
-        assert_msg_critical(
-            self.binding_modes is not None,
-            'MetalSiteForceFieldBuilder.suggest_variants: no binding modes '
-            'available. Run suggest_binding_modes first.')
-
         residues = list(topology.residues())
+        positions = np.asarray(positions)
+        metal_positions = [
+            positions[metal['index']] for metal in binding_modes['metals']
+        ]
 
         by_residue = {}
-        for ligand in self.binding_modes['ligands']:
+        for ligand in binding_modes['ligands']:
             by_residue.setdefault(ligand['res_index'], []).append(ligand)
 
+        notes = []
         variants = {}
         for res_index, group in by_residue.items():
             res_name = residues[res_index].name
@@ -688,17 +756,11 @@ class MetalSiteForceFieldBuilder:
             elif res_name in ('CYS', 'CYX'):
                 variant = 'CYX'
             elif res_name.startswith('HI'):
-                closest = min(group, key=lambda x: min(x['distances']))
-                if closest['atom'] == 'ND1':
-                    variant = 'HIE'
-                elif closest['atom'] == 'NE2':
-                    variant = 'HID'
-                else:
-                    variant = 'HID'
-                    self.binding_modes['notes'].append(
-                        f'{closest["residue"]} coordinates through '
-                        f'{closest["atom"]}, which is not a ring nitrogen; '
-                        'defaulting to HID, please check')
+                variant, note = self._histidine_variant(residues[res_index],
+                                                        positions,
+                                                        metal_positions)
+                if note is not None:
+                    notes.append(note)
             else:
                 variant = None
 
@@ -717,31 +779,42 @@ class MetalSiteForceFieldBuilder:
                 'MetalSiteForceFieldBuilder.suggest_variants: override '
                 f'residue {key} not found')
 
-        return variants
+        return variants, notes
 
-    def protonate(self, topology, positions):
+    def protonate(self, topology, positions, binding_modes):
         """
         Adds hydrogens with the protonation variants that the metal site
         requires.
 
-        Adding hydrogens renumbers the atoms, so the indices in
-        self.binding_modes are remapped to the new topology and the applied
-        variants are recorded there.
+        Adding hydrogens renumbers the atoms, so every index stored in the
+        binding modes is invalidated. A corrected copy is returned rather than
+        the argument being rewritten in place, which keeps the renumbering
+        visible at the call site.
 
         :param topology:
             The OpenMM topology.
         :param positions:
             The positions as an (N, 3) numpy array in Angstrom.
+        :param binding_modes:
+            The binding modes. Not modified.
 
         :return:
-            The tuple of the protonated topology and positions in Angstrom.
+            The tuple of the protonated topology, the positions in Angstrom
+            and the binding modes with their indices remapped.
         """
 
         assert_msg_critical(
             'openmm' in sys.modules,
             'MetalSiteForceFieldBuilder.protonate: openmm is required')
 
-        variants_by_index = self.suggest_variants(topology)
+        variants_by_index, notes = self.suggest_variants(
+            topology, positions, binding_modes)
+
+        # the atom indices of the binding modes are about to be invalidated,
+        # so the caller gets a corrected copy rather than a silently rewritten
+        # version of what it passed in
+        binding_modes = deepcopy(binding_modes)
+        binding_modes['notes'].extend(notes)
 
         variant_list = [None] * topology.getNumResidues()
         for res_index, variant in variants_by_index.items():
@@ -773,18 +846,18 @@ class MetalSiteForceFieldBuilder:
 
         # remap takes an index into the old topology, so the ligands' stored
         # metal indices can be remapped independently of the metal entries
-        for ligand in self.binding_modes['ligands']:
+        for ligand in binding_modes['ligands']:
             ligand['index'] = remap(ligand['index'])
             ligand['metals'] = [remap(index) for index in ligand['metals']]
 
-        for metal in self.binding_modes['metals']:
+        for metal in binding_modes['metals']:
             metal['index'] = remap(metal['index'])
 
-        self.binding_modes['variants'] = variants_by_index
+        binding_modes['variants'] = variants_by_index
 
-        return new_topology, new_positions
+        return new_topology, new_positions, binding_modes
 
-    def extract_active_site(self, topology, positions):
+    def extract_active_site(self, topology, positions, binding_modes):
         """
         Builds the truncated QM cluster.
 
@@ -799,24 +872,20 @@ class MetalSiteForceFieldBuilder:
             The positions as an (N, 3) numpy array in Angstrom.
 
         :return:
-            The active site dictionary, also stored in self.active_site. It
-            records the cluster indices of the capping hydrogens and of the
-            beta carbons, the map back to the topology, and the charge.
+            The active site dictionary. It records the cluster indices of
+            the capping hydrogens and of the beta carbons, the map back to
+            the topology, and the charge.
         """
 
-        assert_msg_critical(
-            self.binding_modes is not None,
-            'MetalSiteForceFieldBuilder.extract_active_site: no binding modes '
-            'available. Run suggest_binding_modes first.')
-
-        self._check_supported_metals(self.binding_modes['metals'],
+        self._check_supported_metals(binding_modes['metals'],
                                      'extract_active_site')
 
         positions = np.asarray(positions)
         residues = list(topology.residues())
 
         res_indices = sorted(
-            {ligand['res_index'] for ligand in self.binding_modes['ligands']})
+            {ligand['res_index']
+             for ligand in binding_modes['ligands']})
 
         labels = []
         coords = []
@@ -825,7 +894,7 @@ class MetalSiteForceFieldBuilder:
         beta_carbon_indices = []
         metal_indices = []
 
-        for metal in self.binding_modes['metals']:
+        for metal in binding_modes['metals']:
             atom_map[len(coords)] = metal['index']
             metal_indices.append(len(coords))
             coords.append(positions[metal['index']])
@@ -867,12 +936,12 @@ class MetalSiteForceFieldBuilder:
                     coords.append(positions[atom.index])
                     labels.append(atom.element.symbol)
 
-        charge = sum(
-            metal['formal_charge'] for metal in self.binding_modes['metals'])
+        charge = sum(metal['formal_charge']
+                     for metal in binding_modes['metals'])
 
         for res_index in res_indices:
             residue = residues[res_index]
-            variant = self.binding_modes['variants'].get(res_index)
+            variant = binding_modes['variants'].get(res_index)
             if variant is None:
                 variant = residue.name
                 self.ostream.print_warning(
@@ -889,7 +958,7 @@ class MetalSiteForceFieldBuilder:
         molecule.set_charge(charge)
         molecule.set_multiplicity(1)
 
-        self.active_site = {
+        active_site = {
             'molecule': molecule,
             'labels': labels,
             'atom_map': atom_map,
@@ -898,15 +967,18 @@ class MetalSiteForceFieldBuilder:
             'metal_indices': metal_indices,
             'charge': charge,
             'multiplicity': 1,
-            'residues': [
-                f'{residues[i].name}{residues[i].id}' for i in res_indices
-            ],
+            'residues':
+            [f'{residues[i].name}{residues[i].id}' for i in res_indices],
             'res_indices': res_indices,
         }
 
-        return self.active_site
+        return active_site
 
-    def build_connectivity(self, topology, warn_above=2.0):
+    def build_connectivity(self,
+                           topology,
+                           active_site,
+                           binding_modes,
+                           warn_above=2.0):
         """
         Builds the connectivity matrix of the cluster without perceiving any
         bonds.
@@ -922,15 +994,10 @@ class MetalSiteForceFieldBuilder:
             The length in Angstrom above which a non-metal bond is reported.
 
         :return:
-            The connectivity matrix, also stored in self.connectivity_matrix.
+            The connectivity matrix.
         """
 
-        assert_msg_critical(
-            self.active_site is not None,
-            'MetalSiteForceFieldBuilder.build_connectivity: no active site '
-            'available. Run extract_active_site first.')
-
-        atom_map = self.active_site['atom_map']
+        atom_map = active_site['atom_map']
         reverse_map = {
             top_index: cluster_index
             for cluster_index, top_index in atom_map.items()
@@ -945,7 +1012,7 @@ class MetalSiteForceFieldBuilder:
                 connectivity_matrix[reverse_map[i], reverse_map[j]] = 1
                 connectivity_matrix[reverse_map[j], reverse_map[i]] = 1
 
-        for ligand in self.binding_modes['ligands']:
+        for ligand in binding_modes['ligands']:
             assert_msg_critical(
                 ligand['index'] in reverse_map,
                 'MetalSiteForceFieldBuilder.build_connectivity: ligand atom '
@@ -958,9 +1025,9 @@ class MetalSiteForceFieldBuilder:
                 connectivity_matrix[lig_index, metal] = 1
 
         # nothing but a metal bond should be long
-        coords = self.active_site['molecule'].get_coordinates_in_angstrom()
-        labels = self.active_site['labels']
-        metals = set(self.active_site['metal_indices'])
+        coords = active_site['molecule'].get_coordinates_in_angstrom()
+        labels = active_site['labels']
+        metals = set(active_site['metal_indices'])
 
         for i in range(n_atoms):
             for j in range(i + 1, n_atoms):
@@ -975,9 +1042,8 @@ class MetalSiteForceFieldBuilder:
                         f'is {distance:.2f} A long')
 
         self.ostream.flush()
-        self.connectivity_matrix = connectivity_matrix
 
-        return self.connectivity_matrix
+        return connectivity_matrix
 
     @staticmethod
     def extract_pairs(connectivity_matrix,
@@ -1049,7 +1115,7 @@ class MetalSiteForceFieldBuilder:
 
         return pairs, atoms
 
-    def _resolve_optimized_geometry(self):
+    def _resolve_optimized_geometry(self, active_site):
         """
         Validates a geometry supplied through optimized_geometry.
 
@@ -1070,7 +1136,7 @@ class MetalSiteForceFieldBuilder:
                 f'{path} not found')
             molecule = Molecule.read_xyz_file(str(path))
 
-        cluster = self.active_site['molecule']
+        cluster = active_site['molecule']
 
         assert_msg_critical(
             molecule.number_of_atoms() == cluster.number_of_atoms(),
@@ -1089,7 +1155,7 @@ class MetalSiteForceFieldBuilder:
 
         return molecule
 
-    def _resolve_hessian(self):
+    def _resolve_hessian(self, active_site):
         """
         Validates a Hessian supplied through the hessian setting.
 
@@ -1110,7 +1176,7 @@ class MetalSiteForceFieldBuilder:
         else:
             hessian = np.asarray(self.hessian)
 
-        n_atoms = self.active_site['molecule'].number_of_atoms()
+        n_atoms = active_site['molecule'].number_of_atoms()
         expected = (3 * n_atoms, 3 * n_atoms)
 
         assert_msg_critical(
@@ -1120,7 +1186,7 @@ class MetalSiteForceFieldBuilder:
 
         return hessian
 
-    def _resolve_partial_charges(self):
+    def _resolve_partial_charges(self, active_site):
         """
         Validates charges supplied through the partial_charges setting.
 
@@ -1140,15 +1206,15 @@ class MetalSiteForceFieldBuilder:
         else:
             charges = np.asarray(self.partial_charges)
 
-        n_atoms = self.active_site['molecule'].number_of_atoms()
+        n_atoms = active_site['molecule'].number_of_atoms()
 
         assert_msg_critical(
-            charges.shape == (n_atoms,),
+            charges.shape == (n_atoms, ),
             f'MetalSiteForceFieldBuilder: partial_charges has shape '
             f'{charges.shape} but the extracted cluster has {n_atoms} atoms')
 
         total = float(np.sum(charges))
-        expected = self.active_site['charge']
+        expected = active_site['charge']
 
         if abs(total - expected) > 1.0e-3:
             self.ostream.print_warning(
@@ -1188,42 +1254,6 @@ class MetalSiteForceFieldBuilder:
 
         return self.scf_drv, basis
 
-    def _run_scf(self, molecule, basis):
-        """
-        Runs the SCF for a given geometry.
-
-        Both the gradient and the Hessian driver reuse whatever is already in
-        scf_drv.scf_results and only fall back to running an SCF when it is
-        empty. They do not check that those results belong to the geometry
-        they were handed, so the SCF has to be run explicitly here whenever
-        the geometry may have moved since the driver was last used.
-
-        :param molecule:
-            The cluster molecule.
-        :param basis:
-            The basis set.
-
-        :return:
-            The SCF results.
-        """
-
-        if self.mute_scf:
-            self.scf_drv.ostream.mute()
-
-        scf_results = self.scf_drv.compute(molecule, basis)
-
-        if self.mute_scf:
-            self.scf_drv.ostream.unmute()
-
-        assert_msg_critical(
-            self.scf_drv.is_converged,
-            'MetalSiteForceFieldBuilder: SCF did not converge in '
-            f'{self.scf_drv.max_iter} iterations. Binuclear metal clusters '
-            'converge slowly; raise max_iter or loosen conv_thresh on the '
-            'SCF driver assigned to scf_drv.')
-
-        return scf_results
-
     def _print_muted_notice(self, step):
         """
         Announces a long calculation whose output is being suppressed.
@@ -1240,7 +1270,7 @@ class MetalSiteForceFieldBuilder:
             self.ostream.print_info(f'Running {step}.')
         self.ostream.flush()
 
-    def constrained_indices(self):
+    def constrained_indices(self, active_site):
         """
         Returns the cluster indices held fixed during optimization.
 
@@ -1254,19 +1284,14 @@ class MetalSiteForceFieldBuilder:
             The sorted list of cluster indices.
         """
 
-        assert_msg_critical(
-            self.active_site is not None,
-            'MetalSiteForceFieldBuilder.constrained_indices: no active site '
-            'available. Run extract_active_site first.')
-
-        indices = set(self.active_site['beta_carbon_indices'])
+        indices = set(active_site['beta_carbon_indices'])
 
         if self.constrain_capping_hydrogens:
-            indices |= set(self.active_site['cap_indices'])
+            indices |= set(active_site['cap_indices'])
 
         return sorted(indices)
 
-    def optimize_active_site(self, frozen_indices=None):
+    def optimize_active_site(self, active_site, frozen_indices=None):
         """
         Optimizes the cluster with the beta carbons frozen.
 
@@ -1281,18 +1306,14 @@ class MetalSiteForceFieldBuilder:
             constrained_indices().
 
         :return:
-            The optimized molecule, also stored in the active site.
+            The optimized molecule. The caller decides whether to put it back
+            into the active site.
         """
 
-        assert_msg_critical(
-            self.active_site is not None,
-            'MetalSiteForceFieldBuilder.optimize_active_site: no active site '
-            'available. Run extract_active_site first.')
-
         if frozen_indices is None:
-            frozen_indices = self.constrained_indices()
+            frozen_indices = self.constrained_indices(active_site)
 
-        molecule = self.active_site['molecule']
+        molecule = active_site['molecule']
 
         constraints = None
         if len(frozen_indices) > 0:
@@ -1325,11 +1346,9 @@ class MetalSiteForceFieldBuilder:
         optimized.set_charge(molecule.get_charge())
         optimized.set_multiplicity(molecule.get_multiplicity())
 
-        self.active_site['molecule'] = optimized
-
         return optimized
 
-    def compute_hessian(self, atom_pairs=None):
+    def compute_hessian(self, active_site, atom_pairs=None):
         """
         Computes the nuclear Hessian of the cluster.
 
@@ -1347,12 +1366,7 @@ class MetalSiteForceFieldBuilder:
             The Hessian as a (3N, 3N) numpy array in Hartree per Bohr squared.
         """
 
-        assert_msg_critical(
-            self.active_site is not None,
-            'MetalSiteForceFieldBuilder.compute_hessian: no active site '
-            'available. Run extract_active_site first.')
-
-        molecule = self.active_site['molecule']
+        molecule = active_site['molecule']
 
         scf_drv, basis = self._get_scf_driver(molecule)
 
@@ -1366,7 +1380,6 @@ class MetalSiteForceFieldBuilder:
         # current one. This costs nothing: the driver would otherwise run the
         # same SCF itself.
         self._print_muted_notice('the SCF for the Hessian')
-        self._run_scf(molecule, basis)
 
         self._print_muted_notice('the Hessian')
 
@@ -1389,7 +1402,7 @@ class MetalSiteForceFieldBuilder:
 
         return np.copy(hessian_drv.hessian)
 
-    def compute_resp_charges(self):
+    def compute_resp_charges(self, active_site):
         """
         Computes RESP charges for the cluster.
 
@@ -1397,12 +1410,7 @@ class MetalSiteForceFieldBuilder:
             The partial charges as an (N,) numpy array.
         """
 
-        assert_msg_critical(
-            self.active_site is not None,
-            'MetalSiteForceFieldBuilder.compute_resp_charges: no active site '
-            'available. Run extract_active_site first.')
-
-        molecule = self.active_site['molecule']
+        molecule = active_site['molecule']
 
         self._print_muted_notice('the RESP charge fit at Hartree-Fock/6-31G*')
 
@@ -1425,33 +1433,31 @@ class MetalSiteForceFieldBuilder:
 
         return np.array(charges)
 
-    def get_metal_keys(self, forcefield=None):
+    def get_metal_keys(self, forcefield, active_site):
         """
         Returns the bond and angle keys that involve a metal center.
 
         :param forcefield:
-            The force field generator. Defaults to self.forcefield.
+            The force field generator.
+        :param active_site:
+            The active site, for the indices of the metal centers.
 
         :return:
             The tuple of the bond key list and the angle key list.
         """
 
-        if forcefield is None:
-            forcefield = self.forcefield
-
-        assert_msg_critical(
-            forcefield is not None,
-            'MetalSiteForceFieldBuilder.get_metal_keys: no force field '
-            'available. Run build_forcefield first.')
-
-        metals = set(self.active_site['metal_indices'])
+        metals = set(active_site['metal_indices'])
 
         bonds = [key for key in forcefield.bonds if metals & set(key)]
         angles = [key for key in forcefield.angles if metals & set(key)]
 
         return bonds, angles
 
-    def build_forcefield(self, hessian=None, partial_charges=None):
+    def build_forcefield(self,
+                         active_site,
+                         connectivity_matrix,
+                         hessian=None,
+                         partial_charges=None):
         """
         Builds the cluster force field and fits the metal terms.
 
@@ -1469,18 +1475,8 @@ class MetalSiteForceFieldBuilder:
             The partial charges. Defaults to zeros.
 
         :return:
-            The force field generator, also stored in self.forcefield.
+            The force field generator.
         """
-
-        assert_msg_critical(
-            self.active_site is not None,
-            'MetalSiteForceFieldBuilder.build_forcefield: no active site '
-            'available. Run extract_active_site first.')
-
-        assert_msg_critical(
-            self.connectivity_matrix is not None,
-            'MetalSiteForceFieldBuilder.build_forcefield: no connectivity '
-            'available. Run build_connectivity first.')
 
         assert_msg_critical(
             not isinstance(hessian, str),
@@ -1489,11 +1485,11 @@ class MetalSiteForceFieldBuilder:
             'the cluster without constraints, which silently replaces every '
             'equilibrium value with a gas-phase one.')
 
-        molecule = self.active_site['molecule']
+        molecule = active_site['molecule']
         n_atoms = molecule.number_of_atoms()
 
         forcefield = MMForceFieldGenerator(self.comm, self.ostream)
-        forcefield.connectivity_matrix = np.asarray(self.connectivity_matrix)
+        forcefield.connectivity_matrix = np.asarray(connectivity_matrix)
         forcefield.topology_update_flag = True
 
         # the generator shares the output stream of the builder, so muting it
@@ -1510,18 +1506,17 @@ class MetalSiteForceFieldBuilder:
         if partial_charges is not None:
             partial_charges = np.asarray(partial_charges)
             assert_msg_critical(
-                partial_charges.shape == (n_atoms,),
+                partial_charges.shape == (n_atoms, ),
                 'MetalSiteForceFieldBuilder.build_forcefield: expected '
                 f'{n_atoms} partial charges, got {partial_charges.shape}')
             forcefield.partial_charges = partial_charges
             for index in range(n_atoms):
                 forcefield.atoms[index]['charge'] = partial_charges[index]
 
-        self.forcefield = forcefield
-        bonds, angles = self.get_metal_keys(forcefield)
+        bonds, angles = self.get_metal_keys(forcefield, active_site)
 
         if hessian is None:
-            self._seed_metal_terms(bonds, angles)
+            self._seed_metal_terms(forcefield, active_site, bonds, angles)
         else:
             hessian = np.asarray(hessian)
             assert_msg_critical(
@@ -1534,11 +1529,11 @@ class MetalSiteForceFieldBuilder:
                 reparameterize_keys=bonds + angles,
                 average_metal_terms=self.average_metal_terms)
             forcefield.ostream.unmute()
-            self._check_force_constants(bonds, angles)
+            self._check_force_constants(forcefield, active_site, bonds, angles)
 
-        return self.forcefield
+        return forcefield
 
-    def _seed_metal_terms(self, bonds, angles):
+    def _seed_metal_terms(self, forcefield, active_site, bonds, angles):
         """
         Seeds the metal terms from literature values for the crude pre-QM
         pass.
@@ -1549,7 +1544,7 @@ class MetalSiteForceFieldBuilder:
             The metal angle keys.
         """
 
-        labels = self.active_site['labels']
+        labels = active_site['labels']
 
         for key in bonds:
             elements = (labels[key[0]], labels[key[1]])
@@ -1561,18 +1556,18 @@ class MetalSiteForceFieldBuilder:
                     f'No literature distance for {elements[0]}-{elements[1]}, '
                     'keeping the guessed value')
                 continue
-            self.forcefield.bonds[key]['equilibrium'] = equilibrium
-            self.forcefield.bonds[key]['force_constant'] = 100000.0
-            self.forcefield.bonds[key]['comment'] = 'literature estimate'
+            forcefield.bonds[key]['equilibrium'] = equilibrium
+            forcefield.bonds[key]['force_constant'] = 100000.0
+            forcefield.bonds[key]['comment'] = 'literature estimate'
 
         for key in angles:
-            self.forcefield.angles[key]['equilibrium'] = 109.5
-            self.forcefield.angles[key]['force_constant'] = 200.0
-            self.forcefield.angles[key]['comment'] = 'literature estimate'
+            forcefield.angles[key]['equilibrium'] = 109.5
+            forcefield.angles[key]['force_constant'] = 200.0
+            forcefield.angles[key]['comment'] = 'literature estimate'
 
         self.ostream.flush()
 
-    def _check_force_constants(self, bonds, angles):
+    def _check_force_constants(self, forcefield, active_site, bonds, angles):
         """
         Warns about metal terms whose force constant was fitted to zero.
 
@@ -1588,15 +1583,15 @@ class MetalSiteForceFieldBuilder:
             The metal angle keys.
         """
 
-        labels = self.active_site['labels']
+        labels = active_site['labels']
 
         zero_bonds = [
             key for key in bonds
-            if self.forcefield.bonds[key]['force_constant'] == 0.0
+            if forcefield.bonds[key]['force_constant'] == 0.0
         ]
         zero_angles = [
             key for key in angles
-            if self.forcefield.angles[key]['force_constant'] == 0.0
+            if forcefield.angles[key]['force_constant'] == 0.0
         ]
 
         if not zero_bonds and not zero_angles:
@@ -1614,7 +1609,11 @@ class MetalSiteForceFieldBuilder:
 
         self.ostream.flush()
 
-    def minimize_active_site(self, frozen_indices=None, max_iterations=0):
+    def minimize_active_site(self,
+                             active_site,
+                             forcefield,
+                             frozen_indices=None,
+                             max_iterations=0):
         """
         Minimizes the cluster with its own force field.
 
@@ -1642,17 +1641,12 @@ class MetalSiteForceFieldBuilder:
             'MetalSiteForceFieldBuilder.minimize_active_site: openmm is '
             'required')
 
-        assert_msg_critical(
-            self.forcefield is not None,
-            'MetalSiteForceFieldBuilder.minimize_active_site: no force field '
-            'available. Run build_forcefield first.')
-
         if frozen_indices is None:
-            frozen_indices = self.constrained_indices()
+            frozen_indices = self.constrained_indices(active_site)
 
         with tempfile.TemporaryDirectory() as temp_dir:
             stem = str(Path(temp_dir) / 'cluster')
-            self.forcefield.write_openmm_files(stem)
+            forcefield.write_openmm_files(stem)
 
             pdb = mmapp.PDBFile(f'{stem}.pdb')
             openmm_ff = mmapp.ForceField(f'{stem}.xml')
@@ -1676,6 +1670,8 @@ class MetalSiteForceFieldBuilder:
 
     def create_enzyme_system(self,
                              topology,
+                             active_site,
+                             forcefield,
                              forcefield_files=('amber14-all.xml',
                                                'amber14/tip3pfb.xml')):
         """
@@ -1703,18 +1699,13 @@ class MetalSiteForceFieldBuilder:
             'MetalSiteForceFieldBuilder.create_enzyme_system: openmm is '
             'required')
 
-        assert_msg_critical(
-            self.forcefield is not None,
-            'MetalSiteForceFieldBuilder.create_enzyme_system: no force field '
-            'available. Run build_forcefield first.')
-
         openmm_ff = mmapp.ForceField(*forcefield_files)
         system = openmm_ff.createSystem(topology,
                                         nonbondedMethod=mmapp.NoCutoff)
 
-        atom_map = self.active_site['atom_map']
-        caps = set(self.active_site['cap_indices'])
-        bonds, angles = self.get_metal_keys()
+        atom_map = active_site['atom_map']
+        caps = set(active_site['cap_indices'])
+        bonds, angles = self.get_metal_keys(forcefield, active_site)
 
         bond_force = None
         angle_force = None
@@ -1734,7 +1725,7 @@ class MetalSiteForceFieldBuilder:
         for key in bonds:
             if caps & set(key):
                 continue
-            params = self.forcefield.bonds[key]
+            params = forcefield.bonds[key]
             bond_force.addBond(
                 atom_map[key[0]], atom_map[key[1]],
                 params['equilibrium'] * mmunit.nanometer,
@@ -1745,7 +1736,7 @@ class MetalSiteForceFieldBuilder:
         for key in angles:
             if caps & set(key):
                 continue
-            params = self.forcefield.angles[key]
+            params = forcefield.angles[key]
             angle_force.addAngle(
                 atom_map[key[0]], atom_map[key[1]], atom_map[key[2]],
                 params['equilibrium'] * mmunit.degree,
@@ -1888,7 +1879,7 @@ class MetalSiteForceFieldBuilder:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def _print_binding_modes(self):
+    def _print_binding_modes(self, binding_modes):
         """
         Prints the detected coordination sphere.
         """
@@ -1897,7 +1888,7 @@ class MetalSiteForceFieldBuilder:
         self.ostream.print_header('Coordination sphere')
         self.ostream.print_header(19 * '-')
 
-        for metal in self.binding_modes['metals']:
+        for metal in binding_modes['metals']:
             self.ostream.print_header(
                 self._param(
                     f'metal {metal["element"]} (index {metal["index"]})',
@@ -1909,24 +1900,25 @@ class MetalSiteForceFieldBuilder:
         self.ostream.print_header(valstr)
         self.ostream.print_header(60 * '-')
 
-        for ligand in self.binding_modes['ligands']:
+        for ligand in binding_modes['ligands']:
             distances = ', '.join(f'{d:.2f}' for d in ligand['distances'])
             valstr = '{:>10} {:>5} | {:>18} | {:>16}'.format(
                 ligand['residue'], ligand['atom'], distances, ligand['mode'])
             self.ostream.print_header(valstr)
 
-        for note in self.binding_modes['notes']:
+        for note in binding_modes['notes']:
             self.ostream.print_warning(note)
 
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def _print_active_site(self):
+    def _print_active_site(self, active_site, binding_modes,
+                           connectivity_matrix):
         """
         Prints the composition of the truncated cluster.
         """
 
-        molecule = self.active_site['molecule']
+        molecule = active_site['molecule']
 
         self.ostream.print_blank()
         self.ostream.print_header('Truncated active site')
@@ -1934,31 +1926,30 @@ class MetalSiteForceFieldBuilder:
         self.ostream.print_header(
             self._param('atoms', molecule.number_of_atoms()))
         self.ostream.print_header(
-            self._param('charge', f'{self.active_site["charge"]:+d}'))
+            self._param('charge', f'{active_site["charge"]:+d}'))
         self.ostream.print_header(
-            self._param('multiplicity', self.active_site['multiplicity']))
+            self._param('multiplicity', active_site['multiplicity']))
         self.ostream.print_header(
-            self._param('capping hydrogens',
-                        len(self.active_site['cap_indices'])))
+            self._param('capping hydrogens', len(active_site['cap_indices'])))
         self.ostream.print_header(
-            self._param('bonds', int(self.connectivity_matrix.sum() // 2)))
-        self._print_param_list('residues', self.active_site['residues'])
+            self._param('bonds', int(connectivity_matrix.sum() // 2)))
+        self._print_param_list('residues', active_site['residues'])
 
-        variants = sorted(self.binding_modes['variants'].values())
+        variants = sorted(binding_modes['variants'].values())
         self._print_param_list('protonation', variants)
 
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def _print_metal_parameters(self):
+    def _print_metal_parameters(self, active_site, forcefield):
         """
         Prints the fitted metal bonds and angles.
         """
 
-        labels = self.active_site['labels']
-        metals = set(self.active_site['metal_indices'])
-        coords = self.active_site['molecule'].get_coordinates_in_angstrom()
-        bonds, angles = self.get_metal_keys()
+        labels = active_site['labels']
+        metals = set(active_site['metal_indices'])
+        coords = active_site['molecule'].get_coordinates_in_angstrom()
+        bonds, angles = self.get_metal_keys(forcefield, active_site)
 
         self.ostream.print_blank()
         self.ostream.print_header('Metal bonds')
@@ -1970,7 +1961,7 @@ class MetalSiteForceFieldBuilder:
         self.ostream.print_header(60 * '-')
 
         for key in bonds:
-            params = self.forcefield.bonds[key]
+            params = forcefield.bonds[key]
             names = '-'.join(labels[index] for index in key)
             # kJ/mol/nm^2 to kcal/mol/A^2
             force_constant = params['force_constant'] / 100.0 / 4.184
@@ -1987,7 +1978,7 @@ class MetalSiteForceFieldBuilder:
         self.ostream.print_header(60 * '-')
 
         for key in angles:
-            params = self.forcefield.angles[key]
+            params = forcefield.angles[key]
             names = '-'.join(labels[index] for index in key)
             bridging = key[0] in metals and key[2] in metals
             # the marker gets a fixed-width field of its own, otherwise the
