@@ -69,7 +69,13 @@ class TestKDiis:
         assert np.allclose(new_coefficients.T @ new_coefficients, np.eye(3))
         assert abs(new_fock_mo[2, 0]) < abs(fock[2, 0])
         assert len(updater.error_vectors) == 1
-        assert len(updater.fock_matrices) == 1
+        assert len(updater.rotation_matrices) == 1
+        assert len(updater.angle_matrices) == 1
+
+        rotation = updater.rotation_matrices[0][0]
+        assert rotation[2, 0] == pytest.approx(-0.10 / 1.50)
+        assert rotation[0, 2] == pytest.approx(0.10 / 1.50)
+        assert np.allclose(updater.error_vectors[0], rotation.reshape(-1))
 
     def test_history_is_bounded(self):
 
@@ -78,11 +84,93 @@ class TestKDiis:
 
         for coupling in [0.10, 0.08, 0.06]:
             fock = np.array([[-1.0, coupling], [coupling, 0.5]])
-            updater.update_restricted(fock, coefficients, 1, np.eye(2),
-                                      np.eye(2))
+            new_coefficients, _ = updater.update_restricted(
+                fock, coefficients, 1, np.eye(2), np.eye(2))
+            coefficients = new_coefficients[0]
 
         assert len(updater.error_vectors) == 2
-        assert len(updater.fock_matrices) == 2
+        assert len(updater.rotation_matrices) == 2
+        assert len(updater.angle_matrices) == 2
+
+    def test_history_is_reset_after_external_orbital_change(self):
+
+        updater = KDiis(max_vectors=4, max_rotation=1.0)
+        fock = np.array([[-1.0, 0.05], [0.05, 0.5]])
+
+        coefficients, _ = updater.update_restricted(
+            fock, np.eye(2), 1, np.eye(2), np.eye(2))
+        updater.update_restricted(fock, coefficients[0], 1, np.eye(2),
+                                  np.eye(2))
+        assert len(updater.error_vectors) == 2
+
+        swapped_orbitals = np.array([[0.0, 1.0], [-1.0, 0.0]])
+        updater.update_restricted(fock, swapped_orbitals, 1, np.eye(2),
+                                  np.eye(2))
+
+        assert len(updater.error_vectors) == 1
+        assert np.allclose(updater.angle_matrices[0][0], np.zeros((2, 2)))
+
+    def test_rotation_and_angle_extrapolation(self, monkeypatch):
+
+        def fixed_weights(errors, method_name):
+            assert method_name == 'KDIIS'
+            if len(errors) == 1:
+                return np.ones(1)
+            return np.array([0.25, 0.75])
+
+        monkeypatch.setattr('veloxchem.kdiis.compute_pulay_weights',
+                            fixed_weights)
+
+        updater = KDiis(max_vectors=3, max_rotation=1.0)
+        coefficients = np.eye(2)
+        fock_1 = np.array([[-1.0, 0.12], [0.12, 0.5]])
+        new_coefficients, _ = updater.update_restricted(
+            fock_1, coefficients, 1, np.eye(2), np.eye(2))
+        coefficients = new_coefficients[0]
+
+        first_rotation = updater.rotation_matrices[0][0].copy()
+        assert np.allclose(updater.angle_matrices[0][0], np.zeros((2, 2)))
+        assert np.allclose(updater.current_angles[0], first_rotation)
+
+        fock_2 = np.array([[-0.9, 0.07], [0.07, 0.6]])
+        updater.update_restricted(fock_2, coefficients, 1, np.eye(2), np.eye(2))
+
+        second_rotation = updater.rotation_matrices[1][0]
+        second_angle = updater.angle_matrices[1][0]
+        expected_angle = (0.25 * updater.angle_matrices[0][0] +
+                          0.75 * second_angle + 0.25 * first_rotation +
+                          0.75 * second_rotation)
+
+        assert np.allclose(second_angle, first_rotation)
+        assert np.allclose(updater.current_angles[0], expected_angle)
+        assert np.allclose(updater.last_weights, np.array([0.25, 0.75]))
+
+    def test_negative_denominator_uses_descent_preconditioner(self):
+
+        fock = np.array([[0.5, 0.10], [0.10, -0.5]])
+        updater = KDiis(max_rotation=1.0)
+        updater.update_restricted(fock,
+                                  np.eye(2),
+                                  1,
+                                  np.eye(2),
+                                  np.eye(2),
+                                  level_shift=0.25)
+
+        rotation = updater.rotation_matrices[0][0]
+        assert rotation[1, 0] == pytest.approx(-0.10 / 1.25)
+        assert rotation[0, 1] == pytest.approx(0.10 / 1.25)
+
+    def test_rotation_limit_preserves_step_direction(self):
+
+        fock = np.array([[-1.0, 1.0, 0.10],
+                         [1.0, 0.5, 0.0],
+                         [0.10, 0.0, 1.0]])
+        updater = KDiis(max_rotation=0.2)
+        updater.update_restricted(fock, np.eye(3), 1, np.eye(3), np.eye(3))
+
+        rotation = updater.rotation_matrices[0][0]
+        assert rotation[1, 0] == pytest.approx(-0.2)
+        assert rotation[2, 0] / rotation[1, 0] == pytest.approx(0.075)
 
     def test_error_vector_is_invariant_to_mo_gauge(self):
 
