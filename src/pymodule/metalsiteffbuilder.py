@@ -104,7 +104,7 @@ class MetalSiteForceFieldBuilder:
         - mute_scf: The flag for muting the output of the QM drivers.
         - optimized_geometry: A molecule, or the path to an xyz file, to use
           instead of running the constrained optimization. Falls back to
-          optimized_geometry.xyz in the working folder.
+          opt_active_site.xyz in the working folder.
         - hessian: A matrix, or the path to a text file readable by
           numpy.loadtxt, to use instead of computing a Hessian. Falls back to
           hessian.txt in the working folder.
@@ -157,6 +157,13 @@ class MetalSiteForceFieldBuilder:
 
     # Elements that can donate a lone pair to a metal center.
     DONOR_ELEMENTS = ('N', 'O', 'S', 'Se')
+
+    # Residues whose sidechain can bridge two metal centers. A carboxylate has
+    # two donor oxygens and a thiolate sulfur has several lone pairs, so both
+    # can reach two metals at once. An imidazole nitrogen has a single lone
+    # pair in the ring plane, so a histidine bound to two metals is a geometric
+    # artifact rather than a bridge, however short the second contact looks.
+    BRIDGING_RESIDUES = ('ASP', 'ASH', 'GLU', 'GLH', 'CYS', 'CYM', 'CYX')
 
     # Atoms dropped when truncating a sidechain at the CA-CB bond. CA itself
     # is replaced by a capping hydrogen rather than dropped.
@@ -450,6 +457,86 @@ class MetalSiteForceFieldBuilder:
 
         return path if path.is_file() else None
 
+    def save_results(self, results, folder=None):
+        """
+        Writes everything a run produced into one folder.
+
+        Entries that are absent are skipped rather than treated as an error, so
+        a structural run that stopped before any QM was paid for still leaves
+        its binding modes behind to be reviewed. Every file a later run can
+        read back is named by the class-level file name attributes, so that
+        saving and reloading cannot drift apart.
+
+        :param results:
+            The results dictionary of compute(), or any subset of it.
+        :param folder:
+            The folder to write into. Defaults to the working folder.
+
+        :return:
+            The folder as a Path.
+        """
+
+        if folder is None:
+            folder = self.working_folder()
+        else:
+            folder = Path(folder)
+            if self.rank == mpi_master():
+                folder.mkdir(parents=True, exist_ok=True)
+
+        if self.rank != mpi_master():
+            return folder
+
+        written = []
+
+        binding_modes = results.get('binding_modes')
+        if binding_modes is not None:
+            self.save_binding_modes(folder / 'binding_modes.json',
+                                    binding_modes)
+            written.append('binding_modes.json')
+
+        topology = results.get('topology')
+        positions = results.get('positions')
+        if topology is not None and positions is not None:
+            with (folder / 'protonated.pdb').open('w') as fh:
+                mmapp.PDBFile.writeFile(topology,
+                                        np.asarray(positions) * mmunit.angstrom,
+                                        fh,
+                                        keepIds=True)
+            written.append('protonated.pdb')
+
+        active_site = results.get('active_site')
+        if active_site is not None:
+            active_site['molecule'].write_xyz_file(
+                str(folder / self.GEOMETRY_FILE))
+            written.append(self.GEOMETRY_FILE)
+
+        hessian = results.get('hessian')
+        if hessian is not None:
+            np.savetxt(folder / self.HESSIAN_FILE, hessian)
+            written.append(self.HESSIAN_FILE)
+
+        partial_charges = results.get('partial_charges')
+        if partial_charges is not None:
+            np.savetxt(folder / self.CHARGES_FILE, partial_charges)
+            written.append(self.CHARGES_FILE)
+
+        forcefield = results.get('forcefield')
+        if forcefield is not None:
+            forcefield.write_openmm_files(str(folder / 'forcefield'))
+            written.extend(['forcefield.xml', 'forcefield.pdb'])
+
+        enzyme_system = results.get('enzyme_system')
+        if enzyme_system is not None:
+            (folder / self.ENZYME_SYSTEM_FILE).write_text(
+                mm.XmlSerializer.serialize(enzyme_system))
+            written.append(self.ENZYME_SYSTEM_FILE)
+
+        if written:
+            self.ostream.print_info(f'Wrote {", ".join(written)} to {folder}')
+            self.ostream.flush()
+
+        return folder
+
     def load_structure(self, structure):
         """
         Reads a PDB or mmCIF structure.
@@ -687,8 +774,14 @@ class MetalSiteForceFieldBuilder:
         """
         Classifies each ligand contact using the residue context.
 
+        Only the residues of BRIDGING_RESIDUES are allowed to reach two metals.
+        A contact that would make any other residue bridge is trimmed back to
+        its closest metal, since carrying it further would put a metal bond
+        into the force field that the chemistry does not support.
+
         :param ligands:
-            The list of ligand contacts. Updated in place with a 'mode' entry.
+            The list of ligand contacts. Updated in place with a 'mode' entry,
+            and trimmed to one metal where the residue cannot bridge.
         :param notes:
             The list of review notes. Appended to in place.
         """
@@ -697,10 +790,31 @@ class MetalSiteForceFieldBuilder:
         for ligand in ligands:
             by_residue.setdefault(ligand['res_index'], []).append(ligand)
 
+        can_bridge = MetalSiteForceFieldBuilder.BRIDGING_RESIDUES
+
         for group in by_residue.values():
             res_name = group[0]['res_name']
 
             for ligand in group:
+                if len(ligand['metals']) >= 2 and res_name not in can_bridge:
+                    # the residue has no way of reaching two metals with one
+                    # donor atom, so the longer contact is dropped rather than
+                    # turned into a bond that the force field would then have
+                    # to hold
+                    closest = ligand['distances'].index(
+                        min(ligand['distances']))
+                    dropped = [
+                        f'{d:.2f} A' for i, d in enumerate(ligand['distances'])
+                        if i != closest
+                    ]
+                    notes.append(
+                        f'{ligand["residue"]} {ligand["atom"]} is within the '
+                        f'primary cutoff of more than one metal, but '
+                        f'{res_name} cannot bridge; keeping the closest '
+                        f'contact and dropping {", ".join(dropped)}')
+                    ligand['metals'] = [ligand['metals'][closest]]
+                    ligand['distances'] = [ligand['distances'][closest]]
+
                 if len(ligand['metals']) >= 2:
                     ligand['mode'] = 'bridging_single'
                 else:
@@ -712,14 +826,26 @@ class MetalSiteForceFieldBuilder:
             if len(group) >= 2 and monodentate:
                 metals_hit = {ligand['metals'][0] for ligand in group}
                 if len(metals_hit) >= 2:
-                    if res_name in ('ASP', 'GLU', 'ASH', 'GLH'):
+                    if res_name not in can_bridge:
+                        # two donor atoms on two metals is a bridge whatever
+                        # it is called, so it is left as two independent
+                        # contacts for review instead
+                        mode = None
+                        notes.append(
+                            f'{group[0]["residue"]} reaches two metals '
+                            f'through {len(group)} atoms, but {res_name} '
+                            'cannot bridge; both contacts are kept as '
+                            'monodentate, so review them')
+                    elif res_name in ('ASP', 'GLU', 'ASH', 'GLH'):
                         mode = 'bridging_mu13'
                     else:
                         mode = 'bridging'
                 else:
                     mode = 'bidentate'
-                for ligand in group:
-                    ligand['mode'] = mode
+
+                if mode is not None:
+                    for ligand in group:
+                        ligand['mode'] = mode
 
             if res_name.startswith('HI') and len(group) >= 2:
                 notes.append(
@@ -1109,8 +1235,8 @@ class MetalSiteForceFieldBuilder:
 
         atom_map = active_site['atom_map']
         reverse_map = {
-            top_index: active site_index
-            for active site_index, top_index in atom_map.items()
+            top_index: site_index
+            for site_index, top_index in atom_map.items()
         }
 
         n_atoms = len(atom_map)
@@ -1801,7 +1927,7 @@ class MetalSiteForceFieldBuilder:
             frozen_indices = self.constrained_indices(active_site)
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            stem = str(Path(temp_dir) / 'active site')
+            stem = str(Path(temp_dir) / 'active_site')
             forcefield.write_openmm_files(stem)
 
             pdb = mmapp.PDBFile(f'{stem}.pdb')
@@ -1828,7 +1954,7 @@ class MetalSiteForceFieldBuilder:
     def redistribute_cap_charges(active_site, partial_charges):
         """
         Moves the charge of the capping hydrogens onto the rest of the active site.
-        
+
         The operation is idempotent: the caps end up at zero, so a second pass
         finds nothing left to move. Both build_forcefield and
         redistribute_charges apply it, and either may be handed charges that
@@ -2276,16 +2402,36 @@ class MetalSiteForceFieldBuilder:
                     f'charge {metal["formal_charge"]:+d}'))
 
         self.ostream.print_blank()
-        valstr = '{:>10} {:>5} | {:>18} | {:>16}'.format(
-            'residue', 'atom', 'distances (A)', 'mode')
+        valstr = '{:>10} {:>9} | {:>18} | {:>16}'.format(
+            'residue', 'atoms', 'distances (A)', 'mode')
         self.ostream.print_header(valstr)
         self.ostream.print_header(60 * '-')
 
+        by_residue = {}
         for ligand in binding_modes['ligands']:
-            distances = ', '.join(f'{d:.2f}' for d in ligand['distances'])
-            valstr = '{:>10} {:>5} | {:>18} | {:>16}'.format(
-                ligand['residue'], ligand['atom'], distances, ligand['mode'])
-            self.ostream.print_header(valstr)
+            by_residue.setdefault(ligand['res_index'], []).append(ligand)
+
+        for group in by_residue.values():
+            # a residue binding through several atoms is one ligand, so it gets
+            # one row listing them side by side, the same way an atom bridging
+            # two metals lists both of its distances. Merging is only
+            # unambiguous while every atom contributes exactly one distance;
+            # otherwise the distances could not be read back onto their atoms,
+            # so that group stays one row per atom
+            if any(len(ligand['distances']) != 1 for ligand in group):
+                rows = [[ligand] for ligand in group]
+            else:
+                rows = [group]
+
+            for row in rows:
+                atoms = ', '.join(ligand['atom'] for ligand in row)
+                distances = ', '.join(f'{d:.2f}' for ligand in row
+                                      for d in ligand['distances'])
+                modes = '/'.join(
+                    dict.fromkeys(ligand['mode'] for ligand in row))
+                valstr = '{:>10} {:>9} | {:>18} | {:>16}'.format(
+                    row[0]['residue'], atoms, distances, modes)
+                self.ostream.print_header(valstr)
 
         for note in binding_modes['notes']:
             self.ostream.print_warning(note)
