@@ -65,7 +65,7 @@ from .sadguessdriver import SadGuessDriver
 from .firstorderprop import FirstOrderProperties
 from .cpcmdriver import CpcmDriver
 from .smddriver import SmdDriver
-from .gostshyp import GostshypDriver
+from .gostshypdriver import GostshypDriver
 from .dispersionmodel import DispersionModel
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           unparse_input, write_unparsed_input_to_hdf5,

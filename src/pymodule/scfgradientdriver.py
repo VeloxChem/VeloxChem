@@ -424,7 +424,7 @@ class ScfGradientDriver(GradientDriver):
         t0 = time.time()
 
         if self.scf_driver._gostshyp:
-            from .gostshyp import GostshypDriver
+            from .gostshypdriver import GostshypDriver
 
             self._gostshyp_drv = GostshypDriver(molecule,
                                                 basis,
