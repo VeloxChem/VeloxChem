@@ -111,7 +111,6 @@ class ScfDriver:
         - xcfun: The XC functional.
         - grid_level: The accuracy level of DFT grid.
         - pe_options: The dictionary with options for polarizable embedding.
-        - gostshyp: The flag for running a gostshyp pressure calculation.
         - pressure: The applied hydrostatic pressure.
         - pressure_units: The units of the applied pressure.
         - num_leb_points: The number of Lebedev points per van der Waals sphere.
@@ -370,7 +369,7 @@ class ScfDriver:
                 'tssf': ('float', 'tessellation sphere scaling factor'),
                 'discretization': ('str', 'surface discretization method'),
                 'switching_thresh': ('float', 'switching function threshold'),
-                'r_ext': 
+                'r_ext':
                     ('float', 'extension radius for outer cavity correction in angstrom'),
                 'solvation_model': ('str', 'solvation model'),
                 'cpcm_grid_per_sphere':
@@ -1034,7 +1033,7 @@ class ScfDriver:
 
         # set up gostshyp method by creating a surface tessellation
         if self._gostshyp:
-            self._gostshyp_drv = GostshypDriver(molecule, 
+            self._gostshyp_drv = GostshypDriver(molecule,
                                                 basis,
                                                 self.pressure,
                                                 self.pressure_units,
@@ -1051,7 +1050,7 @@ class ScfDriver:
 
             tess_t0 = tm.time()
             tessellation = self._gostshyp_drv.generate_tessellation(
-                                                        tessellation_settings)
+                tessellation_settings)
 
             if self.print_level > 1:
                 tess_info = 'Van der Waals cavity with '
@@ -1867,7 +1866,7 @@ class ScfDriver:
 
             fock_mat, vxc_mat, e_emb, V_emb, e_pr, V_pr = self._comp_2e_fock_single_comm(
                 den_mat, molecule, ao_basis, screener, e_grad, profiler)
-            
+
             self._e_gost = e_pr
 
             profiler.start_timer('ErrVec')
@@ -2888,7 +2887,7 @@ class ScfDriver:
 
         if self.timing and self._pe:
             profiler.add_timing_info('FockPE', tm.time() - pe_t0)
-        
+
         gostshyp_t0 = tm.time()
         if self._gostshyp and not self._first_step:
             if self.scf_type == 'restricted':
@@ -3623,7 +3622,7 @@ class ScfDriver:
 
             if self._gostshyp:
                 self.ostream.print_header(110 * '-')
-            else:    
+            else:
                 self.ostream.print_header(92 * '-')
 
     def _print_scf_finish(self, start_time):
@@ -3687,7 +3686,7 @@ class ScfDriver:
                     self._num_iter, te, diff_te)
                 valstr += '{:15.8f} {:15.8f} {:15.8f} '.format(
                     e_grad, max_grad, diff_den)
-                
+
                 if self._gostshyp:
                     valstr += ' ' * 13 + '{:3d} '.format(self._gostshyp_drv.num_neg_amp)
 
@@ -3960,7 +3959,7 @@ class ScfDriver:
             valstr = 'Electrostatic Solvation Energy     :'
             valstr += f'{self.cpcm_drv.cpcm_epol:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
-        
+
         if self._gostshyp:
             valstr = 'GOSTSHYP Pressure Energy           :'
             valstr += f'{self._e_gost:20.10f} a.u.'
