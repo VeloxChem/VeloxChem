@@ -75,6 +75,15 @@ from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import XCMolecularGradient
 from .veloxchemlib import SubMatrix
+from .veloxchemlib import compute_screened_tco_s_fock
+from .veloxchemlib import compute_screened_tco_s_values
+from .veloxchemlib import compute_screened_tco_p_fock
+from .veloxchemlib import compute_screened_tco_p_values
+from .veloxchemlib import compute_screened_tco_d_values
+from .veloxchemlib import compute_screened_tco_f_values
+from .veloxchemlib import compute_screened_contracted_tco_s_gradient
+from .veloxchemlib import compute_screened_contracted_tco_p_gradient
+from .veloxchemlib import count_screened_tco
 
 # for backward compatibility only
 from .veloxchemlib import ElectricDipoleIntegralsDriver
@@ -229,6 +238,8 @@ from .orbitallocalization import OrbitalLocalizationDriver
 from .ensembleparser import EnsembleParser
 from .ensembledriver import EnsembleDriver
 from .spectrumaverager import SpectrumAverager
+from .tessellation import TessellationDriver
+from .gostshyp import GostshypDriver
 # for backward compatibility only
 from .cppsolver import ComplexResponseSolver as ComplexResponse
 from .tdacppsolver import ComplexResponseTdaSolver as ComplexResponseTDA

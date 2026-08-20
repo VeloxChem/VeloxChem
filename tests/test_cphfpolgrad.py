@@ -15,13 +15,14 @@ from veloxchem.polorbitalresponse import PolOrbitalResponse
 class FullDimensionPolOrbitalResponse(PolOrbitalResponse):
 
     def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict,
-                    pe_dict, lr_results):
+                    pe_dict, gostshyp_dict, lr_results):
         if self.is_complex:
             return self.compute_rhs_complex(molecule, basis, scf_tensors,
                                             eri_dict, dft_dict, pe_dict,
-                                            lr_results)
+                                            gostshyp_dict, lr_results)
         return self.compute_rhs_real(molecule, basis, scf_tensors, eri_dict,
-                                     dft_dict, pe_dict, lr_results)
+                                     dft_dict, pe_dict, gostshyp_dict, 
+                                     lr_results)
 
     def compute_omega(self, molecule, basis, scf_tensors, lr_results):
         if self.is_complex:

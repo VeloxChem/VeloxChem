@@ -162,16 +162,16 @@ class PolOrbitalResponse(CphfSolver):
         else:
             return None
 
-    def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, lr_results):
+    def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, gostshyp_dict, lr_results):
 
         if self.is_complex:
             return self.compute_rhs_complex_red_dim(molecule, basis, scf_tensors, eri_dict,
-                                                    dft_dict, pe_dict, lr_results)
+                                                    dft_dict, pe_dict, gostshyp_dict, lr_results)
         else:
             return self.compute_rhs_real_red_dim(molecule, basis, scf_tensors, eri_dict,
-                                                 dft_dict, pe_dict, lr_results)
+                                                 dft_dict, pe_dict, gostshyp_dict, lr_results)
 
-    def compute_rhs_complex(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, lr_results):
+    def compute_rhs_complex(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, gostshyp_dict, lr_results):
         """
         Computes the complex right-hand side (RHS) of the polarizability
         orbital response equation including the necessary density matrices
@@ -434,10 +434,10 @@ class PolOrbitalResponse(CphfSolver):
 
             fock_ao_rhs_real = self._comp_lr_fock(dm_ao_rhs_real_list, molecule,
                                                   basis, eri_dict, dft_dict, pe_dict,
-                                                  profiler)
+                                                  gostshyp_dict, profiler)
             fock_ao_rhs_imag = self._comp_lr_fock(dm_ao_rhs_imag_list, molecule,
                                                   basis, eri_dict, dft_dict, pe_dict,
-                                                  profiler)
+                                                  gostshyp_dict, profiler)
 
             # calculate the RHS
             if self.rank == mpi_master():
@@ -655,7 +655,7 @@ class PolOrbitalResponse(CphfSolver):
                 'dist_fock_gxc_ao': dist_fock_gxc_ao  # empty list if not DFT
             }
 
-    def compute_rhs_complex_red_dim(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, lr_results):
+    def compute_rhs_complex_red_dim(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, gostshyp_dict, lr_results):
         """
         Computes the complex right-hand side (RHS) of the polarizability
         orbital response equation including the necessary density matrices
@@ -916,10 +916,10 @@ class PolOrbitalResponse(CphfSolver):
 
             fock_ao_rhs_real = self._comp_lr_fock(dm_ao_rhs_real_list, molecule,
                                                   basis, eri_dict, dft_dict, pe_dict,
-                                                  profiler)
+                                                  gostshyp_dict, profiler)
             fock_ao_rhs_imag = self._comp_lr_fock(dm_ao_rhs_imag_list, molecule,
                                                   basis, eri_dict, dft_dict, pe_dict,
-                                                  profiler)
+                                                  gostshyp_dict, profiler)
 
             # calculate the RHS
             if self.rank == mpi_master():
@@ -1130,7 +1130,7 @@ class PolOrbitalResponse(CphfSolver):
                 'dist_fock_gxc_ao': dist_fock_gxc_ao  # empty list if not DFT
             }
 
-    def compute_rhs_real(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, lr_results):
+    def compute_rhs_real(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, gostshyp_dict, lr_results):
         """
         Computes the right-hand side (RHS) of the Real polarizability
         orbital response equation including the necessary density matrices
@@ -1315,7 +1315,8 @@ class PolOrbitalResponse(CphfSolver):
             # (not 1PDM part)
 
             fock_ao_rhs = self._comp_lr_fock(dm_ao_rhs_list, molecule, basis,
-                                             eri_dict, dft_dict, pe_dict, profiler)
+                                             eri_dict, dft_dict, pe_dict, 
+                                             gostshyp_dict, profiler)
 
             # calculate the RHS
             if self.rank == mpi_master():
@@ -1459,7 +1460,7 @@ class PolOrbitalResponse(CphfSolver):
                 'dist_fock_gxc_ao': dist_fock_gxc_ao  # empty list if not DFT
             }
 
-    def compute_rhs_real_red_dim(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, lr_results):
+    def compute_rhs_real_red_dim(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, gostshyp_dict, lr_results):
         """
         Computes the right-hand side (RHS) of the Real polarizability
         orbital response equation including the necessary density matrices
@@ -1643,7 +1644,8 @@ class PolOrbitalResponse(CphfSolver):
             # vector-related components to general Fock matrix
             # (not 1PDM part)
             fock_ao_rhs = self._comp_lr_fock(dm_ao_rhs_list, molecule, basis,
-                                             eri_dict, dft_dict, pe_dict, profiler)
+                                             eri_dict, dft_dict, pe_dict, 
+                                             gostshyp_dict, profiler)
 
             # calculate the RHS
             if self.rank == mpi_master():
@@ -2574,6 +2576,8 @@ class PolOrbitalResponse(CphfSolver):
         dft_dict = self._init_dft(molecule, scf_tensors)
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+        # GOSTSHYP information
+        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_tensors)
 
         # number of vector components
         dof = len(self.vector_components)
@@ -2704,7 +2708,7 @@ class PolOrbitalResponse(CphfSolver):
 
             fock_cphf = self._comp_lr_fock(cphf_ao_list, molecule, basis,
                                            eri_dict, dft_dict, pe_dict,
-                                           profiler)
+                                           gostshyp_dict, profiler)
 
             # get Fock matrices from distributed arrays
             # Notes: fock_ao_rhs is a list with dof**2 matrices corresponding to
@@ -2853,6 +2857,8 @@ class PolOrbitalResponse(CphfSolver):
         dft_dict = self._init_dft(molecule, scf_tensors)
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+        # GOSTSHYP information
+        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_tensors)
 
         # number of vector components
         dof = len(self.vector_components)
@@ -2981,7 +2987,7 @@ class PolOrbitalResponse(CphfSolver):
 
             fock_cphf = self._comp_lr_fock(cphf_ao_list, molecule, basis,
                                            eri_dict, dft_dict, pe_dict,
-                                           profiler)
+                                           gostshyp_dict, profiler)
 
             # get Fock matrices from distributed arrays
             # Notes: fock_ao_rhs is a list with dof**2 matrices corresponding to
@@ -3122,6 +3128,8 @@ class PolOrbitalResponse(CphfSolver):
         dft_dict = self._init_dft(molecule, scf_tensors)
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+        # GOSTSHYP information
+        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_tensors)
 
         # number of vector components
         dof = len(self.vector_components)
@@ -3265,10 +3273,10 @@ class PolOrbitalResponse(CphfSolver):
 
             fock_cphf_real = self._comp_lr_fock(cphf_ao_list_real, molecule, basis,
                                                 eri_dict, dft_dict, pe_dict,
-                                                profiler)
+                                                gostshyp_dict, profiler)
             fock_cphf_imag = self._comp_lr_fock(cphf_ao_list_imag, molecule, basis,
                                                 eri_dict, dft_dict, pe_dict,
-                                                profiler)
+                                                gostshyp_dict, profiler)
 
             # get Fock matrix intermediates from distributed arrays
             # Notes: fock_ao_rhs is a list with dof**2 matrices corresponding to
@@ -3464,6 +3472,8 @@ class PolOrbitalResponse(CphfSolver):
         dft_dict = self._init_dft(molecule, scf_tensors)
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+        # GOSTSHYP information
+        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_tensors)
 
         # number of vector components
         dof = len(self.vector_components)
@@ -3603,10 +3613,10 @@ class PolOrbitalResponse(CphfSolver):
 
             fock_cphf_real = self._comp_lr_fock(cphf_ao_list_real, molecule, basis,
                                                 eri_dict, dft_dict, pe_dict,
-                                                profiler)
+                                                gostshyp_dict, profiler)
             fock_cphf_imag = self._comp_lr_fock(cphf_ao_list_imag, molecule, basis,
                                                 eri_dict, dft_dict, pe_dict,
-                                                profiler)
+                                                gostshyp_dict, profiler)
 
             # get Fock matrix intermediates from distributed arrays
             # Notes: fock_ao_rhs is a list with dof**2 matrices corresponding to

@@ -39,7 +39,7 @@ from .distributedarray import DistributedArray
 from .lrsolverbase import LinearResponseSolverBase
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
+                           solvation_model_sanity_check, gostshyp_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
 from .checkpoint import check_rsp_hdf5
@@ -125,6 +125,9 @@ class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
         # check solvation setup
         solvation_model_sanity_check(self)
 
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self)
+
         # check solvation model setup
         if self.rank == mpi_master():
             assert_msg_critical(
@@ -179,6 +182,9 @@ class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
         # CPCM information
         self._init_cpcm(molecule, basis)
 
+        # GOSTSHYP information
+        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_results)
+        
         # TODO: enable PE
         assert_msg_critical(
             not self._pe, f'{type(self).__name__}: ' +
@@ -374,6 +380,7 @@ class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
                                         eri_dict,
                                         dft_dict,
                                         pe_dict,
+                                        gostshyp_dict,
                                         profiler,
                                         method_type='unrestricted')
 
@@ -391,6 +398,7 @@ class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
                                 eri_dict,
                                 dft_dict,
                                 pe_dict,
+                                gostshyp_dict,
                                 profiler,
                                 method_type='unrestricted')
 
@@ -583,6 +591,7 @@ class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
                                 eri_dict,
                                 dft_dict,
                                 pe_dict,
+                                gostshyp_dict,
                                 profiler,
                                 method_type='unrestricted')
 

@@ -126,6 +126,21 @@ def scf_results_sanity_check(obj, scf_results):
                 ]:
                     updated_scf_info[key] = scf_results[key]
 
+        if scf_results.get('pressure', None) is not None:
+            # pressure can be overwritten to enable response pressure scans 
+            # without restarting SCF
+            for key in [
+                    'pressure',
+                    'pressure_units',
+                    'num_leb_points',
+                    'tssf',
+                    'discretization',
+                    'switching_thresh',
+                    'r_ext',
+            ]:
+                if key in scf_results:
+                    updated_scf_info[key] = scf_results[key]
+
     updated_scf_info = obj.comm.bcast(updated_scf_info, root=mpi_master())
 
     for key, val in updated_scf_info.items():
@@ -154,7 +169,7 @@ def rsp_results_solvation_sanity_check(obj, rsp_results):
     Checks response results for C-PCM information.
 
     :param obj:
-        The object (TDDFT orbital response driver) that is being updated.
+        The object (TDDFT orbital response driver) that is being updated.05
     :param rsp_results:
         A dictionary containing the linear response results.
     """
@@ -635,6 +650,34 @@ def embedding_sanity_check(options):
             "At least one of 'json_file' or 'objects' must be provided in 'inputs'."
         )
 
+def gostshyp_sanity_check(obj, basis=None):
+    """
+    Checks the GOSTSHYP settings and updates relevant attributes.
+
+    :param basis:
+        The basis set.
+    """
+
+    obj._gostshyp = (obj.pressure != 0.0)
+
+    if obj._gostshyp:
+        assert_msg_critical(obj.pressure > 0.0,
+            'GOSTSHYP: Unphysical negative pressures invalid')
+
+        obj._pressure_in_input_units = obj.pressure
+
+        if basis is not None:
+        
+            # check max angular momentum of basis 
+            max_am = basis.max_angular_momentum()
+            gost_max_am = 3
+
+            if max_am > gost_max_am:
+                labels = {0: 's', 1: 'p', 2: 'd', 3: 'f', 4: 'g', 5: 'h'}
+                raise ValueError(
+                    f"GOSTSHYP supports basis functions up to f-type; this basis "
+                    f"contains {labels.get(max_am, f'l={max_am}')}-type functions.")
+        
 
 def solvation_model_sanity_check(obj):
     """

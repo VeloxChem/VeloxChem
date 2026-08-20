@@ -39,7 +39,7 @@ from .distributedarray import DistributedArray
 from .lrsolverbase import LinearResponseSolverBase
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
+                           solvation_model_sanity_check, gostshyp_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
 from .checkpoint import check_rsp_hdf5
@@ -125,6 +125,9 @@ class LinearResponseSolver(LinearResponseSolverBase):
         # check solvation setup
         solvation_model_sanity_check(self)
 
+        # check gostshyp setup
+        gostshyp_sanity_check(self)
+
         # check solvation model setup
         if self.rank == mpi_master():
             assert_msg_critical(
@@ -168,6 +171,9 @@ class LinearResponseSolver(LinearResponseSolverBase):
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+
+        # GOSTSHYP information
+        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_results)
 
         # CPCM information
         self._init_cpcm(molecule, basis)
@@ -313,7 +319,7 @@ class LinearResponseSolver(LinearResponseSolverBase):
 
                     self._e2n_half_size(bger, bung, molecule, basis,
                                         scf_results, eri_dict, dft_dict,
-                                        pe_dict, profiler)
+                                        pe_dict, gostshyp_dict, profiler)
 
         # generate initial guess from scratch
         else:
@@ -322,7 +328,8 @@ class LinearResponseSolver(LinearResponseSolverBase):
             profiler.set_timing_key('Preparation')
 
             self._e2n_half_size(bger, bung, molecule, basis, scf_results,
-                                eri_dict, dft_dict, pe_dict, profiler)
+                                eri_dict, dft_dict, pe_dict, gostshyp_dict,
+                                profiler)
 
         profiler.check_memory_usage('Initial guess')
 
@@ -457,6 +464,12 @@ class LinearResponseSolver(LinearResponseSolverBase):
 
                 self._print_iteration(relative_residual_norm, xvs)
 
+                if self._gostshyp:
+                    valstr = '    *** GOSTSHYP information: A total number of '
+                    valstr += '{} grid points with negative amplitudes were excluded'.format(gostshyp_dict['neg_amps'])
+                    self.ostream.print_header(valstr)
+                    self.ostream.print_blank()
+
             profiler.stop_timer('ReducedSpace')
 
             # check convergence
@@ -493,8 +506,8 @@ class LinearResponseSolver(LinearResponseSolverBase):
                 self._add_frequencies_to_checkpoint()
 
             self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
-                                scf_results, eri_dict, dft_dict, pe_dict,
-                                profiler)
+                                scf_results, eri_dict, dft_dict, pe_dict, 
+                                gostshyp_dict, profiler)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trial_in_hours = iter_in_hours / n_new_trials
