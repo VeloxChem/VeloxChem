@@ -47,7 +47,6 @@ from .veloxchemlib import compute_screened_contracted_tco_s_gradient
 from .veloxchemlib import compute_screened_contracted_tco_p_gradient
 from .outputstream import OutputStream
 from .tessellation import TessellationDriver
-from .inputparser import (parse_input, print_keywords)
 from .errorhandler import assert_msg_critical
 
 class GostshypDriver:
@@ -60,9 +59,11 @@ class GostshypDriver:
     :param basis:
         The AO basis set.
     :param pressure:
-        The applied hydrostatic pressure in GPa.
-    :param num_leb_points:
-        The number of Lebedev grid points per van der Waals sphere.
+        The applied hydrostatic pressure in the units given by pressure_units.
+    :param pressure_units:
+        The units of the given pressure.
+    :param tco_tol:
+        The screening threshold for the three-center overlap integrals.
     :param comm:
         The MPI communicator.
     :param ostream:
@@ -71,11 +72,14 @@ class GostshypDriver:
     Instance variables
         - molecule: The molecule.
         - basis: The AO basis set.
-        - pressure: The applied hydrostatic pressure.
-        - pressure_units: The units of the applied pressure.
+        - pressure_au: The applied hydrostatic pressure in atomic units.
         - num_tes_points: The number of points on the tessellated surface.
         - tessellation: The tessellated surface object.
+        - num_neg_amp: The number of tessellation points with negative amplitudes.
+        - tco_tol: The screening threshold for the three-center overlap integrals.
         - comm: The MPI communicator.
+        - rank: The rank of the MPI process.
+        - nodes: The number of MPI processes.
         - ostream: The output stream.
     """
 
@@ -98,7 +102,7 @@ class GostshypDriver:
         self.basis = basis
 
         # GOSTSHYP setup
-        self.pressure = parse_pressure_units(pressure, pressure_units)
+        self.pressure_au = parse_pressure_units(pressure, pressure_units)
         self.num_tes_points = 0
         self.tessellation = None
         self.num_neg_amp = 0
@@ -111,15 +115,6 @@ class GostshypDriver:
 
         # output stream
         self.ostream = ostream
-
-        # input keywords
-        self._input_keywords = {
-            'method_settings': {
-                'pressure': ('float', 'applied pressure (default in  MPa)'),
-                'pressure_units': ('str', 'the units of the given pressure'),
-                'tco_tol': ('float', 'screening threshold for three-center overlap integrals')
-            }
-        }
 
     def gostshyp_contrib(self, den_mat, tessellation_settings=None):
         """
@@ -174,7 +169,7 @@ class GostshypDriver:
                                                         self.tco_tol)
 
         # compute amplitudes
-        initial_amplitudes = self.pressure * initial_areas / initial_f_tilde
+        initial_amplitudes = self.pressure_au * initial_areas / initial_f_tilde
 
         amplitudes_mask = initial_amplitudes >= 0.0
         
@@ -297,7 +292,7 @@ class GostshypDriver:
 
         # compute amplitudes and remove grid points associated with
         # negative amplitudes
-        initial_amplitudes = self.pressure * initial_areas / initial_f_tilde
+        initial_amplitudes = self.pressure_au * initial_areas / initial_f_tilde
 
         amplitudes_mask = initial_amplitudes >= 0.0
         
@@ -443,7 +438,7 @@ class GostshypDriver:
                                                         self.tco_tol)
 
         # compute amplitudes
-        initial_amplitudes = self.pressure * initial_areas / initial_f_tilde
+        initial_amplitudes = self.pressure_au * initial_areas / initial_f_tilde
         amplitudes_mask = initial_amplitudes >= 0.0
         local_neg_p_amp = np.sum(~amplitudes_mask)
 
