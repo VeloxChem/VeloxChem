@@ -127,16 +127,17 @@ def scf_results_sanity_check(obj, scf_results):
                     updated_scf_info[key] = scf_results[key]
 
         if scf_results.get('pressure', None) is not None:
+            # TODO: double check
             # pressure can be overwritten to enable response pressure scans 
             # without restarting SCF
             for key in [
                     'pressure',
                     'pressure_units',
-                    'num_leb_points',
-                    'tssf',
-                    'discretization',
-                    'switching_thresh',
-                    'r_ext',
+                    'gostshyp_num_lebedev_points',
+                    'gostshyp_tssf',
+                    'gostshyp_discretization',
+                    'gostshyp_switching_thresh',
+                    'gostshyp_r_ext',
             ]:
                 if key in scf_results:
                     updated_scf_info[key] = scf_results[key]
@@ -672,6 +673,7 @@ def gostshyp_sanity_check(obj, basis=None):
             max_am = basis.max_angular_momentum()
             gost_max_am = 3
 
+            # TODO: consider moving this check to gostshyp 1e integral drivers
             if max_am > gost_max_am:
                 labels = {0: 's', 1: 'p', 2: 'd', 3: 'f', 4: 'g', 5: 'h'}
                 raise ValueError(

@@ -434,12 +434,12 @@ class ScfGradientDriver(GradientDriver):
                                                 self.comm,
                                                 self.ostream)
 
-            tessellation_settings = {'num_leb_points'   : self.scf_driver.num_leb_points,
-                                     'tssf'             : self.scf_driver.tssf,
-                                     'discretization'   : self.scf_driver.discretization,
-                                     'switching_thresh' : self.scf_driver.switching_thresh,
+            tessellation_settings = {'num_leb_points'   : self.scf_driver.gostshyp_num_lebedev_points,
+                                     'tssf'             : self.scf_driver.gostshyp_tssf,
+                                     'discretization'   : self.scf_driver.gostshyp_discretization,
+                                     'switching_thresh' : self.scf_driver.gostshyp_switching_thresh,
                                      'filename'         : self.scf_driver.filename,
-                                     'r_ext'            : self.scf_driver.r_ext}
+                                     'r_ext'            : self.scf_driver.gostshyp_r_ext}
 
             gostshyp_grad = self._gostshyp_drv.gostshyp_grad_contrib(density_matrix, tessellation_settings)
 

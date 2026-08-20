@@ -113,11 +113,11 @@ class ScfDriver:
         - pe_options: The dictionary with options for polarizable embedding.
         - pressure: The applied hydrostatic pressure.
         - pressure_units: The units of the applied pressure.
-        - num_leb_points: The number of Lebedev points per van der Waals sphere.
-        - tssf: The tessellation sphere scaling factor.
-        - discretization: The surface discretization method.
-        - switching_thresh: The (I)SWIG switching function threshold.
-        - r_ext: The extension radius for the outer cavity correction in angstrom.
+        - gostshyp_num_lebedev_points: The number of Lebedev points per van der Waals sphere.
+        - gostshyp_tssf: The tessellation sphere scaling factor.
+        - gostshyp_discretization: The surface discretization method.
+        - gostshyp_switching_thresh: The (I)SWIG switching function threshold.
+        - gostshyp_r_ext: The extension radius for the outer cavity correction in angstrom.
         - dispersion: The flag for calculating D4 dispersion correction.
         - electric_field: The static electric field.
         - timing: The flag for printing timing information.
@@ -249,11 +249,11 @@ class ScfDriver:
         self.pressure = 0.0
         self._pressure_in_input_units = 0.0
         self.pressure_units = 'MPa'
-        self.num_leb_points = 110
-        self.tssf = 1.2
-        self.discretization = 'fixed'
-        self.switching_thresh = 1.0e-8
-        self.r_ext = 0.0
+        self.gostshyp_num_lebedev_points = 110
+        self.gostshyp_tssf = 1.2
+        self.gostshyp_discretization = 'fixed'
+        self.gostshyp_switching_thresh = 1.0e-8
+        self.gostshyp_r_ext = 0.0
         self._tco_tol = self.conv_thresh * 1.0e-8
 
         # solvation model
@@ -365,11 +365,11 @@ class ScfDriver:
                 'potfile': ('str', 'potential file for polarizable embedding'),
                 'pressure': ('float', 'applied hydrostatic pressure'),
                 'pressure_units': ('str', 'units of the applied pressure'),
-                'num_leb_points': ('int', 'number of grid points per sphere'),
-                'tssf': ('float', 'tessellation sphere scaling factor'),
-                'discretization': ('str', 'surface discretization method'),
-                'switching_thresh': ('float', 'switching function threshold'),
-                'r_ext':
+                'gostshyp_num_lebedev_points': ('int', 'number of grid points per sphere'),
+                'gostshyp_tssf': ('float', 'tessellation sphere scaling factor'),
+                'gostshyp_discretization': ('str', 'surface discretization method'),
+                'gostshyp_switching_thresh': ('float', 'switching function threshold'),
+                'gostshyp_r_ext':
                     ('float', 'extension radius for outer cavity correction in angstrom'),
                 'solvation_model': ('str', 'solvation model'),
                 'cpcm_grid_per_sphere':
@@ -1041,12 +1041,12 @@ class ScfDriver:
                                                 self.comm,
                                                 self.ostream)
 
-            tessellation_settings = {'num_leb_points'   : self.num_leb_points,
-                                     'tssf'             : self.tssf,
-                                     'discretization'   : self.discretization,
-                                     'switching_thresh' : self.switching_thresh,
+            tessellation_settings = {'num_leb_points'   : self.gostshyp_num_lebedev_points,
+                                     'tssf'             : self.gostshyp_tssf,
+                                     'discretization'   : self.gostshyp_discretization,
+                                     'switching_thresh' : self.gostshyp_switching_thresh,
                                      'filename'         : self.filename,
-                                     'r_ext'            : self.r_ext}
+                                     'r_ext'            : self.gostshyp_r_ext}
 
             tess_t0 = tm.time()
             tessellation = self._gostshyp_drv.generate_tessellation(
@@ -1059,9 +1059,9 @@ class ScfDriver:
                 self.ostream.print_info(tess_info)
                 self.ostream.print_blank()
 
-                if self.r_ext > 0:
+                if self.gostshyp_r_ext > 0:
                     occ_info = 'Using the Outer Cavity Correction with exterior radius of '
-                    occ_info += '{:.2f} angstrom.'.format(self.r_ext)
+                    occ_info += '{:.2f} angstrom.'.format(self.gostshyp_r_ext)
                     self.ostream.print_info(occ_info)
                     self.ostream.print_blank()
 
@@ -2181,11 +2181,11 @@ class ScfDriver:
                     for key in [
                             'pressure',
                             'pressure_units',
-                            'num_leb_points',
-                            'tssf',
-                            'discretization',
-                            'switching_thresh',
-                            'r_ext',
+                            'gostshyp_num_lebedev_points',
+                            'gostshyp_tssf',
+                            'gostshyp_discretization',
+                            'gostshyp_switching_thresh',
+                            'gostshyp_r_ext',
                     ]:
                         self._scf_results[key] = getattr(self, key)
 
@@ -3568,16 +3568,16 @@ class ScfDriver:
             cur_str += self.pressure_units
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'vDW Cavity Switching Function   : '
-            cur_str += self.discretization.upper()
+            cur_str += self.gostshyp_discretization.upper()
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'vdW Sphere Scaling Factor       : '
-            cur_str += f'{self.tssf}'
+            cur_str += f'{self.gostshyp_tssf}'
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'Grid Points per vdW Sphere      : '
-            cur_str += f'{self.num_leb_points}'
+            cur_str += f'{self.gostshyp_num_lebedev_points}'
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'Extension radius for OCC        : '
-            cur_str += f'{self.r_ext}'
+            cur_str += f'{self.gostshyp_r_ext}'
             self.ostream.print_header(cur_str.ljust(str_width))
 
         if self.electric_field is not None:

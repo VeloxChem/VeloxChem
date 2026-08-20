@@ -173,11 +173,11 @@ class LinearSolver:
         self.gostshyp_drv = None
         self.pressure = 0.0
         self.pressure_units = 'MPa'
-        self.num_leb_points = 110
-        self.tssf = 1.2
-        self.discretization = 'fixed'
-        self.switching_thresh = 1.0e-8
-        self.r_ext = 0.0
+        self.gostshyp_num_lebedev_points = 110
+        self.gostshyp_tssf = 1.2
+        self.gostshyp_discretization = 'fixed'
+        self.gostshyp_switching_thresh = 1.0e-8
+        self.gostshyp_r_ext = 0.0
 
         # solver setup
         self.conv_thresh = 1.0e-4
@@ -285,11 +285,11 @@ class LinearSolver:
                     ('seq_fixed_str', 'custom vdw radii for C-PCM'),
                 'pressure': ('float', 'applied hydrostatic pressure'),
                 'pressure_units': ('str', 'units of the applied pressure'),
-                'num_leb_points': ('int', 'number of grid points per sphere'),
-                'tssf': ('float', 'tessellation sphere scaling factor'),
-                'discretization': ('str', 'surface discretization method'),
-                'switching_thresh': ('float', 'switching function threshold'),
-                'r_ext': 
+                'gostshyp_num_lebedev_points': ('int', 'number of grid points per sphere'),
+                'gostshyp_tssf': ('float', 'tessellation sphere scaling factor'),
+                'gostshyp_discretization': ('str', 'surface discretization method'),
+                'gostshyp_switching_thresh': ('float', 'switching function threshold'),
+                'gostshyp_r_ext': 
                     ('float', 'extension radius for outer cavity correction in angstrom')
             },
         }
@@ -746,12 +746,12 @@ class LinearSolver:
                                                self.comm,
                                                self.ostream)
             
-            tessellation_settings = {'num_leb_points'   : self.num_leb_points,
-                                     'tssf'             : self.tssf,
-                                     'discretization'   : self.discretization,
-                                     'switching_thresh' : self.switching_thresh,
+            tessellation_settings = {'num_leb_points'   : self.gostshyp_num_lebedev_points,
+                                     'tssf'             : self.gostshyp_tssf,
+                                     'discretization'   : self.gostshyp_discretization,
+                                     'switching_thresh' : self.gostshyp_switching_thresh,
                                      'filename'         : self.filename,
-                                     'r_ext'            : self.r_ext}
+                                     'r_ext'            : self.gostshyp_r_ext}
             
             if self.rank == mpi_master():
                 # Note: make gs_density a tuple
@@ -3108,16 +3108,16 @@ class LinearSolver:
             cur_str += self.pressure_units
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'vDW Cavity Switching Function   : '
-            cur_str += self.discretization.upper()
+            cur_str += self.gostshyp_discretization.upper()
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'vdW Sphere Scaling Factor       : '
-            cur_str += f'{self.tssf}'
+            cur_str += f'{self.gostshyp_tssf}'
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'Grid Points per vdW Sphere      : '
-            cur_str += f'{self.num_leb_points}'
+            cur_str += f'{self.gostshyp_num_lebedev_points}'
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'Extension radius for OCC        : '
-            cur_str += f'{self.r_ext}'
+            cur_str += f'{self.gostshyp_r_ext}'
             self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()
