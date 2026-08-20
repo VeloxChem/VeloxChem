@@ -3104,7 +3104,7 @@ class LinearSolver:
             cur_str += 'GOSTSHYP'
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'Input Pressure                  : '
-            cur_str += f'{self._pressure_in_input_units} '
+            cur_str += f'{self.pressure} '
             cur_str += self.pressure_units
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'vDW Cavity Switching Function   : '

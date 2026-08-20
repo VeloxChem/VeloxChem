@@ -567,10 +567,10 @@ class GostshypDriver:
         """
 
         assert_msg_critical(units.lower() in [
-        'pa', 'pascal', 'hpa', 'hectopascal', 'kpa', 'kilopascal', 'bar', 'mpa',
-        'megapascal', 'gpa', 'gigapascal', 'atm', 'atmosphere', 'atmospheric',
-        'torr', 'au', 'atomic', 'atomic units'],
-        'GOSTSHYP: Invalid unit for pressure')
+            'pa', 'pascal', 'hpa', 'hectopascal', 'kpa', 'kilopascal', 'bar', 'mpa',
+            'megapascal', 'gpa', 'gigapascal', 'atm', 'atmosphere', 'atmospheric',
+            'torr', 'au', 'atomic', 'atomic units'],
+            'GOSTSHYP: Invalid unit for pressure')
 
         # TODO: implement those in the C++ layer:
         # hartree_per_cubic_bohr_in_pascal = 2.942101569713e13

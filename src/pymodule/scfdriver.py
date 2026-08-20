@@ -247,14 +247,13 @@ class ScfDriver:
         # gostshyp setup
         self._gostshyp = False
         self.pressure = 0.0
-        self._pressure_in_input_units = 0.0
         self.pressure_units = 'MPa'
         self.gostshyp_num_lebedev_points = 110
         self.gostshyp_tssf = 1.2
         self.gostshyp_discretization = 'fixed'
         self.gostshyp_switching_thresh = 1.0e-8
         self.gostshyp_r_ext = 0.0
-        self._tco_tol = self.conv_thresh * 1.0e-8
+        self.gostshyp_tco_tol = self.conv_thresh * 1.0e-8
 
         # solvation model
         self.solvation_model = None
@@ -709,7 +708,7 @@ class ScfDriver:
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        pe_sanity_check(self)
+        pe_sanity_check(self, molecule=molecule)
 
         # check gostshyp setup
         gostshyp_sanity_check(self, basis)
@@ -1037,7 +1036,7 @@ class ScfDriver:
                                                 basis,
                                                 self.pressure,
                                                 self.pressure_units,
-                                                self._tco_tol,
+                                                self.gostshyp_tco_tol,
                                                 self.comm,
                                                 self.ostream)
 
@@ -3564,7 +3563,7 @@ class ScfDriver:
             cur_str += 'GOSTSHYP'
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'Input Pressure                  : '
-            cur_str += f'{self._pressure_in_input_units} '
+            cur_str += f'{self.pressure} '
             cur_str += self.pressure_units
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'vDW Cavity Switching Function   : '

@@ -177,9 +177,9 @@ class ScfGradientDriver(GradientDriver):
             write_unparsed_input_to_hdf5(checkpoint_file,
                                          unparse_input(self, grad_keywords),
                                          group_name='grad_settings')
-        
+
         # note that if GOSTSHYP is used in combination with the numerical option,
-        # the number of negative amplitudes printed corresponds to the last 
+        # the number of negative amplitudes printed corresponds to the last
         # SCF calculation performed in the numerical gradient calculation
         if self.scf_driver._gostshyp:
             valstr = '*** GOSTSHYP information: A total number of '
@@ -430,7 +430,7 @@ class ScfGradientDriver(GradientDriver):
                                                 basis,
                                                 self.scf_driver.pressure,
                                                 self.scf_driver.pressure_units,
-                                                self.scf_driver._tco_tol,
+                                                self.scf_driver.gostshyp_tco_tol,
                                                 self.comm,
                                                 self.ostream)
 
@@ -446,7 +446,6 @@ class ScfGradientDriver(GradientDriver):
             self.gradient += gostshyp_grad
 
         grad_timing['GOSTSHYP_grad'] += time.time() - t0
-
 
     def _add_nuclear_and_dispersion_gradient(self, molecule, basis,
                                              xcfun_label, grad_timing):
