@@ -31,10 +31,8 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
-import time as tm
 import sys
 from mpi4py import MPI
-from pathlib import Path
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import compute_screened_tco_s_fock
@@ -48,6 +46,7 @@ from .veloxchemlib import compute_screened_contracted_tco_p_gradient
 from .outputstream import OutputStream
 from .tessellation import TessellationDriver
 from .errorhandler import assert_msg_critical
+
 
 class GostshypDriver:
     """
@@ -83,8 +82,8 @@ class GostshypDriver:
         - ostream: The output stream.
     """
 
-    def __init__(self, molecule, basis, pressure, pressure_units, 
-        tco_tol, comm=None, ostream=None):
+    def __init__(self, molecule, basis, pressure, pressure_units,
+                 tco_tol, comm=None, ostream=None):
         """
         Initializes the GOSTSHYP method for applying hydrostatic pressure.
         """
@@ -137,7 +136,7 @@ class GostshypDriver:
         ave, rem = divmod(self.num_tes_points, self.nodes)
         counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
         start = sum(counts[:self.rank])
-        end   = sum(counts[:self.rank + 1])
+        end = sum(counts[:self.rank + 1])
 
         tess_local = self.tessellation[:, start:end]
         num_local = tess_local.shape[1]
@@ -151,12 +150,12 @@ class GostshypDriver:
         initial_centers = (tess_local[:3].T).copy()
         initial_norms = (tess_local[8:11].T).copy()
         initial_norm_consts = (initial_exponents / np.pi) ** (1.5)
-        
+
         # set up global normalization constant for screening
         initial_global_norm_const = (np.log(2.0) / self.tessellation[3]) ** 1.5
         initial_global_norm_const_max = np.max(initial_global_norm_const)
 
-        #compute f_tilde vector
+        # compute f_tilde vector
         initial_f_tilde = compute_screened_tco_p_values(self.molecule,
                                                         self.basis,
                                                         initial_centers,
@@ -172,11 +171,11 @@ class GostshypDriver:
         initial_amplitudes = self.pressure_au * initial_areas / initial_f_tilde
 
         amplitudes_mask = initial_amplitudes >= 0.0
-        
+
         # compute number of grid points associated with negative amplitudes
         local_neg_p_amp = np.sum(~amplitudes_mask)
 
-        # update gaussian parameters by removing grid points associated 
+        # update gaussian parameters by removing grid points associated
         # with negative amplitudes
         centers = (initial_centers[amplitudes_mask]).copy()
         exponents = (initial_exponents[amplitudes_mask]).copy()
@@ -185,7 +184,7 @@ class GostshypDriver:
         norm_consts = (initial_norm_consts[amplitudes_mask]).copy()
         f_tilde = (initial_f_tilde[amplitudes_mask]).copy()
 
-        # compute global maximum of normalization constants within kept grid points 
+        # compute global maximum of normalization constants within kept grid points
         # for screening
         local_norm_const_max = np.max(norm_consts) if norm_consts.size > 0 else -np.inf
         global_norm_const_max = self.comm.allreduce(local_norm_const_max, op=MPI.MAX)
@@ -200,7 +199,7 @@ class GostshypDriver:
                                                         global_norm_const_max,
                                                         den_mat,
                                                         self.tco_tol)
-        
+
         local_e_pr = np.sum(p_times_g_tilde)
 
         # compute Fock matrix contribution
@@ -212,9 +211,9 @@ class GostshypDriver:
                                             norm_consts,
                                             global_norm_const_max,
                                             self.tco_tol)
-        
+
         pre_fac_V2_pr = (p_times_g_tilde / f_tilde)
-        
+
         V2_pr = compute_screened_tco_p_fock(self.molecule,
                                             self.basis,
                                             centers,
@@ -224,16 +223,16 @@ class GostshypDriver:
                                             norm_consts,
                                             global_norm_const_max,
                                             self.tco_tol)
-        
+
         local_V_pr = V1_pr - V2_pr
 
         e_pr = self.comm.reduce(local_e_pr, root=mpi_master())
         V_pr = self.comm.reduce(local_V_pr, root=mpi_master())
 
         self.num_neg_amp = self.comm.reduce(local_neg_p_amp, root=mpi_master())
-        
+
         return e_pr, V_pr
-    
+
     def gostshyp_resp_contrib(self, gs_den_mat, trans_den_mat, tessellation_settings=None):
         """
         Computes linear response contributions as energy derivative
@@ -257,7 +256,7 @@ class GostshypDriver:
         ave, rem = divmod(self.num_tes_points, self.nodes)
         counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
         start = sum(counts[:self.rank])
-        end   = sum(counts[:self.rank + 1])
+        end = sum(counts[:self.rank + 1])
 
         # local column-slice of the tessellation: rows are properties,
         # columns are tesserae, so slice the second axis
@@ -273,7 +272,7 @@ class GostshypDriver:
         initial_centers = (tess_local[:3].T).copy()
         initial_norms = (tess_local[8:11].T).copy()
         initial_norm_consts = (initial_exponents / np.pi) ** (1.5)
-        
+
         # compute global maximum of normalization constants for screening
         initial_global_norm_const = (np.log(2.0) / self.tessellation[3]) ** 1.5
         initial_global_norm_const_max = np.max(initial_global_norm_const)
@@ -295,11 +294,11 @@ class GostshypDriver:
         initial_amplitudes = self.pressure_au * initial_areas / initial_f_tilde
 
         amplitudes_mask = initial_amplitudes >= 0.0
-        
+
         local_neg_p_amp = np.sum(~amplitudes_mask)
         local_num_points = np.sum(amplitudes_mask)
 
-        # save grid information and auxiliary f_tilde vector 
+        # save grid information and auxiliary f_tilde vector
         # for kept grid points
 
         centers = (initial_centers[amplitudes_mask]).copy()
@@ -346,7 +345,7 @@ class GostshypDriver:
                                                       global_norm_const_max,
                                                       trans_den_mat,
                                                       self.tco_tol)
-        
+
         # compute s-type TCO contribution with prefactor
         prefac_g_mat = - amplitudes * f_tilde_prime / f_tilde
 
@@ -358,11 +357,11 @@ class GostshypDriver:
                                                     norm_consts,
                                                     global_norm_const_max,
                                                     self.tco_tol)
-        
+
         # compute p-type TCO contribution with prefactor
-        prefac_f_mat = (amplitudes / f_tilde * 
+        prefac_f_mat = (amplitudes / f_tilde *
                         (2 * g_tilde * f_tilde_prime / f_tilde - g_tilde_prime))
-        
+
         f_mat_contrib = compute_screened_tco_p_fock(self.molecule,
                                                     self.basis,
                                                     centers,
@@ -372,28 +371,28 @@ class GostshypDriver:
                                                     norm_consts,
                                                     global_norm_const_max,
                                                     self.tco_tol)
-        
+
         local_resp_contrib = g_mat_contrib + f_mat_contrib
 
         resp_contrib = self.comm.reduce(local_resp_contrib, root=mpi_master())
-        
+
         self.num_neg_amp = self.comm.reduce(local_neg_p_amp, root=mpi_master())
-        
+
         return resp_contrib
-    
+
     def gostshyp_grad_contrib(self, den_mat, tessellation_settings=None):
         """
         Computes GOSTSHYP contribution to the molecular gradient.
 
         Pausch, Zeller, Neudecker: J. Chem. Theory Comput. 2025, 21, 747-761. Eq. (30)
-        
+
         :param den_mat:
             The density matrix
         :param tessellation_settings:
             The dictionary of tessellation settings
-            
+
         :return:
-            The GOSTSHYP molecular gradient contribution 
+            The GOSTSHYP molecular gradient contribution
         """
 
         # tessellation driver needed for area gradients
@@ -407,12 +406,12 @@ class GostshypDriver:
         ave, rem = divmod(self.num_tes_points, self.nodes)
         counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
         start = sum(counts[:self.rank])
-        end   = sum(counts[:self.rank + 1])
+        end = sum(counts[:self.rank + 1])
 
         tess_local = self.tessellation[:, start:end]
         num_local = tess_local.shape[1]
 
-        #tesserae areas are extracted
+        # tesserae areas are extracted
         initial_areas = tess_local[3].copy()
         initial_centers = (tess_local[:3].T).copy()
         initial_exponents = (np.pi * np.log(2.0) / initial_areas)
@@ -493,7 +492,7 @@ class GostshypDriver:
 
         # list of corresponding parent atom indices for each tessera
         parent_atom_ids = np.ascontiguousarray(tess_local[11, amplitudes_mask].astype(np.int32))
-        
+
         # terms of constant gaussian exponents
         # bra, ket and center gradients contracted over tessera axis
         g_tilde_grad = compute_screened_contracted_tco_s_gradient(self.molecule,
@@ -524,7 +523,7 @@ class GostshypDriver:
             self.molecule, tess_masked, 2 * g_tilde_term - d_tilde_term + e_tilde_term)
 
         local_grad = area_grad_term + g_tilde_grad - f_tilde_grad
-        
+
         self.num_neg_amp = self.comm.allreduce(local_neg_p_amp, op=MPI.SUM)
 
         # the ScfGradientDriver handles the reduce operation for the gradient
@@ -545,14 +544,15 @@ class GostshypDriver:
         tessellation_drv.update_settings(tessellation_settings)
 
         self.tessellation = tessellation_drv.compute(self.molecule)
-        
+
         assert_msg_critical(self.tessellation.shape[1] != 0,
-            'GOSTSHYP: No tessellation points generated. Check tessellation settings and/or molecular structure.')
-            
+                            'GOSTSHYP: No tessellation points generated. Check tessellation settings and/or molecular structure.')
+
         self.num_tes_points = self.tessellation.shape[1]
 
         return self.tessellation
-    
+
+
 def parse_pressure_units(pressure, units):
     """
     Checks the input given for the units of the applied hydrostatic pressure
@@ -569,12 +569,11 @@ def parse_pressure_units(pressure, units):
     assert_msg_critical(units.lower() in [
         'pa', 'pascal', 'hpa', 'hectopascal', 'kpa', 'kilopascal', 'bar', 'mpa',
         'megapascal', 'gpa', 'gigapascal', 'atm', 'atmosphere', 'atmospheric',
-        'torr', 'au', 'atomic', 'atomic units',
-        ],
+        'torr', 'au', 'atomic', 'atomic units'],
         'GOSTSHYP: Invalid unit for pressure')
 
-    # implement those in the C++ layer:
-    hartree_per_cubic_bohr_in_pascal = 2.942101569713e13
+    # TODO: implement those in the C++ layer:
+    # hartree_per_cubic_bohr_in_pascal = 2.942101569713e13
     pascal_in_hartree_per_cubic_bohr = 1.0 / 2.942101569713e13
     atm_in_pascal = 1.01325e5
     torr_in_pascal = 1.33322368421e2
