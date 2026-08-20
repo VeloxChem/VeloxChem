@@ -101,7 +101,7 @@ class GostshypDriver:
         self.basis = basis
 
         # GOSTSHYP setup
-        self.pressure_au = parse_pressure_units(pressure, pressure_units)
+        self.pressure_au = self.parse_pressure_units(pressure, pressure_units)
         self.num_tes_points = 0
         self.tessellation = None
         self.num_neg_amp = 0
@@ -552,47 +552,51 @@ class GostshypDriver:
 
         return self.tessellation
 
+    @staticmethod
+    def parse_pressure_units(pressure, units):
+        """
+        Checks the input given for the units of the applied hydrostatic pressure
+        and converts it to atomic units.
 
-def parse_pressure_units(pressure, units):
-    """
-    Checks the input given for the units of the applied hydrostatic pressure
-    and converts it to atomic units.
+        :param pressure:
+            The applied hydrostatic pressure.
+        :param units:
+            The unit in which the pressure is given.
+        :return:
+            The applied pressure in atomic units.
+        """
 
-    :param pressure:
-        The applied hydrostatic pressure.
-    :param units:
-        The unit in which the pressure is given.
-    :return:
-        The applied pressure in atomic units.
-    """
-
-    assert_msg_critical(units.lower() in [
+        assert_msg_critical(units.lower() in [
         'pa', 'pascal', 'hpa', 'hectopascal', 'kpa', 'kilopascal', 'bar', 'mpa',
         'megapascal', 'gpa', 'gigapascal', 'atm', 'atmosphere', 'atmospheric',
         'torr', 'au', 'atomic', 'atomic units'],
         'GOSTSHYP: Invalid unit for pressure')
 
-    # TODO: implement those in the C++ layer:
-    # hartree_per_cubic_bohr_in_pascal = 2.942101569713e13
-    pascal_in_hartree_per_cubic_bohr = 1.0 / 2.942101569713e13
-    atm_in_pascal = 1.01325e5
-    torr_in_pascal = 1.33322368421e2
+        # TODO: implement those in the C++ layer:
+        # hartree_per_cubic_bohr_in_pascal = 2.942101569713e13
+        pascal_in_hartree_per_cubic_bohr = 1.0 / 2.942101569713e13
+        atm_in_pascal = 1.01325e5
+        torr_in_pascal = 1.33322368421e2
 
-    if units.lower() in ['pa', 'pascal']:
-        pressure *= pascal_in_hartree_per_cubic_bohr
-    elif units.lower() in ['hpa', 'hectopascal']:
-        pressure *= 1.0e2 * pascal_in_hartree_per_cubic_bohr
-    elif units.lower() in ['kpa', 'kilopascal']:
-        pressure *= 1.0e3 * pascal_in_hartree_per_cubic_bohr
-    elif units.lower() == 'bar':
-        pressure *= 1.0e5 * pascal_in_hartree_per_cubic_bohr
-    elif units.lower() in ['mpa', 'megapascal']:
-        pressure *= 1.0e6 * pascal_in_hartree_per_cubic_bohr
-    elif units.lower() in ['gpa', 'gigapascal']:
-        pressure *= 1.0e9 * pascal_in_hartree_per_cubic_bohr
-    elif units.lower() in ['atm', 'atmosphere', 'atmospheric']:
-        pressure *= atm_in_pascal * pascal_in_hartree_per_cubic_bohr
-    elif units.lower() == 'torr':
-        pressure *= torr_in_pascal * pascal_in_hartree_per_cubic_bohr
+        if units.lower() in ['pa', 'pascal']:
+            pressure_au = pressure * pascal_in_hartree_per_cubic_bohr
+        elif units.lower() in ['hpa', 'hectopascal']:
+            pressure_au = pressure * 1.0e2 * pascal_in_hartree_per_cubic_bohr
+        elif units.lower() in ['kpa', 'kilopascal']:
+            pressure_au = pressure * 1.0e3 * pascal_in_hartree_per_cubic_bohr
+        elif units.lower() == 'bar':
+            pressure_au = pressure * 1.0e5 * pascal_in_hartree_per_cubic_bohr
+        elif units.lower() in ['mpa', 'megapascal']:
+            pressure_au = pressure * 1.0e6 * pascal_in_hartree_per_cubic_bohr
+        elif units.lower() in ['gpa', 'gigapascal']:
+            pressure_au = pressure * 1.0e9 * pascal_in_hartree_per_cubic_bohr
+        elif units.lower() in ['atm', 'atmosphere', 'atmospheric']:
+            pressure_au = pressure * atm_in_pascal * pascal_in_hartree_per_cubic_bohr
+        elif units.lower() == 'torr':
+            pressure_au = pressure * torr_in_pascal * pascal_in_hartree_per_cubic_bohr
+        elif units.lower() in ['au', 'atomic', 'atomic units']:
+            pressure_au = float(pressure)
+        else:
+            assert_msg_critical(False, 'GOSTSHYP: Invalid unit for pressure')
 
-    return pressure
+        return pressure_au
