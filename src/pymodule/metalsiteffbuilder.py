@@ -36,6 +36,7 @@ from copy import deepcopy
 import numpy as np
 import tempfile
 import json
+import time
 import sys
 
 from .veloxchemlib import mpi_master
@@ -69,7 +70,7 @@ class MetalSiteForceFieldBuilder:
     Builds a bonded force field for the zinc center of a metallo-enzyme.
 
     Identifies the coordination sphere, fixes the protonation of the
-    coordinating residues, truncates a QM cluster at the CA-CB bonds, and fits
+    coordinating residues, truncates a QM active site at the CA-CB bonds, and fits
     the metal-ligand bond and angle parameters to a QM Hessian with the
     Seminario method. The fitted parameters can then be injected into a
     protein force field for the whole enzyme.
@@ -101,19 +102,29 @@ class MetalSiteForceFieldBuilder:
           provided. None runs Hartree-Fock.
         - basis_set_label: The basis set label.
         - mute_scf: The flag for muting the output of the QM drivers.
-        - optimized_geometry: A molecule or xyz file to use instead of running
-          the constrained optimization.
-        - hessian: A Hessian matrix or text file to use instead of computing
-          one.
-        - partial_charges: Partial charges or a text file to use instead of
-          computing RESP charges.
-        - do_qm_optimization: The flag for optimizing the cluster before the
+        - optimized_geometry: A molecule, or the path to an xyz file, to use
+          instead of running the constrained optimization. Falls back to
+          optimized_geometry.xyz in the working folder.
+        - hessian: A matrix, or the path to a text file readable by
+          numpy.loadtxt, to use instead of computing a Hessian. Falls back to
+          hessian.txt in the working folder.
+        - partial_charges: Charges, or the path to a text file, to use instead
+          of computing RESP charges. Falls back to partial_charges.txt in the
+          working folder.
+        - do_qm_optimization: The flag for optimizing the active site before the
           Hessian is computed.
         - do_resp: The flag for computing RESP charges.
         - constrain_capping_hydrogens: The flag for constraining the capping
           hydrogens in addition to the beta carbons.
         - average_metal_terms: The flag for averaging the fitted metal terms
           over equivalent atoms.
+        - folder: The working folder. Every expensive step writes its result
+          here as soon as it has it, and reads it back on a later run. Named
+          after the creation time by default, so runs do not collide.
+        - build_enzyme_system: The flag for building a force field system
+          for the whole enzyme at the end of a run, which is what applies the
+          fitted charges to the protein.
+        - save_output: The flag for writing the results at the end of a run.
         - comm: The MPI communicator.
         - rank: The rank of the MPI process.
         - nodes: The number of MPI processes.
@@ -130,7 +141,7 @@ class MetalSiteForceFieldBuilder:
     # if it behaved the same way.
     SUPPORTED_METAL_ELEMENTS = ('Zn', )
 
-    # Formal charges assumed for bare metal ions. Only used for the cluster
+    # Formal charges assumed for bare metal ions. Only used for the active site
     # charge bookkeeping, which is checked rather than trusted.
     METAL_FORMAL_CHARGES = {
         'Zn': 2,
@@ -152,7 +163,7 @@ class MetalSiteForceFieldBuilder:
     BACKBONE_ATOM_NAMES = ('N', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'HA', 'HA2',
                            'HA3', 'HXT')
 
-    # Net charge of each protonation variant, for the cluster charge
+    # Net charge of each protonation variant, for the active site charge
     # bookkeeping.
     VARIANT_CHARGES = {
         'ASP': -1,
@@ -177,6 +188,15 @@ class MetalSiteForceFieldBuilder:
         'MET': 0,
         'TRP': 0,
     }
+
+    # Names of the intermediates kept in the working folder. Each expensive
+    # step writes its result under one of these as soon as it has it, and picks
+    # it up again on a later run, so a failure part way through does not cost
+    # the steps that already succeeded.
+    GEOMETRY_FILE = 'opt_active_site.xyz'
+    HESSIAN_FILE = 'hessian.txt'
+    CHARGES_FILE = 'partial_charges.txt'
+    ENZYME_SYSTEM_FILE = 'enzyme_system.xml'
 
     # Literature equilibrium metal-ligand distances in nm, used for the crude
     # pre-QM pass. Deliberately paired with weak force constants: at that
@@ -228,8 +248,9 @@ class MetalSiteForceFieldBuilder:
         self.basis_set_label = 'def2-svp'
         self.mute_scf = True
 
-        # Precomputed input. Whatever is provided here is validated against
-        # the extracted cluster and the corresponding step is skipped.
+        # Precomputed input. Each may be given as an object or as a path.
+        # Whatever is provided is validated against the extracted active site and
+        # the step that would have produced it is skipped.
         self.optimized_geometry = None
         self.hessian = None
         self.partial_charges = None
@@ -244,18 +265,32 @@ class MetalSiteForceFieldBuilder:
         # genuinely different distances, and that asymmetry is the signal
         self.average_metal_terms = False
 
+        # Whether compute() goes on to build a force field system for the
+        # whole enzyme. That is where the fitted charges reach the protein and
+        # where redistribute_backbone_charges restores the region charge, so
+        # it also pulls in prepare_protein, which the protein force field needs
+        # in order to match templates.
+        self.build_enzyme_system = True
+
+        # Output. The folder is named after the time the builder was created,
+        # so two runs never overwrite one another; assign folder to put the
+        # files somewhere of your own choosing, or to point at an earlier run
+        # and reuse whatever it managed to finish.
+        self.folder = f'metal_site_{int(time.time())}'
+        self.save_output = True
+
     def compute(self, structure):
         """
         Runs the complete pipeline on a structure.
 
         Detects the coordination sphere, protonates the coordinating
-        residues, truncates the QM cluster, optionally optimizes it with the
+        residues, truncates the QM active site, optionally optimizes it with the
         beta carbons frozen, computes a pair-restricted Hessian and RESP
         charges, and fits the metal-ligand terms.
 
         A geometry, Hessian or set of partial charges supplied through
         optimized_geometry, hessian or partial_charges is validated against
-        the extracted cluster and used in place of the step that would have
+        the extracted active site and used in place of the step that would have
         produced it.
 
         :param structure:
@@ -271,6 +306,12 @@ class MetalSiteForceFieldBuilder:
         self._print_header(structure)
 
         topology, positions = self.load_structure(structure)
+
+        if self.build_enzyme_system:
+            # every index downstream refers to this topology, so the repair
+            # has to happen before anything is extracted from it
+            topology, positions = self.prepare_protein(topology, positions)
+
         binding_modes = self.suggest_binding_modes(topology, positions)
         self._print_binding_modes(binding_modes)
 
@@ -283,7 +324,7 @@ class MetalSiteForceFieldBuilder:
         self._print_active_site(active_site, binding_modes, connectivity_matrix)
 
         # anything supplied through the settings is validated against the
-        # cluster and replaces the step that would have produced it
+        # active site and replaces the step that would have produced it
         geometry = self._resolve_optimized_geometry(active_site)
         hessian = self._resolve_hessian(active_site)
         charges = self._resolve_partial_charges(active_site)
@@ -324,13 +365,22 @@ class MetalSiteForceFieldBuilder:
         elif self.do_resp:
             charges = self.compute_resp_charges(active_site)
 
+        if charges is not None:
+            self._print_partial_charges(topology, active_site, charges)
+
         forcefield = self.build_forcefield(active_site, connectivity_matrix,
                                            hessian, charges)
         self._print_metal_parameters(active_site, forcefield)
 
-        return {
+        enzyme_system = None
+        if self.build_enzyme_system:
+            enzyme_system, added = self.create_enzyme_system(
+                topology, active_site, forcefield, charges)
+
+        results = {
             'topology': topology,
             'positions': positions,
+            'enzyme_system': enzyme_system,
             'binding_modes': binding_modes,
             'active_site': active_site,
             'connectivity_matrix': connectivity_matrix,
@@ -339,6 +389,66 @@ class MetalSiteForceFieldBuilder:
             'partial_charges': charges,
             'forcefield': forcefield,
         }
+
+        if self.save_output:
+            self.save_results(results)
+
+        return results
+
+    def working_folder(self):
+        """
+        Returns the working folder, creating it if it does not exist.
+
+        :return:
+            The folder as a Path.
+        """
+
+        folder = Path(self.folder)
+
+        if self.rank == mpi_master():
+            folder.mkdir(parents=True, exist_ok=True)
+
+        return folder
+
+    def _save_intermediate(self, name, writer):
+        """
+        Writes one intermediate as soon as the step that produced it finishes.
+
+        Saving inside the steps rather than only at the end of compute() means
+        a run that dies part way through still leaves behind everything that
+        did succeed, so a geometry optimization is not paid for twice because
+        the Hessian after it failed.
+
+        :param name:
+            The file name, one of the class-level file name attributes.
+        :param writer:
+            A callable taking the path to write.
+        """
+
+        if not self.save_output or self.rank != mpi_master():
+            return
+
+        path = self.working_folder() / name
+        writer(path)
+
+        self.ostream.print_info(f'Wrote {name} to {self.folder}')
+        self.ostream.flush()
+
+    def _folder_file(self, name):
+        """
+        Returns the path of an intermediate in the working folder, or None
+        when it is not there.
+
+        :param name:
+            The file name, one of the class-level file name attributes.
+
+        :return:
+            The path, or None.
+        """
+
+        path = Path(self.folder) / name
+
+        return path if path.is_file() else None
 
     def load_structure(self, structure):
         """
@@ -859,7 +969,7 @@ class MetalSiteForceFieldBuilder:
 
     def extract_active_site(self, topology, positions, binding_modes):
         """
-        Builds the truncated QM cluster.
+        Builds the truncated QM active site.
 
         Sidechains are cut at the CA-CB bond and capped with a hydrogen placed
         along the CB to CA direction. No second-shell fragments and no
@@ -872,7 +982,7 @@ class MetalSiteForceFieldBuilder:
             The positions as an (N, 3) numpy array in Angstrom.
 
         :return:
-            The active site dictionary. It records the cluster indices of
+            The active site dictionary. It records the active site indices of
             the capping hydrogens and of the beta carbons, the map back to
             the topology, and the charge.
         """
@@ -923,7 +1033,7 @@ class MetalSiteForceFieldBuilder:
                     direction /= np.linalg.norm(direction)
                     # the cap is mapped to the CA it replaces, so that the
                     # CA-CB bond of the topology becomes the cap-CB bond of
-                    # the cluster
+                    # the active site
                     atom_map[len(coords)] = atom.index
                     cap_indices.append(len(coords))
                     coords.append(positions[cb_atom.index] +
@@ -980,7 +1090,7 @@ class MetalSiteForceFieldBuilder:
                            binding_modes,
                            warn_above=2.0):
         """
-        Builds the connectivity matrix of the cluster without perceiving any
+        Builds the connectivity matrix of the active site without perceiving any
         bonds.
 
         Covalent bonds come from the OpenMM topology, which is chemically
@@ -999,8 +1109,8 @@ class MetalSiteForceFieldBuilder:
 
         atom_map = active_site['atom_map']
         reverse_map = {
-            top_index: cluster_index
-            for cluster_index, top_index in atom_map.items()
+            top_index: active site_index
+            for active site_index, top_index in atom_map.items()
         }
 
         n_atoms = len(atom_map)
@@ -1017,7 +1127,7 @@ class MetalSiteForceFieldBuilder:
                 ligand['index'] in reverse_map,
                 'MetalSiteForceFieldBuilder.build_connectivity: ligand atom '
                 f'{ligand["residue"]} {ligand["atom"]} is not part of the '
-                'extracted cluster')
+                'extracted active site')
             lig_index = reverse_map[ligand['index']]
             for metal_index in ligand['metals']:
                 metal = reverse_map[metal_index]
@@ -1117,64 +1227,84 @@ class MetalSiteForceFieldBuilder:
 
     def _resolve_optimized_geometry(self, active_site):
         """
-        Validates a geometry supplied through optimized_geometry.
+        Validates a geometry supplied through optimized_geometry, or left
+        behind in the working folder by an earlier run. The element sequence is checked against the extracted active site
+        :param active_site:
+            The active site, to validate against.
 
         :return:
-            The molecule, or None if nothing was supplied.
+            The molecule, or None if there is nothing to use.
         """
 
-        if self.optimized_geometry is None:
-            return None
+        source = self.optimized_geometry
 
-        if isinstance(self.optimized_geometry, Molecule):
-            molecule = Molecule(self.optimized_geometry)
+        if source is None:
+            source = self._folder_file(self.GEOMETRY_FILE)
+            if source is None:
+                return None
+            self.ostream.print_info(
+                f'Reusing {self.GEOMETRY_FILE} from {self.folder}.')
+            self.ostream.flush()
+
+        if isinstance(source, Molecule):
+            molecule = Molecule(source)
         else:
-            path = Path(self.optimized_geometry)
+            path = Path(source)
             assert_msg_critical(
                 path.is_file(),
                 'MetalSiteForceFieldBuilder: optimized_geometry file '
                 f'{path} not found')
             molecule = Molecule.read_xyz_file(str(path))
 
-        cluster = active_site['molecule']
+        active_site = active_site['molecule']
 
         assert_msg_critical(
-            molecule.number_of_atoms() == cluster.number_of_atoms(),
+            molecule.number_of_atoms() == active_site.number_of_atoms(),
             'MetalSiteForceFieldBuilder: optimized_geometry has '
-            f'{molecule.number_of_atoms()} atoms but the extracted cluster '
-            f'has {cluster.number_of_atoms()}')
+            f'{molecule.number_of_atoms()} atoms but the extracted active site '
+            f'has {active_site.number_of_atoms()}')
 
         assert_msg_critical(
-            list(molecule.get_labels()) == list(cluster.get_labels()),
+            list(molecule.get_labels()) == list(active_site.get_labels()),
             'MetalSiteForceFieldBuilder: the elements of '
-            'optimized_geometry do not match the extracted cluster, so it '
+            'optimized_geometry do not match the extracted active site, so it '
             'describes a different structure')
 
-        molecule.set_charge(cluster.get_charge())
-        molecule.set_multiplicity(cluster.get_multiplicity())
+        molecule.set_charge(active_site.get_charge())
+        molecule.set_multiplicity(active_site.get_multiplicity())
 
         return molecule
 
     def _resolve_hessian(self, active_site):
         """
-        Validates a Hessian supplied through the hessian setting.
+        Validates a Hessian supplied through the hessian setting, or left
+        behind in the working folder by an earlier run.
+
+        :param active_site:
+            The active site, to validate the shape against.
 
         :return:
-            The Hessian, or None if nothing was supplied.
+            The Hessian, or None if there is nothing to use.
         """
 
-        if self.hessian is None:
-            return None
+        source = self.hessian
+
+        if source is None:
+            source = self._folder_file(self.HESSIAN_FILE)
+            if source is None:
+                return None
+            self.ostream.print_info(
+                f'Reusing {self.HESSIAN_FILE} from {self.folder}.')
+            self.ostream.flush()
 
         assert_msg_critical(
-            not isinstance(self.hessian, str) or Path(self.hessian).is_file(),
-            f'MetalSiteForceFieldBuilder: hessian file {self.hessian} not '
-            'found')
+            not isinstance(source, (str, Path)) or Path(source).is_file(),
+            f'MetalSiteForceFieldBuilder: hessian file {source} not found')
 
-        if isinstance(self.hessian, str):
-            hessian = np.loadtxt(self.hessian)
+        if isinstance(source, (str, Path)):
+            hessian = np.loadtxt(source)
         else:
-            hessian = np.asarray(self.hessian)
+            hessian = np.asarray(source)
 
         n_atoms = active_site['molecule'].number_of_atoms()
         expected = (3 * n_atoms, 3 * n_atoms)
@@ -1182,36 +1312,47 @@ class MetalSiteForceFieldBuilder:
         assert_msg_critical(
             hessian.shape == expected,
             f'MetalSiteForceFieldBuilder: hessian has shape {hessian.shape} '
-            f'but the extracted cluster needs {expected}')
+            f'but the extracted active site needs {expected}')
 
         return hessian
 
     def _resolve_partial_charges(self, active_site):
         """
-        Validates charges supplied through the partial_charges setting.
+        Validates charges supplied through the partial_charges setting, or
+        left behind in the working folder by an earlier run.
+
+        :param active_site:
+            The active site, to validate the count against.
 
         :return:
-            The partial charges, or None if nothing was supplied.
+            The partial charges, or None if there is nothing to use.
         """
 
-        if self.partial_charges is None:
-            return None
+        source = self.partial_charges
 
-        if isinstance(self.partial_charges, str):
+        if source is None:
+            source = self._folder_file(self.CHARGES_FILE)
+            if source is None:
+                return None
+            self.ostream.print_info(
+                f'Reusing {self.CHARGES_FILE} from {self.folder}.')
+            self.ostream.flush()
+
+        if isinstance(source, (str, Path)):
             assert_msg_critical(
-                Path(self.partial_charges).is_file(),
+                Path(source).is_file(),
                 'MetalSiteForceFieldBuilder: partial_charges file '
-                f'{self.partial_charges} not found')
-            charges = np.loadtxt(self.partial_charges)
+                f'{source} not found')
+            charges = np.loadtxt(source)
         else:
-            charges = np.asarray(self.partial_charges)
+            charges = np.asarray(source)
 
         n_atoms = active_site['molecule'].number_of_atoms()
 
         assert_msg_critical(
             charges.shape == (n_atoms, ),
             f'MetalSiteForceFieldBuilder: partial_charges has shape '
-            f'{charges.shape} but the extracted cluster has {n_atoms} atoms')
+            f'{charges.shape} but the extracted active site has {n_atoms} atoms')
 
         total = float(np.sum(charges))
         expected = active_site['charge']
@@ -1219,23 +1360,20 @@ class MetalSiteForceFieldBuilder:
         if abs(total - expected) > 1.0e-3:
             self.ostream.print_warning(
                 f'The supplied partial charges sum to {total:+.3f}, but the '
-                f'cluster charge is {expected:+d}')
+                f'active site charge is {expected:+d}')
             self.ostream.flush()
 
         return charges
 
     def _get_scf_driver(self, molecule):
         """
-        Returns the SCF driver and basis set for the cluster, without running
-        anything.
+        Returns the SCF driver and basis set for the active site
 
         The driver assigned to scf_drv is used exactly as given, so it carries
-        every QM setting beyond the functional and the basis set. Nothing is
-        computed here: the gradient driver runs its own SCF at every geometry
-        of an optimization, so an SCF at setup time would be thrown away.
+        every QM setting beyond the functional and the basis set.
 
         :param molecule:
-            The cluster molecule.
+            The active site molecule.
 
         :return:
             The tuple of the SCF driver and the basis set.
@@ -1272,7 +1410,7 @@ class MetalSiteForceFieldBuilder:
 
     def constrained_indices(self, active_site):
         """
-        Returns the cluster indices held fixed during optimization.
+        Returns the active site indices held fixed during optimization.
 
         The beta carbons are constrained by default: that is where the
         backbone actually holds the sidechain in place. The capping hydrogens
@@ -1281,7 +1419,7 @@ class MetalSiteForceFieldBuilder:
         constrain_capping_hydrogens.
 
         :return:
-            The sorted list of cluster indices.
+            The sorted list of active site indices.
         """
 
         indices = set(active_site['beta_carbon_indices'])
@@ -1293,7 +1431,7 @@ class MetalSiteForceFieldBuilder:
 
     def optimize_active_site(self, active_site, frozen_indices=None):
         """
-        Optimizes the cluster with the beta carbons frozen.
+        Optimizes the active site with the beta carbons frozen.
 
         Freezing them keeps the spatial arrangement imposed by the protein
         backbone. Without it the site relaxes to a gas-phase geometry, and
@@ -1302,7 +1440,7 @@ class MetalSiteForceFieldBuilder:
         the wrong structure.
 
         :param frozen_indices:
-            The zero-based cluster indices to freeze. Defaults to
+            The zero-based active site indices to freeze. Defaults to
             constrained_indices().
 
         :return:
@@ -1346,11 +1484,15 @@ class MetalSiteForceFieldBuilder:
         optimized.set_charge(molecule.get_charge())
         optimized.set_multiplicity(molecule.get_multiplicity())
 
+        self._save_intermediate(
+            self.GEOMETRY_FILE,
+            lambda path: optimized.write_xyz_file(str(path)))
+
         return optimized
 
     def compute_hessian(self, active_site, atom_pairs=None):
         """
-        Computes the nuclear Hessian of the cluster.
+        Computes the nuclear Hessian of the active site.
 
         With atom_pairs the analytical Hessian is restricted to those blocks
         and everything else is left at zero, which is all the Seminario method
@@ -1400,11 +1542,16 @@ class MetalSiteForceFieldBuilder:
         if self.mute_scf:
             hessian_drv.ostream.unmute()
 
-        return np.copy(hessian_drv.hessian)
+        hessian = np.copy(hessian_drv.hessian)
+
+        self._save_intermediate(self.HESSIAN_FILE,
+                                lambda path: np.savetxt(path, hessian))
+
+        return hessian
 
     def compute_resp_charges(self, active_site):
         """
-        Computes RESP charges for the cluster.
+        Computes RESP charges for the active site.
 
         :return:
             The partial charges as an (N,) numpy array.
@@ -1421,7 +1568,7 @@ class MetalSiteForceFieldBuilder:
 
         # Neither a basis nor SCF results are passed: the driver then defaults
         # to Hartree-Fock with 6-31G*, which is what RESP charges are meant to
-        # be fitted to, and runs its own SCF. Handing it the cluster's own
+        # be fitted to, and runs its own SCF. Handing it the active site's own
         # functional and basis would silently fit the charges at a level the
         # RESP parameters were never derived for.
         charges = resp_drv.compute(molecule)
@@ -1430,8 +1577,12 @@ class MetalSiteForceFieldBuilder:
             resp_drv.ostream.unmute()
 
         charges = self.comm.bcast(charges, root=mpi_master())
+        charges = np.array(charges)
 
-        return np.array(charges)
+        self._save_intermediate(self.CHARGES_FILE,
+                                lambda path: np.savetxt(path, charges))
+
+        return charges
 
     def get_metal_keys(self, forcefield, active_site):
         """
@@ -1459,7 +1610,7 @@ class MetalSiteForceFieldBuilder:
                          hessian=None,
                          partial_charges=None):
         """
-        Builds the cluster force field and fits the metal terms.
+        Builds the active site force field and fits the metal terms.
 
         Without a Hessian the metal terms are seeded from literature distances
         with deliberately weak force constants, which is the crude pre-QM
@@ -1468,11 +1619,13 @@ class MetalSiteForceFieldBuilder:
 
         :param hessian:
             The Hessian as a (3N, 3N) numpy array. The string 'xtb' is
-            rejected: it would make reparameterize re-optimize the cluster
+            rejected: it would make reparameterize re-optimize the active site
             without constraints, silently replacing every equilibrium value
             with a gas-phase one.
         :param partial_charges:
-            The partial charges. Defaults to zeros.
+            The partial charges fitted on the active site. The charge of the
+            capping hydrogens is redistributed over the remaining atoms before
+            they are applied, since the caps do not exist in the protein.
 
         :return:
             The force field generator.
@@ -1481,9 +1634,7 @@ class MetalSiteForceFieldBuilder:
         assert_msg_critical(
             not isinstance(hessian, str),
             'MetalSiteForceFieldBuilder.build_forcefield: the Hessian must be '
-            "a numpy array. Passing 'xtb' makes reparameterize re-optimize "
-            'the cluster without constraints, which silently replaces every '
-            'equilibrium value with a gas-phase one.')
+            'a numpy array.')
 
         molecule = active_site['molecule']
         n_atoms = molecule.number_of_atoms()
@@ -1509,6 +1660,11 @@ class MetalSiteForceFieldBuilder:
                 partial_charges.shape == (n_atoms, ),
                 'MetalSiteForceFieldBuilder.build_forcefield: expected '
                 f'{n_atoms} partial charges, got {partial_charges.shape}')
+            # The capping hydrogens stand in for alpha carbons and do not
+            # exist anywhere the force field is used, so their charge is
+            # folded into the rest of the active site before anything is written.
+            partial_charges = self.redistribute_cap_charges(
+                active_site, partial_charges)
             forcefield.partial_charges = partial_charges
             for index in range(n_atoms):
                 forcefield.atoms[index]['charge'] = partial_charges[index]
@@ -1615,16 +1771,16 @@ class MetalSiteForceFieldBuilder:
                              frozen_indices=None,
                              max_iterations=0):
         """
-        Minimizes the cluster with its own force field.
+        Minimizes the active site with its own force field.
 
         The beta carbons are frozen by default. They are where the backbone
         holds the sidechains in place, so a free minimization of an isolated
-        cluster lets the truncated fragments drift apart and says nothing
+        active site lets the truncated fragments drift apart and says nothing
         about the metal site. Note that the force field only carries
         electrostatics if build_forcefield was given partial charges.
 
         :param frozen_indices:
-            The cluster indices to hold fixed. Defaults to
+            The active site indices to hold fixed. Defaults to
             constrained_indices(); an empty list minimizes freely.
         :param max_iterations:
             The maximum number of minimization steps. Zero runs until
@@ -1645,7 +1801,7 @@ class MetalSiteForceFieldBuilder:
             frozen_indices = self.constrained_indices(active_site)
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            stem = str(Path(temp_dir) / 'cluster')
+            stem = str(Path(temp_dir) / 'active site')
             forcefield.write_openmm_files(stem)
 
             pdb = mmapp.PDBFile(f'{stem}.pdb')
@@ -1668,10 +1824,214 @@ class MetalSiteForceFieldBuilder:
 
         return coords
 
+    @staticmethod
+    def redistribute_cap_charges(active_site, partial_charges):
+        """
+        Moves the charge of the capping hydrogens onto the rest of the active site.
+        
+        The operation is idempotent: the caps end up at zero, so a second pass
+        finds nothing left to move. Both build_forcefield and
+        redistribute_charges apply it, and either may be handed charges that
+        have already been through it.
+
+        :param active_site:
+            The active site, for the indices of the capping hydrogens.
+        :param partial_charges:
+            The charges fitted on the whole active site.
+
+        :return:
+            A copy of the charges with the caps emptied and their charge spread
+            over the other atoms.
+        """
+
+        charges = np.array(partial_charges, dtype=float)
+        caps = set(active_site['cap_indices'])
+        rest = [index for index in range(charges.size) if index not in caps]
+
+        assert_msg_critical(
+            len(rest) > 0,
+            'MetalSiteForceFieldBuilder.redistribute_cap_charges: the active site '
+            'is nothing but capping hydrogens')
+
+        cap_charge = sum(charges[index] for index in caps)
+        charges[list(caps)] = 0.0
+        charges[rest] += cap_charge / len(rest)
+
+        return charges
+
+    def redistribute_charges(self, system, topology, active_site,
+                             partial_charges):
+        """
+        Applies both charge corrections to a protein system.
+
+        :param system:
+            The OpenMM system to modify in place.
+        :param topology:
+            The protonated topology the system was built from.
+        :param active_site:
+            The active site, for the map back to the topology.
+        :param partial_charges:
+            The charges fitted on the active site, capping hydrogens included.
+
+        :return:
+            The tuple of the charge moved off the caps and the shift applied
+            to each uncovered atom.
+        """
+
+        caps = active_site['cap_indices']
+        cap_charge = float(sum(partial_charges[index] for index in caps))
+        charges = self.redistribute_cap_charges(active_site, partial_charges)
+        shift = self.redistribute_backbone_charges(system, topology,
+                                                   active_site, charges)
+
+        return cap_charge, shift
+
+    def redistribute_backbone_charges(self, system, topology, active_site,
+                                      partial_charges):
+        """
+        Restores the charge of the coordination region after the fitted
+        charges are written into a protein system.
+
+        :param system:
+            The OpenMM system to modify in place.
+        :param topology:
+            The protonated topology the system was built from.
+        :param active_site:
+            The active site, for the map back to the topology.
+        :param partial_charges:
+            The active site charges, with the capping hydrogens already folded in.
+
+        :return:
+            The shift applied to each uncovered atom.
+        """
+
+        assert_msg_critical(
+            'openmm' in sys.modules,
+            'MetalSiteForceFieldBuilder.redistribute_backbone_charges: openmm '
+            'is required')
+
+        charges = np.asarray(partial_charges)
+        caps = set(active_site['cap_indices'])
+        atom_map = active_site['atom_map']
+
+        # the caps map to the alpha carbons they replaced, so they have to be
+        # left out or CA would be counted as covered by the active site
+        covered = {
+            atom_map[index]: charges[index]
+            for index in range(len(charges)) if index not in caps
+        }
+
+        # The atom map indexes the topology the active site was extracted
+        # from. Handing over a different one - most easily by running
+        # prepare_protein after the extraction rather than before it - silently
+        # writes the active site charges onto whatever atoms happen to hold those
+        # indices, so the elements are checked before anything is modified.
+        atoms = list(topology.atoms())
+        labels = active_site['labels']
+        mismatched = [
+            index for index in covered
+            if index >= len(atoms) or atoms[index].element is None
+            or atoms[index].element.symbol != labels[next(
+                c for c, t in atom_map.items() if t == index and c not in caps)]
+        ]
+
+        assert_msg_critical(
+            not mismatched,
+            'MetalSiteForceFieldBuilder.redistribute_backbone_charges: the '
+            'atom map does not match this topology. Extract the active site '
+            'from the same topology the system is built from; '
+            'prepare_protein renumbers the atoms, so it must run first.')
+
+        nonbonded = None
+        for force in system.getForces():
+            if isinstance(force, mm.NonbondedForce):
+                nonbonded = force
+                break
+
+        assert_msg_critical(
+            nonbonded is not None,
+            'MetalSiteForceFieldBuilder.redistribute_backbone_charges: the '
+            'system has no nonbonded force to write charges into')
+
+        def get_charge(index):
+            return nonbonded.getParticleParameters(index)[0].value_in_unit(
+                mmunit.elementary_charge)
+
+        atoms = list(topology.atoms())
+        residue_indices = {atoms[index].residue.index for index in covered}
+        region = [
+            atom for residue in topology.residues()
+            if residue.index in residue_indices for atom in residue.atoms()
+        ]
+        uncovered = [atom for atom in region if atom.index not in covered]
+
+        total_before = sum(get_charge(atom.index) for atom in region)
+        total_after = (sum(covered.values()) +
+                       sum(get_charge(atom.index) for atom in uncovered))
+        difference = total_before - total_after
+
+        assert_msg_critical(
+            len(uncovered) > 0 or abs(difference) < 1.0e-6,
+            'MetalSiteForceFieldBuilder.redistribute_backbone_charges: the '
+            f'coordination region is off by {difference:+.4f} e with no '
+            'uncovered atom to absorb it')
+
+        shift = difference / len(uncovered) if uncovered else 0.0
+
+        for atom in region:
+            parameters = nonbonded.getParticleParameters(atom.index)
+            if atom.index in covered:
+                new_charge = covered[atom.index]
+            else:
+                new_charge = get_charge(atom.index) + shift
+            nonbonded.setParticleParameters(atom.index, new_charge,
+                                            parameters[1], parameters[2])
+
+        residual = total_before - sum(get_charge(atom.index) for atom in region)
+        assert_msg_critical(
+            abs(residual) < 1.0e-6,
+            'MetalSiteForceFieldBuilder.redistribute_backbone_charges: the '
+            f'charge moved by {residual:+.6f} e')
+
+        self.ostream.print_blank()
+        self.ostream.print_header('Charges written into the protein')
+        self.ostream.print_header(31 * '-')
+        self.ostream.print_header(
+            self._param(
+                'coordination region',
+                f'{len(residue_indices)} residues, {len(region)} atoms'))
+        self.ostream.print_header(
+            self._param('covered by the active site', f'{len(covered)} atoms'))
+        self.ostream.print_header(
+            self._param('left to the protein', f'{len(uncovered)} atoms'))
+        self.ostream.print_blank()
+        self.ostream.print_header(
+            self._param('region charge, protein', f'{total_before:+.4f} e'))
+        self.ostream.print_header(
+            self._param('region charge, fitted', f'{total_after:+.4f} e'))
+        self.ostream.print_header(
+            self._param('difference to recover', f'{difference:+.4f} e'))
+        self.ostream.print_header(
+            self._param('shift per uncovered atom', f'{shift:+.4f} e'))
+        self.ostream.print_blank()
+        # a shift and not a scaling: after the caps are folded in the active site
+        # carries its own formal charge exactly, so the amount to recover is
+        # always minus the sum of the backbone charges and the scale factor
+        # that achieves it is identically zero
+        self.ostream.print_info(
+            'The region is corrected as a whole, so the ligand-to-metal '
+            'donation the fit captured is kept; balancing each residue to its '
+            'formal charge separately would undo it.')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        return shift
+
     def create_enzyme_system(self,
                              topology,
                              active_site,
                              forcefield,
+                             partial_charges=None,
                              forcefield_files=('amber14-all.xml',
                                                'amber14/tip3pfb.xml')):
         """
@@ -1679,7 +2039,7 @@ class MetalSiteForceFieldBuilder:
         enzyme.
 
         The protein force field already covers everything except the metal, so
-        only the metal bonds and angles are transferred. The cluster was built
+        only the metal bonds and angles are transferred. The active site was built
         from the topology, so the atom map of the active site gives the
         correspondence directly and no graph matching is needed. Capping
         hydrogens are skipped, since they stand in for CA atoms that the
@@ -1687,6 +2047,14 @@ class MetalSiteForceFieldBuilder:
 
         :param topology:
             The protonated OpenMM topology of the whole enzyme.
+        :param active_site:
+            The active site, for the map back to the topology.
+        :param forcefield:
+            The force field generator carrying the fitted metal parameters.
+        :param partial_charges:
+            The charges fitted on the active site. When given they replace the
+            charges of the coordination sphere through redistribute_charges;
+            otherwise the protein force field's own charges are left alone.
         :param forcefield_files:
             The OpenMM force field files for the protein.
 
@@ -1702,6 +2070,10 @@ class MetalSiteForceFieldBuilder:
         openmm_ff = mmapp.ForceField(*forcefield_files)
         system = openmm_ff.createSystem(topology,
                                         nonbondedMethod=mmapp.NoCutoff)
+
+        if partial_charges is not None:
+            self.redistribute_charges(system, topology, active_site,
+                                      partial_charges)
 
         atom_map = active_site['atom_map']
         caps = set(active_site['cap_indices'])
@@ -1749,6 +2121,10 @@ class MetalSiteForceFieldBuilder:
             f'bond(s) and {sum(1 for term in added if term[0] == "angle")} '
             'metal angle(s) to the enzyme system.')
         self.ostream.flush()
+
+        self._save_intermediate(
+            self.ENZYME_SYSTEM_FILE,
+            lambda path: path.write_text(mm.XmlSerializer.serialize(system)))
 
         return system, added
 
@@ -1876,6 +2252,11 @@ class MetalSiteForceFieldBuilder:
             self._param(
                 'constrained atoms', 'beta carbons + caps'
                 if self.constrain_capping_hydrogens else 'beta carbons'))
+        self.ostream.print_header(
+            self._param('enzyme system', self.build_enzyme_system))
+        self.ostream.print_header(
+            self._param('output folder',
+                        self.folder if self.save_output else 'none'))
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -1915,7 +2296,7 @@ class MetalSiteForceFieldBuilder:
     def _print_active_site(self, active_site, binding_modes,
                            connectivity_matrix):
         """
-        Prints the composition of the truncated cluster.
+        Prints the composition of the truncated active site.
         """
 
         molecule = active_site['molecule']
@@ -1937,6 +2318,67 @@ class MetalSiteForceFieldBuilder:
 
         variants = sorted(binding_modes['variants'].values())
         self._print_param_list('protonation', variants)
+
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def _print_partial_charges(self, topology, active_site, partial_charges):
+        """
+        Prints the fitted charges and what the capping correction did to them.
+
+        :param topology:
+            The protonated topology, for the residue each active site atom belongs
+            to.
+        :param active_site:
+            The active site.
+        :param partial_charges:
+            The charges as fitted, capping hydrogens included.
+        """
+
+        charges = np.asarray(partial_charges)
+        caps = sorted(active_site['cap_indices'])
+        metals = active_site['metal_indices']
+        labels = active_site['labels']
+        n_atoms = len(charges)
+        rest = [index for index in range(n_atoms) if index not in caps]
+        cap_charge = float(sum(charges[index] for index in caps))
+
+        self.ostream.print_blank()
+        self.ostream.print_header('Partial charges')
+        self.ostream.print_header(15 * '-')
+        self.ostream.print_header(
+            self._param('active site charge', f'{active_site["charge"]:+d}'))
+        self.ostream.print_header(
+            self._param('fitted total', f'{charges.sum():+.4f} e'))
+        self.ostream.print_header(
+            self._param('on capping hydrogens', f'{cap_charge:+.4f} e'))
+        self.ostream.print_header(
+            self._param(f'spread over {len(rest)} atoms',
+                        f'{cap_charge / len(rest):+.4f} e each'))
+        self.ostream.print_blank()
+
+        # group what is left by the residue each atom came from
+        atoms = list(topology.atoms())
+        by_residue = {}
+        for index in rest:
+            residue = atoms[active_site['atom_map'][index]].residue
+            by_residue.setdefault(residue, []).append(index)
+
+        corrected = self.redistribute_cap_charges(active_site, charges)
+
+        valstr = '{:>16} {:>7} | {:>12}'.format('fragment', 'atoms', 'charge')
+        self.ostream.print_header(valstr)
+        self.ostream.print_header(45 * '-')
+
+        for residue, indices in by_residue.items():
+            total = sum(corrected[index] for index in indices)
+            if len(indices) == 1 and indices[0] in metals:
+                name = f'{labels[indices[0]]} (metal)'
+            else:
+                name = f'{residue.name}{residue.id}'
+            valstr = '{:>16} {:>7} | {:>12.4f}'.format(name, len(indices),
+                                                       total)
+            self.ostream.print_header(valstr)
 
         self.ostream.print_blank()
         self.ostream.flush()
