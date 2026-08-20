@@ -276,6 +276,7 @@ class OpenQPScfDriver:
         self.max_cycles = 100
         self.conv_thresh = None
         self.d4 = False
+        self.stability = False
 
         # OpenMP threads for the OpenQP native kernels
         self.omp_threads = None
@@ -295,14 +296,6 @@ class OpenQPScfDriver:
         # SCF from an extended-Huckel guess throws that continuity away.  The
         # payload is keyed by the electronic problem (not the geometry), so a
         # changed basis, charge, functional or reference type retires it.
-        #
-        # Unlike the tracking reference of run_oqp_tracked_mrsf, this payload
-        # is *not* gated on an accepted nuclear step.  An initial guess cannot
-        # change a converged result, only how the SCF gets there, and the
-        # orbitals of a rejected trial geometry are just as close to the next
-        # trial as the accepted ones.  The tracking reference is gated because
-        # it decides which state carries the target identity, which is a
-        # correctness question rather than a convergence one.
         self.reuse_scf_guess = True
         self._guess_payload = None
         self._guess_signature = None
@@ -1366,6 +1359,7 @@ class OpenQPScfDriver:
                 'type': scf_type,
                 'multiplicity': str(int(multiplicity)),
                 'maxit': str(int(self.max_cycles)),
+                'stabikity': str(bool(self.stability))
             },
             'properties': {
                 'grad': str(int(grad_state)) if grad_state is not None else '0',
