@@ -164,6 +164,22 @@ class SurfaceHoppingSettings:
         Diagnostic threshold, in Hartree, for non-isolated multistate events.
     :param hop_energy_tolerance:
         Maximum accepted energy-conservation residual on a hop, in Hartree.
+    :param scf_stability_mode:
+        OpenQP MRSF working-reference stability policy: ``'off'`` (default),
+        ``'initial'`` or ``'periodic'``.
+    :param scf_stability_interval:
+        Number of accepted dynamics steps between checks in ``'periodic'``
+        mode.  The initial reference is checked separately.
+    :param scf_stability_diagnostics_dir:
+        Directory in which the native OpenQP log of every requested stability
+        calculation is retained.
+    :param scf_reference_continuity_min_singular_value:
+        Optional explicit minimum singular value for the doubly occupied and
+        singly occupied cross-geometry subspace overlaps.  ``None`` uses only
+        a dimension-scaled numerical-rank tolerance.
+    :param electronic_provenance_dir:
+        Diagnostic-only directory receiving one non-overwriting archive for
+        every accepted OpenQP electronic calculation.
     :param checkpoint_interval:
         Number of steps between checkpoint writes; 0 disables checkpointing.
     :param diagnostics_file:
@@ -197,6 +213,11 @@ class SurfaceHoppingSettings:
     random_seed: int = 42
     multistate_warning_gap: float = 0.005
     hop_energy_tolerance: float = 1.0e-6
+    scf_stability_mode: str = 'off'
+    scf_stability_interval: int = 20
+    scf_stability_diagnostics_dir: str = 'scf_stability_logs'
+    scf_reference_continuity_min_singular_value: object = None
+    electronic_provenance_dir: str = 'electronic_provenance'
     checkpoint_interval: int = 10
     diagnostics_file: str = 'surface_hopping.jsonl'
     checkpoint_file: str = 'surface_hopping_checkpoint.npz'
@@ -214,7 +235,9 @@ class SurfaceHoppingSettings:
                         'allow_unsafe_state_tracking', 'momentum_rescaling',
                         'rescaling_atoms', 'remove_translation',
                         'remove_rotation', 'frustrated_hop_policy',
-                        'hop_energy_tolerance')
+                        'hop_energy_tolerance', 'scf_stability_mode',
+                        'scf_stability_interval',
+                        'scf_reference_continuity_min_singular_value')
 
     #: Electronic backends the production driver may select.
     PRODUCTION_BACKENDS = ('openqp_mrsf', 'serenity_sf')
@@ -354,6 +377,44 @@ class SurfaceHoppingSettings:
         assert_msg_critical(
             float(self.hop_energy_tolerance) > 0.0,
             'SurfaceHoppingSettings: hop_energy_tolerance must be positive.')
+
+        stability_mode = str(self.scf_stability_mode).strip().lower()
+        assert_msg_critical(
+            stability_mode in ('off', 'initial', 'periodic'),
+            'SurfaceHoppingSettings: scf_stability_mode must be one of off, '
+            'initial, periodic.')
+        assert_msg_critical(
+            int(self.scf_stability_interval) >= 1,
+            'SurfaceHoppingSettings: scf_stability_interval must be positive.')
+        if stability_mode != 'off':
+            assert_msg_critical(
+                str(self.electronic_backend).strip().lower() == 'openqp_mrsf',
+                'SurfaceHoppingSettings: SCF reference-stability control is '
+                'implemented only for electronic_backend=openqp_mrsf.')
+            assert_msg_critical(
+                bool(str(self.scf_stability_diagnostics_dir).strip()),
+                'SurfaceHoppingSettings: '
+                'scf_stability_diagnostics_dir must not be empty when SCF '
+                'stability checking is enabled.')
+
+        continuity_threshold = (
+            self.scf_reference_continuity_min_singular_value)
+        if continuity_threshold is not None:
+            assert_msg_critical(
+                0.0 <= float(continuity_threshold) <= 1.0,
+                'SurfaceHoppingSettings: '
+                'scf_reference_continuity_min_singular_value must lie in '
+                '[0, 1] or be None.')
+            assert_msg_critical(
+                str(self.electronic_backend).strip().lower() == 'openqp_mrsf',
+                'SurfaceHoppingSettings: an explicit SCF-reference '
+                'continuity threshold is implemented only for '
+                'electronic_backend=openqp_mrsf.')
+
+        assert_msg_critical(
+            bool(str(self.electronic_provenance_dir).strip()),
+            'SurfaceHoppingSettings: electronic_provenance_dir must not be '
+            'empty.')
 
         assert_msg_critical(
             int(self.checkpoint_interval) >= 0,

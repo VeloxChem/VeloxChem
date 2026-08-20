@@ -77,6 +77,10 @@ For linear-response TDA/TDDFT the state energies are
 """
 
 from dataclasses import dataclass
+import json
+import os
+import shutil
+import tempfile
 import numpy as np
 
 from .errorhandler import assert_msg_critical
@@ -1055,6 +1059,58 @@ class BackendStateProvider(ElectronicStateProvider):
         self._snapshots = {}
         self._gradients = {}
         self._restart_reference = None
+        self._restart_reference_guess = None
+        self._reference_stability_request = None
+
+    def configure_reference_stability_policy(self, enabled):
+        """Configures selective OpenQP stability checks for this trajectory."""
+
+        configure = getattr(
+            self.adapter, 'configure_reference_stability_policy', None)
+        assert_msg_critical(
+            callable(configure),
+            'BackendStateProvider: the selected backend does not implement '
+            'SCF reference-stability control.')
+        configure(bool(enabled))
+
+    def request_reference_stability(self, request):
+        """Stages one policy request for the next electronic evaluation."""
+
+        assert_msg_critical(
+            self._reference_stability_request is None,
+            'BackendStateProvider: a reference-stability request is already '
+            'pending.')
+        self._reference_stability_request = dict(request)
+
+    def last_reference_stability_record(self):
+        """Returns the latest OpenQP check record, including failed checks."""
+
+        driver = getattr(self.adapter, 'scf_driver', None)
+        return getattr(driver, 'last_reference_stability', None)
+
+    def configure_reference_continuity_policy(self,
+                                              minimum_singular_value=None):
+        """Configures the optional explicit OpenQP subspace cutoff."""
+
+        configure = getattr(
+            self.adapter, 'configure_reference_continuity_policy', None)
+        if not callable(configure) and minimum_singular_value is None:
+            # Numerical-rank continuity is an intrinsic OpenQP-driver check.
+            # Backend-neutral scripted/Serenity adapters need no policy hook
+            # when no OpenQP-specific user cutoff was requested.
+            return False
+        assert_msg_critical(
+            callable(configure),
+            'BackendStateProvider: the selected backend does not implement '
+            'SCF-reference continuity diagnostics.')
+        configure(minimum_singular_value)
+        return True
+
+    def last_reference_continuity_record(self):
+        """Returns the latest continuity record, including rejected checks."""
+
+        driver = getattr(self.adapter, 'scf_driver', None)
+        return getattr(driver, 'last_reference_continuity', None)
 
     @property
     def number_of_roots(self):
@@ -1159,6 +1215,7 @@ class BackendStateProvider(ElectronicStateProvider):
 
         if reference_payload is None:
             self._restart_reference = None
+            self._restart_reference_guess = None
             self._accepted_snapshot = None
             return
 
@@ -1176,6 +1233,8 @@ class BackendStateProvider(ElectronicStateProvider):
             f'{self.number_of_states}.')
 
         self._restart_reference = stored
+        self._restart_reference_guess = reference_payload.get(
+            'backend_reference_guess', None)
         self._accepted_snapshot = None
         self._pending_snapshot = None
 
@@ -1188,7 +1247,139 @@ class BackendStateProvider(ElectronicStateProvider):
         if self._accepted_snapshot is None:
             return None
 
-        return self._accepted_snapshot.to_restart_dict()
+        payload = self._accepted_snapshot.to_restart_dict()
+        restart_payload = getattr(
+            self.adapter, 'reference_restart_payload', None)
+        if callable(restart_payload):
+            payload['backend_reference_guess'] = restart_payload(
+                self._accepted_snapshot)
+        return payload
+
+    def archive_accepted_provenance(self, *, step, result, tracking,
+                                    directory, calculation_index):
+        """Writes one atomic, non-overwriting accepted-step archive.
+
+        The adapter first materializes OpenQP's native JSON/settings/log
+        bundle in a staging directory.  Compact, backend-neutral summaries are
+        then added and the complete directory is renamed into place.  A
+        missing native serializer is treated as an unsupported optional hook,
+        which keeps generic/fake provider tests free of filesystem side
+        effects.
+        """
+
+        snapshot = getattr(result, 'snapshot', None)
+        writer = getattr(self.adapter, 'write_native_provenance', None)
+        if snapshot is None or not callable(writer):
+            return None
+
+        assert_msg_critical(
+            self._accepted_snapshot is snapshot,
+            'BackendStateProvider: provenance may be written only for the '
+            'accepted electronic snapshot.')
+
+        root = os.path.abspath(str(directory))
+        os.makedirs(root, exist_ok=True)
+        base = f'step_{int(step):08d}'
+        target = os.path.join(root, base)
+        if os.path.exists(target):
+            base += f'_calculation_{int(calculation_index):08d}'
+            target = os.path.join(root, base)
+        copy_index = 2
+        while os.path.exists(target):
+            target = os.path.join(root, f'{base}_copy_{copy_index:02d}')
+            copy_index += 1
+
+        staging = tempfile.mkdtemp(prefix=f'.{base}.tmp-', dir=root)
+
+        def write_json(name, payload):
+            path = os.path.join(staging, name)
+            with open(path, 'x', encoding='utf-8') as outfile:
+                json.dump(payload, outfile, indent=2, sort_keys=True)
+                outfile.write('\n')
+
+        try:
+            native_scf = writer(snapshot, staging, int(step))
+            if native_scf is None:
+                shutil.rmtree(staging)
+                return None
+
+            scf_reference = {
+                'trajectory_step': int(step),
+                'electronic_calculation_index': int(calculation_index),
+                'calculation_id': str(snapshot.calculation_id),
+                'previous_calculation_id': snapshot.previous_calculation_id,
+                'backend': str(snapshot.backend),
+                'method': str(snapshot.method),
+                'functional': str(snapshot.functional),
+                'basis': str(snapshot.basis),
+            }
+            scf_reference.update(native_scf)
+            write_json('scf_reference.json', scf_reference)
+
+            permutation = np.asarray(
+                getattr(tracking, 'permutation',
+                        np.arange(snapshot.n_states)),
+                dtype=int)
+            write_json('mrsf_states.json', {
+                'trajectory_step': int(step),
+                'calculation_id': str(snapshot.calculation_id),
+                'target_state_energies': np.asarray(
+                    snapshot.target_energies, dtype=float).tolist(),
+                'response_energies': np.asarray(
+                    snapshot.response_energies, dtype=float).tolist(),
+                'raw_state_ordering': list(range(snapshot.n_states)),
+                'active_raw_state': int(result.active_raw_state),
+                'tracked_permutation': permutation.tolist(),
+                'state_tracking_confidence': float(
+                    getattr(tracking, 'confidence', 0.0)),
+                'state_tracking_reliable': bool(
+                    getattr(tracking, 'is_reliable', False)),
+                'state_tracking_ambiguity': float(
+                    getattr(tracking, 'ambiguity_ratio', 0.0)),
+            })
+
+            fallback_reason = None
+            if snapshot.overlap_source == 'mrsf_response_vector_overlap':
+                fallback_reason = '; '.join(snapshot.warnings) or (
+                    'native OpenQP state overlap was not conditioned')
+            write_json('state_tracking.json', {
+                'trajectory_step': int(step),
+                'calculation_id': str(snapshot.calculation_id),
+                'native_overlap_spectral_norm':
+                    snapshot.native_spectral_norm,
+                'response_overlap_spectral_norm': (
+                    None if snapshot.response_overlap_matrix is None else
+                    float(np.linalg.svd(
+                        np.asarray(snapshot.response_overlap_matrix,
+                                   dtype=float),
+                        compute_uv=False)[0])),
+                'selected_overlap_spectral_norm':
+                    snapshot.selected_spectral_norm,
+                'selected_overlap_source': snapshot.overlap_source,
+                'fallback_reason': fallback_reason,
+                'confidence': float(getattr(tracking, 'confidence', 0.0)),
+                'ambiguity': float(
+                    getattr(tracking, 'ambiguity_ratio', 0.0)),
+                'state_tracking_reliable': bool(
+                    getattr(tracking, 'is_reliable', False)),
+            })
+
+            continuity = ({} if snapshot.reference_continuity is None else
+                          dict(snapshot.reference_continuity))
+            continuity.update({
+                'trajectory_step': int(step),
+                'calculation_id': str(snapshot.calculation_id),
+                'previous_calculation_id': snapshot.previous_calculation_id,
+            })
+            write_json('reference_continuity.json', continuity)
+
+            os.rename(staging, target)
+        except Exception:
+            if os.path.isdir(staging):
+                shutil.rmtree(staging)
+            raise
+
+        return os.path.abspath(target)
 
     def clear_cache(self):
         """
@@ -1244,7 +1435,9 @@ class BackendStateProvider(ElectronicStateProvider):
                 geometry_fingerprint(geometry),
                 self.adapter.settings_digest(),
                 accepted,
-                int(self.generation))
+                int(self.generation),
+                (None if self._reference_stability_request is None else
+                 int(self._reference_stability_request.get('check_index', 0))))
 
     def _evaluate(self, geometry, active_state):
         """
@@ -1264,16 +1457,24 @@ class BackendStateProvider(ElectronicStateProvider):
         self._resolve_restart_reference()
 
         previous = self._accepted_snapshot
+        stability_request = self._reference_stability_request
+        self._reference_stability_request = None
         key = self._snapshot_key(geometry_fingerprint(coordinates))
         cached = self._snapshots.get(key, None)
 
-        if cached is not None and self._snapshot_matches_reference(cached):
+        if (stability_request is None and cached is not None and
+                self._snapshot_matches_reference(cached)):
             snapshot = cached
             gradient = self._gradient_for(snapshot, raw_state)
         else:
+            adapter_kwargs = {
+                'previous_snapshot': previous,
+                'gradient_hint': raw_state,
+            }
+            if stability_request is not None:
+                adapter_kwargs['stability_request'] = stability_request
             snapshot, gradient = self.adapter.compute_snapshot(
-                coordinates, previous_snapshot=previous,
-                gradient_hint=raw_state)
+                coordinates, **adapter_kwargs)
 
             # Nothing is cached before the whole result has been validated,
             # so a partial or unconverged calculation can never be served to
@@ -1463,6 +1664,19 @@ class BackendStateProvider(ElectronicStateProvider):
                     'BackendStateProvider: the OpenQP MRSF snapshot lacks a '
                     'conditioned overlap-selection decision and its required '
                     'provenance; state assignment cannot proceed safely.')
+                continuity = snapshot.reference_continuity
+                if continuity is not None:
+                    assert_msg_critical(
+                        bool(continuity.get(
+                            'reference_continuity_checked', False)),
+                        'BackendStateProvider: the OpenQP MRSF snapshot lacks '
+                        'an SCF-reference continuity comparison against the '
+                        'accepted reference.')
+                    assert_msg_critical(
+                        bool(continuity.get('reference_continuous', False)),
+                        'BackendStateProvider: a discontinuous OpenQP MRSF '
+                        'SCF reference cannot become an accepted provider '
+                        'snapshot.')
             assert_msg_critical(
                 snapshot.reference_multiplicity ==
                 previous.reference_multiplicity and
@@ -1522,11 +1736,17 @@ class BackendStateProvider(ElectronicStateProvider):
 
         stored = self._restart_reference
         self._restart_reference = None
+        reference_guess = self._restart_reference_guess
+        self._restart_reference_guess = None
 
+        adapter_kwargs = {
+            'previous_snapshot': None,
+            'gradient_hint': None,
+        }
+        if reference_guess is not None:
+            adapter_kwargs['reference_guess_payload'] = reference_guess
         snapshot, _ = self.adapter.compute_snapshot(
-            np.asarray(stored.geometry, dtype=float),
-            previous_snapshot=None,
-            gradient_hint=None)
+            np.asarray(stored.geometry, dtype=float), **adapter_kwargs)
 
         self._validate_snapshot(snapshot, None)
 

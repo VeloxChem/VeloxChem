@@ -186,6 +186,31 @@ class LandauZenerSurfaceHoppingDynamics:
 
         self.ostream = ostream if ostream is not None else OutputStream(sys.stdout)
 
+        self._scf_stability_mode = str(
+            self.settings.scf_stability_mode).strip().lower()
+        if self._scf_stability_mode != 'off':
+            configure_stability = getattr(
+                self.provider, 'configure_reference_stability_policy', None)
+            assert_msg_critical(
+                callable(configure_stability),
+                'LandauZenerSurfaceHoppingDynamics: the selected provider '
+                'does not implement the requested SCF reference-stability '
+                'policy.')
+            configure_stability(True)
+
+        continuity_threshold = (
+            self.settings.scf_reference_continuity_min_singular_value)
+        configure_continuity = getattr(
+            self.provider, 'configure_reference_continuity_policy', None)
+        if callable(configure_continuity):
+            configure_continuity(continuity_threshold)
+        elif continuity_threshold is not None:
+            assert_msg_critical(
+                False,
+                'LandauZenerSurfaceHoppingDynamics: the selected provider '
+                'does not implement the requested SCF-reference continuity '
+                'threshold.')
+
         self._validate_tracking_policy()
 
         tracker_options = {}
@@ -248,6 +273,15 @@ class LandauZenerSurfaceHoppingDynamics:
         self._n_hops_accepted = 0
         self._n_hops_frustrated = 0
         self._n_hops_rejected = 0
+        self.reference_stability_diagnostics = []
+        self.reference_continuity_diagnostics = []
+        self._scf_stability_check_count = 0
+        self._scf_stability_initial_completed = (
+            self._scf_stability_mode == 'off')
+        self._scf_stability_last_accepted_step = None
+        self._recorded_scf_stability_checks = set()
+        self._recorded_reference_continuity_checks = set()
+        self._electronic_provenance_calculation_index = 0
         # While one nuclear interval is provisional, keep the last fully
         # accepted frame available for fail-closed rollback.  In particular,
         # an overlap/tracking failure occurs only after OpenMM has already
@@ -574,6 +608,127 @@ class LandauZenerSurfaceHoppingDynamics:
     # electronic evaluation and tracking
     # ------------------------------------------------------------------
 
+    def _reference_stability_reason(self, step):
+        """Returns the policy reason for checking this accepted-step index."""
+
+        mode = getattr(self, '_scf_stability_mode', 'off')
+        if mode == 'off':
+            return None
+        if not getattr(self, '_scf_stability_initial_completed', False):
+            return 'initial'
+        if (mode == 'periodic' and int(step) > 0 and
+                int(step) % int(self.settings.scf_stability_interval) == 0 and
+                getattr(self, '_scf_stability_last_accepted_step', None) !=
+                int(step)):
+            return 'periodic'
+        return None
+
+    def _request_reference_stability(self, step):
+        """Stages one due stability check on the OpenQP backend provider."""
+
+        reason = self._reference_stability_reason(step)
+        if reason is None:
+            return None
+
+        request_stability = getattr(
+            self.provider, 'request_reference_stability', None)
+        assert_msg_critical(
+            callable(request_stability),
+            'LandauZenerSurfaceHoppingDynamics: the provider cannot accept an '
+            'SCF reference-stability request.')
+
+        try:
+            state = self.context.getState()
+            time_fs = float(
+                state.getTime().value_in_unit(unit.femtosecond))
+        except Exception:
+            time_fs = float(step) * float(self.settings.electronic_timestep)
+
+        self._scf_stability_check_count += 1
+        request = {
+            'stability_mode': self._scf_stability_mode,
+            'stability_requested': True,
+            'reason_for_check': reason,
+            'step': int(step),
+            'time': time_fs,
+            'check_index': int(self._scf_stability_check_count),
+            'diagnostics_dir':
+                str(self.settings.scf_stability_diagnostics_dir),
+        }
+        request_stability(request)
+        return request
+
+    def _provider_reference_stability_record(self):
+        """Returns the latest backend record after an interrupted evaluation."""
+
+        getter = getattr(
+            self.provider, 'last_reference_stability_record', None)
+        if callable(getter):
+            return getter()
+        return None
+
+    def _provider_reference_continuity_record(self):
+        """Returns the latest backend continuity record after a failure."""
+
+        getter = getattr(
+            self.provider, 'last_reference_continuity_record', None)
+        if callable(getter):
+            return getter()
+        return None
+
+    def _write_reference_stability_diagnostics(self, record, error=None):
+        """Persists one requested-check event in the trajectory JSONL."""
+
+        if record is None:
+            return
+        payload = copy.deepcopy(record)
+        check_index = int(payload.get('stability_check_index', 0))
+        if check_index in self._recorded_scf_stability_checks:
+            return
+
+        payload.update({
+            'record_type': 'scf_reference_stability',
+            'trajectory_id': self.settings.trajectory_id,
+            'reference_compatible': bool(
+                payload.get('reason_for_check') == 'initial' or
+                not payload.get('reference_changed', False)),
+            'eligible_for_lz_history': bool(
+                payload.get('stability_performed', False) and
+                payload.get('stability_converged', False) and
+                (payload.get('reason_for_check') == 'initial' or
+                 not payload.get('reference_changed', False))),
+            'failure': None if error is None else str(error),
+        })
+        self._recorded_scf_stability_checks.add(check_index)
+        self.reference_stability_diagnostics.append(payload)
+        self._write_diagnostics_record(payload)
+
+    def _record_reference_continuity(self, record, error=None):
+        """Retains one compact continuity decision without changing tracking."""
+
+        if record is None:
+            return
+        payload = copy.deepcopy(record)
+        key = (payload.get('previous_reference_identifier'),
+               payload.get('current_reference_identifier'))
+        if key in self._recorded_reference_continuity_checks:
+            return
+        self._recorded_reference_continuity_checks.add(key)
+        self.reference_continuity_diagnostics.append(payload)
+
+        # Successful records are part of the ordinary per-step diagnostics and
+        # accepted-step archive.  A rejected calculation has neither, so write
+        # a dedicated JSONL event before aborting.
+        if error is not None:
+            payload.update({
+                'record_type': 'scf_reference_continuity_rejection',
+                'trajectory_id': self.settings.trajectory_id,
+                'trajectory_step': int(self.current_step),
+                'eligible_for_lz_history': False,
+                'failure': str(error),
+            })
+            self._write_diagnostics_record(payload)
+
     def evaluate_electronic_state(self, step):
         """
         Evaluates the electronic states at the current geometry, applies state
@@ -588,16 +743,26 @@ class LandauZenerSurfaceHoppingDynamics:
 
         geometry = self.get_qm_geometry_in_bohr()
         accepted_tracker_reference = copy.deepcopy(self.tracker._reference)
+        get_provider_reference = getattr(
+            self.provider, 'get_reference_state', None)
+        accepted_provider_reference = (
+            get_provider_reference() if callable(get_provider_reference) else
+            None)
         accepted_permutation = np.array(self._state_permutation, copy=True)
         # ``active_state`` is an adiabatic raw-root index.  Character tracking
         # must never redirect the gradient: doing so switches potential-energy
         # surfaces without a Landau-Zener hop.
         raw_state_hint = int(self.active_state)
+        stability_request = self._request_reference_stability(step)
 
         def rollback_electronic_transaction():
             """Restores both owners of accepted electronic-state history."""
 
             self.provider.rollback_reference()
+            set_provider_reference = getattr(
+                self.provider, 'set_reference_state', None)
+            if callable(set_provider_reference):
+                set_provider_reference(accepted_provider_reference)
             self.tracker._reference = copy.deepcopy(
                 accepted_tracker_reference)
             self._state_permutation = np.array(accepted_permutation,
@@ -609,9 +774,28 @@ class LandauZenerSurfaceHoppingDynamics:
             # A failed electronic step commits nothing: no accepted reference,
             # no tracking history, no force.
             rollback_electronic_transaction()
+            stability_record = getattr(exc, 'stability_record', None)
+            if stability_record is None and stability_request is not None:
+                stability_record = self._provider_reference_stability_record()
+            self._write_reference_stability_diagnostics(
+                stability_record, error=exc)
+            continuity_record = getattr(exc, 'continuity_record', None)
+            if continuity_record is None:
+                continuity_record = (
+                    self._provider_reference_continuity_record())
+            self._record_reference_continuity(
+                continuity_record, error=exc)
             raise SurfaceHoppingError(
                 f'electronic-structure calculation failed at step {step}: '
                 f'{exc}')
+
+        stability_record = None
+        snapshot = getattr(result, 'snapshot', None)
+        if snapshot is not None:
+            stability_record = getattr(snapshot, 'reference_stability', None)
+        self._write_reference_stability_diagnostics(stability_record)
+        continuity_record = (None if snapshot is None else
+                             getattr(snapshot, 'reference_continuity', None))
 
         try:
             if not result.scf_converged:
@@ -629,6 +813,15 @@ class LandauZenerSurfaceHoppingDynamics:
                     f'nonfinite electronic energies or gradient at step '
                     f'{step}.')
 
+            if (continuity_record is not None and
+                    continuity_record.get(
+                        'reference_continuity_checked', False) and
+                    not continuity_record.get('reference_continuous', False)):
+                raise SurfaceHoppingError(
+                    'the high-spin SCF reference is discontinuous with the '
+                    f'previous accepted reference at step {step} '
+                    f"({continuity_record.get('reference_continuity_reason', 'unknown')}).")
+
             tracking = self.tracker.track(result.state_descriptors)
 
             if not tracking.is_reliable:
@@ -641,9 +834,15 @@ class LandauZenerSurfaceHoppingDynamics:
 
             proposed_spin_multiplicities = (
                 self._validate_serenity_spin_policy(result, tracking))
-        except SurfaceHoppingError:
+        except SurfaceHoppingError as exc:
             rollback_electronic_transaction()
+            if (continuity_record is not None and
+                    not continuity_record.get('reference_continuous', True)):
+                self._record_reference_continuity(
+                    continuity_record, error=exc)
             raise
+
+        self._record_reference_continuity(continuity_record)
 
         result.state_permutation = tracking.permutation
         result.tracking_scores = tracking.scores
@@ -690,8 +889,33 @@ class LandauZenerSurfaceHoppingDynamics:
                 f'failed to commit the electronic state at step {step}: '
                 f'{exc}')
 
+        archive = getattr(
+            self.provider, 'archive_accepted_provenance', None)
+        provenance_path = None
+        self._electronic_provenance_calculation_index = int(getattr(
+            self, '_electronic_provenance_calculation_index', 0)) + 1
+        if callable(archive):
+            try:
+                provenance_path = archive(
+                    step=int(step),
+                    result=result,
+                    tracking=tracking,
+                    directory=self.settings.electronic_provenance_dir,
+                    calculation_index=
+                        self._electronic_provenance_calculation_index)
+            except Exception as exc:
+                rollback_electronic_transaction()
+                raise SurfaceHoppingError(
+                    'failed to archive the accepted electronic provenance at '
+                    f'step {step}: {exc}')
+        result.electronic_provenance_path = provenance_path
+
         if proposed_spin_multiplicities is not None:
             self._tracked_spin_multiplicities = proposed_spin_multiplicities
+
+        if (stability_record is not None and
+                stability_record.get('reason_for_check') == 'initial'):
+            self._scf_stability_initial_completed = True
 
         return result, tracking
 
@@ -1352,6 +1576,10 @@ class LandauZenerSurfaceHoppingDynamics:
             'state_selectors': (None if result.state_selectors is None else
                                 [int(s) for s in result.state_selectors]),
             'working_reference_energy': float(result.ground_energy),
+            'state_tracking_reliable': bool(
+                getattr(tracking, 'is_reliable', False)),
+            'electronic_provenance_path': getattr(
+                result, 'electronic_provenance_path', None),
         }
 
         if snapshot is None:
@@ -1372,6 +1600,16 @@ class LandauZenerSurfaceHoppingDynamics:
                 'native_spectral_norm': None,
                 'selected_spectral_norm': None,
                 'overlap_is_conditioned': None,
+                'scf_reference_stability': None,
+                'scf_reference_continuity': None,
+                'reference_continuity_checked': False,
+                'reference_continuous': None,
+                'reference_continuity_reason': 'not_available',
+                'reference_overlap_method': None,
+                'docc_overlap_sigma_min': None,
+                'docc_overlap_sigma_values': [],
+                'somo_overlap_sigma_min': None,
+                'somo_overlap_sigma_values': [],
                 'electronic_warnings': [],
             })
             return payload
@@ -1381,6 +1619,8 @@ class LandauZenerSurfaceHoppingDynamics:
                 return None
             return np.asarray(matrix, dtype=float).tolist()
 
+        continuity = ({} if snapshot.reference_continuity is None else
+                      dict(snapshot.reference_continuity))
         payload.update({
             'electronic_backend': snapshot.backend,
             'electronic_method': snapshot.method,
@@ -1404,6 +1644,28 @@ class LandauZenerSurfaceHoppingDynamics:
             'native_spectral_norm': snapshot.native_spectral_norm,
             'selected_spectral_norm': snapshot.selected_spectral_norm,
             'overlap_is_conditioned': snapshot.overlap_is_conditioned,
+            'scf_reference_stability': (
+                None if snapshot.reference_stability is None else
+                dict(snapshot.reference_stability)),
+            'scf_reference_continuity': (
+                None if snapshot.reference_continuity is None else
+                dict(snapshot.reference_continuity)),
+            'reference_continuity_checked': bool(
+                continuity.get('reference_continuity_checked', False)),
+            'reference_continuous': continuity.get(
+                'reference_continuous', None),
+            'reference_continuity_reason': continuity.get(
+                'reference_continuity_reason', 'not_available'),
+            'reference_overlap_method': continuity.get(
+                'reference_overlap_method', None),
+            'docc_overlap_sigma_min': continuity.get(
+                'docc_overlap_sigma_min', None),
+            'docc_overlap_sigma_values': continuity.get(
+                'docc_overlap_sigma_values', []),
+            'somo_overlap_sigma_min': continuity.get(
+                'somo_overlap_sigma_min', None),
+            'somo_overlap_sigma_values': continuity.get(
+                'somo_overlap_sigma_values', []),
             'electronic_warnings': list(snapshot.warnings),
         })
 
@@ -1694,6 +1956,11 @@ class LandauZenerSurfaceHoppingDynamics:
 
         self.diagnostics.append(record)
         self._write_diagnostics_record(record)
+
+        stability_record = record.get('scf_reference_stability', None)
+        if (stability_record is not None and
+                stability_record.get('reason_for_check') == 'periodic'):
+            self._scf_stability_last_accepted_step = int(self.current_step)
 
         interval = int(self.settings.checkpoint_interval)
 
@@ -2123,6 +2390,14 @@ class LandauZenerSurfaceHoppingDynamics:
                 'n_hops_accepted': self._n_hops_accepted,
                 'n_hops_frustrated': self._n_hops_frustrated,
                 'n_hops_rejected': self._n_hops_rejected,
+                'scf_stability_check_count':
+                    int(self._scf_stability_check_count),
+                'scf_stability_initial_completed':
+                    bool(self._scf_stability_initial_completed),
+                'scf_stability_last_accepted_step':
+                    self._scf_stability_last_accepted_step,
+                'electronic_provenance_calculation_index':
+                    int(self._electronic_provenance_calculation_index),
             }
 
             with open(filename, 'wb') as fh:
@@ -2238,6 +2513,18 @@ class LandauZenerSurfaceHoppingDynamics:
         self._n_hops_accepted = int(payload.get('n_hops_accepted', 0))
         self._n_hops_frustrated = int(payload.get('n_hops_frustrated', 0))
         self._n_hops_rejected = int(payload.get('n_hops_rejected', 0))
+        self._scf_stability_check_count = int(
+            payload.get('scf_stability_check_count', 0))
+        self._scf_stability_initial_completed = bool(payload.get(
+            'scf_stability_initial_completed',
+            self._scf_stability_mode == 'off' or self.current_step > 0))
+        stored_stability_step = payload.get(
+            'scf_stability_last_accepted_step', None)
+        self._scf_stability_last_accepted_step = (
+            None if stored_stability_step is None else
+            int(stored_stability_step))
+        self._electronic_provenance_calculation_index = int(payload.get(
+            'electronic_provenance_calculation_index', 0))
 
     def get_summary(self):
         """
@@ -2256,4 +2543,5 @@ class LandauZenerSurfaceHoppingDynamics:
             'scf_calls': int(self.provider.n_scf_calls),
             'response_calls': int(self.provider.n_response_calls),
             'gradient_calls': int(self.provider.n_gradient_calls),
+            'scf_stability_checks': int(self._scf_stability_check_count),
         }

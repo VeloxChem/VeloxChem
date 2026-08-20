@@ -35,6 +35,8 @@ from copy import deepcopy
 from mpi4py import MPI
 import hashlib
 import os
+import re
+import shutil
 import sys
 import time
 import tempfile
@@ -67,6 +69,26 @@ _OPENQP_CONVERGENCE_FAILURES = tuple(
     failure for failure in (
         globals().get('SCFnotConverged'), SystemExit, RuntimeError)
     if failure is not None)
+
+
+class OpenQPReferenceStabilityError(RuntimeError):
+    """Raised when a requested OpenQP stability check cannot be validated."""
+
+    def __init__(self, message, stability_record):
+        super().__init__(message)
+        self.stability_record = stability_record
+
+
+class OpenQPReferenceIntegrityError(OpenQPReferenceStabilityError):
+    """Raised when stability changes an established MRSF SCF reference."""
+
+
+class OpenQPReferenceContinuityError(RuntimeError):
+    """Raised when consecutive accepted OpenQP references are incompatible."""
+
+    def __init__(self, message, continuity_record):
+        super().__init__(message)
+        self.continuity_record = continuity_record
 
 
 # These arrays are outputs of an overlap/NAC evaluation for one ordered pair
@@ -121,6 +143,161 @@ def scf_guess_payload(data):
             continue
         payload[key] = np.array(value, dtype=float)
     return payload
+
+
+def _openqp_reference_identifier(data):
+    """Returns a compact content identifier for one OpenQP SCF reference."""
+
+    hasher = hashlib.sha256()
+    for key in _SCF_GUESS_ELECTRON_TAGS + _SCF_GUESS_ORBITAL_KEYS:
+        try:
+            value = data[key]
+        except (KeyError, AttributeError, TypeError):
+            continue
+        array = np.ascontiguousarray(value)
+        hasher.update(key.encode('ascii'))
+        hasher.update(str(array.shape).encode('ascii'))
+        hasher.update(str(array.dtype).encode('ascii'))
+        hasher.update(array.tobytes())
+    return 'openqp_scf_sha256:' + hasher.hexdigest()
+
+
+def evaluate_scf_reference_continuity(
+        mo_overlap,
+        n_alpha,
+        n_beta,
+        *,
+        previous_reference_identifier=None,
+        current_reference_identifier=None,
+        minimum_singular_value=None):
+    """Evaluates occupied-subspace continuity from an OpenQP MO overlap.
+
+    ``BasisOverlap`` publishes the cross-geometry MO overlap with current
+    orbitals in rows and previous orbitals in columns.  The transpose relative
+    to ``C_old.T @ S_old,new @ C_new`` does not affect singular values.  SVDs
+    of the doubly occupied and singly occupied blocks make the decision
+    invariant to signs, permutations and unitary rotations inside either
+    subspace.
+
+    With no user threshold, only numerical loss of subspace rank is rejected;
+    the tolerance is the standard dimension-scaled floating-point rank
+    tolerance.  A larger, chemistry-dependent cutoff must therefore be an
+    explicit input rather than a hidden framework constant.
+    """
+
+    overlap = np.asarray(mo_overlap, dtype=float)
+    if (overlap.ndim != 2 or overlap.shape[0] != overlap.shape[1] or
+            not np.all(np.isfinite(overlap))):
+        raise ValueError(
+            'evaluate_scf_reference_continuity: the MO overlap must be a '
+            'finite square matrix.')
+
+    nbf = int(overlap.shape[0])
+    n_alpha = int(n_alpha)
+    n_beta = int(n_beta)
+    if not 0 <= n_beta <= n_alpha <= nbf:
+        raise ValueError(
+            'evaluate_scf_reference_continuity: invalid alpha/beta electron '
+            'counts for the MO-overlap dimension.')
+
+    configured_threshold = (None if minimum_singular_value is None else
+                            float(minimum_singular_value))
+    if (configured_threshold is not None and
+            not 0.0 <= configured_threshold <= 1.0):
+        raise ValueError(
+            'evaluate_scf_reference_continuity: minimum_singular_value must '
+            'lie in [0, 1].')
+
+    def subspace_record(block):
+        if block.shape[0] == 0:
+            return [], None, 0.0, True, False
+        singular_values = np.linalg.svd(block, compute_uv=False)
+        sigma_values = [float(value) for value in singular_values]
+        sigma_min = float(singular_values[-1])
+        sigma_max = float(singular_values[0])
+        numerical_tolerance = (max(block.shape) * np.finfo(float).eps *
+                               max(1.0, sigma_max))
+        decision_threshold = (numerical_tolerance if
+                              configured_threshold is None else
+                              max(numerical_tolerance,
+                                  configured_threshold))
+        continuous = bool(sigma_min >= decision_threshold)
+        rank_deficient = bool(sigma_min < numerical_tolerance)
+        return (sigma_values, sigma_min, float(decision_threshold),
+                continuous, rank_deficient)
+
+    docc = overlap[:n_beta, :n_beta]
+    somo = overlap[n_beta:n_alpha, n_beta:n_alpha]
+    (docc_values, docc_min, docc_threshold, docc_continuous,
+     docc_rank_deficient) = subspace_record(docc)
+    (somo_values, somo_min, somo_threshold, somo_continuous,
+     somo_rank_deficient) = subspace_record(somo)
+
+    continuous = bool(docc_continuous and somo_continuous)
+    if continuous:
+        reason = ('subspace_singular_values_above_numerical_rank_tolerance'
+                  if configured_threshold is None else
+                  'subspace_singular_values_above_configured_threshold')
+    elif somo_rank_deficient:
+        reason = 'somo_subspace_numerically_rank_deficient'
+    elif docc_rank_deficient:
+        reason = 'docc_subspace_numerically_rank_deficient'
+    elif not somo_continuous:
+        reason = 'somo_overlap_below_configured_threshold'
+    else:
+        reason = 'docc_overlap_below_configured_threshold'
+
+    return {
+        'reference_continuity_checked': True,
+        'reference_continuous': continuous,
+        'reference_continuity_reason': reason,
+        'reference_overlap_method':
+            'openqp_basis_overlap_docc_somo_subspace_svd',
+        'previous_reference_identifier': previous_reference_identifier,
+        'current_reference_identifier': current_reference_identifier,
+        'docc_overlap_sigma_min': docc_min,
+        'docc_overlap_sigma_values': docc_values,
+        'somo_overlap_sigma_min': somo_min,
+        'somo_overlap_sigma_values': somo_values,
+        'docc_decision_threshold': docc_threshold,
+        'somo_decision_threshold': somo_threshold,
+        'configured_minimum_singular_value': configured_threshold,
+        'reference_continuity_policy': (
+            'numerical_rank' if configured_threshold is None else
+            'configured_minimum_singular_value'),
+        'severe_reference_discontinuity': bool(
+            docc_rank_deficient or somo_rank_deficient),
+        'n_doubly_occupied_orbitals': n_beta,
+        'n_singly_occupied_orbitals': n_alpha - n_beta,
+    }
+
+
+def _initial_reference_continuity_record(data, minimum_singular_value=None):
+    """Returns the explicit no-comparison record for an initial reference."""
+
+    return {
+        'reference_continuity_checked': False,
+        'reference_continuous': True,
+        'reference_continuity_reason': 'no_previous_accepted_reference',
+        'reference_overlap_method':
+            'openqp_basis_overlap_docc_somo_subspace_svd',
+        'previous_reference_identifier': None,
+        'current_reference_identifier': _openqp_reference_identifier(data),
+        'docc_overlap_sigma_min': None,
+        'docc_overlap_sigma_values': [],
+        'somo_overlap_sigma_min': None,
+        'somo_overlap_sigma_values': [],
+        'docc_decision_threshold': None,
+        'somo_decision_threshold': None,
+        'configured_minimum_singular_value': (
+            None if minimum_singular_value is None else
+            float(minimum_singular_value)),
+        'reference_continuity_policy': 'initial_reference',
+        'severe_reference_discontinuity': False,
+        'n_doubly_occupied_orbitals': int(data['nelec_B']),
+        'n_singly_occupied_orbitals': int(data['nelec_A']) -
+                                     int(data['nelec_B']),
+    }
 
 
 def unpack_triangular(packed, nbf):
@@ -301,6 +478,8 @@ class OpenQPScfDriver:
         self._guess_signature = None
         self.last_scf_guess_info = None
         self.scf_guess_reuse_count = 0
+        self.last_reference_stability = None
+        self.last_reference_continuity = None
 
         self._energy = None
         self._energies = None
@@ -1074,7 +1253,10 @@ class OpenQPScfDriver:
                             nstate,
                             previous_payload=None,
                             exc_multiplicity=1,
-                            multiplicity=3):
+                            multiplicity=3,
+                            stability_request=None,
+                            reference_guess_payload=None,
+                            reference_continuity_threshold=None):
         """Runs one MRSF energy/response calculation without a gradient.
 
         This is the multi-state entry point used by surface hopping.  It
@@ -1106,6 +1288,18 @@ class OpenQPScfDriver:
             Multiplicity of the requested MRSF target manifold.
         :param multiplicity:
             Multiplicity of the high-spin ROHF working reference.
+        :param stability_request:
+            Optional surface-hopping policy context.  When present its
+            ``stability_requested`` flag overrides the driver's ordinary
+            all-calculation stability setting for this one reference SCF.
+        :param reference_guess_payload:
+            Optional SCF-only orbital/density payload restored from a dynamics
+            checkpoint.  It seeds the reference without creating a fictitious
+            previous response/overlap pair.
+        :param reference_continuity_threshold:
+            Optional explicit minimum singular value for the doubly occupied
+            and singly occupied subspaces.  When omitted, only numerical loss
+            of subspace rank is rejected.
 
         :return:
             A dictionary with the OpenQP molecule, the full ``energies``
@@ -1121,6 +1315,13 @@ class OpenQPScfDriver:
 
         scf_type = 'rohf'
         geom_signature = self._get_geometry_signature(molecule)
+        self.last_reference_stability = None
+        self.last_reference_continuity = None
+
+        stability_override = None
+        if stability_request is not None:
+            stability_override = bool(
+                stability_request.get('stability_requested', False))
 
         # A fresh OpenQP molecule per geometry.  The native overlap pipeline
         # injects an immutable previous-geometry snapshot through the
@@ -1137,7 +1338,8 @@ class OpenQPScfDriver:
             exc_multiplicity=exc_multiplicity,
             tdhf_type='mrsf',
             nstate=n_states,
-            grad_state=None)
+            grad_state=None,
+            stability=stability_override)
         mol = self._new_oqp_molecule(config)
 
         self._oqp_mol = mol
@@ -1154,17 +1356,67 @@ class OpenQPScfDriver:
         if previous_payload is not None:
             self._seed_scf_guess(mol, None,
                                  payload=previous_payload['data'])
+        elif reference_guess_payload is not None:
+            self._seed_scf_guess(mol, None,
+                                 payload=reference_guess_payload)
 
         try:
             with self._openqp_output_context(mol):
                 single_point = SinglePoint(mol)
-                reference_energy = single_point.reference()
+                stability_log_offset = self._openqp_log_size(mol)
+                try:
+                    reference_energy = single_point.reference()
+                except _OPENQP_CONVERGENCE_FAILURES as exc:
+                    if stability_override:
+                        stability_record = (
+                            self._capture_reference_stability_record(
+                                mol, stability_request, stability_log_offset,
+                                None))
+                        raise OpenQPReferenceStabilityError(
+                            'The requested OpenQP reference/stability '
+                            'calculation did not converge; the MRSF reference '
+                            'was not accepted.', stability_record) from exc
+                    raise
 
+                stability_record = None
+                if stability_override:
+                    stability_record = self._capture_reference_stability_record(
+                        mol, stability_request, stability_log_offset,
+                        float(reference_energy[0]))
+                    self._enforce_reference_stability(stability_record)
+
+                reference_continuity = None
                 if previous_payload is not None:
                     mol.config['properties']['back_door'] = True
                     mol.back_door = (deepcopy(previous_payload['xyz']),
                                      deepcopy(previous_payload['data']))
                     BasisOverlap(mol).overlap()
+                    reference_continuity = (
+                        evaluate_scf_reference_continuity(
+                            mol.data['OQP::overlap_mo_non_orthogonal'],
+                            mol.data['nelec_A'],
+                            mol.data['nelec_B'],
+                            previous_reference_identifier=
+                                _openqp_reference_identifier(
+                                    previous_payload['data']),
+                            current_reference_identifier=
+                                _openqp_reference_identifier(mol.data),
+                            minimum_singular_value=
+                                reference_continuity_threshold))
+                    self.last_reference_continuity = reference_continuity
+                    if not reference_continuity['reference_continuous']:
+                        raise OpenQPReferenceContinuityError(
+                            'The OpenQP high-spin SCF reference is not '
+                            'continuous with the previous accepted reference '
+                            f"({reference_continuity['reference_continuity_reason']}); "
+                            'the electronic frame was rejected before MRSF '
+                            'response, gradient, or Landau-Zener history.',
+                            reference_continuity)
+                else:
+                    reference_continuity = (
+                        _initial_reference_continuity_record(
+                            mol.data, reference_continuity_threshold))
+                    self.last_reference_continuity = reference_continuity
 
                 single_point.excitation(reference_energy)
 
@@ -1244,6 +1496,8 @@ class OpenQPScfDriver:
             'data': snapshot_data,
             'scf_converged': True,
             'response_converged': True,
+            'reference_stability': stability_record,
+            'reference_continuity': reference_continuity,
         }
 
     def compute_oqp_state_gradient(self, mol, selector, number_of_atoms):
@@ -1334,13 +1588,16 @@ class OpenQPScfDriver:
         return mol
 
     def _build_config(self, molecule, *, method, functional, scf_type,
-                      multiplicity, exc_multiplicity=1, tdhf_type=None, nstate=1, grad_state=None):
+                      multiplicity, exc_multiplicity=1, tdhf_type=None,
+                      nstate=1, grad_state=None, stability=None):
         """
         Builds an OpenQP configuration dictionary (ini-style, string values)
         from the VeloxChem molecule and the requested calculation settings.
         """
 
         runtype = 'grad' if grad_state is not None else 'energy'
+        stability_enabled = (bool(self.stability) if stability is None else
+                             bool(stability))
 
         config = {
             'input': {
@@ -1359,7 +1616,7 @@ class OpenQPScfDriver:
                 'type': scf_type,
                 'multiplicity': str(int(multiplicity)),
                 'maxit': str(int(self.max_cycles)),
-                'stability': str(bool(self.stability))
+                'stability': str(stability_enabled)
             },
             'properties': {
                 'grad': str(int(grad_state)) if grad_state is not None else '0',
@@ -1441,7 +1698,186 @@ class OpenQPScfDriver:
         #    int(molecule.get_charge()),
         #    tuple(molecule.get_labels()),
         #)
+    @staticmethod
+    def _openqp_log_size(mol):
+        """Returns the current byte length of one native OpenQP log."""
 
+        try:
+            return int(os.path.getsize(mol.log))
+        except OSError:
+            return 0
+
+    @staticmethod
+    def _openqp_log_segment(mol, offset):
+        """Reads the part of ``mol.log`` written after ``offset``."""
+
+        try:
+            with open(mol.log, 'r', encoding='utf-8', errors='replace') as fh:
+                fh.seek(max(0, int(offset)))
+                return fh.read()
+        except OSError:
+            return ''
+
+    def _reference_stability_record(self, mol, request, log_offset,
+                                    reference_energy_after):
+        """Builds diagnostics from OpenQP's own stability decision.
+
+        OpenQP owns both the stability algorithm and the criterion for retaining
+        a relaxed solution.  Its public return value contains the final energy,
+        while the detailed log identifies the pre-stability energy, the TRAH
+        pass and whether OpenQP retained another solution.  Parsing those
+        existing quantities avoids duplicating stability theory or introducing
+        a second, potentially inconsistent reference-change threshold here.
+        """
+
+        request = dict(request or {})
+        log_text = self._openqp_log_segment(mol, log_offset)
+        marker = 'PyOQP: Verifying SCF stability (TRAH)'
+        changed_marker = 'PyOQP: SCF point was unstable; relaxed to a lower solution'
+        stability_performed = marker in log_text
+        reference_changed = changed_marker in log_text
+
+        energy_pattern = re.compile(
+            r'Final\s+\S+\s+energy\s+is\s+'
+            r'([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][-+]?\d+)?)')
+        marker_index = log_text.find(marker)
+        before_energy = None
+        stability_block = ''
+        if marker_index >= 0:
+            before_matches = energy_pattern.findall(log_text[:marker_index])
+            if before_matches:
+                before_energy = float(before_matches[-1])
+            stability_block = log_text[marker_index:]
+
+        after_energy = (None if reference_energy_after is None else
+                        float(reference_energy_after))
+        if not reference_changed and after_energy is not None:
+            # OpenQP restores its saved orbitals and mol-energy state when the
+            # TRAH pass finds no lower solution, so the exact before/after
+            # reference is identical even if the printed energy is rounded.
+            before_energy = after_energy
+        elif before_energy is None and after_energy is not None:
+            delta_match = re.search(
+                r'relaxed to a lower solution \(dE\s*=\s*'
+                r'([-+0-9.Ee]+)\s+Hartree\)', log_text)
+            if delta_match is not None:
+                before_energy = after_energy - float(delta_match.group(1))
+
+        delta_energy = (None if (before_energy is None or
+                                 after_energy is None) else
+                        after_energy - before_energy)
+        trah_block = ''
+        trah_start = re.search(r'Converger\s*=\s*TRAH', stability_block,
+                               flags=re.IGNORECASE)
+        if trah_start is not None:
+            trah_tail = stability_block[trah_start.end():]
+            next_converger = re.search(r'\n\s*Converger\s*=', trah_tail,
+                                       flags=re.IGNORECASE)
+            if next_converger is not None:
+                trah_tail = trah_tail[:next_converger.start()]
+            trah_block = stability_block[trah_start.start():trah_start.end()]
+            trah_block += trah_tail
+        stability_converged = bool(re.search(
+            r'SCF convergence achieved', trah_block,
+            flags=re.IGNORECASE))
+
+        scf_config = mol.config.get('scf', {})
+        record = {
+            'step': int(request.get('step', -1)),
+            'time': float(request.get('time', 0.0)),
+            'stability_mode': str(request.get('stability_mode', 'off')),
+            'stability_requested': True,
+            'stability_performed': bool(stability_performed),
+            'reference_energy_before': before_energy,
+            'reference_energy_after': after_energy,
+            'stability_delta_energy': delta_energy,
+            'reference_changed': bool(reference_changed),
+            'scf_converged': bool(
+                getattr(mol.mol_energy, 'SCF_converged', True)),
+            'stability_converged': bool(stability_converged),
+            'scf_converger': str(scf_config.get('converger_type', 'unknown')),
+            'stability_solver': 'trah',
+            'scf_convergence_threshold': scf_config.get('conv', None),
+            'reason_for_check': str(request.get('reason_for_check', 'unknown')),
+            'stability_check_index': int(request.get('check_index', 0)),
+            'reference_change_detection': 'openqp_stability_decision',
+            'openqp_reference_calculation': os.path.splitext(
+                os.path.basename(str(mol.log)))[0],
+            'openqp_stability_log': None,
+            'log_retained': False,
+        }
+        return record
+
+    def _capture_reference_stability_record(self, mol, request, log_offset,
+                                            reference_energy_after):
+        """Builds one policy record and retains its native log."""
+
+        record = self._reference_stability_record(
+            mol, request, log_offset, reference_energy_after)
+        self.last_reference_stability = record
+        try:
+            self._preserve_reference_stability_log(mol, record, request)
+        except OSError as exc:
+            record['log_retained'] = False
+            record['log_error'] = str(exc)
+            raise OpenQPReferenceStabilityError(
+                'The requested OpenQP stability calculation completed but '
+                f'its detailed log could not be retained: {exc}',
+                record) from exc
+        return record
+
+    @staticmethod
+    def _enforce_reference_stability(record):
+        """Applies the initialization/propagation reference-safety policy."""
+
+        if not record['stability_performed']:
+            raise OpenQPReferenceStabilityError(
+                'OpenQP did not report the requested TRAH SCF stability '
+                'verification; the MRSF reference was not accepted.', record)
+        if not record['stability_converged']:
+            raise OpenQPReferenceStabilityError(
+                'OpenQP TRAH stability verification did not converge; the '
+                'MRSF reference was not accepted.', record)
+        if (record['reference_changed'] and
+                record['reason_for_check'] != 'initial'):
+            raise OpenQPReferenceIntegrityError(
+                'OpenQP stability relaxation changed the established MRSF '
+                f"working reference at dynamics step {record['step']}; the "
+                'incompatible electronic frame was rejected before response, '
+                'gradient, or Landau-Zener history evaluation.', record)
+
+    @staticmethod
+    def _preserve_reference_stability_log(mol, record, request):
+        """Copies a stability log to a deterministic, non-overwriting path."""
+
+        directory = os.path.abspath(str(request['diagnostics_dir']))
+        os.makedirs(directory, exist_ok=True)
+
+        step = int(record['step'])
+        reason = re.sub(r'[^A-Za-z0-9_-]+', '_',
+                        str(record['reason_for_check'])).strip('_') or 'check'
+        check_index = int(record['stability_check_index'])
+        stem = (f'step_{step:08d}_{reason}_stability_'
+                f'check_{check_index:06d}')
+
+        destination = None
+        for copy_index in range(1, 10000):
+            suffix = '' if copy_index == 1 else f'_copy_{copy_index:02d}'
+            candidate = os.path.join(directory, stem + suffix + '.log')
+            try:
+                with open(mol.log, 'rb') as source, open(candidate, 'xb') as out:
+                    shutil.copyfileobj(source, out)
+                destination = candidate
+                break
+            except FileExistsError:
+                continue
+
+        if destination is None:
+            raise OSError(
+                f'no unused stability-log filename remained for {stem!r}.')
+
+        record['openqp_stability_log'] = os.path.abspath(destination)
+        record['log_retained'] = True
 
     def get_openqp_log_file(self):
         """Returns the current OpenQP log filename."""
@@ -1577,10 +2013,10 @@ class OpenQPScfDriver:
             self.ostream.flush()
 
 
-    def _save_openqp_results(self, mol):
+    def _save_openqp_results(self, mol, force=False):
         """Save OpenQP numerical results and its fully resolved configuration."""
 
-        if not self.save_openqp_json:
+        if not self.save_openqp_json and not bool(force):
             return None
 
         # OpenQP's full numerical bundle, including internal arrays.

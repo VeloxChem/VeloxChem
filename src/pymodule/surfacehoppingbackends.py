@@ -93,6 +93,8 @@ gradient is added by the adapter.  See
 from dataclasses import dataclass, field
 import hashlib
 import json
+import os
+import shutil
 import uuid
 
 import numpy as np
@@ -312,6 +314,12 @@ class ElectronicSnapshot:
         Whether the reference SCF converged.
     :param response_converged:
         Whether the response calculation converged.
+    :param reference_stability:
+        Structured diagnostics for a requested OpenQP reference-stability
+        check on this snapshot, or ``None``.
+    :param reference_continuity:
+        Compact occupied-subspace singular-value diagnostics comparing this
+        high-spin reference with the previous accepted reference.
     :param provider_generation:
         Generation counter of the owning provider; bumped on cache clear so
         that a stale entry can never be mistaken for a current one.
@@ -353,6 +361,8 @@ class ElectronicSnapshot:
     spin_metadata: dict = None
     scf_converged: bool = True
     response_converged: bool = True
+    reference_stability: dict = None
+    reference_continuity: dict = None
 
     energy_unit: str = 'hartree'
     coordinate_unit: str = 'bohr'
@@ -469,6 +479,11 @@ class ElectronicSnapshot:
             'energy_unit': str(self.energy_unit),
             'coordinate_unit': str(self.coordinate_unit),
             'gradient_unit': str(self.gradient_unit),
+            'reference_stability': (None if self.reference_stability is None
+                                    else dict(self.reference_stability)),
+            'reference_continuity': (
+                None if self.reference_continuity is None else
+                dict(self.reference_continuity)),
         }
 
     @classmethod
@@ -507,6 +522,12 @@ class ElectronicSnapshot:
                 int(s) for s in payload['derivative_selectors']),
             reference_energy=float(payload['reference_energy']),
             response_energies=_frozen(payload['response_energies']),
+            reference_stability=(
+                None if payload.get('reference_stability') is None else
+                dict(payload['reference_stability'])),
+            reference_continuity=(
+                None if payload.get('reference_continuity') is None else
+                dict(payload['reference_continuity'])),
             energy_unit=str(payload['energy_unit']),
             coordinate_unit=str(payload['coordinate_unit']),
             gradient_unit=str(payload['gradient_unit']))
@@ -540,6 +561,8 @@ def build_snapshot(*,
                    spin_metadata=None,
                    scf_converged=True,
                    response_converged=True,
+                   reference_stability=None,
+                   reference_continuity=None,
                    provider_generation=0,
                    warnings=()):
     """
@@ -663,6 +686,10 @@ def build_snapshot(*,
         spin_metadata=(None if spin_metadata is None else dict(spin_metadata)),
         scf_converged=bool(scf_converged),
         response_converged=bool(response_converged),
+        reference_stability=(None if reference_stability is None else
+                             dict(reference_stability)),
+        reference_continuity=(None if reference_continuity is None else
+                              dict(reference_continuity)),
         provider_generation=int(provider_generation),
         warnings=tuple(warnings))
 
@@ -903,6 +930,20 @@ class OpenQPMRSFAdapter(ElectronicBackendAdapter):
             'surface.')
 
         self._native = {}
+        self._stability_policy_active = False
+        self._reference_continuity_threshold = None
+
+    def configure_reference_stability_policy(self, enabled):
+        """Lets the trajectory policy selectively override driver stability."""
+
+        self._stability_policy_active = bool(enabled)
+
+    def configure_reference_continuity_policy(self, minimum_singular_value):
+        """Sets an optional explicit occupied-subspace continuity cutoff."""
+
+        self._reference_continuity_threshold = (
+            None if minimum_singular_value is None else
+            float(minimum_singular_value))
 
     def describe_settings(self):
         """
@@ -988,10 +1029,14 @@ class OpenQPMRSFAdapter(ElectronicBackendAdapter):
             'state_specific_gradients': True,
             'cross_geometry_descriptor':
                 'conditioned_openqp_mrsf_overlap_with_response_fallback',
+            'scf_reference_stability': True,
+            'scf_reference_continuity':
+                'docc_somo_subspace_singular_values',
         }
 
     def compute_snapshot(self, geometry, previous_snapshot=None,
-                         gradient_hint=None):
+                         gradient_hint=None, stability_request=None,
+                         reference_guess_payload=None):
         """
         See :func:`ElectronicBackendAdapter.compute_snapshot`.
         """
@@ -1002,14 +1047,30 @@ class OpenQPMRSFAdapter(ElectronicBackendAdapter):
         if previous_snapshot is not None:
             previous_payload = self._native_payload(previous_snapshot)
 
-        native = self.scf_driver.run_oqp_mrsf_states(
-            molecule,
-            functional=self.functional_label,
-            nstate=self.number_of_states,
-            previous_payload=previous_payload,
-            exc_multiplicity=self.exc_multiplicity)
+        driver_request = stability_request
+        if self._stability_policy_active and driver_request is None:
+            driver_request = {'stability_requested': False}
 
-        self.n_scf_calls += 1
+        driver_kwargs = {
+            'functional': self.functional_label,
+            'nstate': self.number_of_states,
+            'previous_payload': previous_payload,
+            'exc_multiplicity': self.exc_multiplicity,
+        }
+        if driver_request is not None:
+            driver_kwargs['stability_request'] = driver_request
+        if reference_guess_payload is not None:
+            driver_kwargs['reference_guess_payload'] = reference_guess_payload
+        if self._reference_continuity_threshold is not None:
+            driver_kwargs['reference_continuity_threshold'] = (
+                self._reference_continuity_threshold)
+
+        try:
+            native = self.scf_driver.run_oqp_mrsf_states(
+                molecule, **driver_kwargs)
+        finally:
+            self.n_scf_calls += 1
+
         self.n_response_calls += 1
 
         energies = np.asarray(native['energies'], dtype=float).reshape(-1)
@@ -1092,6 +1153,8 @@ class OpenQPMRSFAdapter(ElectronicBackendAdapter):
                                     overlap_selection.is_conditioned),
             scf_converged=bool(native.get('scf_converged', True)),
             response_converged=bool(native.get('response_converged', True)),
+            reference_stability=native.get('reference_stability', None),
+            reference_continuity=native.get('reference_continuity', None),
             warnings=(overlap_selection.warnings if
                       overlap_selection is not None else ()))
 
@@ -1145,6 +1208,96 @@ class OpenQPMRSFAdapter(ElectronicBackendAdapter):
         """
 
         self._native.pop(str(calculation_id), None)
+
+    def reference_restart_payload(self, snapshot):
+        """Returns the accepted SCF orbitals/densities for a checkpoint."""
+
+        from .openqpscfdriver import scf_guess_payload
+
+        payload = self._native_payload(snapshot)
+        guess = scf_guess_payload(payload['data'])
+        if 'OQP::VEC_MO_A' not in guess:
+            return None
+        return guess
+
+    def write_native_provenance(self, snapshot, directory, step):
+        """Archives OpenQP's own result bundle for one accepted snapshot.
+
+        Returns compact SCF fields used by the provider for
+        ``scf_reference.json``.  Test doubles and older drivers without the
+        native serializer return ``None`` so generic surface-hopping tests do
+        not create filesystem output.
+        """
+
+        saver = getattr(self.scf_driver, '_save_openqp_results', None)
+        if not callable(saver):
+            return None
+
+        payload = self._native_payload(snapshot)
+        molecule = payload.get('molecule', None)
+        if molecule is None:
+            return None
+
+        saved = saver(molecule, force=True)
+        if saved is None:
+            raise OSError(
+                'OpenQPMRSFAdapter: OpenQP did not create its requested '
+                'provenance bundle.')
+
+        directory = os.path.abspath(str(directory))
+        result_name = f'openqp_step_{int(step):08d}.json'
+        copies = {
+            'openqp_results_file': (
+                saved['openqp_results_file'], result_name),
+            'openqp_settings_file': (
+                saved['openqp_settings_file'], 'openqp_settings.json'),
+            'openqp_log_file': (saved['openqp_log_file'], 'openqp.log'),
+        }
+        archived_files = {}
+        for label, (source, name) in copies.items():
+            destination = os.path.join(directory, name)
+            shutil.copy2(source, destination)
+            archived_files[label] = name
+
+        data = payload.get('data', {})
+        n_alpha = int(data.get('nelec_A', 0))
+        n_beta = int(data.get('nelec_B', 0))
+
+        def values(key):
+            try:
+                return np.asarray(data[key], dtype=float).reshape(-1).tolist()
+            except (KeyError, TypeError, ValueError):
+                return None
+
+        n_orbitals = 0
+        alpha_energies = values('OQP::E_MO_A')
+        beta_energies = values('OQP::E_MO_B')
+        if alpha_energies is not None:
+            n_orbitals = len(alpha_energies)
+        elif beta_energies is not None:
+            n_orbitals = len(beta_energies)
+
+        continuity = snapshot.reference_continuity or {}
+        return {
+            'archived_openqp_files': archived_files,
+            'reference_identifier': continuity.get(
+                'current_reference_identifier'),
+            'reference_energy': float(snapshot.reference_energy),
+            'scf_converged': bool(snapshot.scf_converged),
+            'scf_iteration_count': None,
+            'n_alpha_electrons': n_alpha,
+            'n_beta_electrons': n_beta,
+            'alpha_occupations': (
+                [1.0] * n_alpha + [0.0] * max(0, n_orbitals - n_alpha)),
+            'beta_occupations': (
+                [1.0] * n_beta + [0.0] * max(0, n_orbitals - n_beta)),
+            'alpha_orbital_energies': alpha_energies,
+            'beta_orbital_energies': beta_energies,
+            'reference_multiplicity': int(snapshot.reference_multiplicity),
+            'stability_result': (
+                None if snapshot.reference_stability is None else
+                dict(snapshot.reference_stability)),
+        }
 
     def _store_native(self, snapshot, native):
         """
