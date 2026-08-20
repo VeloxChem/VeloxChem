@@ -1359,7 +1359,7 @@ class OpenQPScfDriver:
                 'type': scf_type,
                 'multiplicity': str(int(multiplicity)),
                 'maxit': str(int(self.max_cycles)),
-                'stabikity': str(bool(self.stability))
+                'stability': str(bool(self.stability))
             },
             'properties': {
                 'grad': str(int(grad_state)) if grad_state is not None else '0',
