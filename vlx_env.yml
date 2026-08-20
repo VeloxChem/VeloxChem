@@ -8,9 +8,12 @@ dependencies:
   - cxx-compiler
   - eigen
   - libboost-headers
-  - mpich
   - mpi4py
   - numpy
+
+  # choose MPI backend
+  - openmpi
+  # - mpich
 
   # choose NumPy backend
   # option 1: use OpenBLAS with OpenMP
