@@ -211,7 +211,7 @@ class TdaEigenSolver(TdaEigenSolverBase):
         self._init_cpcm(molecule, basis)
 
         # GOSTSHYP information
-        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_results)
+        self._init_gostshyp(molecule, basis, scf_results)
 
         # set up trial excitation vectors on master node
 
@@ -277,8 +277,7 @@ class TdaEigenSolver(TdaEigenSolverBase):
                     tdens = self._get_trans_densities(trial_mat, scf_results,
                                                       molecule, basis)
                     fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
-                                              dft_dict, pe_dict, gostshyp_dict,
-                                              profiler)
+                                              dft_dict, pe_dict, profiler)
                     if self.rank == mpi_master():
                         sig_mat = self._get_sigmas(fock, scf_results, molecule,
                                                    basis, trial_mat)
@@ -309,7 +308,7 @@ class TdaEigenSolver(TdaEigenSolverBase):
             tdens = self._get_trans_densities(trial_mat, scf_results, molecule,
                                               basis)
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
-                                      dft_dict, pe_dict, gostshyp_dict, profiler)
+                                      dft_dict, pe_dict, profiler)
 
             profiler.start_timer('ReducedSpace')
 

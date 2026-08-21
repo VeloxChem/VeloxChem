@@ -239,7 +239,7 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
         # CPCM information
         self._init_cpcm(molecule, basis)
         # GOSTSHYP information
-        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_results)
+        self._init_gostshyp(molecule, basis, scf_results)
 
         # TODO: enable PE
         assert_msg_critical(
@@ -479,7 +479,6 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
                                         eri_dict,
                                         dft_dict,
                                         pe_dict,
-                                        gostshyp_dict,
                                         profiler,
                                         method_type='unrestricted')
 
@@ -497,7 +496,6 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
                                 eri_dict,
                                 dft_dict,
                                 pe_dict,
-                                gostshyp_dict,
                                 profiler,
                                 method_type='unrestricted')
 
@@ -608,8 +606,7 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
                 self._collapse_current_subspace(active_keys, current_solutions,
                                                 relative_residual_norm,
                                                 molecule, basis, scf_results,
-                                                eri_dict, dft_dict, pe_dict,
-                                                gostshyp_dict, profiler)
+                                                eri_dict, dft_dict, pe_dict, profiler)
 
                 collapse_str = 'Collapsed reduced space: {:d}->{:d}'.format(
                     self.collapsed_from_dim, self.collapsed_to_dim)
@@ -653,7 +650,6 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
                                 eri_dict,
                                 dft_dict,
                                 pe_dict,
-                                gostshyp_dict,
                                 profiler,
                                 method_type='unrestricted')
 
@@ -950,7 +946,7 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
 
     def _collapse_current_subspace(self, active_keys, solutions, residual_norms,
                                    molecule, basis, scf_results, eri_dict,
-                                   dft_dict, pe_dict, gostshyp_dict, profiler):
+                                   dft_dict, pe_dict, profiler):
         """
         Collapses the reduced space to a basis built from the largest
         unconverged solution vectors and rebuilds associated sigma data.
@@ -1000,7 +996,6 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
                             eri_dict,
                             dft_dict,
                             pe_dict,
-                            gostshyp_dict,
                             profiler,
                             method_type='unrestricted')
 

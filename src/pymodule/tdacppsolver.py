@@ -376,7 +376,7 @@ class ComplexResponseTdaSolver(LinearSolver):
         self._init_cpcm(molecule, basis)
 
         # GOSTSHYP information
-        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_results)
+        self._init_gostshyp(molecule, basis, scf_results)
 
         # right-hand side (gradient)
         if self.rank == mpi_master():
@@ -470,7 +470,7 @@ class ComplexResponseTdaSolver(LinearSolver):
                                               basis)
 
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
-                                      dft_dict, pe_dict, gostshyp_dict)
+                                      dft_dict, pe_dict)
 
             if self.rank == mpi_master():
                 sig_mat = self._get_sigmas(fock, scf_results, molecule, basis,
@@ -697,7 +697,7 @@ class ComplexResponseTdaSolver(LinearSolver):
                                               molecule, basis)
 
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
-                                      dft_dict, pe_dict, gostshyp_dict)
+                                      dft_dict, pe_dict)
 
             if self.rank == mpi_master():
                 sig_mat = self._get_sigmas(fock, scf_results, molecule, basis,

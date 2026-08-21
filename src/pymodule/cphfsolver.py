@@ -109,7 +109,7 @@ class CphfSolver(LinearSolver):
         parse_input(self, cphf_keywords, cphf_dict)
 
     def compute_solution_vectors(self, molecule, basis, scf_results, dist_rhs,
-                                 eri_dict, dft_dict, pe_dict, gostshyp_dict):
+                                 eri_dict, dft_dict, pe_dict):
         """
         Performs CPHF calculation for a specific atom of a molecule and a basis set.
 
@@ -216,7 +216,7 @@ class CphfSolver(LinearSolver):
 
         # construct the sigma (E*t) vectors
         self.build_sigmas(molecule, basis, scf_results, dist_trials, eri_dict,
-                          dft_dict, pe_dict, gostshyp_dict)
+                          dft_dict, pe_dict)
 
         # lists that will hold the solutions and residuals
         # TODO: double check residuals in setup_trials
@@ -300,7 +300,7 @@ class CphfSolver(LinearSolver):
 
             # update sigma vectors
             self.build_sigmas(molecule, basis, scf_results, new_trials,
-                              eri_dict, dft_dict, pe_dict, gostshyp_dict)
+                              eri_dict, dft_dict, pe_dict)
 
         # converged?
         if self.rank == mpi_master():
@@ -406,13 +406,13 @@ class CphfSolver(LinearSolver):
         pe_dict = self._init_pe(molecule, basis)
 
         # GOSTSHYP information
-        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_results)
+        self._init_gostshyp(molecule, basis, scf_results)
 
         # CPCM_information
         self._init_cpcm(molecule, basis)
 
         cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_results, eri_dict,
-                                         dft_dict, pe_dict, gostshyp_dict, *args)
+                                         dft_dict, pe_dict, *args)
 
         # Print after sanity checks in compute_rhs
         if self.rank == mpi_master():
@@ -457,8 +457,8 @@ class CphfSolver(LinearSolver):
 
             # construct the sigma (E*t) vectors
             self.build_sigmas(molecule, basis, scf_results, dist_trials,
-                              eri_dict, dft_dict, pe_dict, gostshyp_dict, 
-                              profiler, self._method_type)
+                              eri_dict, dft_dict, pe_dict, profiler,
+                              self._method_type)
 
         # lists that will hold the solutions and residuals
         # TODO: double check residuals in setup_trials
@@ -580,8 +580,8 @@ class CphfSolver(LinearSolver):
 
             # update sigma vectors
             self.build_sigmas(molecule, basis, scf_results, new_trials,
-                              eri_dict, dft_dict, pe_dict, gostshyp_dict,
-                              profiler, self._method_type)
+                              eri_dict, dft_dict, pe_dict, profiler,
+                              self._method_type)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trial_in_hours = iter_in_hours / n_new_trials
@@ -620,7 +620,6 @@ class CphfSolver(LinearSolver):
                      eri_dict,
                      dft_dict,
                      pe_dict,
-                     gostshyp_dict,
                      profiler=None,
                      method_type='restricted'):
         """
@@ -641,8 +640,6 @@ class CphfSolver(LinearSolver):
             The dictionary containing DFT information.
         :param pe_dict:
             The dictionary containing PE information.
-        :param gostshyp_dict:
-            The dictionary containing GOSTSHYP information.
         :param profiler:
             The profiler.
         :param method_type:
@@ -653,7 +650,7 @@ class CphfSolver(LinearSolver):
             if method_type == 'restricted':
                 self.build_sigmas_subcomms(molecule, basis, scf_results,
                                            dist_trials, eri_dict, dft_dict,
-                                           pe_dict, gostshyp_dict, profiler)
+                                           pe_dict, profiler)
             else:
                 # TODO: enable subcomms for unrestricted
                 assert_msg_critical(
@@ -663,11 +660,11 @@ class CphfSolver(LinearSolver):
             if method_type == 'restricted':
                 self.build_sigmas_single_comm(molecule, basis, scf_results,
                                               dist_trials, eri_dict, dft_dict,
-                                              pe_dict, gostshyp_dict, profiler)
+                                              pe_dict, profiler)
             else:
                 self.build_sigmas_single_comm_unrestricted(
                     molecule, basis, scf_results, dist_trials, eri_dict,
-                    dft_dict, pe_dict, gostshyp_dict, profiler)
+                    dft_dict, pe_dict, profiler)
 
     def build_sigmas_subcomms(self,
                               molecule,
@@ -677,7 +674,6 @@ class CphfSolver(LinearSolver):
                               eri_dict,
                               dft_dict,
                               pe_dict,
-                              gostshyp_dict,
                               profiler=None):
         """
         Compute the matrix-vector product corresponding to the
@@ -883,8 +879,8 @@ class CphfSolver(LinearSolver):
 
                 # create Fock matrices and contract with two-electron integrals
                 fock = self._comp_lr_fock(dens, molecule, basis, eri_dict,
-                                          dft_dict, pe_dict, gostshyp_dict, 
-                                          profiler, local_comm)
+                                          dft_dict, pe_dict, profiler,
+                                          local_comm)
 
                 if profiler is not None:
                     # only increment FockCount on local master
@@ -984,7 +980,6 @@ class CphfSolver(LinearSolver):
                                  eri_dict,
                                  dft_dict,
                                  pe_dict,
-                                 gostshyp_dict,
                                  profiler=None):
         """
         Compute the matrix-vector product corresponding to the
@@ -1065,8 +1060,7 @@ class CphfSolver(LinearSolver):
 
             # create Fock matrices and contract with two-electron integrals
             fock = self._comp_lr_fock(vec_list, molecule, basis, eri_dict,
-                                      dft_dict, pe_dict, gostshyp_dict, 
-                                      profiler)
+                                      dft_dict, pe_dict, profiler)
 
             if profiler is not None:
                 # only increment FockCount on master rank
@@ -1136,7 +1130,6 @@ class CphfSolver(LinearSolver):
                                               eri_dict,
                                               dft_dict,
                                               pe_dict,
-                                              gostshyp_dict,
                                               profiler=None):
         """
         Compute the matrix-vector product corresponding to the
@@ -1232,8 +1225,7 @@ class CphfSolver(LinearSolver):
             # create Fock matrices and contract with two-electron integrals
             fock = self._comp_lr_fock_unrestricted([vec_list_a, vec_list_b],
                                                    molecule, basis, eri_dict,
-                                                   dft_dict, pe_dict, gostshyp_dict,
-                                                   profiler)
+                                                   dft_dict, pe_dict, profiler)
 
             if profiler is not None:
                 # only increment FockCount on master rank
@@ -1449,7 +1441,7 @@ class CphfSolver(LinearSolver):
                                              root=mpi_master())
 
     def compute_rhs(self, molecule, basis, scf_results, eri_dict, dft_dict,
-                    pe_dict, gostshyp_dict, *args):
+                    pe_dict, *args):
         """
         Computes the right hand side for the CPHF equations for
         the analytical Hessian, all atomic coordinates.

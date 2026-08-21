@@ -209,7 +209,7 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
         self._init_cpcm(molecule, basis)
 
         # GOSTSHYP information
-        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_results)
+        self._init_gostshyp(molecule, basis, scf_results)
 
         # TODO: enable PE
         assert_msg_critical(
@@ -292,7 +292,7 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
                                                         spin='beta')
                     fock = self._comp_lr_fock_unrestricted(
                         (tdens_a, tdens_b), molecule, basis, eri_dict, dft_dict,
-                        pe_dict, gostshyp_dict, profiler)
+                        pe_dict, profiler)
                     if self.rank == mpi_master():
                         sig_mat = self._get_sigmas(fock, scf_results, molecule,
                                                    basis, trial_mat)
@@ -332,7 +332,7 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
                                                 spin='beta')
             fock = self._comp_lr_fock_unrestricted((tdens_a, tdens_b), molecule,
                                                    basis, eri_dict, dft_dict,
-                                                   pe_dict, gostshyp_dict, profiler)
+                                                   pe_dict, profiler)
 
             profiler.start_timer('ReducedSpace')
 

@@ -319,7 +319,7 @@ class C6Driver(LinearSolver):
         self._init_cpcm(molecule, basis)
 
         # GOSTSHYP information
-        gostshyp_dict =self._init_gostshyp(molecule, basis, scf_results)
+        self._init_gostshyp(molecule, basis, scf_results)
 
         # right-hand side (gradient)
         b_grad = self.get_complex_prop_grad(self.b_operator, self.b_components,
@@ -399,8 +399,7 @@ class C6Driver(LinearSolver):
             profiler.set_timing_key('Preparation')
 
             self._e2n_half_size(bger, bung, molecule, basis, scf_results,
-                                eri_dict, dft_dict, pe_dict, gostshyp_dict, 
-                                profiler)
+                                eri_dict, dft_dict, pe_dict, profiler)
 
         profiler.check_memory_usage('Initial guess')
 
@@ -599,8 +598,7 @@ class C6Driver(LinearSolver):
             # creating new sigma and rho linear transformations
 
             self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
-                                scf_results, eri_dict, dft_dict, pe_dict,
-                                gostshyp_dict, profiler)
+                                scf_results, eri_dict, dft_dict, pe_dict, profiler)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trial_in_hours = iter_in_hours / n_new_trials

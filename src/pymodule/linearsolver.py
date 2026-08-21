@@ -178,6 +178,9 @@ class LinearSolver:
         self.gostshyp_discretization = 'fixed'
         self.gostshyp_switching_thresh = 1.0e-8
         self.gostshyp_r_ext = 0.0
+        self._gostshyp_tess_info = None
+        self._gostshyp_gs_density = None
+        self._gostshyp_neg_amps = None
 
         # solver setup
         self.conv_thresh = 1.0e-4
@@ -725,9 +728,6 @@ class LinearSolver:
             The AO basis set.
         :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
-
-        :return:
-            The ground state density
         """
 
         if self._gostshyp:
@@ -746,12 +746,12 @@ class LinearSolver:
                                                self.comm,
                                                self.ostream)
 
-            tessellation_settings = {'num_lebedev_points'   : self.gostshyp_num_lebedev_points,
-                                     'tssf'             : self.gostshyp_tssf,
-                                     'discretization'   : self.gostshyp_discretization,
-                                     'switching_thresh' : self.gostshyp_switching_thresh,
-                                     'filename'         : self.filename,
-                                     'r_ext'            : self.gostshyp_r_ext}
+            self._gostshyp_tess_info = {'num_lebedev_points'   : self.gostshyp_num_lebedev_points,
+                                        'tssf'             : self.gostshyp_tssf,
+                                        'discretization'   : self.gostshyp_discretization,
+                                        'switching_thresh' : self.gostshyp_switching_thresh,
+                                        'filename'         : self.filename,
+                                        'r_ext'            : self.gostshyp_r_ext}
 
             if self.rank == mpi_master():
                 # Note: make gs_density a tuple
@@ -763,18 +763,15 @@ class LinearSolver:
             else:
                 gs_density = None
             # TODO: bcast D_alpha and D_beta separately
-            gs_density = self.comm.bcast(gs_density, root=mpi_master())
+            self._gostshyp_gs_density = self.comm.bcast(
+                gs_density, root=mpi_master())
 
-            neg_amps = self.gostshyp_drv.num_neg_amp
+            self._gostshyp_neg_amps = self.gostshyp_drv.num_neg_amp
 
         else:
-            gs_density = None
-            tessellation_settings = {}
-            neg_amps = None
-
-        return {'tess_info': tessellation_settings,
-                'gs_density': gs_density,
-                'neg_amps': neg_amps}
+            self._gostshyp_tess_info = None
+            self._gostshyp_gs_density = None
+            self._gostshyp_neg_amps = None
 
     def _read_checkpoint(self, rsp_vector_labels):
         """
@@ -1095,7 +1092,6 @@ class LinearSolver:
                        eri_dict,
                        dft_dict,
                        pe_dict,
-                       gostshyp_dict,
                        profiler=None,
                        method_type='restricted'):
 
@@ -1112,8 +1108,7 @@ class LinearSolver:
             if method_type == 'restricted':
                 self._e2n_half_size_subcomms(vecs_ger, vecs_ung, molecule,
                                              basis, scf_results, eri_dict,
-                                             dft_dict, pe_dict,
-                                             gostshyp_dict, profiler)
+                                             dft_dict, pe_dict, profiler)
             else:
                 # TODO: enable subcomms for unrestricted
                 assert_msg_critical(
@@ -1123,12 +1118,11 @@ class LinearSolver:
             if method_type == 'restricted':
                 self._e2n_half_size_single_comm(vecs_ger, vecs_ung, molecule,
                                                 basis, scf_results, eri_dict,
-                                                dft_dict, pe_dict,
-                                                gostshyp_dict, profiler)
+                                                dft_dict, pe_dict, profiler)
             else:
                 self._e2n_half_size_single_comm_unrestricted(
                     vecs_ger, vecs_ung, molecule, basis, scf_results, eri_dict,
-                    dft_dict, pe_dict, gostshyp_dict, profiler)
+                    dft_dict, pe_dict, profiler)
 
     def _e2n_half_size_subcomms(self,
                                 vecs_ger,
@@ -1139,7 +1133,6 @@ class LinearSolver:
                                 eri_dict,
                                 dft_dict,
                                 pe_dict,
-                                gostshyp_dict,
                                 profiler=None):
         """
         Computes the E2 b matrix vector product.
@@ -1442,8 +1435,8 @@ class LinearSolver:
                 # form Fock matrices
 
                 fock = self._comp_lr_fock(dks, molecule, basis, eri_dict,
-                                          dft_dict, pe_dict, gostshyp_dict,
-                                          profiler, local_comm)
+                                          dft_dict, pe_dict, profiler,
+                                          local_comm)
 
                 if profiler is not None:
                     # only increment FockCount on local master
@@ -1645,7 +1638,6 @@ class LinearSolver:
                                    eri_dict,
                                    dft_dict,
                                    pe_dict,
-                                   gostshyp_dict,
                                    profiler=None):
         """
         Computes the E2 b matrix vector product.
@@ -1847,7 +1839,7 @@ class LinearSolver:
             # form Fock matrices
 
             fock = self._comp_lr_fock(dks, molecule, basis, eri_dict, dft_dict,
-                                      pe_dict, gostshyp_dict, profiler)
+                                      pe_dict, profiler)
 
             if profiler is not None:
                 # only increment FockCount on master rank
@@ -2010,7 +2002,6 @@ class LinearSolver:
                       eri_dict,
                       dft_dict,
                       pe_dict,
-                      gostshyp_dict,
                       profiler=None,
                       comm=None):
         """
@@ -2028,8 +2019,6 @@ class LinearSolver:
             The dictionary containing DFT information.
         :param pe_dict:
             The dictionary containing PE information.
-        :param gostshyp_dict:
-            The dictionary containing GOSTSHYP information.
         :param profiler:
             The profiler.
 
@@ -2050,8 +2039,8 @@ class LinearSolver:
 
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
-        gs_dm_gost = gostshyp_dict['gs_density']
-        tessellation_settings = gostshyp_dict['tess_info']
+        gs_dm_gost = self._gostshyp_gs_density
+        tessellation_settings = self._gostshyp_tess_info
 
         if comm_rank == mpi_master():
             num_densities = len(dens)
@@ -2214,7 +2203,6 @@ class LinearSolver:
                                    eri_dict,
                                    dft_dict,
                                    pe_dict,
-                                   gostshyp_dict,
                                    profiler=None,
                                    comm=None):
         """
@@ -2232,8 +2220,6 @@ class LinearSolver:
             The dictionary containing DFT information.
         :param pe_dict:
             The dictionary containing PE information.
-        :param gostshyp_dict:
-            The dictionary containing GOSTSHYP information.
         :param profiler:
             The profiler.
 
@@ -2256,8 +2242,8 @@ class LinearSolver:
 
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
-        gs_dm_gost = gostshyp_dict['gs_density']
-        tessellation_settings = gostshyp_dict['tess_info']
+        gs_dm_gost = self._gostshyp_gs_density
+        tessellation_settings = self._gostshyp_tess_info
 
         if comm_rank == mpi_master():
             num_densities = len(dens_a)
@@ -2471,7 +2457,6 @@ class LinearSolver:
                                                 eri_dict,
                                                 dft_dict,
                                                 pe_dict,
-                                                gostshyp_dict,
                                                 profiler=None):
         """
         Computes the E2 b matrix vector product.
@@ -2705,7 +2690,7 @@ class LinearSolver:
 
             fock = self._comp_lr_fock_unrestricted(
                 (dks_a, dks_b), molecule, basis, eri_dict, dft_dict, pe_dict,
-                gostshyp_dict, profiler)
+                profiler)
 
             if profiler is not None:
                 # only increment FockCount on master rank

@@ -207,7 +207,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
         # CPCM_information
         self._init_cpcm(molecule, basis)
 
-        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_results)
+        self._init_gostshyp(molecule, basis, scf_results)
 
         # For now, 'nonlinear' is not supported for unrestricted case.
         assert_msg_critical(
@@ -287,7 +287,6 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                                         eri_dict,
                                         dft_dict,
                                         pe_dict,
-                                        gostshyp_dict,
                                         profiler,
                                         method_type='unrestricted')
 
@@ -308,7 +307,6 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                                 eri_dict,
                                 dft_dict,
                                 pe_dict,
-                                gostshyp_dict,
                                 profiler,
                                 method_type='unrestricted')
 
@@ -434,8 +432,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
 
                 self._collapse_current_subspace(c_ger_all, c_ung_all, molecule,
                                                 basis, scf_results, eri_dict,
-                                                dft_dict, pe_dict, gostshyp_dict, 
-                                                profiler)
+                                                dft_dict, pe_dict, profiler)
 
                 collapse_str = 'Collapsed reduced space: {:d}->{:d}'.format(
                     self.collapsed_from_dim, self.collapsed_to_dim)
@@ -483,7 +480,6 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                                 eri_dict,
                                 dft_dict,
                                 pe_dict,
-                                gostshyp_dict,
                                 profiler,
                                 method_type='unrestricted')
 
@@ -1019,8 +1015,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
         return wn, c_ger, c_ung
 
     def _collapse_current_subspace(self, c_ger, c_ung, molecule, basis,
-                                   scf_results, eri_dict, dft_dict, pe_dict,
-                                   gostshyp_dict, profiler):
+                                   scf_results, eri_dict, dft_dict, pe_dict, profiler):
         """
         Collapses the reduced space to retained Ritz vectors and rebuilds
         associated sigma data.
@@ -1044,7 +1039,6 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                             eri_dict,
                             dft_dict,
                             pe_dict,
-                            gostshyp_dict,
                             profiler,
                             method_type='unrestricted')
 

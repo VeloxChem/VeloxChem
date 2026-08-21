@@ -183,8 +183,8 @@ class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
         self._init_cpcm(molecule, basis)
 
         # GOSTSHYP information
-        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_results)
-        
+        self._init_gostshyp(molecule, basis, scf_results)
+
         # TODO: enable PE
         assert_msg_critical(
             not self._pe, f'{type(self).__name__}: ' +
@@ -380,7 +380,6 @@ class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
                                         eri_dict,
                                         dft_dict,
                                         pe_dict,
-                                        gostshyp_dict,
                                         profiler,
                                         method_type='unrestricted')
 
@@ -398,7 +397,6 @@ class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
                                 eri_dict,
                                 dft_dict,
                                 pe_dict,
-                                gostshyp_dict,
                                 profiler,
                                 method_type='unrestricted')
 
@@ -591,7 +589,6 @@ class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
                                 eri_dict,
                                 dft_dict,
                                 pe_dict,
-                                gostshyp_dict,
                                 profiler,
                                 method_type='unrestricted')
 

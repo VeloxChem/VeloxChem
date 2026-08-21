@@ -91,7 +91,6 @@ class HessianOrbitalResponse(CphfSolver):
                     eri_dict,
                     dft_dict,
                     pe_dict,
-                    gostshyp_dict,
                     atom_pairs=None):
         """
         Computes the right hand side for the CPHF equations for
@@ -414,8 +413,7 @@ class HessianOrbitalResponse(CphfSolver):
 
             # create AODensity and Fock matrix objects, contract with ERI
             fock_uij = self._comp_lr_fock(uij_ao_list, molecule, basis,
-                                          eri_dict, dft_dict, pe_dict, 
-                                          gostshyp_dict, profiler)
+                                          eri_dict, dft_dict, pe_dict, profiler)
 
             if self.rank == mpi_master():
                 uij_ao_list.clear()

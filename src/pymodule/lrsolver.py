@@ -173,7 +173,7 @@ class LinearResponseSolver(LinearResponseSolverBase):
         pe_dict = self._init_pe(molecule, basis)
 
         # GOSTSHYP information
-        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_results)
+        self._init_gostshyp(molecule, basis, scf_results)
 
         # CPCM information
         self._init_cpcm(molecule, basis)
@@ -319,7 +319,7 @@ class LinearResponseSolver(LinearResponseSolverBase):
 
                     self._e2n_half_size(bger, bung, molecule, basis,
                                         scf_results, eri_dict, dft_dict,
-                                        pe_dict, gostshyp_dict, profiler)
+                                        pe_dict, profiler)
 
         # generate initial guess from scratch
         else:
@@ -328,8 +328,7 @@ class LinearResponseSolver(LinearResponseSolverBase):
             profiler.set_timing_key('Preparation')
 
             self._e2n_half_size(bger, bung, molecule, basis, scf_results,
-                                eri_dict, dft_dict, pe_dict, gostshyp_dict,
-                                profiler)
+                                eri_dict, dft_dict, pe_dict, profiler)
 
         profiler.check_memory_usage('Initial guess')
 
@@ -466,7 +465,7 @@ class LinearResponseSolver(LinearResponseSolverBase):
 
                 if self._gostshyp:
                     valstr = '    *** GOSTSHYP information: A total number of '
-                    valstr += '{} grid points with negative amplitudes were excluded'.format(gostshyp_dict['neg_amps'])
+                    valstr += '{} grid points with negative amplitudes were excluded'.format(self._gostshyp_neg_amps)
                     self.ostream.print_header(valstr)
                     self.ostream.print_blank()
 
@@ -506,8 +505,7 @@ class LinearResponseSolver(LinearResponseSolverBase):
                 self._add_frequencies_to_checkpoint()
 
             self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
-                                scf_results, eri_dict, dft_dict, pe_dict, 
-                                gostshyp_dict, profiler)
+                                scf_results, eri_dict, dft_dict, pe_dict, profiler)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trial_in_hours = iter_in_hours / n_new_trials

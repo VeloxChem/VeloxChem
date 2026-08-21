@@ -93,7 +93,6 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
                     eri_dict,
                     dft_dict,
                     pe_dict,
-                    gostshyp_dict,
                     atom_pairs=None):
         """
         Computes the right hand side for the CPHF equations for
@@ -497,7 +496,7 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
             # a is an alpha component and b is beta.
             fock_uij = self._comp_lr_fock_unrestricted(
                 (uij_ao_list_a, uij_ao_list_b), molecule, basis, eri_dict,
-                dft_dict, pe_dict, gostshyp_dict, profiler)
+                dft_dict, pe_dict, profiler)
 
             if self.rank == mpi_master():
                 uij_ao_list_a.clear()
