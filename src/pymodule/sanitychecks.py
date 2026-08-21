@@ -669,6 +669,11 @@ def gostshyp_sanity_check(obj, basis=None):
         assert_msg_critical(obj.pressure > 0.0,
                             'GOSTSHYP: Unphysical negative pressures invalid')
 
+        assert_msg_critical(
+            obj.solvation_model is None,
+            type(obj).__name__ +
+            ': GOSTSHYP is incompatible with the solvation model')
+
         if basis is not None:
 
             # check max angular momentum of basis
@@ -700,6 +705,12 @@ def solvation_model_sanity_check(obj):
             type(obj).__name__ +
             ': The \'solvation_model\' option is incompatible with ' +
             'point charges')
+
+        assert_msg_critical(
+            obj.pressure == 0.0,
+            type(obj).__name__ +
+            ': The \'solvation_model\' option is incompatible with ' +
+            'GOSTSHYP (hydrostatic pressure)')
 
         assert_msg_critical(
             obj.solvation_model.lower() in ['cpcm', 'c-pcm', 'c_pcm', 'smd'],

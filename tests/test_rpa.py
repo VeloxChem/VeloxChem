@@ -527,6 +527,60 @@ class TestRPA:
             assert w_pos.shape == w_rpa.shape == (n_exc,)
             assert np.max(np.abs(w_pos - w_rpa)) < 1.0e-6
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_compute_rejects_solvation_model_with_pressure(self):
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+
+        # empty scf results just for testing
+        scf_results = {}
+
+        lr_drv = LinearResponseEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.solvation_model = 'cpcm'
+        lr_drv.pressure = 20000.0
+
+        with pytest.raises(
+                VeloxChemError,
+                match="LinearResponseEigenSolver: The 'solvation_model' option "
+                      "is incompatible with GOSTSHYP"):
+            lr_results_not_used = lr_drv.compute(mol, bas, scf_results)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_get_e2_rejects_solvation_model_with_pressure(self):
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+
+        # empty scf results just for testing
+        scf_results = {}
+
+        lr_drv = LinearResponseEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.solvation_model = 'smd'
+        lr_drv.pressure = 20000.0
+
+        with pytest.raises(
+                VeloxChemError,
+                match="LinearResponseEigenSolver: The 'solvation_model' option "
+                      "is incompatible with GOSTSHYP"):
+            e2_matrix_not_used = lr_drv.get_e2(mol, bas, scf_results)
+
     def test_guess_and_preconditioner_helpers(self):
 
         lr_drv = LinearResponseEigenSolver()

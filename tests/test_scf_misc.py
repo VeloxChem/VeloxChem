@@ -480,6 +480,22 @@ class TestScfDriverMiscellaneous:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
+    def test_solvation_model_with_pressure_raises(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        def configure(driver):
+            driver.solvation_model = 'cpcm'
+            driver.pressure = 20000.0
+
+        with pytest.raises(
+                VeloxChemError,
+                match="ScfRestrictedDriver: The 'solvation_model' option "
+                      "is incompatible with GOSTSHYP"):
+            self.run_hf_scf(molecule, basis, configure)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
     def test_invalid_acc_type_does_not_return_stale_results(self):
 
         molecule, basis = self.get_water_and_basis()
