@@ -60,7 +60,7 @@ class TessellationDriver:
         The output stream.
 
     Instance variables
-        - num_leb_points: The number of Lebedev points per van der Waals sphere.
+        - num_lebedev_points: The number of Lebedev points per van der Waals sphere.
         - tssf: The tessellation sphere scaling factor.
         - discretization: The surface discretization method.
         - switching_thresh: The (I)SWIG switching function threshold.
@@ -87,7 +87,7 @@ class TessellationDriver:
                 ostream = OutputStream(None)
 
         # Lebedev grid setup
-        self.num_leb_points = 110
+        self.num_lebedev_points = 110
         self.tssf = 1.2
         self.discretization = 'fixed'
         self.switching_thresh = 1.0e-8
@@ -110,7 +110,7 @@ class TessellationDriver:
         # input keywords
         self._input_keywords = {
             'method_settings': {
-                'num_leb_points': ('int', 'number of points per sphere'),
+                'num_lebedev_points': ('int', 'number of points per sphere'),
                 'tssf': ('float', 'tessellation sphere scaling factor'),
                 'discretization': ('str', 'surface discretization method'),
                 'switching_thresh': ('float', 'switching function threshold'),
@@ -236,14 +236,14 @@ class TessellationDriver:
 
         # define parameters used in the swig scheme
         if self.discretization.lower() == 'swig':
-            gamma = np.sqrt(14.0 / self.num_leb_points)
+            gamma = np.sqrt(14.0 / self.num_lebedev_points)
             alpha = 0.5 + 1.0 / gamma - np.sqrt(1.0 / gamma**2 - 1.0 / 28.0)
 
         # define parameters used in the iswig scheme
         elif self.discretization.lower() == 'iswig':
             iswig_input = tessellation[12:14, :].copy()
             iswig_input[1] += self.r_ext / bohr_in_angstrom()
-            zetas = (self.get_zeta(self.num_leb_points)
+            zetas = (self.get_zeta(self.num_lebedev_points)
                      / (iswig_input[1] * np.sqrt(iswig_input[0])))
         
         # initialize array to store the area gradient
@@ -294,7 +294,7 @@ class TessellationDriver:
         # Get grid generated from the C++ class. The spheres are not scaled.
         # Generating from tabulated angles would allow a wider range of
         # different grid points and an on-the-fly scaling.
-        leb_grid = gen_lebedev_grid(self.num_leb_points)
+        leb_grid = gen_lebedev_grid(self.num_lebedev_points)
 
         return leb_grid
 
@@ -354,11 +354,11 @@ class TessellationDriver:
 
             r_i = vdw_radii[idx] + self.r_ext / bohr_in_angstrom()
 
-            gamma = np.sqrt(14.0 / self.num_leb_points)
+            gamma = np.sqrt(14.0 / self.num_lebedev_points)
             alpha = 0.5 + 1.0 / gamma - np.sqrt(1.0 / gamma**2 - 1.0 / 28.0)
 
             if self.discretization.lower() == 'iswig':
-                zeta = self.get_zeta(self.num_leb_points)
+                zeta = self.get_zeta(self.num_lebedev_points)
 
             for j in neighbors[idx]:
 
@@ -536,7 +536,7 @@ class TessellationDriver:
             The grid points of the scaled sphere.
         """
 
-        scaled_sphere = np.zeros((8, self.num_leb_points))
+        scaled_sphere = np.zeros((8, self.num_lebedev_points))
 
         scaled_sphere[0, :] = grid[:, 0] * radius
         scaled_sphere[1, :] = grid[:, 1] * radius
@@ -576,11 +576,11 @@ class TessellationDriver:
 
         n_atoms = coords.shape[0]
 
-        gamma = np.sqrt(14.0 / self.num_leb_points)
+        gamma = np.sqrt(14.0 / self.num_lebedev_points)
         alpha = 0.5 + 1.0 / gamma - np.sqrt(1.0 / gamma**2 - 1.0 / 28.0)
 
         if self.discretization.lower() == 'iswig':
-            zeta = self.get_zeta(self.num_leb_points)
+            zeta = self.get_zeta(self.num_lebedev_points)
         else:
             zeta = 0.0
 
@@ -671,9 +671,9 @@ class TessellationDriver:
         num_points_avail = np.array(
                               [6, 50, 110, 194, 302, 434, 590, 770, 974, 2030])
 
-        if self.num_leb_points not in num_points_avail:
+        if self.num_lebedev_points not in num_points_avail:
             warn_text = '*** Warning: Requested number of '
-            warn_text += str(self.num_leb_points)
+            warn_text += str(self.num_lebedev_points)
             warn_text += ' points for the Lebedev grid is invalid.'
 
             self.ostream.print_header(warn_text.ljust(97))
@@ -684,12 +684,12 @@ class TessellationDriver:
 
             self.ostream.print_header(warn_text.ljust(97))
 
-            self.num_leb_points = num_points_avail[np.abs(
-                              num_points_avail - self.num_leb_points).argmin()]
+            self.num_lebedev_points = num_points_avail[np.abs(
+                              num_points_avail - self.num_lebedev_points).argmin()]
 
             warn_text = '***' + ' ' * 10
             warn_text += 'A number of '
-            warn_text += str(self.num_leb_points)
+            warn_text += str(self.num_lebedev_points)
             warn_text += ' points is used instead as the closest valid number.'
 
             self.ostream.print_header(warn_text.ljust(97))
@@ -697,9 +697,9 @@ class TessellationDriver:
 
             self.ostream.flush()
 
-        if (self.num_leb_points == 2030 and self.discretization.lower() == 'iswig'):
+        if (self.num_lebedev_points == 2030 and self.discretization.lower() == 'iswig'):
             warn_text = '*** Warning: Requested number of '
-            warn_text += str(self.num_leb_points)
+            warn_text += str(self.num_lebedev_points)
             warn_text += ' points for the Lebedev grid is invalid with ISWIG.'
 
             self.ostream.print_header(warn_text.ljust(97))
@@ -710,11 +710,11 @@ class TessellationDriver:
 
             self.ostream.print_header(warn_text.ljust(97))
 
-            self.num_leb_points = 974
+            self.num_lebedev_points = 974
 
             warn_text = '***' + ' ' * 10
             warn_text += 'A number of '
-            warn_text += str(self.num_leb_points)
+            warn_text += str(self.num_lebedev_points)
             warn_text += ' points is used instead as the closest valid number.'
 
             self.ostream.print_header(warn_text.ljust(97))
@@ -722,7 +722,7 @@ class TessellationDriver:
 
             self.ostream.flush()
 
-        return self.num_leb_points
+        return self.num_lebedev_points
 
     def write_grid_to_file(self, vdw_surface):
         """

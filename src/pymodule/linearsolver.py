@@ -289,7 +289,7 @@ class LinearSolver:
                 'gostshyp_tssf': ('float', 'tessellation sphere scaling factor'),
                 'gostshyp_discretization': ('str', 'surface discretization method'),
                 'gostshyp_switching_thresh': ('float', 'switching function threshold'),
-                'gostshyp_r_ext': 
+                'gostshyp_r_ext':
                     ('float', 'extension radius for outer cavity correction in angstrom')
             },
         }
@@ -745,14 +745,14 @@ class LinearSolver:
                                                tco_tol,
                                                self.comm,
                                                self.ostream)
-            
-            tessellation_settings = {'num_leb_points'   : self.gostshyp_num_lebedev_points,
+
+            tessellation_settings = {'num_lebedev_points'   : self.gostshyp_num_lebedev_points,
                                      'tssf'             : self.gostshyp_tssf,
                                      'discretization'   : self.gostshyp_discretization,
                                      'switching_thresh' : self.gostshyp_switching_thresh,
                                      'filename'         : self.filename,
                                      'r_ext'            : self.gostshyp_r_ext}
-            
+
             if self.rank == mpi_master():
                 # Note: make gs_density a tuple
                 if scf_results['scf_type'] == 'restricted':
@@ -764,18 +764,17 @@ class LinearSolver:
                 gs_density = None
             # TODO: bcast D_alpha and D_beta separately
             gs_density = self.comm.bcast(gs_density, root=mpi_master())
-            
+
             neg_amps = self.gostshyp_drv.num_neg_amp
 
         else:
             gs_density = None
             tessellation_settings = {}
             neg_amps = None
-            
-        return {'tess_info': tessellation_settings, 
+
+        return {'tess_info': tessellation_settings,
                 'gs_density': gs_density,
                 'neg_amps': neg_amps}
-
 
     def _read_checkpoint(self, rsp_vector_labels):
         """
@@ -1113,7 +1112,7 @@ class LinearSolver:
             if method_type == 'restricted':
                 self._e2n_half_size_subcomms(vecs_ger, vecs_ung, molecule,
                                              basis, scf_results, eri_dict,
-                                             dft_dict, pe_dict, 
+                                             dft_dict, pe_dict,
                                              gostshyp_dict, profiler)
             else:
                 # TODO: enable subcomms for unrestricted
@@ -1124,7 +1123,7 @@ class LinearSolver:
             if method_type == 'restricted':
                 self._e2n_half_size_single_comm(vecs_ger, vecs_ung, molecule,
                                                 basis, scf_results, eri_dict,
-                                                dft_dict, pe_dict, 
+                                                dft_dict, pe_dict,
                                                 gostshyp_dict, profiler)
             else:
                 self._e2n_half_size_single_comm_unrestricted(
@@ -2186,9 +2185,9 @@ class LinearSolver:
             gs_dm = gs_dm_gost[0]
 
             for idx in range(num_densities):
-                
+
                 dm = dens[idx]
-                
+
                 # Note: only closed shell density for now
                 fock_gost = self.gostshyp_drv.gostshyp_resp_contrib(gs_dm * 2.0,
                                                                     dm * 2.0,
@@ -2429,7 +2428,7 @@ class LinearSolver:
 
         # TODO: validate GOSTSHYP implementation for unrestricted case
         assert_msg_critical(
-            self._gostshyp is False,
+            not self._gostshyp,
             'LinearSolver: GOSTSHYP is not supported for unrestricted case yet')
 
         if self._gostshyp:
@@ -2440,7 +2439,7 @@ class LinearSolver:
             gs_dm_b = gs_dm_gost[1]
 
             for idx in range(num_densities):
-                
+
                 fock_gost = self.gostshyp_drv.gostshyp_resp_contrib(gs_dm_a + gs_dm_b,
                                                                     dens_a[idx] + dens_b[idx],
                                                                     tessellation_settings)

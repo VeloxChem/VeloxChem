@@ -1040,7 +1040,7 @@ class ScfDriver:
                                                 self.comm,
                                                 self.ostream)
 
-            tessellation_settings = {'num_leb_points'   : self.gostshyp_num_lebedev_points,
+            tessellation_settings = {'num_lebedev_points'   : self.gostshyp_num_lebedev_points,
                                      'tssf'             : self.gostshyp_tssf,
                                      'discretization'   : self.gostshyp_discretization,
                                      'switching_thresh' : self.gostshyp_switching_thresh,

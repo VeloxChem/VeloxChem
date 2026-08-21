@@ -132,7 +132,7 @@ class CphfSolver(LinearSolver):
             f'{type(self).__name__}.compute_solution_vectors: ECP is not supported')
 
         assert_msg_critical(
-            self._gostshyp is False,
+            not self._gostshyp,
             f'{type(self).__name__}.compute_solution_vectors: GOSTSHYP is not supported')
 
         if self.norm_thresh is None:

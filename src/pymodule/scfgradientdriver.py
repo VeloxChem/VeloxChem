@@ -434,7 +434,7 @@ class ScfGradientDriver(GradientDriver):
                                                 self.comm,
                                                 self.ostream)
 
-            tessellation_settings = {'num_leb_points'   : self.scf_driver.gostshyp_num_lebedev_points,
+            tessellation_settings = {'num_lebedev_points'   : self.scf_driver.gostshyp_num_lebedev_points,
                                      'tssf'             : self.scf_driver.gostshyp_tssf,
                                      'discretization'   : self.scf_driver.gostshyp_discretization,
                                      'switching_thresh' : self.scf_driver.gostshyp_switching_thresh,

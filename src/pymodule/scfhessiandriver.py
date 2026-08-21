@@ -240,7 +240,7 @@ class ScfHessianDriver(HessianDriver):
             'ScfHessianDriver: Solvation model not implemented')
 
         assert_msg_critical(
-            self.scf_driver._gostshyp is False,
+            not self.scf_driver._gostshyp,
             'ScfHessianDriver: GOSTSHYP not implemented')
 
         # sanity checks
