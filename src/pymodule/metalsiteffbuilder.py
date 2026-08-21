@@ -111,8 +111,33 @@ class MetalSiteForceFieldBuilder:
         - partial_charges: Charges, or the path to a text file, to use instead
           of computing RESP charges. Falls back to partial_charges.txt in the
           working folder.
+        - forcefield: A force field generator, or the path to a JSON file
+          written by save_forcefield, to use instead of building and fitting
+          one. Falls back to forcefield.json in the working folder. The
+          Hessian is then not computed either, since fitting the metal terms
+          is the only thing it is for.
         - do_qm_optimization: The flag for optimizing the active site before the
           Hessian is computed.
+        - do_mm_optimization: The flag for relaxing the active site on a crude
+          force field of its own before any QM is run.
+        - mm_max_iterations: The iteration limit of that relaxation. Zero runs
+          until convergence.
+        - default_metal_bond_force_constant: The force constant given to every
+          metal bond of the crude pass, in kJ/mol/nm^2.
+        - default_metal_angle_force_constant: The force constant given to every
+          metal angle of the crude pass, in kJ/mol/rad^2.
+        - metal_bond_equilibria: Equilibrium metal-ligand distances in nm,
+          keyed by element pair in either order, replacing the values measured
+          on the input geometry. LITERATURE_METAL_BONDS is such a table.
+        - metal_angle_equilibria: Equilibrium metal angles in degrees, keyed by
+          element triple in either order, replacing the measured values.
+        - reparameterize_metal_angles: The flag for touching the metal angles
+          at all. False leaves every one of them at the value the generator
+          guessed, in the crude pass and in the Hessian fit alike.
+        - mm_bond_change_warning: How far a metal-ligand bond may move in the
+          crude pass, in Angstrom, before it is reported.
+        - mm_constrain_metals: The flag for holding the metal centers fixed in
+          the crude pass as well, on top of the beta carbons.
         - do_resp: The flag for computing RESP charges.
         - constrain_capping_hydrogens: The flag for constraining the capping
           hydrogens in addition to the beta carbons.
@@ -158,6 +183,11 @@ class MetalSiteForceFieldBuilder:
     # Elements that can donate a lone pair to a metal center.
     DONOR_ELEMENTS = ('N', 'O', 'S', 'Se')
 
+    # How much closer one carboxylate oxygen has to be than the other, in
+    # Angstrom, before the pair stops counting as a chelating bidentate and
+    # becomes a monodentate contact of the near oxygen alone.
+    BIDENTATE_ASYMMETRY = 0.75
+
     # Residues whose sidechain can bridge two metal centers. A carboxylate has
     # two donor oxygens and a thiolate sulfur has several lone pairs, so both
     # can reach two metals at once. An imidazole nitrogen has a single lone
@@ -201,13 +231,21 @@ class MetalSiteForceFieldBuilder:
     # it up again on a later run, so a failure part way through does not cost
     # the steps that already succeeded.
     GEOMETRY_FILE = 'opt_active_site.xyz'
+    # written for inspection only: the crude pass is cheap enough to repeat,
+    # so unlike the others this one is never read back
+    MM_GEOMETRY_FILE = 'mm_active_site.xyz'
     HESSIAN_FILE = 'hessian.txt'
     CHARGES_FILE = 'partial_charges.txt'
     ENZYME_SYSTEM_FILE = 'enzyme_system.xml'
+    # written by compute() once the metal terms are fitted. The crude pre-QM
+    # pass builds a force field of its own and is deliberately not written
+    # here: it carries seeded force constants rather than fitted ones, and a
+    # later run picking it up would take it for the product of a fit
+    FORCEFIELD_FILE = 'forcefield.json'
 
-    # Literature equilibrium metal-ligand distances in nm, used for the crude
-    # pre-QM pass. Deliberately paired with weak force constants: at that
-    # stage the equilibrium geometry matters far more than the stiffness.
+    # Literature equilibrium metal-ligand distances in nm. The crude pre-QM
+    # pass measures its equilibrium values on the input geometry instead;
+    # assign this to metal_bond_equilibria to impose these in their place.
     LITERATURE_METAL_BONDS = {
         ('Zn', 'N'): 0.205,
         ('Zn', 'O'): 0.200,
@@ -244,6 +282,10 @@ class MetalSiteForceFieldBuilder:
         self.metal_elements = tuple(self.METAL_ELEMENTS)
         self.metal_formal_charges = dict(self.METAL_FORMAL_CHARGES)
 
+        # a carboxylate this much more lopsided than BIDENTATE_ASYMMETRY is
+        # not chelating, whatever the second oxygen looks like on paper
+        self.bidentate_asymmetry = self.BIDENTATE_ASYMMETRY
+
         # truncation and protonation
         self.cap_bond_length = 1.09
         self.protonation_overrides = None
@@ -261,6 +303,7 @@ class MetalSiteForceFieldBuilder:
         self.optimized_geometry = None
         self.hessian = None
         self.partial_charges = None
+        self.forcefield = None
 
         # workflow
         self.do_qm_optimization = True
@@ -271,6 +314,30 @@ class MetalSiteForceFieldBuilder:
         # two topologically equivalent ligands of a strained site sit at
         # genuinely different distances, and that asymmetry is the signal
         self.average_metal_terms = False
+
+        # Crude MM pass. The site is relaxed on a force field of its own
+        # before any QM is run, so the optimization does not spend its first
+        # cycles undoing whatever the structure file happened to hold. Nothing
+        # at that point says anything about the stiffness of a metal term, so
+        # the force constants are flat defaults and only the equilibrium
+        # values carry information: they are measured on the input geometry
+        # unless one of the tables below overrides them.
+        self.do_mm_optimization = True
+        self.mm_max_iterations = 0
+        self.default_metal_bond_force_constant = 100000.0
+        self.default_metal_angle_force_constant = 200.0
+        self.metal_bond_equilibria = None
+        self.metal_angle_equilibria = None
+        self.reparameterize_metal_angles = True
+        # how far a metal-ligand bond may move in the crude pass before it is
+        # worth saying so, in Angstrom
+        self.mm_bond_change_warning = 0.25
+        # Holding the metals as well keeps the metal-metal distance and the
+        # shape of the site exactly as the structure had them, and lets the
+        # crude pass tidy up the ligands around a fixed frame. Off by default:
+        # without electrostatics the metals drift a little, and that drift is
+        # a reading on the seeded terms worth seeing.
+        self.mm_constrain_metals = False
 
         # Whether compute() goes on to build a force field system for the
         # whole enzyme. That is where the fitted charges reach the protein and
@@ -295,10 +362,11 @@ class MetalSiteForceFieldBuilder:
         beta carbons frozen, computes a pair-restricted Hessian and RESP
         charges, and fits the metal-ligand terms.
 
-        A geometry, Hessian or set of partial charges supplied through
-        optimized_geometry, hessian or partial_charges is validated against
-        the extracted active site and used in place of the step that would have
-        produced it.
+        A geometry, Hessian, set of partial charges or force field supplied
+        through optimized_geometry, hessian, partial_charges or forcefield is
+        validated against the extracted active site and used in place of the
+        step that would have produced it. A supplied force field also skips the
+        Hessian, which exists only to fit the metal terms it already carries.
 
         :param structure:
             The path to a PDB or mmCIF file.
@@ -335,6 +403,13 @@ class MetalSiteForceFieldBuilder:
         geometry = self._resolve_optimized_geometry(active_site)
         hessian = self._resolve_hessian(active_site)
         charges = self._resolve_partial_charges(active_site)
+        forcefield = self._resolve_forcefield(active_site)
+
+        # a supplied geometry is the geometry to work with, so there is
+        # nothing for the crude pass to improve on
+        if geometry is None and self.do_mm_optimization:
+            active_site['molecule'] = self.mm_optimize_active_site(
+                active_site, connectivity_matrix)
 
         if geometry is not None:
             self.ostream.print_info(
@@ -353,7 +428,12 @@ class MetalSiteForceFieldBuilder:
                                                active_site['metal_indices'],
                                                bond_count=2)
 
-        if hessian is not None:
+        if forcefield is not None:
+            self.ostream.print_info(
+                'Using the supplied force field; skipping the QM Hessian and '
+                'the fit.')
+            self.ostream.flush()
+        elif hessian is not None:
             self.ostream.print_info(
                 'Using the supplied Hessian; skipping the QM Hessian.')
             self.ostream.flush()
@@ -375,8 +455,16 @@ class MetalSiteForceFieldBuilder:
         if charges is not None:
             self._print_partial_charges(topology, active_site, charges)
 
-        forcefield = self.build_forcefield(active_site, connectivity_matrix,
-                                           hessian, charges)
+        if forcefield is None:
+            forcefield = self.build_forcefield(active_site,
+                                               connectivity_matrix, hessian,
+                                               charges)
+            # written here rather than inside build_forcefield, which the
+            # crude MM pass calls as well: only this one is the fit
+            self._save_intermediate(
+                self.FORCEFIELD_FILE,
+                lambda path: self.save_forcefield(path, forcefield))
+
         self._print_metal_parameters(active_site, forcefield)
 
         enzyme_system = None
@@ -524,6 +612,8 @@ class MetalSiteForceFieldBuilder:
         if forcefield is not None:
             forcefield.write_openmm_files(str(folder / 'forcefield'))
             written.extend(['forcefield.xml', 'forcefield.pdb'])
+            self.save_forcefield(folder / self.FORCEFIELD_FILE, forcefield)
+            written.append(self.FORCEFIELD_FILE)
 
         enzyme_system = results.get('enzyme_system')
         if enzyme_system is not None:
@@ -745,7 +835,8 @@ class MetalSiteForceFieldBuilder:
 
         ligands = [contact for contact in contacts if contact['metals']]
 
-        self._assign_binding_modes(ligands, notes)
+        self._assign_binding_modes(ligands, notes,
+                                   self.bidentate_asymmetry)
 
         for metal in metals:
             n_ligands = sum(1 for ligand in ligands
@@ -770,27 +861,50 @@ class MetalSiteForceFieldBuilder:
         return binding_modes
 
     @staticmethod
-    def _assign_binding_modes(ligands, notes):
+    def _assign_binding_modes(ligands, notes, bidentate_asymmetry=None):
         """
         Classifies each ligand contact using the residue context.
 
-        Only the residues of BRIDGING_RESIDUES are allowed to reach two metals.
-        A contact that would make any other residue bridge is trimmed back to
-        its closest metal, since carrying it further would put a metal bond
-        into the force field that the chemistry does not support.
+        The modes a contact can end up with are monodentate, bidentate (two
+        donor atoms of one residue on one metal), bridging_single (one donor
+        atom on both metals), bridging_double (one donor atom on both metals
+        while a second one reaches one of them), bridging_mu13 (a carboxylate
+        reaching both metals through its two oxygens) and bridging (any other
+        residue doing the same).
+
+        Only the residues of BRIDGING_RESIDUES are allowed to reach two
+        metals, through one donor atom or through two. A contact that would
+        make any other residue bridge is trimmed back to its closest metal,
+        and where the reach is spread over two atoms the whole far contact
+        goes: carrying either further would put a metal bond into the force
+        field that the chemistry does not support.
 
         :param ligands:
             The list of ligand contacts. Updated in place with a 'mode' entry,
-            and trimmed to one metal where the residue cannot bridge.
+            trimmed to one metal where the residue cannot bridge, and with any
+            contact the rules discard removed from the list.
         :param notes:
             The list of review notes. Appended to in place.
+        :param bidentate_asymmetry:
+            How much closer one carboxylate oxygen has to be than the other
+            before the pair is read as monodentate. Defaults to
+            BIDENTATE_ASYMMETRY.
         """
+
+        if bidentate_asymmetry is None:
+            bidentate_asymmetry = (
+                MetalSiteForceFieldBuilder.BIDENTATE_ASYMMETRY)
 
         by_residue = {}
         for ligand in ligands:
             by_residue.setdefault(ligand['res_index'], []).append(ligand)
 
         can_bridge = MetalSiteForceFieldBuilder.BRIDGING_RESIDUES
+        carboxylates = ('ASP', 'GLU', 'ASH', 'GLH')
+
+        # contacts the rules discard, taken out of the list at the end so that
+        # the grouping is not disturbed halfway through
+        discarded = set()
 
         for group in by_residue.values():
             res_name = group[0]['res_name']
@@ -820,6 +934,16 @@ class MetalSiteForceFieldBuilder:
                 else:
                     ligand['mode'] = 'monodentate'
 
+            # One donor atom holding both metals while a second one of the
+            # same residue reaches one of them is a single ligand binding
+            # twice over, not a bridge with an unrelated contact next to it.
+            # Only a residue of can_bridge gets this far: any other one was
+            # trimmed to its closest metal just above.
+            modes = {ligand['mode'] for ligand in group}
+            if 'bridging_single' in modes and 'monodentate' in modes:
+                for ligand in group:
+                    ligand['mode'] = 'bridging_double'
+
             monodentate = all(ligand['mode'] == 'monodentate'
                               for ligand in group)
 
@@ -828,15 +952,28 @@ class MetalSiteForceFieldBuilder:
                 if len(metals_hit) >= 2:
                     if res_name not in can_bridge:
                         # two donor atoms on two metals is a bridge whatever
-                        # it is called, so it is left as two independent
-                        # contacts for review instead
+                        # it is called, so the residue is cut back to the one
+                        # contact it can actually make. Keeping both would
+                        # leave the residue labelled monodentate while still
+                        # reporting, and bonding, two metals.
                         mode = None
+                        nearest = min(group,
+                                      key=lambda ligand: ligand['distances'][0])
+                        far = [
+                            ligand for ligand in group if ligand is not nearest
+                        ]
+                        dropped = ', '.join(
+                            f'{ligand["atom"]} at {ligand["distances"][0]:.2f} A'
+                            for ligand in far)
                         notes.append(
                             f'{group[0]["residue"]} reaches two metals '
                             f'through {len(group)} atoms, but {res_name} '
-                            'cannot bridge; both contacts are kept as '
-                            'monodentate, so review them')
-                    elif res_name in ('ASP', 'GLU', 'ASH', 'GLH'):
+                            f'cannot bridge; keeping {nearest["atom"]} at '
+                            f'{nearest["distances"][0]:.2f} A and dropping '
+                            f'{dropped}')
+                        discarded.update(id(ligand) for ligand in far)
+                        group[:] = [nearest]
+                    elif res_name in carboxylates:
                         mode = 'bridging_mu13'
                     else:
                         mode = 'bridging'
@@ -847,12 +984,38 @@ class MetalSiteForceFieldBuilder:
                     for ligand in group:
                         ligand['mode'] = mode
 
+            # A carboxylate whose two oxygens sit at very different distances
+            # is not chelating: the far oxygen points away, and holding it at
+            # the metal anyway would bend the group open.
+            if (len(group) == 2 and res_name in carboxylates
+                    and all(ligand['mode'] == 'bidentate'
+                            for ligand in group)):
+                near, far = sorted(group,
+                                   key=lambda ligand: ligand['distances'][0])
+                separation = far['distances'][0] - near['distances'][0]
+                if separation > bidentate_asymmetry:
+                    notes.append(
+                        f'{group[0]["residue"]} has {near["atom"]} at '
+                        f'{near["distances"][0]:.2f} A and {far["atom"]} at '
+                        f'{far["distances"][0]:.2f} A, a difference of '
+                        f'{separation:.2f} A; that is not a chelating '
+                        f'bidentate, so it is read as monodentate through '
+                        f'{near["atom"]} alone')
+                    near['mode'] = 'monodentate'
+                    discarded.add(id(far))
+                    group[:] = [near]
+
             if res_name.startswith('HI') and len(group) >= 2:
                 notes.append(
                     f'{group[0]["residue"]} appears to coordinate through '
                     'more than one ring nitrogen; imidazole geometry makes '
                     'this essentially impossible, so treat it as an artifact '
                     'and edit the binding modes')
+
+        if discarded:
+            ligands[:] = [
+                ligand for ligand in ligands if id(ligand) not in discarded
+            ]
 
     def save_binding_modes(self, filename, binding_modes):
         """
@@ -1491,6 +1654,40 @@ class MetalSiteForceFieldBuilder:
 
         return charges
 
+    def _resolve_forcefield(self, active_site):
+        """
+        Validates a force field supplied through the forcefield setting, or
+        left behind in the working folder by an earlier run.
+
+        :param active_site:
+            The active site, to validate against.
+
+        :return:
+            The force field generator, or None if there is nothing to use.
+        """
+
+        source = self.forcefield
+
+        if source is None:
+            source = self._folder_file(self.FORCEFIELD_FILE)
+            if source is None:
+                return None
+            self.ostream.print_info(
+                f'Reusing {self.FORCEFIELD_FILE} from {self.folder}.')
+            self.ostream.flush()
+
+        if isinstance(source, (str, Path)):
+            return self.load_forcefield(source, active_site)
+
+        self._check_forcefield(source, active_site)
+
+        # a generator built elsewhere carries its own molecule; one that has
+        # none is filled in rather than overwritten
+        if getattr(source, 'molecule', None) is None:
+            source.molecule = active_site['molecule']
+
+        return source
+
     def _get_scf_driver(self, molecule):
         """
         Returns the SCF driver and basis set for the active site
@@ -1738,10 +1935,10 @@ class MetalSiteForceFieldBuilder:
         """
         Builds the active site force field and fits the metal terms.
 
-        Without a Hessian the metal terms are seeded from literature distances
-        with deliberately weak force constants, which is the crude pre-QM
-        pass: getting the equilibrium geometry roughly right matters far more
-        than the stiffness at that stage.
+        Without a Hessian the metal terms are seeded by _seed_metal_terms
+        instead of fitted, which is the force field the crude pre-QM pass
+        runs on: getting the equilibrium geometry roughly right matters far
+        more than the stiffness at that stage.
 
         :param hessian:
             The Hessian as a (3N, 3N) numpy array. The string 'xtb' is
@@ -1797,6 +1994,11 @@ class MetalSiteForceFieldBuilder:
 
         bonds, angles = self.get_metal_keys(forcefield, active_site)
 
+        # switching the angles off has to leave them at whatever the generator
+        # guessed in both passes, so it is gated once, here
+        if not self.reparameterize_metal_angles:
+            angles = []
+
         if hessian is None:
             self._seed_metal_terms(forcefield, active_site, bonds, angles)
         else:
@@ -1815,37 +2017,196 @@ class MetalSiteForceFieldBuilder:
 
         return forcefield
 
+    def save_forcefield(self, filename, forcefield):
+        """
+        Writes a force field to a JSON file.
+
+        Only the parameters are written: the atoms, the bonds, the angles, the
+        dihedrals and the impropers, with the redistributed charges already
+        sitting on the atoms. The geometry is not part of it, which is why
+        load_forcefield reads the molecule back off the active site.
+
+        :param filename:
+            The name of the JSON file.
+        :param forcefield:
+            The force field generator to write.
+        """
+
+        if self.rank == mpi_master():
+            MMForceFieldGenerator.save_forcefield_as_json(
+                forcefield, str(filename))
+
+    def load_forcefield(self, filename, active_site=None):
+        """
+        Reads a force field back from a JSON file.
+
+        The file carries the parameters alone, so the molecule of the active
+        site is put back onto the generator: without it the force field cannot
+        be written as OpenMM files or minimized. partial_charges is restored
+        from the charges of the atoms, which are the redistributed ones that
+        build_forcefield wrote.
+
+        :param filename:
+            The name of the JSON file.
+        :param active_site:
+            The active site the force field belongs to. When given, the atom
+            count and the elements are checked against it and its molecule is
+            attached to the generator.
+
+        :return:
+            The force field generator.
+        """
+
+        assert_msg_critical(
+            Path(filename).is_file(),
+            f'MetalSiteForceFieldBuilder: forcefield file {filename} not found')
+
+        forcefield = MMForceFieldGenerator.load_forcefield_from_json_file(
+            str(filename))
+
+        if active_site is not None:
+            self._check_forcefield(forcefield, active_site)
+            forcefield.molecule = active_site['molecule']
+
+        forcefield.partial_charges = np.array(
+            [atom['charge'] for atom in forcefield.atoms.values()])
+
+        return forcefield
+
+    @staticmethod
+    def _forcefield_elements(forcefield):
+        """
+        Returns the element of every atom of a force field generator.
+
+        The generator names its atoms after the element followed by a counter,
+        and reads the element back out of that name when it writes an OpenMM
+        XML, so the name is where the element of a loaded force field lives.
+
+        :param forcefield:
+            The force field generator.
+
+        :return:
+            The element symbols in atom order.
+        """
+
+        elements = []
+
+        for atom in forcefield.atoms.values():
+            element = ''
+            for character in atom['name']:
+                if character.isdigit():
+                    break
+                element += character
+            elements.append(element)
+
+        return elements
+
+    def _check_forcefield(self, forcefield, active_site):
+        """
+        Checks that a force field describes the extracted active site.
+
+        Its bonds and angles are keyed by plain atom indices, which fit any
+        cluster of the same size, so a force field belonging to another site
+        would otherwise be applied to this one without a word.
+
+        :param forcefield:
+            The force field generator.
+        :param active_site:
+            The active site, to validate against.
+        """
+
+        labels = list(active_site['labels'])
+        elements = self._forcefield_elements(forcefield)
+
+        assert_msg_critical(
+            len(elements) == len(labels),
+            f'MetalSiteForceFieldBuilder: the force field has {len(elements)} '
+            f'atoms but the extracted active site has {len(labels)}')
+
+        assert_msg_critical(
+            elements == labels,
+            'MetalSiteForceFieldBuilder: the elements of the force field do '
+            'not match the extracted active site, so it describes a different '
+            'structure')
+
+    @staticmethod
+    def _lookup_equilibrium(table, elements):
+        """
+        Looks an element combination up in an equilibrium table.
+
+        A bond and an angle read the same forwards and backwards, so a table
+        only has to carry one of the two orders.
+
+        :param table:
+            The table, or None.
+        :param elements:
+            The element symbols of the term, in key order.
+
+        :return:
+            The equilibrium value, or None when the table does not hold it.
+        """
+
+        if not table:
+            return None
+
+        if elements in table:
+            return table[elements]
+
+        return table.get(elements[::-1])
+
     def _seed_metal_terms(self, forcefield, active_site, bonds, angles):
         """
-        Seeds the metal terms from literature values for the crude pre-QM
-        pass.
+        Seeds the metal terms for the crude MM pass.
+
+        The equilibrium values are measured on the active site as the
+        structure file gave it, which before any QM is run is the only
+        description of the site there is. metal_bond_equilibria and
+        metal_angle_equilibria override that per element combination;
+        LITERATURE_METAL_BONDS is ready to be assigned to the first of them.
+        The force constants are flat defaults, since nothing at this stage
+        says anything about the stiffness of a metal term.
 
         :param bonds:
             The metal bond keys.
         :param angles:
-            The metal angle keys.
+            The metal angle keys. Empty when reparameterize_metal_angles is
+            switched off.
         """
 
         labels = active_site['labels']
+        molecule = active_site['molecule']
 
         for key in bonds:
-            elements = (labels[key[0]], labels[key[1]])
-            equilibrium = self.LITERATURE_METAL_BONDS.get(elements)
+            elements = tuple(labels[index] for index in key)
+            equilibrium = self._lookup_equilibrium(self.metal_bond_equilibria,
+                                                   elements)
             if equilibrium is None:
-                equilibrium = self.LITERATURE_METAL_BONDS.get(elements[::-1])
-            if equilibrium is None:
-                self.ostream.print_warning(
-                    f'No literature distance for {elements[0]}-{elements[1]}, '
-                    'keeping the guessed value')
-                continue
+                # the getters index atoms from one, and the force field keeps
+                # its bond lengths in nanometers
+                equilibrium = 0.1 * molecule.get_distance_in_angstroms(
+                    [index + 1 for index in key])
+                comment = 'measured on the input geometry'
+            else:
+                comment = 'given equilibrium'
             forcefield.bonds[key]['equilibrium'] = equilibrium
-            forcefield.bonds[key]['force_constant'] = 100000.0
-            forcefield.bonds[key]['comment'] = 'literature estimate'
+            forcefield.bonds[key]['force_constant'] = (
+                self.default_metal_bond_force_constant)
+            forcefield.bonds[key]['comment'] = comment
 
         for key in angles:
-            forcefield.angles[key]['equilibrium'] = 109.5
-            forcefield.angles[key]['force_constant'] = 200.0
-            forcefield.angles[key]['comment'] = 'literature estimate'
+            elements = tuple(labels[index] for index in key)
+            equilibrium = self._lookup_equilibrium(self.metal_angle_equilibria,
+                                                   elements)
+            if equilibrium is None:
+                equilibrium = molecule.get_angle_in_degrees(
+                    [index + 1 for index in key])
+                comment = 'measured on the input geometry'
+            else:
+                comment = 'given equilibrium'
+            forcefield.angles[key]['equilibrium'] = equilibrium
+            forcefield.angles[key]['force_constant'] = (
+                self.default_metal_angle_force_constant)
+            forcefield.angles[key]['comment'] = comment
 
         self.ostream.flush()
 
@@ -1949,6 +2310,74 @@ class MetalSiteForceFieldBuilder:
                 mmunit.angstrom))
 
         return coords
+
+    def mm_optimize_active_site(self,
+                                active_site,
+                                connectivity_matrix,
+                                frozen_indices=None,
+                                constrain_metals=None):
+        """
+        Relaxes the active site on a crude force field of its own.
+
+        A site comes out of a structure file with its ligands wherever the
+        crystallographer or the design left them, and the constrained QM
+        optimization then spends its first cycles cleaning that up. This pass
+        does the same work at MM cost: the metal terms are seeded by
+        _seed_metal_terms, every other term is what the generator assigns, and
+        the beta carbons are frozen exactly as they are in the QM
+        optimization.
+
+        It runs before the RESP charges exist, so the force field it uses
+        carries no electrostatics at all. That is what makes it crude, and why
+        it stands in front of optimize_active_site rather than in place of it.
+
+        :param active_site:
+            The extracted active site.
+        :param connectivity_matrix:
+            The connectivity of the active site.
+        :param frozen_indices:
+            The active site indices to hold fixed. Defaults to
+            constrained_indices().
+        :param constrain_metals:
+            Whether to hold the metal centers as well, added to whatever
+            frozen_indices amounts to. Defaults to mm_constrain_metals.
+
+        :return:
+            The relaxed molecule. The caller decides whether to put it back
+            into the active site.
+        """
+
+        molecule = active_site['molecule']
+
+        if constrain_metals is None:
+            constrain_metals = self.mm_constrain_metals
+
+        if frozen_indices is None:
+            frozen_indices = self.constrained_indices(active_site)
+
+        if constrain_metals:
+            frozen_indices = sorted(
+                set(frozen_indices) | set(active_site['metal_indices']))
+
+        forcefield = self.build_forcefield(active_site, connectivity_matrix)
+        coordinates = self.minimize_active_site(
+            active_site,
+            forcefield,
+            frozen_indices=frozen_indices,
+            max_iterations=self.mm_max_iterations)
+
+        relaxed = Molecule(active_site['labels'], coordinates, 'angstrom')
+        relaxed.set_charge(molecule.get_charge())
+        relaxed.set_multiplicity(molecule.get_multiplicity())
+
+        self._print_mm_optimization(active_site, forcefield, relaxed,
+                                    frozen_indices)
+
+        self._save_intermediate(
+            self.MM_GEOMETRY_FILE,
+            lambda path: relaxed.write_xyz_file(str(path)))
+
+        return relaxed
 
     @staticmethod
     def redistribute_cap_charges(active_site, partial_charges):
@@ -2365,6 +2794,10 @@ class MetalSiteForceFieldBuilder:
                         'given' if self.scf_drv is not None else 'default'))
         self.ostream.print_header(
             self._param(
+                'MM pre-optimization', 'skipped' if self.optimized_geometry
+                is not None else self.do_mm_optimization))
+        self.ostream.print_header(
+            self._param(
                 'QM optimization', 'supplied' if self.optimized_geometry
                 is not None else self.do_qm_optimization))
         self.ostream.print_header(
@@ -2525,6 +2958,114 @@ class MetalSiteForceFieldBuilder:
             valstr = '{:>16} {:>7} | {:>12.4f}'.format(name, len(indices),
                                                        total)
             self.ostream.print_header(valstr)
+
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def _print_mm_optimization(self, active_site, forcefield, relaxed,
+                               frozen_indices):
+        """
+        Prints what the crude MM relaxation did to the coordination sphere.
+
+        The metal-ligand distances before and against after are the point of
+        the table: the pass is there to clean up contacts and hydrogens, and
+        a coordination sphere that moved more than a few hundredths of an
+        Angstrom is the sign that it did something else instead.
+        """
+
+        labels = active_site['labels']
+        molecule = active_site['molecule']
+        metals = sorted(active_site['metal_indices'])
+        bonds, angles = self.get_metal_keys(forcefield, active_site)
+
+        before = molecule.get_coordinates_in_angstrom()
+        after = relaxed.get_coordinates_in_angstrom()
+        shift = np.linalg.norm(after - before, axis=1)
+
+        self.ostream.print_blank()
+        self.ostream.print_header('Crude MM relaxation')
+        self.ostream.print_header(19 * '-')
+
+        self.ostream.print_header(
+            self._param('frozen atoms', len(frozen_indices)))
+        self.ostream.print_header(
+            self._param(
+                'metal centers', 'frozen'
+                if set(metals) <= set(frozen_indices) else 'free'))
+        self.ostream.print_header(
+            self._param(
+                'iteration limit', self.mm_max_iterations
+                if self.mm_max_iterations > 0 else 'convergence'))
+        self.ostream.print_header(
+            self._param('metal bonds', f'{len(bonds)}, k = '
+                        f'{self.default_metal_bond_force_constant:.0f}'))
+        self.ostream.print_header(
+            self._param(
+                'metal angles', f'{len(angles)}, k = '
+                f'{self.default_metal_angle_force_constant:.0f}'
+                if self.reparameterize_metal_angles else 'left untouched'))
+        self.ostream.print_header(
+            self._param(
+                'bond equilibria', 'given'
+                if self.metal_bond_equilibria else 'measured'))
+        if self.reparameterize_metal_angles:
+            self.ostream.print_header(
+                self._param(
+                    'angle equilibria', 'given'
+                    if self.metal_angle_equilibria else 'measured'))
+        self.ostream.print_blank()
+
+        valstr = '{:>12} {:>8} | {:>10} | {:>9} | {:>8}'.format(
+            'atoms', 'elements', 'before (A)', 'after (A)', 'change')
+        self.ostream.print_header(valstr)
+        self.ostream.print_header(60 * '-')
+
+        worst_bond = None
+        for key in bonds:
+            one_based = [index + 1 for index in key]
+            was = molecule.get_distance_in_angstroms(one_based)
+            now = relaxed.get_distance_in_angstroms(one_based)
+            names = '-'.join(labels[index] for index in key)
+            valstr = '{:>12} {:>8} | {:>10.2f} | {:>9.2f} | {:>+8.2f}'.format(
+                str(key), names, was, now, now - was)
+            self.ostream.print_header(valstr)
+            if worst_bond is None or abs(now - was) > abs(worst_bond[1]):
+                worst_bond = (names, now - was)
+
+        for first in range(len(metals)):
+            for second in range(first + 1, len(metals)):
+                pair = (metals[first], metals[second])
+                one_based = [index + 1 for index in pair]
+                was = molecule.get_distance_in_angstroms(one_based)
+                now = relaxed.get_distance_in_angstroms(one_based)
+                names = '-'.join(labels[index] for index in pair)
+                valstr = ('{:>12} {:>8} | {:>10.2f} | {:>9.2f} | '
+                          '{:>+8.2f}').format(str(pair), names, was, now,
+                                              now - was)
+                self.ostream.print_header(valstr)
+
+        self.ostream.print_blank()
+
+        largest = int(np.argmax(shift))
+        self.ostream.print_header(
+            self._param(
+                'largest shift', f'{shift[largest]:.2f} A on '
+                f'{labels[largest]} {largest}'))
+        self.ostream.print_header(
+            self._param('mean shift', f'{shift.mean():.2f} A'))
+
+        # A ligand swinging around its metal moves a long way in Cartesian
+        # terms while the coordination sphere itself is untouched, so what
+        # the pass has to be held to is the bond lengths, not the shifts.
+        if worst_bond is not None:
+            self.ostream.print_header(
+                self._param('largest bond change',
+                            f'{worst_bond[1]:+.2f} A on {worst_bond[0]}'))
+            if abs(worst_bond[1]) > self.mm_bond_change_warning:
+                self.ostream.print_warning(
+                    f'The crude relaxation changed a {worst_bond[0]} bond by '
+                    f'{worst_bond[1]:+.2f} A. Check the metal terms it was '
+                    'given before trusting the geometry it produced.')
 
         self.ostream.print_blank()
         self.ostream.flush()
