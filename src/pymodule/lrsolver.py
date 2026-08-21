@@ -172,11 +172,11 @@ class LinearResponseSolver(LinearResponseSolverBase):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
-        # GOSTSHYP information
-        self._init_gostshyp(molecule, basis, scf_results)
-
         # CPCM information
         self._init_cpcm(molecule, basis)
+
+        # GOSTSHYP information
+        self._init_gostshyp(molecule, basis, scf_results)
 
         # right-hand side (gradient)
         if self.rank == mpi_master():

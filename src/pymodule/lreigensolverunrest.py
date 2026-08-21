@@ -204,9 +204,10 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
-        # CPCM_information
+        # CPCM information
         self._init_cpcm(molecule, basis)
 
+        # GOSTSHYP information
         self._init_gostshyp(molecule, basis, scf_results)
 
         # For now, 'nonlinear' is not supported for unrestricted case.

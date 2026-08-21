@@ -207,7 +207,7 @@ class TdaEigenSolver(TdaEigenSolverBase):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
-        # CPCM_information
+        # CPCM information
         self._init_cpcm(molecule, basis)
 
         # GOSTSHYP information
