@@ -546,20 +546,21 @@ export_oneeints(py::module& m)
                 std::string errsize("compute_screened_tco_s_fock: Inconsistent sizes");
                 errors::assertMsgCritical(point_coords.shape(0) == point_exp.shape(0), errsize);
                 errors::assertMsgCritical(point_coords.shape(0) == point_amp.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(0) == point_norm_const.shape(0), errsize);
                 errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
                 auto npoints = static_cast<int>(point_coords.shape(0));
                 auto naos = static_cast<int>(basis.dimensions_of_basis());
                 auto tco_s = onee::computescreenedFock1GOSTcontrib(molecule,
-                                                                   basis, 
-                                                                   point_coords.data(), 
-                                                                   npoints, 
-                                                                   point_exp.data(), 
-                                                                   point_amp.data(), 
-                                                                   point_norm_const.data(), 
-                                                                   point_norm_const_max, 
-                                                                   naos, 
+                                                                   basis,
+                                                                   point_coords.data(),
+                                                                   npoints,
+                                                                   point_exp.data(),
+                                                                   point_amp.data(),
+                                                                   point_norm_const.data(),
+                                                                   point_norm_const_max,
+                                                                   naos,
                                                                    tco_tol);
-                return vlx_general::pointer_to_numpy(tco_s.values(), 
+                return vlx_general::pointer_to_numpy(tco_s.values(),
                                                      {tco_s.getNumberOfRows(), tco_s.getNumberOfColumns()});
             },
             "Computes screened three-center s-type overlap integrals.",
@@ -595,7 +596,7 @@ export_oneeints(py::module& m)
                 errors::assertMsgCritical(point_coords.shape(0) == point_amp.shape(0), errsize);
                 errors::assertMsgCritical(point_coords.shape(0) == point_norm_const.shape(0), errsize);
                 errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
-                auto        c_style = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style = py::detail::check_flags(D.ptr(), py::array::c_style);
                 errors::assertMsgCritical(c_style, errstyle);
                 std::string errshape("compute_screened_tco_s_values: Expecting square matrix D");
                 errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
@@ -604,17 +605,16 @@ export_oneeints(py::module& m)
                 std::string errsizedensity("compute_screened_tco_s_values: Density matrix shape does not "
                                 "match basis dimension");
                 errors::assertMsgCritical(D.ndim() == 2 && D.shape(0) == naos && D.shape(1) == naos, errsizedensity);
-                errors::assertMsgCritical(D.flags() & py::array::c_style, errstyle);
                 auto tco_s_vals = onee::computescreenedTCOSValues(molecule,
-                                                                  basis, 
-                                                                  point_coords.data(), 
-                                                                  npoints, 
-                                                                  point_exp.data(), 
-                                                                  point_amp.data(), 
-                                                                  point_norm_const.data(), 
-                                                                  point_norm_const_max, 
-                                                                  D.data(), 
-                                                                  naos, 
+                                                                  basis,
+                                                                  point_coords.data(),
+                                                                  npoints,
+                                                                  point_exp.data(),
+                                                                  point_amp.data(),
+                                                                  point_norm_const.data(),
+                                                                  point_norm_const_max,
+                                                                  D.data(),
+                                                                  naos,
                                                                   tco_tol);
                 return vlx_general::pointer_to_numpy(tco_s_vals.data(), {static_cast<int>(tco_s_vals.size())});
             },
@@ -640,7 +640,7 @@ export_oneeints(py::module& m)
                 const py::array_t<double>& point_norm_const,
                 const double               point_norm_const_max,
                 const double               tco_tol) -> py::array_t<double> {
-                std::string errstyle("compute_tco_p_fock: Expecting contiguous numpy arrays");
+                std::string errstyle("compute_screened_tco_p_fock: Expecting contiguous numpy arrays");
                 auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
                 auto        c_style_2 = py::detail::check_flags(point_exp.ptr(), py::array::c_style);
                 auto        c_style_3 = py::detail::check_flags(point_amp.ptr(), py::array::c_style);
@@ -656,18 +656,18 @@ export_oneeints(py::module& m)
                 errors::assertMsgCritical(point_norms.shape(1) == 3, errsize);
                 auto npoints = static_cast<int>(point_coords.shape(0));
                 auto naos = static_cast<int>(basis.dimensions_of_basis());
-                auto tco_p = onee::computescreenedFock2GOSTcontrib(molecule, 
-                                                                   basis, 
-                                                                   point_coords.data(), 
+                auto tco_p = onee::computescreenedFock2GOSTcontrib(molecule,
+                                                                   basis,
+                                                                   point_coords.data(),
                                                                    npoints,
-                                                                   point_exp.data(), 
-                                                                   point_amp.data(), 
-                                                                   point_norms.data(), 
-                                                                   point_norm_const.data(), 
+                                                                   point_exp.data(),
+                                                                   point_amp.data(),
+                                                                   point_norms.data(),
+                                                                   point_norm_const.data(),
                                                                    point_norm_const_max,
-                                                                   naos, 
+                                                                   naos,
                                                                    tco_tol);
-                return vlx_general::pointer_to_numpy(tco_p.values(), 
+                return vlx_general::pointer_to_numpy(tco_p.values(),
                                                      {tco_p.getNumberOfRows(), tco_p.getNumberOfColumns()});
             },
             "Computes screened three-center p-type overlap integrals dot product with grid point normal vector.",
@@ -708,7 +708,7 @@ export_oneeints(py::module& m)
                 errors::assertMsgCritical(point_coords.shape(0) == point_norm_const.shape(0), errsize);
                 errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
                 errors::assertMsgCritical(point_norms.shape(1) == 3, errsize);
-                auto        c_style = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style = py::detail::check_flags(D.ptr(), py::array::c_style);
                 errors::assertMsgCritical(c_style, errstyle);
                 std::string errshape("compute_screened_tco_p_values: Expecting square matrix D");
                 errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
@@ -717,17 +717,16 @@ export_oneeints(py::module& m)
                 std::string errsizedensity("compute_screened_tco_p_values: Density matrix shape does not "
                                 "match basis dimension");
                 errors::assertMsgCritical(D.ndim() == 2 && D.shape(0) == naos && D.shape(1) == naos, errsizedensity);
-                errors::assertMsgCritical(D.flags() & py::array::c_style, errstyle);
-                auto tco_p_vals = onee::computescreenedTCOPValues(molecule, 
-                                                                  basis, 
+                auto tco_p_vals = onee::computescreenedTCOPValues(molecule,
+                                                                  basis,
                                                                   point_coords.data(),
-                                                                  npoints, 
-                                                                  point_exp.data(), 
-                                                                  point_amp.data(), 
-                                                                  point_norms.data(), 
-                                                                  point_norm_const.data(), 
+                                                                  npoints,
+                                                                  point_exp.data(),
+                                                                  point_amp.data(),
+                                                                  point_norms.data(),
+                                                                  point_norm_const.data(),
                                                                   point_norm_const_max, D.data(),
-                                                                  naos, 
+                                                                  naos,
                                                                   tco_tol);
                 return vlx_general::pointer_to_numpy(tco_p_vals.data(), {static_cast<int>(tco_p_vals.size())});
             },
@@ -767,7 +766,7 @@ export_oneeints(py::module& m)
                 errors::assertMsgCritical(point_coords.shape(0) == point_amp.shape(0), errsize);
                 errors::assertMsgCritical(point_coords.shape(0) == point_norm_const.shape(0), errsize);
                 errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
-                auto        c_style = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style = py::detail::check_flags(D.ptr(), py::array::c_style);
                 errors::assertMsgCritical(c_style, errstyle);
                 std::string errshape("compute_screened_tco_d_values: Expecting square matrix D");
                 errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
@@ -776,17 +775,16 @@ export_oneeints(py::module& m)
                 std::string errsizedensity("compute_screened_tco_d_values: Density matrix shape does not "
                                 "match basis dimension");
                 errors::assertMsgCritical(D.ndim() == 2 && D.shape(0) == naos && D.shape(1) == naos, errsizedensity);
-                errors::assertMsgCritical(D.flags() & py::array::c_style, errstyle);
                 auto tco_d_vals = onee::computescreenedTCODValues(molecule,
-                                                                  basis, 
-                                                                  point_coords.data(), 
-                                                                  npoints, 
-                                                                  point_exp.data(), 
-                                                                  point_amp.data(), 
-                                                                  point_norm_const.data(), 
-                                                                  point_norm_const_max, 
-                                                                  D.data(), 
-                                                                  naos, 
+                                                                  basis,
+                                                                  point_coords.data(),
+                                                                  npoints,
+                                                                  point_exp.data(),
+                                                                  point_amp.data(),
+                                                                  point_norm_const.data(),
+                                                                  point_norm_const_max,
+                                                                  D.data(),
+                                                                  naos,
                                                                   tco_tol);
                 return vlx_general::pointer_to_numpy(tco_d_vals.data(), {static_cast<int>(tco_d_vals.size())});
             },
@@ -802,7 +800,7 @@ export_oneeints(py::module& m)
                 "tco_tol"_a);
 
 
-        m.def("compute_screened_tco_f_values",
+    m.def("compute_screened_tco_f_values",
             [](const CMolecule&           molecule,
                 const CMolecularBasis&     basis,
                 const py::array_t<double>& point_coords,
@@ -828,7 +826,7 @@ export_oneeints(py::module& m)
                 errors::assertMsgCritical(point_coords.shape(0) == point_norm_const.shape(0), errsize);
                 errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
                 errors::assertMsgCritical(point_norms.shape(1) == 3, errsize);
-                auto        c_style = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style = py::detail::check_flags(D.ptr(), py::array::c_style);
                 errors::assertMsgCritical(c_style, errstyle);
                 std::string errshape("compute_screened_tco_f_values: Expecting square matrix D");
                 errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
@@ -837,18 +835,17 @@ export_oneeints(py::module& m)
                 std::string errsizedensity("compute_screened_tco_f_values: Density matrix shape does not "
                                 "match basis dimension");
                 errors::assertMsgCritical(D.ndim() == 2 && D.shape(0) == naos && D.shape(1) == naos, errsizedensity);
-                errors::assertMsgCritical(D.flags() & py::array::c_style, errstyle);
                 auto e_tilde_vals = onee::computescreenedTCOFValues(molecule,
-                                                                    basis, 
-                                                                    point_coords.data(), 
-                                                                    npoints, 
-                                                                    point_exp.data(), 
-                                                                    point_amp.data(), 
-                                                                    point_norms.data(), 
-                                                                    point_norm_const.data(), 
-                                                                    point_norm_const_max, 
-                                                                    D.data(), 
-                                                                    naos, 
+                                                                    basis,
+                                                                    point_coords.data(),
+                                                                    npoints,
+                                                                    point_exp.data(),
+                                                                    point_amp.data(),
+                                                                    point_norms.data(),
+                                                                    point_norm_const.data(),
+                                                                    point_norm_const_max,
+                                                                    D.data(),
+                                                                    naos,
                                                                     tco_tol);
                 return vlx_general::pointer_to_numpy(e_tilde_vals.data(), {static_cast<int>(e_tilde_vals.size())});
             },
@@ -865,7 +862,7 @@ export_oneeints(py::module& m)
                 "density"_a,
                 "tco_tol"_a);
 
-    
+
     m.def("compute_screened_contracted_tco_s_gradient",
             [](const CMolecule&           molecule,
                 const CMolecularBasis&     basis,
@@ -877,7 +874,7 @@ export_oneeints(py::module& m)
                 const py::array_t<int>&    point_atom_ids,
                 const py::array_t<double>& D,
                 const double               tco_tol
-                ) -> py::list {
+                ) -> py::array_t<double> {
                 std::string errstyle("compute_screened_contracted_tco_s_gradient: Expecting contiguous numpy arrays");
                 auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
                 auto        c_style_2 = py::detail::check_flags(point_exp.ptr(), py::array::c_style);
@@ -891,7 +888,7 @@ export_oneeints(py::module& m)
                 errors::assertMsgCritical(point_coords.shape(0) == point_norm_const.shape(0), errsize);
                 errors::assertMsgCritical(point_coords.shape(0) == point_atom_ids.shape(0), errsize);
                 errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
-                auto        c_style = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style = py::detail::check_flags(D.ptr(), py::array::c_style);
                 errors::assertMsgCritical(c_style, errstyle);
                 std::string errshape("compute_screened_contracted_tco_s_gradient: Expecting square matrix D");
                 errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
@@ -900,22 +897,21 @@ export_oneeints(py::module& m)
                 std::string errsizedensity("compute_screened_contracted_tco_s_gradient: Density matrix shape does not "
                                 "match basis dimension");
                 errors::assertMsgCritical(D.ndim() == 2 && D.shape(0) == naos && D.shape(1) == naos, errsizedensity);
-                errors::assertMsgCritical(D.flags() & py::array::c_style, errstyle);
-                auto tco_s_grad = onee::computescreenedcontractedTCOSGradient(molecule, 
-                                                                              basis, 
-                                                                              point_coords.data(), 
-                                                                              npoints, 
-                                                                              point_exp.data(), 
-                                                                              point_amp.data(), 
-                                                                              point_norm_const.data(), 
-                                                                              point_norm_const_max, 
-                                                                              point_atom_ids.data(), 
-                                                                              D.data(), 
-                                                                              naos, 
+                auto tco_s_grad = onee::computescreenedcontractedTCOSGradient(molecule,
+                                                                              basis,
+                                                                              point_coords.data(),
+                                                                              npoints,
+                                                                              point_exp.data(),
+                                                                              point_amp.data(),
+                                                                              point_norm_const.data(),
+                                                                              point_norm_const_max,
+                                                                              point_atom_ids.data(),
+                                                                              D.data(),
+                                                                              naos,
                                                                               tco_tol);
-                return vlx_general::pointer_to_numpy(tco_s_grad.values(), 
-                                                     {tco_s_grad.getNumberOfRows(), 
-                                                      tco_s_grad.getNumberOfColumns()});;
+                return vlx_general::pointer_to_numpy(tco_s_grad.values(),
+                                                     {tco_s_grad.getNumberOfRows(),
+                                                      tco_s_grad.getNumberOfColumns()});
             },
             "Computes screened three-center s-type overlap integrals gradient contribution and contracts with density matrix "
             "and along grid point axis",
@@ -927,7 +923,7 @@ export_oneeints(py::module& m)
                 "point_norm_const"_a,
                 "point_norm_const_max"_a,
                 "point_atom_ids"_a,
-                "density"_a,    
+                "density"_a,
                 "tco_tol"_a);
 
 
@@ -943,7 +939,7 @@ export_oneeints(py::module& m)
                 const py::array_t<int>&    point_atom_ids,
                 const py::array_t<double>& D,
                 const double               tco_tol
-                ) -> py::list {
+                ) -> py::array_t<double> {
                 std::string errstyle("compute_screened_contracted_tco_p_gradient: Expecting contiguous numpy arrays");
                 auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
                 auto        c_style_2 = py::detail::check_flags(point_exp.ptr(), py::array::c_style);
@@ -955,11 +951,12 @@ export_oneeints(py::module& m)
                 std::string errsize("compute_screened_contracted_tco_p_gradient: Inconsistent sizes");
                 errors::assertMsgCritical(point_coords.shape(0) == point_exp.shape(0), errsize);
                 errors::assertMsgCritical(point_coords.shape(0) == point_amp.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(0) == point_norms.shape(0), errsize);
                 errors::assertMsgCritical(point_coords.shape(0) == point_norm_const.shape(0), errsize);
                 errors::assertMsgCritical(point_coords.shape(0) == point_atom_ids.shape(0), errsize);
                 errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
                 errors::assertMsgCritical(point_norms.shape(1) == 3, errsize);
-                auto        c_style = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style = py::detail::check_flags(D.ptr(), py::array::c_style);
                 errors::assertMsgCritical(c_style, errstyle);
                 std::string errshape("compute_screened_contracted_tco_p_gradient: Expecting square matrix D");
                 errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
@@ -968,23 +965,22 @@ export_oneeints(py::module& m)
                 std::string errsizedensity("compute_screened_contracted_tco_p_gradient: Density matrix shape does not "
                                 "match basis dimension");
                 errors::assertMsgCritical(D.ndim() == 2 && D.shape(0) == naos && D.shape(1) == naos, errsizedensity);
-                errors::assertMsgCritical(D.flags() & py::array::c_style, errstyle);
-                auto tco_p_grad = onee::computescreenedcontractedTCOPGradient(molecule, 
+                auto tco_p_grad = onee::computescreenedcontractedTCOPGradient(molecule,
                                                                               basis,
-                                                                              point_coords.data(), 
-                                                                              npoints, 
-                                                                              point_exp.data(), 
-                                                                              point_amp.data(), 
-                                                                              point_norms.data(), 
+                                                                              point_coords.data(),
+                                                                              npoints,
+                                                                              point_exp.data(),
+                                                                              point_amp.data(),
+                                                                              point_norms.data(),
                                                                               point_norm_const.data(),
                                                                               point_norm_const_max,
-                                                                              point_atom_ids.data(), 
-                                                                              D.data(), 
-                                                                              naos, 
+                                                                              point_atom_ids.data(),
+                                                                              D.data(),
+                                                                              naos,
                                                                               tco_tol);
-                return vlx_general::pointer_to_numpy(tco_p_grad.values(), 
-                                                     {tco_p_grad.getNumberOfRows(), 
-                                                      tco_p_grad.getNumberOfColumns()});;
+                return vlx_general::pointer_to_numpy(tco_p_grad.values(),
+                                                     {tco_p_grad.getNumberOfRows(),
+                                                      tco_p_grad.getNumberOfColumns()});
             },
             "Computes screened three-center p-type overlap integrals gradient contribution and contracts with density matrix "
             "and along grid point axis",
@@ -1008,8 +1004,7 @@ export_oneeints(py::module& m)
                 const double               tco_tol
                 ) -> py::tuple {
                 auto naos = static_cast<int>(basis.dimensions_of_basis());
-                auto [screened_counts, total_counts] = onee::countscreenedTCO(molecule, basis, point_norm_const_max,
-                naos, tco_tol);
+                auto [screened_counts, total_counts] = onee::countscreenedTCO(molecule, basis, point_norm_const_max, naos, tco_tol);
                 return py::make_tuple(screened_counts, total_counts);
             },
             "Returns the (screened, total) primitive-pair counts per angular-momentum block "
@@ -1018,6 +1013,6 @@ export_oneeints(py::module& m)
                 "basis"_a,
                 "point_norm_const_max"_a,
                 "tco_tol"_a);
-    }
+}
 
 }  // namespace vlx_oneeints
