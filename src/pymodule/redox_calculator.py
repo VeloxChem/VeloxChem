@@ -862,9 +862,6 @@ def _run_sp(
     elif solvation == "cpcm" and cpcm_epsilon is not None and hasattr(drv, "cpcm_epsilon"):
         drv.cpcm_epsilon = cpcm_epsilon
 
-    if mult > 1:
-        drv.level_shifting = 0.3
-
     drv.filename = tmp_prefix
     drv.ostream.mute()
 
@@ -1179,9 +1176,6 @@ def _scf_gibbs_correction(
     scf_drv.ri_jk = ri_jk
     scf_drv.max_iter = 200
     scf_drv.dispersion = dispersion
-
-    if mult > 1:
-        scf_drv.level_shifting = 0.3
 
     scf_drv.filename = tmp_prefix
     scf_drv.ostream.mute()
@@ -2572,9 +2566,7 @@ class RedoxCalculator:
         scf_opt.max_iter    = 200
         scf_opt.conv_thresh = 1e-5
         scf_opt.dispersion  = True
-        scf_opt.grid_level  = 3
-        if mult > 1:
-            scf_opt.level_shifting = 0.3
+        scf_opt.grid_level  = 4
         scf_opt.filename = os.path.join(tmpdir, "opt")
         scf_opt.ostream.mute()
         
@@ -2640,52 +2632,94 @@ class RedoxCalculator:
 
             # ---- Gibbs thermal correction -----------------------------
             method = self.gibbs_correction_method
-            log.info("  [%s] Step 3: %s Gibbs correction", label, method.upper())
-            try:
-                if method == "xtb":
-                    g_corr = _xtb_gibbs_correction(
-                        opt_mol,
-                        temperature=self.temperature,
-                    )
-                elif method == "scf":
-                    g_corr = _scf_gibbs_correction(
-                        opt_mol,
-                        basis_name=self.scf_gibbs_basis,
-                        xcfun=self.scf_gibbs_xcfun,
-                        temperature=self.temperature,
-                        ri_jk=False,
-                        dispersion=self.sp_dispersion,
-                        solvation=self.scf_gibbs_solvation,
-                        mult=mult,
-                        tmp_prefix=os.path.join(tmpdir, "scf_gibbs"),
-                        smd_solvent=self.smd_solvent,
-                    )
-                else:
-                    raise ValueError(
-                        f"Unsupported gibbs_correction_method {method!r}. "
-                        "Use 'xtb' or 'scf'."
+
+            if method == "none":
+                log.info(
+                    "  [%s] Step 3: Gibbs correction SKIPPED",
+                    label,
+                )
+
+                g_corr = 0.0
+
+                # True here means this is intentional, not a failed correction.
+                # This prevents the later code from flagging the state as
+                # "SP-ONLY: Hessian failed".
+                mm_corr_ok = True
+
+            else:
+                log.info(
+                    "  [%s] Step 3: %s Gibbs correction",
+                    label,
+                    method.upper(),
+                )
+
+                try:
+                    if method == "xtb":
+                        g_corr = _xtb_gibbs_correction(
+                            opt_mol,
+                            temperature=self.temperature,
+                        )
+
+                    elif method == "scf":
+                        g_corr = _scf_gibbs_correction(
+                            opt_mol,
+                            basis_name=self.scf_gibbs_basis,
+                            xcfun=self.scf_gibbs_xcfun,
+                            temperature=self.temperature,
+                            ri_jk=False,
+                            dispersion=self.sp_dispersion,
+                            solvation=self.scf_gibbs_solvation,
+                            mult=mult,
+                            tmp_prefix=os.path.join(
+                                tmpdir,
+                                "scf_gibbs",
+                            ),
+                            smd_solvent=self.smd_solvent,
+                        )
+
+                    else:
+                        raise ValueError(
+                            f"Unsupported gibbs_correction_method "
+                            f"{method!r}. "
+                            "Use 'none', 'xtb', or 'scf'."
+                        )
+
+                    n_atoms_check = (
+                        opt_mol.number_of_atoms()
                     )
 
-                # Sanity check: thermal correction should be small relative
-                # to molecule size. A broken thermochemistry run can give
-                # wildly wrong values.
-                n_atoms_check = opt_mol.number_of_atoms()
-                g_corr_limit = 0.05 * n_atoms_check
-                if abs(g_corr) > g_corr_limit:
-                    raise ValueError(
-                        f"g_corr = {g_corr:.4f} au exceeds the plausible "
-                        f"limit of +/-{g_corr_limit:.3f} au for a "
-                        f"{n_atoms_check}-atom molecule."
+                    g_corr_limit = (
+                        0.05 * n_atoms_check
                     )
-                log.info("  [%s] Step 3 done: g_corr = %.6f au", label, g_corr)
-            except Exception as corr_exc:
-                log.warning(
-                    "  [%s] Gibbs correction failed (%s). "
-                    "Setting g_corr = 0.0 and continuing with E_SP only.",
-                    label, corr_exc,
-                )
-                g_corr = 0.0
-            mm_corr_ok = (g_corr != 0.0)
+
+                    if abs(g_corr) > g_corr_limit:
+                        raise ValueError(
+                            f"g_corr = {g_corr:.4f} au "
+                            f"exceeds the plausible limit of "
+                            f"+/-{g_corr_limit:.3f} au for a "
+                            f"{n_atoms_check}-atom molecule."
+                        )
+
+                    log.info(
+                        "  [%s] Step 3 done: "
+                        "g_corr = %.6f au",
+                        label,
+                        g_corr,
+                    )
+
+                    mm_corr_ok = True
+
+                except Exception as corr_exc:
+                    log.warning(
+                        "  [%s] Gibbs correction failed (%s). "
+                        "Setting g_corr = 0.0 and continuing "
+                        "with E_SP only.",
+                        label,
+                        corr_exc,
+                    )
+
+                    g_corr = 0.0
+                    mm_corr_ok = False
 
             # ---- DFT single-points --------------------------------------
             log.info("  [%s] Step 4: solvent single-point (%s/%s)", label, self.xcfun_sp, self.basis_sp)
