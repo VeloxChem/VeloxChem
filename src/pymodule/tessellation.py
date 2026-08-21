@@ -31,7 +31,6 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
-import time as tm
 import math
 import sys
 from mpi4py import MPI
@@ -49,10 +48,11 @@ from .inputparser import (parse_input, print_keywords,
                           get_random_string_parallel)
 from .errorhandler import assert_msg_critical
 
+
 class TessellationDriver:
     """
     Implements the discretization of the van der Waals surface
-    into a grid with octahedral symmetry including grid point areas geometric derivatives 
+    into a grid with octahedral symmetry including grid point areas geometric derivatives
 
     :param comm:
         The MPI communicator.
@@ -92,7 +92,7 @@ class TessellationDriver:
         self.discretization = 'fixed'
         self.switching_thresh = 1.0e-8
         self.r_ext = 0.0
-        
+
         # area gradient setup
         self.atom = None
 
@@ -143,7 +143,7 @@ class TessellationDriver:
             self.method_dict = dict(method_dict)
 
         parse_input(self, method_keywords, method_dict)
-    
+
     def compute(self, molecule):
         """
         Solves for the van der Waals surface discretized with a Lebedev grid.
@@ -189,7 +189,7 @@ class TessellationDriver:
             # unscaled weight and vdw radii
             sphere = vdw_spheres[rad].copy()
             sphere = np.vstack((sphere, norm_vecs.copy(),
-                                np.full(sphere.shape[1], i), unscaled_w, 
+                                np.full(sphere.shape[1], i), unscaled_w,
                                 np.full(sphere.shape[1], rad)))
 
             # translate sphere to the center of the respective atom
@@ -197,23 +197,23 @@ class TessellationDriver:
             sphere[4:7, :] += np.array(molecule.get_atom_coordinates(i))[:, None]
 
             # remove non-contributing points
-            contribution_mask, sw_functions = self.get_contribution_mask(sphere,
-                i, neighbors, molecule, vdw_radii, unscaled_w)
+            contribution_mask, sw_functions = self.get_contribution_mask(
+                sphere, i, neighbors, molecule, vdw_radii, unscaled_w)
 
             contribution = np.vstack((sphere[:, contribution_mask],
                                       sw_functions[contribution_mask]))
 
             vdw_surface = np.hstack((vdw_surface, contribution))
-        
+
         # correct the surface areas
         vdw_surface[3, :] *= vdw_surface[-1, :]
 
         return vdw_surface
 
     def compute_area_grad(self, molecule, tessellation, coeff):
-        
+
         """Calculate the cavity (area/switching function) gradient.
-        
+
         Herbert, Lange, J. Chem. Phys. 133, 244111 (2010), Appendix C
 
         :param molecule             : the molecule.
@@ -223,9 +223,10 @@ class TessellationDriver:
         :return                     : the area gradient contribution (natoms, 3).
         """
 
-        assert_msg_critical(self.discretization.lower() != 'fixed',
-            'GOSTSHYP: Molecular gradient not available with the fixed discretization scheme. Use SWIG or ISWIG.') 
-        
+        assert_msg_critical(
+            self.discretization.lower() != 'fixed',
+            'GOSTSHYP: Molecular gradient not available with the fixed discretization scheme. Use SWIG or ISWIG.')
+
         radii = molecule.vdw_radii_to_numpy() * self.tssf + self.r_ext / bohr_in_angstrom()
         coords = molecule.get_coordinates_in_bohr()
         natoms = molecule.number_of_atoms()
@@ -245,7 +246,7 @@ class TessellationDriver:
             iswig_input[1] += self.r_ext / bohr_in_angstrom()
             zetas = (self.get_zeta(self.num_lebedev_points)
                      / (iswig_input[1] * np.sqrt(iswig_input[0])))
-        
+
         # initialize array to store the area gradient
         area_grad = np.zeros((natoms, 3))
         T = np.zeros((3, num_tes_points))
@@ -259,27 +260,27 @@ class TessellationDriver:
 
             if self.discretization.lower() == 'swig':
                 sw_radius = radii[J] * gamma
-                inner_J   = radii[J] - alpha * sw_radius
+                inner_J = radii[J] - alpha * sw_radius
                 x = (distances - inner_J) / sw_radius
                 t_J = (self.swig_elem_sw_func_derivative_array(x)
-                      / (self.swig_elem_sw_func_array(x) * sw_radius)) * norm_diff
-            
+                       / (self.swig_elem_sw_func_array(x) * sw_radius)) * norm_diff
+
             elif self.discretization.lower() == 'iswig':
                 t_J = (self.iswig_elem_sw_func_derivative(distances, zetas, radii[J])
                        / self.iswig_elem_sw_func_array(distances, zetas, radii[J])) * norm_diff
 
             T += t_J
 
-            area_grad[J] -= np.sum(c * t_J, axis=1) # summed over tessera axis
+            area_grad[J] -= np.sum(c * t_J, axis=1)  # summed over tessera axis
 
-        weighted_T = c * T # (3, npoints)
+        weighted_T = c * T  # (3, npoints)
 
         # scatter contributions onto parent atom gradient
         for d in range(3):
             area_grad[:, d] += np.bincount(parent_atom_ids,
                                            weights=weighted_T[d],
                                            minlength=natoms)
-        
+
         return area_grad
 
     def generate_lebedev_grid(self):
@@ -311,7 +312,7 @@ class TessellationDriver:
 
         return np.vstack((grid[:, 0], grid[:, 1],
                           grid[:, 2]))
-    
+
     def get_contribution_mask(self, sphere, idx, neighbors, molecule, vdw_radii,
                               weights):
         """
@@ -337,13 +338,13 @@ class TessellationDriver:
         """
 
         mask = [True] * sphere.shape[1]
-        
+
         sw_funcs = np.ones(sphere.shape[1])
 
         if self.discretization.lower() == 'fixed':
             for j in neighbors[idx]:
                 diff = sphere[:3, :] - np.array(
-                                      molecule.get_atom_coordinates(j))[:, None]
+                    molecule.get_atom_coordinates(j))[:, None]
                 distances = np.linalg.norm(diff, axis=0)
                 neighbor_mask = distances > vdw_radii[j]
                 mask = [a and b for a, b in zip(mask, neighbor_mask)]
@@ -365,7 +366,7 @@ class TessellationDriver:
                 r_j = vdw_radii[j] + self.r_ext / bohr_in_angstrom()
 
                 diff = sphere[4:7, :] - np.array(
-                                      molecule.get_atom_coordinates(j))[:, None]
+                    molecule.get_atom_coordinates(j))[:, None]
                 distances = np.linalg.norm(diff, axis=0)
 
                 if self.discretization.lower() == 'swig':
@@ -373,13 +374,13 @@ class TessellationDriver:
                     inner_j = r_j - alpha * sw_radius
 
                     elem_sw_funcs = [self.swig_elem_sw_func(
-                                  (d - inner_j) / sw_radius) for d in distances]
+                        (d - inner_j) / sw_radius) for d in distances]
 
                 elif self.discretization.lower() == 'iswig':
                     zetas = zeta / (r_i * np.sqrt(weights))
 
-                    elem_sw_funcs = [self.iswig_elem_sw_func(
-                                   x, z, r_j) for x, z in zip(distances, zetas)]
+                    elem_sw_funcs = [self.iswig_elem_sw_func(x, z, r_j)
+                                     for x, z in zip(distances, zetas)]
 
                 sw_funcs *= elem_sw_funcs
 
@@ -427,7 +428,7 @@ class TessellationDriver:
         :return:
             The function value.
         """
-        
+
         x = np.clip(np.asarray(x, dtype=float), 0.0, 1.0)
 
         return x**3 * (10.0 - 15.0 * x + 6.0 * x**2)
@@ -442,7 +443,7 @@ class TessellationDriver:
             The zeta value.
         :param r_j:
             The radius of atom j.
-        
+
         :return:
             The function value.
         """
@@ -450,7 +451,6 @@ class TessellationDriver:
         return (1.0 - 0.5 * (math.erf(zeta * (r_j - x)) +
                              math.erf(zeta * (r_j + x))))
 
-        
     def iswig_elem_sw_func_array(self, x, zeta, r_j):
         """
         Returns the value for the ISWIG elementary switching function of an array.
@@ -461,7 +461,7 @@ class TessellationDriver:
             The zeta value.
         :param r_j:
             The radius of atom j.
-        
+
         :return:
             The function value.
         """
@@ -516,13 +516,13 @@ class TessellationDriver:
             The zeta value.
         :param r_j:
             The radius of atom j.
-            
+
         :return:
             The function value.
-        """    
+        """
 
-        return zeta / np.sqrt(np.pi) * (np.exp(-zeta**2 * (r_j - x)**2) + np.exp(-zeta**2 * (r_j + x)**2 ))
-    
+        return zeta / np.sqrt(np.pi) * (np.exp(-zeta**2 * (r_j - x)**2) + np.exp(-zeta**2 * (r_j + x)**2))
+
     def scale_sphere(self, grid, radius):
         """
         Scales the unit sphere Lebedev grid to a sphere of a given radius.
@@ -545,11 +545,11 @@ class TessellationDriver:
         # make weights sum to the total surface area in bohr^2
         surface_area = 4.0 * np.pi * radius**2
         scaled_sphere[3, :] = grid[:, 3] * surface_area
-        
+
         scaled_sphere[4, :] = grid[:, 0] * (radius + self.r_ext / bohr_in_angstrom())
         scaled_sphere[5, :] = grid[:, 1] * (radius + self.r_ext / bohr_in_angstrom())
         scaled_sphere[6, :] = grid[:, 2] * (radius + self.r_ext / bohr_in_angstrom())
-    
+
         surface_area_occ = 4.0 * np.pi * (radius + self.r_ext / bohr_in_angstrom())**2
         scaled_sphere[7, :] = grid[:, 3] * surface_area_occ
 
@@ -606,19 +606,19 @@ class TessellationDriver:
                 zeta_j = zeta * (1.0 / (r_j * np.sqrt(weight)))
 
                 if (self.discretization.lower() == 'fixed' and
-                    d_ij <= (r_i + r_j)):
+                        d_ij <= (r_i + r_j)):
                     neighbors[i].append(j)
                     neighbors[j].append(i)
 
                 elif (self.discretization.lower() == 'swig' and
-                     ((d_ij - r_i - inner_j) * (1.0 / r_j * gamma) < 1.0
-                       and (d_ij - r_j - inner_i) * (1.0 / r_i * gamma) < 1.0)):
+                        ((d_ij - r_i - inner_j) * (1.0 / r_j * gamma) < 1.0
+                            and (d_ij - r_j - inner_i) * (1.0 / r_i * gamma) < 1.0)):
                     neighbors[i].append(j)
                     neighbors[j].append(i)
 
                 elif (self.discretization.lower() == 'iswig' and
-                      (self.iswig_elem_sw_func((d_ij - r_i), zeta_i, r_j) < 1.0
-                       and self.iswig_elem_sw_func((d_ij - r_j), zeta_j, r_i) < 1.0)):
+                        (self.iswig_elem_sw_func((d_ij - r_i), zeta_i, r_j) < 1.0
+                            and self.iswig_elem_sw_func((d_ij - r_j), zeta_j, r_i) < 1.0)):
                     neighbors[i].append(j)
                     neighbors[j].append(i)
 
@@ -633,7 +633,7 @@ class TessellationDriver:
             The zeta value.
         """
 
-        zeta_dict =  {
+        zeta_dict = {
             50: 4.893,
             110: 4.901,
             194: 4.903,
@@ -668,8 +668,7 @@ class TessellationDriver:
         """
 
         # the available grids in the C++ class:
-        num_points_avail = np.array(
-                              [6, 50, 110, 194, 302, 434, 590, 770, 974, 2030])
+        num_points_avail = np.array([6, 50, 110, 194, 302, 434, 590, 770, 974, 2030])
 
         if self.num_lebedev_points not in num_points_avail:
             warn_text = '*** Warning: Requested number of '
@@ -684,8 +683,8 @@ class TessellationDriver:
 
             self.ostream.print_header(warn_text.ljust(97))
 
-            self.num_lebedev_points = num_points_avail[np.abs(
-                              num_points_avail - self.num_lebedev_points).argmin()]
+            self.num_lebedev_points = num_points_avail[
+                np.abs(num_points_avail - self.num_lebedev_points).argmin()]
 
             warn_text = '***' + ' ' * 10
             warn_text += 'A number of '
