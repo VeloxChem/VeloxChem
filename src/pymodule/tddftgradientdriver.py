@@ -49,6 +49,7 @@ from .tdaeigensolver import TdaEigenSolver
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
+from .oneeints import compute_point_charge_gradient
 from .firstorderprop import FirstOrderProperties
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
@@ -339,6 +340,11 @@ class TddftGradientDriver(GradientDriver):
             f'{type(self).__name__}.compute_analytical: ' +
             'Analytical TDDFT gradient is not supported with GOSTSHYP ' +
             '(hydrostatic pressure)')
+        assert_msg_critical(
+            not self._scf_drv._pe,
+            f'{type(self).__name__}.compute_analytical: ' +
+            'Analytical TDDFT gradient is not supported with polarizable ' +
+            'embedding')
 
         scf_tensors = self._scf_drv.scf_tensors
         if self._rsp_results is None:
@@ -369,6 +375,7 @@ class TddftGradientDriver(GradientDriver):
             'Ground_state_grad': 0.0,
             'Kinetic_energy_grad': 0.0,
             'Nuclear_potential_grad': 0.0,
+            'Point_charges_grad': 0.0,
             'Overlap_grad': 0.0,
             'Fock_prep': 0.0,
             'Fock_grad': 0.0,
@@ -512,6 +519,30 @@ class TddftGradientDriver(GradientDriver):
             gmats_010 = Matrices()
 
         grad_timing['Nuclear_potential_grad'] += time.time() - t0
+
+        # point-charge contribution to gradient
+
+        t0 = time.time()
+
+        if self._scf_drv.point_charges is not None:
+            npoints = self._scf_drv.point_charges.shape[1]
+
+            mm_coords = []
+            mm_charges = []
+            for p in range(npoints):
+                xyz_p = self._scf_drv.point_charges[:3, p]
+                chg_p = self._scf_drv.point_charges[3, p]
+                mm_coords.append(xyz_p.copy())
+                mm_charges.append(chg_p)
+
+            for s in range(dof):
+                # summation of alpha and beta already included
+                # in relaxed_density_ao
+                self.gradient[s] += compute_point_charge_gradient(
+                    molecule, basis, relaxed_density_ao[s], mm_charges,
+                    mm_coords, local_atoms)
+
+        grad_timing['Point_charges_grad'] += time.time() - t0
 
         # orbital response contribution to gradient
 
