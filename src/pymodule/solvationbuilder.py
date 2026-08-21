@@ -298,6 +298,13 @@ class SolvationBuilder:
         if equilibrate:
             run_steps = (self.steps if equilibration_steps is None else
                          equilibration_steps)
+            self.ostream.print_info("Attempting equilibration of the system")
+            self.ostream.print_blank()
+            self.ostream.print_info(f"Duration: {run_steps/1000} ps")
+            self.ostream.print_info(f"Temperature: {self.temperature} K")
+            self.ostream.print_info(f"Pressure: {self.pressure} bar")
+            self.ostream.print_blank()
+            self.ostream.flush()
             start = time.time()
             try:
                 self.perform_equilibration(steps=equilibration_steps, write_log=write_log)
@@ -308,17 +315,11 @@ class SolvationBuilder:
                 self.ostream.print_blank()
             else:
                 end = time.time()
-                self.ostream.print_info("Equilibrating the system")
-                self.ostream.print_blank()
-                self.ostream.print_info(f"Duration: {run_steps/1000} ps")
-                self.ostream.print_info(f"Temperature: {self.temperature} K")
-                self.ostream.print_info(f"Pressure: {self.pressure} bar")
-                self.ostream.print_blank()
                 self.ostream.print_info(
                     f"Elapsed time to equilibrate the system: {end - start:.2f} s"
                 )
+                self.ostream.flush()
                 self.equilibration_flag = True
-            self.ostream.flush()
 
     def custom_solvate(self, solute, solvents, proportion, box_size):
         """
@@ -1002,9 +1003,11 @@ class SolvationBuilder:
             forcefield = app.ForceField(str(self._path('liquid.xml')))
         else:
             pdb = app.PDBFile(str(self._path('system.pdb')))
-            forcefield = app.ForceField(
-                str(self._path('solute.xml')),
-                *[str(self._path(f'solvent_{i+1}.xml')) for i in range(len(self.solvent_ffs))])
+            ff_files = [str(self._path('solute.xml'))]
+            if self.counterion is not None and self.added_counterions > 0:
+                ff_files.append(f'{self.parent_forcefield}.xml')
+            ff_files.extend([str(self._path(f'solvent_{i+1}.xml')) for i in range(len(self.solvent_ffs))])
+            forcefield = app.ForceField(*ff_files)
 
         topology = pdb.topology
         positions = pdb.positions

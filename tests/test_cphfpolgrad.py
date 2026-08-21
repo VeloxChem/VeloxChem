@@ -2,7 +2,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 import h5py
-import sys
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
@@ -85,12 +84,12 @@ class TestCphfPolgrad:
                 cphfpolgrad_omega_coefficients.append(solution_vec)
 
         if scf_drv.rank == mpi_master():
-            cphfpolgrad_results = cphfpolgrad_solver.cphf_results
-            #cphfpolgrad_omega_coefficients = np.array([cphfpolgrad_results[0.0]['omega_ao'], 
-            #                                          cphfpolgrad_results[0.4]['omega_ao']])
-            np.set_printoptions(suppress=True, precision=10)
+            # cphfpolgrad_results = cphfpolgrad_solver.cphf_results
+            # cphfpolgrad_omega_coefficients = np.array([cphfpolgrad_results[0.0]['omega_ao'],
+            #                                            cphfpolgrad_results[0.4]['omega_ao']])
+
             here = Path(__file__).parent
-            hf_file_name = str(here /'data'/'cphfpolgrad_coefficients.h5')
+            hf_file_name = str(here / 'data' / 'cphfpolgrad_coefficients.h5')
             hf = h5py.File(hf_file_name, 'r')
             cphfpolgrad_reference = np.array(hf.get(label1))
             cphfpolgrad_omega_reference = np.array(hf.get(label2))
@@ -102,9 +101,7 @@ class TestCphfPolgrad:
             # Here we are comparing the CPHF coefficients in MO basis, so
             # there might be sign differences; we compare absolute values instead.
             assert np.max(np.abs(cphfpolgrad_coefficients) - np.abs(cphfpolgrad_reference)) < 1.0e-6
-            assert np.max(np.abs(cphfpolgrad_omega_coefficients)
-                                   - np.abs(cphfpolgrad_omega_reference)) < 1.0e-6
-
+            assert np.max(np.abs(cphfpolgrad_omega_coefficients) - np.abs(cphfpolgrad_omega_reference)) < 1.0e-6
 
     def run_cphfpolgrad_complex(self,
                                 molecule,
@@ -159,12 +156,12 @@ class TestCphfPolgrad:
                 cphfpolgrad_omega_coefficients.append(solution_vec)
 
         if scf_drv.rank == mpi_master():
-            cphfpolgrad_results = cphfpolgrad_solver.cphf_results
-            #cphfpolgrad_omega_coefficients = np.array([cphfpolgrad_results[0.0]['omega_ao'], 
-            #                                          cphfpolgrad_results[0.4]['omega_ao']])
-            np.set_printoptions(suppress=True, precision=10)
+            # cphfpolgrad_results = cphfpolgrad_solver.cphf_results
+            # cphfpolgrad_omega_coefficients = np.array([cphfpolgrad_results[0.0]['omega_ao'],
+            #                                            cphfpolgrad_results[0.4]['omega_ao']])
+
             here = Path(__file__).parent
-            hf_file_name = str(here /'data'/'cphfpolgrad_coefficients.h5')
+            hf_file_name = str(here / 'data' / 'cphfpolgrad_coefficients.h5')
             hf = h5py.File(hf_file_name, 'r')
             cphfpolgrad_reference = np.array(hf.get(label1))[12:]
             cphfpolgrad_omega_reference = np.array(hf.get(label2))[12:]
@@ -176,8 +173,7 @@ class TestCphfPolgrad:
             # Here we ar comparing the CPHF coefficients in MO basis, so
             # there might be sign differences; we compare absolute values instead.
             assert np.max(np.abs(cphfpolgrad_coefficients) - np.abs(cphfpolgrad_reference)) < 1.0e-6
-            assert np.max(np.abs(cphfpolgrad_omega_coefficients)
-                                   - np.abs(cphfpolgrad_omega_reference)) < 1.0e-6 
+            assert np.max(np.abs(cphfpolgrad_omega_coefficients) - np.abs(cphfpolgrad_omega_reference)) < 1.0e-6
 
     @pytest.mark.parametrize(
         'solver_cls',
@@ -188,7 +184,7 @@ class TestCphfPolgrad:
 
         O     0.000000    0.000000    0.000000
         H     0.000000    0.504284    0.758602
-        H     0.000000   -0.504284    0.758602 
+        H     0.000000   -0.504284    0.758602
         """
         basis_set_label = "sto-3g"
 
@@ -208,7 +204,7 @@ class TestCphfPolgrad:
 
         O     0.000000    0.000000    0.000000
         H     0.000000    0.504284    0.758602
-        H     0.000000   -0.504284    0.758602 
+        H     0.000000   -0.504284    0.758602
         """
         basis_set_label = "sto-3g"
 
@@ -228,13 +224,12 @@ class TestCphfPolgrad:
 
         O     0.000000    0.000000    0.000000
         H     0.000000    0.504284    0.758602
-        H     0.000000   -0.504284    0.758602 
+        H     0.000000   -0.504284    0.758602
         """
         basis_set_label = "sto-3g"
 
         molecule = Molecule.from_xyz_string(h2o_xyz)
         basis = MolecularBasis.read(molecule, basis_set_label)
-
 
         self.run_cphfpolgrad_real(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_red_b3lyp_real",
                                   "cpkspolgrad_omega_coefficients_red_b3lyp_real",
@@ -249,7 +244,7 @@ class TestCphfPolgrad:
 
         O     0.000000    0.000000    0.000000
         H     0.000000    0.504284    0.758602
-        H     0.000000   -0.504284    0.758602 
+        H     0.000000   -0.504284    0.758602
         """
         basis_set_label = "sto-3g"
 

@@ -1,6 +1,5 @@
 from mpi4py import MPI
 import numpy as np
-from pathlib import Path
 import pytest
 
 from veloxchem.molecule import Molecule
@@ -343,8 +342,8 @@ class TestSolvationBuilder:
                         box=box)
 
         assert builder.equilibration_flag is False
+        assert 'Attempting equilibration of the system' in builder.ostream.infos
         assert 'Equilibration skipped due to missing files' in builder.ostream.infos
-        assert 'Equilibrating the system' not in builder.ostream.infos
 
     def test_unlink_if_exists_handles_present_and_missing_files(self, tmp_path):
 
@@ -800,7 +799,7 @@ class TestSolvationBuilder:
 
         assert builder.equilibration_flag is True
         assert (tmp_path / 'equilibrated_system.pdb').exists()
-        assert 'Equilibrating the system' in builder.ostream.infos
+        assert 'Attempting equilibration of the system' in builder.ostream.infos
         assert 'Duration: 0.001 ps' in builder.ostream.infos
 
     def test_perform_equilibration_supports_itself_for_non_water_system(
@@ -848,6 +847,29 @@ class TestSolvationBuilder:
         assert builder.system_molecule.number_of_atoms() > 0
         assert not (tmp_path / 'system.gro').exists()
         assert not (tmp_path / 'system.top').exists()
+
+    def test_perform_equilibration_supports_counterions(self, tmp_path):
+
+        pytest.importorskip("openmm")
+
+        np.random.seed(0)
+        solute = _make_fluoride_solute()
+        solvent = _make_water()
+        box = [25.0, 25.0, 25.0]
+        target_density = _target_density_for_count(solute, solvent, 2, box)
+        builder = SolvationBuilder(ostream=RecordingOutput())
+        builder.workdir = tmp_path
+
+        builder.solvate(solute,
+                        solvent='other',
+                        solvent_molecule=solvent,
+                        target_density=target_density,
+                        neutralize=True,
+                        box=box)
+        builder.perform_equilibration(steps=1)
+
+        assert (tmp_path / 'equilibrated_system.pdb').exists()
+        assert builder.added_counterions == 1
 
     def test_perform_equilibration_requires_water_model_for_pure_water_itself(
             self):

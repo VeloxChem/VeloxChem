@@ -324,8 +324,11 @@ class OpenMMDynamics:
         info_msg = f"Unique Residues: {self.unique_residues}, saved as molecules."
         self.ostream.print_info(info_msg)
         self.ostream.flush()
-    
+
     def show_available_implicit_solvent_models(self):
+        """
+        Shows available implicit solvent models.
+        """
         if self._rank == mpi_master():
             implicit_folder_path = Path(
                 mm.__file__).parent / "app" / "data" / "implicit"
@@ -450,19 +453,17 @@ class OpenMMDynamics:
             self.pdb = app.PDBFile(f'{filename}.pdb')
             # Common forcefield loading, modified according to phase specifics
             forcefield_files = [f'{filename}.xml']
-        
+
         elif solvent == 'implicit':
             phase = 'implicit'
             self.ostream.print_info(f'Using implicit solvent model: {self.implicit_solvent_model}')
             self.ostream.print_info(f'Dielectric constant of the solvent: {self.solvent_dielectric}')
             self.pdb = app.PDBFile(f'{filename}.pdb')
             implicit_fpath = Path(mm.__file__).parent / "app" / "data" / "implicit"
-            implicit_model_fname = str(implicit_fpath /
-                                           f"{self.implicit_solvent_model}.xml")
+            implicit_model_fname = str(implicit_fpath / f"{self.implicit_solvent_model}.xml")
             assert_msg_critical(
-                    Path(implicit_model_fname).is_file(),
-                    f"ConformerGenerator: Could not find file {implicit_model_fname}"
-                )
+                Path(implicit_model_fname).is_file(),
+                f"{type(self).__name__}: Could not find file {implicit_model_fname}")
             forcefield_files = [f'{filename}.xml', implicit_model_fname]
 
         else:
@@ -502,12 +503,12 @@ class OpenMMDynamics:
         if phase == 'gas':
             self.system = forcefield.createSystem(self.pdb.topology, nonbondedMethod=app.NoCutoff, constraints=app.HBonds)
         elif phase == 'implicit':
-            self.system = forcefield.createSystem(self.pdb.topology,
-                    nonbondedMethod=app.NoCutoff,
-                    constraints=app.HBonds,
-                    soluteDielectric=self.solute_dielectric,
-                    solventDielectric=self.solvent_dielectric
-                )
+            self.system = forcefield.createSystem(
+                self.pdb.topology,
+                nonbondedMethod=app.NoCutoff,
+                constraints=app.HBonds,
+                soluteDielectric=self.solute_dielectric,
+                solventDielectric=self.solvent_dielectric)
         else:
             self.system = forcefield.createSystem(self.pdb.topology,
                                                   nonbondedMethod=app.PME,
@@ -1426,6 +1427,8 @@ class OpenMMDynamics:
         self.ostream.print_info(f'Simulation output saved as {output_file}')
         self.ostream.flush()
 
+        self.simulation.reporters.clear()
+
     def run_qmmm(self,
                  qm_driver,
                  grad_driver,
@@ -1647,6 +1650,8 @@ class OpenMMDynamics:
         self._save_output(output_file)
         self.ostream.print_info(f'Simulation report saved as {output_file}.out')
         self.ostream.flush()
+
+        self.simulation.reporters.clear()
 
     # Post-simulation analysis methods
     def plot_energy(self,
@@ -2249,7 +2254,9 @@ class OpenMMDynamics:
         :param ff_gen:
             MMForceFieldGenerator object from VeloxChem.
         """
-
+        assert_msg_critical(
+            phase != 'implicit',
+            f"{type(self).__name__}: QM/MM calculations are not supported with implicit solvent models.")
         from openmm import NonbondedForce
 
         # Set the QM/MM Interaction Groups
