@@ -135,10 +135,10 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
-        # check solvation
+        # check solvation model setup
         solvation_model_sanity_check(self)
 
-        # check gostshyp
+        # check GOSTSHYP setup
         gostshyp_sanity_check(self)
 
         # check print level (verbosity of output)

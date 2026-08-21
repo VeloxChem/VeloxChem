@@ -43,7 +43,7 @@ from .subcommunicators import SubCommunicators
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
-                           gostshyp_sanity_check)
+                           gostshyp_sanity_check, solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
 from .inputparser import parse_input
@@ -131,10 +131,6 @@ class CphfSolver(LinearSolver):
             not basis.has_ecp(),
             f'{type(self).__name__}.compute_solution_vectors: ECP is not supported')
 
-        assert_msg_critical(
-            not self._gostshyp,
-            f'{type(self).__name__}.compute_solution_vectors: GOSTSHYP is not supported')
-
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
         if self.lindep_thresh is None:
@@ -166,8 +162,19 @@ class CphfSolver(LinearSolver):
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
+        # check solvation model setup
+        solvation_model_sanity_check(self)
+
+        assert_msg_critical(
+            not self._cpcm,
+            f'{type(self).__name__}.compute_solution_vectors: CPCM is not supported')
+
         # check GOSTSHYP setup
         gostshyp_sanity_check(self)
+
+        assert_msg_critical(
+            not self._gostshyp,
+            f'{type(self).__name__}.compute_solution_vectors: GOSTSHYP is not supported')
 
         if self.rank == mpi_master():
             if self._dft:

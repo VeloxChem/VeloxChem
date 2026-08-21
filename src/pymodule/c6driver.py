@@ -270,10 +270,10 @@ class C6Driver(LinearSolver):
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
-        # check solvation setup
+        # check solvation model setup
         solvation_model_sanity_check(self)
 
-        # check gostshyp setup
+        # check GOSTSHYP setup
         gostshyp_sanity_check(self)
 
         # check solvation model setup

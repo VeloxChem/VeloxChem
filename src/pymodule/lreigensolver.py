@@ -151,11 +151,11 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
-        # check gostshyp setup
-        gostshyp_sanity_check(self)
-
-        # check solvation
+        # check solvation model setup
         solvation_model_sanity_check(self)
+
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self)
 
         # check print level (verbosity of output)
         self.print_level = max(1, min(self.print_level, 3))
@@ -1173,6 +1173,24 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
         molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
+        # check SCF results
+        scf_results_sanity_check(self, scf_results)
+
+        # check RI setup
+        ri_sanity_check(self)
+
+        # check dft setup
+        dft_sanity_check(self, 'compute')
+
+        # check pe setup
+        pe_sanity_check(self, molecule=molecule)
+
+        # check solvation model setup
+        solvation_model_sanity_check(self)
+
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self)
+
         if self.rank == mpi_master():
             orb_ene = scf_results['E_alpha']
         else:
@@ -1189,6 +1207,9 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+
+        # CPCM information
+        self._init_cpcm(molecule, basis)
 
         # GOSTSHYP information
         self._init_gostshyp(molecule, basis, scf_results)

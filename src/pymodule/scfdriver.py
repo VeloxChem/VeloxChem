@@ -558,6 +558,10 @@ class ScfDriver:
 
         pe_sanity_check(self, method_dict)
 
+        # check solvation model setup
+        solvation_model_sanity_check(self)
+
+        # check GOSTSHYP setup
         gostshyp_sanity_check(self)
 
         if self.electric_field is not None:
@@ -710,11 +714,12 @@ class ScfDriver:
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
-        # check gostshyp setup
-        gostshyp_sanity_check(self, basis)
-
         # check solvation model setup
         solvation_model_sanity_check(self)
+
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self, basis)
+
         if self._cpcm:
             assert_msg_critical(
                 len(self.cpcm_grid_per_sphere) == 2 and

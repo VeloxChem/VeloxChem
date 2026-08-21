@@ -393,9 +393,11 @@ class LinearSolver:
 
         pe_sanity_check(self, method_dict)
 
-        gostshyp_sanity_check(self)
-
+        # check solvation model setup
         solvation_model_sanity_check(self)
+
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self)
 
         assert_msg_critical(not self._smd,
                             'Cannot use SMD in response calculation')

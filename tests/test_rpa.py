@@ -422,6 +422,111 @@ class TestRPA:
             assert np.max(np.abs(e2_matrix - e2_matrix.T)) < 1.0e-10
             assert np.all(np.diag(e2_matrix) > 0.0)
 
+    def test_get_e2_cpcm_matches_rpa(self):
+        """get_e2 must build the same E[2] as the RPA solver when CPCM is on.
+
+        Regression test: get_e2 used to skip the solvation sanity checks, so
+        _init_cpcm was a no-op and the CPCM response-Fock contribution was
+        missing from E[2] (only the solvated MOs entered).  Diagonalizing E[2]
+        then disagreed with the regular RPA by ~1e-2 a.u. in the presence of
+        CPCM.  This test compares the full eigenvalue spectrum.
+        """
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+        norb = bas.get_dimensions_of_basis()
+        nocc = mol.number_of_alpha_occupied_orbitals(bas)
+        n_exc = nocc * (norb - nocc)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.solvation_model = 'cpcm'
+        scf_drv.cpcm_epsilon = 10.0
+        scf_results = scf_drv.compute(mol, bas)
+
+        # regular RPA over the full excitation space (reference)
+        rpa_drv = LinearResponseEigenSolver()
+        rpa_drv.ostream.mute()
+        rpa_drv.nstates = n_exc
+        rpa_drv.max_iter = 200
+        rpa_drv.initial_guess_multiplier = 4
+        rpa_drv.max_subspace_dim = 2 * n_exc + 10
+        rpa_drv.cpcm_optical_epsilon = 5.0
+        rpa_drv.conv_thresh = 1.0e-7
+        rpa_results = rpa_drv.compute(mol, bas, scf_results)
+
+        # E[2] via get_e2 + diagonalization of E2 v = w S v, S = diag(I,-I)
+        lr_drv = LinearResponseEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.cpcm_optical_epsilon = 5.0
+        e2_matrix = lr_drv.get_e2(mol, bas, scf_results)
+
+        if lr_drv.rank == mpi_master():
+            S = np.zeros_like(e2_matrix)
+            S[:n_exc, :n_exc] = np.eye(n_exc)
+            S[n_exc:, n_exc:] = -np.eye(n_exc)
+            w_all = np.linalg.eigvals(S @ e2_matrix)
+            assert np.max(np.abs(np.imag(w_all))) < 1.0e-5
+            w_pos = np.sort(np.real(w_all[w_all > 1.0e-6]))
+            w_rpa = np.sort(rpa_results['eigenvalues'])
+            assert w_pos.shape == w_rpa.shape == (n_exc,)
+            assert np.max(np.abs(w_pos - w_rpa)) < 1.0e-6
+
+    def test_get_e2_gostshyp_matches_rpa(self):
+        """get_e2 must build the same E[2] as the RPA solver when GOSTSHYP is on.
+
+        Mirrors test_get_e2_cpcm_matches_rpa for hydrostatic pressure; before
+        the get_e2 sanity-check fix the GOSTSHYP response-Fock contribution was
+        missing and the eigenvalues disagreed with RPA by ~5e-4.
+        """
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+        norb = bas.get_dimensions_of_basis()
+        nocc = mol.number_of_alpha_occupied_orbitals(bas)
+        n_exc = nocc * (norb - nocc)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.pressure = 20000.0
+        scf_results = scf_drv.compute(mol, bas)
+
+        rpa_drv = LinearResponseEigenSolver()
+        rpa_drv.ostream.mute()
+        rpa_drv.nstates = n_exc
+        rpa_drv.max_iter = 200
+        rpa_drv.initial_guess_multiplier = 4
+        rpa_drv.max_subspace_dim = 2 * n_exc + 10
+        rpa_drv.conv_thresh = 1.0e-7
+        rpa_results = rpa_drv.compute(mol, bas, scf_results)
+
+        lr_drv = LinearResponseEigenSolver()
+        lr_drv.ostream.mute()
+        e2_matrix = lr_drv.get_e2(mol, bas, scf_results)
+
+        if lr_drv.rank == mpi_master():
+            S = np.zeros_like(e2_matrix)
+            S[:n_exc, :n_exc] = np.eye(n_exc)
+            S[n_exc:, n_exc:] = -np.eye(n_exc)
+            w_all = np.linalg.eigvals(S @ e2_matrix)
+            assert np.max(np.abs(np.imag(w_all))) < 1.0e-5
+            w_pos = np.sort(np.real(w_all[w_all > 1.0e-6]))
+            w_rpa = np.sort(rpa_results['eigenvalues'])
+            assert w_pos.shape == w_rpa.shape == (n_exc,)
+            assert np.max(np.abs(w_pos - w_rpa)) < 1.0e-6
+
     def test_guess_and_preconditioner_helpers(self):
 
         lr_drv = LinearResponseEigenSolver()

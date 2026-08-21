@@ -189,9 +189,10 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
         dft_sanity_check(self, 'compute')
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
-        # check solvation setup
+        # check solvation model setup
         solvation_model_sanity_check(self)
-        # check gostshyp setup
+
+        # check GOSTSHYP setup
         gostshyp_sanity_check(self)
 
         # check print level (verbosity of output)

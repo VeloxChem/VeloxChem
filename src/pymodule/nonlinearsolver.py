@@ -119,7 +119,10 @@ class NonlinearSolver:
         self.electric_field = None
 
         # pressure
-        self.pressure = None
+        self.pressure = 0.0
+
+        # solvation model
+        self.solvation_model = None
 
         # solver setup
         self.conv_thresh = 1.0e-4
@@ -295,9 +298,15 @@ class NonlinearSolver:
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
-        if self.pressure is not None:
+        if self.pressure != 0.0:
             errmsg = 'NonlinearSolver: The \'pressure\' keyword is not supported '
             errmsg += 'in nonlinear response calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+        if self.solvation_model is not None:
+            errmsg = 'NonlinearSolver: The \'solvation_model\' keyword is not '
+            errmsg += 'supported in nonlinear response calculation.'
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 

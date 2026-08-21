@@ -660,6 +660,9 @@ def gostshyp_sanity_check(obj, basis=None):
         The basis set.
     """
 
+    if obj.pressure is None:
+        obj.pressure = 0.0
+
     obj._gostshyp = (obj.pressure != 0.0)
 
     if obj._gostshyp:

@@ -122,17 +122,11 @@ class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
-        # check solvation setup
+        # check solvation model setup
         solvation_model_sanity_check(self)
 
         # check GOSTSHYP setup
         gostshyp_sanity_check(self)
-
-        # check solvation model setup
-        if self.rank == mpi_master():
-            assert_msg_critical(
-                'solvation_model' not in scf_results,
-                type(self).__name__ + ': Solvation model not implemented')
 
         # check print level (verbosity of output)
         self.print_level = max(1, min(self.print_level, 3))

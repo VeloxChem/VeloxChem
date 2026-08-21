@@ -329,7 +329,7 @@ class ComplexResponseTdaSolver(LinearSolver):
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
-        # check solvation setup
+        # check solvation model setup
         solvation_model_sanity_check(self)
 
         # check GOSTSHYP setup
