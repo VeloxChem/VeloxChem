@@ -421,6 +421,9 @@ class MetalSiteForceFieldBuilder:
 
         if geometry is not None:
             active_site['molecule'] = geometry
+            binding_modes, connectivity_matrix, _ = self.update_binding_modes(
+                topology, geometry, active_site, binding_modes,
+                connectivity_matrix)
 
         molecule = active_site['molecule']
 
@@ -428,12 +431,7 @@ class MetalSiteForceFieldBuilder:
                                                active_site['metal_indices'],
                                                bond_count=2)
 
-        if forcefield is not None:
-            self.ostream.print_info(
-                'Using the supplied force field; skipping the QM Hessian and '
-                'the fit.')
-            self.ostream.flush()
-        elif hessian is not None:
+        if hessian is not None:
             self.ostream.print_info(
                 'Using the supplied Hessian; skipping the QM Hessian.')
             self.ostream.flush()
@@ -455,15 +453,13 @@ class MetalSiteForceFieldBuilder:
         if charges is not None:
             self._print_partial_charges(topology, active_site, charges)
 
-        if forcefield is None:
-            forcefield = self.build_forcefield(active_site,
-                                               connectivity_matrix, hessian,
-                                               charges)
-            # written here rather than inside build_forcefield, which the
-            # crude MM pass calls as well: only this one is the fit
-            self._save_intermediate(
-                self.FORCEFIELD_FILE,
-                lambda path: self.save_forcefield(path, forcefield))
+        forcefield = self.build_forcefield(active_site, connectivity_matrix,
+                                           hessian, charges)
+        # written here rather than inside build_forcefield, which the
+        # crude MM pass calls as well: only this one is the fit
+        self._save_intermediate(
+            self.FORCEFIELD_FILE,
+            lambda path: self.save_forcefield(path, forcefield))
 
         self._print_metal_parameters(active_site, forcefield)
 
@@ -773,22 +769,61 @@ class MetalSiteForceFieldBuilder:
 
         self._check_supported_metals(metals, 'suggest_binding_modes')
 
-        metal_indices = [metal['index'] for metal in metals]
         notes = []
+        ligands = self._collect_ligands(topology.atoms(),
+                                        lambda index: positions[index], metals,
+                                        notes)
+
+        binding_modes = {
+            'metals': metals,
+            'ligands': ligands,
+            'variants': {},
+            'cutoffs': {
+                'primary': self.metal_bond_cutoff,
+                'secondary': self.report_cutoff,
+            },
+            'notes': notes,
+        }
+
+        return binding_modes
+
+    def _collect_ligands(self, atoms, position_of, metals, notes):
+        """
+        Builds the classified ligand contact list of a set of candidate atoms.
+
+        Shared by suggest_binding_modes, which offers it every atom of the
+        topology, and by update_binding_modes, which offers it the atoms of the
+        truncated active site only, so that the two apply the same cutoffs and
+        the same classification rules.
+
+        :param atoms:
+            The candidate atoms, as OpenMM atoms. Metals, non-donors and atoms
+            beyond the secondary cutoff are skipped.
+        :param position_of:
+            The callable returning the position in Angstrom of an atom index of
+            the topology. Called for the candidates and for the metals.
+        :param metals:
+            The metal entries of the binding modes.
+        :param notes:
+            The list of review notes. Appended to in place.
+
+        :return:
+            The list of ligand contacts, each carrying its mode.
+        """
+
+        metal_indices = [metal['index'] for metal in metals]
         contacts = []
 
-        for atom in topology.atoms():
+        for atom in atoms:
             if atom.element is None or atom.index in metal_indices:
                 continue
             if atom.element.symbol not in self.DONOR_ELEMENTS:
                 continue
 
+            position = position_of(atom.index)
             distances = {
-                metal['index']:
-                float(
-                    np.linalg.norm(positions[atom.index] -
-                                   positions[metal['index']]))
-                for metal in metals
+                index: float(np.linalg.norm(position - position_of(index)))
+                for index in metal_indices
             }
             closest = min(distances.values())
             if closest > self.report_cutoff:
@@ -835,8 +870,7 @@ class MetalSiteForceFieldBuilder:
 
         ligands = [contact for contact in contacts if contact['metals']]
 
-        self._assign_binding_modes(ligands, notes,
-                                   self.bidentate_asymmetry)
+        self._assign_binding_modes(ligands, notes, self.bidentate_asymmetry)
 
         for metal in metals:
             n_ligands = sum(1 for ligand in ligands
@@ -847,18 +881,7 @@ class MetalSiteForceFieldBuilder:
                     f'only {n_ligands} ligand(s) within the primary cutoff; '
                     'check for a missing bridging ligand or water')
 
-        binding_modes = {
-            'metals': metals,
-            'ligands': ligands,
-            'variants': {},
-            'cutoffs': {
-                'primary': self.metal_bond_cutoff,
-                'secondary': self.report_cutoff,
-            },
-            'notes': notes,
-        }
-
-        return binding_modes
+        return ligands
 
     @staticmethod
     def _assign_binding_modes(ligands, notes, bidentate_asymmetry=None):
@@ -915,8 +938,8 @@ class MetalSiteForceFieldBuilder:
                     # donor atom, so the longer contact is dropped rather than
                     # turned into a bond that the force field would then have
                     # to hold
-                    closest = ligand['distances'].index(
-                        min(ligand['distances']))
+                    closest = ligand['distances'].index(min(
+                        ligand['distances']))
                     dropped = [
                         f'{d:.2f} A' for i, d in enumerate(ligand['distances'])
                         if i != closest
@@ -988,8 +1011,7 @@ class MetalSiteForceFieldBuilder:
             # is not chelating: the far oxygen points away, and holding it at
             # the metal anyway would bend the group open.
             if (len(group) == 2 and res_name in carboxylates
-                    and all(ligand['mode'] == 'bidentate'
-                            for ligand in group)):
+                    and all(ligand['mode'] == 'bidentate' for ligand in group)):
                 near, far = sorted(group,
                                    key=lambda ligand: ligand['distances'][0])
                 separation = far['distances'][0] - near['distances'][0]
@@ -1444,6 +1466,198 @@ class MetalSiteForceFieldBuilder:
 
         return connectivity_matrix
 
+    def update_binding_modes(self, topology, geometry, active_site,
+                             binding_modes, connectivity_matrix):
+        """
+        Re-detects the coordination sphere on a new active site geometry.
+
+        Relaxing the active site moves the metal-ligand distances: a contact
+        that started just inside the primary cutoff can end up outside it, an
+        asymmetric carboxylate can open into a monodentate one, and a second
+        oxygen can rotate onto a metal. The rules of suggest_binding_modes are
+        applied again to the new coordinates so that what is fitted afterwards
+        is the coordination the geometry actually has.
+        Nothing is modified in place, and the arguments themselves are returned
+        when the coordination did not change, so the caller can overwrite what
+        it holds unconditionally and still compare by identity. 
+
+        :param topology:
+            The protonated OpenMM topology, which the active site indexes into.
+        :param geometry:
+            The new active site geometry, as a molecule or as an (N, 3) array
+            in Angstrom. Ordered like the active site, not like the topology.
+        :param active_site:
+            The active site the geometry belongs to. Not modified.
+        :param binding_modes:
+            The binding modes to check. Not modified.
+        :param connectivity_matrix:
+            The connectivity matrix to check. Not modified.
+
+        :return:
+            The tuple of the binding modes, the connectivity matrix and the
+            flag that is True when the coordination changed.
+        """
+
+        self._check_supported_metals(binding_modes['metals'],
+                                     'update_binding_modes')
+
+        if isinstance(geometry, Molecule):
+            coordinates = geometry.get_coordinates_in_angstrom()
+        else:
+            coordinates = np.asarray(geometry, dtype=float)
+
+        atom_map = active_site['atom_map']
+
+        assert_msg_critical(
+            len(coordinates) == len(atom_map),
+            'MetalSiteForceFieldBuilder.update_binding_modes: the geometry '
+            f'has {len(coordinates)} atoms while the active site has '
+            f'{len(atom_map)}')
+
+        # a capping hydrogen is mapped to the CA it replaces, so its position
+        # must not be read back as that CA's
+        cap_atoms = {
+            atom_map[site_index]
+            for site_index in active_site['cap_indices']
+        }
+        site_of = {
+            top_index: site_index
+            for site_index, top_index in atom_map.items()
+            if top_index not in cap_atoms
+        }
+
+        atoms = list(topology.atoms())
+        candidates = [atoms[top_index] for top_index in sorted(site_of)]
+
+        notes = []
+        new_ligands = self._collect_ligands(
+            candidates, lambda index: coordinates[site_of[index]],
+            binding_modes['metals'], notes)
+
+        def coordination(ligands):
+            return {
+                ligand['index']: (ligand['mode'], tuple(ligand['metals']))
+                for ligand in ligands
+            }
+
+        old_coordination = coordination(binding_modes['ligands'])
+        new_coordination = coordination(new_ligands)
+
+        old_ligands = {
+            ligand['index']: ligand
+            for ligand in binding_modes['ligands']
+        }
+        new_by_index = {ligand['index']: ligand for ligand in new_ligands}
+
+        # measured over the bonds the argument recorded, so that a contact
+        # the update drops still contributes the distance it moved
+        shifts = []
+        for ligand in binding_modes['ligands']:
+            assert_msg_critical(
+                ligand['index'] in site_of,
+                'MetalSiteForceFieldBuilder.update_binding_modes: ligand atom '
+                f'{ligand["residue"]} {ligand["atom"]} is not part of the '
+                'active site the geometry belongs to')
+            lig_index = site_of[ligand['index']]
+            for metal_index, distance in zip(ligand['metals'],
+                                             ligand['distances']):
+                moved = float(
+                    np.linalg.norm(coordinates[lig_index] -
+                                   coordinates[site_of[metal_index]]))
+                shifts.append(abs(moved - distance))
+
+        largest_shift = max(shifts) if shifts else 0.0
+
+        if new_coordination == old_coordination:
+            self._print_binding_mode_update([], largest_shift)
+            return binding_modes, connectivity_matrix, False
+
+        changes = []
+        for index in sorted(set(old_coordination) | set(new_coordination)):
+            old = old_ligands.get(index)
+            new = new_by_index.get(index)
+
+            if old is None:
+                changes.append(
+                    ('gained', f'{new["residue"]} {new["atom"]}',
+                     f'{self._metal_contact_label(new, binding_modes)}, '
+                     f'{new["mode"]}'))
+            elif new is None:
+                changes.append(
+                    ('lost', f'{old["residue"]} {old["atom"]}', 'was '
+                     f'{self._metal_contact_label(old, binding_modes)}, '
+                     f'{old["mode"]}'))
+            elif old_coordination[index] != new_coordination[index]:
+                detail = []
+                if old['mode'] != new['mode']:
+                    detail.append(f'{old["mode"]} -> {new["mode"]}')
+                if old['metals'] != new['metals']:
+                    detail.append(self._metal_contact_label(new, binding_modes))
+                changes.append(('changed', f'{new["residue"]} {new["atom"]}',
+                                ', '.join(detail)))
+
+        # a residue that lost every contact is still part of the truncated
+        # active site, and only a new extraction can take it out
+        dropped_residues = sorted({
+            ligand['residue']
+            for ligand in binding_modes['ligands']
+            if ligand['index'] not in new_by_index
+        } - {ligand['residue']
+             for ligand in new_ligands})
+
+        self._print_binding_mode_update(changes, largest_shift,
+                                        dropped_residues)
+
+        new_binding_modes = {
+            'metals': deepcopy(binding_modes['metals']),
+            'ligands': new_ligands,
+            'variants': deepcopy(binding_modes.get('variants', {})),
+            'cutoffs': {
+                'primary': self.metal_bond_cutoff,
+                'secondary': self.report_cutoff,
+            },
+            'notes': notes,
+        }
+
+        # only the metal-ligand bonds are read off the geometry, so the
+        # covalent bonds of the matrix are left exactly as they were
+        new_matrix = np.array(connectivity_matrix, copy=True)
+
+        for ligands, value in ((binding_modes['ligands'], 0), (new_ligands, 1)):
+            for ligand in ligands:
+                lig_index = site_of[ligand['index']]
+                for metal_index in ligand['metals']:
+                    metal = site_of[metal_index]
+                    new_matrix[metal, lig_index] = value
+                    new_matrix[lig_index, metal] = value
+
+        self._print_binding_modes(new_binding_modes)
+
+        return new_binding_modes, new_matrix, True
+
+    @staticmethod
+    def _metal_contact_label(ligand, binding_modes):
+        """
+        Names the metals a contact reaches and how far away they are.
+
+        :param ligand:
+            The ligand contact.
+        :param binding_modes:
+            The binding modes, for the elements of the metals.
+
+        :return:
+            The formatted contact, such as 'Zn4 2.11 A'.
+        """
+
+        elements = {
+            metal['index']: metal['element']
+            for metal in binding_modes['metals']
+        }
+
+        return ', '.join(
+            f'{elements.get(index, "metal")}{index} {distance:.2f} A'
+            for index, distance in zip(ligand['metals'], ligand['distances']))
+
     @staticmethod
     def extract_pairs(connectivity_matrix,
                       source_atoms,
@@ -1641,7 +1855,8 @@ class MetalSiteForceFieldBuilder:
         assert_msg_critical(
             charges.shape == (n_atoms, ),
             f'MetalSiteForceFieldBuilder: partial_charges has shape '
-            f'{charges.shape} but the extracted active site has {n_atoms} atoms')
+            f'{charges.shape} but the extracted active site has {n_atoms} atoms'
+        )
 
         total = float(np.sum(charges))
         expected = active_site['charge']
@@ -2373,9 +2588,8 @@ class MetalSiteForceFieldBuilder:
         self._print_mm_optimization(active_site, forcefield, relaxed,
                                     frozen_indices)
 
-        self._save_intermediate(
-            self.MM_GEOMETRY_FILE,
-            lambda path: relaxed.write_xyz_file(str(path)))
+        self._save_intermediate(self.MM_GEOMETRY_FILE,
+                                lambda path: relaxed.write_xyz_file(str(path)))
 
         return relaxed
 
@@ -2860,14 +3074,75 @@ class MetalSiteForceFieldBuilder:
                 atoms = ', '.join(ligand['atom'] for ligand in row)
                 distances = ', '.join(f'{d:.2f}' for ligand in row
                                       for d in ligand['distances'])
-                modes = '/'.join(
-                    dict.fromkeys(ligand['mode'] for ligand in row))
+                modes = '/'.join(dict.fromkeys(ligand['mode']
+                                               for ligand in row))
                 valstr = '{:>10} {:>9} | {:>18} | {:>16}'.format(
                     row[0]['residue'], atoms, distances, modes)
                 self.ostream.print_header(valstr)
 
         for note in binding_modes['notes']:
             self.ostream.print_warning(note)
+
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def _print_binding_mode_update(self,
+                                   changes,
+                                   largest_shift,
+                                   dropped_residues=None):
+        """
+        Prints what re-detecting the coordination on a new geometry did.
+
+        :param changes:
+            The list of (kind, atom, detail) tuples describing the contacts
+            that were gained, lost or reclassified. Empty when the coordination
+            is unchanged.
+        :param largest_shift:
+            The largest change in Angstrom that the recorded metal-ligand
+            bonds underwent.
+        :param dropped_residues:
+            The residues that no longer coordinate at all.
+        """
+
+        self.ostream.print_blank()
+        self.ostream.print_header('Coordination update')
+        self.ostream.print_header(19 * '-')
+        self.ostream.print_header(
+            self._param('largest bond change', f'{largest_shift:.2f} A'))
+
+        if not changes:
+            self.ostream.print_header(self._param('coordination', 'unchanged'))
+            self.ostream.print_blank()
+            self.ostream.print_info(
+                'The new geometry gives the same coordination sphere; the '
+                'binding modes and the connectivity matrix are kept as they '
+                'are.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+            return
+
+        self.ostream.print_header(self._param('contacts changed', len(changes)))
+        self.ostream.print_blank()
+
+        valstr = '{:>10} {:>12} | {:>46}'.format('change', 'atom', 'detail')
+        self.ostream.print_header(valstr)
+        self.ostream.print_header(72 * '-')
+
+        for kind, atom, detail in changes:
+            self.ostream.print_header('{:>10} {:>12} | {:>46}'.format(
+                kind, atom, detail))
+
+        self.ostream.print_blank()
+        self.ostream.print_info(
+            'The binding modes and the connectivity matrix were updated to '
+            'the new geometry. Overwrite the ones you hold, or the fit will '
+            'use a coordination the geometry no longer has.')
+
+        for residue in dropped_residues or []:
+            self.ostream.print_warning(
+                f'{residue} no longer coordinates a metal, but it is still '
+                'part of the truncated active site; extract the active site '
+                'again to leave it out')
 
         self.ostream.print_blank()
         self.ostream.flush()
@@ -2990,29 +3265,29 @@ class MetalSiteForceFieldBuilder:
             self._param('frozen atoms', len(frozen_indices)))
         self.ostream.print_header(
             self._param(
-                'metal centers', 'frozen'
-                if set(metals) <= set(frozen_indices) else 'free'))
+                'metal centers',
+                'frozen' if set(metals) <= set(frozen_indices) else 'free'))
         self.ostream.print_header(
             self._param(
                 'iteration limit', self.mm_max_iterations
                 if self.mm_max_iterations > 0 else 'convergence'))
         self.ostream.print_header(
-            self._param('metal bonds', f'{len(bonds)}, k = '
-                        f'{self.default_metal_bond_force_constant:.0f}'))
+            self._param(
+                'metal bonds', f'{len(bonds)}, k = '
+                f'{self.default_metal_bond_force_constant:.0f}'))
         self.ostream.print_header(
             self._param(
                 'metal angles', f'{len(angles)}, k = '
                 f'{self.default_metal_angle_force_constant:.0f}'
                 if self.reparameterize_metal_angles else 'left untouched'))
         self.ostream.print_header(
-            self._param(
-                'bond equilibria', 'given'
-                if self.metal_bond_equilibria else 'measured'))
+            self._param('bond equilibria',
+                        'given' if self.metal_bond_equilibria else 'measured'))
         if self.reparameterize_metal_angles:
             self.ostream.print_header(
                 self._param(
-                    'angle equilibria', 'given'
-                    if self.metal_angle_equilibria else 'measured'))
+                    'angle equilibria',
+                    'given' if self.metal_angle_equilibria else 'measured'))
         self.ostream.print_blank()
 
         valstr = '{:>12} {:>8} | {:>10} | {:>9} | {:>8}'.format(
