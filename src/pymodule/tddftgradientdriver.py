@@ -330,6 +330,16 @@ class TddftGradientDriver(GradientDriver):
             The results of the RPA or TDA calculation.
         """
 
+        assert_msg_critical(
+            not self._scf_drv._cpcm,
+            f'{type(self).__name__}.compute_analytical: ' +
+            'Analytical TDDFT gradient is not supported with CPCM solvation')
+        assert_msg_critical(
+            not self._scf_drv._gostshyp,
+            f'{type(self).__name__}.compute_analytical: ' +
+            'Analytical TDDFT gradient is not supported with GOSTSHYP ' +
+            '(hydrostatic pressure)')
+
         scf_tensors = self._scf_drv.scf_tensors
         if self._rsp_results is None:
             self._rsp_results = rsp_results
