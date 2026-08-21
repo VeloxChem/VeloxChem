@@ -3597,32 +3597,19 @@ class ScfDriver:
         else:
             self.ostream.print_blank()
             if self._dft:
-                if self._gostshyp:
-                    valstr = '{} | {} | {} | {} | {} | {} | {}'.format(
-                        'Iter.', '   Kohn-Sham Energy', 'Energy Change',
-                        'Gradient Norm', 'Max. Gradient', 'Density Change',
-                        'Neg. Amplitudes')
-                else:
-                    valstr = '{} | {} | {} | {} | {} | {}'.format(
-                        'Iter.', '   Kohn-Sham Energy', 'Energy Change',
-                        'Gradient Norm', 'Max. Gradient', 'Density Change')
-                self.ostream.print_header(valstr)
+                ename = '   Kohn-Sham Energy'
             else:
-                if self._gostshyp:
-                    valstr = '{} | {} | {} | {} | {} | {} | {}'.format(
-                        'Iter.', 'Hartree-Fock Energy', 'Energy Change',
-                        'Gradient Norm', 'Max. Gradient', 'Density Change',
-                        'Neg. Amplitudes')
-                else:
-                    valstr = '{} | {} | {} | {} | {} | {}'.format(
-                        'Iter.', 'Hartree-Fock Energy', 'Energy Change',
-                        'Gradient Norm', 'Max. Gradient', 'Density Change')
-                self.ostream.print_header(valstr)
+                ename = 'Hartree-Fock Energy'
+
+            valstr = '{} | {} | {} | {} | {} | {}'.format(
+                'Iter.', ename, 'Energy Change',
+                'Gradient Norm', 'Max. Gradient', 'Density Change')
 
             if self._gostshyp:
-                self.ostream.print_header(110 * '-')
-            else:
-                self.ostream.print_header(92 * '-')
+                valstr += ' | Neg. Amplitudes'
+
+            self.ostream.print_header(valstr)
+            self.ostream.print_header(len(valstr) * '-')
 
     def _print_scf_finish(self, start_time):
         """
