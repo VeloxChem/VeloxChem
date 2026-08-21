@@ -1015,7 +1015,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
         return wn, c_ger, c_ung
 
     def _collapse_current_subspace(self, c_ger, c_ung, molecule, basis,
-                                   scf_results, eri_dict, dft_dict, pe_dict, profiler):
+                                   scf_results, eri_dict, dft_dict, pe_dict,
+                                   profiler):
         """
         Collapses the reduced space to retained Ritz vectors and rebuilds
         associated sigma data.

@@ -598,7 +598,8 @@ class C6Driver(LinearSolver):
             # creating new sigma and rho linear transformations
 
             self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
-                                scf_results, eri_dict, dft_dict, pe_dict, profiler)
+                                scf_results, eri_dict, dft_dict, pe_dict,
+                                profiler)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trial_in_hours = iter_in_hours / n_new_trials

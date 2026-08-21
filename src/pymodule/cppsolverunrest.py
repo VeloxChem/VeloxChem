@@ -606,7 +606,8 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
                 self._collapse_current_subspace(active_keys, current_solutions,
                                                 relative_residual_norm,
                                                 molecule, basis, scf_results,
-                                                eri_dict, dft_dict, pe_dict, profiler)
+                                                eri_dict, dft_dict, pe_dict,
+                                                profiler)
 
                 collapse_str = 'Collapsed reduced space: {:d}->{:d}'.format(
                     self.collapsed_from_dim, self.collapsed_to_dim)

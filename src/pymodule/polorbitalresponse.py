@@ -433,9 +433,11 @@ class PolOrbitalResponse(CphfSolver):
                 fock_gxc_ao_imre = None
 
             fock_ao_rhs_real = self._comp_lr_fock(dm_ao_rhs_real_list, molecule,
-                                                  basis, eri_dict, dft_dict, pe_dict, profiler)
+                                                  basis, eri_dict, dft_dict, pe_dict,
+                                                  profiler)
             fock_ao_rhs_imag = self._comp_lr_fock(dm_ao_rhs_imag_list, molecule,
-                                                  basis, eri_dict, dft_dict, pe_dict, profiler)
+                                                  basis, eri_dict, dft_dict, pe_dict,
+                                                  profiler)
 
             # calculate the RHS
             if self.rank == mpi_master():
@@ -913,9 +915,11 @@ class PolOrbitalResponse(CphfSolver):
                 fock_gxc_ao_imre = None
 
             fock_ao_rhs_real = self._comp_lr_fock(dm_ao_rhs_real_list, molecule,
-                                                  basis, eri_dict, dft_dict, pe_dict, profiler)
+                                                  basis, eri_dict, dft_dict, pe_dict,
+                                                  profiler)
             fock_ao_rhs_imag = self._comp_lr_fock(dm_ao_rhs_imag_list, molecule,
-                                                  basis, eri_dict, dft_dict, pe_dict, profiler)
+                                                  basis, eri_dict, dft_dict, pe_dict,
+                                                  profiler)
 
             # calculate the RHS
             if self.rank == mpi_master():
@@ -2701,7 +2705,8 @@ class PolOrbitalResponse(CphfSolver):
                 cphf_ao_list = None
 
             fock_cphf = self._comp_lr_fock(cphf_ao_list, molecule, basis,
-                                           eri_dict, dft_dict, pe_dict, profiler)
+                                           eri_dict, dft_dict, pe_dict,
+                                           profiler)
 
             # get Fock matrices from distributed arrays
             # Notes: fock_ao_rhs is a list with dof**2 matrices corresponding to
@@ -2979,7 +2984,8 @@ class PolOrbitalResponse(CphfSolver):
                 cphf_ao_list = None
 
             fock_cphf = self._comp_lr_fock(cphf_ao_list, molecule, basis,
-                                           eri_dict, dft_dict, pe_dict, profiler)
+                                           eri_dict, dft_dict, pe_dict,
+                                           profiler)
 
             # get Fock matrices from distributed arrays
             # Notes: fock_ao_rhs is a list with dof**2 matrices corresponding to
@@ -3264,9 +3270,11 @@ class PolOrbitalResponse(CphfSolver):
                 cphf_ao_list_imag = None
 
             fock_cphf_real = self._comp_lr_fock(cphf_ao_list_real, molecule, basis,
-                                                eri_dict, dft_dict, pe_dict, profiler)
+                                                eri_dict, dft_dict, pe_dict,
+                                                profiler)
             fock_cphf_imag = self._comp_lr_fock(cphf_ao_list_imag, molecule, basis,
-                                                eri_dict, dft_dict, pe_dict, profiler)
+                                                eri_dict, dft_dict, pe_dict,
+                                                profiler)
 
             # get Fock matrix intermediates from distributed arrays
             # Notes: fock_ao_rhs is a list with dof**2 matrices corresponding to
@@ -3602,9 +3610,11 @@ class PolOrbitalResponse(CphfSolver):
                 cphf_ao_list_imag = None
 
             fock_cphf_real = self._comp_lr_fock(cphf_ao_list_real, molecule, basis,
-                                                eri_dict, dft_dict, pe_dict, profiler)
+                                                eri_dict, dft_dict, pe_dict,
+                                                profiler)
             fock_cphf_imag = self._comp_lr_fock(cphf_ao_list_imag, molecule, basis,
-                                                eri_dict, dft_dict, pe_dict, profiler)
+                                                eri_dict, dft_dict, pe_dict,
+                                                profiler)
 
             # get Fock matrix intermediates from distributed arrays
             # Notes: fock_ao_rhs is a list with dof**2 matrices corresponding to
