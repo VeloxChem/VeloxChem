@@ -1,4 +1,5 @@
 from pathlib import Path
+import sys
 import numpy as np
 import pytest
 from mpi4py import MPI
@@ -214,3 +215,52 @@ class TestPointCharges:
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert lr_prop.rsp_driver.electric_field == field
+
+    def test_response_electric_field_conflict_warns(self, capsys):
+
+        # a different electric field in response settings is overwritten
+        # by the SCF value with a warning
+
+        mol, bas = self.get_molecule_and_basis()
+
+        scf_settings = {'conv_thresh': 1.0e-8}
+        rsp_settings = {'conv_thresh': 1.0e-5, 'frequencies': '0'}
+        method_settings = {'xcfun': 'hf'}
+        field = [0.0, 0.0, 0.001]
+        other_field = [0.0, 0.001, 0.0]
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.update_settings(scf_settings, method_settings)
+        scf_drv.electric_field = field
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, bas)
+
+        ostream = OutputStream(
+            sys.stdout if MPI.COMM_WORLD.Get_rank() == mpi_master() else None)
+
+        lr_prop = Polarizability(
+            rsp_settings, {'xcfun': 'hf', 'electric_field': other_field})
+        lr_prop.init_driver(MPI.COMM_WORLD, ostream)
+        lr_prop.compute(mol, bas, scf_results)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            # the SCF value wins
+            assert lr_prop.rsp_driver.electric_field == field
+
+        captured = capsys.readouterr()
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert 'electric_field' in captured.out
+            assert 'overwritten' in captured.out
+
+        # a matching field propagates silently
+        lr_prop_match = Polarizability(
+            rsp_settings, {'xcfun': 'hf', 'electric_field': field})
+        lr_prop_match.init_driver(MPI.COMM_WORLD, ostream)
+        lr_prop_match.compute(mol, bas, scf_results)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert lr_prop_match.rsp_driver.electric_field == field
+
+        captured = capsys.readouterr()
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert 'overwritten' not in captured.out

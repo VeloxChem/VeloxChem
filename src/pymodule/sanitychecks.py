@@ -69,9 +69,44 @@ def molecule_sanity_check(mol, method_type=None, caller_name=None):
     assert_msg_critical(mol.check_proximity(0.1), 'Molecule: Atoms too close')
 
 
+def _warn_if_environment_overwritten(obj, key, scf_value):
+    """
+    Warns if an environment setting explicitly specified in response
+    settings differs from the value used in SCF and will be overwritten
+    by it.
+
+    :param obj:
+        The object (response driver) that is being updated.
+    :param key:
+        The environment setting name.
+    :param scf_value:
+        The value from the SCF results.
+    """
+
+    rsp_value = getattr(obj, key, None)
+
+    if rsp_value is None:
+        return
+
+    if (isinstance(rsp_value, (list, tuple)) or
+            isinstance(scf_value, (list, tuple)) or
+            hasattr(rsp_value, 'shape') or
+            hasattr(scf_value, 'shape')):
+        differs = (tuple(rsp_value) != tuple(scf_value))
+    else:
+        differs = (rsp_value != scf_value)
+
+    if differs:
+        warn_msg = f"The '{key}' in response settings differs from the "
+        warn_msg += 'value used in SCF and will be overwritten: '
+        warn_msg += str(scf_value)
+        obj.ostream.print_warning(warn_msg)
+        obj.ostream.flush()
+
+
 def scf_results_sanity_check(obj, scf_results):
     """
-    Checks SCF results for ERI, DFT and PE information.
+    Checks SCF results and inherits method and environment settings.
 
     :param obj:
         The object (response driver) that is being updated.
@@ -102,20 +137,27 @@ def scf_results_sanity_check(obj, scf_results):
                 updated_scf_info['restart'] = scf_results['restart']
 
         if scf_results.get('xcfun', None) is not None:
-            # do not overwrite xcfun if it is already specified
+            # do not overwrite xcfun if it is already specified: a different
+            # functional in response is a deliberate method choice (e.g. HF
+            # ground state with DFT response)
             if obj.xcfun is None:
                 updated_scf_info['xcfun'] = scf_results['xcfun']
                 if 'grid_level' in scf_results:
                     updated_scf_info['grid_level'] = scf_results['grid_level']
 
         if scf_results.get('potfile', None) is not None:
-            # do not overwrite potfile if it is already specified
-            if obj.potfile is None:
-                updated_scf_info['potfile'] = scf_results['potfile']
+            # the environment is inherited from SCF; a different potfile in
+            # response settings is overwritten with a warning
+            _warn_if_environment_overwritten(obj, 'potfile',
+                                             scf_results['potfile'])
+            updated_scf_info['potfile'] = scf_results['potfile']
 
         if scf_results.get('solvation_model', None) is not None:
-            # do not overwrite solvation_model if it is already specified
-            if hasattr(obj, 'solvation_model') and obj.solvation_model is None:
+            # the environment is inherited from SCF; a different solvation
+            # model in response settings is overwritten with a warning
+            if hasattr(obj, 'solvation_model'):
+                _warn_if_environment_overwritten(
+                    obj, 'solvation_model', scf_results['solvation_model'])
                 for key in [
                         'solvation_model',
                         'cpcm_epsilon',
@@ -127,9 +169,8 @@ def scf_results_sanity_check(obj, scf_results):
                     updated_scf_info[key] = scf_results[key]
 
         if scf_results.get('pressure', None) is not None:
-            # TODO: double check
-            # pressure can be overwritten to enable response pressure scans
-            # without restarting SCF
+            # the environment (including GOSTSHYP pressure) is inherited
+            # from SCF; response cannot override it
             for key in [
                     'pressure',
                     'pressure_units',
@@ -143,7 +184,10 @@ def scf_results_sanity_check(obj, scf_results):
                     updated_scf_info[key] = scf_results[key]
 
         if scf_results.get('electric_field', None) is not None:
-            # always propagate electric_field
+            # the environment is inherited from SCF; a different electric
+            # field in response settings is overwritten with a warning
+            _warn_if_environment_overwritten(obj, 'electric_field',
+                                             scf_results['electric_field'])
             updated_scf_info['electric_field'] = scf_results['electric_field']
 
     updated_scf_info = obj.comm.bcast(updated_scf_info, root=mpi_master())
