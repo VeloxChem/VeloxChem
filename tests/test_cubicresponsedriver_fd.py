@@ -1,4 +1,5 @@
 from mpi4py import MPI
+import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import mpi_master
@@ -13,7 +14,8 @@ from veloxchem.cubicresponsedriver import CubicResponseDriver
 @pytest.mark.timeconsuming
 class TestCrfFD:
 
-    def run_crf_fd(self, xcfun_label, basis_set_label, components, freqs):
+    def run_crf_fd(self, xcfun_label, basis_set_label, components, freqs,
+                   point_charges=None):
 
         comm = MPI.COMM_WORLD
         ostream = OutputStream(None)
@@ -40,6 +42,18 @@ class TestCrfFD:
         scfdrv = ScfRestrictedDriver(comm, ostream)
         scfdrv.update_settings(scf_settings, method_settings)
         scf_result = scfdrv.compute(molecule, basis)
+
+        if point_charges is not None:
+            # rerun the SCF with the point-charge environment; the response
+            # drivers then inherit the environment through the SCF reference
+            # (orbitals and Fock matrix), since the static point-charge
+            # potential does not enter the response equations directly
+            scf_result_vacuum = scf_result
+            scfdrv.point_charges = point_charges
+            scf_result = scfdrv.compute(molecule, basis)
+            if MPI.COMM_WORLD.Get_rank() == mpi_master():
+                assert abs(scf_result['scf_energy'] -
+                           scf_result_vacuum['scf_energy']) > 1.0e-3
 
         # CRF
 
@@ -121,6 +135,19 @@ class TestCrfFD:
             gamma_0 = -crf_result[('crf', wb, wc, 0)].real
             assert abs(-crf_result[('crf', wb, wc, 0)].imag) < 1.0e-6
 
+        if point_charges is not None:
+            # check that the point-charge environment changes the response
+            crf_vacuum = CubicResponseDriver(comm, ostream)
+            crf_vacuum.update_settings(rsp_settings, method_settings)
+            crf_result_vacuum = crf_vacuum.compute(molecule, basis,
+                                                   scf_result_vacuum)
+            if MPI.COMM_WORLD.Get_rank() == mpi_master():
+                gamma_0_vacuum = -crf_result_vacuum[('crf', wb, wc, 0)].real
+                assert abs(-crf_result_vacuum[('crf', wb, wc,
+                                               0)].imag) < 1.0e-6
+                assert abs(gamma_0 - gamma_0_vacuum) > 1.0e-2 * abs(
+                    gamma_0_vacuum)
+
         qrf_settings = {
             'conv_thresh': rsp_conv_thresh,
             'a_component': a,
@@ -146,6 +173,8 @@ class TestCrfFD:
 
         scf_drv_plus = ScfRestrictedDriver(comm, ostream)
         scf_drv_plus.update_settings(scf_settings, method_dict_plus)
+        if point_charges is not None:
+            scf_drv_plus.point_charges = point_charges
         scf_result_plus = scf_drv_plus.compute(molecule, basis)
 
         qrf_plus = QuadraticResponseDriver(comm, ostream)
@@ -154,6 +183,8 @@ class TestCrfFD:
 
         scf_drv_minus = ScfRestrictedDriver(comm, ostream)
         scf_drv_minus.update_settings(scf_settings, method_dict_minus)
+        if point_charges is not None:
+            scf_drv_minus.point_charges = point_charges
         scf_result_minus = scf_drv_minus.compute(molecule, basis)
 
         qrf_minus = QuadraticResponseDriver(comm, ostream)
@@ -180,6 +211,22 @@ class TestCrfFD:
     def test_gga_hyb_crf_fd(self):
 
         self.run_crf_fd('b3lyp', 'def2-tzvp', 'zyyz', [0.11, -0.3, 0.05])
+
+    def test_gga_hyb_pc_crf_fd(self):
+
+        # point-charge environment (positions in bohr, charges in e); strong
+        # enough to clearly change the response vs. vacuum, but weak enough
+        # that the finite-difference test retains its accuracy
+        point_charges = np.array([
+            # x, y, z, q, sigma, epsilon
+            [3.0, 2.0, 1.0, 0.10, 0.0, 0.0],
+            [-3.0, -2.0, -1.0, -0.10, 0.0, 0.0],
+            [0.0, 0.0, 3.5, 0.06, 0.0, 0.0],
+            [2.5, -2.5, 0.0, -0.06, 0.0, 0.0],
+        ]).T
+
+        self.run_crf_fd('b3lyp', 'def2-tzvp', 'zyyz', [0.11, -0.3, 0.05],
+                        point_charges)
 
     def test_gga_rsh_crf_fd(self):
 
