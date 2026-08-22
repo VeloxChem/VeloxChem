@@ -184,6 +184,7 @@ class NonlinearSolver:
                 'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
+                'electric_field': ('seq_fixed', 'static electric field'),
             },
         }
 
@@ -293,10 +294,14 @@ class NonlinearSolver:
                 assert_msg_critical(False, errmsg)
 
         if self.electric_field is not None:
-            errmsg = 'NonlinearSolver: The \'electric field\' keyword is not '
-            errmsg += 'supported in nonlinear response calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
+            assert_msg_critical(
+                len(self.electric_field) == 3,
+                'NonlinearSolver: Expecting 3 values in \'electric field\' '
+                'input')
+            # disable restart of calculation with static electric field since
+            # checkpoint file does not contain information about the electric
+            # field
+            self.restart = False
 
         if self.pressure != 0.0:
             errmsg = 'NonlinearSolver: The \'pressure\' keyword is not supported '
