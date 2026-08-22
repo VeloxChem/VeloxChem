@@ -186,7 +186,6 @@ class TestPointCharges:
             assert not hasattr(lr_prop_pc.rsp_driver, 'point_charges')
             assert not hasattr(lr_prop_pc_nokey.rsp_driver, 'point_charges')
 
-    @pytest.mark.timeconsuming
     def test_linear_response_with_electric_field(self):
 
         # electric_field is inherited from SCF results, and only indirectly

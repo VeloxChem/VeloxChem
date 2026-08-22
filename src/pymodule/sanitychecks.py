@@ -32,6 +32,7 @@
 
 from pathlib import Path
 import json
+import numpy as np
 
 from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import parse_xc_func
@@ -88,11 +89,11 @@ def _warn_if_environment_overwritten(obj, key, scf_value):
     if rsp_value is None:
         return
 
-    if (isinstance(rsp_value, (list, tuple)) or
-            isinstance(scf_value, (list, tuple)) or
-            hasattr(rsp_value, 'shape') or
-            hasattr(scf_value, 'shape')):
-        differs = (tuple(rsp_value) != tuple(scf_value))
+    if isinstance(rsp_value, np.ndarray) or isinstance(scf_value, np.ndarray):
+        differs = not np.array_equal(rsp_value, scf_value)
+    elif (isinstance(rsp_value, (list, tuple)) and
+            isinstance(scf_value, (list, tuple))):
+        differs = (list(rsp_value) != list(scf_value))
     else:
         differs = (rsp_value != scf_value)
 
@@ -138,8 +139,7 @@ def scf_results_sanity_check(obj, scf_results):
 
         if scf_results.get('xcfun', None) is not None:
             # do not overwrite xcfun if it is already specified: a different
-            # functional in response is a deliberate method choice (e.g. HF
-            # ground state with DFT response)
+            # functional in response will not be rejected
             if obj.xcfun is None:
                 updated_scf_info['xcfun'] = scf_results['xcfun']
                 if 'grid_level' in scf_results:
@@ -171,24 +171,32 @@ def scf_results_sanity_check(obj, scf_results):
         if scf_results.get('pressure', None) is not None:
             # the environment (including GOSTSHYP pressure) is inherited
             # from SCF; response cannot override it
-            for key in [
-                    'pressure',
-                    'pressure_units',
-                    'gostshyp_num_lebedev_points',
-                    'gostshyp_tssf',
-                    'gostshyp_discretization',
-                    'gostshyp_switching_thresh',
-                    'gostshyp_r_ext',
-            ]:
-                if key in scf_results:
-                    updated_scf_info[key] = scf_results[key]
+            if hasattr(obj, 'pressure'):
+                # warn only for explicitly set pressures: 0.0 is the default
+                if obj.pressure != 0.0:
+                    _warn_if_environment_overwritten(obj, 'pressure',
+                                                     scf_results['pressure'])
+                    _warn_if_environment_overwritten(obj, 'pressure_units',
+                                                     scf_results['pressure_units'])
+                for key in [
+                        'pressure',
+                        'pressure_units',
+                        'gostshyp_num_lebedev_points',
+                        'gostshyp_tssf',
+                        'gostshyp_discretization',
+                        'gostshyp_switching_thresh',
+                        'gostshyp_r_ext',
+                ]:
+                    if key in scf_results:
+                        updated_scf_info[key] = scf_results[key]
 
         if scf_results.get('electric_field', None) is not None:
             # the environment is inherited from SCF; a different electric
             # field in response settings is overwritten with a warning
-            _warn_if_environment_overwritten(obj, 'electric_field',
-                                             scf_results['electric_field'])
-            updated_scf_info['electric_field'] = scf_results['electric_field']
+            if hasattr(obj, 'electric_field'):
+                _warn_if_environment_overwritten(obj, 'electric_field',
+                                                 scf_results['electric_field'])
+                updated_scf_info['electric_field'] = scf_results['electric_field']
 
     updated_scf_info = obj.comm.bcast(updated_scf_info, root=mpi_master())
 
