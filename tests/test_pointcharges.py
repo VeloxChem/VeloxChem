@@ -9,6 +9,8 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.scfgradientdriver import ScfGradientDriver
+from veloxchem.rsppolarizability import Polarizability
+from veloxchem.outputstream import OutputStream
 from veloxchem.errorhandler import VeloxChemError
 
 
@@ -115,3 +117,100 @@ class TestPointCharges:
         with pytest.raises(VeloxChemError,
                            match='qm_vdw_params: Invalid data on line 2'):
             scf_drv.compute(mol, bas)
+
+    def test_linear_response_with_point_charges(self):
+
+        # point_charges only indirectly affect response
+
+        mol, bas = self.get_molecule_and_basis()
+
+        here = Path(__file__).parent
+        potfile = str(here / 'data' / 'pe_water.pot')
+
+        ref_energy_vac = -75.9610148052
+        ref_energy_pc = -75.9798409316
+        ref_alpha_zz_vac = 4.9696841693
+        ref_alpha_zz_pc = 4.7783688210
+
+        scf_settings = {'conv_thresh': 1.0e-8}
+        rsp_settings = {'conv_thresh': 1.0e-5, 'frequencies': '0'}
+        method_settings = {'xcfun': 'hf'}
+        method_settings_pc = {'xcfun': 'hf', 'point_charges': potfile}
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.update_settings(scf_settings, method_settings)
+        scf_drv.ostream.mute()
+        scf_results_vac = scf_drv.compute(mol, bas)
+
+        scf_drv_pc = ScfRestrictedDriver()
+        scf_drv_pc.update_settings(scf_settings, method_settings)
+        scf_drv_pc.point_charges = potfile
+        scf_drv_pc.ostream.mute()
+        scf_results_pc = scf_drv_pc.compute(mol, bas)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert 'point_charges' in scf_results_pc
+            assert abs(scf_results_vac['scf_energy'] -
+                       ref_energy_vac) < 1.0e-8
+            assert abs(scf_results_pc['scf_energy'] -
+                       ref_energy_pc) < 1.0e-8
+
+        lr_prop_vac = Polarizability(rsp_settings, method_settings)
+        lr_prop_vac.init_driver(MPI.COMM_WORLD, OutputStream(None))
+        lr_prop_vac.compute(mol, bas, scf_results_vac)
+
+        # point_charges in the response method settings is ignored
+        lr_prop_pc = Polarizability(rsp_settings, method_settings_pc)
+        lr_prop_pc.init_driver(MPI.COMM_WORLD, OutputStream(None))
+        lr_prop_pc.compute(mol, bas, scf_results_pc)
+
+        lr_prop_pc_nokey = Polarizability(rsp_settings, method_settings)
+        lr_prop_pc_nokey.init_driver(MPI.COMM_WORLD, OutputStream(None))
+        lr_prop_pc_nokey.compute(mol, bas, scf_results_pc)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            alpha_zz_vac = -lr_prop_vac.get_property(
+                'response_functions')[('z', 'z', 0)]
+            alpha_zz_pc = -lr_prop_pc.get_property(
+                'response_functions')[('z', 'z', 0)]
+            alpha_zz_pc_nokey = -lr_prop_pc_nokey.get_property(
+                'response_functions')[('z', 'z', 0)]
+
+            assert abs(alpha_zz_vac - ref_alpha_zz_vac) < 1.0e-6
+            assert abs(alpha_zz_pc - ref_alpha_zz_pc) < 1.0e-6
+            assert abs(alpha_zz_pc_nokey - ref_alpha_zz_pc) < 1.0e-6
+
+            # the response solver carries no point_charges attribute
+            assert not hasattr(lr_prop_vac.rsp_driver, 'point_charges')
+            assert not hasattr(lr_prop_pc.rsp_driver, 'point_charges')
+            assert not hasattr(lr_prop_pc_nokey.rsp_driver, 'point_charges')
+
+    @pytest.mark.timeconsuming
+    def test_linear_response_with_electric_field(self):
+
+        # electric_field is inherited from SCF results, and only indirectly
+        # affect response
+
+        mol, bas = self.get_molecule_and_basis()
+
+        scf_settings = {'conv_thresh': 1.0e-8}
+        rsp_settings = {'conv_thresh': 1.0e-5, 'frequencies': '0'}
+        method_settings = {'xcfun': 'hf'}
+        field = [0.0, 0.0, 0.001]
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.update_settings(scf_settings, method_settings)
+        scf_drv.electric_field = field
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, bas)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert 'electric_field' in scf_results
+            assert scf_results['electric_field'] == field
+
+        lr_prop = Polarizability(rsp_settings, method_settings)
+        lr_prop.init_driver(MPI.COMM_WORLD, OutputStream(None))
+        lr_prop.compute(mol, bas, scf_results)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert lr_prop.rsp_driver.electric_field == field

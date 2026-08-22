@@ -298,10 +298,6 @@ class NonlinearSolver:
                 len(self.electric_field) == 3,
                 'NonlinearSolver: Expecting 3 values in \'electric field\' '
                 'input')
-            # disable restart of calculation with static electric field since
-            # checkpoint file does not contain information about the electric
-            # field
-            self.restart = False
 
         if self.pressure != 0.0:
             errmsg = 'NonlinearSolver: The \'pressure\' keyword is not supported '

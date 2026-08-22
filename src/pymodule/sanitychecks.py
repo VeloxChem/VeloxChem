@@ -142,6 +142,10 @@ def scf_results_sanity_check(obj, scf_results):
                 if key in scf_results:
                     updated_scf_info[key] = scf_results[key]
 
+        if scf_results.get('electric_field', None) is not None:
+            # always propagate electric_field
+            updated_scf_info['electric_field'] = scf_results['electric_field']
+
     updated_scf_info = obj.comm.bcast(updated_scf_info, root=mpi_master())
 
     for key, val in updated_scf_info.items():
@@ -701,7 +705,7 @@ def solvation_model_sanity_check(obj):
             'polarizable embedding')
 
         assert_msg_critical(
-            obj.point_charges is None,
+            getattr(obj, 'point_charges', None) is None,
             type(obj).__name__ +
             ': The \'solvation_model\' option is incompatible with ' +
             'point charges')

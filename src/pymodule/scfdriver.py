@@ -572,10 +572,6 @@ class ScfDriver:
                 not self._pe,
                 'SCF driver: \'electric field\' input is incompatible with ' +
                 'polarizable embedding')
-            # disable restart of calculation with static electric field since
-            # checkpoint file does not contain information about the electric
-            # field
-            self.restart = False
 
         if self.point_charges is not None:
             assert_msg_critical(
@@ -2168,6 +2164,8 @@ class ScfDriver:
                     self._scf_results['point_charges'] = self.point_charges
                 if self.qm_vdw_params is not None:
                     self._scf_results['qm_vdw_params'] = self.qm_vdw_params
+                if self.electric_field is not None:
+                    self._scf_results['electric_field'] = self.electric_field
 
                 if self.solvation_model is not None:
                     for key in [

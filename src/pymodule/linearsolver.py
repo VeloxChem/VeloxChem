@@ -151,9 +151,6 @@ class LinearSolver:
         # static electric field
         self.electric_field = None
 
-        # point charges
-        self.point_charges = None
-
         # solvation model
         self.solvation_model = None
         self.non_equilibrium_solv = True
@@ -410,10 +407,6 @@ class LinearSolver:
                 not self._pe,
                 'LinearSolver: \'electric field\' input is incompatible ' +
                 'with polarizable embedding')
-            # disable restart of calculation with static electric field since
-            # checkpoint file does not contain information about the electric
-            # field
-            self.restart = False
 
     def _get_response_keywords(self):
         """
