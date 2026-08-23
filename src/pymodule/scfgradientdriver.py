@@ -426,13 +426,11 @@ class ScfGradientDriver(GradientDriver):
         if self.scf_driver._gostshyp:
             from .gostshypdriver import GostshypDriver
 
-            self._gostshyp_drv = GostshypDriver(molecule,
-                                                basis,
-                                                self.scf_driver.pressure,
-                                                self.scf_driver.pressure_units,
-                                                self.scf_driver.gostshyp_tco_tol,
-                                                self.comm,
-                                                self.ostream)
+            self._gostshyp_drv = GostshypDriver(self.comm, self.ostream)
+            self._gostshyp_drv.init(molecule, basis,
+                                    self.scf_driver.pressure,
+                                    self.scf_driver.pressure_units,
+                                    self.scf_driver.gostshyp_tco_tol)
 
             tessellation_settings = {'num_lebedev_points'   : self.scf_driver.gostshyp_num_lebedev_points,
                                      'tssf'             : self.scf_driver.gostshyp_tssf,

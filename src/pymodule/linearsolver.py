@@ -167,7 +167,7 @@ class LinearSolver:
 
         # gostshyp setup
         self._gostshyp = False
-        self.gostshyp_drv = None
+        self._gostshyp_drv = None
         self.pressure = 0.0
         self.pressure_units = 'MPa'
         self.gostshyp_num_lebedev_points = 110
@@ -733,13 +733,9 @@ class LinearSolver:
                 tco_tol = None
             tco_tol = self.comm.bcast(tco_tol, root=mpi_master())
 
-            self.gostshyp_drv = GostshypDriver(molecule,
-                                               basis,
-                                               self.pressure,
-                                               self.pressure_units,
-                                               tco_tol,
-                                               self.comm,
-                                               self.ostream)
+            self._gostshyp_drv = GostshypDriver(self.comm, self.ostream)
+            self._gostshyp_drv.init(molecule, basis, self.pressure,
+                                    self.pressure_units, tco_tol)
 
             self._gostshyp_tess_info = {'num_lebedev_points'   : self.gostshyp_num_lebedev_points,
                                         'tssf'             : self.gostshyp_tssf,
@@ -761,7 +757,7 @@ class LinearSolver:
             self._gostshyp_gs_density = self.comm.bcast(
                 gs_density, root=mpi_master())
 
-            self._gostshyp_neg_amps = self.gostshyp_drv.num_neg_amp
+            self._gostshyp_neg_amps = self._gostshyp_drv.num_neg_amp
 
         else:
             self._gostshyp_tess_info = None
@@ -2173,7 +2169,7 @@ class LinearSolver:
                 dm = dens[idx]
 
                 # Note: only closed shell density for now
-                fock_gost = self.gostshyp_drv.gostshyp_resp_contrib(gs_dm * 2.0,
+                fock_gost = self._gostshyp_drv.gostshyp_rsp_contrib(gs_dm * 2.0,
                                                                     dm * 2.0,
                                                                     tessellation_settings)
 
@@ -2421,7 +2417,7 @@ class LinearSolver:
 
             for idx in range(num_densities):
 
-                fock_gost = self.gostshyp_drv.gostshyp_resp_contrib(gs_dm_a + gs_dm_b,
+                fock_gost = self._gostshyp_drv.gostshyp_rsp_contrib(gs_dm_a + gs_dm_b,
                                                                     dens_a[idx] + dens_b[idx],
                                                                     tessellation_settings)
 

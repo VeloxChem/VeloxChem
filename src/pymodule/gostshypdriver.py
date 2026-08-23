@@ -53,16 +53,6 @@ class GostshypDriver:
     Implements the GOSTSHYP method for applying hydrostatic pressure to a
     molecular system.
 
-    :param molecule:
-        The molecule.
-    :param basis:
-        The AO basis set.
-    :param pressure:
-        The applied hydrostatic pressure in the units given by pressure_units.
-    :param pressure_units:
-        The units of the given pressure.
-    :param tco_tol:
-        The screening threshold for the three-center overlap integrals.
     :param comm:
         The MPI communicator.
     :param ostream:
@@ -82,10 +72,9 @@ class GostshypDriver:
         - ostream: The output stream.
     """
 
-    def __init__(self, molecule, basis, pressure, pressure_units,
-                 tco_tol, comm=None, ostream=None):
+    def __init__(self, comm=None, ostream=None):
         """
-        Initializes the GOSTSHYP method for applying hydrostatic pressure.
+        Initializes the GOSTSHYP driver.
         """
 
         if comm is None:
@@ -97,23 +86,45 @@ class GostshypDriver:
             else:
                 ostream = OutputStream(None)
 
+        # mpi information
+        self.comm = comm
+        self.rank = comm.Get_rank()
+        self.nodes = comm.Get_size()
+
+        # output stream
+        self.ostream = ostream
+
+        # GOSTSHYP setup
+        self.molecule = None
+        self.basis = None
+        self.pressure_au = None
+        self.num_tes_points = 0
+        self.tessellation = None
+        self.num_neg_amp = 0
+        self.tco_tol = None
+
+    def init(self, molecule, basis, pressure, pressure_units, tco_tol):
+        """
+        Initializes the GOSTSHYP method for applying hydrostatic pressure.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param pressure:
+            The applied hydrostatic pressure in the units given by pressure_units.
+        :param pressure_units:
+            The units of the given pressure.
+        :param tco_tol:
+            The screening threshold for the three-center overlap integrals.
+        """
+
         self.molecule = molecule
         self.basis = basis
 
         # GOSTSHYP setup
         self.pressure_au = self.parse_pressure_units(pressure, pressure_units)
-        self.num_tes_points = 0
-        self.tessellation = None
-        self.num_neg_amp = 0
         self.tco_tol = tco_tol
-
-        # mpi information
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.nodes = self.comm.Get_size()
-
-        # output stream
-        self.ostream = ostream
 
     def gostshyp_contrib(self, den_mat, tessellation_settings=None):
         """
@@ -233,7 +244,7 @@ class GostshypDriver:
 
         return e_pr, V_pr
 
-    def gostshyp_resp_contrib(self, gs_den_mat, trans_den_mat, tessellation_settings=None):
+    def gostshyp_rsp_contrib(self, gs_den_mat, trans_den_mat, tessellation_settings=None):
         """
         Computes linear response contributions as energy derivative
         wrt to two density matrix elements.
