@@ -73,7 +73,8 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
 from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            ri_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check, gostshyp_sanity_check)
+                           solvation_model_sanity_check, gostshyp_sanity_check,
+                           environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import screened_eigh
 from .checkpoint import write_cpcm_charges, read_cpcm_charges
@@ -580,6 +581,10 @@ class ScfDriver:
                 'with polarizable embedding')
             # Note: we allow restarting SCF with point charges
 
+        # check pairwise compatibility of the environment settings
+        # (only 'electric_field' + 'point_charges' is supported)
+        environment_compatibility_sanity_check(self)
+
     def read_settings(self, checkpoint_file):
         """
         Reads SCF and method settings from checkpoint file.
@@ -715,6 +720,10 @@ class ScfDriver:
 
         # check GOSTSHYP setup
         gostshyp_sanity_check(self, basis)
+
+        # check pairwise compatibility of the environment settings
+        # (only 'electric_field' + 'point_charges' is supported)
+        environment_compatibility_sanity_check(self)
 
         if self._cpcm:
             assert_msg_critical(

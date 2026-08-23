@@ -824,6 +824,71 @@ def solvation_model_sanity_check(obj):
         obj._smd = False
 
 
+def environment_compatibility_sanity_check(obj):
+    """
+    Checks the pairwise compatibility of the environment settings.
+
+    The environment settings are: ``potfile`` (polarizable embedding),
+    ``solvation_model`` (C-PCM / SMD), ``pressure`` (GOSTSHYP),
+    ``electric_field`` and ``point_charges``. Each setting can be used
+    individually. The only supported combination is ``electric_field``
+    together with ``point_charges``: both are static one-electron terms
+    with no mutual response loop. All other combinations are rejected,
+    because the density-coupled response loops of the other environments
+    (induced dipoles, surface charges, pressure potential) are not
+    supported in combination.
+
+    The helper is intended to be reusable: it only relies on the driver
+    attributes that declare the five settings (all queried with
+    ``getattr``), so it can be called from any driver that carries them,
+    e.g. after the environment sanity checks in ``ScfDriver``.
+
+    :param obj:
+        The driver.
+    """
+
+    has_pe = (bool(getattr(obj, '_pe', False)) or
+              bool(getattr(obj, 'potfile', None)))
+    has_cpcm = getattr(obj, 'solvation_model', None) is not None
+    pressure = getattr(obj, 'pressure', 0.0)
+    has_gostshyp = (bool(getattr(obj, '_gostshyp', False)) or
+                    (pressure is not None and pressure != 0.0))
+    has_field = getattr(obj, 'electric_field', None) is not None
+    has_pc = getattr(obj, 'point_charges', None) is not None
+
+    if has_field:
+        assert_msg_critical(
+            len(obj.electric_field) == 3,
+            f"{type(obj).__name__}: Expecting 3 values in "
+            "'electric field' input")
+
+    names = []
+    if has_pe:
+        names.append("'potfile' (polarizable embedding)")
+    if has_cpcm:
+        names.append("'solvation_model'")
+    if has_gostshyp:
+        names.append("'pressure' (GOSTSHYP)")
+    if has_field:
+        names.append("'electric_field'")
+    if has_pc:
+        names.append("'point_charges'")
+
+    if len(names) <= 1:
+        return
+
+    if has_field and has_pc and len(names) == 2:
+        # the only supported combination: two static one-electron terms
+        return
+
+    err_msg = f"{type(obj).__name__}: Incompatible environment settings: "
+    err_msg += ', '.join(names) + '. '
+    err_msg += "Environment settings can only be used individually; the "
+    err_msg += "only supported combination is 'electric_field' with "
+    err_msg += "'point_charges'."
+    assert_msg_critical(False, err_msg)
+
+
 def write_pe_jsonfile(molecule, potfile):
     """
     Writes potential json file for PyFraME.
