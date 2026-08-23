@@ -663,64 +663,16 @@ class TessellationDriver:
 
     def update_num_points(self):
         """
-        Checks if requested number of points is valid and updates it to
+        Checks if the requested number of points is valid and updates it to
         the closest valid one if necessary.
+
+        :return:
+            The number of Lebedev points that will be used.
         """
 
-        # the available grids in the C++ class:
-        num_points_avail = np.array(
-                              [6, 50, 110, 194, 302, 434, 590, 770, 974, 2030])
-
-        if self.num_leb_points not in num_points_avail:
-            warn_text = '*** Warning: Requested number of '
-            warn_text += str(self.num_leb_points)
-            warn_text += ' points for the Lebedev grid is invalid.'
-
-            self.ostream.print_header(warn_text.ljust(97))
-
-            warn_text = '***' + ' ' * 10
-            warn_text += 'Valid numbers of grid points are: '
-            warn_text += '6, 50, 110, 194, 302, 434, 590, 770, 974 and 2030.'
-
-            self.ostream.print_header(warn_text.ljust(97))
-
-            self.num_leb_points = num_points_avail[np.abs(
-                              num_points_avail - self.num_leb_points).argmin()]
-
-            warn_text = '***' + ' ' * 10
-            warn_text += 'A number of '
-            warn_text += str(self.num_leb_points)
-            warn_text += ' points is used instead as the closest valid number.'
-
-            self.ostream.print_header(warn_text.ljust(97))
-            self.ostream.print_blank()
-
-            self.ostream.flush()
-
-        if (self.num_leb_points == 2030 and self.discretization.lower() == 'iswig'):
-            warn_text = '*** Warning: Requested number of '
-            warn_text += str(self.num_leb_points)
-            warn_text += ' points for the Lebedev grid is invalid with ISWIG.'
-
-            self.ostream.print_header(warn_text.ljust(97))
-
-            warn_text = '***' + ' ' * 10
-            warn_text += 'Valid numbers of grid points are: '
-            warn_text += '6, 50, 110, 194, 302, 434, 590, 770 and 974.'
-
-            self.ostream.print_header(warn_text.ljust(97))
-
-            self.num_leb_points = 974
-
-            warn_text = '***' + ' ' * 10
-            warn_text += 'A number of '
-            warn_text += str(self.num_leb_points)
-            warn_text += ' points is used instead as the closest valid number.'
-
-            self.ostream.print_header(warn_text.ljust(97))
-            self.ostream.print_blank()
-
-            self.ostream.flush()
+        self.num_leb_points = validate_num_leb_points(self.num_leb_points,
+                                                      self.discretization,
+                                                      self.ostream)
 
         return self.num_leb_points
 
@@ -764,7 +716,7 @@ class TessellationDriver:
             x, y, z = grid_in_angstrom[i]
             grid_xyz_string += f'He {x} {y} {z}\n'
 
-        v = p3d.view(width=2500, height=800)
+        v = p3d.view(width=600, height=600)
 
         v.addModel(molecule.get_xyz_string(), 'xyz')
         v.setStyle({'stick': {}})
@@ -779,3 +731,64 @@ class TessellationDriver:
 
         v.zoomTo()
         v.show()
+
+def validate_num_leb_points(num_leb_points, discretization='fixed', ostream=None):
+    """
+    Checks that the requested number of Lebedev points is available and
+    returns the closest valid alternative if it is not.
+
+    :param num_leb_points:
+        The requested number of Lebedev points per sphere.
+    :param discretization:
+        The surface discretization method.
+    :param ostream:
+        The output stream used for warnings; no warning is printed if None.
+
+    :return:
+        The valid number of Lebedev points.
+    """
+
+    def print_warning(header, valid_points, new_value):
+        if ostream is None:
+            return
+        ostream.print_header(header.ljust(97))
+        warn_text = '***' + ' ' * 10 + 'Valid numbers of grid points are: '
+        warn_text += ', '.join(str(p) for p in valid_points[:-1])
+        warn_text += f' and {valid_points[-1]}.'
+        ostream.print_header(warn_text.ljust(97))
+        warn_text = '***' + ' ' * 10 + f'A number of {new_value} points is '
+        warn_text += 'used instead as the closest valid number.'
+        ostream.print_header(warn_text.ljust(97))
+        ostream.print_blank()
+        ostream.flush()
+
+    # the Lebedev grids available in the C++ class
+    NUM_LEB_POINTS_AVAILABLE = (6, 50, 110, 194, 302, 434, 590, 770, 974, 2030)
+
+    # ISWIG is not parameterized for the smallest and largest grid
+    NUM_LEB_POINTS_ISWIG_AVAILABLE = (50, 110, 194, 302, 434, 590, 770, 974)
+
+    num_leb_points = int(num_leb_points)
+    available = np.array(NUM_LEB_POINTS_AVAILABLE)
+    available_iswig = np.array(NUM_LEB_POINTS_ISWIG_AVAILABLE)
+    is_iswig = str(discretization).lower() == 'iswig'
+
+    # snap to the closest available grid
+    if num_leb_points not in available:
+        closest = int(available[np.abs(available - num_leb_points).argmin()])
+        print_warning(
+            f'*** Warning: Requested number of {num_leb_points} points '
+            'for the Lebedev grid is invalid.',
+            NUM_LEB_POINTS_AVAILABLE, closest)
+        num_leb_points = closest
+
+    # check for combination of smallest and largest grid with iswig
+    if is_iswig and num_leb_points not in NUM_LEB_POINTS_ISWIG_AVAILABLE:
+        closest = int(available_iswig[np.abs(available_iswig - num_leb_points).argmin()])
+        print_warning(
+            f'*** Warning: Requested number of {num_leb_points} points '
+            'for the Lebedev grid is invalid with ISWIG.',
+            NUM_LEB_POINTS_ISWIG_AVAILABLE, closest)
+        num_leb_points = closest
+
+    return num_leb_points

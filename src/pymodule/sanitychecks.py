@@ -666,6 +666,11 @@ def gostshyp_sanity_check(obj, basis=None):
 
         obj._pressure_in_input_units = obj.pressure
 
+        from .tessellation import validate_num_leb_points
+        obj.num_leb_points = validate_num_leb_points(obj.num_leb_points,
+                                                     obj.discretization,
+                                                     obj.ostream)
+
         if basis is not None:
         
             # check max angular momentum of basis 
