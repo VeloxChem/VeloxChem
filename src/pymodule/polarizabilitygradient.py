@@ -53,6 +53,7 @@ from .matrices import Matrices
 from .inputparser import parse_input
 from .profiler import Profiler
 from .dftutils import get_default_grid_level
+from .errorhandler import assert_msg_critical
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, polgrad_sanity_check_1, polgrad_sanity_check_2)
 
@@ -264,6 +265,34 @@ class PolarizabilityGradient:
         :param lr_results:
             The results of the linear response calculation.
         """
+
+        # The analytical polarizability gradient is implemented for the
+        # vacuum only: all environment settings are rejected here.
+        assert_msg_critical(
+            not self._scf_drv._cpcm,
+            f'{type(self).__name__}.compute_analytical: '
+            'Analytical polarizability gradient is not supported with '
+            'CPCM/SMD solvation')
+        assert_msg_critical(
+            not self._scf_drv._gostshyp,
+            f'{type(self).__name__}.compute_analytical: '
+            'Analytical polarizability gradient is not supported with '
+            'GOSTSHYP (hydrostatic pressure)')
+        assert_msg_critical(
+            not self._scf_drv._pe,
+            f'{type(self).__name__}.compute_analytical: '
+            'Analytical polarizability gradient is not supported with '
+            'polarizable embedding')
+        assert_msg_critical(
+            self._scf_drv.electric_field is None,
+            f'{type(self).__name__}.compute_analytical: '
+            'Analytical polarizability gradient is not supported with a '
+            'static electric field')
+        assert_msg_critical(
+            self._scf_drv.point_charges is None,
+            f'{type(self).__name__}.compute_analytical: '
+            'Analytical polarizability gradient is not supported with '
+            'point charges')
 
         # profiling
         profiler = Profiler({
