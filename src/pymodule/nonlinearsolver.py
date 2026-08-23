@@ -47,6 +47,7 @@ from .fockdriver import FockDriver
 from .linearsolver import LinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import dft_sanity_check, ri_sanity_check
+from .sanitychecks import nonlinear_response_environment_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords, print_attributes
 from .dftutils import get_default_grid_level
@@ -287,29 +288,7 @@ class NonlinearSolver:
 
         dft_sanity_check(self, 'update_settings', 'nonlinear')
 
-        if self.potfile is not None:
-            errmsg = 'NonlinearSolver: The \'potfile\' keyword is not supported '
-            errmsg += 'in nonlinear response calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
-
-        if self.electric_field is not None:
-            assert_msg_critical(
-                len(self.electric_field) == 3,
-                'NonlinearSolver: Expecting 3 values in \'electric field\' '
-                'input')
-
-        if self.pressure != 0.0:
-            errmsg = 'NonlinearSolver: The \'pressure\' keyword is not supported '
-            errmsg += 'in nonlinear response calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
-
-        if self.solvation_model is not None:
-            errmsg = 'NonlinearSolver: The \'solvation_model\' keyword is not '
-            errmsg += 'supported in nonlinear response calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
+        nonlinear_response_environment_sanity_check(self)
 
     def _init_eri(self, molecule, basis):
         """

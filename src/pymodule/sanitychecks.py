@@ -221,6 +221,49 @@ def scf_results_sanity_check(obj, scf_results):
             obj.ostream.flush()
 
 
+def nonlinear_response_environment_sanity_check(obj):
+    """
+    Checks environment settings in nonlinear response drivers.
+
+    Solvation, pressure and polarizable embedding are not supported in
+    nonlinear response calculations. The settings are rejected here whether
+    they were set explicitly or inherited from the SCF results, so that an
+    unsupported environment is never silently ignored.
+
+    :param obj:
+        The nonlinear response driver.
+    """
+
+    if obj.potfile is not None:
+        errmsg = "NonlinearSolver: The 'potfile' keyword is not supported "
+        errmsg += 'in nonlinear response calculation.'
+        if obj.rank == mpi_master():
+            assert_msg_critical(False, errmsg)
+
+    if obj.solvation_model is not None:
+        errmsg = "NonlinearSolver: The 'solvation_model' keyword is not "
+        errmsg += 'supported in nonlinear response calculation.'
+        if obj.rank == mpi_master():
+            assert_msg_critical(False, errmsg)
+
+    if obj.pressure != 0.0:
+        errmsg = "NonlinearSolver: The 'pressure' keyword is not supported "
+        errmsg += 'in nonlinear response calculation.'
+        if obj.rank == mpi_master():
+            assert_msg_critical(False, errmsg)
+
+    if obj.electric_field is not None:
+        # the electric field is supported: it is a static one-electron term
+        # that enters the calculation through the SCF; only validate it
+        assert_msg_critical(
+            len(obj.electric_field) == 3,
+            "NonlinearSolver: Expecting 3 values in 'electric field' "
+            'input')
+
+    # point charges are also supported: they enter the calculation through
+    # the SCF as a static one-electron term, with no driver attribute
+
+
 def rsp_results_solvation_sanity_check(obj, rsp_results):
     """
     Checks response results for C-PCM information.
