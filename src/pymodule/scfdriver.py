@@ -582,7 +582,6 @@ class ScfDriver:
             # Note: we allow restarting SCF with point charges
 
         # check pairwise compatibility of the environment settings
-        # (only 'electric_field' + 'point_charges' is supported)
         environment_compatibility_sanity_check(self)
 
     def read_settings(self, checkpoint_file):
@@ -722,7 +721,6 @@ class ScfDriver:
         gostshyp_sanity_check(self, basis)
 
         # check pairwise compatibility of the environment settings
-        # (only 'electric_field' + 'point_charges' is supported)
         environment_compatibility_sanity_check(self)
 
         if self._cpcm:

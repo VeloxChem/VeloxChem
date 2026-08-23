@@ -39,7 +39,8 @@ from .distributedarray import DistributedArray
 from .lrsolverbase import LinearResponseSolverBase
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check, gostshyp_sanity_check)
+                           solvation_model_sanity_check, gostshyp_sanity_check,
+                           environment_compatibility_sanity_check)
 from .mathutils import safe_solve
 from .checkpoint import check_rsp_hdf5
 from .resultsio import (clear_group_in_hdf5, write_rsp_full_solution_to_hdf5,
@@ -126,6 +127,9 @@ class LinearResponseSolver(LinearResponseSolverBase):
 
         # check GOSTSHYP setup
         gostshyp_sanity_check(self)
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
 
         # check print level (verbosity of output)
         self.print_level = max(1, min(self.print_level, 3))

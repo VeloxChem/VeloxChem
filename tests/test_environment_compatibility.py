@@ -9,6 +9,7 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.errorhandler import VeloxChemError
 from veloxchem.sanitychecks import environment_compatibility_sanity_check
 
@@ -290,3 +291,59 @@ class TestEnvironmentCompatibility:
             assert np.isfinite(scf_results['scf_energy'])
             assert 'electric_field' in scf_results
             assert 'point_charges' in scf_results
+
+    # ------------------------------------------------------------------
+    # integration tests through linear response drivers
+    # (explicitly set response environments survive the SCF inheritance
+    # when the SCF results do not carry those keys, so the response
+    # drivers must enforce the same compatibility rule themselves)
+    # ------------------------------------------------------------------
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_lr_update_settings_rejects_cpcm_with_electric_field(self):
+
+        lr_drv = LinearResponseEigenSolver()
+        lr_drv.ostream.mute()
+
+        with pytest.raises(VeloxChemError,
+                           match='Incompatible environment settings'):
+            lr_drv.update_settings(
+                {}, {'solvation_model': 'cpcm',
+                     'electric_field': [0.0, 0.0, 1.0e-4]})
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_lr_compute_rejects_cpcm_with_electric_field(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        # empty scf results: no environment is inherited from SCF, so the
+        # explicitly set response environment is what is being checked
+        scf_results = {}
+
+        lr_drv = LinearResponseEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.solvation_model = 'cpcm'
+        lr_drv.electric_field = [0.0, 0.0, 1.0e-4]
+
+        with pytest.raises(VeloxChemError,
+                           match='Incompatible environment settings'):
+            lr_drv.compute(molecule, basis, scf_results)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_lr_compute_rejects_gostshyp_with_electric_field(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        scf_results = {}
+
+        lr_drv = LinearResponseEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.pressure = 100.0
+        lr_drv.electric_field = [0.0, 0.0, 1.0e-4]
+
+        with pytest.raises(VeloxChemError,
+                           match='Incompatible environment settings'):
+            lr_drv.compute(molecule, basis, scf_results)

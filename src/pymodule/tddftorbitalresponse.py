@@ -44,7 +44,8 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check,
                            rsp_results_solvation_sanity_check,
-                           gostshyp_sanity_check)
+                           gostshyp_sanity_check,
+                           environment_compatibility_sanity_check)
 
 
 class TddftOrbitalResponse(CphfSolver):
@@ -177,6 +178,9 @@ class TddftOrbitalResponse(CphfSolver):
 
         # check GOSTSHYP setup
         gostshyp_sanity_check(self)
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
 
         # TODO: replace with a sanity check?
         if self.rank == mpi_master():
@@ -504,6 +508,9 @@ class TddftOrbitalResponse(CphfSolver):
 
         # check GOSTSHYP setup
         gostshyp_sanity_check(self)
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
 
         profiler = Profiler({
             'timing': self.timing,

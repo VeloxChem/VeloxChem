@@ -40,7 +40,8 @@ from .inputparser import parse_input
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check, gostshyp_sanity_check,
-                           polorbrsp_sanity_check_1, polorbrsp_sanity_check_2)
+                           polorbrsp_sanity_check_1, polorbrsp_sanity_check_2,
+                           environment_compatibility_sanity_check)
 from .oneeints import compute_electric_dipole_integrals
 from .distributedarray import DistributedArray
 from .profiler import Profiler
@@ -2562,6 +2563,9 @@ class PolOrbitalResponse(CphfSolver):
 
         # check GOSTSHYP setup
         gostshyp_sanity_check(self)
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
 
         if self.is_complex:
             return self.compute_omega_complex_red_dim(molecule, basis, scf_tensors,

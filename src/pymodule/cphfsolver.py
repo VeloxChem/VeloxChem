@@ -43,7 +43,8 @@ from .subcommunicators import SubCommunicators
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
-                           gostshyp_sanity_check, solvation_model_sanity_check)
+                           gostshyp_sanity_check, solvation_model_sanity_check,
+                           environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
 from .inputparser import parse_input
@@ -171,6 +172,9 @@ class CphfSolver(LinearSolver):
 
         # check GOSTSHYP setup
         gostshyp_sanity_check(self)
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
 
         assert_msg_critical(
             not self._gostshyp,
@@ -402,6 +406,9 @@ class CphfSolver(LinearSolver):
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)

@@ -58,7 +58,8 @@ from .oneeints import (compute_electric_dipole_integrals,
                        compute_angular_momentum_integrals)
 from .sanitychecks import (dft_sanity_check, ri_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check,
-                           gostshyp_sanity_check)
+                           gostshyp_sanity_check,
+                           environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel, unparse_input,
@@ -407,6 +408,9 @@ class LinearSolver:
                 not self._pe,
                 'LinearSolver: \'electric field\' input is incompatible ' +
                 'with polarizable embedding')
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
 
     def _get_response_keywords(self):
         """
