@@ -448,6 +448,22 @@ def write_lr_rsp_results_to_hdf5(fname, rsp_results):
                           replace_group=False)
 
 
+def write_descriptor_results_to_hdf5(fname, descriptor_results):
+    """
+    Writes descriptor results to HDF5 file.
+
+    :param fname:
+        Name of the HDF5 file.
+    :param descriptor_results:
+        The dictionary containing descriptor results.
+    """
+
+    write_results_to_hdf5(fname,
+                          'descriptor',
+                          descriptor_results,
+                          value_label='descriptor result')
+
+
 def write_detach_attach_to_hdf5(fname,
                                 state_label,
                                 dens_detach,
@@ -534,6 +550,20 @@ def read_results(fname, label):
                             label + " section not found in the checkpoint file.")
 
         return _read_value_from_hdf5(h5f[label], value_label='results')
+
+
+def read_descriptor_results(fname):
+    """
+    Read descriptor results from an HDF5 file.
+
+    :param fname:
+        Name of the HDF5 file.
+
+    :return:
+        The descriptor results dictionary.
+    """
+
+    return read_results(fname, 'descriptor')
 
 
 def read_molecule_and_basis(fname):

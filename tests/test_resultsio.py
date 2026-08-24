@@ -8,9 +8,12 @@ import pytest
 from veloxchem import (Molecule, MolecularBasis, OptimizationDriver, MpiTask,
                        OutputStream, ScfGradientDriver, ScfRestrictedDriver,
                        mpi_master)
+from veloxchem.descriptordriver import DescriptorDriver
 from veloxchem.cppsolver import ComplexResponseSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
-from veloxchem.resultsio import (read_results, write_results_to_hdf5,
+from veloxchem.resultsio import (read_descriptor_results, read_results,
+                                 write_descriptor_results_to_hdf5,
+                                 write_results_to_hdf5,
                                  write_scf_results_to_hdf5)
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.vibrationalanalysis import VibrationalAnalysis
@@ -325,6 +328,116 @@ def test_read_results_roundtrips_only_requested_group(tmp_path):
     assert isinstance(recovered['F'], tuple)
     np.testing.assert_allclose(recovered['F'][0], scf_results['F'][0])
     np.testing.assert_allclose(recovered['F'][1], scf_results['F'][1])
+
+
+def test_descriptor_results_hdf5_roundtrip_and_group_isolation(tmp_path):
+
+    if MPI.COMM_WORLD.Get_rank() != mpi_master():
+        return
+
+    class _DummyBasis:
+
+        @staticmethod
+        def get_label():
+            return 'def2-svpd'
+
+    class _DummyScfDrv:
+        xcfun = 'b3lyp'
+
+    h5file = Path(tmp_path) / 'descriptor_results.h5'
+    with h5py.File(h5file, 'w') as h5f:
+        scf_group = h5f.create_group('scf')
+        scf_group.attrs['value_type'] = 'dict'
+        scf_group.attrs['dict_storage'] = 'named'
+        energy = scf_group.create_dataset('scf_energy', data=-75.0)
+        energy.attrs['value_type'] = 'float'
+
+    descriptor_results = {
+        'IE_EA': {
+            0: {
+                'min_EA': 0.1,
+                'max_EA': 0.2,
+                'mean_EA': 0.15,
+                'std_EA': 0.01,
+                'n_points': 5,
+                'min_IE': 12.0,
+                'max_IE': 13.0,
+                'mean_IE': 12.5,
+                'std_IE': 0.2,
+            },
+            1: {
+                'min_EA': 0.3,
+                'max_EA': 0.4,
+                'mean_EA': 0.35,
+                'std_EA': 0.01,
+                'n_points': 6,
+                'min_IE': 11.0,
+                'max_IE': 12.0,
+                'mean_IE': 11.5,
+                'std_IE': 0.2,
+            },
+        },
+        'atomtypes': ['oh', 'ho'],
+        'log_p': -1.2,
+        'sasa': 33.4,
+        'RESP_charges': np.array([-0.8, 0.4, 0.4]),
+        'ie_surface_average': 12.1,
+        'ea_surface_average': 0.21,
+        'scf_results': {
+            'scf_energy': -75.0,
+        },
+    }
+
+    drv = DescriptorDriver()
+    drv.basis = _DummyBasis()
+    drv.scf_drv = _DummyScfDrv()
+    drv._write_final_hdf5(str(h5file), descriptor_results)
+
+    expected = drv._get_hdf5_results(descriptor_results)
+    recovered = read_descriptor_results(str(h5file))
+
+    _assert_roundtrip_equal(expected, recovered)
+
+    with h5py.File(h5file, 'r') as h5f:
+        assert 'scf' in h5f
+        assert h5f['scf/scf_energy'][()] == pytest.approx(-75.0)
+
+
+def test_write_descriptor_results_to_hdf5_writes_descriptor_group(tmp_path):
+
+    if MPI.COMM_WORLD.Get_rank() != mpi_master():
+        return
+
+    h5file = Path(tmp_path) / 'descriptor_group_only.h5'
+    with h5py.File(h5file, 'w'):
+        pass
+
+    descriptor_payload = {
+        'descriptor_schema_version': 1,
+        'summary': {
+            'log_p': -0.7,
+            'sasa': 25.0,
+            'ie_surface_average': 10.1,
+            'ea_surface_average': 0.9,
+        },
+        'per_atom': {
+            0: {'n_points': 10},
+        },
+        'atomtypes': ['c3'],
+        'resp_charges': np.array([0.0]),
+        'provenance': {
+            'main_basis_label': 'def2-svpd',
+            'main_xcfun': 'b3lyp',
+            'resp_basis_label': '6-31G*',
+            'logp_basis_label': 'def2-svp',
+            'logp_xcfun': 'b3lyp',
+        },
+    }
+
+    write_descriptor_results_to_hdf5(str(h5file), descriptor_payload)
+    recovered = read_descriptor_results(str(h5file))
+
+    _assert_roundtrip_equal(descriptor_payload, recovered)
 
 
 def test_read_results_roundtrips_tda_rsp_and_preserves_legacy_solution_vectors(

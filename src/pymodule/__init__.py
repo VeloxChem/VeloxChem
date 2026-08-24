@@ -241,7 +241,8 @@ from .oneeints import compute_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
 from .oneeints import compute_linear_momentum_integrals
 from .oneeints import compute_angular_momentum_integrals
-from .resultsio import read_molecule_and_basis, read_results
+from .resultsio import (read_descriptor_results, read_molecule_and_basis,
+                        read_results, write_descriptor_results_to_hdf5)
 
 # Environment variable: basis set path, number of OpenMP threads
 from .environment import (set_vlxbasispath, get_basis_path, set_vlxdatapath,

@@ -1,10 +1,14 @@
 """Driver for computing atom- and molecule-level QM/empirical descriptors."""
  
+from pathlib import Path
 from collections import defaultdict
 from typing import Any, Dict, Optional
  
 import numpy as np
 import veloxchem as vlx
+
+from .resultsio import (read_descriptor_results,
+                        write_descriptor_results_to_hdf5)
  
  
 # Unit conversion / physical constants used below.
@@ -32,6 +36,7 @@ class DescriptorDriver:
     """
  
     def __init__(self):
+        self.filename = None
         self.molecule = None       # molecule for descriptor calculation
         self.basis = None
         self.scf_drv = None
@@ -295,6 +300,65 @@ class DescriptorDriver:
         self.results_dict["ie_surface_average"] = np.mean(self.ie_values)
         self.results_dict["ea_surface_average"] = np.mean(self.ea_values)
         self.results_dict["scf_results"] = self.scf_results
+
+    def _get_hdf5_results(self, results: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Convert descriptor results to a compact HDF5 payload.
+
+        The full SCF result dictionary is intentionally omitted because SCF
+        data should already be stored under the scf group in shared files.
+        """
+
+        xcfun = getattr(self.scf_drv, "xcfun", None)
+        if xcfun is None:
+            main_xcfun = None
+        elif isinstance(xcfun, str):
+            main_xcfun = xcfun
+        else:
+            main_xcfun = xcfun.get_func_label()
+
+        return {
+            "descriptor_schema_version": 1,
+            "summary": {
+                "log_p": results["log_p"],
+                "sasa": results["sasa"],
+                "ie_surface_average": results["ie_surface_average"],
+                "ea_surface_average": results["ea_surface_average"],
+            },
+            "per_atom": results["IE_EA"],
+            "atomtypes": results["atomtypes"],
+            "resp_charges": results["RESP_charges"],
+            "provenance": {
+                "main_basis_label": self.basis.get_label(),
+                "main_xcfun": main_xcfun,
+                "resp_basis_label": self.resp_basis_label,
+                "logp_basis_label": self.logp_basis_label,
+                "logp_xcfun": self.logp_xcfun,
+            },
+        }
+
+    def _write_final_hdf5(self, fname: str, results: Dict[str, Any]):
+        """
+        Write descriptor results to an HDF5 file.
+
+        If the target file does not exist, create an empty file first and then
+        write/replace the descriptor group.
+        """
+
+        if not fname:
+            return
+
+        fpath = Path(fname).with_suffix(".h5")
+        fpath.touch(exist_ok=True)
+
+        write_descriptor_results_to_hdf5(str(fpath),
+                                         self._get_hdf5_results(results))
+
+    @staticmethod
+    def read_hdf5(fname: str) -> Dict[str, Any]:
+        """Read descriptor results from an HDF5 file."""
+
+        return read_descriptor_results(str(Path(fname).with_suffix(".h5")))
  
     def compute_descriptors(
         self,
@@ -327,6 +391,22 @@ class DescriptorDriver:
             See compile_results() for the keys included.
         """
         self.molecule = molecule
+
+        # Reset transient state so repeated calls on the same driver instance
+        # do not accumulate point/orbital arrays from previous runs.
+        self.molgrid = None
+        self.surface_points = None
+        self.point_atom_indices = None
+        self.occ_mo_points_amplitude = []
+        self.unocc_mo_points_amplitude = []
+        self.ea_values = []
+        self.ie_values = []
+        self.atomtypes = []
+        self.sasa = None
+        self.log_p = None
+        self.resp_charges = None
+        self.ea_ie_results = None
+        self.results_dict = {}
  
         if basis is None:
             basis = vlx.MolecularBasis.read(molecule, "def2-svpd")
@@ -359,6 +439,10 @@ class DescriptorDriver:
         self.compute_log_p_and_SASA()
  
         self.compile_results()
+
+        if self.filename is not None:
+            self._write_final_hdf5(self.filename, self.results_dict)
+
         return self.results_dict
 
 
