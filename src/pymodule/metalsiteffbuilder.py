@@ -111,11 +111,6 @@ class MetalSiteForceFieldBuilder:
         - partial_charges: Charges, or the path to a text file, to use instead
           of computing RESP charges. Falls back to partial_charges.txt in the
           working folder.
-        - forcefield: A force field generator, or the path to a JSON file
-          written by save_forcefield, to use instead of building and fitting
-          one. Falls back to forcefield.json in the working folder. The
-          Hessian is then not computed either, since fitting the metal terms
-          is the only thing it is for.
         - do_qm_optimization: The flag for optimizing the active site before the
           Hessian is computed.
         - do_mm_optimization: The flag for relaxing the active site on a crude
@@ -237,11 +232,19 @@ class MetalSiteForceFieldBuilder:
     HESSIAN_FILE = 'hessian.txt'
     CHARGES_FILE = 'partial_charges.txt'
     ENZYME_SYSTEM_FILE = 'enzyme_system.xml'
-    # written by compute() once the metal terms are fitted. The crude pre-QM
-    # pass builds a force field of its own and is deliberately not written
-    # here: it carries seeded force constants rather than fitted ones, and a
-    # later run picking it up would take it for the product of a fit
+    # written by compute() once the metal terms are fitted, for whatever
+    # comes after the run to read. Never read back by a run of its own: the
+    # fit is cheap next to everything that feeds it, and it belongs to the
+    # geometry it was made from. The crude pre-QM pass builds a force field
+    # of its own and is deliberately not written here, since it carries
+    # seeded force constants rather than fitted ones.
     FORCEFIELD_FILE = 'forcefield.json'
+
+    # Written into the comment of an atom by annotate_atoms, so that a force
+    # field on its own still says which atoms these are. The truncation is
+    # what knows it, and nothing about a bare force field and a geometry
+    # recovers it afterwards without guessing.
+    BETA_CARBON_COMMENT = 'beta carbon'
 
     # Literature equilibrium metal-ligand distances in nm. The crude pre-QM
     # pass measures its equilibrium values on the input geometry instead;
@@ -303,7 +306,6 @@ class MetalSiteForceFieldBuilder:
         self.optimized_geometry = None
         self.hessian = None
         self.partial_charges = None
-        self.forcefield = None
 
         # workflow
         self.do_qm_optimization = True
@@ -334,9 +336,7 @@ class MetalSiteForceFieldBuilder:
         self.mm_bond_change_warning = 0.25
         # Holding the metals as well keeps the metal-metal distance and the
         # shape of the site exactly as the structure had them, and lets the
-        # crude pass tidy up the ligands around a fixed frame. Off by default:
-        # without electrostatics the metals drift a little, and that drift is
-        # a reading on the seeded terms worth seeing.
+        # crude pass tidy up the ligands around a fixed frame.
         self.mm_constrain_metals = False
 
         # Whether compute() goes on to build a force field system for the
@@ -362,11 +362,11 @@ class MetalSiteForceFieldBuilder:
         beta carbons frozen, computes a pair-restricted Hessian and RESP
         charges, and fits the metal-ligand terms.
 
-        A geometry, Hessian, set of partial charges or force field supplied
-        through optimized_geometry, hessian, partial_charges or forcefield is
-        validated against the extracted active site and used in place of the
-        step that would have produced it. A supplied force field also skips the
-        Hessian, which exists only to fit the metal terms it already carries.
+        A geometry, Hessian or set of partial charges supplied through
+        optimized_geometry, hessian or partial_charges is validated against
+        the extracted active site and used in place of the step that would
+        have produced it. The force field is always fitted afresh from
+        whatever geometry and Hessian the run ends up with.
 
         :param structure:
             The path to a PDB or mmCIF file.
@@ -403,7 +403,6 @@ class MetalSiteForceFieldBuilder:
         geometry = self._resolve_optimized_geometry(active_site)
         hessian = self._resolve_hessian(active_site)
         charges = self._resolve_partial_charges(active_site)
-        forcefield = self._resolve_forcefield(active_site)
 
         # a supplied geometry is the geometry to work with, so there is
         # nothing for the crude pass to improve on
@@ -720,7 +719,7 @@ class MetalSiteForceFieldBuilder:
             'literature distances, formal charges and coordination rules have '
             'only been validated for zinc.')
 
-    def suggest_binding_modes(self, topology, positions):
+    def suggest_binding_modes(self, topology, positions, include_residue=None):
         """
         Proposes the coordination topology of the metal centers from geometry.
 
@@ -729,10 +728,21 @@ class MetalSiteForceFieldBuilder:
         be written to and read back from JSON and is meant to be reviewed before
         use. Everything downstream reads the dictionary, never the geometry.
 
+        include_residue is the same principle applied before the fact: a
+        residue named there is made a ligand of its nearest metal however far
+        away it sits, through its closest sidechain donor. That is how a
+        design whose ligand has not been placed properly yet, or a contact the
+        cutoffs are too tight for, gets into the active site. The request is
+        recorded in the dictionary, so update_binding_modes honours it too and
+        a relaxation cannot drop what was asked for.
+
         :param topology:
             The OpenMM topology.
         :param positions:
             The positions as an (N, 3) numpy array in Angstrom.
+        :param include_residue:
+            Residues that must be ligands whatever their distance, each given
+            as a residue id ('130' or 130) or as a residue label ('ASP130').
 
         :return:
             The binding modes dictionary.
@@ -769,10 +779,12 @@ class MetalSiteForceFieldBuilder:
 
         self._check_supported_metals(metals, 'suggest_binding_modes')
 
+        forced = self._resolve_residues(topology, include_residue)
+
         notes = []
         ligands = self._collect_ligands(topology.atoms(),
                                         lambda index: positions[index], metals,
-                                        notes)
+                                        notes, forced)
 
         binding_modes = {
             'metals': metals,
@@ -782,12 +794,13 @@ class MetalSiteForceFieldBuilder:
                 'primary': self.metal_bond_cutoff,
                 'secondary': self.report_cutoff,
             },
+            'include_residue': sorted(forced),
             'notes': notes,
         }
 
         return binding_modes
 
-    def _collect_ligands(self, atoms, position_of, metals, notes):
+    def _collect_ligands(self, atoms, position_of, metals, notes, forced=None):
         """
         Builds the classified ligand contact list of a set of candidate atoms.
 
@@ -806,12 +819,15 @@ class MetalSiteForceFieldBuilder:
             The metal entries of the binding modes.
         :param notes:
             The list of review notes. Appended to in place.
+        :param forced:
+            The residue indices that are ligands whatever their distance.
 
         :return:
             The list of ligand contacts, each carrying its mode.
         """
 
         metal_indices = [metal['index'] for metal in metals]
+        atoms = list(atoms)
         contacts = []
 
         for atom in atoms:
@@ -868,6 +884,9 @@ class MetalSiteForceFieldBuilder:
                     f'({self.report_cutoff}) cutoffs; review whether it '
                     'should be a ligand')
 
+        self._force_ligands(atoms, position_of, metal_indices, contacts, notes,
+                            forced)
+
         ligands = [contact for contact in contacts if contact['metals']]
 
         self._assign_binding_modes(ligands, notes, self.bidentate_asymmetry)
@@ -882,6 +901,155 @@ class MetalSiteForceFieldBuilder:
                     'check for a missing bridging ligand or water')
 
         return ligands
+
+    def _resolve_residues(self, topology, include_residue):
+        """
+        Turns the residues asked for into residue indices of the topology.
+
+        A request is matched against the residue id ('130' or 130) and against
+        the label the binding modes report ('ASP130'). A request that matches
+        nothing is an error rather than a silently ignored line, and one that
+        matches several residues - the same number in two chains - takes all
+        of them and says which.
+
+        :param topology:
+            The OpenMM topology.
+        :param include_residue:
+            The residues asked for, or None.
+
+        :return:
+            The residue indices, as a set.
+        """
+
+        if not include_residue:
+            return set()
+
+        if isinstance(include_residue, (str, int)):
+            include_residue = [include_residue]
+
+        residues = list(topology.residues())
+        forced = set()
+
+        for request in include_residue:
+            wanted = str(request).strip()
+            matched = [
+                residue for residue in residues
+                if wanted in (str(residue.id), f'{residue.name}{residue.id}')
+            ]
+
+            assert_msg_critical(
+                len(matched) > 0,
+                'MetalSiteForceFieldBuilder: include_residue asked for '
+                f'{request}, which is not a residue of this structure')
+
+            for residue in matched:
+                forced.add(residue.index)
+
+            found = ', '.join(f'{residue.name}{residue.id} '
+                              f'(chain {residue.chain.id})'
+                              for residue in matched)
+            self.ostream.print_info(
+                f'Including {found} in the coordination sphere by request.')
+
+        self.ostream.flush()
+
+        return forced
+
+    def _force_ligands(self, atoms, position_of, metal_indices, contacts, notes,
+                       forced):
+        """
+        Makes the residues asked for ligands of their nearest metal.
+
+        Only the closest sidechain donor of the residue is taken, and only
+        when the cutoffs have not already made one of its atoms a ligand:
+        a request is there to add coordination the distances missed, not to
+        add a second contact to a residue that already has one.
+
+        :param atoms:
+            The candidate atoms.
+        :param position_of:
+            The callable returning the position of an atom index.
+        :param metal_indices:
+            The indices of the metal centers.
+        :param contacts:
+            The contacts found so far. Appended to, and promoted in, in place.
+        :param notes:
+            The list of review notes. Appended to in place.
+        :param forced:
+            The residue indices that are ligands whatever their distance.
+        """
+
+        if not forced:
+            return
+
+        already = {
+            contact['res_index']
+            for contact in contacts if contact['metals']
+        }
+
+        for res_index in sorted(forced):
+            if res_index in already:
+                continue
+
+            donors = [
+                atom for atom in atoms
+                if atom.residue.index == res_index and atom.element is not None
+                and atom.element.symbol in self.DONOR_ELEMENTS
+                and atom.name not in self.BACKBONE_ATOM_NAMES
+                and atom.index not in metal_indices
+            ]
+
+            assert_msg_critical(
+                len(donors) > 0,
+                'MetalSiteForceFieldBuilder: include_residue asked for '
+                f'residue index {res_index}, whose sidechain has no '
+                f'{list(self.DONOR_ELEMENTS)} atom to coordinate with')
+
+            best = None
+            for atom in donors:
+                position = position_of(atom.index)
+                for metal in metal_indices:
+                    distance = float(
+                        np.linalg.norm(position - position_of(metal)))
+                    if best is None or distance < best[0]:
+                        best = (distance, atom, metal)
+
+            distance, atom, metal = best
+            label = f'{atom.residue.name}{atom.residue.id}'
+
+            notes.append(
+                f'{label} {atom.name} is {distance:.2f} A from a metal, '
+                f'beyond the primary cutoff ({self.metal_bond_cutoff}), and '
+                'was made a ligand because include_residue asked for it')
+
+            if distance > self.report_cutoff:
+                self.ostream.print_warning(
+                    f'{label} {atom.name} is {distance:.2f} A from its metal, '
+                    'which is a long way for a bond. It is a ligand because '
+                    'include_residue asked for it.')
+                self.ostream.flush()
+
+            existing = [
+                contact for contact in contacts
+                if contact['index'] == atom.index
+            ]
+
+            if existing:
+                # it was already reported as a near miss between the cutoffs
+                existing[0]['metals'] = [metal]
+                existing[0]['distances'] = [round(distance, 3)]
+                continue
+
+            contacts.append({
+                'residue': label,
+                'res_name': atom.residue.name,
+                'res_index': atom.residue.index,
+                'chain': atom.residue.chain.id,
+                'atom': atom.name,
+                'index': atom.index,
+                'metals': [metal],
+                'distances': [round(distance, 3)],
+            })
 
     @staticmethod
     def _assign_binding_modes(ligands, notes, bidentate_asymmetry=None):
@@ -1476,10 +1644,12 @@ class MetalSiteForceFieldBuilder:
         asymmetric carboxylate can open into a monodentate one, and a second
         oxygen can rotate onto a metal. The rules of suggest_binding_modes are
         applied again to the new coordinates so that what is fitted afterwards
-        is the coordination the geometry actually has.
+        is the coordination the geometry actually has. Residues that were
+        asked for through include_residue stay ligands, since a distance is
+        not what put them there.
         Nothing is modified in place, and the arguments themselves are returned
         when the coordination did not change, so the caller can overwrite what
-        it holds unconditionally and still compare by identity. 
+        it holds unconditionally and still compare by identity.
 
         :param topology:
             The protonated OpenMM topology, which the active site indexes into.
@@ -1532,7 +1702,8 @@ class MetalSiteForceFieldBuilder:
         notes = []
         new_ligands = self._collect_ligands(
             candidates, lambda index: coordinates[site_of[index]],
-            binding_modes['metals'], notes)
+            binding_modes['metals'], notes,
+            set(binding_modes.get('include_residue', [])))
 
         def coordination(ligands):
             return {
@@ -1869,40 +2040,6 @@ class MetalSiteForceFieldBuilder:
 
         return charges
 
-    def _resolve_forcefield(self, active_site):
-        """
-        Validates a force field supplied through the forcefield setting, or
-        left behind in the working folder by an earlier run.
-
-        :param active_site:
-            The active site, to validate against.
-
-        :return:
-            The force field generator, or None if there is nothing to use.
-        """
-
-        source = self.forcefield
-
-        if source is None:
-            source = self._folder_file(self.FORCEFIELD_FILE)
-            if source is None:
-                return None
-            self.ostream.print_info(
-                f'Reusing {self.FORCEFIELD_FILE} from {self.folder}.')
-            self.ostream.flush()
-
-        if isinstance(source, (str, Path)):
-            return self.load_forcefield(source, active_site)
-
-        self._check_forcefield(source, active_site)
-
-        # a generator built elsewhere carries its own molecule; one that has
-        # none is filled in rather than overwritten
-        if getattr(source, 'molecule', None) is None:
-            source.molecule = active_site['molecule']
-
-        return source
-
     def _get_scf_driver(self, molecule):
         """
         Returns the SCF driver and basis set for the active site
@@ -2207,6 +2344,8 @@ class MetalSiteForceFieldBuilder:
             for index in range(n_atoms):
                 forcefield.atoms[index]['charge'] = partial_charges[index]
 
+        self.annotate_atoms(forcefield, active_site)
+
         bonds, angles = self.get_metal_keys(forcefield, active_site)
 
         # switching the angles off has to leave them at whatever the generator
@@ -2343,6 +2482,37 @@ class MetalSiteForceFieldBuilder:
             'MetalSiteForceFieldBuilder: the elements of the force field do '
             'not match the extracted active site, so it describes a different '
             'structure')
+
+    def annotate_atoms(self, forcefield, active_site):
+        """
+        Writes what the truncation knows about an atom into its comment.
+
+        A force field carries atom types, charges and bonds, and a geometry
+        carries positions; neither of them says which carbon a sidechain was
+        cut at. That is known here, while the active site is still in hand,
+        and the comment is the one field that survives into forcefield.json
+        for anything downstream to read it back out of.
+
+        Comments the generator already wrote are kept, and running this twice
+        does not write the same note twice.
+
+        :param forcefield:
+            The force field generator to annotate.
+        :param active_site:
+            The active site, for the atoms the truncation created.
+        """
+
+        for index in active_site['beta_carbon_indices']:
+            atom = forcefield.atoms[index]
+            comment = atom.get('comment', '') or ''
+
+            if self.BETA_CARBON_COMMENT in comment:
+                continue
+
+            atom['comment'] = '; '.join(part
+                                        for part in (comment,
+                                                     self.BETA_CARBON_COMMENT)
+                                        if part)
 
     @staticmethod
     def _lookup_equilibrium(table, elements):

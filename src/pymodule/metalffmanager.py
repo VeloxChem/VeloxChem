@@ -31,8 +31,11 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
+from collections import Counter
+from itertools import permutations, product
 from pathlib import Path
 import numpy as np
+import math
 import sys
 
 from networkx.algorithms.isomorphism import GraphMatcher
@@ -191,8 +194,14 @@ class MetalForceFieldManager:
         # 16.8 degrees max over the angles of the same structure compared to
         # itself, and the thresholds have to clear that.
         self.ic_rmsd_thresholds = {
-            'bonds': {'rms': 0.05, 'max': 0.15},
-            'angles': {'rms': 5.0, 'max': 20.0},
+            'bonds': {
+                'rms': 0.05,
+                'max': 0.15
+            },
+            'angles': {
+                'rms': 5.0,
+                'max': 20.0
+            },
             'dihedrals': None,
         }
         self.metal_bond_tolerance = 0.25
@@ -435,16 +444,26 @@ class MetalForceFieldManager:
                 'given a charge of zero on every atom.')
             self.ostream.flush()
 
+        marker = MetalSiteForceFieldBuilder.BETA_CARBON_COMMENT
+        beta_carbon_indices = [
+            index for index, atom in forcefield.atoms.items()
+            if marker in (atom.get('comment', '') or '')
+        ]
+
         graph = self._graph(labels, forcefield.bonds.keys(), cap_indices)
+        description = self._describe_site(labels, graph, metal_indices,
+                                          cap_indices)
 
         return {
             'name': name,
+            'description': description,
             'forcefield': forcefield,
             'geometry': geometry,
             'geometry_kind': kind,
             'labels': labels,
             'metal_indices': metal_indices,
             'cap_indices': cap_indices,
+            'beta_carbon_indices': beta_carbon_indices,
             'charges': charges,
             'graph': graph,
             'folder': str(folder),
@@ -476,6 +495,191 @@ class MetalForceFieldManager:
             graph.add_edge(i, j)
 
         return graph
+
+    def _describe_site(self, labels, graph, metal_indices, cap_indices):
+        """
+        Describes a site at the two levels a comparison is made on.
+
+        The fine level is the atoms of each residue, where the bonding is
+        ordinary covalent chemistry. The coarse level is which residue
+        coordinates which metal, and nothing about how many atoms do the
+        coordinating: a carboxylate that grips one metal with one oxygen and
+        one that grips it with two are the same residue on the same metal, and
+        only the coarse level is allowed to have an opinion about metal bonds.
+
+        The residues are the connected components left once the metals are
+        taken out of the graph. That decomposition is untouched by how the
+        metal is gripped, which is the whole reason for splitting the
+        comparison in two.
+
+        :param labels:
+            The element of every atom.
+        :param graph:
+            The graph of the site.
+        :param metal_indices:
+            The indices of the metal centers.
+        :param cap_indices:
+            The indices of the capping hydrogens.
+
+        :return:
+            The description: the residues, their keys, the coarse graph and
+            the printable site spec.
+        """
+
+        sidechains = graph.copy()
+        sidechains.remove_nodes_from(metal_indices)
+
+        residues = []
+        for component in nx.connected_components(sidechains):
+            nodes = sorted(component)
+            residues.append({
+                'nodes':
+                nodes,
+                'formula':
+                self._formula(labels, nodes),
+                'key':
+                self._fragment_key(graph, nodes),
+                'metals':
+                sorted(metal for metal in metal_indices if any(
+                    graph.has_edge(metal, node) for node in nodes)),
+                'heavy':
+                self._heavy_subgraph(labels, graph, nodes),
+            })
+
+        coarse = nx.Graph()
+
+        for metal in metal_indices:
+            coarse.add_node(('metal', metal), kind='metal', key=labels[metal])
+
+        for index, residue in enumerate(residues):
+            node = ('residue', index)
+            coarse.add_node(node, kind='residue', key=residue['key'])
+            for metal in residue['metals']:
+                coarse.add_edge(node, ('metal', metal))
+
+        return {
+            'labels': labels,
+            'graph': graph,
+            'metal_indices': list(metal_indices),
+            'cap_indices': list(cap_indices),
+            'residues': residues,
+            'coarse': coarse,
+            'spec': self._site_spec(labels, metal_indices, residues),
+        }
+
+    @staticmethod
+    def _formula(labels, nodes):
+        """
+        Returns the formula of one residue, for reading rather than for
+        comparing: two residues can share a formula and still be different
+        residues, which is what the key is for.
+
+        :param labels:
+            The element of every atom.
+        :param nodes:
+            The atoms of the fragment.
+
+        :return:
+            The formula.
+        """
+
+        counts = Counter(labels[node] for node in nodes)
+        order = [element for element in ('C', 'H') if element in counts]
+        order += sorted(element for element in counts
+                        if element not in ('C', 'H'))
+
+        return ''.join(
+            f'{element}{counts[element]}' if counts[element] > 1 else element
+            for element in order)
+
+    @staticmethod
+    def _fragment_key(graph, nodes):
+        """
+        Returns a canonical key for one residue.
+
+        The hash is taken over the whole fragment, hydrogens included, so that
+        a protonated carboxylate and a deprotonated one are not the same
+        residue.
+
+        :param graph:
+            The graph of the site.
+        :param nodes:
+            The atoms of the fragment.
+
+        :return:
+            The key.
+        """
+
+        return nx.weisfeiler_lehman_graph_hash(graph.subgraph(nodes),
+                                               node_attr='elem')
+
+    @staticmethod
+    def _heavy_subgraph(labels, graph, nodes):
+        """
+        Returns the heavy atom graph of one residue.
+
+        The hydrogens are the bulk of the atoms and almost all of the symmetry,
+        so the atom mapping is enumerated over the heavy atoms alone. How many
+        hydrogens each of them carries goes on as an attribute, since without
+        it a CH2 would map onto a CH3 and a protonated oxygen onto a bare one.
+
+        :param labels:
+            The element of every atom.
+        :param graph:
+            The graph of the site.
+        :param nodes:
+            The atoms of the fragment.
+
+        :return:
+            The subgraph, with an elem and an h_count attribute per node.
+        """
+
+        heavy = nx.Graph()
+
+        for node in nodes:
+            if labels[node] == 'H':
+                continue
+            hydrogens = [
+                other for other in graph.neighbors(node) if labels[other] == 'H'
+            ]
+            heavy.add_node(node, elem=labels[node], h_count=len(hydrogens))
+
+        for node in heavy:
+            for other in graph.neighbors(node):
+                if other in heavy:
+                    heavy.add_edge(node, other)
+
+        return heavy
+
+    @staticmethod
+    def _site_spec(labels, metal_indices, residues):
+        """
+        Returns what a site is made of, in a form two sites can be compared
+        and reported by.
+
+        :param labels:
+            The element of every atom.
+        :param metal_indices:
+            The indices of the metal centers.
+        :param residues:
+            The residues of the site.
+
+        :return:
+            One entry per metal center and one for the residues themselves.
+        """
+
+        spec = {}
+
+        for metal in metal_indices:
+            bound = sorted(residue['key'] for residue in residues
+                           if metal in residue['metals'])
+            spec[f'{labels[metal]}{metal}'] = bound
+
+        spec['residues'] = sorted(residue['key'] for residue in residues)
+        spec['bridging'] = sorted(residue['key'] for residue in residues
+                                  if len(residue['metals']) > 1)
+
+        return spec
 
     def _active_site_graph(self, active_site, connectivity_matrix):
         """
@@ -537,7 +741,7 @@ class MetalForceFieldManager:
             'MetalForceFieldManager: rmsd_region must be one of '
             f'{list(self.RMSD_REGIONS)}, got {self.rmsd_region}')
 
-        query = self._prepare_query(structure)
+        query = self._extract_active_site(structure)
         active_site = query['active_site']
         self.last_mol = active_site['molecule']
         graph = self._active_site_graph(active_site,
@@ -582,8 +786,8 @@ class MetalForceFieldManager:
                     matched, verdict, ic_rmsd = self._apply_criterion(
                         template, mapping, coords, scored)
                     if matched:
-                        candidates.append((scored, name, mapping, rmsd,
-                                           heavy_rmsd, ic_rmsd))
+                        candidates.append(
+                            (scored, name, mapping, rmsd, heavy_rmsd, ic_rmsd))
 
                 report.append((name, stage, rmsd, heavy_rmsd, verdict))
 
@@ -661,7 +865,145 @@ class MetalForceFieldManager:
             'enzyme_system': enzyme_system,
         }
 
-    def _prepare_query(self, structure):
+    def compare_to_templates(self,
+                             structure,
+                             mm_opt=True,
+                             include_hydrogens=False):
+        """
+        Measures a structure against every template and reports, deciding
+        nothing.
+
+        Where match_enzyme_to_template picks one template and builds a force
+        field from it, this walks the whole set and says how each of them
+        stands: whether it holds the same atoms at all, whether it is wired
+        the same way, and how far away it is in every region under both
+        measures. It is what to reach for when a match came back None and the
+        question is which template was closest, and by what.
+
+        Every number it returns is also printed as a table, and the dictionary
+        holds one entry per template, so a decision the thresholds cannot make
+        can be made on the numbers afterwards.
+
+        The hydrogens are left out of every measurement by default, since
+        protonate does not place them reproducibly; include_hydrogens puts
+        them back for this call whatever rmsd_heavy_atoms_only says. One
+        geometry is measured per call, so call it twice to see both.
+
+        :param structure:
+            The path to a PDB or mmCIF file.
+        :param mm_opt:
+            Whether to relax the active site on a crude force field first,
+            which is what takes the slack out of an unrelaxed structure.
+        :param include_hydrogens:
+            Whether the hydrogens count toward the RMSDs and the internal
+            coordinates.
+
+        :return:
+            The findings, with one entry per template under 'templates'.
+        """
+
+        assert_msg_critical(
+            len(self.templates) > 0,
+            'MetalForceFieldManager.compare_to_templates: no templates '
+            'loaded. Call load_ff_from_folder first.')
+
+        query = self._extract_active_site(structure)
+        active_site = query['active_site']
+        graph = self._active_site_graph(active_site,
+                                        query['connectivity_matrix'])
+        described = self._describe_site(list(active_site['labels']), graph,
+                                        active_site['metal_indices'],
+                                        active_site['cap_indices'])
+
+        if mm_opt:
+            molecule = self._mm_relax(query)
+            geometry = 'mm_relaxed'
+        else:
+            molecule = active_site['molecule']
+            geometry = 'input'
+
+        coordinates = molecule.get_coordinates_in_angstrom()
+        heavy_only = not include_hydrogens
+        composition = sorted(active_site['labels'])
+
+        findings = {}
+
+        for name, template in self.templates.items():
+            entry = {
+                'status': 'measured',
+                'mapping': None,
+                'n_coarse_mappings': 0,
+                'n_mappings': 0,
+                'metal_bonds': None,
+                'metal_bond_deviation': None,
+                'regions': {},
+            }
+
+            if sorted(template['labels']) != composition:
+                # not the same atoms, so there is nothing to map onto
+                entry['status'] = 'composition'
+                findings[name] = entry
+                continue
+
+            # which residue coordinates which metal, with nothing said about
+            # how many atoms of it do the coordinating
+            coarse = self._coarse_mappings(template['description'], described)
+
+            if not coarse:
+                entry['status'] = 'spec'
+                entry['spec'] = template['description']['spec']
+                findings[name] = entry
+                continue
+
+            maps = []
+            for coarse_mapping in coarse:
+                maps.extend(
+                    self._heavy_atom_maps(template['description'], described,
+                                          coarse_mapping))
+
+            if not maps:
+                entry['status'] = 'spec'
+                entry['spec'] = template['description']['spec']
+                findings[name] = entry
+                continue
+
+            entry['n_coarse_mappings'] = len(coarse)
+            entry['n_mappings'] = len(maps)
+
+            heavy_map, rot, trans = self._best_heavy_map(
+                template, maps, coordinates)
+            mapping = self._complete_hydrogens(template, described, heavy_map,
+                                               coordinates, rot, trans)
+
+            entry['mapping'] = mapping
+            entry['metal_bonds'] = self._metal_bond_summary(
+                template, described, mapping, coordinates)
+            entry['metal_bond_deviation'] = entry['metal_bonds']['deviation']
+
+            for region in self.RMSD_REGIONS:
+                entry['regions'][region] = self._measure_region(
+                    template, mapping, coordinates, region, heavy_only)
+
+            findings[name] = entry
+
+        results = {
+            'structure': str(structure),
+            'geometry': geometry,
+            'include_hydrogens': include_hydrogens,
+            'active_site': active_site,
+            'connectivity_matrix': query['connectivity_matrix'],
+            'binding_modes': query['binding_modes'],
+            'topology': query['topology'],
+            'spec': described['spec'],
+            'description': described,
+            'templates': findings,
+        }
+
+        self._print_comparison(results)
+
+        return results
+
+    def _extract_active_site(self, structure):
         """
         Runs the structural half of the builder pipeline on a structure.
 
@@ -798,6 +1140,205 @@ class MetalForceFieldManager:
 
         return mappings
 
+    def _coarse_mappings(self, template, query):
+        """
+        Matches the metals and the residues of two sites, ignoring how the
+        residues grip the metals.
+
+        The graph this runs on has one node per metal and one per residue and
+        carries no denticity at all, so a monodentate carboxylate and a
+        bidentate one are the same node with the same edge. It is also tiny -
+        eight nodes for a binuclear site - which is what makes this cheap
+        where an isomorphism of the whole site is not.
+
+        :param template:
+            The description of the template site.
+        :param query:
+            The description of the queried site.
+
+        :return:
+            One mapping of coarse nodes per way the two sites line up.
+        """
+
+        def node_match(a, b):
+            return a['kind'] == b['kind'] and a['key'] == b['key']
+
+        matcher = GraphMatcher(template['coarse'],
+                               query['coarse'],
+                               node_match=node_match)
+
+        return list(matcher.isomorphisms_iter())
+
+    def _heavy_atom_maps(self, template, query, coarse_mapping):
+        """
+        Builds the heavy atom mappings that one coarse mapping allows.
+
+        Each residue is mapped onto the residue the coarse level paired it
+        with, atom by atom and on its own, so the symmetry that survives is
+        the symmetry of a sidechain: the two oxygens of a carboxylate, the two
+        hydrogens of a CB. The hydrogens are left out here and put back once
+        the geometry has chosen between what remains.
+
+        :param template:
+            The description of the template site.
+        :param query:
+            The description of the queried site.
+        :param coarse_mapping:
+            One mapping of coarse nodes.
+
+        :return:
+            The heavy atom mappings, from template index to query index.
+        """
+
+        def node_match(a, b):
+            return a['elem'] == b['elem'] and a['h_count'] == b['h_count']
+
+        metals = {}
+        per_residue = []
+
+        for node, image in coarse_mapping.items():
+            if node[0] == 'metal':
+                metals[node[1]] = image[1]
+                continue
+
+            first = template['residues'][node[1]]['heavy']
+            second = query['residues'][image[1]]['heavy']
+
+            matcher = GraphMatcher(first, second, node_match=node_match)
+            found = list(matcher.isomorphisms_iter())
+
+            if not found:
+                # the coarse keys agreed, so this should not happen; a site
+                # that manages it is not one to guess about
+                return []
+
+            per_residue.append(found)
+
+        maps = []
+
+        for combination in product(*per_residue):
+            atom_map = dict(metals)
+            for residue_map in combination:
+                atom_map.update(residue_map)
+            maps.append(atom_map)
+
+            if len(maps) >= self.max_mappings:
+                self.ostream.print_warning(
+                    f'Reached the limit of {self.max_mappings} atom mappings; '
+                    'the best of the ones built is used, which need not be '
+                    'the best there is')
+                self.ostream.flush()
+                break
+
+        return maps
+
+    def _best_heavy_map(self, template, maps, coordinates):
+        """
+        Picks the heavy atom mapping that superimposes the two sites best.
+
+        :param template:
+            The template being compared to.
+        :param maps:
+            The heavy atom mappings to choose between.
+        :param coordinates:
+            The coordinates of the queried site, in Angstrom.
+
+        :return:
+            The tuple of the best mapping and the superposition it gives.
+        """
+
+        reference = template['geometry'].get_coordinates_in_angstrom()
+        best = None
+
+        for atom_map in maps:
+            order = sorted(atom_map)
+            moved = coordinates[[atom_map[index] for index in order]]
+
+            rmsd, rot, trans = svd_superimpose(moved, reference[order])
+
+            if best is None or rmsd < best[0]:
+                best = (rmsd, atom_map, rot, trans)
+
+        return best[1], best[2], best[3]
+
+    def _complete_hydrogens(self, template, query, heavy_map, coordinates, rot,
+                            trans):
+        """
+        Extends a heavy atom mapping over the hydrogens.
+
+        The hydrogens of one heavy atom are equivalent to each other in
+        everything the comparison measures, so which of them goes where is
+        settled by proximity under the superposition the heavy atoms already
+        found rather than by another round of enumeration. Capping hydrogens
+        are kept apart from ordinary ones, since a cap stands for an alpha
+        carbon and is not equivalent to anything else.
+
+        :param template:
+            The description of the template site.
+        :param query:
+            The description of the queried site.
+        :param heavy_map:
+            The mapping of the heavy atoms.
+        :param coordinates:
+            The coordinates of the queried site, in Angstrom.
+        :param rot:
+            The rotation of the superposition.
+        :param trans:
+            The translation of the superposition.
+
+        :return:
+            The mapping over every atom.
+        """
+
+        reference = template['geometry'].get_coordinates_in_angstrom()
+        aligned = np.matmul(coordinates, rot) + trans
+
+        template_caps = set(template['description']['cap_indices'])
+        query_caps = set(query['cap_indices'])
+
+        atom_map = dict(heavy_map)
+
+        def hydrogens(labels, graph, node):
+            return [
+                other for other in graph.neighbors(node) if labels[other] == 'H'
+            ]
+
+        for node, image in heavy_map.items():
+            first = hydrogens(template['labels'], template['graph'], node)
+            second = hydrogens(query['labels'], query['graph'], image)
+
+            groups = [(first, second)]
+
+            first_caps = [index for index in first if index in template_caps]
+            second_caps = [index for index in second if index in query_caps]
+
+            if first_caps and len(first_caps) == len(second_caps):
+                # a cap stands for an alpha carbon, so it is not free to swap
+                # with the ordinary hydrogens of the same carbon
+                groups = [
+                    (first_caps, second_caps),
+                    ([index for index in first if index not in template_caps],
+                     [index for index in second if index not in query_caps]),
+                ]
+
+            for ours, theirs in groups:
+                if len(ours) != len(theirs):
+                    # nothing sensible to pair up; leave them out rather than
+                    # invent a correspondence
+                    continue
+
+                best = None
+                for order in permutations(theirs):
+                    distance = sum(
+                        float(np.linalg.norm(reference[index] - aligned[other]))
+                        for index, other in zip(ours, order))
+                    if best is None or distance < best[0]:
+                        best = (distance, order)
+
+                atom_map.update(dict(zip(ours, best[1])))
+
+        return atom_map
+
     @staticmethod
     def _invariants_match(template, graph):
         """
@@ -853,9 +1394,7 @@ class MetalForceFieldManager:
 
         reference = template['geometry'].get_coordinates_in_angstrom()
         region = self._region_indices(template)
-        heavy = [
-            index for index in region if template['labels'][index] != 'H'
-        ]
+        heavy = [index for index in region if template['labels'][index] != 'H']
 
         best = None
 
@@ -877,101 +1416,80 @@ class MetalForceFieldManager:
 
         return mapping, rmsd, heavy_rmsd, deviation
 
-    def _rmsd_indices(self, template):
+    def _rmsd_indices(self, template, region=None, heavy_only=None):
         """
         Returns the template indices every RMSD is measured over, which is the
         region less the hydrogens when they are being left out.
 
         :param template:
             The template.
+        :param region:
+            The region to take, or None for rmsd_region.
+        :param heavy_only:
+            Whether to leave the hydrogens out, or None for
+            rmsd_heavy_atoms_only.
 
         :return:
             The indices, in order.
         """
 
-        region = self._region_indices(template)
+        if heavy_only is None:
+            heavy_only = self.rmsd_heavy_atoms_only
 
-        if not self.rmsd_heavy_atoms_only:
-            return region
+        indices = self._region_indices(template, region)
 
-        return [
-            index for index in region if template['labels'][index] != 'H'
-        ]
+        if not heavy_only:
+            return indices
 
-    def _beta_carbons(self, template, graph):
-        """
-        Finds the beta carbons of a template.
+        return [index for index in indices if template['labels'][index] != 'H']
 
-        A template is a force field and a geometry, and neither of them says
-        which atom is which residue's CB. The truncation does: it cuts at the
-        CA-CB bond and puts a capping hydrogen where the alpha carbon was, so
-        the one atom a cap is bonded to is the beta carbon it was cut from.
-
-        :param template:
-            The template.
-        :param graph:
-            Its graph.
-
-        :return:
-            The indices of the beta carbons.
-        """
-
-        assert_msg_critical(
-            len(template['cap_indices']) > 0,
-            f'MetalForceFieldManager: template {template["name"]} has no '
-            'capping hydrogens, so its beta carbons cannot be found')
-
-        beta_carbons = set()
-
-        for cap in template['cap_indices']:
-            neighbors = list(graph.neighbors(cap))
-
-            assert_msg_critical(
-                len(neighbors) == 1 and template['labels'][neighbors[0]] == 'C',
-                f'MetalForceFieldManager: in template {template["name"]} the '
-                f'capping hydrogen {cap} is not bonded to exactly one carbon, '
-                'so it is not a cap. The capping hydrogens are read off the '
-                'charges, which a force field built without RESP does not '
-                'have.')
-
-            beta_carbons.add(neighbors[0])
-
-        return beta_carbons
-
-    def _region_indices(self, template):
+    def _region_indices(self, template, region=None):
         """
         Returns the template indices of the region an RMSD is measured over.
 
         :param template:
             The template.
+        :param region:
+            The region to take, or None for rmsd_region.
 
         :return:
             The indices, in order.
         """
 
-        if self.rmsd_region == 'active_site':
+        if region is None:
+            region = self.rmsd_region
+
+        if region == 'active_site':
             return list(range(len(template['labels'])))
 
         graph = template['graph']
 
-        if self.rmsd_region == 'metal_beta_carbons':
+        if region == 'metal_beta_carbons':
+            assert_msg_critical(
+                len(template['beta_carbon_indices']) > 0,
+                f'MetalForceFieldManager: template {template["name"]} does '
+                'not say which of its atoms are beta carbons. Its force field '
+                'was written before annotate_atoms recorded them, so rebuild '
+                'it or measure over another region.')
+
             return sorted(
                 set(template['metal_indices'])
-                | self._beta_carbons(template, graph))
-        region = set()
+                | set(template['beta_carbon_indices']))
+
+        shell = set()
 
         for metal in template['metal_indices']:
-            region.update(
+            shell.update(
                 nx.single_source_shortest_path_length(
                     graph, metal, cutoff=self.metal_shell_bonds))
 
         assert_msg_critical(
-            len(region) > len(template['metal_indices']),
+            len(shell) > len(template['metal_indices']),
             'MetalForceFieldManager: the metal centers of template '
             f'{template["name"]} have nothing bonded to them within '
             f'{self.metal_shell_bonds} bond(s)')
 
-        return sorted(region)
+        return sorted(shell)
 
     def _apply_criterion(self, template, mapping, coordinates, scored):
         """
@@ -1006,22 +1524,100 @@ class MetalForceFieldManager:
 
         ic_rmsd = self._ic_rmsd(template, mapping, coordinates)
         violation = self._ic_violation(ic_rmsd)
-        ic_ok = violation is None
+        matched = self._criteria_flags(xyz_ok, violation is None)[criterion]
 
         if criterion == 'ic_rmsd':
-            matched = ic_ok
             verdict = violation
         elif criterion == 'ic_and_xyz':
-            matched = ic_ok and xyz_ok
             # name whichever failed first, so the report says what to loosen
             verdict = 'geometry off' if not xyz_ok else violation
         else:
-            matched = ic_ok or xyz_ok
             verdict = 'geometry and IC off'
 
         return matched, 'match' if matched else verdict, ic_rmsd
 
-    def _ic_rmsd(self, template, mapping, coordinates):
+    @staticmethod
+    def _criteria_flags(xyz_ok, ic_ok):
+        """
+        Combines the two measurements into the four criteria.
+
+        :param xyz_ok:
+            Whether the cartesian RMSD is within its threshold.
+        :param ic_ok:
+            Whether the internal coordinates are within theirs.
+
+        :return:
+            What each criterion in MATCH_CRITERIA makes of the pair.
+        """
+
+        return {
+            'xyz_rmsd': xyz_ok,
+            'ic_rmsd': ic_ok,
+            'ic_or_xyz': xyz_ok or ic_ok,
+            'ic_and_xyz': xyz_ok and ic_ok,
+        }
+
+    def _measure_region(self,
+                        template,
+                        mapping,
+                        coordinates,
+                        region,
+                        heavy_only=None):
+        """
+        Measures one region of an active site against a template.
+
+        :param template:
+            The template being compared to.
+        :param mapping:
+            The mapping from template index to active site index.
+        :param coordinates:
+            The coordinates of the active site, in Angstrom.
+        :param region:
+            The region to measure over.
+        :param heavy_only:
+            Whether to leave the hydrogens out, or None for
+            rmsd_heavy_atoms_only.
+
+        :return:
+            The atom count, the cartesian RMSDs over the whole region and
+            over its heavy atoms, the internal coordinate deviations and what
+            each criterion makes of them.
+        """
+
+        if heavy_only is None:
+            heavy_only = self.rmsd_heavy_atoms_only
+
+        reference = template['geometry'].get_coordinates_in_angstrom()
+        indices = self._region_indices(template, region)
+        heavy = [index for index in indices if template['labels'][index] != 'H']
+
+        order = [mapping[index] for index in range(len(reference))]
+        moved = coordinates[order]
+
+        rmsd, _, _ = svd_superimpose(moved[indices], reference[indices])
+        heavy_rmsd, _, _ = svd_superimpose(moved[heavy], reference[heavy])
+
+        ic_rmsd = self._ic_rmsd(template, mapping, coordinates, region,
+                                heavy_only)
+
+        scored = heavy_rmsd if heavy_only else rmsd
+        flags = self._criteria_flags(scored <= self.geometry_rmsd_threshold,
+                                     self._ic_violation(ic_rmsd) is None)
+
+        return {
+            'atoms': len(self._rmsd_indices(template, region, heavy_only)),
+            'rmsd': rmsd,
+            'rmsd_heavy': heavy_rmsd,
+            'ic_rmsd': ic_rmsd,
+            'criteria': flags,
+        }
+
+    def _ic_rmsd(self,
+                 template,
+                 mapping,
+                 coordinates,
+                 region=None,
+                 heavy_only=None):
         """
         Measures the internal coordinate deviations from a template.
 
@@ -1038,20 +1634,25 @@ class MetalForceFieldManager:
             The mapping from template index to active site index.
         :param coordinates:
             The coordinates of the active site, in Angstrom.
+        :param region:
+            The region to measure over, or None for rmsd_region.
+        :param heavy_only:
+            Whether to leave the hydrogens out, or None for
+            rmsd_heavy_atoms_only.
 
         :return:
             The deviations, as get_ic_rmsd reports them, or None when they
             could not be measured.
         """
 
-        region = self._rmsd_indices(template)
-        labels = [template['labels'][index] for index in region]
+        indices = self._rmsd_indices(template, region, heavy_only)
+        labels = [template['labels'][index] for index in indices]
 
         reference = template['geometry'].get_coordinates_in_angstrom()
-        order = [mapping[index] for index in region]
+        order = [mapping[index] for index in indices]
 
         mapped = Molecule(labels, coordinates[order], 'angstrom')
-        wanted = Molecule(labels, reference[region], 'angstrom')
+        wanted = Molecule(labels, reference[indices], 'angstrom')
 
         ic_rmsd = OptimizationDriver.get_ic_rmsd(mapped, wanted)
 
@@ -1104,6 +1705,64 @@ class MetalForceFieldManager:
                             f'{limit:.2f} {unit}')
 
         return None
+
+    def _metal_bond_summary(self, template, query, mapping, coordinates):
+        """
+        Compares the metal-ligand bonds of a template with those of a site.
+
+        Only the bonds the two of them agree on are measured. Which atoms of a
+        residue reach a metal is exactly what a comparison is meant not to
+        turn on - it is a distance cutoff on an unrelaxed structure, not
+        chemistry - so a contact one side makes and the other does not is
+        counted and reported rather than allowed to fail the comparison.
+
+        :param template:
+            The template being compared to.
+        :param query:
+            The description of the queried site.
+        :param mapping:
+            The mapping from template index to active site index.
+        :param coordinates:
+            The coordinates of the queried site, in Angstrom.
+
+        :return:
+            The largest difference over the shared bonds, how many were
+            shared, and how many either side makes alone.
+        """
+
+        reference = template['geometry'].get_coordinates_in_angstrom()
+        bonds, _ = self._metal_keys(template)
+
+        deviation = 0.0
+        shared = 0
+        template_only = 0
+        mapped = set()
+
+        for i, j in bonds:
+            first, second = mapping[i], mapping[j]
+            mapped.add(frozenset((first, second)))
+
+            if not query['graph'].has_edge(first, second):
+                template_only += 1
+                continue
+
+            shared += 1
+            expected = np.linalg.norm(reference[i] - reference[j])
+            found = np.linalg.norm(coordinates[first] - coordinates[second])
+            deviation = max(deviation, abs(found - expected))
+
+        metals = set(query['metal_indices'])
+        query_only = sum(
+            1 for first, second in query['graph'].edges()
+            if ({first, second} & metals) and frozenset((first,
+                                                         second)) not in mapped)
+
+        return {
+            'deviation': deviation,
+            'shared': shared,
+            'template_only': template_only,
+            'query_only': query_only,
+        }
 
     def _metal_bond_deviation(self, template, mapping, coordinates):
         """
@@ -1396,12 +2055,11 @@ class MetalForceFieldManager:
                 label = f'IC {name} ({unit})'
                 thresholds = self.ic_rmsd_thresholds.get(name)
                 if not thresholds:
-                    self.ostream.print_header(
-                        self._param(label, 'not checked'))
+                    self.ostream.print_header(self._param(label, 'not checked'))
                     continue
-                limits = ', '.join(
-                    f'{measure} {thresholds[measure]:.2f}'
-                    for measure in ('rms', 'max') if thresholds.get(measure))
+                limits = ', '.join(f'{measure} {thresholds[measure]:.2f}'
+                                   for measure in ('rms', 'max')
+                                   if thresholds.get(measure))
                 self.ostream.print_header(self._param(label, limits))
 
         self.ostream.print_header(
@@ -1410,6 +2068,256 @@ class MetalForceFieldManager:
         self.ostream.print_blank()
         self.ostream.print_info(
             f'Residues: {", ".join(active_site["residues"])}')
+        self.ostream.flush()
+
+    def _print_comparison(self, results):
+        """
+        Prints everything compare_to_templates measured.
+
+        One table of numbers and one of verdicts per template that could be
+        measured, and a closing summary ranking the templates by the region
+        that is configured, so the closest one is visible without reading
+        every table.
+
+        :param results:
+            The findings of compare_to_templates.
+        """
+
+        active_site = results['active_site']
+        metals = ', '.join(active_site['labels'][index]
+                           for index in active_site['metal_indices'])
+
+        self.ostream.print_blank()
+        self.ostream.print_header('Comparison against every template')
+        self.ostream.print_header(33 * '-')
+        self.ostream.print_header(
+            self._param('structure',
+                        Path(results['structure']).name))
+        self.ostream.print_header(
+            self._param('active site atoms', len(active_site['labels'])))
+        self.ostream.print_header(self._param('metal centers', metals))
+        self.ostream.print_header(self._param('geometry', results['geometry']))
+        self.ostream.print_header(
+            self._param(
+                'measured over',
+                'all atoms' if results['include_hydrogens'] else 'heavy atoms'))
+        self.ostream.print_header(
+            self._param('templates', len(results['templates'])))
+        self.ostream.print_blank()
+        self.ostream.print_info(
+            f'Residues: {", ".join(active_site["residues"])}')
+        self.ostream.print_info(
+            f'Thresholds: RMSD {self.geometry_rmsd_threshold:.2f} A, '
+            f'metal bond {self.metal_bond_tolerance:.2f} A, '
+            f'IC {self._ic_threshold_summary()}')
+
+        self._print_spec('the structure holds', results['description'])
+
+        for name, entry in results['templates'].items():
+            self._print_template_comparison(name, entry)
+
+        self._print_comparison_summary(results)
+
+    def _ic_threshold_summary(self):
+        """
+        Returns the internal coordinate thresholds on one line.
+
+        :return:
+            The summary.
+        """
+
+        parts = []
+
+        for name, unit in self.IC_TYPES.items():
+            thresholds = self.ic_rmsd_thresholds.get(name)
+            if not thresholds:
+                continue
+            limits = '/'.join(f'{thresholds[measure]:g}'
+                              for measure in ('rms', 'max')
+                              if thresholds.get(measure))
+            parts.append(f'{name} {limits} {unit}')
+
+        return ', '.join(parts) if parts else 'none'
+
+    def _print_spec(self, title, description):
+        """
+        Prints what a site is made of: which residues it holds and which of
+        them coordinate which metal.
+
+        The residues are named by their formula, which is for reading; two
+        sites are compared on the keys behind them.
+
+        :param title:
+            What the block is describing.
+        :param description:
+            The description of the site.
+        """
+
+        labels = description['labels']
+
+        def named(residues):
+            return ', '.join(
+                sorted(f'{residue["formula"]}/{residue["key"][:6]}'
+                       for residue in residues))
+
+        self.ostream.print_blank()
+        self.ostream.print_info(f'Site spec, {title}:')
+
+        for metal in description['metal_indices']:
+            bound = [
+                residue for residue in description['residues']
+                if metal in residue['metals']
+            ]
+            self.ostream.print_info(f'  {labels[metal]}{metal}: {named(bound)}')
+
+        bridging = [
+            residue for residue in description['residues']
+            if len(residue['metals']) > 1
+        ]
+        if bridging:
+            self.ostream.print_info(f'  bridging: {named(bridging)}')
+
+        self.ostream.flush()
+
+    def _print_template_comparison(self, name, entry):
+        """
+        Prints the numbers and the verdicts of one template.
+
+        :param name:
+            The name of the template.
+        :param entry:
+            What compare_to_templates measured for it.
+        """
+
+        self.ostream.print_blank()
+
+        if entry['status'] == 'composition':
+            self.ostream.print_info(
+                f'{name}: holds different atoms, so nothing was measured.')
+            self.ostream.flush()
+            return
+
+        if entry['status'] == 'spec':
+            self.ostream.print_info(
+                f'{name}: coordinates a different set of residues, so '
+                'nothing was measured.')
+            self._print_spec(f'{name} holds',
+                             self.templates[name]['description'])
+            self.ostream.flush()
+            return
+
+        bonds = entry['metal_bonds']
+        summary = (f'{bonds["shared"]} metal bond(s) shared, within '
+                   f'{bonds["deviation"]:.3f} A')
+        if bonds['template_only']:
+            summary += f', {bonds["template_only"]} only in the template'
+        if bonds['query_only']:
+            summary += f', {bonds["query_only"]} only in the structure'
+
+        self.ostream.print_info(
+            f'{name}: {entry["n_mappings"]} atom mapping(s) from '
+            f'{entry["n_coarse_mappings"]} coarse mapping(s), {summary}')
+        self.ostream.print_blank()
+
+        row = '{:>19} | {:>5} | {:>7} | {:>7} | {:>14} | {:>14} | {:>14}'
+        self.ostream.print_header(
+            row.format('region', 'atoms', 'RMSD', 'heavy', 'bonds rms/max',
+                       'angles rms/max', 'dihed rms/max'))
+        self.ostream.print_header(98 * '-')
+
+        for region, found in entry['regions'].items():
+            self.ostream.print_header(
+                row.format(region, found['atoms'], f'{found["rmsd"]:.3f}',
+                           f'{found["rmsd_heavy"]:.3f}',
+                           self._ic_cell(found['ic_rmsd'], 'bonds'),
+                           self._ic_cell(found['ic_rmsd'], 'angles'),
+                           self._ic_cell(found['ic_rmsd'], 'dihedrals')))
+
+        self.ostream.print_blank()
+
+        row = '{:>19} | {:>9} | {:>9} | {:>10} | {:>11}'
+        self.ostream.print_header(row.format('region', *self.MATCH_CRITERIA))
+        self.ostream.print_header(68 * '-')
+
+        for region, found in entry['regions'].items():
+            flags = found['criteria']
+            self.ostream.print_header(
+                row.format(
+                    region, *[
+                        'yes' if flags[criterion] else '-'
+                        for criterion in self.MATCH_CRITERIA
+                    ]))
+
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    @staticmethod
+    def _ic_cell(ic_rmsd, name):
+        """
+        Formats one internal coordinate type for a table cell.
+
+        :param ic_rmsd:
+            The deviations, as get_ic_rmsd reports them.
+        :param name:
+            The type to format.
+
+        :return:
+            The cell.
+        """
+
+        if ic_rmsd is None:
+            return ''
+
+        found = ic_rmsd.get(name)
+
+        if found is None:
+            return ''
+
+        return f'{found["rms"]:.2f} / {found["max"]:.2f}'
+
+    def _print_comparison_summary(self, results):
+        """
+        Ranks the templates by the region that is configured.
+
+        :param results:
+            The findings of compare_to_templates.
+        """
+
+        region = self.rmsd_region
+        heavy = not results['include_hydrogens']
+
+        def scored(entry):
+            found = entry['regions'].get(region)
+            if found is None:
+                return math.inf
+            return found['rmsd_heavy'] if heavy else found['rmsd']
+
+        order = sorted(results['templates'].items(),
+                       key=lambda item: scored(item[1]))
+
+        self.ostream.print_blank()
+        title = f'Ranked on the {region} region'
+        self.ostream.print_header(title)
+        self.ostream.print_header(len(title) * '-')
+
+        row = '{:>24} | {:>14} | {:>9} | {:>10} | {:>10}'
+        self.ostream.print_header(
+            row.format('template', 'status', 'RMSD', 'metal bond', 'criteria'))
+        self.ostream.print_header(78 * '-')
+
+        for name, entry in order:
+            found = entry['regions'].get(region)
+            if found is None:
+                self.ostream.print_header(
+                    row.format(name[:24], entry['status'], '', '', ''))
+                continue
+            met = sum(1 for passed in found['criteria'].values() if passed)
+            self.ostream.print_header(
+                row.format(name[:24], entry['status'], f'{scored(entry):.3f}',
+                           f'{entry["metal_bond_deviation"]:.3f}',
+                           f'{met} of {len(found["criteria"])}'))
+
+        self.ostream.print_blank()
         self.ostream.flush()
 
     def _print_multiple_hits(self, candidates, chosen, stage):
