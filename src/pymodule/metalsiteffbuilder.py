@@ -1542,7 +1542,6 @@ class MetalSiteForceFieldBuilder:
         # them somewhere to disagree
         active_site = {
             'molecule': molecule,
-            'labels': labels,
             'atom_map': atom_map,
             'cap_indices': cap_indices,
             'beta_carbon_indices': beta_carbon_indices,
@@ -1605,7 +1604,7 @@ class MetalSiteForceFieldBuilder:
 
         # nothing but a metal bond should be long
         coords = active_site['molecule'].get_coordinates_in_angstrom()
-        labels = active_site['labels']
+        labels = active_site['molecule'].get_labels()
         metals = set(active_site['metal_indices'])
 
         for i in range(n_atoms):
@@ -2285,7 +2284,7 @@ class MetalSiteForceFieldBuilder:
         :param partial_charges:
             The partial charges fitted on the active site. The charge of the
             capping hydrogens is redistributed over the remaining atoms before
-            they are applied, since the caps do not exist in the protein. 
+            they are applied, since the caps do not exist in the protein.
             If None, D4 charges are used.
 
         :return:
@@ -2461,7 +2460,7 @@ class MetalSiteForceFieldBuilder:
             The active site, to validate against.
         """
 
-        labels = list(active_site['labels'])
+        labels = active_site['molecule'].get_labels()
         elements = self._forcefield_elements(forcefield)
 
         assert_msg_critical(
@@ -2550,7 +2549,7 @@ class MetalSiteForceFieldBuilder:
             switched off.
         """
 
-        labels = active_site['labels']
+        labels = active_site['molecule'].get_labels()
         molecule = active_site['molecule']
 
         for key in bonds:
@@ -2603,7 +2602,7 @@ class MetalSiteForceFieldBuilder:
             The metal angle keys.
         """
 
-        labels = active_site['labels']
+        labels = active_site['molecule'].get_labels()
 
         zero_bonds = [
             key for key in bonds
@@ -2743,7 +2742,8 @@ class MetalSiteForceFieldBuilder:
             frozen_indices=frozen_indices,
             max_iterations=self.mm_max_iterations)
 
-        relaxed = Molecule(active_site['labels'], coordinates, 'angstrom')
+        relaxed = Molecule(active_site['molecule'].get_labels(), coordinates,
+                           'angstrom')
         relaxed.set_charge(molecule.get_charge())
         relaxed.set_multiplicity(molecule.get_multiplicity())
 
@@ -2858,7 +2858,7 @@ class MetalSiteForceFieldBuilder:
         # writes the active site charges onto whatever atoms happen to hold those
         # indices, so the elements are checked before anything is modified.
         atoms = list(topology.atoms())
-        labels = active_site['labels']
+        labels = active_site['molecule'].get_labels()
         mismatched = [
             index for index in covered
             if index >= len(atoms) or atoms[index].element is None
@@ -3354,7 +3354,7 @@ class MetalSiteForceFieldBuilder:
         charges = np.asarray(partial_charges)
         caps = sorted(active_site['cap_indices'])
         metals = active_site['metal_indices']
-        labels = active_site['labels']
+        labels = active_site['molecule'].get_labels()
         n_atoms = len(charges)
         rest = [index for index in range(n_atoms) if index not in caps]
         cap_charge = float(sum(charges[index] for index in caps))
@@ -3412,7 +3412,7 @@ class MetalSiteForceFieldBuilder:
         Angstrom is the sign that it did something else instead.
         """
 
-        labels = active_site['labels']
+        labels = active_site['molecule'].get_labels()
         molecule = active_site['molecule']
         metals = sorted(active_site['metal_indices'])
         bonds, angles = self.get_metal_keys(forcefield, active_site)
@@ -3514,7 +3514,7 @@ class MetalSiteForceFieldBuilder:
         Prints the fitted metal bonds and angles.
         """
 
-        labels = active_site['labels']
+        labels = active_site['molecule'].get_labels()
         metals = set(active_site['metal_indices'])
         coords = active_site['molecule'].get_coordinates_in_angstrom()
         bonds, angles = self.get_metal_keys(forcefield, active_site)
