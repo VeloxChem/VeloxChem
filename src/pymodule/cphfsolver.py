@@ -560,6 +560,8 @@ class CphfSolver(LinearSolver):
 
                 self.print_iteration(relative_residual_norm, molecule)
 
+                self._print_gostshyp_neg_amp_info()
+
             profiler.stop_timer('ReducedSpace')
 
             # check convergence

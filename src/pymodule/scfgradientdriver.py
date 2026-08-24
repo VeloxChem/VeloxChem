@@ -178,12 +178,15 @@ class ScfGradientDriver(GradientDriver):
                                          unparse_input(self, grad_keywords),
                                          group_name='grad_settings')
 
-        # note that if GOSTSHYP is used in combination with the numerical option,
-        # the number of negative amplitudes printed corresponds to the last
-        # SCF calculation performed in the numerical gradient calculation
-        if self.scf_driver._gostshyp:
+        # num_neg_amp is reduced to the master rank only, and the information
+        # is checked and printed on the master rank only.
+        if (self.rank == mpi_master() and self.scf_driver._gostshyp
+                and self.scf_driver._gostshyp_drv is not None
+                and self.scf_driver._gostshyp_drv.num_neg_amp > 0):
             valstr = '*** GOSTSHYP information: A total number of '
-            valstr += '{} grid points with negative amplitudes were excluded ***'.format(self.scf_driver._gostshyp_drv.num_neg_amp)
+            valstr += ('{} grid points with negative amplitudes were '
+                       'excluded ***'.format(
+                           self.scf_driver._gostshyp_drv.num_neg_amp))
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
 

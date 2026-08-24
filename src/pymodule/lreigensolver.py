@@ -418,11 +418,7 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
                 self._print_iteration(relative_residual_norm, wn)
 
-                if self._gostshyp:
-                    valstr = '    *** GOSTSHYP information: A total number of '
-                    valstr += '{} grid points with negative amplitudes were excluded'.format(self._gostshyp_neg_amps)
-                    self.ostream.print_header(valstr)
-                    self.ostream.print_blank()
+                self._print_gostshyp_neg_amp_info()
 
             profiler.stop_timer('ReducedSpace')
 

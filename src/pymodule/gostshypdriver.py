@@ -240,6 +240,8 @@ class GostshypDriver:
         e_pr = self.comm.reduce(local_e_pr, root=mpi_master())
         V_pr = self.comm.reduce(local_V_pr, root=mpi_master())
 
+        # the number of excluded grid points is reduced to the master rank
+        # only; it is checked and printed on the master rank only
         self.num_neg_amp = self.comm.reduce(local_neg_p_amp, root=mpi_master())
 
         return e_pr, V_pr
@@ -387,6 +389,7 @@ class GostshypDriver:
 
         resp_contrib = self.comm.reduce(local_resp_contrib, root=mpi_master())
 
+        # see comment in gostshyp_contrib
         self.num_neg_amp = self.comm.reduce(local_neg_p_amp, root=mpi_master())
 
         return resp_contrib
@@ -535,7 +538,8 @@ class GostshypDriver:
 
         local_grad = area_grad_term + g_tilde_grad - f_tilde_grad
 
-        self.num_neg_amp = self.comm.allreduce(local_neg_p_amp, op=MPI.SUM)
+        # see comment in gostshyp_contrib
+        self.num_neg_amp = self.comm.reduce(local_neg_p_amp, root=mpi_master())
 
         # the ScfGradientDriver handles the reduce operation for the gradient
         return local_grad

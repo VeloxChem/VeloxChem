@@ -329,6 +329,8 @@ class TdaEigenSolver(TdaEigenSolverBase):
 
                 self._print_iter_data(i)
 
+                self._print_gostshyp_neg_amp_info()
+
             profiler.stop_timer('ReducedSpace')
 
             profiler.check_memory_usage(f'Iteration {i + 1}')

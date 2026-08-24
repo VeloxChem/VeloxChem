@@ -544,6 +544,8 @@ class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
 
                 self._print_iteration(relative_residual_norm, xvs)
 
+                self._print_gostshyp_neg_amp_info()
+
             profiler.stop_timer('ReducedSpace')
 
             # check convergence
