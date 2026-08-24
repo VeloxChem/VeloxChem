@@ -97,6 +97,10 @@ class MetalForceFieldManager:
         - metal_bond_tolerance: How far a metal-ligand bond may differ from the
           template, in Angstrom, before the match is rejected however good the
           RMSD is.
+        - selection_criteria: What build_ff_from_comparison holds a template to
+          before its parameters are transferred: 'tight', 'loose' or a set of
+          the same shape as those in SELECTION_CRITERIA. Unrelated to
+          match_criterion, which is what the older matching path gates on.
         - rmsd_heavy_atoms_only: The flag for leaving the hydrogens out of
           every RMSD, cartesian and internal alike. On by default: protonate
           places the hydrogens through Modeller.addHydrogens, which does not
@@ -149,6 +153,63 @@ class MetalForceFieldManager:
         'angles': 'deg',
         'dihedrals': 'deg',
     }
+
+    # What a template has to be within, region by region, before its
+    # parameters are put on a new site. The bonds are what is checked: they
+    # are the internal coordinates a transferred force field is written in,
+    # and they carry none of the noise the floppy dihedrals about a metal do.
+    # A region is read as {ic type: {rms: , max: }}, the shape
+    # ic_rmsd_thresholds has, so that angles can be added to a set without
+    # anything here changing. The tight set is what two runs of the same site
+    # look like; the loose one is what an unrelaxed design model looks like.
+    SELECTION_CRITERIA = {
+        'tight': {
+            'active_site': {
+                'bonds': {
+                    'rms': 0.5,
+                    'max': 1.0
+                }
+            },
+            'metal_shell': {
+                'bonds': {
+                    'rms': 0.25,
+                    'max': 0.5
+                }
+            },
+            'metal_beta_carbons': {
+                'bonds': {
+                    'rms': 0.5,
+                    'max': 1.0
+                }
+            },
+        },
+        'loose': {
+            'active_site': {
+                'bonds': {
+                    'rms': 1.0,
+                    'max': 2.0
+                }
+            },
+            'metal_shell': {
+                'bonds': {
+                    'rms': 0.5,
+                    'max': 1.0
+                }
+            },
+            'metal_beta_carbons': {
+                'bonds': {
+                    'rms': 1.0,
+                    'max': 1.5
+                }
+            },
+        },
+    }
+
+    # Which region decides between several templates that all pass. The
+    # cartesian RMSD is not what is ranked on: the whole site is what a
+    # transferred force field describes, and its bonds are what it is written
+    # in, so the site that is built the most like the template wins.
+    SELECTION_RANKED_ON = ('active_site', 'bonds', 'rms')
 
     def __init__(self, comm=None, ostream=None):
         """
@@ -205,6 +266,9 @@ class MetalForceFieldManager:
             'dihedrals': None,
         }
         self.metal_bond_tolerance = 0.25
+        # what a template has to be within before build_ff_from_comparison
+        # puts it on a site; the call may override it
+        self.selection_criteria = self.SELECTION_CRITERIA['tight']
         # the hydrogens carry the noise of Modeller.addHydrogens rather than
         # anything about the site; see the class docstring
         self.rmsd_heavy_atoms_only = True
@@ -376,7 +440,7 @@ class MetalForceFieldManager:
                            second.get_coordinates_in_angstrom(),
                            atol=1.0e-6)
 
-    def _build_template(self, name, forcefield, geometry, kind, folder):
+    def _build_template(self, name, forcefield, molecule, kind, folder):
         """
         Assembles a template from a loaded force field and geometry.
 
@@ -391,7 +455,7 @@ class MetalForceFieldManager:
             The name of the template.
         :param forcefield:
             The force field generator loaded from the folder.
-        :param geometry:
+        :param molecule:
             The active site geometry.
         :param kind:
             The geometry kind.
@@ -402,7 +466,7 @@ class MetalForceFieldManager:
             The template dictionary.
         """
 
-        labels = list(geometry.get_labels())
+        labels = list(molecule.get_labels())
         elements = self.builder._forcefield_elements(forcefield)
 
         assert_msg_critical(
@@ -451,23 +515,26 @@ class MetalForceFieldManager:
         ]
 
         graph = self._graph(labels, forcefield.bonds.keys(), cap_indices)
-        description = self._describe_site(labels, graph, metal_indices,
-                                          cap_indices)
 
-        return {
+        # A template is the description of a site with the two files it was
+        # loaded from added to it, rather than a dictionary holding a
+        # description: the labels, the graph and the metal and cap indices
+        # would otherwise be in both of them, and a template could not be
+        # handed to the matching steps that take a description.
+        template = self._describe_site(labels, graph, metal_indices,
+                                       cap_indices)
+
+        template.update({
             'name': name,
-            'description': description,
             'forcefield': forcefield,
-            'geometry': geometry,
+            'molecule': molecule,
             'geometry_kind': kind,
-            'labels': labels,
-            'metal_indices': metal_indices,
-            'cap_indices': cap_indices,
             'beta_carbon_indices': beta_carbon_indices,
             'charges': charges,
-            'graph': graph,
             'folder': str(folder),
-        }
+        })
+
+        return template
 
     @staticmethod
     def _graph(labels, edges, cap_indices):
@@ -533,8 +600,6 @@ class MetalForceFieldManager:
         for component in nx.connected_components(sidechains):
             nodes = sorted(component)
             residues.append({
-                'nodes':
-                nodes,
                 'formula':
                 self._formula(labels, nodes),
                 'key':
@@ -935,7 +1000,6 @@ class MetalForceFieldManager:
                 'n_coarse_mappings': 0,
                 'n_mappings': 0,
                 'metal_bonds': None,
-                'metal_bond_deviation': None,
                 'regions': {},
             }
 
@@ -947,23 +1011,22 @@ class MetalForceFieldManager:
 
             # which residue coordinates which metal, with nothing said about
             # how many atoms of it do the coordinating
-            coarse = self._coarse_mappings(template['description'], described)
+            coarse = self._coarse_mappings(template, described)
 
             if not coarse:
+                # what it holds instead is printed from the template
                 entry['status'] = 'spec'
-                entry['spec'] = template['description']['spec']
                 findings[name] = entry
                 continue
 
             maps = []
             for coarse_mapping in coarse:
                 maps.extend(
-                    self._heavy_atom_maps(template['description'], described,
-                                          coarse_mapping))
+                    self._heavy_atom_maps(template, described, coarse_mapping))
 
             if not maps:
+                # what it holds instead is printed from the template
                 entry['status'] = 'spec'
-                entry['spec'] = template['description']['spec']
                 findings[name] = entry
                 continue
 
@@ -978,7 +1041,6 @@ class MetalForceFieldManager:
             entry['mapping'] = mapping
             entry['metal_bonds'] = self._metal_bond_summary(
                 template, described, mapping, coordinates)
-            entry['metal_bond_deviation'] = entry['metal_bonds']['deviation']
 
             for region in self.RMSD_REGIONS:
                 entry['regions'][region] = self._measure_region(
@@ -994,7 +1056,10 @@ class MetalForceFieldManager:
             'connectivity_matrix': query['connectivity_matrix'],
             'binding_modes': query['binding_modes'],
             'topology': query['topology'],
-            'spec': described['spec'],
+            'positions': query['positions'],
+            # the geometry every number above was measured on, which is the
+            # relaxed one rather than the site's own when mm_opt is set
+            'molecule': molecule,
             'description': described,
             'templates': findings,
         }
@@ -1002,6 +1067,359 @@ class MetalForceFieldManager:
         self._print_comparison(results)
 
         return results
+
+    def select_template(self, comparison, template=None, criteria=None):
+        """
+        Picks the template a force field should be built from, and says why.
+
+        A template is usable only if it maps onto every atom of the site
+
+        If no template is specified, every template that maps completely is held to
+        the the specified criteria. The passing templates are ranked and the best one is picked
+
+        If, the criteria are measured and reported but do
+        not decide, since naming a template is a statement that it is the
+        right one.
+
+        :param comparison:
+            The findings of compare_to_templates, or a structure to run it on.
+        :param template:
+            The name of the template to use, or None to choose one.
+        :param criteria:
+            The criteria to hold a template to: 'tight', 'loose', a set of the
+            same shape, or None for selection_criteria.
+
+        :return:
+            The decision, with the chosen name under 'name', None when nothing
+            passed, and what was made of every template under 'verdicts'.
+        """
+
+        comparison = self._comparison(comparison)
+        criteria_name, criteria = self._selection_criteria(criteria)
+
+        decision = {
+            'name': None,
+            'entry': None,
+            'forced': template is not None,
+            'criteria': criteria,
+            'criteria_name': criteria_name,
+            'score': None,
+            'verdicts': {},
+            'scores': {},
+            'candidates': [],
+        }
+
+        for name, entry in comparison['templates'].items():
+            verdict = self._selection_verdict(comparison, entry, criteria)
+            decision['verdicts'][name] = verdict
+            decision['scores'][name] = self._selection_score(entry)
+
+        if template is not None:
+            assert_msg_critical(
+                template in comparison['templates'],
+                'MetalForceFieldManager.select_template: no template named '
+                f'{template} was compared. Loaded: '
+                f'{sorted(comparison["templates"])}')
+
+            entry = comparison['templates'][template]
+            verdict = decision['verdicts'][template]
+
+            assert_msg_critical(
+                self._maps_every_atom(comparison, entry),
+                f'MetalForceFieldManager.select_template: template {template} '
+                f'does not map onto every atom of the site ({verdict}), so '
+                'its parameters cannot be transferred. Build this site with '
+                'MetalSiteForceFieldBuilder.')
+
+            if verdict is not None:
+                self.ostream.print_warning(
+                    f'Template {template} was named rather than chosen, and '
+                    f'it is outside the {criteria_name} criteria: {verdict}. '
+                    'Transferring it anyway.')
+                self.ostream.flush()
+
+            decision['name'] = template
+            decision['entry'] = entry
+            decision['score'] = decision['scores'][template]
+
+        else:
+            passed = [
+                name for name, verdict in decision['verdicts'].items()
+                if verdict is None
+            ]
+            decision['candidates'] = sorted(
+                passed, key=lambda name: decision['scores'][name])
+
+            if decision['candidates']:
+                name = decision['candidates'][0]
+                decision['name'] = name
+                decision['entry'] = comparison['templates'][name]
+                decision['score'] = decision['scores'][name]
+
+        self._print_selection(comparison, decision)
+
+        return decision
+
+    def build_ff_from_comparison(self,
+                                 comparison,
+                                 template=None,
+                                 criteria=None):
+        """
+        Builds a force field for a structure out of the template that fits it.
+
+        This is the half of a builder run that QM was paid for: the fitted
+        metal bonds and angles and the RESP charges are taken from a template
+        that describes the same site, and everything else is built for the
+        structure in front of us. Which template that is comes from
+        select_template, on the numbers compare_to_templates measured.
+
+        :param comparison:
+            The findings of compare_to_templates, or a structure to run it on.
+        :param template:
+            The name of the template to use, or None to choose one.
+        :param criteria:
+            The criteria to hold a template to: 'tight', 'loose', a set of the
+            same shape, or None for selection_criteria.
+
+        :return:
+            The results dictionary, or None when no template was good enough.
+        """
+
+        # todo accept pdb names?
+        comparison = self._comparison(comparison)
+        decision = self.select_template(comparison, template, criteria)
+
+        # todo should this logic be moved into select template
+        if decision['name'] is None:
+            closest = min(decision['scores'],
+                          key=lambda name: decision['scores'][name],
+                          default=None)
+
+            if closest is not None and math.isfinite(
+                    decision['scores'][closest]):
+                self.ostream.print_info(
+                    f'No template is within the {decision["criteria_name"]} '
+                    f'criteria. The closest is {closest}: '
+                    f'{decision["verdicts"][closest]}.')
+            else:
+                self.ostream.print_info(
+                    'No template describes this site: none of them maps onto '
+                    'all of its atoms.')
+
+            self.ostream.print_info(
+                "Returning None. Try criteria='loose', or build this site "
+                'with MetalSiteForceFieldBuilder.')
+            self.ostream.flush()
+            return None
+
+        name = decision['name']
+        template = self.templates[name]
+        entry = decision['entry']
+        active_site = comparison['active_site']
+
+        self.ostream.print_info(
+            f'Building the force field from {name}, measured on the '
+            f'{comparison["geometry"]} geometry. Transferring its metal terms '
+            'and charges.')
+        self.ostream.flush()
+
+        forcefield = self._transfer(template, entry['mapping'], active_site,
+                                    comparison['connectivity_matrix'])
+
+        enzyme_system = None
+        if self.build_enzyme_system:
+            enzyme_system, _ = self.builder.create_enzyme_system(
+                comparison['topology'], active_site, forcefield,
+                forcefield.partial_charges)
+
+        self.builder._print_metal_parameters(active_site, forcefield)
+
+        return {
+            'template': name,
+            'forcefield': forcefield,
+            'mapping': entry['mapping'],
+            'forced': decision['forced'],
+            'criteria': decision['criteria_name'],
+            'score': decision['score'],
+            'verdicts': decision['verdicts'],
+            'candidates': decision['candidates'],
+            'regions': entry['regions'],
+            'metal_bonds': entry['metal_bonds'],
+            'geometry': comparison['geometry'],
+            'geometry_kind': template['geometry_kind'],
+            'topology': comparison['topology'],
+            'positions': comparison['positions'],
+            'binding_modes': comparison['binding_modes'],
+            'active_site': active_site,
+            'connectivity_matrix': comparison['connectivity_matrix'],
+            'enzyme_system': enzyme_system,
+        }
+
+    def _comparison(self, comparison):
+        """
+        Takes either the findings of compare_to_templates or a structure to
+        measure, and returns the findings.
+
+        :param comparison:
+            The findings, or the path to a PDB or mmCIF file.
+
+        :return:
+            The findings.
+        """
+
+        if isinstance(comparison, (str, Path)):
+            return self.compare_to_templates(comparison)
+
+        assert_msg_critical(
+            isinstance(comparison, dict) and 'templates' in comparison,
+            'MetalForceFieldManager: expected the findings of '
+            'compare_to_templates or a structure to measure, got '
+            f'{type(comparison).__name__}')
+
+        return comparison
+
+    def _selection_criteria(self, criteria):
+        """
+        Resolves the criteria a template is held to.
+
+        :param criteria:
+            A name in SELECTION_CRITERIA, a set of the same shape, or None for
+            selection_criteria.
+
+        :return:
+            The tuple of the name to report it under and the set itself.
+        """
+
+        if criteria is None:
+            criteria = self.selection_criteria
+
+        if isinstance(criteria, str):
+            assert_msg_critical(
+                criteria in self.SELECTION_CRITERIA,
+                'MetalForceFieldManager: the criteria must be one of '
+                f'{sorted(self.SELECTION_CRITERIA)} or a set of thresholds, '
+                f'got {criteria}')
+            return criteria, self.SELECTION_CRITERIA[criteria]
+
+        assert_msg_critical(
+            isinstance(criteria, dict),
+            'MetalForceFieldManager: the criteria must be one of '
+            f'{sorted(self.SELECTION_CRITERIA)} or a set of thresholds, got '
+            f'{type(criteria).__name__}')
+
+        for region, thresholds in criteria.items():
+            assert_msg_critical(
+                region in self.RMSD_REGIONS,
+                f'MetalForceFieldManager: {region} is not a region the '
+                f'criteria can name; expected one of {list(self.RMSD_REGIONS)}')
+            for name, limits in (thresholds or {}).items():
+                assert_msg_critical(
+                    name in self.IC_TYPES,
+                    f'MetalForceFieldManager: {name} is not an internal '
+                    'coordinate type the criteria can name; expected one of '
+                    f'{list(self.IC_TYPES)}')
+                for measure in (limits or {}):
+                    assert_msg_critical(
+                        measure in ('rms', 'max'),
+                        f'MetalForceFieldManager: {measure} is not a measure '
+                        "the criteria can name; expected 'rms' or 'max'")
+
+        return 'custom', criteria
+
+    @staticmethod
+    def _maps_every_atom(comparison, entry):
+        """
+        Says whether a template covers every atom of the site.
+
+        A template that holds other atoms, or coordinates them differently,
+        never gets as far as a mapping; this also catches a mapping that came
+        back incomplete, which would leave part of a site unparameterized.
+
+        :param comparison:
+            The findings of compare_to_templates.
+        :param entry:
+            What it measured for the template.
+
+        :return:
+            True when every atom of the site is mapped onto exactly once.
+        """
+
+        if entry['status'] != 'measured' or entry['mapping'] is None:
+            return False
+
+        atoms = len(comparison['active_site']['labels'])
+        mapping = entry['mapping']
+
+        return (len(mapping) == atoms
+                and sorted(mapping.values()) == list(range(atoms)))
+
+    def _selection_verdict(self, comparison, entry, criteria):
+        """
+        Holds one template to the criteria, region by region.
+
+        :param comparison:
+            The findings of compare_to_templates.
+        :param entry:
+            What it measured for the template.
+        :param criteria:
+            The criteria, as _selection_criteria resolves them.
+
+        :return:
+            A description of what stands in the way, or None when nothing
+            does.
+        """
+
+        if entry['status'] == 'composition':
+            return 'different atoms'
+
+        if entry['status'] == 'spec':
+            return 'different coordination'
+
+        if not self._maps_every_atom(comparison, entry):
+            return 'incomplete mapping'
+
+        for region in self.RMSD_REGIONS:
+            thresholds = criteria.get(region)
+            if not thresholds:
+                continue
+
+            found = entry['regions'].get(region)
+            if found is None:
+                return f'{region} not measured'
+
+            # a criterion that could not be evaluated is not one that was
+            # passed, so the region is held to strictly here
+            violation = self._ic_violation(found['ic_rmsd'],
+                                           thresholds,
+                                           strict=True)
+            if violation is not None:
+                return f'{region} {violation}'
+
+        return None
+
+    def _selection_score(self, entry):
+        """
+        Returns what several templates that all pass are ranked on.
+
+        :param entry:
+            What compare_to_templates measured for the template.
+
+        :return:
+            The measure named by SELECTION_RANKED_ON, or infinity where it was
+            not measured.
+        """
+
+        region, ic_type, measure = self.SELECTION_RANKED_ON
+
+        found = entry['regions'].get(region)
+        if found is None or found['ic_rmsd'] is None:
+            return math.inf
+
+        found = found['ic_rmsd'].get(ic_type)
+        if found is None:
+            return math.inf
+
+        return found[measure]
 
     def _extract_active_site(self, structure):
         """
@@ -1247,7 +1665,7 @@ class MetalForceFieldManager:
             The tuple of the best mapping and the superposition it gives.
         """
 
-        reference = template['geometry'].get_coordinates_in_angstrom()
+        reference = template['molecule'].get_coordinates_in_angstrom()
         best = None
 
         for atom_map in maps:
@@ -1290,10 +1708,10 @@ class MetalForceFieldManager:
             The mapping over every atom.
         """
 
-        reference = template['geometry'].get_coordinates_in_angstrom()
+        reference = template['molecule'].get_coordinates_in_angstrom()
         aligned = np.matmul(coordinates, rot) + trans
 
-        template_caps = set(template['description']['cap_indices'])
+        template_caps = set(template['cap_indices'])
         query_caps = set(query['cap_indices'])
 
         atom_map = dict(heavy_map)
@@ -1392,7 +1810,7 @@ class MetalForceFieldManager:
             largest metal-ligand bond difference under it.
         """
 
-        reference = template['geometry'].get_coordinates_in_angstrom()
+        reference = template['molecule'].get_coordinates_in_angstrom()
         region = self._region_indices(template)
         heavy = [index for index in region if template['labels'][index] != 'H']
 
@@ -1587,7 +2005,7 @@ class MetalForceFieldManager:
         if heavy_only is None:
             heavy_only = self.rmsd_heavy_atoms_only
 
-        reference = template['geometry'].get_coordinates_in_angstrom()
+        reference = template['molecule'].get_coordinates_in_angstrom()
         indices = self._region_indices(template, region)
         heavy = [index for index in indices if template['labels'][index] != 'H']
 
@@ -1648,7 +2066,7 @@ class MetalForceFieldManager:
         indices = self._rmsd_indices(template, region, heavy_only)
         labels = [template['labels'][index] for index in indices]
 
-        reference = template['geometry'].get_coordinates_in_angstrom()
+        reference = template['molecule'].get_coordinates_in_angstrom()
         order = [mapping[index] for index in indices]
 
         mapped = Molecule(labels, coordinates[order], 'angstrom')
@@ -1666,9 +2084,9 @@ class MetalForceFieldManager:
 
         return ic_rmsd
 
-    def _ic_violation(self, ic_rmsd):
+    def _ic_violation(self, ic_rmsd, thresholds=None, strict=False):
         """
-        Checks internal coordinate deviations against ic_rmsd_thresholds.
+        Checks internal coordinate deviations against a set of thresholds.
 
         A type left at None, or a threshold left out of one, is not checked.
         The dihedrals are None by default: the ones about a metal center are
@@ -1677,23 +2095,38 @@ class MetalForceFieldManager:
 
         :param ic_rmsd:
             The deviations, as get_ic_rmsd reports them.
+        :param thresholds:
+            The thresholds to check against, or None for ic_rmsd_thresholds.
+        :param strict:
+            Whether a type that is asked for but was not measured counts as a
+            violation. Off for the matching path, which reads a missing type
+            as a region that holds none of them; on for the selection path,
+            where a criterion that could not be evaluated is not one that was
+            passed.
 
         :return:
             A description of the first threshold that was exceeded, or None
             when every one of them holds.
         """
 
+        if thresholds is None:
+            thresholds_for = self.ic_rmsd_thresholds.get
+        else:
+            thresholds_for = thresholds.get
+
         if ic_rmsd is None:
             return 'no internal coords'
 
         for name, unit in self.IC_TYPES.items():
-            thresholds = self.ic_rmsd_thresholds.get(name)
+            thresholds = thresholds_for(name)
             if not thresholds:
                 continue
 
             found = ic_rmsd.get(name)
             if found is None:
                 # the region holds no internal coordinate of this type
+                if strict:
+                    return f'no {name} measured'
                 continue
 
             for measure in ('rms', 'max'):
@@ -1730,7 +2163,7 @@ class MetalForceFieldManager:
             shared, and how many either side makes alone.
         """
 
-        reference = template['geometry'].get_coordinates_in_angstrom()
+        reference = template['molecule'].get_coordinates_in_angstrom()
         bonds, _ = self._metal_keys(template)
 
         deviation = 0.0
@@ -1784,7 +2217,7 @@ class MetalForceFieldManager:
             The largest difference in Angstrom, or 0.0 without metal bonds.
         """
 
-        reference = template['geometry'].get_coordinates_in_angstrom()
+        reference = template['molecule'].get_coordinates_in_angstrom()
         bonds, _ = self._metal_keys(template)
 
         deviation = 0.0
@@ -1814,6 +2247,7 @@ class MetalForceFieldManager:
             template['forcefield'],
             {'metal_indices': template['metal_indices']})
 
+    # todo come up with a more descriptive name for this
     def _transfer(self, template, mapping, active_site, connectivity_matrix):
         """
         Builds a force field for an active site out of a template.
@@ -1844,10 +2278,11 @@ class MetalForceFieldManager:
             charges[site_index] = template['charges'][template_index]
 
         total = float(np.sum(charges))
-        if abs(total - active_site['charge']) > 1.0e-3:
+        expected = int(active_site['molecule'].get_charge())
+        if abs(total - expected) > 1.0e-3:
             self.ostream.print_warning(
                 f'The transferred charges sum to {total:+.3f}, but the active '
-                f'site charge is {active_site["charge"]:+d}')
+                f'site charge is {expected:+d}')
 
         # build_forcefield writes the charges onto the atoms and redistributes
         # the caps; the metal terms it seeds here are overwritten below
@@ -2201,8 +2636,7 @@ class MetalForceFieldManager:
             self.ostream.print_info(
                 f'{name}: coordinates a different set of residues, so '
                 'nothing was measured.')
-            self._print_spec(f'{name} holds',
-                             self.templates[name]['description'])
+            self._print_spec(f'{name} holds', self.templates[name])
             self.ostream.flush()
             return
 
@@ -2314,8 +2748,97 @@ class MetalForceFieldManager:
             met = sum(1 for passed in found['criteria'].values() if passed)
             self.ostream.print_header(
                 row.format(name[:24], entry['status'], f'{scored(entry):.3f}',
-                           f'{entry["metal_bond_deviation"]:.3f}',
+                           f'{entry["metal_bonds"]["deviation"]:.3f}',
                            f'{met} of {len(found["criteria"])}'))
+
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def _print_selection(self, comparison, decision):
+        """
+        Prints how every template stands against the criteria, and which one
+        was taken.
+
+        The whole field is printed rather than the winner alone: whether the
+        others are near misses or a long way off is what says how much the
+        chosen one is worth.
+
+        :param comparison:
+            The findings of compare_to_templates.
+        :param decision:
+            The decision, as select_template makes it.
+        """
+
+        regions = [
+            region for region in self.RMSD_REGIONS
+            if decision['criteria'].get(region)
+        ]
+
+        self.ostream.print_blank()
+        title = f'Choosing a template on the {decision["criteria_name"]} criteria'
+        self.ostream.print_header(title)
+        self.ostream.print_header(len(title) * '-')
+        self.ostream.print_blank()
+
+        for region in regions:
+            thresholds = decision['criteria'][region]
+            # only the measures the set actually holds, since either of
+            # them may be left out of one
+            measures = {
+                name:
+                ' / '.join(f'{measure} {limit:.2f}'
+                           for measure, limit in given.items()
+                           if limit is not None)
+                for name, given in thresholds.items() if given
+            }
+            limits = '; '.join(f'{name} {shown} {self.IC_TYPES[name]}'
+                               for name, shown in measures.items())
+            self.ostream.print_header(
+                self._param(region, limits, value_width=44))
+
+        self.ostream.print_blank()
+
+        # one column per region the criteria name, so a custom set of them
+        # prints as readably as the two that come with the class
+        row = ' | '.join(['{:>22}'] + ['{:>13}'] * len(regions) +
+                         ['{:>26}', '{:>5}'])
+        header = row.format('template', *[region[:13] for region in regions],
+                            'verdict', 'taken')
+        self.ostream.print_header(header)
+        self.ostream.print_header(len(header) * '-')
+
+        order = sorted(comparison['templates'],
+                       key=lambda name: (decision['verdicts'][name] is not None,
+                                         decision['scores'][name], name))
+
+        for name in order:
+            entry = comparison['templates'][name]
+            cells = []
+            for region in regions:
+                found = entry['regions'].get(region)
+                cells.append('' if found is
+                             None else self._ic_cell(found['ic_rmsd'], 'bonds'))
+
+            verdict = decision['verdicts'][name] or 'within the criteria'
+            self.ostream.print_header(
+                row.format(name[:22], *cells, verdict[:26],
+                           'yes' if name == decision['name'] else ''))
+
+        self.ostream.print_blank()
+
+        if decision['name'] is None:
+            self.ostream.print_info('No template was taken.')
+        elif decision['forced']:
+            self.ostream.print_info(
+                f'{decision["name"]} was named rather than chosen, so the '
+                'criteria were measured but did not decide.')
+        else:
+            ranked = ' '.join(self.SELECTION_RANKED_ON)
+            self.ostream.print_info(
+                f'{len(decision["candidates"])} of '
+                f'{len(comparison["templates"])} template(s) are within the '
+                f'criteria. Taking {decision["name"]}, whose {ranked} of '
+                f'{decision["score"]:.3f} is the lowest of them.')
 
         self.ostream.print_blank()
         self.ostream.flush()
