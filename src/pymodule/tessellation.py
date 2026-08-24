@@ -295,9 +295,9 @@ class TessellationDriver:
         # Get grid generated from the C++ class. The spheres are not scaled.
         # Generating from tabulated angles would allow a wider range of
         # different grid points and an on-the-fly scaling.
-        leb_grid = gen_lebedev_grid(self.num_lebedev_points)
+        lebedev_grid = gen_lebedev_grid(self.num_lebedev_points)
 
-        return leb_grid
+        return lebedev_grid
 
     def get_norm_vecs(self, grid):
         """
@@ -663,63 +663,15 @@ class TessellationDriver:
 
     def update_num_points(self):
         """
-        Checks if requested number of points is valid and updates it to
+        Checks if the requested number of points is valid and updates it to
         the closest valid one if necessary.
+
+        :return:
+            The number of Lebedev points that will be used.
         """
 
-        # the available grids in the C++ class:
-        num_points_avail = np.array([6, 50, 110, 194, 302, 434, 590, 770, 974, 2030])
-
-        if self.num_lebedev_points not in num_points_avail:
-            warn_text = '*** Warning: Requested number of '
-            warn_text += str(self.num_lebedev_points)
-            warn_text += ' points for the Lebedev grid is invalid.'
-
-            self.ostream.print_header(warn_text.ljust(97))
-
-            warn_text = '***' + ' ' * 10
-            warn_text += 'Valid numbers of grid points are: '
-            warn_text += '6, 50, 110, 194, 302, 434, 590, 770, 974 and 2030.'
-
-            self.ostream.print_header(warn_text.ljust(97))
-
-            self.num_lebedev_points = num_points_avail[
-                np.abs(num_points_avail - self.num_lebedev_points).argmin()]
-
-            warn_text = '***' + ' ' * 10
-            warn_text += 'A number of '
-            warn_text += str(self.num_lebedev_points)
-            warn_text += ' points is used instead as the closest valid number.'
-
-            self.ostream.print_header(warn_text.ljust(97))
-            self.ostream.print_blank()
-
-            self.ostream.flush()
-
-        if (self.num_lebedev_points == 2030 and self.discretization.lower() == 'iswig'):
-            warn_text = '*** Warning: Requested number of '
-            warn_text += str(self.num_lebedev_points)
-            warn_text += ' points for the Lebedev grid is invalid with ISWIG.'
-
-            self.ostream.print_header(warn_text.ljust(97))
-
-            warn_text = '***' + ' ' * 10
-            warn_text += 'Valid numbers of grid points are: '
-            warn_text += '6, 50, 110, 194, 302, 434, 590, 770 and 974.'
-
-            self.ostream.print_header(warn_text.ljust(97))
-
-            self.num_lebedev_points = 974
-
-            warn_text = '***' + ' ' * 10
-            warn_text += 'A number of '
-            warn_text += str(self.num_lebedev_points)
-            warn_text += ' points is used instead as the closest valid number.'
-
-            self.ostream.print_header(warn_text.ljust(97))
-            self.ostream.print_blank()
-
-            self.ostream.flush()
+        self.num_lebedev_points = validate_num_lebedev_points(
+            self.num_lebedev_points, self.discretization, self.ostream)
 
         return self.num_lebedev_points
 
@@ -763,7 +715,7 @@ class TessellationDriver:
             x, y, z = grid_in_angstrom[i]
             grid_xyz_string += f'He {x} {y} {z}\n'
 
-        v = p3d.view(width=2500, height=800)
+        v = p3d.view(width=600, height=600)
 
         v.addModel(molecule.get_xyz_string(), 'xyz')
         v.setStyle({'stick': {}})
@@ -778,3 +730,64 @@ class TessellationDriver:
 
         v.zoomTo()
         v.show()
+
+def validate_num_lebedev_points(num_lebedev_points, discretization='fixed',
+                                ostream=None):
+    """
+    Checks that the requested number of Lebedev points is available and
+    returns the closest valid alternative if it is not.
+
+    :param num_lebedev_points:
+        The number of Lebedev points per sphere.
+    :param discretization:
+        The surface discretization method.
+    :param ostream:
+        The output stream used for warnings; no warning is printed if None.
+
+    :return:
+        The valid number of Lebedev points.
+    """
+
+    def print_warning(header, valid_points, new_value):
+        if ostream is None:
+            return
+        ostream.print_header(header.ljust(97))
+        warn_text = '***' + ' ' * 10 + 'Valid numbers of grid points are: '
+        warn_text += ', '.join(str(p) for p in valid_points[:-1])
+        warn_text += f' and {valid_points[-1]}.'
+        ostream.print_header(warn_text.ljust(97))
+        warn_text = '***' + ' ' * 10 + f'A number of {new_value} points is '
+        warn_text += 'used instead as the closest valid number.'
+        ostream.print_header(warn_text.ljust(97))
+        ostream.print_blank()
+        ostream.flush()
+
+    # the Lebedev grids available in the C++ class
+    num_lebedev_points_available = (6, 50, 110, 194, 302, 434, 590, 770, 974, 2030)
+
+    # ISWIG is not parameterized for the smallest and largest grid
+    num_lebedev_points_iswig_available = (50, 110, 194, 302, 434, 590, 770, 974)
+
+    num_lebedev_points = int(num_lebedev_points)
+    is_iswig = str(discretization).lower() == 'iswig'
+
+    # select the grid list applicable to the discretization method
+    if is_iswig:
+        available = np.array(num_lebedev_points_iswig_available)
+        valid_points = num_lebedev_points_iswig_available
+        warning_tail = 'invalid with ISWIG'
+    else:
+        available = np.array(num_lebedev_points_available)
+        valid_points = num_lebedev_points_available
+        warning_tail = 'invalid'
+
+    # snap to the closest available grid
+    if num_lebedev_points not in available:
+        closest = int(available[np.abs(available - num_lebedev_points).argmin()])
+        print_warning(
+            f'*** Warning: Requested number of {num_lebedev_points} points '
+            f'for the Lebedev grid is {warning_tail}.',
+            valid_points, closest)
+        num_lebedev_points = closest
+
+    return num_lebedev_points

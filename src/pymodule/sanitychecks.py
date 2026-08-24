@@ -773,6 +773,12 @@ def gostshyp_sanity_check(obj, basis=None):
             type(obj).__name__ +
             ': GOSTSHYP is incompatible with the solvation model')
 
+        from .tessellation import validate_num_lebedev_points
+        obj.gostshyp_num_lebedev_points = validate_num_lebedev_points(
+            obj.gostshyp_num_lebedev_points,
+            obj.gostshyp_discretization,
+            obj.ostream)
+
         if basis is not None:
 
             # check max angular momentum of basis
