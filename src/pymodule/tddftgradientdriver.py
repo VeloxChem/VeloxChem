@@ -957,6 +957,10 @@ class TddftGradientDriver(GradientDriver):
             'Numerical dipole is not supported with a static ' +
             'electric field')
 
+        # disable restarting scf and response
+        scf_drv.restart = False
+        rsp_drv.restart = False
+
         n_states = len(self.state_deriv_index)
         dipole_moment = np.zeros((n_states, 3))
         field = [0.0, 0.0, 0.0]
@@ -978,7 +982,6 @@ class TddftGradientDriver(GradientDriver):
                     scf_drv.electric_field = field
                     scf_drv.compute(molecule, ao_basis)
                     scf_tensors = scf_drv.scf_tensors
-                    rsp_drv._is_converged = False  # only needed for RPA
                     rsp_results = rsp_drv.compute(molecule, ao_basis,
                                                   scf_tensors)
                     exc_en_plus = rsp_results['eigenvalues'][s]
@@ -986,7 +989,6 @@ class TddftGradientDriver(GradientDriver):
 
                     field[i] = -field_strength
                     scf_drv.compute(molecule, ao_basis)
-                    rsp_drv._is_converged = False
                     rsp_results = rsp_drv.compute(molecule, ao_basis,
                                                   scf_drv.scf_tensors)
                     exc_en_minus = rsp_results['eigenvalues'][s]
@@ -1001,6 +1003,16 @@ class TddftGradientDriver(GradientDriver):
         finally:
             # the scan leaves scf_drv.electric_field set; restore it
             scf_drv.electric_field = None
+
+        # restore the reference (zero-field) state: the last SCF/response
+        # run in the loop above was at a finite field, so scf_drv and rsp_drv
+        # would otherwise keep finite-field results.
+        scf_drv.ostream.mute()
+        rsp_drv.ostream.mute()
+        scf_drv.compute(molecule, ao_basis)
+        rsp_drv.compute(molecule, ao_basis, scf_drv.scf_tensors)
+        scf_drv.ostream.unmute()
+        rsp_drv.ostream.unmute()
 
         return dipole_moment
 
