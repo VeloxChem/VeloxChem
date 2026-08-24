@@ -1069,9 +1069,14 @@ class ScfDriver:
                     self.ostream.print_blank()
 
                 area_info = 'The total surface area of the van der Waals cavity is '
-                area_info += '{:.2f} angstrom^2.'.format(
+                area_info += '{:.2f} Angstrom^2.'.format(
                     np.sum(np.sum(tessellation[3, :]) * bohr_in_angstrom()**2))
                 self.ostream.print_info(area_info)
+                self.ostream.print_blank()
+
+                neg_amp_info = 'GOSTSHYP grid points with negative amplitudes '
+                neg_amp_info += 'are excluded from the pressure potential.'
+                self.ostream.print_info(neg_amp_info)
                 self.ostream.print_blank()
 
         # DIIS method
@@ -3612,7 +3617,7 @@ class ScfDriver:
                 'Gradient Norm', 'Max. Gradient', 'Density Change')
 
             if self._gostshyp:
-                valstr += ' | Neg. Amplitudes'
+                valstr += ' | Neg. Amp. Points'
 
             self.ostream.print_header(valstr)
             self.ostream.print_header(len(valstr) * '-')
@@ -3680,7 +3685,7 @@ class ScfDriver:
                     e_grad, max_grad, diff_den)
 
                 if self._gostshyp:
-                    valstr += ' ' * 13 + '{:3d} '.format(self._gostshyp_drv.num_neg_amp)
+                    valstr += '{:18d} '.format(self._gostshyp_drv.num_neg_amp)
 
                 self.ostream.print_header(valstr)
 
