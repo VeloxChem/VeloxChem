@@ -728,13 +728,7 @@ class MetalSiteForceFieldBuilder:
         be written to and read back from JSON and is meant to be reviewed before
         use. Everything downstream reads the dictionary, never the geometry.
 
-        include_residue is the same principle applied before the fact: a
-        residue named there is made a ligand of its nearest metal however far
-        away it sits, through its closest sidechain donor. That is how a
-        design whose ligand has not been placed properly yet, or a contact the
-        cutoffs are too tight for, gets into the active site. The request is
-        recorded in the dictionary, so update_binding_modes honours it too and
-        a relaxation cannot drop what was asked for.
+        include_residue forces inclusion of a residue as a ligand whatever its distance
 
         :param topology:
             The OpenMM topology.
@@ -790,10 +784,6 @@ class MetalSiteForceFieldBuilder:
             'metals': metals,
             'ligands': ligands,
             'variants': {},
-            'cutoffs': {
-                'primary': self.metal_bond_cutoff,
-                'secondary': self.report_cutoff,
-            },
             'include_residue': sorted(forced),
             'notes': notes,
         }
@@ -1547,6 +1537,9 @@ class MetalSiteForceFieldBuilder:
         molecule.set_charge(charge)
         molecule.set_multiplicity(1)
 
+        # the charge and the multiplicity are on the molecule, which is
+        # where they are read from; keeping a second copy here only gives
+        # them somewhere to disagree
         active_site = {
             'molecule': molecule,
             'labels': labels,
@@ -1554,11 +1547,8 @@ class MetalSiteForceFieldBuilder:
             'cap_indices': cap_indices,
             'beta_carbon_indices': beta_carbon_indices,
             'metal_indices': metal_indices,
-            'charge': charge,
-            'multiplicity': 1,
             'residues':
             [f'{residues[i].name}{residues[i].id}' for i in res_indices],
-            'res_indices': res_indices,
         }
 
         return active_site
@@ -1783,10 +1773,8 @@ class MetalSiteForceFieldBuilder:
             'metals': deepcopy(binding_modes['metals']),
             'ligands': new_ligands,
             'variants': deepcopy(binding_modes.get('variants', {})),
-            'cutoffs': {
-                'primary': self.metal_bond_cutoff,
-                'secondary': self.report_cutoff,
-            },
+            'include_residue': sorted(binding_modes.get('include_residue',
+                                                        [])),
             'notes': notes,
         }
 
@@ -2030,7 +2018,7 @@ class MetalSiteForceFieldBuilder:
         )
 
         total = float(np.sum(charges))
-        expected = active_site['charge']
+        expected = int(active_site['molecule'].get_charge())
 
         if abs(total - expected) > 1.0e-3:
             self.ostream.print_warning(
@@ -2293,14 +2281,12 @@ class MetalSiteForceFieldBuilder:
         more than the stiffness at that stage.
 
         :param hessian:
-            The Hessian as a (3N, 3N) numpy array. The string 'xtb' is
-            rejected: it would make reparameterize re-optimize the active site
-            without constraints, silently replacing every equilibrium value
-            with a gas-phase one.
+            The Hessian as a (3N, 3N) numpy array. If None, default values for the metal terms are used instead of fitted.
         :param partial_charges:
             The partial charges fitted on the active site. The charge of the
             capping hydrogens is redistributed over the remaining atoms before
-            they are applied, since the caps do not exist in the protein.
+            they are applied, since the caps do not exist in the protein. 
+            If None, D4 charges are used.
 
         :return:
             The force field generator.
@@ -2329,20 +2315,26 @@ class MetalSiteForceFieldBuilder:
         # take effect, also resets partial_charges to None, and resp=False
         # then fills them with zeros. Assigning them beforehand is silently
         # discarded.
-        if partial_charges is not None:
-            partial_charges = np.asarray(partial_charges)
-            assert_msg_critical(
-                partial_charges.shape == (n_atoms, ),
-                'MetalSiteForceFieldBuilder.build_forcefield: expected '
-                f'{n_atoms} partial charges, got {partial_charges.shape}')
-            # The capping hydrogens stand in for alpha carbons and do not
-            # exist anywhere the force field is used, so their charge is
-            # folded into the rest of the active site before anything is written.
-            partial_charges = self.redistribute_cap_charges(
-                active_site, partial_charges)
-            forcefield.partial_charges = partial_charges
-            for index in range(n_atoms):
-                forcefield.atoms[index]['charge'] = partial_charges[index]
+        if partial_charges is None:
+            self.ostream.print_info(
+                "Using D4 partial charges because no charges were supplied.")
+            self.ostream.flush()
+            partial_charges = active_site['molecule'].get_partial_charges(
+                active_site['molecule'].get_charge())
+
+        partial_charges = np.asarray(partial_charges)
+        assert_msg_critical(
+            partial_charges.shape == (n_atoms, ),
+            'MetalSiteForceFieldBuilder.build_forcefield: expected '
+            f'{n_atoms} partial charges, got {partial_charges.shape}')
+        # The capping hydrogens stand in for alpha carbons and do not
+        # exist anywhere the force field is used, so their charge is
+        # folded into the rest of the active site before anything is written.
+        partial_charges = self.redistribute_cap_charges(active_site,
+                                                        partial_charges)
+        forcefield.partial_charges = partial_charges
+        for index in range(n_atoms):
+            forcefield.atoms[index]['charge'] = partial_charges[index]
 
         self.annotate_atoms(forcefield, active_site)
 
@@ -3331,9 +3323,9 @@ class MetalSiteForceFieldBuilder:
         self.ostream.print_header(
             self._param('atoms', molecule.number_of_atoms()))
         self.ostream.print_header(
-            self._param('charge', f'{active_site["charge"]:+d}'))
+            self._param('charge', f'{int(molecule.get_charge()):+d}'))
         self.ostream.print_header(
-            self._param('multiplicity', active_site['multiplicity']))
+            self._param('multiplicity', int(molecule.get_multiplicity())))
         self.ostream.print_header(
             self._param('capping hydrogens', len(active_site['cap_indices'])))
         self.ostream.print_header(
@@ -3371,7 +3363,9 @@ class MetalSiteForceFieldBuilder:
         self.ostream.print_header('Partial charges')
         self.ostream.print_header(15 * '-')
         self.ostream.print_header(
-            self._param('active site charge', f'{active_site["charge"]:+d}'))
+            self._param(
+                'active site charge',
+                f'{int(active_site["molecule"].get_charge()):+d}'))
         self.ostream.print_header(
             self._param('fitted total', f'{charges.sum():+.4f} e'))
         self.ostream.print_header(
