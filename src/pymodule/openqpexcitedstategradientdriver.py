@@ -660,15 +660,17 @@ class OpenQPExcitedStateGradientDriver(GradientDriver):
              if result.seeded_from_reference else
              'OpenQP default (no reusable reference)'))
         guess_info = getattr(self.openqp_driver, 'last_scf_guess_info', None)
-        if guess_info is not None and guess_info.get('seeded'):
-            # The reported number is the violation the Loewdin step removed,
-            # i.e. how far the previous geometry's orbitals were from
-            # orthonormal in *this* geometry's AO metric -- a measure of how
-            # far the geometry moved, not a residual error.
+        if (guess_info is not None and guess_info.get('seeded') and
+                guess_info.get('orthonormality_error') is not None):
+            # The orbitals are injected as-is, not realigned; the reported
+            # number is how far they sit from AO-metric orthonormal in
+            # *this* geometry's overlap -- a measure of how far the geometry
+            # moved (and, near a frontier near-degeneracy, an early-warning
+            # signal), not a residual error.
             self.ostream.print_info(
-                f"  {guess_info['basis_functions']} orbitals re-orthonormalized"
-                ' (Loewdin) in this AO metric; largest violation removed: '
-                f"{guess_info['orthonormality_error']:.3e}")
+                f"  {guess_info['basis_functions']} orbitals seeded from the "
+                'previous geometry; largest deviation from orthonormal in '
+                f"this AO metric: {guess_info['orthonormality_error']:.3e}")
         if result.stale_reference_steps:
             self.ostream.print_info(
                 'Reference age              : '

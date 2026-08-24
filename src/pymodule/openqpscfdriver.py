@@ -322,78 +322,6 @@ def pack_triangular(matrix):
     return np.asarray(matrix, dtype=float)[rows, cols]
 
 
-def align_scf_guess_payload(payload, overlap, occupations=None):
-    """Re-orthonormalizes seeded orbitals in the AO metric of a new geometry.
-
-    MO coefficients converged at one geometry are orthonormal under *that*
-    geometry's overlap matrix only.  Injected verbatim into the next geometry
-    they define a density that is not idempotent, so the first SCF energy of
-    the new geometry drops *below* its own variational minimum and DIIS has to
-    spend several iterations repairing the guess before it can converge.
-
-    A symmetric (Loewdin) transformation ``C <- C (C^T S C)^{-1/2}`` in the new
-    metric restores orthonormality while perturbing the orbitals as little as
-    possible, and it is applied identically to the alpha and beta sets so an
-    ROHF reference keeps sharing one orbital set.  The seeded densities are
-    rebuilt from the repaired orbitals, which matters for the restricted
-    guess: OpenQP rebuilds the density from the orbitals for ROHF/UHF but uses
-    the injected ``OQP::DM_A`` as given for RHF.
-
-    :param payload:
-        Guess payload from :func:`scf_guess_payload`; modified in place.
-    :param overlap:
-        Square AO overlap matrix of the *new* geometry.
-    :param occupations:
-        Optional ``{orbital key: number of occupied orbitals}`` mapping used to
-        rebuild the densities.
-
-    :return:
-        The payload and the largest orthonormality violation that was
-        repaired, or ``None`` when the payload could not be aligned.
-    """
-
-    overlap = np.asarray(overlap, dtype=float)
-    nbf = overlap.shape[0]
-    occupations = occupations or {}
-    deviation = 0.0
-
-    for orbital_key, density_key in zip(_SCF_GUESS_ORBITAL_KEYS,
-                                        _SCF_GUESS_DENSITY_KEYS):
-        if orbital_key not in payload:
-            continue
-
-        stored = np.asarray(payload[orbital_key], dtype=float)
-        if stored.size != nbf * nbf:
-            # A different basis dimension: the payload cannot describe this
-            # calculation at all, so it is left untouched for the caller to
-            # reject.
-            return payload, None
-
-        # Fortran stores MOs column-wise, so the C-order view has them as rows.
-        coefficients = stored.reshape(nbf, nbf).T
-        metric = coefficients.T @ overlap @ coefficients
-        deviation = max(deviation,
-                        float(np.abs(metric - np.eye(nbf)).max()))
-
-        eigenvalues, eigenvectors = np.linalg.eigh(metric)
-        if not np.all(np.isfinite(eigenvalues)) or eigenvalues.min() <= 0.0:
-            # A singular metric means the stored orbitals do not span the
-            # current AO space; a repaired guess would be meaningless.
-            return payload, None
-        inverse_sqrt = (eigenvectors * eigenvalues**-0.5) @ eigenvectors.T
-        coefficients = coefficients @ inverse_sqrt
-
-        payload[orbital_key] = np.ascontiguousarray(coefficients.T)
-
-        n_occupied = occupations.get(orbital_key)
-        if (density_key in payload and n_occupied is not None and
-                0 <= int(n_occupied) <= nbf):
-            occupied = coefficients[:, :int(n_occupied)]
-            payload[density_key] = pack_triangular(occupied @ occupied.T)
-
-    return payload, deviation
-
-
 class OpenQPScfDriver:
     """
     Implements OpenQP (PyOQP) SCF driver.
@@ -952,10 +880,28 @@ class OpenQPScfDriver:
     def _seed_scf_guess(self, mol, guess_signature, payload=None):
         """Initializes the SCF of this geometry from a previous one.
 
-        The payload is aligned to the AO metric of the *current* geometry
-        before it is injected, see :func:`align_scf_guess_payload`.  Seeding is
-        skipped -- never fatal -- when no payload is available, when it
-        describes a different electronic problem, or when it cannot be aligned.
+        The payload's orbitals are injected as-is, *without* an AO-metric
+        realignment first.  Earlier versions of this method ran the seeded
+        orbitals through a Loewdin re-orthonormalization before injection,
+        on the reasoning that orbitals converged at the previous geometry
+        are not orthonormal
+        under the new geometry's overlap matrix and so build a momentarily
+        non-idempotent guess density.  That reasoning is correct but the fix
+        was wrong: near a genuine ROHF frontier-orbital near-degeneracy, the
+        realignment step itself -- full-basis or block-restricted to the
+        occupied/virtual partition, both were tested -- was the perturbation
+        that tipped the SCF onto a different, discontinuous stationary
+        solution than the one the raw, uncorrected guess converges to (an
+        openqp_mrsf state-tracking failure was traced to exactly this: a
+        single seeded step landed 1.6 eV away from the continuous branch).
+        No realignment is needed for correctness: OpenQP's first Fock
+        diagonalization is a generalized eigenproblem in the new geometry's
+        overlap metric, which returns exactly S-orthonormal orbitals
+        regardless of the guess's own orthonormality, so any non-idempotency
+        in the seeded density self-corrects after one SCF iteration -- the
+        same way a raw file-based ``guess.type=json`` restart already
+        behaves.  Seeding is skipped -- never fatal -- when no payload is
+        available or it describes a different electronic problem.
 
         :param mol:
             The OpenQP molecule about to run its reference SCF.
@@ -984,33 +930,29 @@ class OpenQPScfDriver:
         if 'OQP::VEC_MO_A' not in payload:
             return False
 
+        nbf = int(round(np.sqrt(payload['OQP::VEC_MO_A'].size)))
+        if payload['OQP::VEC_MO_A'].size != nbf * nbf:
+            # A payload from a different basis dimension cannot seed this
+            # SCF.
+            return False
+
         # The basis and the one-electron integrals of the current geometry
-        # define the metric the orbitals have to be aligned to.  SinglePoint
+        # are computed here only to report how far the seeded orbitals sit
+        # from AO-metric orthonormal at the new geometry -- a diagnostic of
+        # how much the geometry moved, no longer a correction.  SinglePoint
         # recomputes both in _prep_guess(); repeating them here costs one
         # O(N^2) integral pass and is negligible next to the SCF itself.
+        deviation = None
         with self._openqp_output_context(mol):
             oqp_set_basis(mol)
             oqp_ints_1e(mol)
-
-        nbf = int(round(np.sqrt(payload['OQP::VEC_MO_A'].size)))
         try:
             overlap = unpack_triangular(mol.data['OQP::SM'], nbf)
+            coefficients = payload['OQP::VEC_MO_A'].reshape(nbf, nbf).T
+            metric = coefficients.T @ overlap @ coefficients
+            deviation = float(np.abs(metric - np.eye(nbf)).max())
         except (AttributeError, KeyError, ValueError):
-            # A payload from a different basis dimension cannot seed this SCF.
-            return False
-
-        occupations = {}
-        for orbital_key, electron_tag in zip(_SCF_GUESS_ORBITAL_KEYS,
-                                             _SCF_GUESS_ELECTRON_TAGS):
-            try:
-                occupations[orbital_key] = int(mol.data[electron_tag])
-            except (AttributeError, KeyError, TypeError, ValueError):
-                continue
-
-        payload, deviation = align_scf_guess_payload(
-            payload, overlap, occupations)
-        if deviation is None:
-            return False
+            deviation = None
 
         # put_data() reports the config blocks that a tag-only snapshot does
         # not carry; that chatter belongs in the OpenQP output channel, not on
@@ -1030,7 +972,7 @@ class OpenQPScfDriver:
         self.last_scf_guess_info = {
             'seeded': True,
             'basis_functions': nbf,
-            'orthonormality_error': float(deviation),
+            'orthonormality_error': deviation,
         }
         return True
 
