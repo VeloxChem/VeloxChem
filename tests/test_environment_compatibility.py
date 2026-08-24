@@ -206,6 +206,7 @@ class TestEnvironmentCompatibility:
                         reason='skip pytest.raises for multiple MPI processes')
     def test_compute_rejects_pe_with_gostshyp(self, tmp_path):
 
+        pytest.importorskip('pyframe')
         molecule, basis = self.get_water_and_basis()
         potfile = tmp_path / 'dummy_pe.json'
         potfile.write_text('{}')
@@ -225,6 +226,7 @@ class TestEnvironmentCompatibility:
 
         # the pre-existing rejection only ran in update_settings; compute
         # must also reject the pair when attributes are set directly
+        pytest.importorskip('pyframe')
         molecule, basis = self.get_water_and_basis()
         potfile = tmp_path / 'dummy_pe.json'
         potfile.write_text('{}')
@@ -243,6 +245,7 @@ class TestEnvironmentCompatibility:
     def test_compute_rejects_pe_with_point_charges(self, tmp_path):
 
         # same as above: the pair must be rejected in compute as well
+        pytest.importorskip('pyframe')
         molecule, basis = self.get_water_and_basis()
         potfile = tmp_path / 'dummy_pe.json'
         potfile.write_text('{}')

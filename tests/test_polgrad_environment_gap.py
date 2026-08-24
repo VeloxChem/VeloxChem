@@ -87,6 +87,7 @@ class TestPolgradEnvironmentGap:
                         reason='pytest.raises only valid in serial')
     def test_compute_analytical_rejects_potfile(self):
 
+        pytest.importorskip('pyframe')
         here = Path(__file__).parent
         potfile = str(here / 'data' / 'pe_water.json')
 
