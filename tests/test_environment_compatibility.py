@@ -29,8 +29,9 @@ class TestEnvironmentCompatibility:
     (potfile / PE, solvation_model / CPCM, pressure / GOSTSHYP,
     electric_field, point_charges).
 
-    Policy: each setting can be used individually; the only supported
-    combination is 'electric_field' with 'point_charges'. All other
+    Policy: each setting can be used individually; the supported
+    combinations are 'electric_field' with 'point_charges' and
+    'electric_field' with 'pressure' (GOSTSHYP). All other
     combinations are rejected, in 'update_settings' and 'compute'.
     """
 
@@ -86,8 +87,7 @@ class TestEnvironmentCompatibility:
             ({'solvation_model': 'cpcm'}, {'pressure': 100.0}),
             ({'solvation_model': 'cpcm'}, {'electric_field': [0.0, 0.0, 1.0e-4]}),
             ({'solvation_model': 'cpcm'}, {'point_charges': one_point_charge()}),
-            # GOSTSHYP with the two static settings
-            ({'pressure': 100.0}, {'electric_field': [0.0, 0.0, 1.0e-4]}),
+            # GOSTSHYP with the static settings
             ({'pressure': 100.0}, {'point_charges': one_point_charge()}),
         ])
     def test_helper_rejects_incompatible_pairs(self, settings_a, settings_b):
@@ -102,7 +102,8 @@ class TestEnvironmentCompatibility:
                         reason='skip pytest.raises for multiple MPI processes')
     def test_helper_rejects_three_settings(self):
 
-        # only the exact combination field + point_charges is allowed
+        # only the exact combinations field + point_charges and
+        # field + pressure are allowed
         dummy = self.make_dummy(pressure=100.0,
                                 electric_field=[0.0, 0.0, 1.0e-4],
                                 point_charges=one_point_charge())
@@ -115,6 +116,13 @@ class TestEnvironmentCompatibility:
 
         dummy = self.make_dummy(electric_field=[0.0, 0.0, 1.0e-4],
                                 point_charges=one_point_charge())
+
+        environment_compatibility_sanity_check(dummy)
+
+    def test_helper_allows_electric_field_with_pressure(self):
+
+        dummy = self.make_dummy(pressure=100.0,
+                                electric_field=[0.0, 0.0, 1.0e-4])
 
         environment_compatibility_sanity_check(dummy)
 
@@ -172,10 +180,12 @@ class TestEnvironmentCompatibility:
                            match='Incompatible environment settings'):
             scf_drv.compute(molecule, basis)
 
-    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
-                        reason='skip pytest.raises for multiple MPI processes')
-    def test_compute_rejects_gostshyp_with_electric_field(self):
+    def test_compute_allows_gostshyp_with_electric_field(self):
 
+        # the supported combination pressure + electric field runs to
+        # convergence: the field is a static one-electron term added to
+        # the density-dependent GOSTSHYP potential within the SCF
+        # iterations
         molecule, basis = self.get_water_and_basis()
 
         scf_drv = ScfRestrictedDriver()
@@ -183,9 +193,14 @@ class TestEnvironmentCompatibility:
         scf_drv.pressure = 100.0
         scf_drv.electric_field = [0.0, 0.0, 1.0e-4]
 
-        with pytest.raises(VeloxChemError,
-                           match='Incompatible environment settings'):
-            scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert scf_results is not None
+            assert scf_drv.is_converged
+            assert np.isfinite(scf_results['scf_energy'])
+            assert 'pressure' in scf_results
+            assert 'electric_field' in scf_results
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
@@ -259,18 +274,17 @@ class TestEnvironmentCompatibility:
                            match='Incompatible environment settings'):
             scf_drv.compute(molecule, basis)
 
-    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
-                        reason='skip pytest.raises for multiple MPI processes')
-    def test_update_settings_rejects_gostshyp_with_electric_field(self):
+    def test_update_settings_allows_gostshyp_with_electric_field(self):
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
 
-        with pytest.raises(VeloxChemError,
-                           match='Incompatible environment settings'):
-            scf_drv.update_settings(
-                {}, {'pressure': 100.0,
-                     'electric_field': [0.0, 0.0, 1.0e-4]})
+        scf_drv.update_settings(
+            {}, {'pressure': 100.0,
+                 'electric_field': [0.0, 0.0, 1.0e-4]})
+
+        assert scf_drv.pressure == 100.0
+        assert scf_drv.electric_field == (0.0, 0.0, 1.0e-4)
 
     def test_compute_allows_electric_field_with_point_charges(self):
 
@@ -334,19 +348,23 @@ class TestEnvironmentCompatibility:
                            match='Incompatible environment settings'):
             lr_drv.compute(molecule, basis, scf_results)
 
-    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
-                        reason='skip pytest.raises for multiple MPI processes')
-    def test_lr_compute_rejects_gostshyp_with_electric_field(self):
+    def test_lr_compute_allows_gostshyp_with_electric_field(self):
 
+        # the response driver inherits both the pressure and the electric
+        # field from the SCF results; the combined environment is
+        # supported and the response calculation runs to completion
         molecule, basis = self.get_water_and_basis()
 
-        scf_results = {}
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.pressure = 100.0
+        scf_drv.electric_field = [0.0, 0.0, 1.0e-4]
+        scf_results = scf_drv.compute(molecule, basis)
 
         lr_drv = LinearResponseEigenSolver()
         lr_drv.ostream.mute()
-        lr_drv.pressure = 100.0
-        lr_drv.electric_field = [0.0, 0.0, 1.0e-4]
+        lr_results = lr_drv.compute(molecule, basis, scf_results)
 
-        with pytest.raises(VeloxChemError,
-                           match='Incompatible environment settings'):
-            lr_drv.compute(molecule, basis, scf_results)
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert 'eigenvalues' in lr_results
+            assert np.all(np.isfinite(lr_results['eigenvalues']))

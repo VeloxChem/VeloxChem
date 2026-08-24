@@ -837,11 +837,14 @@ def environment_compatibility_sanity_check(obj):
     The environment settings are: ``potfile`` (polarizable embedding),
     ``solvation_model`` (C-PCM / SMD), ``pressure`` (GOSTSHYP),
     ``electric_field`` and ``point_charges``. Each setting can be used
-    individually. The only supported combination is ``electric_field``
-    together with ``point_charges``: both are static one-electron terms
-    with no mutual response loop. All other combinations are rejected,
-    because the density-coupled response loops of the other environments
-    (induced dipoles, surface charges, pressure potential) are not
+    individually. The supported combinations are ``electric_field``
+    together with ``point_charges`` and ``electric_field`` together
+    with ``pressure`` (GOSTSHYP): the electric field is a static
+    one-electron term with no mutual response loop, and the GOSTSHYP
+    pressure potential is converged within the SCF iterations rather
+    than in a separate self-consistent loop. All other combinations
+    are rejected, because the density-coupled response loops of the
+    other environments (induced dipoles, surface charges) are not
     supported in combination.
 
     The helper is intended to be reusable: it only relies on the driver
@@ -883,15 +886,20 @@ def environment_compatibility_sanity_check(obj):
     if len(names) <= 1:
         return
 
-    if has_field and has_pc and len(names) == 2:
-        # the only supported combination: two static one-electron terms
+    if has_field and len(names) == 2 and (has_pc or has_gostshyp):
+        # supported combinations: 'electric_field' with 'point_charges'
+        # (two static one-electron terms) and 'electric_field' with
+        # 'pressure' (GOSTSHYP): the field is a static one-electron term
+        # added to the density-dependent GOSTSHYP potential within the
+        # SCF iterations, with no mutual response loop
         return
 
     err_msg = f"{type(obj).__name__}: Incompatible environment settings: "
     err_msg += ', '.join(names) + '. '
     err_msg += "Environment settings can only be used individually; the "
-    err_msg += "only supported combination is 'electric_field' with "
-    err_msg += "'point_charges'."
+    err_msg += "supported combinations are 'electric_field' with "
+    err_msg += "'point_charges' and 'electric_field' with 'pressure' "
+    err_msg += "(GOSTSHYP)."
     assert_msg_critical(False, err_msg)
 
 
