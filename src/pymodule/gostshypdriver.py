@@ -103,6 +103,26 @@ class GostshypDriver:
         self.num_neg_amp = 0
         self.tco_tol = None
 
+    def print_gostshyp_references(self):
+        """
+        Print information and references.
+        """
+
+        gostshyp_info = 'Using GOSTSHYP for the application of '
+        gostshyp_info += 'hydrostatic pressure.'
+        self.ostream.print_info(gostshyp_info)
+        self.ostream.print_blank()
+        gostshyp_ref = 'M. Scheurer, A. Dreuw, E. Epifanovsky,'
+        gostshyp_ref += ' M. Head-Gordon, T. Stauch,'
+        gostshyp_ref += ' J. Chem. Theory Comput. 2021, 17, 583-597.'
+        self.ostream.print_reference(gostshyp_ref)
+        self.ostream.print_blank()
+        gostshyp_ref = 'A. Pausch, F. Zeller, T. Neudecker,'
+        gostshyp_ref += ' J. Chem. Theory Comput. 2025, 21, 747-761.'
+        self.ostream.print_reference(gostshyp_ref)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
     def init(self, molecule, basis, pressure, pressure_units, tco_tol):
         """
         Initializes the GOSTSHYP method for applying hydrostatic pressure.

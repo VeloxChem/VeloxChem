@@ -1041,6 +1041,7 @@ class ScfDriver:
         # set up gostshyp method by creating a surface tessellation
         if self._gostshyp:
             self._gostshyp_drv = GostshypDriver(self.comm, self.ostream)
+            self._gostshyp_drv.print_gostshyp_references()
             self._gostshyp_drv.init(molecule, basis, self.pressure,
                                     self.pressure_units, self.gostshyp_tco_tol)
 

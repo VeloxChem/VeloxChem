@@ -737,6 +737,7 @@ class LinearSolver:
             tco_tol = self.comm.bcast(tco_tol, root=mpi_master())
 
             self._gostshyp_drv = GostshypDriver(self.comm, self.ostream)
+            self._gostshyp_drv.print_gostshyp_references()
             self._gostshyp_drv.init(molecule, basis, self.pressure,
                                     self.pressure_units, tco_tol)
 
