@@ -8,7 +8,7 @@ from mpi4py import MPI
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
-from veloxchem.molecularorbitals import molorb
+from veloxchem.molecularorbitals import MolecularOrbitals, molorb
 from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfrestopendriver import ScfRestrictedOpenDriver
@@ -84,6 +84,26 @@ class TestScfDriverMiscellaneous:
     def is_master():
 
         return MPI.COMM_WORLD.Get_rank() == mpi_master()
+
+    @staticmethod
+    def assert_scf_results_close(results, ref_results):
+        """
+        Asserts that the final SCF results of a modified driver match the
+        unmodified reference.
+        """
+
+        assert np.abs(results['scf_energy'] -
+                      ref_results['scf_energy']) < 1.0e-10
+        assert np.max(
+            np.abs(
+                np.abs(results['C_alpha']) -
+                np.abs(ref_results['C_alpha']))) < 1.0e-6
+        assert np.max(
+            np.abs(results['D_alpha'] - ref_results['D_alpha'])) < 1.0e-6
+        assert np.max(
+            np.abs(results['E_alpha'] - ref_results['E_alpha'])) < 1.0e-6
+        assert np.max(
+            np.abs(results['F_alpha'] - ref_results['F_alpha'])) < 1.0e-6
 
     def test_filename_checkpoint_and_restart(self, tmp_path):
 
@@ -179,6 +199,116 @@ class TestScfDriverMiscellaneous:
         assert scf_results is not None
         assert scf_drv.checkpoint_file is None
         assert scf_drv.restart is False
+
+    def test_compute_resets_point_charge_energy_on_reuse(self, tmp_path):
+
+        molecule, basis = self.get_water_and_basis()
+
+        ref_drv = ScfRestrictedDriver()
+        ref_drv.ostream.mute()
+        ref_drv.acc_type = 'DIIS'
+        ref_results = ref_drv.compute(molecule, basis)
+        assert ref_results is not None
+
+        potfile = tmp_path / 'point_charges.pot'
+        potfile.write_text('1\nvalid\nQ 0.0 0.0 5.0 -0.1\n')
+
+        point_charge_drv = ScfRestrictedDriver()
+        point_charge_drv.ostream.mute()
+        point_charge_drv.acc_type = 'DIIS'
+        point_charge_drv.point_charges = str(potfile)
+        point_charge_results = point_charge_drv.compute(molecule, basis)
+        assert point_charge_results is not None
+
+        point_charge_drv.point_charges = None
+        reused_results = point_charge_drv.compute(molecule, basis)
+        assert reused_results is not None
+
+        if self.is_master():
+            assert reused_results['scf_energy'] == pytest.approx(
+                ref_results['scf_energy'], abs=1.0e-10)
+
+    def test_checkpoint_point_charges_roundtrip(self, tmp_path):
+
+        molecule, basis = self.get_water_and_basis()
+
+        here = Path(__file__).parent
+        potfile = str(here / 'data' / 'pe_water.pot')
+        vdwfile = str(here / 'data' / 'pe_water.qm_vdw_params.txt')
+        filename = str(tmp_path / 'water_point_charges_roundtrip')
+
+        comm = MPI.COMM_WORLD
+        filename = comm.bcast(filename, root=mpi_master())
+        checkpoint_file = comm.bcast(Path(f'{filename}_scf.h5'),
+                                     root=mpi_master())
+
+        def configure(driver):
+            driver.filename = filename
+            driver.point_charges = potfile
+            driver.qm_vdw_params = vdwfile
+
+        scf_drv, scf_results = self.run_hf_scf(molecule, basis, configure)
+
+        assert scf_results is not None
+        assert isinstance(scf_drv.point_charges, np.ndarray)
+        assert isinstance(scf_drv.qm_vdw_params, np.ndarray)
+
+        if self.is_master():
+            assert checkpoint_file.is_file()
+            checkpoint_scf_input = read_unparsed_input_from_hdf5(
+                str(checkpoint_file), group_name='scf_settings')
+        else:
+            checkpoint_scf_input = None
+
+        checkpoint_scf_input = scf_drv.comm.bcast(checkpoint_scf_input,
+                                                  root=mpi_master())
+
+        assert isinstance(checkpoint_scf_input['point_charges'], np.ndarray)
+        assert isinstance(checkpoint_scf_input['qm_vdw_params'], np.ndarray)
+        assert np.array_equal(checkpoint_scf_input['point_charges'],
+                              scf_drv.point_charges)
+        assert np.array_equal(checkpoint_scf_input['qm_vdw_params'],
+                              scf_drv.qm_vdw_params)
+
+        new_drv = ScfRestrictedDriver()
+        new_drv.ostream.mute()
+        new_drv.checkpoint_file = str(checkpoint_file)
+        new_drv.read_settings(str(checkpoint_file))
+
+        assert isinstance(new_drv.point_charges, np.ndarray)
+        assert isinstance(new_drv.qm_vdw_params, np.ndarray)
+
+        new_results = new_drv.compute(molecule, basis)
+        assert new_results is not None
+
+        if self.is_master():
+            assert new_results['scf_energy'] == pytest.approx(
+                scf_results['scf_energy'], abs=1.0e-10)
+
+    def test_compute_resets_electric_field_energy_on_reuse(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        ref_drv = ScfRestrictedDriver()
+        ref_drv.ostream.mute()
+        ref_drv.acc_type = 'DIIS'
+        ref_results = ref_drv.compute(molecule, basis)
+        assert ref_results is not None
+
+        field_drv = ScfRestrictedDriver()
+        field_drv.ostream.mute()
+        field_drv.acc_type = 'DIIS'
+        field_drv.electric_field = (0.0, 0.001, 0.0)
+        field_results = field_drv.compute(molecule, basis)
+        assert field_results is not None
+
+        field_drv.electric_field = None
+        reused_results = field_drv.compute(molecule, basis)
+        assert reused_results is not None
+
+        if self.is_master():
+            assert reused_results['scf_energy'] == pytest.approx(
+                ref_results['scf_energy'], abs=1.0e-10)
 
     def test_checkpoint_writes_input_groups(self, tmp_path):
 
@@ -348,6 +478,103 @@ class TestScfDriverMiscellaneous:
         with pytest.raises(VeloxChemError, match="either ri_coulomb or ri_jk"):
             self.run_hf_scf(molecule, basis, configure)
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_invalid_acc_type_does_not_return_stale_results(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.acc_type = 'DIIS'
+
+        scf_results = scf_drv.compute(molecule, basis)
+        assert scf_results is not None
+
+        scf_drv.acc_type = 'BAD'
+        with pytest.raises(VeloxChemError,
+                           match='Invalid acceleration type'):
+            scf_drv.compute(molecule, basis)
+
+        assert not scf_drv.is_converged
+        assert scf_drv.scf_results is None
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    @pytest.mark.parametrize(
+        'configure, match',
+        [
+            (lambda drv: setattr(drv, 'max_iter', 0), 'max_iter'),
+            (lambda drv: setattr(drv, 'max_err_vecs', 0), 'max_err_vecs'),
+            (lambda drv: setattr(drv, 'conv_thresh', 0.0), 'conv_thresh'),
+            (lambda drv: setattr(drv, 'eri_thresh', 0.0), 'eri_thresh'),
+            (lambda drv: setattr(drv, 'eri_thresh_tight', 0.0),
+             'eri_thresh_tight'),
+            (lambda drv: setattr(drv, 'ovl_thresh', 0.0), 'ovl_thresh'),
+            (lambda drv: setattr(drv, 'pfon', True) or
+             setattr(drv, 'pfon_nocc', 0), 'pfon_nocc'),
+            (lambda drv: setattr(drv, 'pfon', True) or
+             setattr(drv, 'pfon_nvir', 0), 'pfon_nvir'),
+        ])
+    def test_invalid_scf_controls_raise(self, configure, match):
+
+        molecule, basis = self.get_water_and_basis()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        configure(scf_drv)
+
+        with pytest.raises(VeloxChemError, match=match):
+            scf_drv.compute(molecule, basis)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_invalid_cpcm_grid_per_sphere_raises(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.solvation_model = 'cpcm'
+        scf_drv.cpcm_grid_per_sphere = (110,)
+
+        with pytest.raises(VeloxChemError, match='cpcm_grid_per_sphere'):
+            scf_drv.compute(molecule, basis)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_invalid_guess_unpaired_electrons_raise(self):
+
+        molecule, basis = self.get_open_shell_water_and_basis()
+
+        scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.acc_type = 'DIIS'
+        scf_drv.guess_unpaired_electrons = 'O(invalid)'
+
+        with pytest.raises(ValueError):
+            scf_drv.compute(molecule, basis)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_l2_settings_restored_after_first_step_error(self):
+
+        molecule, basis = self.get_open_shell_water_and_basis()
+
+        scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.guess_unpaired_electrons = 'O(invalid)'
+
+        original_conv_thresh = scf_drv.conv_thresh
+        original_max_iter = scf_drv.max_iter
+
+        with pytest.raises(ValueError):
+            scf_drv.compute(molecule, basis)
+
+        assert scf_drv._first_step is False
+        assert scf_drv.conv_thresh == original_conv_thresh
+        assert scf_drv.max_iter == original_max_iter
+
     def test_grid_level_consistency(self):
 
         molecule, basis = self.get_water_and_basis()
@@ -412,6 +639,27 @@ class TestScfDriverMiscellaneous:
         assert scf_results is None
         assert not scf_drv.is_converged
 
+    @pytest.mark.parametrize('acc_type', ['DIIS', 'L2_DIIS'])
+    def test_scf_history_matches_printed_iteration_table(self, acc_type):
+
+        molecule, basis = self.get_water_and_basis()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.acc_type = acc_type
+        scf_drv.max_iter = 2
+        scf_drv.conv_thresh = 1.0e-12
+
+        scf_results = scf_drv.compute(molecule, basis)
+
+        assert scf_results is None
+        assert len(scf_drv.history) == 2
+
+        assert scf_drv.history[0]['diff_energy'] == pytest.approx(0.0)
+        assert scf_drv.history[0]['diff_density'] == pytest.approx(0.0)
+        assert scf_drv.history[1]['diff_energy'] == pytest.approx(
+            scf_drv.history[1]['energy'] - scf_drv.history[0]['energy'])
+
     def test_scf_results_being_independent(self):
 
         molecule, basis = self.get_water_and_basis()
@@ -458,6 +706,174 @@ class TestScfDriverMiscellaneous:
 
         if self.is_master():
             assert abs(-74.54939063506086 - scf_results["scf_energy"]) < 1.0e-8
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='requires standard single-process assertions')
+    @pytest.mark.parametrize(
+        ('alpha_list', 'beta_list', 'error_pattern'), [
+            ([0, 1, 2, 3, 3], [0, 1, 2, 3, 4],
+             'alpha occupation list contains duplicate orbital indices'),
+            ([0, 1, 2, 3, 4], [-1, 1, 2, 3, 4],
+             r'beta occupation list indices must be in the range \[0, 7\)'),
+            ([0, 1, 2, 3, 7], [0, 1, 2, 3, 4],
+             r'alpha occupation list indices must be in the range \[0, 7\)'),
+        ])
+    def test_mom_rejects_invalid_occupation_indices(
+            self, alpha_list, beta_list, error_pattern):
+
+        molecule, basis = self.get_water_and_basis()
+        n_mo = basis.get_dimension_of_basis()
+        coefficients = np.eye(n_mo)
+        energies = np.zeros(n_mo)
+        occupations = np.zeros(n_mo)
+        orbitals = MolecularOrbitals(
+            [coefficients, coefficients], [energies, energies],
+            [occupations, occupations], molorb.unrest)
+
+        scf_drv = ScfUnrestrictedDriver(MPI.COMM_WORLD, OutputStream(None))
+        with pytest.raises(VeloxChemError, match=error_pattern):
+            scf_drv.maximum_overlap(molecule, basis, orbitals, alpha_list,
+                                    beta_list)
+
+    @pytest.mark.parametrize(
+        ('alpha_bad', 'beta_bad', 'expected_molist_a', 'expected_molist_b',
+         'expected_warning'), [
+            ([(4, 1.0)], [], [0, 1, 2, 3], [0, 1, 2, 3],
+             'beta orbital trimming list is longer by 1; '
+             'removing highest-energy retained MO 5.'),
+            ([], [(4, 1.0)], [0, 1, 2, 3], [0, 1, 2, 3],
+             'alpha orbital trimming list is longer by 1; '
+             'removing highest-energy retained MO 5.'),
+            ([(4, 1.0)], [(4, 1.0)], [0, 1, 2, 3], [0, 1, 2, 3], None),
+            ([(4, 1.0)], [(3, 1.0)], [0, 1, 2, 3], [0, 1, 2, 4], None),
+            ([(3, 2.0), (4, 1.0)], [(4, 1.0)], [0, 1, 2], [0, 1, 2],
+             'beta orbital trimming list is longer by 1; '
+             'removing highest-energy retained MO 4.'),
+            ([(3, 2.0), (4, 1.0)], [], [0, 1, 2], [0, 1, 2],
+             'beta orbital trimming list is longer by 2; '
+             'removing highest-energy retained MOs 4, 5.'),
+        ])
+    def test_delete_mos_unrest_matches_mo_list_lengths(
+            self, alpha_bad, beta_bad, expected_molist_a, expected_molist_b,
+            expected_warning, tmp_path):
+
+        outfile = tmp_path / 'delete_mos_unrest.out'
+        ostream = OutputStream.create_mpi_ostream(MPI.COMM_WORLD,
+                                                  str(outfile))
+        scf_drv = ScfUnrestrictedDriver(MPI.COMM_WORLD, ostream)
+        scf_drv.ovl_thresh = 1.0e-6
+        fmax = 1.0 / np.sqrt(scf_drv.ovl_thresh)
+
+        orb_a = np.eye(5)
+        orb_b = np.eye(5)
+        for col, factor in alpha_bad:
+            orb_a[0, col] = factor * fmax
+        for col, factor in beta_bad:
+            orb_b[0, col] = factor * fmax
+
+        eigs_a = np.array([-1.0, -0.8, -0.5, -0.2, 0.4])
+        eigs_b = np.array([-0.9, -0.7, -0.4, -0.1, 0.3])
+
+        trimmed = scf_drv._delete_mos_unrest(orb_a, orb_b, eigs_a, eigs_b)
+
+        assert trimmed[0].shape == (5, len(expected_molist_a))
+        assert trimmed[1].shape == (5, len(expected_molist_b))
+        assert np.array_equal(trimmed[0], orb_a[:, expected_molist_a])
+        assert np.array_equal(trimmed[1], orb_b[:, expected_molist_b])
+        assert np.array_equal(trimmed[2], eigs_a[expected_molist_a])
+        assert np.array_equal(trimmed[3], eigs_b[expected_molist_b])
+
+        if self.is_master():
+            scf_drv.ostream.close()
+            output = outfile.read_text()
+            if expected_warning is None:
+                assert 'removing highest-energy retained' not in output
+            else:
+                assert expected_warning in output
+
+    @pytest.mark.parametrize(
+        ('driver_cls', 'open_shell', 'delete_mos_method'), [
+            (ScfRestrictedDriver, False, '_delete_mos'),
+            (ScfRestrictedOpenDriver, True, '_delete_mos'),
+            (ScfUnrestrictedDriver, True, '_delete_mos_unrest'),
+        ])
+    def test_mo_trimming_calls_can_be_disabled_via_input(
+            self, driver_cls, open_shell, delete_mos_method, monkeypatch):
+
+        if open_shell:
+            molecule, basis = self.get_open_shell_water_and_basis()
+        else:
+            molecule, basis = self.get_water_and_basis()
+
+        scf_drv = driver_cls(MPI.COMM_WORLD, OutputStream(None))
+        assert scf_drv.trim_mos is True
+
+        scf_drv.update_settings({'trim_mos': 'no'})
+        assert scf_drv.trim_mos is False
+
+        def fail_if_called(*args):
+            pytest.fail(f'{delete_mos_method} should not be called')
+
+        monkeypatch.setattr(scf_drv, delete_mos_method, fail_if_called)
+
+        n_mos = basis.get_dimension_of_basis()
+        fock = np.diag(np.linspace(-1.0, 1.0, n_mos))
+        if driver_cls is ScfUnrestrictedDriver:
+            eff_fock_mat = (fock, fock)
+        else:
+            eff_fock_mat = (fock,)
+
+        mol_orbs = scf_drv._gen_molecular_orbitals(
+            molecule, basis, eff_fock_mat, np.eye(n_mos))
+
+        if self.is_master():
+            assert mol_orbs.number_of_mos() == n_mos
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='requires standard single-process assertions')
+    def test_delete_mos_unrest_rejects_mismatched_column_counts(self):
+
+        scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ovl_thresh = 1.0e-6
+
+        orb_a = np.eye(4)
+        orb_b = np.eye(3)
+        eigs_a = np.zeros(4)
+        eigs_b = np.zeros(3)
+
+        with pytest.raises(VeloxChemError, match='different numbers of MOs'):
+            scf_drv._delete_mos_unrest(orb_a, orb_b, eigs_a, eigs_b)
+
+    def test_unrestricted_phase_update_with_fewer_reference_orbitals(self):
+
+        scf_drv = ScfUnrestrictedDriver()
+
+        ref_alpha = np.eye(3)[:, :2]
+        ref_beta = np.eye(3)[:, :2]
+        ref_energies = np.zeros(2)
+        ref_occupations = np.zeros(2)
+        scf_drv._ref_mol_orbs = MolecularOrbitals(
+            [ref_alpha, ref_beta], [ref_energies, ref_energies],
+            [ref_occupations, ref_occupations], molorb.unrest)
+
+        current_alpha = -np.eye(3)
+        current_beta = -np.eye(3)
+        current_energies = np.zeros(3)
+        current_occupations = np.zeros(3)
+        scf_drv._molecular_orbitals = MolecularOrbitals(
+            [current_alpha, current_beta],
+            [current_energies, current_energies],
+            [current_occupations, current_occupations], molorb.unrest)
+
+        scf_drv._update_mol_orbs_phase()
+
+        if self.is_master():
+            updated_alpha = scf_drv.molecular_orbitals.alpha_to_numpy()
+            updated_beta = scf_drv.molecular_orbitals.beta_to_numpy()
+            assert np.allclose(updated_alpha[:, :2], ref_alpha)
+            assert np.allclose(updated_beta[:, :2], ref_beta)
+            assert np.allclose(updated_alpha[:, 2], [0.0, 0.0, -1.0])
+            assert np.allclose(updated_beta[:, 2], [0.0, 0.0, -1.0])
 
     def test_user_supplied_start_orbitals_are_not_checkpoint_restart(
             self, tmp_path):
@@ -799,34 +1215,441 @@ class TestScfDriverMiscellaneous:
             assert '1.0 unpaired alpha electrons on atom 1 (O)' in output
             assert '0.5 unpaired beta  electrons on atom 2 (H)' in output
 
-    def test_level_shifting_and_pfon_real_scf(self, tmp_path):
+    def test_level_shifting_real_scf(self, tmp_path):
 
         molecule, basis = self.get_water_and_basis()
 
         comm = MPI.COMM_WORLD
         ostream = OutputStream.create_mpi_ostream(
-            comm, str(tmp_path / 'level_pfon.out'))
+            comm, str(tmp_path / 'level_shifting.out'))
+
+        scf_drv = ScfRestrictedDriver(comm, ostream)
+        scf_drv.acc_type = 'diis'
+        scf_drv.level_shifting = 0.2
+
+        scf_results = scf_drv.compute(molecule, basis)
+        assert scf_drv.is_converged
+        assert scf_drv.level_shifting == 0.0
+
+        if self.is_master():
+            output = (tmp_path / 'level_shifting.out').read_text()
+            assert 'Applying level-shifting' in output
+            assert 'Applying pseudo-FON' not in output
+
+        ref_drv, ref_results = self.run_hf_scf(
+            molecule, basis, lambda drv: setattr(drv, 'acc_type', 'diis'))
+        assert ref_drv.is_converged
+
+        if self.is_master():
+            self.assert_scf_results_close(scf_results, ref_results)
+
+    def test_level_shift_smoothing_real_scf(self, monkeypatch):
+
+        molecule, basis = self.get_water_and_basis()
+
+        smoothing_calls = []
+        original_smooth = ScfRestrictedDriver._smooth_level_shift
+
+        def track_smoothing(driver, level_shift):
+            smoothing_calls.append(driver.level_shift_smoothing)
+            return original_smooth(driver, level_shift)
+
+        monkeypatch.setattr(ScfRestrictedDriver, '_smooth_level_shift',
+                            track_smoothing)
+
+        energies = {}
+        for smoothing in (0.0, 0.25):
+            def configure(driver, smoothing=smoothing):
+                driver.acc_type = 'diis'
+                driver.level_shifting = 0.2
+                driver.level_shift_smoothing = smoothing
+
+            scf_drv, scf_results = self.run_hf_scf(
+                molecule, basis, configure)
+            assert scf_drv.is_converged
+
+            if self.is_master():
+                energies[smoothing] = scf_results['scf_energy']
+
+        if self.is_master():
+            assert len(smoothing_calls) > 1
+            assert all(smoothing == 0.25 for smoothing in smoothing_calls)
+            assert energies[0.0] == pytest.approx(energies[0.25], abs=1.0e-10)
+
+    def test_level_shifting_decrement_and_clamp(self, tmp_path):
+
+        molecule, basis = self.get_water_and_basis()
+
+        comm = MPI.COMM_WORLD
+        ostream = OutputStream.create_mpi_ostream(
+            comm, str(tmp_path / 'level_shifting_clamp.out'))
 
         scf_drv = ScfRestrictedDriver(comm, ostream)
         scf_drv.acc_type = 'diis'
         scf_drv.level_shifting = 0.2
         scf_drv.level_shifting_delta = 0.5
+
+        scf_results_not_used = scf_drv.compute(molecule, basis)
+        assert scf_drv.is_converged
+        assert scf_drv.level_shifting == 0.0
+
+        if self.is_master():
+            output = (tmp_path / 'level_shifting_clamp.out').read_text()
+            # Level shifting is skipped on the fresh-guess iteration and, with
+            # a delta (0.5) larger than the initial value (0.2), is clamped to
+            # zero right after the first application.
+            assert output.count('Applying level-shifting') == 1
+            assert 'Applying level-shifting (0.20au)' in output
+
+    def test_pfon_real_scf(self, tmp_path):
+
+        molecule, basis = self.get_water_and_basis()
+
+        comm = MPI.COMM_WORLD
+        ostream = OutputStream.create_mpi_ostream(
+            comm, str(tmp_path / 'pfon.out'))
+
+        scf_drv = ScfRestrictedDriver(comm, ostream)
+        scf_drv.acc_type = 'diis'
         scf_drv.pfon = True
-        scf_drv.pfon_temperature = 100
-        scf_drv.pfon_delta_temperature = 50
-        scf_drv.max_iter = 2
-        scf_drv.conv_thresh = 1.0e-12
+        scf_drv.pfon_temperature = 1000
 
         scf_results = scf_drv.compute(molecule, basis)
-
-        assert scf_results is None
-        assert len(scf_drv.history) == 3
+        assert scf_drv.is_converged
         assert scf_drv.pfon_temperature == 0
-        assert scf_drv.level_shifting == 0.0
+
         if self.is_master():
-            output = (tmp_path / 'level_pfon.out').read_text()
-            assert 'Applying level-shifting' in output
+            output = (tmp_path / 'pfon.out').read_text()
             assert 'Applying pseudo-FON' in output
+            assert 'Applying level-shifting' not in output
+
+        ref_drv, ref_results = self.run_hf_scf(
+            molecule, basis, lambda drv: setattr(drv, 'acc_type', 'diis'))
+        assert ref_drv.is_converged
+
+        if self.is_master():
+            self.assert_scf_results_close(scf_results, ref_results)
+
+    @pytest.mark.parametrize('acc_type, expected_acc_type', [
+        ('l2_diis', 'DIIS'),
+        ('l2_c2diis', 'C2DIIS'),
+    ])
+    @pytest.mark.parametrize(
+        'modifier', ['level_shifting', 'pfon', 'density_damping'])
+    def test_scf_modifiers_use_single_level_diis(
+            self, acc_type, expected_acc_type, modifier):
+
+        molecule, basis = self.get_water_and_basis()
+
+        def configure(driver):
+            driver.acc_type = acc_type
+            if modifier == 'level_shifting':
+                driver.level_shifting = 0.2
+            elif modifier == 'pfon':
+                driver.pfon = True
+                driver.pfon_temperature = 1000
+            elif modifier == 'density_damping':
+                driver.density_damping = True
+
+        scf_drv, _ = self.run_hf_scf(molecule, basis, configure)
+
+        assert scf_drv.is_converged
+        assert scf_drv.acc_type == expected_acc_type
+
+    def test_apply_level_shifting_restricted(self):
+
+        molecule, basis = self.get_water_and_basis()
+        n_mo = basis.get_dimension_of_basis()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+
+        fock = np.diag(np.linspace(-1.0, 1.0, n_mo))
+        ovl = np.eye(n_mo)
+        coeffs = np.eye(n_mo)
+        energies = np.diag(fock).copy()
+        occupations = np.zeros(n_mo)
+
+        driver = ScfRestrictedDriver()
+        driver.ostream.mute()
+        driver.level_shifting = 0.5
+        driver._molecular_orbitals = MolecularOrbitals(
+            [coeffs], [energies], [occupations], molorb.rest)
+
+        shifted = driver._apply_level_shifting(molecule, basis, (fock,), ovl)
+
+        expected = np.diag(fock).copy()
+        expected[nocc:] += 0.5
+
+        if self.is_master():
+            assert np.allclose(np.diag(shifted[0]), expected)
+            assert np.allclose(np.diag(shifted[0])[:nocc], np.diag(fock)[:nocc])
+            assert np.allclose(shifted[0], shifted[0].T)
+
+    def test_apply_level_shifting_unrestricted(self):
+
+        molecule, basis = self.get_open_shell_water_and_basis()
+        n_mo = basis.get_dimension_of_basis()
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+        nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
+
+        fock_a = np.diag(np.linspace(-1.0, 1.0, n_mo))
+        fock_b = np.diag(np.linspace(-0.8, 1.2, n_mo))
+        ovl = np.eye(n_mo)
+        coeffs = np.eye(n_mo)
+        energies_a = np.diag(fock_a).copy()
+        energies_b = np.diag(fock_b).copy()
+        occupations = np.zeros(n_mo)
+
+        driver = ScfUnrestrictedDriver()
+        driver.ostream.mute()
+        driver.level_shifting = 0.5
+        driver._molecular_orbitals = MolecularOrbitals(
+            [coeffs, coeffs], [energies_a, energies_b],
+            [occupations, occupations], molorb.unrest)
+
+        shifted = driver._apply_level_shifting(
+            molecule, basis, (fock_a, fock_b), ovl)
+
+        expected_a = np.diag(fock_a).copy()
+        expected_a[nocc_a:] += 0.5
+        expected_b = np.diag(fock_b).copy()
+        expected_b[nocc_b:] += 0.5
+
+        if self.is_master():
+            assert np.allclose(np.diag(shifted[0]), expected_a)
+            assert np.allclose(np.diag(shifted[1]), expected_b)
+            assert np.allclose(shifted[0], shifted[0].T)
+            assert np.allclose(shifted[1], shifted[1].T)
+
+    def test_apply_level_shifting_restricted_open(self):
+
+        molecule, basis = self.get_open_shell_water_and_basis()
+        n_mo = basis.get_dimension_of_basis()
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+
+        fock = np.diag(np.linspace(-1.0, 1.0, n_mo))
+        ovl = np.eye(n_mo)
+        coeffs = np.eye(n_mo)
+        energies = np.diag(fock).copy()
+        occupations = np.zeros(n_mo)
+
+        driver = ScfRestrictedOpenDriver()
+        driver.ostream.mute()
+        driver.level_shifting = 0.5
+        driver._molecular_orbitals = MolecularOrbitals(
+            [coeffs], [energies], [occupations, occupations], molorb.restopen)
+
+        shifted = driver._apply_level_shifting(molecule, basis, (fock,), ovl)
+
+        expected = np.diag(fock).copy()
+        expected[nocc_a:] += 0.5
+
+        if self.is_master():
+            assert np.allclose(np.diag(shifted[0]), expected)
+            assert np.allclose(shifted[0], shifted[0].T)
+
+    def test_build_add_level_shift_restricted(self):
+
+        molecule, basis = self.get_water_and_basis()
+        n_mo = basis.get_dimension_of_basis()
+
+        fock = np.diag(np.linspace(-1.0, 1.0, n_mo))
+        ovl = np.eye(n_mo)
+        coeffs = np.eye(n_mo)
+        energies = np.diag(fock).copy()
+        occupations = np.zeros(n_mo)
+
+        driver = ScfRestrictedDriver()
+        driver.ostream.mute()
+        driver.level_shifting = 0.5
+        driver._molecular_orbitals = MolecularOrbitals(
+            [coeffs], [energies], [occupations], molorb.rest)
+
+        shifted = driver._apply_level_shifting(molecule, basis, (fock,), ovl)
+        level_shift = driver._build_level_shift(molecule, basis, ovl)
+        rebuilt = driver._add_level_shift((fock,), level_shift)
+
+        if self.is_master():
+            assert np.allclose(rebuilt[0], shifted[0])
+
+    def test_build_add_level_shift_unrestricted(self):
+
+        molecule, basis = self.get_open_shell_water_and_basis()
+        n_mo = basis.get_dimension_of_basis()
+
+        fock_a = np.diag(np.linspace(-1.0, 1.0, n_mo))
+        fock_b = np.diag(np.linspace(-0.8, 1.2, n_mo))
+        ovl = np.eye(n_mo)
+        coeffs = np.eye(n_mo)
+        energies_a = np.diag(fock_a).copy()
+        energies_b = np.diag(fock_b).copy()
+        occupations = np.zeros(n_mo)
+
+        driver = ScfUnrestrictedDriver()
+        driver.ostream.mute()
+        driver.level_shifting = 0.5
+        driver._molecular_orbitals = MolecularOrbitals(
+            [coeffs, coeffs], [energies_a, energies_b],
+            [occupations, occupations], molorb.unrest)
+
+        shifted = driver._apply_level_shifting(
+            molecule, basis, (fock_a, fock_b), ovl)
+        level_shift = driver._build_level_shift(molecule, basis, ovl)
+        rebuilt = driver._add_level_shift((fock_a, fock_b), level_shift)
+
+        if self.is_master():
+            assert np.allclose(rebuilt[0], shifted[0])
+            assert np.allclose(rebuilt[1], shifted[1])
+
+    def test_build_add_level_shift_restricted_open(self):
+
+        molecule, basis = self.get_open_shell_water_and_basis()
+        n_mo = basis.get_dimension_of_basis()
+
+        fock = np.diag(np.linspace(-1.0, 1.0, n_mo))
+        ovl = np.eye(n_mo)
+        coeffs = np.eye(n_mo)
+        energies = np.diag(fock).copy()
+        occupations = np.zeros(n_mo)
+
+        driver = ScfRestrictedOpenDriver()
+        driver.ostream.mute()
+        driver.level_shifting = 0.5
+        driver._molecular_orbitals = MolecularOrbitals(
+            [coeffs], [energies], [occupations, occupations], molorb.restopen)
+
+        shifted = driver._apply_level_shifting(molecule, basis, (fock,), ovl)
+        level_shift = driver._build_level_shift(molecule, basis, ovl)
+        rebuilt = driver._add_level_shift((fock,), level_shift)
+
+        if self.is_master():
+            assert np.allclose(rebuilt[0], shifted[0])
+
+    def test_smooth_level_shift_restricted(self):
+
+        driver = ScfRestrictedDriver()
+        driver.ostream.mute()
+        driver.level_shift_smoothing = 0.25
+
+        level_shift = (np.diag(np.arange(1.0, 5.0)),)
+
+        first = driver._smooth_level_shift(level_shift)
+        assert np.allclose(first[0], level_shift[0])
+
+        smaller = (0.5 * level_shift[0],)
+        second = driver._smooth_level_shift(smaller)
+        expected = 0.75 * smaller[0] + 0.25 * first[0]
+        assert np.allclose(second[0], expected)
+
+    def test_smooth_level_shift_unrestricted(self):
+
+        driver = ScfUnrestrictedDriver()
+        driver.ostream.mute()
+        driver.level_shift_smoothing = 0.25
+
+        level_shift = (np.diag([0.0, 1.0]), np.diag([0.0, 2.0]))
+
+        first = driver._smooth_level_shift(level_shift)
+        assert np.allclose(first[0], level_shift[0])
+        assert np.allclose(first[1], level_shift[1])
+
+        smaller = (0.5 * level_shift[0], 0.5 * level_shift[1])
+        second = driver._smooth_level_shift(smaller)
+        assert np.allclose(second[0], 0.75 * smaller[0] + 0.25 * first[0])
+        assert np.allclose(second[1], 0.75 * smaller[1] + 0.25 * first[1])
+
+    def test_level_shifting_keywords_parsed(self):
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+
+        scf_drv.update_settings({
+            'level_shifting': '0.25',
+            'level_shifting_delta': '0.05',
+            'level_shift_smoothing': '0.35',
+        })
+
+        assert scf_drv.level_shifting == pytest.approx(0.25)
+        assert scf_drv.level_shifting_delta == pytest.approx(0.05)
+        assert scf_drv.level_shift_smoothing == pytest.approx(0.35)
+
+    def test_registered_scf_controls_parse(self):
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+
+        scf_drv.update_settings({'diis_thresh': '1.0e-2'},
+                                {'cpcm_radii_scaling': '1.1'})
+
+        assert scf_drv.diis_thresh == pytest.approx(1.0e-2)
+        assert scf_drv.cpcm_radii_scaling == pytest.approx(1.1)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_level_shift_smoothing_validation(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        for bad_value in (-0.1, 1.0, 1.5):
+            def configure(driver, bad_value=bad_value):
+                driver.level_shifting = 0.2
+                driver.level_shift_smoothing = bad_value
+
+            with pytest.raises(VeloxChemError,
+                               match="level_shift_smoothing"):
+                self.run_hf_scf(molecule, basis, configure)
+
+    def test_scf_modifier_delay_convergence(self):
+
+        molecule, basis = self.get_water_and_basis()
+        scf_drv = ScfRestrictedDriver(MPI.COMM_WORLD, OutputStream(None))
+        scf_drv.restart = False
+        scf_drv._num_iter = 1
+        scf_drv._iter_data = {'gradient_norm': 0.0}
+
+        scf_drv._check_convergence(molecule, basis, None, True)
+        assert not scf_drv.is_converged
+
+        scf_drv._check_convergence(molecule, basis, None, False)
+        assert scf_drv.is_converged
+
+    def test_density_damping_marks_next_convergence_check(self, monkeypatch):
+
+        molecule, basis = self.get_water_and_basis()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.acc_type = 'diis'
+        scf_drv.density_damping = True
+        scf_drv.max_iter = 3
+        scf_drv.conv_thresh = 1.0e-12
+
+        # Control the damping branch independently of the numerical SCF
+        # trajectory. A gradient above 1.0e-2 activates damping, while the
+        # subsequent smaller gradient makes den_damp equal to 1.0 and clears
+        # the modifier flag for the next convergence check.
+        def controlled_gradient(*args):
+            gradient_norm = (2.0e-2
+                             if scf_drv._num_iter <= 1 else 1.0e-3)
+            return gradient_norm, gradient_norm
+
+        monkeypatch.setattr(scf_drv, '_comp_gradient', controlled_gradient)
+
+        calls = []
+        original_check = scf_drv._check_convergence
+
+        def tracked_check(molecule, ao_basis, ovl_mat, use_scf_modifier):
+            calls.append((scf_drv._num_iter, use_scf_modifier))
+            return original_check(molecule, ao_basis, ovl_mat,
+                                  use_scf_modifier)
+
+        monkeypatch.setattr(scf_drv, '_check_convergence', tracked_check)
+
+        scf_drv.compute(molecule, basis)
+
+        # The fresh-guess cycle is not damped. Damping after iteration 1 marks
+        # iteration 2, and the undamped update after iteration 2 clears the
+        # marker for iteration 3.
+        assert calls == [(0, False), (1, False), (2, True), (3, False)]
 
     def test_density_damping_changes_real_scf_trajectory(self):
 
@@ -849,7 +1672,7 @@ class TestScfDriverMiscellaneous:
 
         assert ref_results is None
         assert damped_results is None
-        assert len(ref_drv.history) == len(damped_drv.history) == 3
+        assert len(ref_drv.history) == len(damped_drv.history) == 2
 
         if self.is_master():
             ref_energies = np.array(
