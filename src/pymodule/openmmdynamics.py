@@ -2139,7 +2139,8 @@ class OpenMMDynamics:
                            friction=1.0,
                            timestep=0.5,
                            restart_file=None,
-                           initial_temperature=None):
+                           initial_temperature=None,
+                           initial_velocity_seed=None):
         """
         Creates the OpenMM simulation object without propagating it.
 
@@ -2202,7 +2203,13 @@ class OpenMMDynamics:
             else:
                 init_temp = 10 * unit.kelvin
 
-            self.simulation.context.setVelocitiesToTemperature(init_temp)
+            if initial_velocity_seed is None:
+                self.simulation.context.setVelocitiesToTemperature(init_temp)
+            else:
+                self.simulation.context.setVelocitiesToTemperature(
+                    init_temp,
+                    randomSeed=int(initial_velocity_seed),
+                )
 
         return self.simulation
 
