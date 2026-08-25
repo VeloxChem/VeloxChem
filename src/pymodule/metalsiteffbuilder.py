@@ -134,10 +134,18 @@ class MetalSiteForceFieldBuilder:
         - mm_constrain_metals: The flag for holding the metal centers fixed in
           the crude pass as well, on top of the beta carbons.
         - do_resp: The flag for computing RESP charges.
+        - calculate_partial_hessian: The flag for restricting the Hessian to
+          the atom pairs the metal terms are fitted from. False computes the
+          whole thing, which costs far more and changes no parameter.
         - constrain_capping_hydrogens: The flag for constraining the capping
           hydrogens in addition to the beta carbons.
         - average_metal_terms: The flag for averaging the fitted metal terms
           over equivalent atoms.
+        - prune_weak_bridge_bonds: The flag for dropping the long arm of a
+          bridging residue when the fit gave it no force constant.
+        - weak_bridge_tolerance: How much longer than the residue's shortest
+          metal bond, in Angstrom, the unfitted arm has to be before it is
+          dropped.
         - folder: The working folder. Every expensive step writes its result
           here as soon as it has it, and reads it back on a later run. Named
           after the creation time by default, so runs do not collide.
@@ -311,12 +319,28 @@ class MetalSiteForceFieldBuilder:
         # workflow
         self.do_qm_optimization = True
         self.do_resp = True
+        # Only the metal terms are fitted, and Seminario reads one block of
+        # the Hessian per bond and two per angle, so the analytical Hessian is
+        # restricted to exactly those pairs. Everything else it would have
+        # computed is thrown away by the fit, which is why this is on. Turn it
+        # off for a Hessian that is worth something on its own -- a frequency
+        # analysis, or a fit of terms the metals do not reach.
+        self.calculate_partial_hessian = True
         # the beta carbon is where the backbone actually holds the sidechain;
         # the capping hydrogen only stands in for the alpha carbon
         self.constrain_capping_hydrogens = False
         # two topologically equivalent ligands of a strained site sit at
         # genuinely different distances, and that asymmetry is the signal
         self.average_metal_terms = False
+
+        # A residue that bridges two metals, through one atom or through two,
+        # can reach one of them far more weakly than the other. Where the fit
+        # says so outright, by giving that arm no force constant at all, and
+        # the geometry agrees by holding it this much further out than the
+        # residue's shortest metal bond, it is dropped rather than kept as a
+        # bond with no stiffness.
+        self.prune_weak_bridge_bonds = True
+        self.weak_bridge_tolerance = 0.25
 
         # Crude MM pass. The site is relaxed on a force field of its own
         # before any QM is run, so the optimization does not spend its first
@@ -428,12 +452,19 @@ class MetalSiteForceFieldBuilder:
             self.ostream.print_info(
                 'Using the supplied Hessian; skipping the QM Hessian.')
             self.ostream.flush()
-        else:
+        elif self.calculate_partial_hessian:
             self.ostream.print_info(
                 f'Hessian restricted to {len(atom_pairs)} atom pairs over '
                 f'{len(atoms)} of {molecule.number_of_atoms()} atoms.')
             self.ostream.flush()
             hessian = self.compute_hessian(active_site, atom_pairs)
+        else:
+            self.ostream.print_info(
+                'Computing the full Hessian over all '
+                f'{molecule.number_of_atoms()} atoms; the metal terms read '
+                f'{len(atom_pairs)} of its blocks.')
+            self.ostream.flush()
+            hessian = self.compute_hessian(active_site)
 
         if charges is not None:
             self.ostream.print_info(
@@ -2208,6 +2239,10 @@ class MetalSiteForceFieldBuilder:
         are added by the Hessian driver itself, so only the off-diagonal pairs
         need to be given.
 
+        compute() passes the pairs of extract_pairs unless
+        calculate_partial_hessian is off, in which case it asks for the whole
+        Hessian instead.
+
         :param atom_pairs:
             The list of zero-based (i, j) tuples, typically from
             extract_pairs. None computes the full Hessian.
@@ -2426,7 +2461,13 @@ class MetalSiteForceFieldBuilder:
                 reparameterize_keys=bonds + angles,
                 average_metal_terms=self.average_metal_terms)
             forcefield.ostream.unmute()
-            self._check_force_constants(forcefield, active_site, bonds, angles)
+
+            if self.prune_weak_bridge_bonds:
+                bonds, angles = self._prune_weak_bridges(
+                    forcefield, active_site, bonds, angles)
+
+            self._check_force_constants(forcefield, active_site, bonds,
+                                        angles, hessian)
 
         return forcefield
 
@@ -2664,47 +2705,322 @@ class MetalSiteForceFieldBuilder:
 
         self.ostream.flush()
 
-    def _check_force_constants(self, forcefield, active_site, bonds, angles):
+    def _prune_weak_bridges(self, forcefield, active_site, bonds, angles):
         """
-        Warns about metal terms whose force constant was fitted to zero.
+        Drops the long arm of a bridging residue that the fit gave no force
+        constant.
 
-        The Seminario method clamps negative Hessian projections to zero, and
-        a negative projection means the geometry is not a stationary point
-        along that coordinate. On an unrelaxed structure this typically wipes
-        out the long, strained metal-ligand bonds, which are exactly the ones
-        that matter for a bridged binuclear site.
+        A residue that reaches two metals can hold one of them far more
+        weakly than the other, whether it does the bridging through one atom
+        that binds both (mu-1,1) or through two atoms of the same group that
+        take one metal each (a mu-1,3 carboxylate). Both are the same
+        situation seen from the residue, so the residue is what is looked at:
+        the metal bonds of everything the metals leave connected together.
+
+        Two independent things have to agree before an arm is dropped: the
+        Hessian, by giving it no force constant at all, and the geometry, by
+        holding it at least weak_bridge_tolerance further out than the
+        shortest metal bond of that same residue. A zero on its own says
+        nothing here - it can equally mean a geometry that is not stationary,
+        or a Hessian that never covered the pair - which is why the distance
+        has to agree.
+
+        A bond with no stiffness is not the same thing as no bond: it leaves
+        the pair at an equilibrium the dynamics never restores while its
+        angles, torsions and exclusions all still act as though the two were
+        bonded. So the bond goes, and with it every angle, torsion and
+        improper that crosses it.
+
+        Only the longer arms are ever dropped, so a bridging residue can
+        never lose the contact it is held by.
+
+        :param forcefield:
+            The force field being built, whose terms are removed in place.
+        :param active_site:
+            The active site, for the metal indices and the geometry the fit
+            was made on.
+        :param bonds:
+            The metal bond keys.
+        :param angles:
+            The metal angle keys.
+
+        :return:
+            The metal bond and angle keys that are left.
+        """
+
+        metals = set(active_site['metal_indices'])
+        coordinates = active_site['molecule'].get_coordinates_in_angstrom()
+        labels = active_site['molecule'].get_labels()
+        fragments = self._ligand_fragments(forcefield, metals)
+
+        # the metal bonds of each residue, keyed by the fragment it is
+        reached = {}
+        for key in bonds:
+            ligands = [index for index in key if index not in metals]
+            if len(ligands) != 1:
+                # a metal-metal bond belongs to no residue
+                continue
+            reached.setdefault(fragments[ligands[0]], []).append(key)
+
+        removed = []
+        for keys in reached.values():
+            touched = {index for key in keys for index in key if index in metals}
+            if len(touched) < 2:
+                # one metal is a grip, however many atoms it is made with
+                continue
+
+            lengths = {
+                key: float(
+                    np.linalg.norm(coordinates[key[0]] - coordinates[key[1]]))
+                for key in keys
+            }
+            shortest = min(lengths.values())
+
+            for key in keys:
+                if forcefield.bonds[key]['force_constant'] != 0.0:
+                    continue
+                if lengths[key] - shortest < self.weak_bridge_tolerance:
+                    continue
+                removed.append((key, lengths[key], shortest))
+
+        if not removed:
+            return bonds, angles
+
+        for key, length, shortest in removed:
+            pair = set(key)
+            names = '-'.join(labels[index] for index in key)
+
+            crossing = {
+                'angle':
+                    self._terms_crossing(forcefield.angles, pair),
+                'torsion':
+                    self._terms_crossing(forcefield.dihedrals, pair),
+                'improper':
+                    self._terms_crossing(forcefield.impropers, pair, path=False),
+            }
+
+            del forcefield.bonds[key]
+            for table, found in ((forcefield.angles, crossing['angle']),
+                                 (forcefield.dihedrals, crossing['torsion']),
+                                 (forcefield.impropers, crossing['improper'])):
+                for crossed in found:
+                    del table[crossed]
+
+            counts = ', '.join(f'{len(found)} {name}(s)'
+                               for name, found in crossing.items())
+            self.ostream.print_info(
+                f'Removed the bridging bond {key} {names}: it was fitted to '
+                f'no force constant and is {length:.2f} A long against '
+                f'{shortest:.2f} A for the shortest metal bond of the same '
+                f'residue. {counts} crossing it were removed with it.')
+
+        self.ostream.flush()
+
+        # filtered rather than re-derived, so that an angle list the caller
+        # emptied on purpose stays empty
+        return ([key for key in bonds if key in forcefield.bonds],
+                [key for key in angles if key in forcefield.angles])
+
+    @staticmethod
+    def _ligand_fragments(forcefield, metals):
+        """
+        Numbers the residues a force field holds, as what the metals leave
+        connected together.
+
+        The bonds of the force field are walked rather than the connectivity
+        matrix, so that what counts as one residue is what this force field
+        is actually wired as. A metal is not part of any of them, which is
+        the whole point: it is what would otherwise join two residues into
+        one.
+
+        :param forcefield:
+            The force field.
+        :param metals:
+            The indices of the metal centers.
+
+        :return:
+            A dictionary from atom index to fragment number, holding every
+            atom that is not a metal.
+        """
+
+        neighbors = {}
+        for first, second in forcefield.bonds:
+            if first in metals or second in metals:
+                continue
+            neighbors.setdefault(first, set()).add(second)
+            neighbors.setdefault(second, set()).add(first)
+
+        fragments = {}
+        count = 0
+
+        for atom in forcefield.atoms:
+            if atom in metals or atom in fragments:
+                continue
+
+            stack = [atom]
+            while stack:
+                current = stack.pop()
+                if current in fragments:
+                    continue
+                fragments[current] = count
+                stack.extend(neighbors.get(current, set()) - fragments.keys())
+
+            count += 1
+
+        return fragments
+
+    @staticmethod
+    def _terms_crossing(table, pair, path=True):
+        """
+        Finds the terms of one table that act across a bond.
+
+        A bond, an angle and a torsion are paths, so a term crosses the bond
+        when the two atoms are neighbours in its key. An improper is not a
+        path - its central atom is written first, with the substituents after
+        it - so there it is enough that both atoms are in the key at all.
+
+        :param table:
+            The bonds, angles, dihedrals or impropers of a force field.
+        :param pair:
+            The two atoms of the bond, as a set.
+        :param path:
+            Whether the keys of the table are paths.
+
+        :return:
+            The keys that cross the bond.
+        """
+
+        if not path:
+            return [key for key in table if pair <= set(key)]
+
+        return [
+            key for key in table
+            if any({key[index], key[index + 1]} == pair
+                   for index in range(len(key) - 1))
+        ]
+
+    def _check_force_constants(self,
+                               forcefield,
+                               active_site,
+                               bonds,
+                               angles,
+                               hessian=None):
+        """
+        Warns about metal terms whose force constant was fitted to zero, and
+        says which of the two reasons put it there.
+
+        A term reads its own blocks of the Hessian and nothing else: a bond
+        (i, j) reads the (i, j) block and an angle (i, j, k) reads the (i, j)
+        and (j, k) blocks. So a zero comes from one of two places, and the fix
+        is not the same:
+
+        - **the Hessian does not cover the term.** compute_hessian is
+          restricted to the pairs extract_pairs walks out of the connectivity,
+          and everything else is left at zero. A bond that was not there when
+          those pairs were taken has nothing to project, which is what a
+          Hessian reused from a folder or supplied by hand runs into when the
+          coordination has moved on since. Only recomputing it on this
+          coordination fixes that.
+        - **the projection was negative and Seminario clamped it**, which
+          means the geometry is not stationary along that coordinate. On an
+          unrelaxed structure this typically wipes out the long, strained
+          metal-ligand bonds, which are exactly the ones that matter for a
+          bridged binuclear site.
+
+        Without a Hessian the two cannot be told apart and everything is
+        reported as the second.
 
         :param bonds:
             The metal bond keys.
         :param angles:
             The metal angle keys.
+        :param hessian:
+            The Hessian the terms were fitted to, for telling an uncovered
+            term from a clamped one.
         """
 
         labels = active_site['molecule'].get_labels()
 
-        zero_bonds = [
-            key for key in bonds
-            if forcefield.bonds[key]['force_constant'] == 0.0
-        ]
-        zero_angles = [
-            key for key in angles
-            if forcefield.angles[key]['force_constant'] == 0.0
-        ]
+        zero = [(key, 'bond') for key in bonds
+                if forcefield.bonds[key]['force_constant'] == 0.0]
+        zero += [(key, 'angle') for key in angles
+                 if forcefield.angles[key]['force_constant'] == 0.0]
 
-        if not zero_bonds and not zero_angles:
+        if not zero:
             return
 
-        self.ostream.print_warning(
-            f'{len(zero_bonds)} of {len(bonds)} metal bond(s) and '
-            f'{len(zero_angles)} of {len(angles)} metal angle(s) got a zero '
-            'force constant. The Hessian is most likely not evaluated at a '
-            'stationary point; run optimize_active_site first.')
+        n_bonds = sum(1 for _, kind in zero if kind == 'bond')
+        n_angles = len(zero) - n_bonds
 
-        for key in zero_bonds:
-            names = '-'.join(labels[index] for index in key)
-            self.ostream.print_warning(f'  zero force constant: {key} {names}')
+        uncovered = [(key, kind) for key, kind in zero
+                     if not self._hessian_covers(hessian, key)]
+        clamped = [pair for pair in zero if pair not in uncovered]
+
+        def report(terms):
+            for key, kind in terms:
+                names = '-'.join(labels[index] for index in key)
+                self.ostream.print_warning(
+                    f'  zero force constant: {kind} {key} {names}')
+
+        self.ostream.print_warning(
+            f'{n_bonds} of {len(bonds)} metal bond(s) and {n_angles} of '
+            f'{len(angles)} metal angle(s) got a zero force constant.')
+
+        if uncovered:
+            self.ostream.print_warning(
+                f'{len(uncovered)} of them are not covered by the Hessian at '
+                'all: it was restricted to the atom pairs of a different '
+                'coordination, so it holds no data for these terms. Recompute '
+                'it on this one rather than reusing it.')
+            report(uncovered)
+
+        if clamped:
+            self.ostream.print_warning(
+                f'{len(clamped)} of them were clamped from a negative '
+                'projection. The Hessian is most likely not evaluated at a '
+                'stationary point; run optimize_active_site first.')
+            report(clamped)
 
         self.ostream.flush()
+
+    @staticmethod
+    def _hessian_covers(hessian, key):
+        """
+        Says whether a Hessian holds anything for one term.
+
+        The blocks a term reads are the bonded pairs of its key, which is what
+        extract_pairs walks out of the connectivity: (i, j) for a bond and
+        (i, j) together with (j, k) for an angle. A block left at exactly zero
+        was never computed, since compute_hessian fills only the pairs it is
+        given.
+
+        :param hessian:
+            The Hessian, or None when there is none to look at.
+        :param key:
+            The bond or angle key.
+
+        :return:
+            True when every block the term reads holds something, and when
+            there is no Hessian to say otherwise.
+        """
+
+        if hessian is None:
+            return True
+
+        hessian = np.asarray(hessian)
+        pairs = [(key[index], key[index + 1]) for index in range(len(key) - 1)]
+
+        for first, second in pairs:
+            # the driver fills the pairs it is given, and a key is not stored
+            # in any particular order, so both orientations are looked at
+            block = hessian[3 * first:3 * first + 3,
+                            3 * second:3 * second + 3]
+            mirror = hessian[3 * second:3 * second + 3,
+                             3 * first:3 * first + 3]
+            if not np.any(block) and not np.any(mirror):
+                return False
+
+        return True
 
     def minimize_active_site(self,
                              active_site,
@@ -3255,9 +3571,13 @@ class MetalSiteForceFieldBuilder:
             self._param(
                 'QM optimization', 'supplied' if self.optimized_geometry
                 is not None else self.do_qm_optimization))
-        self.ostream.print_header(
-            self._param('Hessian',
-                        'supplied' if self.hessian is not None else 'computed'))
+        if self.hessian is not None:
+            hessian_source = 'supplied'
+        elif self.calculate_partial_hessian:
+            hessian_source = 'computed, partial'
+        else:
+            hessian_source = 'computed, full'
+        self.ostream.print_header(self._param('Hessian', hessian_source))
         if self.partial_charges is not None:
             charge_source = 'supplied'
         elif self.do_resp:
@@ -3270,6 +3590,11 @@ class MetalSiteForceFieldBuilder:
             self._param(
                 'constrained atoms', 'beta carbons + caps'
                 if self.constrain_capping_hydrogens else 'beta carbons'))
+        self.ostream.print_header(
+            self._param(
+                'weak bridge pruning',
+                f'> {self.weak_bridge_tolerance:.2f} A'
+                if self.prune_weak_bridge_bonds else 'off'))
         self.ostream.print_header(
             self._param('enzyme system', self.build_enzyme_system))
         self.ostream.print_header(

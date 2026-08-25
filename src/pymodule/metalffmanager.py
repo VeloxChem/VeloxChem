@@ -62,6 +62,10 @@ class MetalForceFieldManager:
     QM of the next one. A template is matched to a new structure by graph
     isomorphism of the active site and by the RMSD between the two geometries,
     and the mapping the isomorphism gives is what carries the parameters across.
+    How many atoms of a residue reach a metal is left out of the matching, and
+    the site is wired the way the template is wired before its force field is
+    built: a template that is monodentate builds a monodentate site out of a
+    structure the cutoffs called bidentate, and the other way round.
 
     Only settings are kept on the object, apart from the templates themselves.
     Everything a match produces is returned by match_enzyme_to_template.
@@ -993,6 +997,16 @@ class MetalForceFieldManager:
         structure in front of us. Which template that is comes from
         select_template, on the numbers compare_to_templates measured.
 
+        The coordination comes from the template too. Denticity is a distance
+        cutoff on an unrelaxed structure rather than chemistry, so a site that
+        matched a template on every other count is wired the way the template
+        is wired before the force field is built, and what that changed is
+        reported and returned under 'forced_bonds'. The active site returned
+        is that rewired one; the one compare_to_templates measured is left as
+        it was measured. Note that 'binding_modes' still describes the
+        coordination the structure was detected with, which is what it is a
+        record of.
+
         :param comparison:
             The findings of compare_to_templates, or a structure to run it on.
         :param template:
@@ -1019,7 +1033,8 @@ class MetalForceFieldManager:
             'and charges.')
         self.ostream.flush()
 
-        forcefield = self._transfer(template, entry['mapping'], active_site)
+        forcefield, forced_bonds, active_site = self._transfer(
+            template, entry['mapping'], active_site)
 
         enzyme_system = None
         if self.build_enzyme_system:
@@ -1040,6 +1055,7 @@ class MetalForceFieldManager:
             'candidates': decision['candidates'],
             'regions': entry['regions'],
             'metal_bonds': entry['metal_bonds'],
+            'forced_bonds': forced_bonds,
             'geometry': comparison['geometry'],
             'geometry_kind': template['geometry_kind'],
             'topology': comparison['topology'],
@@ -1784,6 +1800,129 @@ class MetalForceFieldManager:
             template['forcefield'],
             {'metal_indices': template['metal_indices']})
 
+    def _template_connectivity(self, template, mapping, active_site):
+        """
+        Wires a site's metal center exactly as the template wires its own.
+
+        How many atoms of a residue reach a metal is a distance cutoff on an
+        unrelaxed structure rather than chemistry, which is why the matching
+        refuses to have an opinion about it: a carboxylate gripping a metal
+        with one oxygen and one gripping it with two are the same residue on
+        the same metal. What matches on those terms, though, has to be built
+        on the template's terms as well. A template bond the site does not
+        make has no atoms to land on, and a bond the site makes alone has no
+        fitted parameters to land on it - it would keep the seeded guess and
+        say nothing about it.
+
+        So the template decides the coordination: its metal bonds are added
+        where the site lacks them and the site's own are dropped where the
+        template does not make them. Only bonds touching a metal are touched;
+        the residues are wired as the structure has them.
+
+        The active site is not modified; a new dictionary is returned, with
+        the topologies rebuilt so they agree with the connectivity. When the
+        two already agree the site is handed back as it came.
+
+        :param template:
+            The template that matched.
+        :param mapping:
+            The mapping from template index to active site index.
+        :param active_site:
+            The active site of the query.
+
+        :return:
+            The active site to build on, and what was added and removed.
+        """
+
+        metals = set(active_site['metal_indices'])
+
+        assert_msg_critical(
+            {mapping[index] for index in template['metal_indices']} == metals,
+            'MetalForceFieldManager: the template maps its metal centers onto '
+            'atoms of the site that are not metal centers')
+
+        bonds, _ = self._metal_keys(template)
+        wanted = {
+            frozenset((mapping[first], mapping[second]))
+            for first, second in bonds
+        }
+
+        matrix = np.array(active_site['connectivity_matrix'])
+        changes = {'added': [], 'removed': []}
+
+        for pair in wanted:
+            first, second = sorted(pair)
+            if not matrix[first, second]:
+                matrix[first, second] = 1
+                matrix[second, first] = 1
+                changes['added'].append((first, second))
+
+        for first, second in self._matrix_edges(matrix):
+            if not ({first, second} & metals):
+                continue
+            if frozenset((first, second)) in wanted:
+                continue
+            matrix[first, second] = 0
+            matrix[second, first] = 0
+            changes['removed'].append((first, second))
+
+        if not changes['added'] and not changes['removed']:
+            return active_site, changes
+
+        active_site = {**active_site, 'connectivity_matrix': matrix}
+
+        return self._describe(active_site,
+                              self._matrix_edges(matrix)), changes
+
+    def _print_forced_bonds(self, template, active_site, changes):
+        """
+        Reports the metal bonds the template decided against the site.
+
+        A bond added over a long contact carries the template's equilibrium
+        and will pull the two atoms together at the first minimization, and a
+        short contact dropped is a pair left to the nonbonded terms alone.
+        Both are worth seeing here rather than in a geometry afterwards, so
+        anything on the wrong side of the coordination cutoff is a warning.
+
+        :param template:
+            The template that decided.
+        :param active_site:
+            The active site the distances are read off.
+        :param changes:
+            What _template_connectivity added and removed.
+        """
+
+        if not changes['added'] and not changes['removed']:
+            return
+
+        coordinates = active_site['molecule'].get_coordinates_in_angstrom()
+        labels = active_site['molecule'].get_labels()
+        cutoff = self.builder.metal_bond_cutoff
+
+        self.ostream.print_info(
+            f'The coordination of the site differs from {template["name"]}; '
+            f'forcing it onto the template: {len(changes["added"])} metal '
+            f'bond(s) added, {len(changes["removed"])} removed.')
+
+        for kind, pairs in (('adding', changes['added']),
+                            ('removing', changes['removed'])):
+            for first, second in pairs:
+                distance = np.linalg.norm(coordinates[first] -
+                                          coordinates[second])
+                line = (f'  {kind} {labels[first]}{first}-'
+                        f'{labels[second]}{second}, {distance:.2f} A apart '
+                        'in the site')
+
+                far = (kind == 'adding' and distance > cutoff)
+                near = (kind == 'removing' and distance <= cutoff)
+
+                if far or near:
+                    self.ostream.print_warning(line.strip())
+                else:
+                    self.ostream.print_info(line)
+
+        self.ostream.flush()
+
     # todo come up with a more descriptive name for this
     def _transfer(self, template, mapping, active_site):
         """
@@ -1795,17 +1934,28 @@ class MetalForceFieldManager:
         terms of the residues come from the structure rather than from
         somewhere else.
 
+        The coordination itself is the template's, not the site's: the metal
+        bonds are forced onto the template's by _template_connectivity before
+        anything is built, so a residue the structure holds bidentate is built
+        monodentate where the template is monodentate and the other way
+        round. Everything the template was fitted for then has atoms to land
+        on, and nothing is left carrying a seeded guess.
+
         :param template:
             The template that matched.
         :param mapping:
             The mapping from template index to active site index.
         :param active_site:
             The active site of the query, whose connectivity the force field
-            is built on.
+            is built on once the template has decided the metal bonds.
 
         :return:
-            The force field generator.
+            The force field generator, and the active site it was built on.
         """
+
+        active_site, changes = self._template_connectivity(
+            template, mapping, active_site)
+        self._print_forced_bonds(template, active_site, changes)
 
         template_ff = template['forcefield']
         charges = np.zeros(active_site['molecule'].number_of_atoms())
@@ -1842,7 +1992,7 @@ class MetalForceFieldManager:
             f'angle(s) and {len(charges)} charge(s) from {template["name"]}.')
         self.ostream.flush()
 
-        return forcefield
+        return forcefield, changes, active_site
 
     @staticmethod
     def _map_key(key, mapping, table, kind):
