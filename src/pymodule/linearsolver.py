@@ -173,7 +173,7 @@ class LinearSolver:
         self.pressure_units = 'MPa'
         self.gostshyp_num_lebedev_points = 110
         self.gostshyp_tssf = 1.2
-        self.gostshyp_discretization = 'iswig'
+        self.gostshyp_discretization = 'swig'
         self.gostshyp_switching_thresh = 1.0e-8
         self.gostshyp_r_ext = 0.25
         self._gostshyp_tess_info = None
