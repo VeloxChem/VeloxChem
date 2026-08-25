@@ -132,6 +132,12 @@ class ScfGradientDriver(GradientDriver):
             scf_energy_not_used = self.compute_energy(molecule, basis)
             scf_results = self.scf_driver.scf_results
 
+        # sanity checks: inherit method settings from the SCF results so
+        # that the DFT state is up to date before the setup header is printed
+        molecule_sanity_check(molecule)
+        scf_results_sanity_check(self, scf_results)
+        dft_sanity_check(self, 'compute')
+
         start_time = time.time()
         self.print_header()
 
@@ -139,11 +145,6 @@ class ScfGradientDriver(GradientDriver):
             self.compute_numerical(molecule, basis, scf_results)
 
         else:
-            # sanity checks
-            molecule_sanity_check(molecule)
-            scf_results_sanity_check(self, scf_results)
-            dft_sanity_check(self, 'compute')
-
             if self.rank == mpi_master():
                 scf_type = scf_results['scf_type']
             else:

@@ -161,6 +161,21 @@ class ScfHessianDriver(HessianDriver):
             self.scf_driver.electric_field is None,
             f'{type(self).__name__}.compute: electric_field is not supported')
 
+        scf_results = self.scf_driver.scf_results
+        if scf_results is None:
+            # run SCF if needed
+            scf_energy_not_used = self.compute_energy(molecule, ao_basis)
+            scf_results = self.scf_driver.scf_results
+
+        # Save the electronic energy
+        self.elec_energy = self.scf_driver.get_scf_energy()
+
+        # sanity checks: inherit method settings from the SCF results so
+        # that the DFT state is up to date before the setup header is printed
+        molecule_sanity_check(molecule)
+        scf_results_sanity_check(self, scf_results)
+        dft_sanity_check(self, 'compute')
+
         if self.rank == mpi_master():
             self.print_header()
 
@@ -173,23 +188,9 @@ class ScfHessianDriver(HessianDriver):
             'memory_tracing': self.memory_tracing,
         })
 
-        scf_results = self.scf_driver.scf_results
-        if scf_results is None:
-            # run SCF if needed
-            scf_energy_not_used = self.compute_energy(molecule, ao_basis)
-            scf_results = self.scf_driver.scf_results
-
-        # Save the electronic energy
-        self.elec_energy = self.scf_driver.get_scf_energy()
-
         if self.numerical:
             self.compute_numerical(molecule, ao_basis)
         else:
-            # sanity checks
-            molecule_sanity_check(molecule)
-            scf_results_sanity_check(self, scf_results)
-            dft_sanity_check(self, 'compute')
-
             if self.rank == mpi_master():
                 scf_type = scf_results['scf_type']
             else:
