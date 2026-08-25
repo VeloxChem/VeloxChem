@@ -398,8 +398,8 @@ class MetalForceFieldManager:
         The bonding topology is not a separate file: the bonds of the force
         field are the edges of the active site, metal-ligand bonds included,
         since build_forcefield builds them from the connectivity matrix. The
-        capping hydrogens are the ones left at exactly zero charge by
-        redistribute_cap_charges, which is how a cap is told apart from the
+        capping hydrogens and the beta carbons come from the comments
+        annotate_atoms wrote, which is how a cap is told apart from the
         hydrogens it is symmetric with.
 
         :param name:
@@ -443,27 +443,30 @@ class MetalForceFieldManager:
 
         charges = np.array(
             [atom['charge'] for atom in forcefield.atoms.values()])
-        cap_indices = [
-            index for index, label in enumerate(labels)
-            if label == 'H' and charges[index] == 0.0
-        ]
 
-        # A force field built without charges has every atom at zero, which
-        # makes every hydrogen look like a cap and would put nothing but
-        # zeroes on whatever it is transferred to.
-        if not np.any(charges):
-            self.ostream.print_warning(
-                f'The force field of {folder} carries no charges at all, so '
-                'it was built without RESP. Its capping hydrogens cannot be '
-                'told from the others, and a site matched to it would be '
-                'given a charge of zero on every atom.')
-            self.ostream.flush()
+        # The truncation records what it made in the comments, and those are
+        # what a template reads. The capping hydrogens do sit at exactly zero
+        # charge once redistribute_cap_charges has run, but that is the
+        # correction doing its job rather than a marker, and it says nothing
+        # in a force field whose charges are all zero.
+        marked = {
+            role: [
+                index for index, atom in forcefield.atoms.items()
+                if role in (atom.get('comment', '') or '')
+            ]
+            for role in (MetalSiteForceFieldBuilder.BETA_CARBON_COMMENT,
+                         MetalSiteForceFieldBuilder.CAP_COMMENT)
+        }
 
-        marker = MetalSiteForceFieldBuilder.BETA_CARBON_COMMENT
-        beta_carbon_indices = [
-            index for index, atom in forcefield.atoms.items()
-            if marker in (atom.get('comment', '') or '')
-        ]
+        beta_carbon_indices = marked[
+            MetalSiteForceFieldBuilder.BETA_CARBON_COMMENT]
+        cap_indices = marked[MetalSiteForceFieldBuilder.CAP_COMMENT]
+
+        assert_msg_critical(
+            len(cap_indices) > 0,
+            f'MetalForceFieldManager: the force field of {folder} does not '
+            'say which of its atoms are capping hydrogens. It was written '
+            'before annotate_atoms recorded them, so rebuild it.')
 
         # A template is an active site with the two files it was loaded from
         # added to it, rather than a dictionary holding a description of one:
@@ -848,7 +851,6 @@ class MetalForceFieldManager:
             'geometry': geometry,
             'include_hydrogens': include_hydrogens,
             'active_site': active_site,
-            'connectivity_matrix': query['connectivity_matrix'],
             'binding_modes': query['binding_modes'],
             'topology': query['topology'],
             'positions': query['positions'],
@@ -1017,8 +1019,7 @@ class MetalForceFieldManager:
             'and charges.')
         self.ostream.flush()
 
-        forcefield = self._transfer(template, entry['mapping'], active_site,
-                                    comparison['connectivity_matrix'])
+        forcefield = self._transfer(template, entry['mapping'], active_site)
 
         enzyme_system = None
         if self.build_enzyme_system:
@@ -1045,7 +1046,6 @@ class MetalForceFieldManager:
             'positions': comparison['positions'],
             'binding_modes': comparison['binding_modes'],
             'active_site': active_site,
-            'connectivity_matrix': comparison['connectivity_matrix'],
             'enzyme_system': enzyme_system,
         }
 
@@ -1225,8 +1225,8 @@ class MetalForceFieldManager:
             The path to a PDB or mmCIF file.
 
         :return:
-            A dictionary with the topology, the positions, the binding modes,
-            the described active site and its connectivity.
+            A dictionary with the topology, the positions, the binding modes
+            and the described active site, whose connectivity comes with it.
         """
 
         assert_msg_critical('openmm' in sys.modules,
@@ -1234,28 +1234,22 @@ class MetalForceFieldManager:
 
         builder = self.builder
 
-        topology, positions = builder.load_structure(structure)
-
-        if self.do_prepare_protein:
-            # every index downstream refers to this topology, so the repair
-            # has to happen before anything is extracted from it
-            topology, positions = builder.prepare_protein(topology, positions)
+        topology, positions = builder.load_and_prepare_protein(
+            structure, prepare=self.do_prepare_protein)
 
         binding_modes = builder.suggest_binding_modes(topology, positions)
         topology, positions, binding_modes = builder.protonate(
             topology, positions, binding_modes)
         active_site = builder.extract_active_site(topology, positions,
                                                   binding_modes)
-        connectivity_matrix = builder.build_connectivity(
-            topology, active_site, binding_modes)
 
         return {
             'topology': topology,
             'positions': positions,
             'binding_modes': binding_modes,
             'active_site': self._describe(
-                active_site, self._matrix_edges(connectivity_matrix)),
-            'connectivity_matrix': connectivity_matrix,
+                active_site,
+                self._matrix_edges(active_site['connectivity_matrix'])),
         }
 
     def _mm_relax(self, query):
@@ -1288,8 +1282,7 @@ class MetalForceFieldManager:
         builder.save_output = False
 
         try:
-            return builder.mm_optimize_active_site(query['active_site'],
-                                                   query['connectivity_matrix'])
+            return builder.mm_optimize_active_site(query['active_site'])
         finally:
             builder.save_output = save_output
             if override:
@@ -1792,7 +1785,7 @@ class MetalForceFieldManager:
             {'metal_indices': template['metal_indices']})
 
     # todo come up with a more descriptive name for this
-    def _transfer(self, template, mapping, active_site, connectivity_matrix):
+    def _transfer(self, template, mapping, active_site):
         """
         Builds a force field for an active site out of a template.
 
@@ -1807,9 +1800,8 @@ class MetalForceFieldManager:
         :param mapping:
             The mapping from template index to active site index.
         :param active_site:
-            The active site of the query.
-        :param connectivity_matrix:
-            Its connectivity.
+            The active site of the query, whose connectivity the force field
+            is built on.
 
         :return:
             The force field generator.
@@ -1830,8 +1822,7 @@ class MetalForceFieldManager:
 
         # build_forcefield writes the charges onto the atoms and redistributes
         # the caps; the metal terms it seeds here are overwritten below
-        forcefield = self.builder.build_forcefield(active_site,
-                                                   connectivity_matrix, None,
+        forcefield = self.builder.build_forcefield(active_site, None,
                                                    charges)
 
         bonds, angles = self._metal_keys(template)

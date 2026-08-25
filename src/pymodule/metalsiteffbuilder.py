@@ -245,6 +245,7 @@ class MetalSiteForceFieldBuilder:
     # what knows it, and nothing about a bare force field and a geometry
     # recovers it afterwards without guessing.
     BETA_CARBON_COMMENT = 'beta carbon'
+    CAP_COMMENT = 'capping hydrogen'
 
     # Literature equilibrium metal-ligand distances in nm. The crude pre-QM
     # pass measures its equilibrium values on the input geometry instead;
@@ -380,12 +381,7 @@ class MetalSiteForceFieldBuilder:
 
         self._print_header(structure)
 
-        topology, positions = self.load_structure(structure)
-
-        if self.build_enzyme_system:
-            # every index downstream refers to this topology, so the repair
-            # has to happen before anything is extracted from it
-            topology, positions = self.prepare_protein(topology, positions)
+        topology, positions = self.load_and_prepare_protein(structure)
 
         binding_modes = self.suggest_binding_modes(topology, positions)
         self._print_binding_modes(binding_modes)
@@ -394,9 +390,7 @@ class MetalSiteForceFieldBuilder:
             topology, positions, binding_modes)
         active_site = self.extract_active_site(topology, positions,
                                                binding_modes)
-        connectivity_matrix = self.build_connectivity(topology, active_site,
-                                                      binding_modes)
-        self._print_active_site(active_site, binding_modes, connectivity_matrix)
+        self._print_active_site(active_site, binding_modes)
 
         # anything supplied through the settings is validated against the
         # active site and replaces the step that would have produced it
@@ -408,7 +402,7 @@ class MetalSiteForceFieldBuilder:
         # nothing for the crude pass to improve on
         if geometry is None and self.do_mm_optimization:
             active_site['molecule'] = self.mm_optimize_active_site(
-                active_site, connectivity_matrix)
+                active_site)
 
         if geometry is not None:
             self.ostream.print_info(
@@ -420,15 +414,15 @@ class MetalSiteForceFieldBuilder:
 
         if geometry is not None:
             active_site['molecule'] = geometry
-            binding_modes, connectivity_matrix, _ = self.update_binding_modes(
-                topology, geometry, active_site, binding_modes,
-                connectivity_matrix)
+            binding_modes, active_site, _ = self.update_binding_modes(
+                topology, geometry, active_site, binding_modes)
 
         molecule = active_site['molecule']
 
-        atom_pairs, atoms = self.extract_pairs(connectivity_matrix,
-                                               active_site['metal_indices'],
-                                               bond_count=2)
+        atom_pairs, atoms = self.extract_pairs(
+            active_site['connectivity_matrix'],
+            active_site['metal_indices'],
+            bond_count=2)
 
         if hessian is not None:
             self.ostream.print_info(
@@ -449,11 +443,15 @@ class MetalSiteForceFieldBuilder:
         elif self.do_resp:
             charges = self.compute_resp_charges(active_site)
 
-        if charges is not None:
-            self._print_partial_charges(topology, active_site, charges)
+        # settled here rather than inside the steps that need them, so that
+        # the force field, the enzyme system and partial_charges.txt all
+        # carry the same charges whatever they came from
+        if charges is None:
+            charges = self.d4_charges(active_site)
 
-        forcefield = self.build_forcefield(active_site, connectivity_matrix,
-                                           hessian, charges)
+        self._print_partial_charges(topology, active_site, charges)
+
+        forcefield = self.build_forcefield(active_site, hessian, charges)
         # written here rather than inside build_forcefield, which the
         # crude MM pass calls as well: only this one is the fit
         self._save_intermediate(
@@ -473,7 +471,6 @@ class MetalSiteForceFieldBuilder:
             'enzyme_system': enzyme_system,
             'binding_modes': binding_modes,
             'active_site': active_site,
-            'connectivity_matrix': connectivity_matrix,
             'atom_pairs': atom_pairs,
             'hessian': hessian,
             'partial_charges': charges,
@@ -622,7 +619,39 @@ class MetalSiteForceFieldBuilder:
 
         return folder
 
-    def load_structure(self, structure):
+    def load_and_prepare_protein(self, structure, prepare=None):
+        """
+        Reads a structure and repairs it for a protein force field.
+
+        The two are one step because the repair renumbers atoms: every index
+        downstream refers to the topology this returns, so a structure that is
+        read and then prepared separately is a chance to extract from the
+        wrong one.
+
+        :param structure:
+            The path to a .pdb, .cif or .pdbx file.
+        :param prepare:
+            Whether to run the repair. Defaults to build_enzyme_system, which
+            is what needs a topology a protein force field can template; a run
+            that only wants the metal site can skip it, and skip pdbfixer with
+            it.
+
+        :return:
+            The tuple of the OpenMM topology and the positions as an (N, 3)
+            numpy array in Angstrom.
+        """
+
+        if prepare is None:
+            prepare = self.build_enzyme_system
+
+        topology, positions = self._load_structure(structure)
+
+        if prepare:
+            topology, positions = self._prepare_protein(topology, positions)
+
+        return topology, positions
+
+    def _load_structure(self, structure):
         """
         Reads a PDB or mmCIF structure.
 
@@ -636,13 +665,15 @@ class MetalSiteForceFieldBuilder:
 
         assert_msg_critical(
             'openmm' in sys.modules,
-            'MetalSiteForceFieldBuilder.load_structure: openmm is required')
+            'MetalSiteForceFieldBuilder.load_and_prepare_protein: openmm is '
+            'required')
 
         path = Path(structure)
 
         assert_msg_critical(
             path.is_file(),
-            f'MetalSiteForceFieldBuilder.load_structure: {path} not found')
+            f'MetalSiteForceFieldBuilder.load_and_prepare_protein: {path} not '
+            'found')
 
         if path.suffix.lower() in ('.cif', '.pdbx', '.mmcif'):
             pdb = mmapp.PDBxFile(str(path))
@@ -653,7 +684,7 @@ class MetalSiteForceFieldBuilder:
 
         return pdb.topology, positions
 
-    def prepare_protein(self, topology, positions):
+    def _prepare_protein(self, topology, positions):
         """
         Adds missing heavy atoms so that a protein force field can match
         templates.  Missing residues are deliberately not built.
@@ -1445,6 +1476,11 @@ class MetalSiteForceFieldBuilder:
         backbone: the scheme is fixed, which also guarantees that the RESP and
         Hessian calculations see the same truncation.
 
+        The connectivity comes with it, under 'connectivity_matrix'. It is not
+        a separate object: which atoms are bonded is a property of the site
+        that was extracted, and nothing downstream should be able to pair the
+        two up wrongly.
+
         :param topology:
             The protonated OpenMM topology.
         :param positions:
@@ -1550,13 +1586,16 @@ class MetalSiteForceFieldBuilder:
             [f'{residues[i].name}{residues[i].id}' for i in res_indices],
         }
 
+        active_site['connectivity_matrix'] = self._build_connectivity(
+            topology, active_site, binding_modes)
+
         return active_site
 
-    def build_connectivity(self,
-                           topology,
-                           active_site,
-                           binding_modes,
-                           warn_above=2.0):
+    def _build_connectivity(self,
+                            topology,
+                            active_site,
+                            binding_modes,
+                            warn_above=2.0):
         """
         Builds the connectivity matrix of the active site without perceiving any
         bonds.
@@ -1565,6 +1604,9 @@ class MetalSiteForceFieldBuilder:
         correct by construction for standard residues, and the metal-ligand
         bonds come from the binding modes, which are explicit and reviewable.
         Molecule.get_connectivity_matrix is not used.
+
+        Called by extract_active_site, which puts the result into the
+        dictionary it returns.
 
         :param topology:
             The protonated OpenMM topology.
@@ -1593,7 +1635,7 @@ class MetalSiteForceFieldBuilder:
         for ligand in binding_modes['ligands']:
             assert_msg_critical(
                 ligand['index'] in reverse_map,
-                'MetalSiteForceFieldBuilder.build_connectivity: ligand atom '
+                'MetalSiteForceFieldBuilder._build_connectivity: ligand atom '
                 f'{ligand["residue"]} {ligand["atom"]} is not part of the '
                 'extracted active site')
             lig_index = reverse_map[ligand['index']]
@@ -1624,7 +1666,7 @@ class MetalSiteForceFieldBuilder:
         return connectivity_matrix
 
     def update_binding_modes(self, topology, geometry, active_site,
-                             binding_modes, connectivity_matrix):
+                             binding_modes):
         """
         Re-detects the coordination sphere on a new active site geometry.
 
@@ -1646,15 +1688,16 @@ class MetalSiteForceFieldBuilder:
             The new active site geometry, as a molecule or as an (N, 3) array
             in Angstrom. Ordered like the active site, not like the topology.
         :param active_site:
-            The active site the geometry belongs to. Not modified.
+            The active site the geometry belongs to, whose connectivity is
+            what gets checked. Not modified.
         :param binding_modes:
             The binding modes to check. Not modified.
-        :param connectivity_matrix:
-            The connectivity matrix to check. Not modified.
 
         :return:
-            The tuple of the binding modes, the connectivity matrix and the
-            flag that is True when the coordination changed.
+            The tuple of the binding modes, the active site and the flag that
+            is True when the coordination changed. The active site is a new
+            dictionary carrying the new connectivity when it did change, and
+            the one that was passed in when it did not.
         """
 
         self._check_supported_metals(binding_modes['metals'],
@@ -1730,7 +1773,7 @@ class MetalSiteForceFieldBuilder:
 
         if new_coordination == old_coordination:
             self._print_binding_mode_update([], largest_shift)
-            return binding_modes, connectivity_matrix, False
+            return binding_modes, active_site, False
 
         changes = []
         for index in sorted(set(old_coordination) | set(new_coordination)):
@@ -1779,7 +1822,7 @@ class MetalSiteForceFieldBuilder:
 
         # only the metal-ligand bonds are read off the geometry, so the
         # covalent bonds of the matrix are left exactly as they were
-        new_matrix = np.array(connectivity_matrix, copy=True)
+        new_matrix = np.array(active_site['connectivity_matrix'], copy=True)
 
         for ligands, value in ((binding_modes['ligands'], 0), (new_ligands, 1)):
             for ligand in ligands:
@@ -1791,7 +1834,10 @@ class MetalSiteForceFieldBuilder:
 
         self._print_binding_modes(new_binding_modes)
 
-        return new_binding_modes, new_matrix, True
+        new_active_site = dict(active_site)
+        new_active_site['connectivity_matrix'] = new_matrix
+
+        return new_binding_modes, new_active_site, True
 
     @staticmethod
     def _metal_contact_label(ligand, binding_modes):
@@ -2246,6 +2292,34 @@ class MetalSiteForceFieldBuilder:
 
         return charges
 
+    def d4_charges(self, active_site):
+        """
+        Returns D4 partial charges for the active site.
+
+        The fallback wherever charges are wanted and none were fitted. They
+        are cheap - a fraction of a millisecond - and they sum to the charge
+        of the site exactly, but they are not RESP: on a binuclear zinc site
+        they put about 0.3 e less on each metal. Good enough to relax a
+        geometry on, and worth knowing about before they reach anything else.
+
+        :param active_site:
+            The active site.
+
+        :return:
+            The charges as an (N,) numpy array, capping hydrogens included.
+        """
+
+        molecule = active_site['molecule']
+        charges = np.array(
+            molecule.get_partial_charges(molecule.get_charge()))
+
+        self.ostream.print_info(
+            f'Using D4 partial charges: {charges.size} atoms summing to '
+            f'{charges.sum():+.3f} e. No RESP charges were supplied.')
+        self.ostream.flush()
+
+        return charges
+
     def get_metal_keys(self, forcefield, active_site):
         """
         Returns the bond and angle keys that involve a metal center.
@@ -2266,10 +2340,7 @@ class MetalSiteForceFieldBuilder:
 
         return bonds, angles
 
-    def build_forcefield(self,
-                         active_site,
-                         connectivity_matrix,
-                         hessian=None,
+    def build_forcefield(self, active_site, hessian=None,
                          partial_charges=None):
         """
         Builds the active site force field and fits the metal terms.
@@ -2300,7 +2371,8 @@ class MetalSiteForceFieldBuilder:
         n_atoms = molecule.number_of_atoms()
 
         forcefield = MMForceFieldGenerator(self.comm, self.ostream)
-        forcefield.connectivity_matrix = np.asarray(connectivity_matrix)
+        forcefield.connectivity_matrix = np.asarray(
+            active_site['connectivity_matrix'])
         forcefield.topology_update_flag = True
 
         # the generator shares the output stream of the builder, so muting it
@@ -2315,11 +2387,7 @@ class MetalSiteForceFieldBuilder:
         # then fills them with zeros. Assigning them beforehand is silently
         # discarded.
         if partial_charges is None:
-            self.ostream.print_info(
-                "Using D4 partial charges because no charges were supplied.")
-            self.ostream.flush()
-            partial_charges = active_site['molecule'].get_partial_charges(
-                active_site['molecule'].get_charge())
+            partial_charges = self.d4_charges(active_site)
 
         partial_charges = np.asarray(partial_charges)
         assert_msg_critical(
@@ -2480,9 +2548,15 @@ class MetalSiteForceFieldBuilder:
 
         A force field carries atom types, charges and bonds, and a geometry
         carries positions; neither of them says which carbon a sidechain was
-        cut at. That is known here, while the active site is still in hand,
-        and the comment is the one field that survives into forcefield.json
-        for anything downstream to read it back out of.
+        cut at, or which hydrogen stands in for an alpha carbon. That is known
+        here, while the active site is still in hand, and the comment is the
+        one field that survives into forcefield.json for anything downstream
+        to read it back out of.
+
+        The capping hydrogens do end up at exactly zero charge, but that is
+        the charge correction doing its job rather than a marker, and it says
+        nothing in a force field whose charges are all zero. The comment is
+        the marker.
 
         Comments the generator already wrote are kept, and running this twice
         does not write the same note twice.
@@ -2493,17 +2567,21 @@ class MetalSiteForceFieldBuilder:
             The active site, for the atoms the truncation created.
         """
 
-        for index in active_site['beta_carbon_indices']:
-            atom = forcefield.atoms[index]
-            comment = atom.get('comment', '') or ''
+        roles = (
+            (self.BETA_CARBON_COMMENT, active_site['beta_carbon_indices']),
+            (self.CAP_COMMENT, active_site['cap_indices']),
+        )
 
-            if self.BETA_CARBON_COMMENT in comment:
-                continue
+        for note, indices in roles:
+            for index in indices:
+                atom = forcefield.atoms[index]
+                comment = atom.get('comment', '') or ''
 
-            atom['comment'] = '; '.join(part
-                                        for part in (comment,
-                                                     self.BETA_CARBON_COMMENT)
-                                        if part)
+                if note in comment:
+                    continue
+
+                atom['comment'] = '; '.join(
+                    part for part in (comment, note) if part)
 
     @staticmethod
     def _lookup_equilibrium(table, elements):
@@ -2689,7 +2767,6 @@ class MetalSiteForceFieldBuilder:
 
     def mm_optimize_active_site(self,
                                 active_site,
-                                connectivity_matrix,
                                 frozen_indices=None,
                                 constrain_metals=None):
         """
@@ -2709,8 +2786,6 @@ class MetalSiteForceFieldBuilder:
 
         :param active_site:
             The extracted active site.
-        :param connectivity_matrix:
-            The connectivity of the active site.
         :param frozen_indices:
             The active site indices to hold fixed. Defaults to
             constrained_indices().
@@ -2735,7 +2810,7 @@ class MetalSiteForceFieldBuilder:
             frozen_indices = sorted(
                 set(frozen_indices) | set(active_site['metal_indices']))
 
-        forcefield = self.build_forcefield(active_site, connectivity_matrix)
+        forcefield = self.build_forcefield(active_site)
         coordinates = self.minimize_active_site(
             active_site,
             forcefield,
@@ -2983,9 +3058,11 @@ class MetalSiteForceFieldBuilder:
         :param forcefield:
             The force field generator carrying the fitted metal parameters.
         :param partial_charges:
-            The charges fitted on the active site. When given they replace the
-            charges of the coordination sphere through redistribute_charges;
-            otherwise the protein force field's own charges are left alone.
+            The charges fitted on the active site, which replace the charges
+            of the coordination sphere through redistribute_charges. D4
+            charges are used when none are given, so that the system carries
+            the same charges as the force field built beside it rather than
+            the protein force field's own.
         :param forcefield_files:
             The OpenMM force field files for the protein.
 
@@ -3002,9 +3079,11 @@ class MetalSiteForceFieldBuilder:
         system = openmm_ff.createSystem(topology,
                                         nonbondedMethod=mmapp.NoCutoff)
 
-        if partial_charges is not None:
-            self.redistribute_charges(system, topology, active_site,
-                                      partial_charges)
+        if partial_charges is None:
+            partial_charges = self.d4_charges(active_site)
+
+        self.redistribute_charges(system, topology, active_site,
+                                  partial_charges)
 
         atom_map = active_site['atom_map']
         caps = set(active_site['cap_indices'])
@@ -3179,10 +3258,14 @@ class MetalSiteForceFieldBuilder:
         self.ostream.print_header(
             self._param('Hessian',
                         'supplied' if self.hessian is not None else 'computed'))
-        self.ostream.print_header(
-            self._param(
-                'RESP charges', 'supplied'
-                if self.partial_charges is not None else self.do_resp))
+        if self.partial_charges is not None:
+            charge_source = 'supplied'
+        elif self.do_resp:
+            charge_source = 'RESP'
+        else:
+            charge_source = 'D4'
+        self.ostream.print_header(self._param('partial charges',
+                                              charge_source))
         self.ostream.print_header(
             self._param(
                 'constrained atoms', 'beta carbons + caps'
@@ -3309,8 +3392,7 @@ class MetalSiteForceFieldBuilder:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def _print_active_site(self, active_site, binding_modes,
-                           connectivity_matrix):
+    def _print_active_site(self, active_site, binding_modes):
         """
         Prints the composition of the truncated active site.
         """
@@ -3329,7 +3411,8 @@ class MetalSiteForceFieldBuilder:
         self.ostream.print_header(
             self._param('capping hydrogens', len(active_site['cap_indices'])))
         self.ostream.print_header(
-            self._param('bonds', int(connectivity_matrix.sum() // 2)))
+            self._param('bonds',
+                        int(active_site['connectivity_matrix'].sum() // 2)))
         self._print_param_list('residues', active_site['residues'])
 
         variants = sorted(binding_modes['variants'].values())
