@@ -48,7 +48,7 @@ class TestScfSetupHeader:
         drv.compute(molecule, basis)
 
         if drv.rank == mpi_master():
-            return outfile.read_text()
+            return outfile.read_text(encoding='utf-8')
         return ''
 
     def dft_header_lines(self, text):

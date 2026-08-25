@@ -74,7 +74,7 @@ class OutputStream:
         elif (isinstance(stream, str) and stream) or isinstance(stream, Path):
             fname = str(stream)
             try:
-                self.stream = open(fname, 'w')
+                self.stream = open(fname, 'w', encoding='utf-8')
                 self.state = True
             except OSError:
                 self.state = False
