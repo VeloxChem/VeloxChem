@@ -9,6 +9,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfgradientdriver import ScfGradientDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.tessellation import TessellationDriver
+from veloxchem.errorhandler import VeloxChemError
 
 
 def test_write_grid_to_file(tmp_path):
@@ -33,6 +34,29 @@ class TestGostshyp:
     """GOSTSHYP hydrostatic pressure tests: SCF, analytical gradient and
     linear response for small molecules.
     """
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    @pytest.mark.parametrize('discretization', ['iwig', 'becke'])
+    def test_rejects_invalid_discretization(self, discretization):
+
+        xyz_string = """3
+
+        O   -3.3278470    3.1951799   -0.0000000
+        H   -4.2057717    2.7370843   -0.0000000
+        H   -2.6643996    2.4600330   -0.0000000
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.pressure = 1.0
+        scf_drv.gostshyp_discretization = discretization
+
+        with pytest.raises(VeloxChemError,
+                           match='GOSTSHYP: Invalid discretization'):
+            scf_results_not_used = scf_drv.compute(mol, bas)
 
     def run_gostshyp(self,
                      mol,

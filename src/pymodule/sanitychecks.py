@@ -773,6 +773,13 @@ def gostshyp_sanity_check(obj, basis=None):
             type(obj).__name__ +
             ': GOSTSHYP is incompatible with the solvation model')
 
+        valid_discretizations = ('fixed', 'swig', 'iswig')
+        assert_msg_critical(
+            isinstance(obj.gostshyp_discretization, str) and
+            obj.gostshyp_discretization.lower() in valid_discretizations,
+            "GOSTSHYP: Invalid discretization. Valid options are 'fixed', "
+            "'swig', and 'iswig'")
+
         from .tessellation import validate_num_lebedev_points
         obj.gostshyp_num_lebedev_points = validate_num_lebedev_points(
             obj.gostshyp_num_lebedev_points,
