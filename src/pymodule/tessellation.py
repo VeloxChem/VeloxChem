@@ -44,8 +44,7 @@ from .veloxchemlib import gen_lebedev_grid
 from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstrom
 from .outputstream import OutputStream
-from .inputparser import (parse_input, print_keywords,
-                          get_random_string_parallel)
+from .inputparser import parse_input, print_keywords
 from .errorhandler import assert_msg_critical
 
 
@@ -104,9 +103,6 @@ class TessellationDriver:
         # output stream
         self.ostream = ostream
 
-        # filename for file writing
-        self.filename = get_random_string_parallel(self.comm)
-
         # input keywords
         self._input_keywords = {
             'method_settings': {
@@ -114,7 +110,6 @@ class TessellationDriver:
                 'tssf': ('float', 'tessellation sphere scaling factor'),
                 'discretization': ('str', 'surface discretization method'),
                 'switching_thresh': ('float', 'switching function threshold'),
-                'filename': ('str', 'filename for writing the tessellation'),
                 'r_ext': ('float', 'extension radius for outer cavity correction in angstrom')
             }
         }
@@ -677,15 +672,17 @@ class TessellationDriver:
 
         return self.num_lebedev_points
 
-    def write_grid_to_file(self, vdw_surface):
+    def write_grid_to_file(self, vdw_surface, xyz_filename):
         """
         Writes the cartesian coordinates of the surface tessellation points to
         an .xyz file.
 
         :param vdw_surface:
             The surface tessellation object.
+        :param xyz_filename:
+            The name of the XYZ output file.
         """
-        with open(f"{self.filename}_tessellation.xyz","w") as f:
+        with open(xyz_filename, 'w') as f:
             f.write(f"{vdw_surface.shape[1]}  \n\n")
             for i in vdw_surface.T:
                 f.write(f"  x   {i[0]}  {i[1]}  {i[2]}    \n")

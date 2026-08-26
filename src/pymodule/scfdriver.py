@@ -1049,7 +1049,6 @@ class ScfDriver:
                                      'tssf'             : self.gostshyp_tssf,
                                      'discretization'   : self.gostshyp_discretization,
                                      'switching_thresh' : self.gostshyp_switching_thresh,
-                                     'filename'         : self.filename,
                                      'r_ext'            : self.gostshyp_r_ext}
 
             tess_t0 = tm.time()

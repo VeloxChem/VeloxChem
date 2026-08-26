@@ -529,6 +529,34 @@ class TestRPA:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
+    def test_compute_rejects_gostshyp_with_subcomms(self):
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.pressure = 20000.0
+        scf_results = scf_drv.compute(mol, bas)
+
+        lr_drv = LinearResponseEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.nstates = 1
+        lr_drv.use_subcomms = True
+
+        with pytest.raises(
+                VeloxChemError,
+                match='LinearSolver: Cannot use subcomms with GOSTSHYP'):
+            lr_results_not_used = lr_drv.compute(mol, bas, scf_results)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
     def test_compute_rejects_solvation_model_with_pressure(self):
 
         xyz_string = """3

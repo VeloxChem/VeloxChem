@@ -745,7 +745,6 @@ class LinearSolver:
                                         'tssf'             : self.gostshyp_tssf,
                                         'discretization'   : self.gostshyp_discretization,
                                         'switching_thresh' : self.gostshyp_switching_thresh,
-                                        'filename'         : self.filename,
                                         'r_ext'            : self.gostshyp_r_ext}
 
             if self.rank == mpi_master():
@@ -1108,6 +1107,11 @@ class LinearSolver:
                        pe_dict,
                        profiler=None,
                        method_type='restricted'):
+
+        # TODO: support GOSTSHYP with communicator-local drivers in subcomms.
+        assert_msg_critical(
+            not (self.use_subcomms and self._gostshyp),
+            'LinearSolver: Cannot use subcomms with GOSTSHYP')
 
         if self.use_subcomms and self.ri_coulomb:
             self.use_subcomms = False

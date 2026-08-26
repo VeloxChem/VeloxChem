@@ -8,6 +8,24 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfgradientdriver import ScfGradientDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
+from veloxchem.tessellation import TessellationDriver
+
+
+def test_write_grid_to_file(tmp_path):
+    """Checks that the grid writer uses its mandatory XYZ filename."""
+
+    tessellation_drv = TessellationDriver()
+    vdw_surface = np.zeros((15, 2))
+    vdw_surface[:3, 0] = [1.0, 2.0, 3.0]
+    vdw_surface[:3, 1] = [4.0, 5.0, 6.0]
+    xyz_filename = tmp_path / 'tessellation.xyz'
+
+    tessellation_drv.write_grid_to_file(vdw_surface, xyz_filename)
+
+    lines = xyz_filename.read_text().splitlines()
+    assert lines[0].strip() == '2'
+    assert lines[2].split() == ['x', '1.0', '2.0', '3.0']
+    assert lines[3].split() == ['x', '4.0', '5.0', '6.0']
 
 
 @pytest.mark.solvers
