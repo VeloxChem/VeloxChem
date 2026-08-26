@@ -738,11 +738,13 @@ class LinearSolver:
                                     self.pressure_units,
                                     self.gostshyp_tco_tol)
 
-            self._gostshyp_tess_info = {'num_lebedev_points'   : self.gostshyp_num_lebedev_points,
-                                        'tssf'             : self.gostshyp_tssf,
-                                        'discretization'   : self.gostshyp_discretization,
-                                        'switching_thresh' : self.gostshyp_switching_thresh,
-                                        'r_ext'            : self.gostshyp_r_ext}
+            self._gostshyp_tess_info = {
+                'num_lebedev_points': self.gostshyp_num_lebedev_points,
+                'tssf': self.gostshyp_tssf,
+                'discretization': self.gostshyp_discretization,
+                'switching_thresh': self.gostshyp_switching_thresh,
+                'r_ext': self.gostshyp_r_ext,
+            }
 
             if self.rank == mpi_master():
                 # Note: make gs_density a tuple

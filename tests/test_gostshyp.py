@@ -9,6 +9,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfgradientdriver import ScfGradientDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.tessellation import TessellationDriver
+from veloxchem.outputstream import OutputStream
 from veloxchem.errorhandler import VeloxChemError
 
 
@@ -134,6 +135,63 @@ class TestGostshyp:
 
         assert rsp_drv.gostshyp_tco_tol == custom_tco_tol
         assert rsp_drv._gostshyp_drv.tco_tol == custom_tco_tol
+
+    def test_scf_prints_negative_amplitude_exclusion_info(self, tmp_path):
+
+        xyz_string = """14
+
+        C         -0.87931       -4.77039        0.03554
+        C         -0.68902       -4.75793        1.56474
+        C         -0.13597       -3.42950        2.03558
+        O          0.03224       -3.23762        3.23105
+        O          0.16603       -2.44864        1.15545
+        N          0.21623       -5.83383        1.98004
+        S         -1.69196       -6.29641       -0.54799
+        H          0.09753       -4.64794       -0.48155
+        H         -1.52147       -3.92199       -0.28390
+        H         -1.68351       -4.90147        2.04299
+        H          0.51499       -1.59560        1.45037
+        H          0.30340       -5.83393        3.02290
+        H         -0.18435       -6.76203        1.71757
+        H         -0.50079       -6.84368       -1.06167
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+
+        # write the SCF output to a file on the master rank only
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            ostream = OutputStream(tmp_path / 'scf_neg_amp.out')
+        else:
+            ostream = OutputStream(None)
+
+        scf_drv = ScfRestrictedDriver(ostream=ostream)
+        scf_drv.pressure = 50
+        scf_drv.pressure_units = 'GPa'
+        scf_drv.gostshyp_discretization = 'swig'
+        scf_drv.gostshyp_num_lebedev_points = 110
+        scf_drv.gostshyp_tssf = 1.2
+        scf_drv.gostshyp_r_ext = 0.0
+        scf_drv.compute(mol, bas)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            ostream.close()
+            output_text = (tmp_path / 'scf_neg_amp.out').read_text()
+
+            # the count is reduced to the master rank only
+            num_neg_amp = scf_drv._gostshyp_drv.num_neg_amp
+            assert num_neg_amp > 0
+
+            expected = (
+                '*** GOSTSHYP information: A total number of '
+                '{} grid points with negative amplitudes were '
+                'excluded ***'.format(num_neg_amp))
+            assert expected in output_text
+
+            # the information is printed at the end of SCF, after the
+            # convergence message
+            assert (output_text.index(
+                'grid points with negative amplitudes were excluded') >
+                output_text.index('converged in'))
 
     def run_gostshyp(self,
                      mol,

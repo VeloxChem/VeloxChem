@@ -1049,11 +1049,13 @@ class ScfDriver:
             self._gostshyp_drv.init(molecule, basis, self.pressure,
                                     self.pressure_units, self.gostshyp_tco_tol)
 
-            tessellation_settings = {'num_lebedev_points'   : self.gostshyp_num_lebedev_points,
-                                     'tssf'             : self.gostshyp_tssf,
-                                     'discretization'   : self.gostshyp_discretization,
-                                     'switching_thresh' : self.gostshyp_switching_thresh,
-                                     'r_ext'            : self.gostshyp_r_ext}
+            tessellation_settings = {
+                'num_lebedev_points': self.gostshyp_num_lebedev_points,
+                'tssf': self.gostshyp_tssf,
+                'discretization': self.gostshyp_discretization,
+                'switching_thresh': self.gostshyp_switching_thresh,
+                'r_ext': self.gostshyp_r_ext,
+            }
 
             tess_t0 = tm.time()
             tessellation = self._gostshyp_drv.generate_tessellation(
@@ -3632,6 +3634,28 @@ class ScfDriver:
             self.ostream.print_header(valstr)
             self.ostream.print_header(len(valstr) * '-')
 
+    def _print_gostshyp_neg_amp_info(self):
+        """
+        Prints information about grid points with negative amplitudes
+        excluded in the GOSTSHYP calculation, provided that any grid
+        points were excluded.
+
+        The number of excluded grid points is read from the GOSTSHYP
+        driver; it is determined from the ground state density the first
+        time the GOSTSHYP contribution to the Fock matrix is computed.
+        The count is reduced to the master rank only, and the
+        information is checked and printed on the master rank only.
+        """
+
+        if (self.rank == mpi_master() and self._gostshyp
+                and self._gostshyp_drv is not None
+                and self._gostshyp_drv.num_neg_amp > 0):
+            valstr = '*** GOSTSHYP information: A total number of '
+            valstr += ('{} grid points with negative amplitudes were '
+                       'excluded ***'.format(self._gostshyp_drv.num_neg_amp))
+            self.ostream.print_header(valstr)
+            self.ostream.print_blank()
+
     def _print_scf_finish(self, start_time):
         """
         Prints SCF calculation finish message to the output stream.
@@ -3660,6 +3684,8 @@ class ScfDriver:
             self.ostream.print_blank()
             self.ostream.print_header(valstr.ljust(92))
             self.ostream.print_blank()
+
+            self._print_gostshyp_neg_amp_info()
 
         self.ostream.flush()
 
