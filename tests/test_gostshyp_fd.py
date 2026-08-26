@@ -6,7 +6,29 @@ from veloxchem.lrsolver import LinearResponseSolver
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.molecule import Molecule
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.tessellation import TessellationDriver
 from veloxchem.veloxchemlib import mpi_master
+
+
+def test_iswig_switching_function_derivative():
+    """Checks the analytical ISWIG derivative by finite differences."""
+
+    tessellation_drv = TessellationDriver()
+
+    x = 1.0
+    zeta = 0.7
+    radius = 2.0
+    step = 1.0e-6
+
+    analytical = tessellation_drv.iswig_elem_sw_func_derivative(
+        x, zeta, radius)
+    numerical = (
+        tessellation_drv.iswig_elem_sw_func(x + step, zeta, radius) -
+        tessellation_drv.iswig_elem_sw_func(x - step, zeta, radius)
+    ) / (2.0 * step)
+
+    assert analytical == pytest.approx(numerical, rel=1.0e-8,
+                                       abs=1.0e-10)
 
 
 @pytest.mark.solvers

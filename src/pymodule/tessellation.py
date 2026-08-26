@@ -521,7 +521,9 @@ class TessellationDriver:
             The function value.
         """
 
-        return zeta / np.sqrt(np.pi) * (np.exp(-zeta**2 * (r_j - x)**2) + np.exp(-zeta**2 * (r_j + x)**2))
+        return zeta / np.sqrt(np.pi) * (
+            np.exp(-zeta**2 * (r_j - x)**2) -
+            np.exp(-zeta**2 * (r_j + x)**2))
 
     def scale_sphere(self, grid, radius):
         """
