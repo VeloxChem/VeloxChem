@@ -724,6 +724,9 @@ class MetalForceFieldManager:
         """
         Returns the bonds of a connectivity matrix as index pairs.
 
+        The builder derives them the same way for active_site['bond_labels'],
+        so there is one definition of what an edge of the matrix is.
+
         :param connectivity_matrix:
             The connectivity of an active site.
 
@@ -731,11 +734,8 @@ class MetalForceFieldManager:
             The bonds.
         """
 
-        matrix = np.asarray(connectivity_matrix)
-
-        return [(int(i), int(j))
-                for i, j in zip(*np.triu_indices_from(matrix, k=1))
-                if matrix[i, j]]
+        return MetalSiteForceFieldBuilder.connectivity_bonds(
+            connectivity_matrix)
 
     def compare_to_templates(self,
                              structure,
@@ -1869,7 +1869,11 @@ class MetalForceFieldManager:
         if not changes['added'] and not changes['removed']:
             return active_site, changes
 
-        active_site = {**active_site, 'connectivity_matrix': matrix}
+        active_site = {
+            **active_site,
+            'connectivity_matrix': matrix,
+            'bond_labels': self._matrix_edges(matrix),
+        }
 
         return self._describe(active_site,
                               self._matrix_edges(matrix)), changes

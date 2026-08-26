@@ -2437,6 +2437,23 @@ class MetalSiteForceFieldBuilder:
         that was extracted, and nothing downstream should be able to pair the
         two up wrongly.
 
+        It also comes with 'labels', one string per atom, holding what
+        add_metal_bond and remove_metal_bond want to be told about that atom:
+        the atom index for a metal, the resid on the beta carbon that stands
+        for its residue, the atom name on any other heavy atom, and an empty
+        string on every hydrogen. Passing it to Molecule.show as atom_labels
+        therefore draws the coordination edit straight onto the structure.
+        These are not the element labels, which are read off the molecule with
+        get_labels().
+
+        'bond_labels' is the same matrix as index pairs, for Molecule.show to
+        take as bonds, which then draws exactly the bonds the site has and
+        perceives none by distance. That matters here for two reasons: the
+        metal-ligand bonds are a decision rather than a distance and nothing
+        perceives them, and OpenMM places hydrogens at about 1.19 Angstrom,
+        past the C-H threshold of Molecule.get_connectivity_matrix. It is
+        rewritten wherever the matrix is, so the two cannot drift apart.
+
         :param topology:
             The protonated OpenMM topology.
         :param positions:
@@ -2445,7 +2462,7 @@ class MetalSiteForceFieldBuilder:
         :return:
             The active site dictionary. It records the active site indices of
             the capping hydrogens and of the beta carbons, the map back to
-            the topology, and the charge.
+            the topology, the per-atom labels, the bonds and the charge.
         """
 
         self._check_supported_metals(binding_modes['metals'],
@@ -2459,6 +2476,7 @@ class MetalSiteForceFieldBuilder:
              for ligand in binding_modes['ligands']})
 
         labels = []
+        atom_labels = []
         coords = []
         atom_map = {}
         cap_indices = []
@@ -2470,6 +2488,7 @@ class MetalSiteForceFieldBuilder:
             metal_indices.append(len(coords))
             coords.append(positions[metal['index']])
             labels.append(metal['element'])
+            atom_labels.append(str(metal['index']))
 
         for res_index in res_indices:
             residue = residues[res_index]
@@ -2500,9 +2519,17 @@ class MetalSiteForceFieldBuilder:
                     coords.append(positions[cb_atom.index] +
                                   direction * self.cap_bond_length)
                     labels.append('H')
+                    atom_labels.append('')
                 else:
                     if atom.name == 'CB':
                         beta_carbon_indices.append(len(coords))
+                        # the beta carbon stands for its residue, so it is
+                        # labelled with what add_metal_bond takes as resid
+                        atom_labels.append(str(residue.id))
+                    elif atom.element.symbol == 'H':
+                        atom_labels.append('')
+                    else:
+                        atom_labels.append(atom.name)
                     atom_map[len(coords)] = atom.index
                     coords.append(positions[atom.index])
                     labels.append(atom.element.symbol)
@@ -2543,14 +2570,39 @@ class MetalSiteForceFieldBuilder:
             beta_carbon_indices,
             'metal_indices':
             metal_indices,
+            'labels':
+            atom_labels,
             'residues':
             [f'{residues[i].name}{residues[i].id}' for i in res_indices],
         }
 
         active_site['connectivity_matrix'] = self._build_connectivity(
             topology, active_site, binding_modes)
+        active_site['bond_labels'] = self.connectivity_bonds(
+            active_site['connectivity_matrix'])
 
         return active_site
+
+    @staticmethod
+    def connectivity_bonds(connectivity_matrix):
+        """
+        Reads a connectivity matrix as the list of bonds Molecule.show draws.
+
+        The pairs are zero-indexed and plain ints, since they are handed to
+        RDKit, which does not take numpy integers.
+
+        :param connectivity_matrix:
+            The connectivity of an active site.
+
+        :return:
+            The bonds, as index pairs.
+        """
+
+        matrix = np.asarray(connectivity_matrix)
+
+        return [(int(i), int(j))
+                for i, j in zip(*np.triu_indices_from(matrix, k=1))
+                if matrix[i, j]]
 
     def _build_connectivity(self,
                             topology,
@@ -2811,6 +2863,7 @@ class MetalSiteForceFieldBuilder:
 
         new_active_site = dict(active_site)
         new_active_site['connectivity_matrix'] = new_matrix
+        new_active_site['bond_labels'] = self.connectivity_bonds(new_matrix)
 
         return new_binding_modes, new_active_site, True
 
