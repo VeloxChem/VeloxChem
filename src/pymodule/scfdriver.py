@@ -3569,6 +3569,7 @@ class ScfDriver:
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'C-PCM Points per non-H Sphere   : '
             cur_str += f'{self.cpcm_drv.grid_per_sphere[0]}'
+            self.ostream.print_header(cur_str.ljust(str_width))
 
         if self._gostshyp:
             cur_str = 'Pressure Model                  : '
