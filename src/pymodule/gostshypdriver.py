@@ -613,6 +613,10 @@ class GostshypDriver:
             The applied pressure in atomic units.
         """
 
+        assert_msg_critical(
+            isinstance(units, str),
+            'GOSTSHYP: Invalid unit for pressure: expecting a string')
+
         assert_msg_critical(units.lower() in [
             'pa', 'pascal', 'hpa', 'hectopascal', 'kpa', 'kilopascal', 'bar', 'mpa',
             'megapascal', 'gpa', 'gigapascal', 'atm', 'atmosphere', 'atmospheric',

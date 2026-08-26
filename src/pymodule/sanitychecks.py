@@ -840,7 +840,8 @@ def gostshyp_sanity_check(obj, basis=None):
             # TODO: consider moving this check to gostshyp 1e integral drivers
             if max_am > gost_max_am:
                 labels = {0: 's', 1: 'p', 2: 'd', 3: 'f', 4: 'g', 5: 'h'}
-                raise ValueError(
+                assert_msg_critical(
+                    False,
                     f"GOSTSHYP supports basis functions up to f-type; this basis "
                     f"contains {labels.get(max_am, f'l={max_am}')}-type functions.")
 

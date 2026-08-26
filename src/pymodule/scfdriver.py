@@ -658,6 +658,7 @@ class ScfDriver:
         # from returning stale converged results.
         self._nuc_mm_energy = 0.0
         self._ef_nuc_energy = 0.0
+        self._e_gostshyp = 0.0
         self._is_converged = False
         self._scf_results = None
         self._scf_energy = 0.0
@@ -1878,7 +1879,7 @@ class ScfDriver:
             fock_mat, vxc_mat, e_emb, V_emb, e_pr, V_pr = self._comp_2e_fock_single_comm(
                 den_mat, molecule, ao_basis, screener, e_grad, profiler)
 
-            self._e_gost = e_pr
+            self._e_gostshyp = e_pr
 
             profiler.start_timer('ErrVec')
 
@@ -3938,7 +3939,7 @@ class ScfDriver:
             e_el -= self.cpcm_drv.cpcm_epol
 
         if self._gostshyp:
-            e_el -= self._e_gost
+            e_el -= self._e_gostshyp
 
         valstr = f'Total Energy                       :{etot:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
@@ -3964,7 +3965,7 @@ class ScfDriver:
 
         if self._gostshyp:
             valstr = 'GOSTSHYP Pressure Energy           :'
-            valstr += f'{self._e_gost:20.10f} a.u.'
+            valstr += f'{self._e_gostshyp:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
 
         valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} a.u.'

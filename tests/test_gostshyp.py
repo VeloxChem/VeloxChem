@@ -29,6 +29,18 @@ def test_write_grid_to_file(tmp_path):
     assert lines[3].split() == ['x', '4.0', '5.0', '6.0']
 
 
+@pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                    reason='skip pytest.raises for multiple MPI processes')
+def test_parse_pressure_units_rejects_non_string_units():
+    """Checks that parse_pressure_units rejects non-string units."""
+
+    from veloxchem.gostshypdriver import GostshypDriver
+
+    with pytest.raises(VeloxChemError,
+                       match='GOSTSHYP: Invalid unit for pressure'):
+        GostshypDriver.parse_pressure_units(1.0, None)
+
+
 @pytest.mark.solvers
 class TestGostshyp:
     """GOSTSHYP hydrostatic pressure tests: SCF, analytical gradient and
