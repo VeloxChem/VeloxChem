@@ -2208,7 +2208,7 @@ class OpenMMDynamics:
             else:
                 self.simulation.context.setVelocitiesToTemperature(
                     init_temp,
-                    randomSeed=int(initial_velocity_seed),
+                    int(initial_velocity_seed),
                 )
 
         return self.simulation
