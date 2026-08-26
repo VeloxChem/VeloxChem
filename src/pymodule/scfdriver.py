@@ -1450,7 +1450,11 @@ class ScfDriver:
 
     def validate_checkpoint(self, nuclear_charges, basis_set, scf_type):
         """
-        Validates the checkpoint file by checking nuclear charges and basis set.
+        Validates the checkpoint file by checking nuclear charges, basis set,
+        and SCF type.
+
+        Method and environment settings are intentionally ignored because the
+        checkpoint orbitals only provide the initial guess.
 
         :param nuclear_charges:
             Numpy array of the nuclear charges.
