@@ -105,6 +105,38 @@ def _warn_if_environment_overwritten(obj, key, scf_value):
         obj.ostream.flush()
 
 
+def _warn_if_environment_absent_from_scf(obj, scf_results):
+    """
+    Warns about environments active in a calculation but absent from its SCF
+    reference.
+
+    :param obj:
+        The driver being updated.
+    :param scf_results:
+        The dictionary containing SCF results.
+    """
+
+    environments_absent_from_scf = []
+
+    for key in ('potfile', 'solvation_model'):
+        if (getattr(obj, key, None) is not None and
+                scf_results.get(key, None) is None):
+            environments_absent_from_scf.append(key)
+
+    if (getattr(obj, 'pressure', 0.0) not in (None, 0.0) and
+            scf_results.get('pressure', 0.0) in (None, 0.0)):
+        environments_absent_from_scf.append('pressure')
+
+    if environments_absent_from_scf:
+        warn_msg = ('Environment settings active in the current calculation '
+                    'but absent from the SCF reference: ')
+        warn_msg += ', '.join(environments_absent_from_scf)
+        warn_msg += ('. The SCF reference orbitals and density are not '
+                     'relaxed for these settings.')
+        obj.ostream.print_warning(warn_msg)
+        obj.ostream.flush()
+
+
 def scf_results_sanity_check(obj, scf_results):
     """
     Checks SCF results and inherits method and environment settings.
@@ -207,6 +239,8 @@ def scf_results_sanity_check(obj, scf_results):
     # double check xcfun in SCF and response
 
     if obj.rank == mpi_master():
+        _warn_if_environment_absent_from_scf(obj, scf_results)
+
         scf_xcfun_label = scf_results.get('xcfun', 'HF').upper()
         if obj.xcfun is None:
             rsp_xcfun_label = 'HF'

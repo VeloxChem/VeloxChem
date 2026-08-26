@@ -11,7 +11,8 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.errorhandler import VeloxChemError
-from veloxchem.sanitychecks import environment_compatibility_sanity_check
+from veloxchem.sanitychecks import (environment_compatibility_sanity_check,
+                                    scf_results_sanity_check)
 
 
 def one_point_charge():
@@ -20,6 +21,60 @@ def one_point_charge():
     """
 
     return np.zeros((6, 1))
+
+
+def make_recording_output():
+    """Creates a minimal output stream that records warnings."""
+
+    warnings = []
+    ostream = SimpleNamespace(print_warning=warnings.append,
+                              flush=lambda: None)
+    return ostream, warnings
+
+
+@pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                    reason='warning output is checked on the master process')
+@pytest.mark.parametrize('environment, value', [
+    ('pressure', 100.0),
+    ('potfile', 'embedding.json'),
+])
+def test_warns_about_environment_absent_from_scf(environment, value):
+
+    driver = LinearResponseEigenSolver()
+    driver._ostream, warnings = make_recording_output()
+    driver.xcfun = 'BLYP'
+    setattr(driver, environment, value)
+
+    scf_results_sanity_check(driver, {'xcfun': 'BLYP'})
+
+    assert warnings == [
+        'Environment settings active in the current calculation but absent '
+        f'from the SCF reference: {environment}. The SCF reference orbitals '
+        'and density are not relaxed for these settings.'
+    ]
+
+
+@pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                    reason='warning output is checked on the master process')
+@pytest.mark.parametrize('environment, value', [
+    ('pressure', 100.0),
+    ('potfile', 'embedding.json'),
+])
+def test_does_not_warn_about_environment_inherited_from_scf(environment,
+                                                            value):
+
+    driver = LinearResponseEigenSolver()
+    driver._ostream, warnings = make_recording_output()
+    driver.xcfun = 'BLYP'
+    setattr(driver, environment, value)
+
+    scf_results = {'xcfun': 'BLYP', environment: value}
+    if environment == 'pressure':
+        scf_results['pressure_units'] = 'MPa'
+
+    scf_results_sanity_check(driver, scf_results)
+
+    assert warnings == []
 
 
 @pytest.mark.solvers
