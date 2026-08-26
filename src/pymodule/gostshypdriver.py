@@ -199,6 +199,9 @@ class GostshypDriver:
                                                         self.tco_tol)
 
         # compute amplitudes
+        assert_msg_critical(
+            np.all(np.isfinite(initial_f_tilde) & (initial_f_tilde != 0.0)),
+            'GOSTSHYP: Encountered a zero or non-finite f_tilde value')
         initial_amplitudes = self.pressure_au * initial_areas / initial_f_tilde
 
         amplitudes_mask = initial_amplitudes >= 0.0
@@ -324,6 +327,9 @@ class GostshypDriver:
 
         # compute amplitudes and remove grid points associated with
         # negative amplitudes
+        assert_msg_critical(
+            np.all(np.isfinite(initial_f_tilde) & (initial_f_tilde != 0.0)),
+            'GOSTSHYP: Encountered a zero or non-finite f_tilde value')
         initial_amplitudes = self.pressure_au * initial_areas / initial_f_tilde
 
         amplitudes_mask = initial_amplitudes >= 0.0
@@ -471,6 +477,9 @@ class GostshypDriver:
                                                         self.tco_tol)
 
         # compute amplitudes
+        assert_msg_critical(
+            np.all(np.isfinite(initial_f_tilde) & (initial_f_tilde != 0.0)),
+            'GOSTSHYP: Encountered a zero or non-finite f_tilde value')
         initial_amplitudes = self.pressure_au * initial_areas / initial_f_tilde
         amplitudes_mask = initial_amplitudes >= 0.0
         local_neg_p_amp = np.sum(~amplitudes_mask)
@@ -564,7 +573,7 @@ class GostshypDriver:
         # the ScfGradientDriver handles the reduce operation for the gradient
         return local_grad
 
-    def generate_tessellation(self, tessellation_settings={}):
+    def generate_tessellation(self, tessellation_settings=None):
         """
         Initiates the surface tessellation using a Lebedev grid.
 
@@ -574,6 +583,9 @@ class GostshypDriver:
             The coordinates, surface area, normal vector coordinates and
             reference atoms of the grid points.
         """
+
+        if tessellation_settings is None:
+            tessellation_settings = {}
 
         tessellation_drv = TessellationDriver(self.comm, self.ostream)
         tessellation_drv.update_settings(tessellation_settings)

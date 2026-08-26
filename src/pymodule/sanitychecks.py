@@ -804,6 +804,11 @@ def gostshyp_sanity_check(obj, basis=None):
                             'GOSTSHYP: Unphysical negative pressures invalid')
 
         assert_msg_critical(
+            np.isfinite(obj.gostshyp_tssf) and obj.gostshyp_tssf > 0.0,
+            'GOSTSHYP: Tessellation sphere scaling factor must be finite and '
+            'positive')
+
+        assert_msg_critical(
             obj.solvation_model is None,
             type(obj).__name__ +
             ': GOSTSHYP is incompatible with the solvation model')

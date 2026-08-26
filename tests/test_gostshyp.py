@@ -75,6 +75,23 @@ class TestGostshyp:
                 'gostshyp_tco_tol': tco_tol,
             })
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    @pytest.mark.parametrize('tssf', [0.0, -1.0, np.nan, np.inf, -np.inf])
+    def test_rejects_invalid_tessellation_scaling_factor(self, tssf):
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+
+        with pytest.raises(
+                VeloxChemError,
+                match='Tessellation sphere scaling factor must be finite and '
+                      'positive'):
+            scf_drv.update_settings({}, {
+                'pressure': 1.0,
+                'gostshyp_tssf': tssf,
+            })
+
     def test_custom_tco_tolerance_is_inherited_by_response(self):
 
         xyz_string = """3
