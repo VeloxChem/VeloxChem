@@ -186,6 +186,7 @@ def scf_results_sanity_check(obj, scf_results):
                         'gostshyp_discretization',
                         'gostshyp_switching_thresh',
                         'gostshyp_r_ext',
+                        'gostshyp_tco_tol',
                 ]:
                     if key in scf_results:
                         updated_scf_info[key] = scf_results[key]
@@ -779,6 +780,11 @@ def gostshyp_sanity_check(obj, basis=None):
             obj.gostshyp_discretization.lower() in valid_discretizations,
             "GOSTSHYP: Invalid discretization. Valid options are 'fixed', "
             "'swig', and 'iswig'")
+
+        assert_msg_critical(
+            obj.gostshyp_tco_tol > 0.0,
+            'GOSTSHYP: Three-center overlap integral screening threshold '
+            'must be positive')
 
         from .tessellation import validate_num_lebedev_points
         obj.gostshyp_num_lebedev_points = validate_num_lebedev_points(

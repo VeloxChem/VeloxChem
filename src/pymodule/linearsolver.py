@@ -176,6 +176,7 @@ class LinearSolver:
         self.gostshyp_discretization = 'swig'
         self.gostshyp_switching_thresh = 1.0e-8
         self.gostshyp_r_ext = 0.25
+        self.gostshyp_tco_tol = 1.0e-14
         self._gostshyp_tess_info = None
         self._gostshyp_gs_density = None
 
@@ -290,7 +291,9 @@ class LinearSolver:
                 'gostshyp_discretization': ('str', 'surface discretization method'),
                 'gostshyp_switching_thresh': ('float', 'switching function threshold'),
                 'gostshyp_r_ext':
-                    ('float', 'extension radius for outer cavity correction in angstrom')
+                    ('float', 'extension radius for outer cavity correction in angstrom'),
+                'gostshyp_tco_tol':
+                    ('float', 'three-center overlap integral screening threshold')
             },
         }
 
@@ -729,17 +732,11 @@ class LinearSolver:
         """
 
         if self._gostshyp:
-
-            if self.rank == mpi_master():
-                tco_tol = scf_results['conv_thresh'] * 1.0e-8
-            else:
-                tco_tol = None
-            tco_tol = self.comm.bcast(tco_tol, root=mpi_master())
-
             self._gostshyp_drv = GostshypDriver(self.comm, self.ostream)
             self._gostshyp_drv.print_gostshyp_references()
             self._gostshyp_drv.init(molecule, basis, self.pressure,
-                                    self.pressure_units, tco_tol)
+                                    self.pressure_units,
+                                    self.gostshyp_tco_tol)
 
             self._gostshyp_tess_info = {'num_lebedev_points'   : self.gostshyp_num_lebedev_points,
                                         'tssf'             : self.gostshyp_tssf,

@@ -58,6 +58,54 @@ class TestGostshyp:
                            match='GOSTSHYP: Invalid discretization'):
             scf_results_not_used = scf_drv.compute(mol, bas)
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    @pytest.mark.parametrize('tco_tol', [0.0, -1.0e-14])
+    def test_rejects_nonpositive_tco_tolerance(self, tco_tol):
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+
+        with pytest.raises(
+                VeloxChemError,
+                match='Three-center overlap integral screening threshold '
+                      'must be positive'):
+            scf_drv.update_settings({}, {
+                'pressure': 1.0,
+                'gostshyp_tco_tol': tco_tol,
+            })
+
+    def test_custom_tco_tolerance_is_inherited_by_response(self):
+
+        xyz_string = """3
+
+        O   -3.3278470    3.1951799   -0.0000000
+        H   -4.2057717    2.7370843   -0.0000000
+        H   -2.6643996    2.4600330   -0.0000000
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+        custom_tco_tol = 2.5e-13
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.update_settings({}, {
+            'pressure': 20000.0,
+            'gostshyp_tco_tol': custom_tco_tol,
+        })
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            assert scf_results['gostshyp_tco_tol'] == custom_tco_tol
+
+        rsp_drv = LinearResponseEigenSolver()
+        rsp_drv.ostream.mute()
+        rsp_drv.nstates = 1
+        rsp_results_not_used = rsp_drv.compute(mol, bas, scf_results)
+
+        assert rsp_drv.gostshyp_tco_tol == custom_tco_tol
+        assert rsp_drv._gostshyp_drv.tco_tol == custom_tco_tol
+
     def run_gostshyp(self,
                      mol,
                      basis_label,
@@ -99,6 +147,7 @@ class TestGostshyp:
             assert scf_results['gostshyp_num_lebedev_points'] == num_lebedev_points
             assert scf_results['gostshyp_tssf'] == pytest.approx(tssf)
             assert scf_results['gostshyp_r_ext'] == pytest.approx(r_ext)
+            assert scf_results['gostshyp_tco_tol'] == pytest.approx(1.0e-14)
 
         # Analytical gradient (the full gradient is available on all ranks)
         grad_drv = ScfGradientDriver(scf_drv)

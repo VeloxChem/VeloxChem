@@ -119,6 +119,7 @@ class ScfDriver:
         - gostshyp_discretization: The surface discretization method.
         - gostshyp_switching_thresh: The (I)SWIG switching function threshold.
         - gostshyp_r_ext: The extension radius for the outer cavity correction in angstrom.
+        - gostshyp_tco_tol: The screening threshold for three-center overlap integrals.
         - dispersion: The flag for calculating D4 dispersion correction.
         - electric_field: The static electric field.
         - timing: The flag for printing timing information.
@@ -254,7 +255,7 @@ class ScfDriver:
         self.gostshyp_discretization = 'swig'
         self.gostshyp_switching_thresh = 1.0e-8
         self.gostshyp_r_ext = 0.25
-        self.gostshyp_tco_tol = self.conv_thresh * 1.0e-8
+        self.gostshyp_tco_tol = 1.0e-14
 
         # solvation model
         self.solvation_model = None
@@ -371,6 +372,8 @@ class ScfDriver:
                 'gostshyp_switching_thresh': ('float', 'switching function threshold'),
                 'gostshyp_r_ext':
                     ('float', 'extension radius for outer cavity correction in angstrom'),
+                'gostshyp_tco_tol':
+                    ('float', 'three-center overlap integral screening threshold'),
                 'solvation_model': ('str', 'solvation model'),
                 'cpcm_grid_per_sphere':
                     ('seq_fixed_int', 'number of C-PCM grid points per sphere'),
@@ -2196,6 +2199,7 @@ class ScfDriver:
                             'gostshyp_discretization',
                             'gostshyp_switching_thresh',
                             'gostshyp_r_ext',
+                            'gostshyp_tco_tol',
                     ]:
                         self._scf_results[key] = getattr(self, key)
 
