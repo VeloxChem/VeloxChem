@@ -234,4 +234,4 @@ class TestCrfFD:
 
     def test_mgga_crf_fd(self):
 
-        self.run_crf_fd('tpssh', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05])
+        self.run_crf_fd('m06-2x', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05])
