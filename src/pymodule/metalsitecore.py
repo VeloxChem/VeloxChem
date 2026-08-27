@@ -119,8 +119,22 @@ CARBOXYLATE_RESIDUES = ('ASP', 'ASH', 'GLU', 'GLH')
 BACKBONE_ATOM_NAMES = ('N', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'HA', 'HA2',
                        'HA3', 'HXT')
 
+# Residues the CA-CB truncation cannot cut, and why. A residue that only
+# coordinates a metal is always one of ASP/GLU/CYS/HIS and never lands
+# here, but include_residue takes any residue at all, so the rule the
+# truncation relies on is written down where it is enforced.
+UNTRUNCATABLE_RESIDUES = {
+    'GLY': 'has no CB to cut at',
+    'PRO': 'has a sidechain that closes back onto the backbone nitrogen, '
+           'so cutting at CA-CB leaves CD with a dangling valence and no cap',
+}
+
 # Net charge of each protonation variant, for the active site charge
-# bookkeeping.
+# bookkeeping. Note that CYX here is Modeller's variant of that name - a
+# cysteine with no HG, which for a metal-bound sidechain is a thiolate -
+# and not Amber's disulfide-bridged CYX, which is neutral.
+# Every residue the truncation can cut needs an entry, since
+# include_residue can put any of them in the cluster.
 VARIANT_CHARGES = {
     'ASP': -1,
     'ASH': 0,
@@ -143,6 +157,13 @@ VARIANT_CHARGES = {
     'GLN': 0,
     'MET': 0,
     'TRP': 0,
+    'ALA': 0,
+    'GLY': 0,
+    'ILE': 0,
+    'LEU': 0,
+    'PHE': 0,
+    'PRO': 0,
+    'VAL': 0,
 }
 
 # Names of the intermediates kept in the working folder. Each expensive
@@ -392,7 +413,7 @@ def _check_supported_metals(metals, method):
 
 def suggest_binding_modes(topology,
                           positions,
-                          include_residues=None,
+                          coordinating_residues=None,
                           metal_elements=METAL_ELEMENTS,
                           metal_formal_charges=None,
                           ostream=None,
@@ -407,13 +428,13 @@ def suggest_binding_modes(topology,
     be written to and read back from JSON and is meant to be reviewed before
     use. Everything downstream reads the dictionary, never the geometry.
 
-    include_residues forces inclusion of a residue as a ligand whatever its distance
+    coordinating_residues forces inclusion of a residue as a ligand whatever its distance
 
     :param topology:
         The OpenMM topology.
     :param positions:
         The positions as an (N, 3) numpy array in Angstrom.
-    :param include_residues:
+    :param coordinating_residues:
         Residues that must be ligands whatever their distance, each given
         as a residue id ('130' or 130) or as a residue label ('ASP130').
     :param metal_elements:
@@ -455,7 +476,7 @@ def suggest_binding_modes(topology,
 
     _check_supported_metals(metals, 'suggest_binding_modes')
 
-    forced = _resolve_residues(topology, include_residues, ostream=ostream)
+    forced = _resolve_residues(topology, coordinating_residues, ostream=ostream)
 
     notes = []
     ligands = _collect_ligands(topology.atoms(),
@@ -472,7 +493,13 @@ def suggest_binding_modes(topology,
         'metals': metals,
         'ligands': ligands,
         'variants': {},
-        'include_residues': sorted(forced),
+        'coordinating_residues': sorted(forced),
+        # what the caller asked for on top of the coordination, rather
+        # than the membership those requests work out to: which residues
+        # the cluster holds is derived by active_site_residues, so a
+        # re-detection cannot leave the two disagreeing
+        'extra_residues': [],
+        'excluded_residues': [],
         'manual_bonds': [],
         'notes': notes,
     }
@@ -593,7 +620,7 @@ def _collect_ligands(atoms,
     return ligands
 
 
-def _resolve_residues(topology, include_residues, ostream=None):
+def _resolve_residues(topology, coordinating_residues, ostream=None):
     """
     Turns the residues asked for into residue indices of the topology.
 
@@ -605,7 +632,7 @@ def _resolve_residues(topology, include_residues, ostream=None):
 
     :param topology:
         The OpenMM topology.
-    :param include_residues:
+    :param coordinating_residues:
         The residues asked for, or None.
 
     :return:
@@ -614,16 +641,16 @@ def _resolve_residues(topology, include_residues, ostream=None):
 
     ostream = _stream(ostream)
 
-    if not include_residues:
+    if not coordinating_residues:
         return set()
 
-    if isinstance(include_residues, (str, int)):
-        include_residues = [include_residues]
+    if isinstance(coordinating_residues, (str, int)):
+        coordinating_residues = [coordinating_residues]
 
     residues = list(topology.residues())
     forced = set()
 
-    for request in include_residues:
+    for request in coordinating_residues:
         wanted = str(request).strip()
         matched = [
             residue for residue in residues
@@ -631,7 +658,7 @@ def _resolve_residues(topology, include_residues, ostream=None):
         ]
 
         assert_msg_critical(
-            len(matched) > 0, 'include_residues asked for '
+            len(matched) > 0, 'coordinating_residues asked for '
             f'{request}, which is not a residue of this structure')
 
         for residue in matched:
@@ -699,7 +726,7 @@ def _force_ligands(atoms,
         ]
 
         assert_msg_critical(
-            len(donors) > 0, 'include_residues asked for '
+            len(donors) > 0, 'coordinating_residues asked for '
             f'residue index {res_index}, whose sidechain has no '
             f'{list(DONOR_ELEMENTS)} atom to coordinate with')
 
@@ -716,13 +743,13 @@ def _force_ligands(atoms,
 
         notes.append(f'{label} {atom.name} is {distance:.2f} A from a metal, '
                      f'beyond the primary cutoff ({metal_bond_cutoff}), and '
-                     'was made a ligand because include_residues asked for it')
+                     'was made a ligand because coordinating_residues asked for it')
 
         if distance > report_cutoff:
             ostream.print_warning(
                 f'{label} {atom.name} is {distance:.2f} A from its metal, '
                 'which is a long way for a bond. It is a ligand because '
-                'include_residues asked for it.')
+                'coordinating_residues asked for it.')
             ostream.flush()
 
         existing = [
@@ -1066,16 +1093,16 @@ def remove_metal_bond(binding_modes,
         if not ligand['metals']:
             ligands.remove(ligand)
 
-    forced = new_binding_modes.get('include_residues', [])
+    forced = new_binding_modes.get('coordinating_residues', [])
     still_bound = any(ligand['res_index'] == res_index for ligand in ligands)
 
     if res_index in forced and not still_bound:
-        new_binding_modes['include_residues'] = [
+        new_binding_modes['coordinating_residues'] = [
             index for index in forced if index != res_index
         ]
         ostream.print_info(
             f'{label} no longer coordinates anything and was taken out of '
-            'include_residues, which would otherwise put the bond back on '
+            'coordinating_residues, which would otherwise put the bond back on '
             'the next update.')
 
     notes = []
@@ -1716,6 +1743,13 @@ def load_binding_modes(filename):
     }
     # a file written before the manual edits existed has no such key
     binding_modes.setdefault('manual_bonds', [])
+    # nor does one written before the residues could be edited, and a
+    # file older still calls the forced ligands by their first name
+    if 'coordinating_residues' not in binding_modes:
+        binding_modes['coordinating_residues'] = binding_modes.pop(
+            'include_residues', [])
+    binding_modes.setdefault('extra_residues', [])
+    binding_modes.setdefault('excluded_residues', [])
     _check_supported_metals(binding_modes.get('metals', []),
                             'load_binding_modes')
 
@@ -1780,6 +1814,118 @@ def _histidine_variant(residue, positions, metal_positions):
     return variant, note
 
 
+def known_variants(res_name):
+    """
+    The protonation variants OpenMM will accept for a residue.
+
+    Modeller keeps them in hydrogens.xml and refuses anything else from
+    deep inside addHydrogens, with a bare ValueError. Asking it what it
+    knows before it is called turns that into an error naming the legal
+    set, and keeps the check and the thing it guards from drifting apart.
+
+    :param res_name:
+        The residue name, as the topology has it.
+
+    :return:
+        The variant names, as a tuple. Empty for a residue whose
+        protonation Modeller does not offer a choice about.
+    """
+
+    assert_msg_critical('openmm' in sys.modules,
+                        'known_variants: openmm is required')
+
+    mmapp.Modeller._loadStandardHydrogenDefinitions()
+    spec = mmapp.Modeller._residueHydrogens.get(res_name)
+
+    if spec is None:
+        return ()
+
+    return tuple(spec.variants)
+
+
+def check_variant(residue, variant):
+    """
+    Checks that a protonation variant can be asked for and paid for.
+
+    Two things have to hold, and they come from different places: OpenMM
+    has to know how to build the variant, and the charge bookkeeping of
+    the active site has to know what it is worth. A variant that passes
+    one and not the other fails much later and much less clearly - either
+    inside addHydrogens or on the cluster charge - so both are checked
+    here.
+
+    :param residue:
+        The residue the variant is for.
+    :param variant:
+        The variant name.
+    """
+
+    label = f'{residue.name}{residue.id}'
+    legal = known_variants(residue.name)
+
+    assert_msg_critical(
+        len(legal) > 0, 'check_variant: '
+        f'{label} has no protonation variants to choose between; OpenMM '
+        'builds it one way only')
+
+    assert_msg_critical(
+        variant in legal, 'check_variant: '
+        f'{variant} is not a protonation variant of {label}. The variants '
+        f'OpenMM knows for {residue.name} are {list(legal)}')
+
+    assert_msg_critical(
+        variant in VARIANT_CHARGES, 'check_variant: no charge known for '
+        f'variant {variant}, so the charge of the active site could not be '
+        'counted. Add it to VARIANT_CHARGES')
+
+
+def check_truncatable(residue):
+    """
+    Checks that a residue can be cut at its CA-CB bond.
+
+    The truncation is sidechain-only and fixed, and a residue that only
+    ever got here by coordinating a metal is always one the rule fits.
+    include_residue takes any residue at all, so the two it does not fit
+    are refused by name rather than left to fail later on a missing CB or,
+    worse, to succeed with a dangling valence.
+
+    :param residue:
+        The residue to be truncated.
+    """
+
+    reason = UNTRUNCATABLE_RESIDUES.get(residue.name)
+
+    assert_msg_critical(
+        reason is None, 'check_truncatable: '
+        f'{residue.name}{residue.id} {reason}, and the truncation of this '
+        'module cuts every sidechain at CA-CB. It cannot be part of the '
+        'active site')
+
+
+def active_site_residues(binding_modes):
+    """
+    The residues the truncated active site holds.
+
+    A residue is in the cluster when it coordinates a metal, or when
+    include_residue asked for it, and out of it when remove_residue said
+    so. Only those two requests are stored; the membership itself is
+    worked out here every time it is needed, so that a re-detection which
+    gains or loses a contact cannot leave a stored set behind.
+
+    :param binding_modes:
+        The binding modes.
+
+    :return:
+        The residue indices, sorted.
+    """
+
+    residues = {ligand['res_index'] for ligand in binding_modes['ligands']}
+    residues |= set(binding_modes.get('extra_residues', []))
+    residues -= set(binding_modes.get('excluded_residues', []))
+
+    return sorted(residues)
+
+
 def suggest_variants(topology,
                      positions,
                      binding_modes,
@@ -1792,6 +1938,12 @@ def suggest_variants(topology,
     and the histidine tautomer is set so that the coordinating nitrogen
     carries no hydrogen. Entries in protonation_overrides win over
     the rules.
+
+    Every one of these rules is about a sidechain that coordinates a
+    metal, so a residue that include_residue put in the cluster without
+    one is deliberately left out of them: it keeps whatever Modeller
+    picks for the pH, and update_protonation_state is how it is told
+    otherwise. What Modeller picked is recorded by protonate.
 
     :param topology:
         The OpenMM topology.
@@ -1838,16 +1990,38 @@ def suggest_variants(topology,
         if variant is not None:
             variants[res_index] = variant
 
+    # An override is matched against the residue id, the ASP130 label and,
+    # for a caller that has a residue in hand, the residue index. Note that
+    # ids and indices overlap almost completely -- a single chain numbered
+    # from one has index i for id i+1 -- so a key that hits both is a
+    # collision rather than two ways of saying the same thing, and naming it
+    # beats protonating a residue nobody asked about.
     overrides = protonation_overrides or {}
     for key, variant in overrides.items():
-        matched = False
-        for residue in residues:
-            if str(residue.id) == str(key) or residue.index == key:
-                variants[residue.index] = variant
-                matched = True
+        by_id = [
+            residue for residue in residues
+            if str(residue.id) == str(key) or
+            f'{residue.name}{residue.id}' == str(key)
+        ]
+        matched = by_id or [
+            residue for residue in residues if residue.index == key
+        ]
+
         assert_msg_critical(
-            matched, 'suggest_variants: override '
+            len(matched) > 0, 'suggest_variants: override '
             f'residue {key} not found')
+
+        named = ', '.join(f'{residue.name}{residue.id} '
+                          f'(chain {residue.chain.id})' for residue in matched)
+
+        assert_msg_critical(
+            len(matched) == 1 or by_id, 'suggest_variants: override '
+            f'{key} matches {named}; name the residue as a label such as '
+            f'{matched[0].name}{matched[0].id} to say which is meant')
+
+        for residue in matched:
+            check_variant(residue, variant)
+            variants[residue.index] = variant
 
     return variants, notes
 
@@ -1894,7 +2068,25 @@ def protonate(topology, positions, binding_modes, protonation_overrides=None):
         variant_list[res_index] = variant
 
     modeller = mmapp.Modeller(topology, np.asarray(positions) * mmunit.angstrom)
-    modeller.addHydrogens(variants=variant_list)
+    actual_variants = modeller.addHydrogens(variants=variant_list)
+
+    # A residue put in the cluster without a metal bond is left to the pH
+    # by suggest_variants, so what it ended up as is only known here.
+    # Recording it means the charge count reads what was built rather than
+    # falling back on the residue name and warning about it.
+    # addHydrogens only names a variant it chose between - the cysteines and
+    # the histidines - and reports None for a residue it left at the default
+    # for the pH. That default is the variant the residue is named after:
+    # every alternative in hydrogens.xml is gated behind a maxph the default
+    # pH of 7 does not reach.
+    topology_residues = list(topology.residues())
+    for res_index in active_site_residues(binding_modes):
+        if variants_by_index.get(res_index) is not None:
+            continue
+        chosen = actual_variants[res_index]
+        variants_by_index[res_index] = (
+            chosen if isinstance(chosen, str) else
+            topology_residues[res_index].name)
 
     new_topology = modeller.topology
     new_positions = np.array(modeller.positions.value_in_unit(mmunit.angstrom))
@@ -1982,8 +2174,24 @@ def extract_active_site(topology,
     positions = np.asarray(positions)
     residues = list(topology.residues())
 
-    res_indices = sorted(
-        {ligand['res_index'] for ligand in binding_modes['ligands']})
+    res_indices = active_site_residues(binding_modes)
+
+    # a ligand whose residue was excluded would be left with a metal bond
+    # to an atom the cluster does not hold, which _build_connectivity
+    # would only find out about several steps later
+    orphaned = sorted({
+        ligand['residue']
+        for ligand in binding_modes['ligands']
+        if ligand['res_index'] not in res_indices
+    })
+
+    assert_msg_critical(
+        not orphaned, 'extract_active_site: '
+        f'{", ".join(orphaned)} coordinate(s) a metal but was excluded from '
+        'the active site. Remove the metal bond before removing the residue')
+
+    for res_index in res_indices:
+        check_truncatable(residues[res_index])
 
     labels = []
     atom_labels = []
@@ -2184,6 +2392,74 @@ def _build_connectivity(topology,
     return connectivity_matrix
 
 
+def apply_metal_bonds(active_site, binding_modes):
+    """
+    Rewrites the metal-ligand bonds of an active site from the binding
+    modes, leaving everything else alone.
+
+    This is what a coordination edit made after the force field was built
+    needs: the geometry, the charges and the Hessian all still belong to
+    this site, and only which atoms the metals are bonded to has changed.
+    Re-extracting would throw away an optimized geometry; re-detecting
+    would read the distances the edit was made to overrule.
+
+    The covalent bonds are untouched, and so is a metal-metal bond, which
+    comes from the topology rather than from a ligand contact.
+
+    :param active_site:
+        The active site to rewrite. Not modified.
+    :param binding_modes:
+        The binding modes to read the coordination off, whose indices are
+        those of the topology the active site was extracted from.
+
+    :return:
+        A new active site carrying the new connectivity, or the argument
+        itself when nothing changed.
+    """
+
+    caps = set(active_site['cap_indices'])
+    site_of = {
+        top_index: site_index
+        for site_index, top_index in active_site['atom_map'].items()
+        if site_index not in caps
+    }
+    metals = set(active_site['metal_indices'])
+
+    matrix = np.array(active_site['connectivity_matrix'], copy=True)
+
+    # only a metal-to-ligand entry is the binding modes' to say anything
+    # about, so a metal-metal bond of the topology survives the rewrite
+    for metal in metals:
+        for other in range(matrix.shape[0]):
+            if other in metals:
+                continue
+            matrix[metal, other] = 0
+            matrix[other, metal] = 0
+
+    for ligand in binding_modes['ligands']:
+        assert_msg_critical(
+            ligand['index'] in site_of, 'apply_metal_bonds: '
+            f'{ligand["residue"]} {ligand["atom"]} is not part of this '
+            'active site, so it has no atom here to bond to a metal. Only a '
+            'residue the cluster already holds can gain a metal bond once '
+            'the force field is built; call build_active_site() again to '
+            'extract the site afresh, which drops the fit')
+        lig_index = site_of[ligand['index']]
+        for metal_index in ligand['metals']:
+            metal = site_of[metal_index]
+            matrix[metal, lig_index] = 1
+            matrix[lig_index, metal] = 1
+
+    if np.array_equal(matrix, np.asarray(active_site['connectivity_matrix'])):
+        return active_site
+
+    new_active_site = dict(active_site)
+    new_active_site['connectivity_matrix'] = matrix
+    new_active_site['bond_labels'] = connectivity_bonds(matrix)
+
+    return new_active_site
+
+
 def update_binding_modes(topology,
                          geometry,
                          active_site,
@@ -2201,7 +2477,7 @@ def update_binding_modes(topology,
     oxygen can rotate onto a metal. The rules of suggest_binding_modes are
     applied again to the new coordinates so that what is fitted afterwards
     is the coordination the geometry actually has. Residues that were
-    asked for through include_residues stay ligands, since a distance is
+    asked for through coordinating_residues stay ligands, since a distance is
     not what put them there.
     Nothing is modified in place, and the arguments themselves are returned
     when the coordination did not change, so the caller can overwrite what
@@ -2262,7 +2538,7 @@ def update_binding_modes(topology,
                                    binding_modes['metals'],
                                    notes,
                                    set(binding_modes.get(
-                                       'include_residues', [])),
+                                       'coordinating_residues', [])),
                                    bidentate_asymmetry=bidentate_asymmetry,
                                    metal_bond_cutoff=metal_bond_cutoff,
                                    report_cutoff=report_cutoff,
@@ -2354,7 +2630,12 @@ def update_binding_modes(topology,
         'metals': deepcopy(binding_modes['metals']),
         'ligands': new_ligands,
         'variants': deepcopy(binding_modes.get('variants', {})),
-        'include_residues': sorted(binding_modes.get('include_residues', [])),
+        'coordinating_residues':
+            sorted(binding_modes.get('coordinating_residues', [])),
+        'extra_residues':
+            sorted(binding_modes.get('extra_residues', [])),
+        'excluded_residues':
+            sorted(binding_modes.get('excluded_residues', [])),
         'manual_bonds': deepcopy(records),
         'notes': notes,
     }
@@ -3041,6 +3322,68 @@ def get_metal_keys(forcefield, active_site):
     return bonds, angles
 
 
+def manual_bond_keys(active_site, topology, binding_modes):
+    """
+    The active site bond keys of the metal bonds that were asked for by
+    hand.
+
+    The records name their atoms the way they have to in order to survive
+    the renumbering of protonate - by residue index, atom name and the
+    residue index of the metal - so turning them into keys of the force
+    field means going back through the atom map of the active site.
+
+    :param active_site:
+        The active site the keys are to index into.
+    :param topology:
+        The protonated topology the active site was extracted from.
+    :param binding_modes:
+        The binding modes carrying the records.
+
+    :return:
+        The bond keys, as a set of sorted index pairs.
+    """
+
+    records = [
+        record for record in binding_modes.get('manual_bonds', [])
+        if record['action'] == 'add'
+    ]
+
+    if not records:
+        return set()
+
+    atoms = list(topology.atoms())
+    caps = set(active_site['cap_indices'])
+    site_of = {
+        top_index: site_index
+        for site_index, top_index in active_site['atom_map'].items()
+        if site_index not in caps
+    }
+
+    by_key = {}
+    for top_index in site_of:
+        atom = atoms[top_index]
+        by_key[(atom.residue.index, atom.name)] = top_index
+
+    metal_by_res = {
+        atoms[metal['index']].residue.index: metal['index']
+        for metal in binding_modes['metals']
+    }
+
+    keys = set()
+    for record in records:
+        top_atom = by_key.get((record['res_index'], record['atom']))
+        top_metal = metal_by_res.get(record['metal_res_index'])
+
+        if top_atom is None or top_metal is None:
+            # the residue is no longer part of this active site, so
+            # there is no bond of this force field to protect
+            continue
+
+        keys.add(tuple(sorted((site_of[top_atom], site_of[top_metal]))))
+
+    return keys
+
+
 def build_forcefield(
         active_site,
         hessian=None,
@@ -3054,6 +3397,7 @@ def build_forcefield(
         default_metal_bond_force_constant=DEFAULT_METAL_BOND_FORCE_CONSTANT,
         metal_angle_equilibria=None,
         metal_bond_equilibria=None,
+        protected_bonds=None,
         weak_bridge_tolerance=0.25):
     """
     Builds the active site force field and fits the metal terms.
@@ -3070,6 +3414,10 @@ def build_forcefield(
         capping hydrogens is redistributed over the remaining atoms before
         they are applied, since the caps do not exist in the protein.
         If None, D4 charges are used.
+    :param protected_bonds:
+        The metal bond keys the weak bridge pruning must leave alone,
+        which is what a bond added by hand needs: manual_bond_keys turns
+        the records of the binding modes into them.
 
     :return:
         The force field generator.
@@ -3156,6 +3504,7 @@ def build_forcefield(
                 bonds,
                 angles,
                 weak_bridge_tolerance=weak_bridge_tolerance,
+                protected=protected_bonds,
                 ostream=ostream)
 
         _check_force_constants(forcefield,
@@ -3419,6 +3768,7 @@ def _prune_weak_bridges(forcefield,
                         bonds,
                         angles,
                         weak_bridge_tolerance=0.25,
+                        protected=None,
                         ostream=None):
     """
     Drops the long arm of a bridging residue that the fit gave no force
@@ -3464,6 +3814,12 @@ def _prune_weak_bridges(forcefield,
 
     ostream = _stream(ostream)
 
+    # a bond asked for by hand is a decision, and the two things this
+    # reads - a zero force constant and a long distance - are exactly what
+    # a hand-added bond looks like when the Hessian does not cover it, so
+    # leaving it in reach of the heuristic would take it straight back out
+    protected = {tuple(key) for key in (protected or ())}
+
     metals = set(active_site['metal_indices'])
     coordinates = active_site['molecule'].get_coordinates_in_angstrom()
     labels = active_site['molecule'].get_labels()
@@ -3493,6 +3849,8 @@ def _prune_weak_bridges(forcefield,
         shortest = min(lengths.values())
 
         for key in keys:
+            if key in protected:
+                continue
             if forcefield.bonds[key]['force_constant'] != 0.0:
                 continue
             if lengths[key] - shortest < weak_bridge_tolerance:

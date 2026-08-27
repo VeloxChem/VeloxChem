@@ -32,6 +32,7 @@
 
 from mpi4py import MPI
 from pathlib import Path
+from copy import deepcopy
 import numpy as np
 import time
 import sys
@@ -65,9 +66,24 @@ class MetalSiteForceFieldBuilder:
         forcefield = builder.build_forcefield()
         system, topology = builder.create_enzyme_system()
 
-    with add_metal_bond and remove_metal_bond in between the first two to
-    correct a coordination the distances got wrong, and build_active_site
-    called again with no path to rebuild the site from the corrected modes.
+    The active site can be edited in between them, and how much of it can be
+    edited is what separates the two gaps.
+
+    Between the first and the second nothing expensive has run yet, so the
+    site can be changed in every way it is described by: add_metal_bond and
+    remove_metal_bond correct a coordination the distances got wrong,
+    update_protonation_state overrules a variant, and include_residue and
+    remove_residue change which residues the cluster is made of. Each of
+    them extracts the site again on its own, so an edit is never a request
+    waiting for a rebuild that might be forgotten.
+
+    Between the second and the third only the coordination is still open.
+    The charges and the fitted parameters describe the protonation and the
+    residues they were fitted to, so those two are refused with an error
+    naming the way back -- build_active_site again, which drops the fit.
+    A bond edit is fitted again on the geometry, the Hessian and the charges
+    that are already there, which costs nothing; a bond the Hessian holds no
+    data for is fitted to zero and reported as such, and kept.
 
     The object holds the settings and the intermediates; the work itself is
     done by the functions of metalsitecore, which keep no state and take
@@ -94,8 +110,13 @@ class MetalSiteForceFieldBuilder:
           than the other before the pair stops counting as chelating.
         - cap_bond_length: The C-H distance in Angstrom of the capping
           hydrogen that replaces CA.
-        - protonation_overrides: The residue id to variant mapping that
-          overrides the automatic protonation rules.
+        - protonation_overrides: The residue to variant mapping that overrides
+          the automatic protonation rules. A residue is named by its id
+          ('187'), by its label ('HIS187') or by its index, and a label is
+          worth preferring: ids and indices overlap, so an index can name a
+          residue by one reading and its neighbour by the other.
+          update_protonation_state writes into this, by label, so a variant
+          set by hand and one set as a setting are the same thing.
         - prepare_protein: The flag for repairing the structure with pdbfixer,
           which is what a protein force field needs in order to match
           templates.
@@ -265,6 +286,7 @@ class MetalSiteForceFieldBuilder:
         # protonating an already protonated topology is the bug that guards
         # against.
         self._structure = None
+        self._mm_opt = True
         self._topology = None
         self._positions = None
         self._binding_modes = None
@@ -378,7 +400,7 @@ class MetalSiteForceFieldBuilder:
     def build_active_site(self,
                           cif_path=None,
                           mm_opt=True,
-                          include_residues=None):
+                          coordinating_residues=None):
         """
         Builds the truncated active site, from a structure or from the
         binding modes as they now stand.
@@ -394,12 +416,16 @@ class MetalSiteForceFieldBuilder:
         a crude force field of its own so that a later QM optimization does not
         spend its first cycles cleaning up the structure file.
 
+        The edit methods rebuild the site themselves, so calling this again
+        by hand is only needed to start from a different structure, to change
+        mm_opt, or to reopen editing after build_forcefield.
+
         :param cif_path:
             The path to a .pdb, .cif or .pdbx file, or None to rebuild from
             the binding modes of the previous call.
         :param mm_opt:
             Whether to relax the extracted site on a crude force field.
-        :param include_residues:
+        :param coordinating_residues:
             Residues that coordinate a metal however far out they sit, as ids
             ('130') or labels ('ASP130'). Only used when a path is given.
 
@@ -410,8 +436,12 @@ class MetalSiteForceFieldBuilder:
         assert_msg_critical('openmm' in sys.modules,
                             'MetalSiteForceFieldBuilder: openmm is required')
 
-        state = self._on_master(
-            lambda: self._build_active_site(cif_path, mm_opt, include_residues))
+        state = self._on_master(lambda: self._build_active_site(
+            cif_path, mm_opt, coordinating_residues))
+
+        # an edit rebuilds the site the way this call built it, so what it
+        # was told has to outlive the call
+        self._mm_opt = mm_opt
 
         self._topology = state['topology']
         self._positions = state['positions']
@@ -431,7 +461,7 @@ class MetalSiteForceFieldBuilder:
 
         return self.active_site_molecule
 
-    def _build_active_site(self, cif_path, mm_opt, include_residues):
+    def _build_active_site(self, cif_path, mm_opt, coordinating_residues):
         """
         The work of build_active_site, on one rank.
 
@@ -446,7 +476,7 @@ class MetalSiteForceFieldBuilder:
             binding_modes = core.suggest_binding_modes(
                 topology,
                 positions,
-                include_residues=include_residues,
+                coordinating_residues=coordinating_residues,
                 metal_elements=self.metal_elements,
                 metal_formal_charges=self.metal_formal_charges,
                 ostream=self.ostream,
@@ -522,13 +552,17 @@ class MetalSiteForceFieldBuilder:
         which the renumbering of the protonation touches, so that a rebuild
         and a re-detection on a relaxed geometry both put the bond back.
 
-        Call build_active_site again, with no path, to rebuild the site with
-        the corrected coordination.
+        The active site is brought up to date on its own: before
+        build_forcefield it is extracted again from the corrected
+        coordination, and afterwards the metal terms are fitted again on the
+        geometry, the Hessian and the charges that are already there. It is
+        the one edit that is still allowed once the force field exists.
 
         :param resid:
             The residue, as an id ('130' or 130) or as a label ('ASP130').
         :param metal:
-            The atom index of the metal to bind to.
+            The atom index of the metal to bind to, as the active site labels
+            it.
         :param atom:
             The name of the coordinating atom ('OD1'). Worked out from the
             geometry when there is no ambiguity.
@@ -538,16 +572,18 @@ class MetalSiteForceFieldBuilder:
 
         self._require_binding_modes('add_metal_bond')
 
-        self._binding_modes = self._on_master(lambda: core.add_metal_bond(
-            self._binding_modes,
-            self._topology,
-            self._positions,
-            resid,
-            metal,
-            atom=atom,
-            chain=chain,
-            ostream=self.ostream,
-            **self._detection_kwargs()))
+        def edit(modes, topology, positions):
+            return core.add_metal_bond(modes,
+                                       topology,
+                                       positions,
+                                       resid,
+                                       self._metal_index(metal, modes),
+                                       atom=atom,
+                                       chain=chain,
+                                       ostream=self.ostream,
+                                       **self._detection_kwargs())
+
+        self._edit_coordination(edit)
 
     def remove_metal_bond(self, resid, metal=None, atom=None, chain=None):
         """
@@ -555,13 +591,19 @@ class MetalSiteForceFieldBuilder:
 
         The counterpart of add_metal_bond, and recorded the same way, so that
         a contact the cutoffs invented does not come back when the
-        coordination is detected again on a relaxed geometry.
+        coordination is detected again on a relaxed geometry. The active site
+        is brought up to date on its own, and this too is still allowed once
+        the force field exists.
+
+        Note that taking the last bond off a residue takes the residue out of
+        the active site with it, unless include_residue asked for it. Use
+        remove_residue to say so outright.
 
         :param resid:
             The residue, as an id ('130' or 130) or as a label ('ASP130').
         :param metal:
-            The atom index of the metal to unbind from. Only needed when the
-            residue reaches more than one.
+            The atom index of the metal to unbind from, as the active site
+            labels it. Only needed when the residue reaches more than one.
         :param atom:
             The name of the coordinating atom. Only needed when the residue
             binds that metal through more than one atom.
@@ -571,14 +613,240 @@ class MetalSiteForceFieldBuilder:
 
         self._require_binding_modes('remove_metal_bond')
 
-        self._binding_modes = self._on_master(lambda: core.remove_metal_bond(
-            self._binding_modes,
-            resid,
-            metal=metal,
-            atom=atom,
-            chain=chain,
-            bidentate_asymmetry=self.bidentate_asymmetry,
-            ostream=self.ostream))
+        def edit(modes, topology, positions):
+            return core.remove_metal_bond(
+                modes,
+                resid,
+                metal=None if metal is None else self._metal_index(
+                    metal, modes),
+                atom=atom,
+                chain=chain,
+                bidentate_asymmetry=self.bidentate_asymmetry,
+                ostream=self.ostream)
+
+        self._edit_coordination(edit)
+
+    def update_protonation_state(self, resid, variant, chain=None):
+        """
+        Sets the protonation variant of one residue of the active site.
+
+        The variants are chosen automatically from the coordination -- a
+        coordinating carboxylate is deprotonated, a coordinating cysteine is a
+        thiolate, and the histidine tautomer puts no hydrogen on the
+        coordinating nitrogen -- and this is how one of them is overruled, or
+        how a residue that coordinates nothing is told what it should be.
+
+        The request goes into protonation_overrides, so it is the same thing
+        as the setting and survives every later rebuild. Hydrogens are added
+        and removed by protonating the structure again from before any
+        hydrogens were placed, which is also why the whole active site is
+        rebuilt: nothing expensive has run at this point, and re-protonating
+        an already protonated topology is not something to reach for.
+
+        Only possible before build_forcefield, since the charges and the
+        parameters of the force field describe the protonation it was fitted
+        to.
+
+        :param resid:
+            The residue, as an id ('130' or 130) or as a label ('ASP130').
+        :param variant:
+            The variant to set, as OpenMM names it: 'ASP'/'ASH', 'GLU'/'GLH',
+            'CYS'/'CYX', 'HID'/'HIE'/'HIP'/'HIN' or 'LYS'/'LYN'. Note that
+            CYX here is the cysteine without its HG, which for a metal-bound
+            sidechain is the thiolate.
+        :param chain:
+            The chain id, when the residue id occurs in more than one chain.
+        """
+
+        self._require_binding_modes('update_protonation_state')
+        self._require_editable('update_protonation_state')
+
+        def work():
+            residue = core._resolve_residue(self._topology, resid, chain)
+            core.check_variant(residue, variant)
+
+            # keyed by the label rather than the index, because residue ids
+            # and residue indices overlap: a single chain numbered from one
+            # has index i for id i+1, so an index written here would also
+            # match its neighbour by id
+            overrides = dict(self.protonation_overrides or {})
+            overrides[f'{residue.name}{residue.id}'] = variant
+
+            self.ostream.print_info(
+                f'{residue.name}{residue.id} will be protonated as {variant}.')
+            self.ostream.flush()
+
+            return overrides
+
+        self.protonation_overrides = self._on_master(work)
+        self._reapply()
+
+    def include_residue(self, resid, chain=None):
+        """
+        Puts a residue into the truncated active site.
+
+        The cluster is otherwise exactly the residues that coordinate a
+        metal. This adds one that does not have to -- a second-shell residue
+        that hydrogen bonds to a ligand, or one whose sidechain the QM should
+        see for any other reason. It is truncated and capped like every other
+        residue, and it keeps whatever protonation the pH gives it unless
+        update_protonation_state says otherwise.
+
+        To make a residue coordinate a metal instead, use add_metal_bond, or
+        build_active_site(coordinating_residues=...) to do it during the
+        detection.
+
+        Only possible before build_forcefield, since the geometry, the
+        Hessian and the charges all describe the cluster they were computed
+        for.
+
+        :param resid:
+            The residue, as an id ('58' or 58) or as a label ('TYR58').
+        :param chain:
+            The chain id, when the residue id occurs in more than one chain.
+        """
+
+        self._require_binding_modes('include_residue')
+        self._require_editable('include_residue')
+
+        def work():
+            residue = core._resolve_residue(self._topology, resid, chain)
+            core.check_truncatable(residue)
+
+            modes = self._binding_modes
+            label = f'{residue.name}{residue.id}'
+
+            already = residue.index in core.active_site_residues(modes)
+            excluded = residue.index in modes.get('excluded_residues', [])
+
+            if already and not excluded:
+                self.ostream.print_warning(
+                    f'{label} is already part of the active site; nothing to '
+                    'include')
+                self.ostream.flush()
+                return None
+
+            modes = deepcopy(modes)
+            modes['excluded_residues'] = [
+                index for index in modes.get('excluded_residues', [])
+                if index != residue.index
+            ]
+            extra = set(modes.get('extra_residues', []))
+            extra.add(residue.index)
+            modes['extra_residues'] = sorted(extra)
+
+            core._merge_notes(modes, [
+                f'{label} is part of the active site because include_residue '
+                'asked for it, whether or not it coordinates a metal'
+            ])
+
+            self.ostream.print_info(f'Added {label} to the active site.')
+            self.ostream.flush()
+
+            return modes
+
+        modes = self._on_master(work)
+
+        if modes is None:
+            return
+
+        self._binding_modes = modes
+        self._reapply()
+
+    def remove_residue(self, resid, chain=None):
+        """
+        Takes a residue out of the truncated active site.
+
+        Any metal bonds it makes go with it, recorded the way
+        remove_metal_bond records them, so that neither the residue nor its
+        coordination comes back when the site is detected again on a relaxed
+        geometry.
+
+        A metal that would be left with no ligand at all, and the last
+        residue of the site, are refused: what is left would not be an active
+        site.
+
+        Only possible before build_forcefield, for the same reason as
+        include_residue.
+
+        :param resid:
+            The residue, as an id ('130' or 130) or as a label ('ASP130').
+        :param chain:
+            The chain id, when the residue id occurs in more than one chain.
+        """
+
+        self._require_binding_modes('remove_residue')
+        self._require_editable('remove_residue')
+
+        def work():
+            residue = core._resolve_residue(self._topology, resid, chain)
+
+            modes = self._binding_modes
+            label = f'{residue.name}{residue.id}'
+            members = core.active_site_residues(modes)
+
+            assert_msg_critical(
+                residue.index in members, 'remove_residue: '
+                f'{label} is not part of the active site, so there is '
+                'nothing to remove')
+
+            assert_msg_critical(
+                len(members) > 1, 'remove_residue: '
+                f'{label} is the only residue of the active site, and what '
+                'would be left is not one')
+
+            orphaned = sorted({
+                f'{metal["element"]} (index {metal["index"]})'
+                for metal in modes['metals']
+                if not any(metal['index'] in ligand['metals']
+                           for ligand in modes['ligands']
+                           if ligand['res_index'] != residue.index)
+            })
+
+            assert_msg_critical(
+                not orphaned, 'remove_residue: removing '
+                f'{label} would leave {", ".join(orphaned)} with no ligand '
+                'at all')
+
+            # the bonds have to go through remove_metal_bond, so that the
+            # removals are recorded and a re-detection does not put back what
+            # the geometry still looks like
+            while any(ligand['res_index'] == residue.index
+                      for ligand in modes['ligands']):
+                bound = next(ligand for ligand in modes['ligands']
+                             if ligand['res_index'] == residue.index)
+                modes = core.remove_metal_bond(
+                    modes,
+                    label,
+                    metal=bound['metals'][0],
+                    bidentate_asymmetry=self.bidentate_asymmetry,
+                    ostream=self.ostream)
+
+            modes = deepcopy(modes)
+            modes['extra_residues'] = [
+                index for index in modes.get('extra_residues', [])
+                if index != residue.index
+            ]
+            modes['coordinating_residues'] = [
+                index for index in modes.get('coordinating_residues', [])
+                if index != residue.index
+            ]
+            excluded = set(modes.get('excluded_residues', []))
+            excluded.add(residue.index)
+            modes['excluded_residues'] = sorted(excluded)
+
+            core._merge_notes(modes, [
+                f'{label} is not part of the active site because '
+                'remove_residue asked for it'
+            ])
+
+            self.ostream.print_info(f'Removed {label} from the active site.')
+            self.ostream.flush()
+
+            return modes
+
+        self._binding_modes = self._on_master(work)
+        self._reapply()
 
     def mm_optimize_active_site(self):
         """
@@ -823,12 +1091,14 @@ class MetalSiteForceFieldBuilder:
 
         forcefield = None
         if self.rank == mpi_master():
-            forcefield = core.build_forcefield(self._active_site,
-                                               hessian=hessian,
-                                               partial_charges=charges,
-                                               comm=MPI.COMM_SELF,
-                                               ostream=self.ostream,
-                                               **self._fit_kwargs())
+            forcefield = core.build_forcefield(
+                self._active_site,
+                hessian=hessian,
+                partial_charges=charges,
+                comm=MPI.COMM_SELF,
+                ostream=self.ostream,
+                protected_bonds=self._protected_bonds(),
+                **self._fit_kwargs())
             core._print_metal_parameters(self._active_site,
                                          forcefield,
                                          ostream=self.ostream)
@@ -1058,6 +1328,214 @@ class MetalSiteForceFieldBuilder:
             ostream=self.ostream)
 
         return {'binding_modes': binding_modes, 'active_site': active_site}
+
+    def _edit_coordination(self, edit):
+        """
+        Applies one coordination edit and brings the builder up to date.
+
+        Which binding modes the edit is applied to is the whole difference
+        between the two stages. Before the force field exists the edit belongs
+        on the modes the site is rebuilt from, which are the ones from before
+        the hydrogens were placed. Afterwards there is a geometry, a Hessian
+        and a set of charges that all belong to this cluster, and rebuilding
+        would throw them away, so the edit is applied to the protonated modes
+        the active site indexes into and the metal terms are fitted again.
+
+        :param edit:
+            A callable taking the binding modes, the topology and the
+            positions they index into, and returning the edited modes.
+        """
+
+        if self._forcefield is None:
+            self._binding_modes = self._on_master(lambda: edit(
+                self._binding_modes, self._topology, self._positions))
+        else:
+            self._protonated_binding_modes = self._on_master(
+                lambda: edit(self._protonated_binding_modes, self.
+                             _protonated_topology, self._protonated_positions))
+
+        self._reapply()
+
+    def _metal_index(self, metal, binding_modes):
+        """
+        Translates a metal atom index into the numbering of one set of
+        binding modes.
+
+        A metal is named by the number the active site labels it with, which
+        is an index into the protonated topology, since that is the only one
+        anything draws or prints for the user to read. The modes an edit is
+        applied to before the force field exists are the ones from before the
+        hydrogens were placed, where the same atom has a different index, so
+        the two are matched up by position: protonate remaps the entries in
+        place and keeps their order.
+
+        :param metal:
+            The atom index of the metal, as the active site labels it.
+        :param binding_modes:
+            The binding modes whose numbering is wanted.
+
+        :return:
+            The atom index of that metal in those binding modes.
+        """
+
+        reference = self._protonated_binding_modes or self._binding_modes
+        wanted = int(metal)
+
+        position = None
+        for index, entry in enumerate(reference['metals']):
+            if entry['index'] == wanted:
+                position = index
+                break
+
+        known = ', '.join(
+            f'{entry["element"]} {entry["index"]}'
+            for entry in reference['metals'])
+
+        assert_msg_critical(
+            position is not None, 'MetalSiteForceFieldBuilder: there is no '
+            f'metal center at atom index {wanted}. The active site holds '
+            f'{known}, which is what its labels show')
+
+        return binding_modes['metals'][position]['index']
+
+    def _reapply(self):
+        """
+        Brings everything downstream of an edit up to date.
+
+        An edit is not a request to be remembered for later: the builder that
+        made it describes the edited site immediately, at whichever stage it
+        is in. Before the force field exists that means extracting the site
+        again from the corrected binding modes; afterwards it means fitting
+        the metal terms again on what is already there.
+        """
+
+        if self._forcefield is None:
+            self._rebuild_active_site()
+        else:
+            self._refit_forcefield()
+
+    def _rebuild_active_site(self):
+        """
+        Protonates and truncates again from the binding modes as they stand.
+
+        The same work build_active_site does without a path, and run the same
+        way it was run then, so that an edit does not silently change whether
+        the crude pass happens. The run header is not printed again: this is
+        not a new run.
+        """
+
+        state = self._on_master(
+            lambda: self._build_active_site(None, self._mm_opt, None))
+
+        self._topology = state['topology']
+        self._positions = state['positions']
+        self._binding_modes = state['binding_modes']
+        self._protonated_topology = state['protonated_topology']
+        self._protonated_positions = state['protonated_positions']
+        self._protonated_binding_modes = state['protonated_binding_modes']
+        self._active_site = state['active_site']
+
+        # the site they were computed for has just been replaced; a file in
+        # the folder that still fits this one is picked back up by
+        # build_forcefield, which validates it before it uses it
+        self._hessian = None
+        self._partial_charges = None
+        self._enzyme_system = None
+
+    def _refit_forcefield(self):
+        """
+        Fits the metal terms again after the coordination was edited.
+
+        Nothing expensive runs. The geometry, the Hessian and the charges all
+        still describe this cluster, and only which atoms the metals are
+        bonded to has changed, so the force field is built again from them
+        with the new connectivity. Rebuilding it rather than patching it is
+        what keeps the angles, torsions and impropers that cross an edited
+        bond right: the generator derives every one of them from the
+        connectivity matrix.
+
+        A term the Hessian holds nothing for is fitted to zero and reported by
+        _check_force_constants, which is what a bond added by hand looks like
+        when the Hessian was computed for a coordination without it. The bond
+        is kept: the warning says to recompute the Hessian, not that the edit
+        was refused.
+        """
+
+        self.ostream.print_info(
+            'Fitting the metal terms again on the edited coordination. '
+            'Nothing is recomputed; a term the Hessian does not cover is '
+            'reported below.')
+        self.ostream.flush()
+
+        self._active_site = self._on_master(lambda: core.apply_metal_bonds(
+            self._active_site, self._protonated_binding_modes))
+
+        forcefield = None
+        if self.rank == mpi_master():
+            forcefield = core.build_forcefield(
+                self._active_site,
+                hessian=self._hessian,
+                partial_charges=self._partial_charges,
+                comm=MPI.COMM_SELF,
+                ostream=self.ostream,
+                protected_bonds=self._protected_bonds(),
+                **self._fit_kwargs())
+            core._print_metal_parameters(self._active_site,
+                                         forcefield,
+                                         ostream=self.ostream)
+            self._write_run_artifacts(forcefield, self._hessian,
+                                      self._partial_charges)
+
+        self._forcefield = core.broadcast_forcefield(forcefield,
+                                                     comm=self.comm,
+                                                     ostream=self.ostream)
+
+        # it was built from the metal terms that have just been refitted
+        self._enzyme_system = None
+
+    def _protected_bonds(self):
+        """
+        The metal bonds the weak bridge pruning must leave alone.
+
+        A bond that was asked for by hand is a decision, and the two things
+        the pruning reads -- a zero force constant and a long distance -- are
+        exactly what such a bond looks like when the Hessian does not cover
+        it. Without this the fit would take it straight back out.
+
+        :return:
+            The bond keys, as a set.
+        """
+
+        if self._protonated_binding_modes is None:
+            return set()
+
+        return core.manual_bond_keys(self._active_site,
+                                     self._protonated_topology,
+                                     self._protonated_binding_modes)
+
+    def _require_editable(self, method):
+        """
+        Checks that the force field has not been built yet.
+
+        The protonation and the residues of the active site are what the
+        charges and the fitted parameters describe, so changing either after
+        the fit would leave a force field describing a cluster that no longer
+        exists. Coordination is the exception: only which atoms the metals
+        bond to changes, and that can be fitted again from what is already
+        there.
+
+        :param method:
+            The name of the method that needs it.
+        """
+
+        assert_msg_critical(
+            self._forcefield is None,
+            f'MetalSiteForceFieldBuilder.{method}: the force field has '
+            'already been built, and its charges and parameters describe the '
+            'protonation and the residues it was fitted to. Only '
+            'add_metal_bond and remove_metal_bond can be used after '
+            'build_forcefield. Call build_active_site() again to start over '
+            'from the binding modes, which drops the fit.')
 
     def _require_active_site(self, method):
         """
