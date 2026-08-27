@@ -45,6 +45,7 @@ from .veloxchemlib import mpi_master
 from .molecule import Molecule
 from .outputstream import OutputStream
 from .metalsiteffbuilder import MetalSiteForceFieldBuilder
+from . import metalsitecore as core
 from .optimizationdriver import OptimizationDriver
 from .superimpose import svd_superimpose
 from .errorhandler import assert_msg_critical
@@ -77,9 +78,9 @@ class MetalForceFieldManager:
 
     Instance variables
         - templates: The loaded templates, keyed by name.
-        - builder: The MetalSiteForceFieldBuilder whose steps are used to
-          extract and parameterize an active site. Its settings apply here,
-          so set them on it.
+        - builder: A MetalSiteForceFieldBuilder held for its settings. The
+          steps themselves are the functions of metalsitecore, which are
+          called with the settings this carries, so set them on it.
         - metal_shell_bonds: How many bonds out from a metal the metal_shell
           region reaches.
         - selection_criteria: What a template has to be within before
@@ -279,14 +280,14 @@ class MetalForceFieldManager:
         if name is None:
             name = folder.resolve().name
 
-        ff_path = folder / MetalSiteForceFieldBuilder.FORCEFIELD_FILE
+        ff_path = folder / core.FORCEFIELD_FILE
         assert_msg_critical(
             ff_path.is_file(),
             f'MetalForceFieldManager: {ff_path} not found, so {folder} holds '
-            'no force field to use as a template. It is written by a run with '
-            'save_output on, and by save_results.')
+            'no force field to use as a template. It is written by '
+            'MetalSiteForceFieldBuilder.build_forcefield.')
 
-        forcefield = self.builder.load_forcefield(ff_path)
+        forcefield = core.load_forcefield(ff_path)
         geometry, kind = self._load_geometry(folder, fallback)
         forcefield.molecule = geometry
 
@@ -335,8 +336,8 @@ class MetalForceFieldManager:
             The tuple of the molecule and its kind.
         """
 
-        opt_path = folder / MetalSiteForceFieldBuilder.GEOMETRY_FILE
-        mm_path = folder / MetalSiteForceFieldBuilder.MM_GEOMETRY_FILE
+        opt_path = folder / core.GEOMETRY_FILE
+        mm_path = folder / core.MM_GEOMETRY_FILE
 
         allowed = self.GEOMETRY_KINDS[:1 if fallback is None else 2]
 
@@ -345,9 +346,10 @@ class MetalForceFieldManager:
 
             if mm_path.is_file() and self._same_geometry(
                     geometry, Molecule.read_xyz_file(str(mm_path))):
-                # save_results writes whatever the active site ended up as
-                # under the name of the optimized geometry, so an untouched
-                # copy of the MM geometry means the QM optimization never ran
+                # build_forcefield writes whatever the active site ended
+                # up as under the name of the optimized geometry, so an
+                # untouched copy of the MM geometry means the QM optimization
+                # never ran
                 kind = 'mm_opt'
                 assert_msg_critical(
                     kind in allowed,
@@ -422,7 +424,7 @@ class MetalForceFieldManager:
         """
 
         labels = list(molecule.get_labels())
-        elements = self.builder._forcefield_elements(forcefield)
+        elements = core._forcefield_elements(forcefield)
 
         assert_msg_critical(
             len(labels) == len(elements),
@@ -458,13 +460,13 @@ class MetalForceFieldManager:
                 index for index, atom in forcefield.atoms.items()
                 if role in (atom.get('comment', '') or '')
             ]
-            for role in (MetalSiteForceFieldBuilder.BETA_CARBON_COMMENT,
-                         MetalSiteForceFieldBuilder.CAP_COMMENT)
+            for role in (core.BETA_CARBON_COMMENT,
+                         core.CAP_COMMENT)
         }
 
         beta_carbon_indices = marked[
-            MetalSiteForceFieldBuilder.BETA_CARBON_COMMENT]
-        cap_indices = marked[MetalSiteForceFieldBuilder.CAP_COMMENT]
+            core.BETA_CARBON_COMMENT]
+        cap_indices = marked[core.CAP_COMMENT]
 
         assert_msg_critical(
             len(cap_indices) > 0,
@@ -734,7 +736,7 @@ class MetalForceFieldManager:
             The bonds.
         """
 
-        return MetalSiteForceFieldBuilder.connectivity_bonds(
+        return core.connectivity_bonds(
             connectivity_matrix)
 
     def compare_to_templates(self,
@@ -1038,11 +1040,17 @@ class MetalForceFieldManager:
 
         enzyme_system = None
         if self.build_enzyme_system:
-            enzyme_system, _ = self.builder.create_enzyme_system(
-                comparison['topology'], active_site, forcefield,
-                forcefield.partial_charges)
+            enzyme_system, _ = core.create_enzyme_system(
+                comparison['topology'],
+                active_site,
+                forcefield,
+                partial_charges=forcefield.partial_charges,
+                forcefield_files=self.builder.protein_forcefield_files,
+                ostream=self.ostream)
 
-        self.builder._print_metal_parameters(active_site, forcefield)
+        core._print_metal_parameters(active_site,
+                                     forcefield,
+                                     ostream=self.ostream)
 
         return {
             'template': name,
@@ -1250,14 +1258,27 @@ class MetalForceFieldManager:
 
         builder = self.builder
 
-        topology, positions = builder.load_and_prepare_protein(
+        topology, positions = core.load_and_prepare_protein(
             structure, prepare=self.do_prepare_protein)
 
-        binding_modes = builder.suggest_binding_modes(topology, positions)
-        topology, positions, binding_modes = builder.protonate(
-            topology, positions, binding_modes)
-        active_site = builder.extract_active_site(topology, positions,
-                                                  binding_modes)
+        binding_modes = core.suggest_binding_modes(
+            topology,
+            positions,
+            metal_elements=builder.metal_elements,
+            metal_formal_charges=builder.metal_formal_charges,
+            ostream=self.ostream,
+            **builder._detection_kwargs())
+        topology, positions, binding_modes = core.protonate(
+            topology,
+            positions,
+            binding_modes,
+            protonation_overrides=builder.protonation_overrides)
+        active_site = core.extract_active_site(
+            topology,
+            positions,
+            binding_modes,
+            cap_bond_length=builder.cap_bond_length,
+            ostream=self.ostream)
 
         return {
             'topology': topology,
@@ -1286,23 +1307,28 @@ class MetalForceFieldManager:
         """
 
         builder = self.builder
-        equilibria = builder.metal_bond_equilibria
-        override = (self.mm_fallback_literature_bonds and equilibria is None)
+        active_site = query['active_site']
 
-        if override:
-            builder.metal_bond_equilibria = builder.LITERATURE_METAL_BONDS
+        fit_kwargs = builder._fit_kwargs()
+        if self.mm_fallback_literature_bonds and (
+                fit_kwargs['metal_bond_equilibria'] is None):
+            fit_kwargs['metal_bond_equilibria'] = core.LITERATURE_METAL_BONDS
 
-        # this geometry is a way of comparing, not a result of a run, so it
-        # does not get a folder of its own
-        save_output = builder.save_output
-        builder.save_output = False
+        forcefield = core.build_forcefield(active_site,
+                                           comm=MPI.COMM_SELF,
+                                           ostream=self.ostream,
+                                           **fit_kwargs)
 
-        try:
-            return builder.mm_optimize_active_site(query['active_site'])
-        finally:
-            builder.save_output = save_output
-            if override:
-                builder.metal_bond_equilibria = equilibria
+        # this geometry is a way of comparing, not a result of a run, so
+        # nothing about it is written to a folder
+        return core.mm_optimize_active_site(
+            active_site,
+            forcefield,
+            constrain_metals=builder.mm_constrain_metals,
+            constrain_capping_hydrogens=builder.constrain_capping_hydrogens,
+            max_iterations=builder.mm_max_iterations,
+            bond_change_warning=builder.mm_bond_change_warning,
+            ostream=self.ostream)
 
     def _coarse_mappings(self, template, query):
         """
@@ -1796,7 +1822,7 @@ class MetalForceFieldManager:
 
         # get_metal_keys reads nothing of the active site but the metal
         # indices, and a template knows those from its elements
-        return self.builder.get_metal_keys(
+        return core.get_metal_keys(
             template['forcefield'],
             {'metal_indices': template['metal_indices']})
 
@@ -1975,9 +2001,14 @@ class MetalForceFieldManager:
                 f'site charge is {expected:+d}')
 
         # build_forcefield writes the charges onto the atoms and redistributes
-        # the caps; the metal terms it seeds here are overwritten below
-        forcefield = self.builder.build_forcefield(active_site, None,
-                                                   charges)
+        # the caps; the metal terms it seeds here are overwritten below.
+        # Every rank builds its own: the work is cheap, and a communicator of
+        # one keeps it clear of the collectives a shared one would invite.
+        forcefield = core.build_forcefield(active_site,
+                                           partial_charges=charges,
+                                           comm=MPI.COMM_SELF,
+                                           ostream=self.ostream,
+                                           **self.builder._fit_kwargs())
 
         bonds, angles = self._metal_keys(template)
 
