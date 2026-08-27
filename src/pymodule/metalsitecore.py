@@ -2775,6 +2775,35 @@ def freeze_constraints(active_site,
     return f'freeze xyz {selection}'
 
 
+def _run_scf(scf_drv, molecule, basis, mute_scf=True):
+    """
+    Runs the SCF for a geometry, whatever the driver already holds.
+
+    Both the gradient and the Hessian driver reuse whatever is already in
+    scf_drv.scf_results and only fall back to running an SCF when it is
+    empty. They do not check that those results belong to the geometry they
+    were handed, so the SCF is run explicitly whenever the geometry may have
+    moved since the driver was last used.
+
+    :param scf_drv:
+        The SCF driver.
+    :param molecule:
+        The active site molecule.
+    :param basis:
+        The basis set.
+    :param mute_scf:
+        Whether to mute the driver while it runs.
+    """
+
+    if mute_scf:
+        scf_drv.ostream.mute()
+
+    scf_drv.compute(molecule, basis)
+
+    if mute_scf:
+        scf_drv.ostream.unmute()
+
+
 def optimize_active_site(active_site,
                          frozen_indices=None,
                          mute_scf=True,
@@ -2897,6 +2926,7 @@ def compute_hessian(active_site,
     _print_muted_notice('the SCF for the Hessian',
                         mute_scf=mute_scf,
                         ostream=ostream)
+    _run_scf(scf_drv, molecule, basis, mute_scf=mute_scf)
 
     _print_muted_notice('the Hessian', mute_scf=mute_scf, ostream=ostream)
 
