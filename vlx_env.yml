@@ -37,7 +37,7 @@ dependencies:
   - rdkit
   - dftd4-python
   - geometric
-  - libxc>=7.0.0
+  - libxc=7.*=cpu_*
   - clang-format
   - yapf
   - toml
