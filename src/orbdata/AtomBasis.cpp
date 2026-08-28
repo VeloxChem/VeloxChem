@@ -61,6 +61,7 @@ CAtomBasis::CAtomBasis(const std::vector<CBasisFunction> &functions, const std::
 
     , _identifier(identifier)
 {
+    _sort();
 }
 
 CAtomBasis::CAtomBasis(const std::vector<CBasisFunction> &functions, const std::string &name, const int identifier)
@@ -73,6 +74,7 @@ CAtomBasis::CAtomBasis(const std::vector<CBasisFunction> &functions, const std::
 
     , _identifier(identifier)
 {
+    _sort();
 }
 
 CAtomBasis::CAtomBasis(const CAtomBasis &other)
@@ -173,6 +175,8 @@ auto
 CAtomBasis::add(const CBasisFunction &function) -> void
 {
     _functions.push_back(function);
+
+    _sort();
 }
 
 auto
@@ -197,6 +201,12 @@ CAtomBasis::reduce_to_valence_basis() const -> CAtomBasis
 
 auto
 CAtomBasis::basis_functions() const -> std::vector<CBasisFunction>
+{
+    return _functions;
+}
+
+auto
+CAtomBasis::functions() const -> const std::vector<CBasisFunction> &
 {
     return _functions;
 }
@@ -254,10 +264,15 @@ CAtomBasis::has_ecp() const -> bool
 auto
 CAtomBasis::max_angular_momentum() const -> int
 {
-    auto pos = std::ranges::max_element(_functions,
-                                        [&](const auto &lbf, const auto &rbf) { return lbf.get_angular_momentum() < rbf.get_angular_momentum(); });
+    // NOTE: basis functions are kept sorted by ascending angular momentum.
 
-    return (pos == _functions.end()) ? -1 : pos->get_angular_momentum();
+    return _functions.empty() ? -1 : _functions.back().get_angular_momentum();
+}
+
+auto
+CAtomBasis::number_of_basis_functions() const -> size_t
+{
+    return _functions.size();
 }
 
 auto
@@ -280,6 +295,36 @@ CAtomBasis::number_of_primitive_functions(const int angular_momentum) const -> s
     return std::accumulate(_functions.begin(), _functions.end(), size_t{0}, [=](const size_t &sum, const auto &bf) {
         return (bf.get_angular_momentum() == angular_momentum) ? sum + bf.number_of_primitive_functions() : sum;
     });
+}
+
+auto
+CAtomBasis::largest_exponent(const int angular_momentum) const -> double
+{
+    auto fexp = 0.0;
+
+    std::ranges::for_each(_functions, [&](const auto &bf) {
+        if (bf.get_angular_momentum() == angular_momentum)
+        {
+            if (const auto bexp = bf.largest_exponent(); bexp > fexp) fexp = bexp;
+        }
+    });
+
+    return fexp;
+}
+
+auto
+CAtomBasis::smallest_exponent(const int angular_momentum) const -> double
+{
+    auto fexp = 0.0;
+
+    std::ranges::for_each(_functions, [&](const auto &bf) {
+        if (bf.get_angular_momentum() == angular_momentum)
+        {
+            if (const auto bexp = bf.smallest_exponent(); (fexp == 0.0) || (bexp < fexp)) fexp = bexp;
+        }
+    });
+
+    return fexp;
 }
 
 auto
@@ -334,4 +379,10 @@ CAtomBasis::primitives_string() const -> std::string
     str.append(")");
 
     return str;
+}
+
+auto
+CAtomBasis::_sort() -> void
+{
+    std::ranges::stable_sort(_functions, [](const auto &lbf, const auto &rbf) { return lbf.get_angular_momentum() < rbf.get_angular_momentum(); });
 }

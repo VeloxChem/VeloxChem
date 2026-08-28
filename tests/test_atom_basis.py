@@ -232,6 +232,62 @@ class TestAtomBasis:
         bas = self.get_lithium_svp()
         assert bas.primitives_str() == '(7S,3P)'
 
+    def test_total_number_of_basis_functions(self):
+
+        assert self.get_hydrogen_svp().number_of_basis_functions() == 3
+        assert self.get_lithium_svp().number_of_basis_functions() == 5
+        assert AtomBasis().number_of_basis_functions() == 0
+
+    def test_largest_and_smallest_exponent(self):
+
+        tol = 1.0e-12
+
+        abas = self.get_lithium_svp()
+
+        assert abs(abas.largest_exponent(0) - 2.662778551600e+02) < tol
+        assert abs(abas.smallest_exponent(0) - 2.096094879800e-02) < tol
+
+        assert abs(abas.largest_exponent(1) - 1.450000000000e+00) < tol
+        assert abs(abas.smallest_exponent(1) - 8.200000000000e-02) < tol
+
+        # atom basis has no d functions
+
+        assert abas.largest_exponent(2) == 0.0
+        assert abas.smallest_exponent(2) == 0.0
+
+    def test_angular_momentum_ordering(self):
+
+        # basis functions added out of order are grouped by ascending angular
+        # momentum, keeping their relative order within each angular momentum
+
+        abas = AtomBasis()
+        abas.set_name('DEF2-SVP')
+        abas.set_identifier(3)
+        abas.add(self.get_lithium_svp_1p())
+        abas.add(self.get_lithium_svp_1s())
+        abas.add(self.get_lithium_svp_2p())
+        abas.add(self.get_lithium_svp_2s())
+        abas.add(self.get_lithium_svp_3s())
+
+        assert abas == self.get_lithium_svp()
+        assert abas.max_angular_momentum() == 1
+
+        # ordering is also established by the constructor
+
+        abas = AtomBasis([
+            self.get_lithium_svp_1p(),
+            self.get_lithium_svp_1s(),
+            self.get_lithium_svp_2p(),
+            self.get_lithium_svp_2s(),
+            self.get_lithium_svp_3s()
+        ], 'DEF2-SVP', 3)
+
+        assert abas == self.get_lithium_svp()
+
+    def test_max_angular_momentum_of_empty_basis(self):
+
+        assert AtomBasis().max_angular_momentum() == -1
+
     def test_mpi_bcast(self):
 
         comm = MPI.COMM_WORLD
