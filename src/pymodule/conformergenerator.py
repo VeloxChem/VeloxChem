@@ -412,8 +412,8 @@ class ConformerGenerator:
 
         n_steps = min(self.mc_steps, max_unique)
 
-        # search space is not (much) larger than mc_steps: just grid it
-        if n_steps < self.mc_steps:
+        # search space is not larger than mc_steps: just grid it
+        if n_steps <= self.mc_steps and max_unique <= self.mc_steps:
             self.ostream.print_info(
                 f"MC search: requested {self.mc_steps} steps but search space "
                 f"has only {max_unique} unique combinations — "
