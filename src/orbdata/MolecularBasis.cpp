@@ -174,6 +174,44 @@ CMolecularBasis::basis_groups() const -> std::vector<CAtomBasisGroup>
 }
 
 auto
+CMolecularBasis::basis_pair_groups() const -> std::vector<CAtomBasisPairGroup>
+{
+    // NOTE: pair groups refer to atom bases owned by this molecular basis, not
+    // by the transient groups below, so they stay valid after groups expires.
+
+    const auto groups = basis_groups();
+
+    std::vector<CAtomBasisPairGroup> pair_groups;
+
+    pair_groups.reserve(groups.size() * (groups.size() + 1) / 2);
+
+    std::ranges::for_each(std::views::iota(size_t{0}, groups.size()), [&](const auto i) {
+        std::ranges::for_each(std::views::iota(i, groups.size()),
+                              [&](const auto j) { pair_groups.push_back(CAtomBasisPairGroup(groups[i], groups[j])); });
+    });
+
+    return pair_groups;
+}
+
+auto
+CMolecularBasis::basis_pair_groups(const CMolecularBasis &other) const -> std::vector<CAtomBasisPairGroup>
+{
+    const auto bra_groups = basis_groups();
+
+    const auto ket_groups = other.basis_groups();
+
+    std::vector<CAtomBasisPairGroup> pair_groups;
+
+    pair_groups.reserve(bra_groups.size() * ket_groups.size());
+
+    std::ranges::for_each(bra_groups, [&](const auto &bra) {
+        std::ranges::for_each(ket_groups, [&](const auto &ket) { pair_groups.push_back(CAtomBasisPairGroup(bra, ket)); });
+    });
+
+    return pair_groups;
+}
+
+auto
 CMolecularBasis::basis_sets() const -> std::vector<CAtomBasis>
 {
     return _basis_sets;

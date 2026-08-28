@@ -40,6 +40,7 @@
 
 #include "AtomBasis.hpp"
 #include "AtomBasisGroup.hpp"
+#include "AtomBasisPairGroup.hpp"
 #include "Molecule.hpp"
 #include "AtomCorePotential.hpp"
 
@@ -106,6 +107,20 @@ class CMolecularBasis
     /// basis and are invalidated by any modification of it.
     /// @return The vector of atom basis groups.
     auto basis_groups() const -> std::vector<CAtomBasisGroup>;
+
+    /// @brief Gets vector of atom basis pair groups for unique pairs of atom
+    /// bases in molecular basis. Groups refer to atom bases owned by this
+    /// molecular basis and are invalidated by any modification of it.
+    /// @return The vector of atom basis pair groups.
+    auto basis_pair_groups() const -> std::vector<CAtomBasisPairGroup>;
+
+    /// @brief Gets vector of atom basis pair groups pairing atom bases of this
+    /// molecular basis on bra side with atom bases of other molecular basis on
+    /// ket side. Groups refer to atom bases owned by both molecular bases, which
+    /// must outlive the groups and invalidate them when modified.
+    /// @param other The molecular basis on ket side.
+    /// @return The vector of atom basis pair groups.
+    auto basis_pair_groups(const CMolecularBasis &other) const -> std::vector<CAtomBasisPairGroup>;
 
     /// @brief Gets vector of unique atom bases.
     /// @return The vector of atom bases.
