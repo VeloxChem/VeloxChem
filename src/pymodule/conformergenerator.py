@@ -892,8 +892,10 @@ class ConformerGenerator:
             for r in ratios:
                 Q2 = Q * r
                 Q3 = Q * np.sqrt(max(1 - r**2, 0))
-                for phi2 in phis:
-                    for phi3 in phis:
+                phi2_values = [0.0] if np.isclose(Q2, 0.0) else phis
+                phi3_values = [0.0] if np.isclose(Q3, 0.0) else phis
+                for phi2 in phi2_values:
+                    for phi3 in phi3_values:
                         grid.append({'Q2': Q2, 'phi2': float(phi2),
                                      'Q3': Q3, 'phi3': float(phi3)})
 
