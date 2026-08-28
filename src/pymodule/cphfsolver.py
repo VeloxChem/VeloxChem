@@ -1428,11 +1428,11 @@ class CphfSolver(LinearSolver):
                 int(dist_trials.data.ndim > 0 and dist_trials.shape(0) > 0),
                 op=MPI.SUM) > 0
             if has_global_rows:
-                dist_trials = self._remove_linear_dependence_half_size(
+                dist_trials = self._remove_linear_dependence_full_size(
                     dist_trials, self.lindep_thresh)
-                dist_trials = (
-                    self._orthogonalize_gram_schmidt_half_size(dist_trials))
-                dist_trials = self._normalize_half_size(dist_trials)
+                dist_trials = self._orthogonalize_gram_schmidt_full_size(
+                    dist_trials)
+                dist_trials = self._normalize_full_size(dist_trials)
 
         if self.rank == mpi_master():
             assert_msg_critical(dist_trials.data.size > 0,
@@ -1448,12 +1448,14 @@ class CphfSolver(LinearSolver):
             Relative residual norms.
         """
 
+        self._is_converged = False
+
         if self.rank == mpi_master():
             max_residual = max(relative_residual_norm)
             if max_residual < self.conv_thresh:
                 self._is_converged = True
 
-        self._is_converged = self.comm.bcast(self.is_converged,
+        self._is_converged = self.comm.bcast(self._is_converged,
                                              root=mpi_master())
 
     def compute_rhs(self, molecule, basis, scf_results, eri_dict, dft_dict,

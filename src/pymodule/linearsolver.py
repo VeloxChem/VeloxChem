@@ -3782,6 +3782,32 @@ class LinearSolver:
 
         return basis.matmul_AB_no_gather(Tmask)
 
+    def _remove_linear_dependence_full_size(self, basis, threshold):
+        """
+        Removes linear dependence in a set of full-size vectors.
+
+        :param basis:
+            The set of vectors.
+        :param threshold:
+            The threshold for removing linear dependence.
+
+        :return:
+            The new set of vectors.
+        """
+
+        Sb = basis.matmul_AtB(basis)
+
+        if self.rank == mpi_master():
+            l, T = np.linalg.eigh(Sb)
+            b_norm = np.sqrt(Sb.diagonal())
+            mask = l > b_norm * threshold
+            Tmask = T[:, mask].copy()
+        else:
+            Tmask = None
+        Tmask = self.comm.bcast(Tmask, root=mpi_master())
+
+        return basis.matmul_AB_no_gather(Tmask)
+
     @staticmethod
     def orthogonalize_gram_schmidt(tvecs):
         """
@@ -3841,6 +3867,35 @@ class LinearSolver:
         return tvecs
 
     @staticmethod
+    def _orthogonalize_gram_schmidt_full_size(tvecs):
+        """
+        Applies modified Gram Schmidt orthogonalization to full-size trial
+        vectors.
+
+        :param tvecs:
+            The trial vectors.
+
+        :return:
+            The orthogonalized trial vectors.
+        """
+
+        if tvecs.shape(1) > 0:
+
+            n2 = tvecs.dot(0, tvecs, 0)
+            tvecs.data[:, 0] *= 1.0 / np.sqrt(n2)
+
+            for i in range(1, tvecs.shape(1)):
+                for j in range(i):
+                    dot_ij = tvecs.dot(i, tvecs, j)
+                    dot_jj = tvecs.dot(j, tvecs, j)
+                    tvecs.data[:, i] -= (dot_ij / dot_jj) * tvecs.data[:, j]
+
+                n2 = tvecs.dot(i, tvecs, i)
+                tvecs.data[:, i] *= 1.0 / np.sqrt(n2)
+
+        return tvecs
+
+    @staticmethod
     def normalize(vecs):
         """
         Normalizes vectors by dividing by vector norm.
@@ -3876,6 +3931,24 @@ class LinearSolver:
         invsqrt2 = 1.0 / np.sqrt(2.0)
 
         invnorm = invsqrt2 / vecs.norm(axis=0)
+
+        vecs.data *= invnorm
+
+        return vecs
+
+    @staticmethod
+    def _normalize_full_size(vecs):
+        """
+        Normalizes full-size vectors by dividing by vector norm.
+
+        :param vecs:
+            The vectors.
+
+        :return:
+            The normalized vectors.
+        """
+
+        invnorm = 1.0 / vecs.norm(axis=0)
 
         vecs.data *= invnorm
 

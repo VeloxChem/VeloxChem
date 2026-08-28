@@ -1269,16 +1269,17 @@ class ComplexResponseTdaSolver(LinearSolver):
                 int(dist_new_b.data.ndim > 0 and dist_new_b.shape(0) > 0),
                 op=MPI.SUM) > 0
             if has_global_rows:
-                dist_new_b = self.remove_linear_dependence(
+                dist_new_b = self._remove_linear_dependence_full_size(
                     dist_new_b, self.lindep_thresh)
 
-                dist_new_b = self.orthogonalize_gram_schmidt(dist_new_b)
+                dist_new_b = self._orthogonalize_gram_schmidt_full_size(
+                    dist_new_b)
 
-                dist_new_b = self.normalize(dist_new_b)
+                dist_new_b = self._normalize_full_size(dist_new_b)
 
         if self.rank == mpi_master():
             assert_msg_critical(dist_new_b.data.size > 0,
-                                'LinearSolver: trial vectors are empty')
+                                'ComplexResponseTdaSolver: trial vectors are empty')
 
         return dist_new_b
 
@@ -1581,86 +1582,6 @@ class ComplexResponseTdaSolver(LinearSolver):
         checkpoint_text += self.checkpoint_file
         self.ostream.print_info(checkpoint_text)
         self.ostream.print_blank()
-
-    def remove_linear_dependence(self, basis, threshold):
-        """
-        Removes linear dependence in a set of vectors.
-        Based on the function in linearsolver.py, modified to work with full size
-        distributed arrays.
-
-        :param basis:
-            The set of vectors.
-        :param threshold:
-            The threshold for removing linear dependence.
-
-        :return:
-            The new set of vectors.
-        """
-
-        Sb = basis.matmul_AtB(basis)
-        if self.rank == mpi_master():
-            l, T = np.linalg.eigh(Sb)
-            b_norm = np.sqrt(Sb.diagonal())
-            mask = l > b_norm * threshold
-            Tmask = T[:, mask].copy()
-        else:
-            Tmask = None
-        Tmask = self.comm.bcast(Tmask, root=mpi_master())
-
-        return basis.matmul_AB_no_gather(Tmask)
-
-    @staticmethod
-    def orthogonalize_gram_schmidt(tvecs):
-        """
-        Applies modified Gram Schmidt orthogonalization to trial vectors.
-        Based on the function in linearsolver.py, modified to work with full size
-        distributed arrays.
-
-        :param tvecs:
-            The trial vectors.
-
-        :return:
-            The orthogonalized trial vectors.
-        """
-
-        if tvecs.shape(1) > 0:
-
-            n2 = tvecs.dot(0, tvecs, 0)
-            f = 1.0 / n2
-            tvecs.data[:, 0] *= f
-
-            for i in range(1, tvecs.shape(1)):
-                for j in range(i):
-                    dot_ij = tvecs.dot(i, tvecs, j)
-                    dot_jj = tvecs.dot(j, tvecs, j)
-                    f = dot_ij / dot_jj
-                    tvecs.data[:, i] -= f * tvecs.data[:, j]
-
-                n2 = tvecs.dot(i, tvecs, i)
-                f = 1.0 / n2
-                tvecs.data[:, i] *= f
-
-        return tvecs
-
-    @staticmethod
-    def normalize(vecs):
-        """
-        Normalizes vectors by dividing by vector norm.
-        Based on the function in linearsolver.py, modified to work with full size
-        distributed arrays.
-
-        :param vecs:
-            The vectors.
-
-        :param Retruns:
-            The normalized vectors.
-        """
-
-        invnorm = 1 / vecs.norm(axis=0)
-
-        vecs.data *= invnorm
-
-        return vecs
 
     def get_cpp_property_densities(self,
                                    molecule,
