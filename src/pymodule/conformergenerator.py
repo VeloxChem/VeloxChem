@@ -52,14 +52,68 @@ try:
     import openmm
     from openmm import LangevinIntegrator, Platform
     from openmm.app import NoCutoff, Simulation, PDBFile, ForceField, GromacsTopFile
-    from openmm.unit import nanometer, md_unit_system, kelvin, picoseconds, picosecond,dalton
+    from openmm.unit import nanometer, md_unit_system, kelvin, picoseconds, picosecond, dalton
 except ImportError:
     pass
 
 
 class ConformerGenerator:
+    """
+    Generates conformers of a molecule by rotating the dihedral angles of
+    its rotatable bonds (or, for rings, by sampling Cremer-Pople puckering
+    coordinates), energy-minimizing each geometry with a MM force field,
+    and removing duplicate conformers.
+
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
+
+    Instance variables:
+        - molecule: The molecule.
+        - number_of_conformers_to_select: The number of conformers to select.
+        - top_file_name: The filename of the topology file.
+        - partial_charges: The partial charges of the molecule.
+        - resp_charges: If RESP charges should be computed when partial_charges is not set.
+        - resp_charges_driver: The RESP charges driver.
+        - freeze_atoms: The list of atom indices to freeze during optimization and rotatable bond detection.
+        - save_xyz_files: If the selected conformers should be saved as xyz files.
+        - save_path: The folder for saving the xyz files.
+        - em_tolerance: The tolerance for energy minimization.
+        - rmsd_threshold: The RMSD threshold (Angstrom) for removing duplicate conformers.
+        - energy_threshold: The energy threshold (kJ/mol) for removing duplicate conformers.
+        - implicit_solvent_model: The implicit solvent model.
+        - solute_dielectric: The solute dielectric constant.
+        - solvent_dielectric: The solvent dielectric constant.
+        - use_gromacs_files: If Gromacs topology files should be used instead of OpenMM files.
+        - mc_search: If Monte Carlo random sampling should be used instead of the full
+          grid search. mc_steps random dihedral combinations (seeded by mc_seed) are
+          drawn from the same discrete angle grids used by the grid search, instead of
+          enumerating the full combinatorial grid.
+        - mc_steps: The number of Monte Carlo steps.
+        - mc_seed: The random seed for Monte Carlo sampling.
+        - bh_search: If basin-hopping should be used instead of grid/MC search. At each
+          step a random subset of dihedrals is perturbed and re-minimized, and the new
+          basin is accepted with the Metropolis criterion at temperature bh_temperature.
+          Runs on rank 0 only; the collected basins are broadcast to the other ranks
+          afterwards.
+        - bh_steps: The number of basin-hopping steps.
+        - bh_temperature: The effective temperature (K) for the Boltzmann acceptance criterion.
+        - bh_perturb: The dihedral perturbation mode: 'grid' draws angles from the
+          periodicity grid, 'continuous' draws uniformly from [0, 360).
+        - bh_seed: The random seed for basin-hopping.
+        - cp_search: If Cremer-Pople ring puckering search should be used. Every ring of
+          size 5, 6, or 7 is scanned on a uniform grid of Cremer-Pople amplitude/phase
+          coordinates instead of scanning dihedrals.
+        - cp_grid_points: The number of grid points per angular axis in the Cremer-Pople search.
+        - cp_amplitude: The fixed puckering amplitude (Angstrom), or None to use a
+          ring-size-specific default amplitude.
+    """
 
     def __init__(self, comm=None, ostream=None):
+        """
+        Initializes conformer generator.
+        """
 
         if comm is None:
             comm = MPI.COMM_WORLD
@@ -78,12 +132,10 @@ class ConformerGenerator:
 
         self.molecule = None
         self.number_of_conformers_to_select = None
-
         self.top_file_name = None
         self.partial_charges = None
         self.resp_charges = True
         self.resp_charges_driver = RespChargesDriver()
-
         self.freeze_atoms = None  # list of atom indices to freeze during optimization and rotatable bond detection
 
         self.save_xyz_files = False
@@ -94,7 +146,6 @@ class ConformerGenerator:
 
         # thresholds for removing duplicate conformers
         # rmsd threshold in Angstrom, energy threshold in kJ/mol
-        # TODO: double check the thresholds
         self.rmsd_threshold = 1.2
         self.energy_threshold = 1.2
 
@@ -106,13 +157,28 @@ class ConformerGenerator:
 
         self.use_gromacs_files = False
 
+        # Monte Carlo random sampling settings (see class docstring)
+        self.mc_search = False
+        self.mc_steps = 500
+        self.mc_seed = 42
+
+        # basin-hopping settings (see class docstring)
+        self.bh_search = False
+        self.bh_steps = 500
+        self.bh_temperature = 300.0
+        self.bh_perturb = 'grid'    # 'grid' or 'continuous'
+        self.bh_seed = 42
+
+        # Cremer-Pople ring puckering search settings (see class docstring)
+        self.cp_search      = False
+        self.cp_grid_points = 12       # points per angular axis
+        self.cp_amplitude   = None     # Angstrom; None = auto
+
     def _analyze_equiv(self, molecule):
 
         idtf = AtomTypeIdentifier()
         idtf.ostream.mute()
-
-        atom_type_not_used = idtf.generate_gaff_atomtypes(molecule)
-
+        atom_type = idtf.generate_gaff_atomtypes(molecule)
         idtf.identify_equivalences()
         equivalent_charges = idtf.equivalent_charges
         if len(equivalent_charges) == 0:
@@ -146,15 +212,11 @@ class ConformerGenerator:
         # check j and k side of dihedral
         for a, b in [(side_j_index, side_k_index),
                      (side_k_index, side_j_index)]:
-
-            # check equiv_atoms on one dihedral atom
             if atom_info_dict[a]["AtomicSymbol"] == "C":
                 one_based_connected_atom_numbers = atom_info_dict[a][
                     "ConnectedAtomsNumbers"]
                 connected_set = set(one_based_connected_atom_numbers)
-                connected_set = connected_set - {
-                    b
-                }  # remove the other dihedral atom
+                connected_set = connected_set - {b}  # remove the other dihedral atom
 
                 for equiv_g in one_based_equiv_atoms_groups:
                     if connected_set.issubset(set(equiv_g)):
@@ -204,14 +266,12 @@ class ConformerGenerator:
         # check j and k side of dihedral
         for a, b in [(side_j_index, side_k_index),
                      (side_k_index, side_j_index)]:
-
             if atom_info_dict[a]["AtomicSymbol"] == "C":
                 one_based_connected_atom_numbers = atom_info_dict[a][
                     "ConnectedAtomsNumbers"]
                 connected_set = set(one_based_connected_atom_numbers)
-                connected_set = connected_set - {
-                    b
-                }  # remove the other dihedral atom
+                connected_set = connected_set - {b}  # remove the other dihedral atom
+
                 connected_elements = [
                     atom_info_dict[idx]["AtomicSymbol"]
                     for idx in connected_set
@@ -261,17 +321,13 @@ class ConformerGenerator:
 
         # convert to zero based index
         rotatable_bonds_zero_based = [(i - 1, j - 1) for (i, j) in rotatable_bonds]
-        rotatable_dihedrals_dict = {}
 
-        # Due to size limit in mmforcefieldgenerator's cycle detection, we need
-        # to do another check and see if a rotatable bond is in a larger cycle.
-        # This check involves disconnecting i-j and finding all atoms that are
-        # connected to j. A rotatable bond in a macrocycle is rotatable in the
-        # force field, but not rotatable for conformeregnerator since we do
-        # rigid rotation here.
+        # Reject bonds that remain connected through a ring. Atom typing only
+        # detects cycles up to size 10, but rigid dihedral rotation cannot
+        # handle rings of any size.
         rotatable_bonds_zero_based_refined = []
         conn_matrix = molecule.get_connectivity_matrix()
-        for (atom_i, atom_j) in rotatable_bonds_zero_based:
+        for atom_i, atom_j in rotatable_bonds_zero_based:
             conn_mat_copy = np.copy(conn_matrix)
             conn_mat_copy[atom_i, atom_j] = 0
             conn_mat_copy[atom_j, atom_i] = 0
@@ -281,6 +337,8 @@ class ConformerGenerator:
                 rotatable_bonds_zero_based_refined.append((atom_i, atom_j))
         rotatable_bonds_zero_based = rotatable_bonds_zero_based_refined
 
+        rotatable_dihedrals_dict = {}
+
         def get_max_periodicity(periodicity):
             if isinstance(periodicity, list):
                 return max([abs(p) for p in periodicity])
@@ -289,7 +347,6 @@ class ConformerGenerator:
 
         # only pick one dihedral for each rotatable bond
         for (i, j, k, l), dih in dihedrals_dict.items():
-
             sorted_bond = tuple(sorted([j, k]))
             max_periodicity = get_max_periodicity(dih["periodicity"])
 
@@ -314,6 +371,8 @@ class ConformerGenerator:
 
         for k, v in rotatable_dihedrals_dict.items():
             max_periodicity = v["max_periodicity"]
+
+            # angle grid to scan is chosen from the dihedral's periodicity
             if max_periodicity == 2:
                 dih_angle = [0, 180]
             elif max_periodicity == 3:
@@ -346,9 +405,9 @@ class ConformerGenerator:
         return dihedrals_candidates, atom_info_dict, dihedrals_dict
 
     def _get_dihedral_combinations(self, dihedrals_candidates):
+        """Full combinatorial grid — original behaviour."""
 
         # assemble all possible combinations of dihedrals
-
         dih_angles = [i[1] for i in dihedrals_candidates]
         dihedrals_combinations = list(itertools.product(*dih_angles))
         dihedral_list = [i[0] for i in dihedrals_candidates]
@@ -359,10 +418,83 @@ class ConformerGenerator:
 
         return dihedrals_combinations, dihedral_list
 
+    def _get_mc_combinations(self, dihedrals_candidates):
+        """
+        Draws mc_steps random dihedral-angle combinations instead of
+        enumerating the full combinatorial grid. Each angle is drawn from
+        the same discrete per-bond grid used by the grid search, so the
+        sampling stays limited to physically meaningful (periodicity
+        minimum) angles. Falls back to _get_dihedral_combinations if the
+        search space is not larger than mc_steps.
+
+        :param dihedrals_candidates:
+            The list of (dihedral_indices, angle_list) tuples, as returned
+            by _get_dihedral_candidates.
+
+        :return:
+            The tuple (dihedrals_combinations, dihedral_list).
+        """
+
+        rng = np.random.default_rng(self.mc_seed)
+
+        dih_angles  = [candidate[1] for candidate in dihedrals_candidates]
+        dihedral_list = [candidate[0] for candidate in dihedrals_candidates]
+
+        # maximum number of unique combinations given the discrete grids
+        max_unique = 1
+        for angles in dih_angles:
+            max_unique *= len(angles)
+
+        n_steps = min(self.mc_steps, max_unique)
+
+        # search space is not larger than mc_steps: just grid it
+        if n_steps <= self.mc_steps and max_unique <= self.mc_steps:
+            self.ostream.print_info(
+                f"MC search: requested {self.mc_steps} steps but search space "
+                f"has only {max_unique} unique combinations — "
+                f"switching to full grid search for this molecule."
+            )
+            self.ostream.flush()
+            return self._get_dihedral_combinations(dihedrals_candidates)
+
+        # draw combinations in batches and discard duplicates until n_steps
+        # unique combinations have been collected
+        seen = set()
+        dihedrals_combinations = []
+
+        batch = n_steps
+        while len(dihedrals_combinations) < n_steps:
+            # one random angle per bond, `batch` independent draws at once
+            samples = np.array(
+                [rng.choice(angles, size=batch) for angles in dih_angles]
+            ).T   # shape: (batch, n_bonds)
+
+            for row in samples:
+                key = tuple(row)
+                if key not in seen:
+                    seen.add(key)
+                    dihedrals_combinations.append(key)
+                    if len(dihedrals_combinations) == n_steps:
+                        break
+
+        self.ostream.print_info(
+            f"MC search: {n_steps} random conformers will be generated "
+            f"(search space: {max_unique} combinations, "
+            f"{len(dih_angles)} rotatable bonds)."
+        )
+        self.ostream.flush()
+
+        return dihedrals_combinations, dihedral_list
+
     def _get_mol_comb(self, molecule, top_file_name, dihedrals_candidates):
 
-        dihedrals_combinations, dihedral_list = self._get_dihedral_combinations(
-            dihedrals_candidates)
+        # dispatch to MC sampling or the full grid, depending on mc_search
+        if self.mc_search:
+            dihedrals_combinations, dihedral_list = self._get_mc_combinations(
+                dihedrals_candidates)
+        else:
+            dihedrals_combinations, dihedral_list = self._get_dihedral_combinations(
+                dihedrals_candidates)
 
         # assemble the dihedral and the angle to a dict
         conformation_dih_dict = []
@@ -375,6 +507,528 @@ class ConformerGenerator:
 
         # should be aware that dihedral_dict count atom index from 0, but molecule to set dihedral count from 1
         return dih_comb_array
+
+    def _run_basin_hopping(self, molecule, dihedrals_candidates,
+                           top_file_name, simulation):
+        """
+        Basin-hopping search: starting from the minimized input geometry,
+        repeatedly perturbs a random subset of dihedrals, re-minimizes, and
+        accepts or rejects the new basin with the Metropolis criterion.
+        Every accepted basin is kept; duplicates are removed later by the
+        RMSD/energy filter in _postprocess_conformers.
+
+        Runs on rank 0 only; the caller broadcasts the result to the other
+        ranks.
+
+        :param molecule:
+            The starting molecule.
+        :param dihedrals_candidates:
+            The list of (dihedral_indices, angle_list) tuples.
+        :param top_file_name:
+            The topology file stem used by OpenMM.
+        :param simulation:
+            The initialized OpenMM Simulation object.
+
+        :return:
+            The list of [energy, coordinates_in_angstrom] pairs, one entry
+            per accepted basin (including the starting geometry).
+        """
+
+        # gas constant in kJ / (mol.K)
+        R_kJ = 8.314e-3
+
+        rng = np.random.default_rng(self.bh_seed)
+
+        dih_indices = [cand[0] for cand in dihedrals_candidates]   # (i,j,k,l)
+        dih_grids   = [cand[1] for cand in dihedrals_candidates]   # angle lists
+        n_bonds     = len(dih_indices)
+
+        assert_msg_critical(
+            self.bh_perturb in ('grid', 'continuous'),
+            "ConformerGenerator: bh_perturb must be 'grid' or 'continuous'."
+        )
+        assert_msg_critical(
+            isinstance(self.bh_steps, (int, np.integer)) and self.bh_steps > 0,
+            "ConformerGenerator: bh_steps must be a positive integer."
+        )
+        assert_msg_critical(
+            np.isfinite(self.bh_temperature) and self.bh_temperature > 0.0,
+            "ConformerGenerator: bh_temperature must be positive and finite."
+        )
+
+        # minimize the starting geometry first
+        current_energy, current_coords = self._minimize_energy(
+            molecule, simulation, self.em_tolerance)
+        current_mol = Molecule(molecule)
+        for i, coord in enumerate(current_coords):
+            current_mol.set_atom_coordinates(i, coord / bohr_in_angstrom())
+
+        accepted_basins = [[current_energy, current_coords]]
+        n_accepted = 1
+        n_rejected = 0
+
+        self.ostream.print_info(
+            f"Basin-hopping: starting energy = {current_energy:.3f} kJ/mol"
+        )
+        self.ostream.flush()
+
+        for step in range(self.bh_steps):
+
+            # perturb a random non-empty subset of the rotatable bonds
+            subset_size = int(rng.integers(1, n_bonds + 1))
+            subset      = rng.choice(n_bonds, size=subset_size, replace=False)
+
+            trial_mol = Molecule(current_mol)
+            for bond_i in subset:
+                idx_quad = list(np.array(dih_indices[bond_i]) + 1)  # 1-based
+                if self.bh_perturb == 'grid':
+                    angle = float(rng.choice(dih_grids[bond_i]))
+                else:  # continuous
+                    angle = float(rng.uniform(0.0, 360.0))
+                trial_mol.set_dihedral_in_degrees(idx_quad, angle,
+                                                  verbose=False)
+
+            trial_energy, trial_coords = self._minimize_energy(
+                trial_mol, simulation, self.em_tolerance)
+
+            # Metropolis acceptance: always accept downhill moves, accept
+            # uphill moves with probability exp(-delta_e / R.T)
+            delta_e = trial_energy - current_energy
+            if delta_e <= 0.0:
+                accept = True
+            else:
+                prob   = np.exp(-delta_e / (R_kJ * self.bh_temperature))
+                accept = bool(rng.random() < prob)
+
+            if accept:
+                current_energy = trial_energy
+                current_coords = trial_coords
+                current_mol    = Molecule(trial_mol)
+                for i, coord in enumerate(trial_coords):
+                    current_mol.set_atom_coordinates(
+                        i, coord / bohr_in_angstrom())
+                accepted_basins.append([trial_energy, trial_coords])
+                n_accepted += 1
+            else:
+                n_rejected += 1
+
+            # progress report every 100 steps
+            if (step + 1) % 100 == 0:
+                acceptance_rate = n_accepted / (step + 1) * 100
+                self.ostream.print_info(
+                    f"Basin-hopping: step {step + 1}/{self.bh_steps}  "
+                    f"accepted={n_accepted}  rejected={n_rejected}  "
+                    f"rate={acceptance_rate:.1f}%  "
+                    f"current E={current_energy:.3f} kJ/mol"
+                )
+                self.ostream.flush()
+
+        self.ostream.print_info(
+            f"Basin-hopping finished: {n_accepted} unique basins found "
+            f"in {self.bh_steps} steps "
+            f"(acceptance rate {n_accepted / self.bh_steps * 100:.1f}%)."
+        )
+        self.ostream.flush()
+
+        return accepted_basins
+
+    def _detect_rings(self, molecule):
+        """
+        Detects rings of size 5, 6, or 7 in molecule with a DFS traversal of
+        the covalent bond graph. First stage of the Cremer-Pople ring
+        puckering search: the rings found here are each scanned by
+        _cp_grid / _ring_coords_from_cremer_pople / _run_cremer_pople_search,
+        which complements dihedral scanning since rotating dihedrals alone
+        samples ring puckering poorly.
+
+        :param molecule:
+            The molecule.
+
+        :return:
+            The list of rings, each a tuple of zero-based atom indices in
+            ring-traversal order.
+        """
+
+        labels = list(molecule.get_labels())
+        coords = np.array(molecule.get_coordinates_in_angstrom(), dtype=float)
+        n = len(labels)
+
+        # build adjacency from covalent distances
+        adj = [[] for _ in range(n)]
+        for i in range(n):
+            for j in range(i + 1, n):
+                ri = self._cov_radius_cp(labels[i])
+                rj = self._cov_radius_cp(labels[j])
+                if np.linalg.norm(coords[i] - coords[j]) < 1.3 * (ri + rj):
+                    adj[i].append(j)
+                    adj[j].append(i)
+
+        rings = []
+        seen_sets = set()
+
+        # record a ring whenever the walk returns to its own starting atom
+        # after at least 3 bonds, with a total size between 5 and 7 atoms
+        def dfs(start, current, path, depth):
+            for nb in adj[current]:
+                if depth >= 2 and nb == start and 5 <= len(path) <= 7:
+                    key = frozenset(path)
+                    if key not in seen_sets:
+                        seen_sets.add(key)
+                        rings.append(tuple(path))
+                    continue
+                if nb not in path and len(path) < 7:
+                    dfs(start, nb, path + [nb], depth + 1)
+
+        for i in range(n):
+            dfs(i, i, [i], 0)
+
+        # keep only rings of size 5-7, remove duplicates (forward/reverse)
+        unique = []
+        unique_sets = set()
+        for ring in rings:
+            if not (5 <= len(ring) <= 7):
+                continue
+            key = frozenset(ring)
+            if key not in unique_sets:
+                unique_sets.add(key)
+                unique.append(ring)
+
+        return unique
+
+    @staticmethod
+    def _cov_radius_cp(element):
+        """Covalent radius table (Angstrom) for ring detection."""
+        table = {
+            'H': 0.31, 'C': 0.76, 'N': 0.71, 'O': 0.66, 'S': 1.05,
+            'F': 0.57, 'P': 1.07, 'Cl': 1.02, 'Se': 1.20, 'Si': 1.11,
+        }
+        return table.get(element, 0.77)
+
+    @staticmethod
+    def _cremer_pople_from_coords(ring_coords):
+        """
+        Computes Cremer-Pople puckering coordinates from ring Cartesian
+        coordinates (Cremer, Pople, J. Am. Chem. Soc. 1975, 97, 1354). This
+        is the inverse of _ring_coords_from_cremer_pople; it is provided for
+        completeness/diagnostics and is not called elsewhere in this class.
+
+        :param ring_coords:
+            The (N, 3) array of ring atom coordinates, in ring order.
+
+        :return:
+            A dict of puckering parameters: {'Q', 'phi'} for N=5,
+            {'Q', 'theta', 'phi'} for N=6, {'Q2', 'phi2', 'Q3', 'phi3'} for
+            N=7. Angles are in radians.
+        """
+
+        coords = np.asarray(ring_coords, dtype=float)
+        N = len(coords)
+        assert N in (5, 6, 7), f"Ring size {N} not supported"
+
+        # mean plane: subtract centroid, get the normal from the
+        # Cremer-Pople reference plane vectors R1, R2
+        centroid = coords.mean(axis=0)
+        r = coords - centroid                          # (N, 3)
+
+        R1 = np.sum([r[j] * np.sin(2 * np.pi * j / N) for j in range(N)], axis=0)
+        R2 = np.sum([r[j] * np.cos(2 * np.pi * j / N) for j in range(N)], axis=0)
+        n  = np.cross(R1, R2)
+        if np.linalg.norm(n) < 1e-10:
+            n = np.array([0., 0., 1.])
+        n /= np.linalg.norm(n)
+
+        # out-of-plane displacement of each ring atom
+        z = r @ n                                     # (N,)
+
+        if N == 5:
+            # single puckering mode, m=2
+            A2 = np.sqrt(2 / N) * np.sum(z * np.cos(4 * np.pi * np.arange(N) / N))
+            B2 = -np.sqrt(2 / N) * np.sum(z * np.sin(4 * np.pi * np.arange(N) / N))
+            Q   = np.sqrt(A2**2 + B2**2)
+            phi = np.arctan2(B2, A2)
+            return {'Q': Q, 'phi': phi}
+
+        elif N == 6:
+            # two puckering modes: m=2 (equatorial), m=3 (axial/chair)
+            j   = np.arange(6)
+            A2  = np.sqrt(1/3) * np.sum(z * np.cos(2 * np.pi * j * 2 / 6))
+            B2  = -np.sqrt(1/3) * np.sum(z * np.sin(2 * np.pi * j * 2 / 6))
+            q3  = (1 / np.sqrt(6)) * np.sum(z * np.cos(np.pi * j))   # alternating +/-1
+
+            Q2    = np.sqrt(A2**2 + B2**2)
+            phi2  = np.arctan2(B2, A2)
+            Q     = np.sqrt(Q2**2 + q3**2)
+            theta = np.arctan2(Q2, q3)    # 0=chair, pi/2=boat, pi=inverted chair
+            phi   = phi2
+
+            return {'Q': Q, 'theta': theta, 'phi': phi}
+
+        else:  # N == 7
+            j = np.arange(7)
+            A2 = np.sqrt(2/7) * np.sum(z * np.cos(2*np.pi*j*2/7))
+            B2 = -np.sqrt(2/7) * np.sum(z * np.sin(2*np.pi*j*2/7))
+            A3 = np.sqrt(2/7) * np.sum(z * np.cos(2*np.pi*j*3/7))
+            B3 = -np.sqrt(2/7) * np.sum(z * np.sin(2*np.pi*j*3/7))
+
+            Q2   = np.sqrt(A2**2 + B2**2)
+            phi2 = np.arctan2(B2, A2)
+            Q3   = np.sqrt(A3**2 + B3**2)
+            phi3 = np.arctan2(B3, A3)
+
+            return {'Q2': Q2, 'phi2': phi2, 'Q3': Q3, 'phi3': phi3}
+
+    @staticmethod
+    def _ring_coords_from_cremer_pople(ring_coords_ref, cp_params):
+        """
+        Reconstructs ring atom positions with a target Cremer-Pople
+        puckering, given a reference ring geometry. Rather than patching the
+        (possibly distorted) reference in-plane positions, an ideal regular
+        polygon is built in the XY plane using the reference's mean in-plane
+        radius, the target out-of-plane displacements from cp_params are
+        added along Z, and the result is rotated/translated back onto the
+        reference ring's plane and centroid so attached substituents stay
+        put. This guarantees the output ring has exactly the requested
+        puckering with no in-plane distortion.
+
+        :param ring_coords_ref:
+            The (N, 3) reference ring atom coordinates.
+        :param cp_params:
+            The target Cremer-Pople parameters, as returned by
+            _cremer_pople_from_coords.
+
+        :return:
+            The (N, 3) array of new ring atom coordinates.
+        """
+
+        coords = np.asarray(ring_coords_ref, dtype=float)
+        N      = len(coords)
+        j      = np.arange(N, dtype=float)
+
+        # mean in-plane radius from the reference ring
+        centroid = coords.mean(axis=0)
+        r        = coords - centroid
+
+        R1 = np.sum([r[k] * np.sin(2*np.pi*k/N) for k in range(N)], axis=0)
+        R2 = np.sum([r[k] * np.cos(2*np.pi*k/N) for k in range(N)], axis=0)
+        n_ref = np.cross(R1, R2)
+        if np.linalg.norm(n_ref) < 1e-10:
+            n_ref = np.array([0., 0., 1.])
+        n_ref /= np.linalg.norm(n_ref)
+
+        r_ip   = r - np.outer(r @ n_ref, n_ref)
+        R_mean = np.mean(np.linalg.norm(r_ip, axis=1))
+
+        # ideal polygon in the XY plane, aligned to atom 0 of the reference
+        phi0    = np.arctan2(r_ip[0, 1], r_ip[0, 0])
+        angles  = 2 * np.pi * j / N + phi0
+        xy      = R_mean * np.column_stack([np.cos(angles), np.sin(angles)])
+
+        # target out-of-plane displacement from cp_params (inverse of the
+        # transform in _cremer_pople_from_coords)
+        if N == 5:
+            Q   = cp_params['Q']
+            phi = cp_params['phi']
+            A2  = Q * np.cos(phi)
+            B2  = Q * np.sin(phi)
+            z_new = np.sqrt(2/N) * (
+                A2 * np.cos(4*np.pi*j/N) - B2 * np.sin(4*np.pi*j/N))
+
+        elif N == 6:
+            Q     = cp_params['Q']
+            theta = cp_params['theta']
+            phi   = cp_params['phi']
+            Q2    = Q * np.sin(theta)
+            q3    = Q * np.cos(theta)
+            A2    = Q2 * np.cos(phi)
+            B2    = Q2 * np.sin(phi)
+            z_new = (
+                np.sqrt(1/3) * (A2 * np.cos(2*np.pi*j*2/6) -
+                                B2 * np.sin(2*np.pi*j*2/6)) +
+                (1/np.sqrt(6)) * q3 * np.cos(np.pi * j))
+
+        else:  # N == 7
+            Q2, phi2 = cp_params['Q2'], cp_params['phi2']
+            Q3, phi3 = cp_params['Q3'], cp_params['phi3']
+            A2 = Q2*np.cos(phi2); B2 = Q2*np.sin(phi2)
+            A3 = Q3*np.cos(phi3); B3 = Q3*np.sin(phi3)
+            z_new = (
+                np.sqrt(2/7) * (A2*np.cos(2*np.pi*j*2/7) -
+                                B2*np.sin(2*np.pi*j*2/7)) +
+                np.sqrt(2/7) * (A3*np.cos(2*np.pi*j*3/7) -
+                                B3*np.sin(2*np.pi*j*3/7)))
+
+        # assemble in the local frame (XY plane + Z normal) ...
+        new_local = np.column_stack([xy, z_new])   # (N, 3) in local frame
+
+        # ... then rotate the local Z axis onto n_ref (Rodrigues' formula)
+        z_axis = np.array([0., 0., 1.])
+
+        v    = np.cross(z_axis, n_ref)
+        c    = np.dot(z_axis, n_ref)
+        if np.linalg.norm(v) < 1e-10:
+            R_zn = np.eye(3) if c > 0 else np.diag([1., 1., -1.])
+        else:
+            s    = np.linalg.norm(v)
+            K    = np.array([[0, -v[2], v[1]],
+                              [v[2], 0, -v[0]],
+                              [-v[1], v[0], 0]])
+            R_zn = np.eye(3) + K + K @ K * ((1 - c) / s**2)
+
+        new_coords = new_local @ R_zn.T + centroid
+
+        return new_coords
+
+    def _cp_grid(self, N, Q, n_pts):
+        """
+        Builds a uniform grid of Cremer-Pople parameters for a ring of size
+        N at fixed amplitude Q, suitable for _ring_coords_from_cremer_pople.
+
+        N=5: n_pts points of phi on a circle.
+        N=6: n_pts x n_pts points of (theta, phi) on a sphere, plus the two
+        chair/inverted-chair poles explicitly (they are missed by an
+        equal-area interior grid but are the most important conformations).
+        N=7: n_pts amplitude ratios Q2/Q times n_pts**2 phase combinations
+        (phi2, phi3), with Q2**2 + Q3**2 = Q**2.
+
+        :param N:
+            The ring size (5, 6, or 7).
+        :param Q:
+            The puckering amplitude.
+        :param n_pts:
+            The number of grid points per angular axis.
+
+        :return:
+            The list of Cremer-Pople parameter dicts.
+        """
+
+        grid = []
+
+        if N == 5:
+            for phi in np.linspace(0, 2 * np.pi, n_pts, endpoint=False):
+                grid.append({'Q': Q, 'phi': phi})
+
+        elif N == 6:
+            # theta=0 -> chair, theta=pi -> inverted chair,
+            # theta=pi/2 -> boat/twist-boat belt
+            phis = np.linspace(0, 2 * np.pi, n_pts, endpoint=False)
+
+            grid.append({'Q': Q, 'theta': np.pi, 'phi': 0.0})  # chair
+            grid.append({'Q': Q, 'theta': 0.0, 'phi': 0.0})    # inverted chair
+
+            # interior points, equal-area spacing, skipping the poles
+            thetas = np.arccos(np.linspace(1, -1, n_pts + 2)[1:-1])
+            for theta in thetas:
+                for phi in phis:
+                    grid.append({'Q': Q, 'theta': float(theta), 'phi': float(phi)})
+
+        else:  # N == 7
+            ratios = np.linspace(0, 1, n_pts)
+            phis   = np.linspace(0, 2 * np.pi, n_pts, endpoint=False)
+            for r in ratios:
+                Q2 = Q * r
+                Q3 = Q * np.sqrt(max(1 - r**2, 0))
+                phi2_values = [0.0] if np.isclose(Q2, 0.0) else phis
+                phi3_values = [0.0] if np.isclose(Q3, 0.0) else phis
+                for phi2 in phi2_values:
+                    for phi3 in phi3_values:
+                        grid.append({'Q2': Q2, 'phi2': float(phi2),
+                                     'Q3': Q3, 'phi3': float(phi3)})
+
+        return grid
+
+    def _run_cremer_pople_search(self, molecule, top_file_name, simulation):
+        """
+        Scans the Cremer-Pople coordinate space for every ring of size 5-7
+        in molecule. For each ring, a uniform grid of target puckering
+        parameters is built with _cp_grid; for each grid point the ring
+        atoms are rebuilt with _ring_coords_from_cremer_pople, embedded in
+        the full geometry, and energy-minimized.
+
+        Runs on rank 0 only.
+
+        :param molecule:
+            The molecule.
+        :param top_file_name:
+            The topology file stem used by OpenMM.
+        :param simulation:
+            The initialized OpenMM Simulation object.
+
+        :return:
+            The list of [energy, coordinates_in_angstrom] pairs.
+        """
+
+        rings = self._detect_rings(molecule)
+        rings = [r for r in rings if len(r) in (5, 6, 7)]
+
+        if not rings:
+            self.ostream.print_info(
+                "Cremer-Pople: no 5-, 6-, or 7-membered rings detected.")
+            self.ostream.flush()
+            return []
+
+        self.ostream.print_info(
+            f"Cremer-Pople: found {len(rings)} ring(s) — sizes "
+            f"{[len(r) for r in rings]}."
+        )
+        self.ostream.flush()
+
+        all_results = []
+        ref_coords  = np.array(molecule.get_coordinates_in_angstrom(), dtype=float)
+
+        for ring_idx, ring in enumerate(rings):
+            N            = len(ring)
+            ring_coords  = ref_coords[list(ring)]
+
+            if self.cp_amplitude is not None:
+                Q = self.cp_amplitude
+            else:
+                # scan at roughly 2x the typical equilibrium amplitude
+                # (6-ring chair ~0.63 A, 5-ring ~0.40 A, 7-ring ~0.50 A) so
+                # grid geometries are pushed over conformational barriers
+                # and relax into genuinely distinct minima
+                _cp_scan_amplitude = {5: 0.80, 6: 1.20, 7: 1.00}
+                Q = _cp_scan_amplitude[N]
+
+            grid = self._cp_grid(N, Q, self.cp_grid_points)
+
+            self.ostream.print_info(
+                f"Cremer-Pople: ring {ring_idx + 1} (size {N}, Q={Q:.3f} Å) "
+                f"— {len(grid)} grid points."
+            )
+            self.ostream.flush()
+
+            for pt_idx, cp_params in enumerate(grid):
+                new_ring_coords = self._ring_coords_from_cremer_pople(
+                    ring_coords, cp_params)
+
+                # embed the new ring coordinates into the full geometry
+                trial_full = ref_coords.copy()
+                for local_i, global_i in enumerate(ring):
+                    trial_full[global_i] = new_ring_coords[local_i]
+
+                trial_mol = Molecule(molecule)
+                for iatom, coord in enumerate(trial_full):
+                    trial_mol.set_atom_coordinates(
+                        iatom, coord / bohr_in_angstrom())
+
+                # a failed minimization for one grid point should not abort
+                # the whole ring scan
+                try:
+                    energy, opt_coords = self._minimize_energy(
+                        trial_mol, simulation, self.em_tolerance)
+                    all_results.append([energy, opt_coords])
+                except Exception as e:
+                    self.ostream.print_info(
+                        f"Cremer-Pople: skipping ring {ring_idx+1} "
+                        f"point {pt_idx+1} ({e})")
+
+            self.ostream.print_info(
+                f"Cremer-Pople: ring {ring_idx + 1} done "
+                f"({len(all_results)} conformers so far)."
+            )
+            self.ostream.flush()
+
+        return all_results
 
     def _init_openmm_system(self, topology_file, implicit_solvent_model):
 
@@ -398,6 +1052,7 @@ class ConformerGenerator:
             pdb_file = str(Path(topology_file).with_suffix(".pdb"))
             xml_file = str(Path(topology_file).with_suffix(".xml"))
             pdb = PDBFile(pdb_file)
+
             if implicit_solvent_model is None:
                 forcefield = ForceField(xml_file)
                 system = forcefield.createSystem(pdb.topology,
@@ -454,6 +1109,7 @@ class ConformerGenerator:
 
         coords_nm = molecule.get_coordinates_in_angstrom() * 0.1
         simulation.context.setPositions(coords_nm * nanometer)
+
         # freeze atoms if specified
         if self.freeze_atoms is not None:
             for atom_idx in self.freeze_atoms:
@@ -464,11 +1120,9 @@ class ConformerGenerator:
         state = simulation.context.getState(
             getPositions=True,
             getEnergy=True,
-            # getForces=True,
         )
 
-        energy = state.getPotentialEnergy().value_in_unit_system(
-            md_unit_system)
+        energy = state.getPotentialEnergy().value_in_unit_system(md_unit_system)
         # convert to angstrom
         optimized_coords = state.getPositions(
             asNumpy=True).value_in_unit_system(md_unit_system) * 10
@@ -565,6 +1219,96 @@ class ConformerGenerator:
             else:
                 return None
 
+        # log which search strategy is being used
+        if rank == mpi_master():
+            if self.bh_search:
+                self.ostream.print_info(
+                    f"ConformerGenerator: using basin-hopping search "
+                    f"({self.bh_steps} steps, T={self.bh_temperature} K, "
+                    f"perturb='{self.bh_perturb}', seed={self.bh_seed})."
+                )
+            elif self.cp_search:
+                self.ostream.print_info(
+                    f"ConformerGenerator: using Cremer-Pople ring puckering search "
+                    f"(grid_points={self.cp_grid_points}, "
+                    f"amplitude={'auto' if self.cp_amplitude is None else f'{self.cp_amplitude:.3f} Å'})."
+                )
+            elif self.mc_search:
+                self.ostream.print_info(
+                    f"ConformerGenerator: using Monte Carlo random sampling "
+                    f"({self.mc_steps} steps, seed={self.mc_seed})."
+                )
+            else:
+                # warn if the full combinatorial grid is going to be very large
+                grid_size = 1
+                for _, angles in dihedrals_candidates:
+                    grid_size *= len(angles)
+                if grid_size > 10000:
+                    self.ostream.print_warning(
+                        f"ConformerGenerator: grid search will generate "
+                        f"{grid_size} conformers ({len(dihedrals_candidates)} "
+                        f"rotatable bonds). Consider setting mc_search=True "
+                        f"with mc_steps=500, or bh_search=True to limit the search."
+                    )
+            self.ostream.flush()
+
+        # basin-hopping: runs on rank 0, results broadcast to all ranks
+        if self.bh_search:
+            if rank == mpi_master():
+                simulation = self._init_openmm_system(top_file_name,
+                                                      self.implicit_solvent_model)
+                bh_basins = self._run_basin_hopping(
+                    molecule, dihedrals_candidates, top_file_name, simulation)
+            else:
+                bh_basins = None
+
+            bh_basins = comm.bcast(bh_basins, root=mpi_master())
+
+            all_sorted_energy_coords = sorted(bh_basins, key=lambda x: x[0])
+            num_total_conformers = len(all_sorted_energy_coords)
+
+            self.ostream.print_info(
+                f"{num_total_conformers} basins collected before deduplication.")
+            self.ostream.flush()
+
+            if rank == mpi_master():
+                return self._postprocess_conformers(
+                    molecule, all_sorted_energy_coords, conf_gen_t0)
+            else:
+                return None
+
+        # Cremer-Pople ring puckering: runs on rank 0, results broadcast
+        if self.cp_search:
+            if rank == mpi_master():
+                simulation  = self._init_openmm_system(top_file_name,
+                                                       self.implicit_solvent_model)
+                cp_results  = self._run_cremer_pople_search(
+                    molecule, top_file_name, simulation)
+            else:
+                cp_results = None
+
+            cp_results = comm.bcast(cp_results, root=mpi_master())
+
+            if not cp_results:
+                self.ostream.print_info(
+                    "Cremer-Pople search found no conformers.")
+                self.ostream.flush()
+                return None
+
+            all_sorted_energy_coords = sorted(cp_results, key=lambda x: x[0])
+
+            self.ostream.print_info(
+                f"{len(all_sorted_energy_coords)} conformers collected "
+                "before deduplication.")
+            self.ostream.flush()
+
+            if rank == mpi_master():
+                return self._postprocess_conformers(
+                    molecule, all_sorted_energy_coords, conf_gen_t0)
+            else:
+                return None
+
+        # grid / MC search: original parallel pipeline
         if rank == mpi_master():
             conformation_dih_arr = self._get_mol_comb(molecule, top_file_name,
                                                       dihedrals_candidates)
@@ -591,7 +1335,6 @@ class ConformerGenerator:
         conf_start_time = time.time()
 
         conformations = []
-
         for i in range(dih_comb_arr_rank.shape[0]):
             if i > 0:
                 new_molecule = Molecule(conformations[-1])
@@ -605,7 +1348,6 @@ class ConformerGenerator:
                 diff_dih_ind = np.arange(dih_comb_arr_rank[i].shape[0])
 
             value_atom_index = dih_comb_arr_rank[i, :, 0:4] + 1
-
             for j in diff_dih_ind:
                 new_molecule.set_dihedral_in_degrees(
                     value_atom_index[j], dih_comb_arr_rank[i, j, 4], verbose=False)
@@ -613,7 +1355,6 @@ class ConformerGenerator:
             conformations.append(Molecule(new_molecule))
 
         conf_dt = time.time() - conf_start_time
-
         info = f"{num_total_conformers} conformers generated in {conf_dt:.2f} sec"
         if comm.Get_size() > 1:
             dt_list = comm.gather(conf_dt, root=mpi_master())
@@ -631,7 +1372,6 @@ class ConformerGenerator:
                                               self.implicit_solvent_model)
 
         energy_coords = []
-
         for mol_i in range(len(conformations)):
             energy, opt_coords = self._minimize_energy(conformations[mol_i],
                                                        simulation,
@@ -639,7 +1379,6 @@ class ConformerGenerator:
             energy_coords.append([energy, opt_coords])
 
         opt_dt = time.time() - opt_start_time
-
         info = f"Energy minimization of {num_total_conformers} conformers took {opt_dt:.2f} sec"
         if comm.Get_size() > 1:
             dt_list = comm.gather(opt_dt, root=mpi_master())
@@ -661,129 +1400,131 @@ class ConformerGenerator:
                                              root=mpi_master())
 
         if rank == mpi_master():
-            # now we have all optimized conformer and energy, so we can analyze
-            # the energy and get the lowest energy conformer reshape the
-            # all_energy_coords to a list
             all_sel_energy_coords = [
                 ene_coord for local_energy_coords in gathered_energy_coords
                 for ene_coord in local_energy_coords
             ]
-
-            # sort all_energy_coords
             all_sorted_energy_coords = sorted(all_sel_energy_coords,
                                               key=lambda x: x[0])
-            # get the lowest energy conformer
-            min_energy, min_coords_angstrom = all_sorted_energy_coords[0]
-            min_mol = Molecule(molecule)
-            for iatom in range(min_mol.number_of_atoms()):
-                min_mol.set_atom_coordinates(
-                    iatom, min_coords_angstrom[iatom] / bohr_in_angstrom())
-            self.ostream.print_info(
-                f"Global minimum energy: {min_energy:.3f} kJ/mol")
-            self.ostream.flush()
 
-            self.global_minimum_conformer = min_mol
-            self.global_minimum_energy = min_energy
-
-            # return conformers info
-            conformers_dict = {
-                'energies': [],
-                'molecules': [],
-                'geometries': [],
-            }
-
-            for conf_energy, conf_coords_angstrom in all_sorted_energy_coords:
-                conformers_dict["energies"].append(conf_energy)
-                mol_copy = Molecule(molecule)
-                for iatom in range(mol_copy.number_of_atoms()):
-                    mol_copy.set_atom_coordinates(
-                        iatom,
-                        conf_coords_angstrom[iatom] / bohr_in_angstrom())
-                conformers_dict["molecules"].append(mol_copy)
-                conformers_dict["geometries"].append(
-                    mol_copy.get_xyz_string(
-                        comment=f"Energy: {conf_energy:.3f} kJ/mol"))
-
-            num_conformers = len(conformers_dict["energies"])
-
-            equiv_conformer_pairs = []
-
-            for i in range(num_conformers):
-                xyz_i = conformers_dict["molecules"][
-                    i].get_coordinates_in_angstrom()
-                ene_i = conformers_dict["energies"][i]
-
-                for j in range(i + 1, num_conformers):
-                    xyz_j = conformers_dict["molecules"][
-                        j].get_coordinates_in_angstrom()
-                    ene_j = conformers_dict["energies"][j]
-
-                    if abs(ene_i - ene_j) < self.energy_threshold:
-                        rmsd, rot, trans = svd_superimpose(xyz_j, xyz_i)
-                        if rmsd < self.rmsd_threshold:
-                            equiv_conformer_pairs.append((i, j))
-
-            duplicate_conformers = [j for i, j in equiv_conformer_pairs]
-            duplicate_conformers = sorted(list(set(duplicate_conformers)))
-
-            filtered_energies = [
-                e for i, e in enumerate(conformers_dict["energies"])
-                if i not in duplicate_conformers
-            ]
-            filtered_molecules = [
-                Molecule(m) for i, m in enumerate(conformers_dict["molecules"])
-                if i not in duplicate_conformers
-            ]
-            filtered_geometries = [
-                g for i, g in enumerate(conformers_dict["geometries"])
-                if i not in duplicate_conformers
-            ]
-
-            conformers_dict = {
-                "energies":
-                filtered_energies[:self.number_of_conformers_to_select],
-                "molecules":
-                filtered_molecules[:self.number_of_conformers_to_select],
-                "geometries":
-                filtered_geometries[:self.number_of_conformers_to_select],
-            }
-
-            # save the selected conformers to file
-            if self.save_xyz_files:
-                if self.save_path is None:
-                    save_path = Path("selected_conformers")
-                else:
-                    save_path = Path(self.save_path)
-                save_path.mkdir(parents=True, exist_ok=True)
-
-                for i in range(len(conformers_dict["energies"])):
-                    conf_energy = conformers_dict["energies"][i]
-                    conf_mol = conformers_dict["molecules"][i]
-                    xyz_path = save_path / f"conformer_{i + 1}.xyz"
-                    with xyz_path.open("w") as fh:
-                        fh.write(
-                            conf_mol.get_xyz_string(
-                                comment=f"Energy: {conf_energy:.3f} kJ/mol"))
-
-                self.ostream.print_info(
-                    f"{len(conformers_dict['energies'])} conformers with " +
-                    f"the lowest energies are saved in folder {str(save_path)}"
-                )
-            else:
-                self.ostream.print_info(
-                    f"{len(conformers_dict['energies'])} conformers remain " +
-                    "after removal of duplicate conformers.")
-
-            self.ostream.print_info(
-                "Total time spent in generating conformers: " +
-                f"{time.time() - conf_gen_t0:.2f} sec")
-            self.ostream.flush()
-
-            self.conformer_dict = conformers_dict
-
-            return conformers_dict
+            return self._postprocess_conformers(
+                molecule, all_sorted_energy_coords, conf_gen_t0)
         else:
             return None
+
+    def _postprocess_conformers(self, molecule, all_sorted_energy_coords,
+                                conf_gen_t0):
+        """
+        Common tail end of generate(), shared by all search strategies: turns
+        a sorted list of [energy, coordinates] pairs into Molecule objects,
+        removes duplicate conformers by RMSD/energy, optionally writes xyz
+        files, and returns conformers_dict. Also sets
+        self.global_minimum_conformer and self.global_minimum_energy.
+
+        Must be called on rank 0 only.
+
+        :param molecule:
+            The molecule.
+        :param all_sorted_energy_coords:
+            The energy-sorted list of [energy, coordinates_in_angstrom] pairs.
+        :param conf_gen_t0:
+            The start time of generate(), for the total-time log message.
+
+        :return:
+            The conformers_dict with keys 'energies', 'molecules', 'geometries'.
+        """
+
+        # get the lowest energy conformer
+        min_energy, min_coords_angstrom = all_sorted_energy_coords[0]
+        min_mol = Molecule(molecule)
+        for iatom in range(min_mol.number_of_atoms()):
+            min_mol.set_atom_coordinates(
+                iatom, min_coords_angstrom[iatom] / bohr_in_angstrom())
+        self.ostream.print_info(
+            f"Global minimum energy: {min_energy:.3f} kJ/mol")
+        self.ostream.flush()
+
+        self.global_minimum_conformer = min_mol
+        self.global_minimum_energy    = min_energy
+
+        # return conformers info
+        conformers_dict = {'energies': [], 'molecules': [], 'geometries': []}
+
+        for conf_energy, conf_coords_angstrom in all_sorted_energy_coords:
+            conformers_dict["energies"].append(conf_energy)
+            mol_copy = Molecule(molecule)
+            for iatom in range(mol_copy.number_of_atoms()):
+                mol_copy.set_atom_coordinates(
+                    iatom, conf_coords_angstrom[iatom] / bohr_in_angstrom())
+            conformers_dict["molecules"].append(mol_copy)
+            conformers_dict["geometries"].append(
+                mol_copy.get_xyz_string(
+                    comment=f"Energy: {conf_energy:.3f} kJ/mol"))
+
+        num_conformers = len(conformers_dict["energies"])
+
+        # remove duplicate conformers by rmsd/energy threshold
+        equiv_conformer_pairs = []
+        for i in range(num_conformers):
+            xyz_i = conformers_dict["molecules"][i].get_coordinates_in_angstrom()
+            ene_i = conformers_dict["energies"][i]
+            for j in range(i + 1, num_conformers):
+                xyz_j = conformers_dict["molecules"][j].get_coordinates_in_angstrom()
+                ene_j = conformers_dict["energies"][j]
+
+                if abs(ene_i - ene_j) < self.energy_threshold:
+                    rmsd, rot, trans = svd_superimpose(xyz_j, xyz_i)
+                    if rmsd < self.rmsd_threshold:
+                        equiv_conformer_pairs.append((i, j))
+
+        duplicate_conformers = sorted(
+            set(j for i, j in equiv_conformer_pairs))
+
+        n_to_select = self.number_of_conformers_to_select or num_conformers
+
+        filtered_energies  = [e for i, e in enumerate(conformers_dict["energies"])
+                               if i not in duplicate_conformers]
+        filtered_molecules = [Molecule(m) for i, m in enumerate(conformers_dict["molecules"])
+                               if i not in duplicate_conformers]
+        filtered_geometries = [g for i, g in enumerate(conformers_dict["geometries"])
+                                if i not in duplicate_conformers]
+
+        conformers_dict = {
+            "energies":   filtered_energies[:n_to_select],
+            "molecules":  filtered_molecules[:n_to_select],
+            "geometries": filtered_geometries[:n_to_select],
+        }
+
+        # save the selected conformers to file
+        if self.save_xyz_files:
+            save_path = Path(self.save_path) if self.save_path else Path("selected_conformers")
+            save_path.mkdir(parents=True, exist_ok=True)
+
+            for i in range(len(conformers_dict["energies"])):
+                conf_energy = conformers_dict["energies"][i]
+                conf_mol    = conformers_dict["molecules"][i]
+                xyz_path    = save_path / f"conformer_{i + 1}.xyz"
+                with xyz_path.open("w") as fh:
+                    fh.write(conf_mol.get_xyz_string(
+                        comment=f"Energy: {conf_energy:.3f} kJ/mol"))
+
+            self.ostream.print_info(
+                f"{len(conformers_dict['energies'])} conformers with the "
+                f"lowest energies are saved in folder {str(save_path)}"
+            )
+        else:
+            self.ostream.print_info(
+                f"{len(conformers_dict['energies'])} conformers remain "
+                "after removal of duplicate conformers.")
+
+        self.ostream.print_info(
+            "Total time spent in generating conformers: "
+            f"{time.time() - conf_gen_t0:.2f} sec")
+        self.ostream.flush()
+
+        self.conformer_dict = conformers_dict
+
+        return conformers_dict
 
     def show_global_minimum(self, atom_indices=False, atom_labels=False):
 
