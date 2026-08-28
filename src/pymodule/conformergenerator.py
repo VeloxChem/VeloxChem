@@ -106,8 +106,8 @@ class ConformerGenerator:
           size 5, 6, or 7 is scanned on a uniform grid of Cremer-Pople amplitude/phase
           coordinates instead of scanning dihedrals.
         - cp_grid_points: The number of grid points per angular axis in the Cremer-Pople search.
-        - cp_amplitude: The fixed puckering amplitude (Angstrom), or None to use an amplitude
-          scaled from the input geometry.
+        - cp_amplitude: The fixed puckering amplitude (Angstrom), or None to use a
+          ring-size-specific default amplitude.
     """
 
     def __init__(self, comm=None, ostream=None):
