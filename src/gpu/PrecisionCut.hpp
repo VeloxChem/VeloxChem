@@ -170,7 +170,8 @@ build_exchange_cuts_device(
     double          max_D,
     double          tau,
     double          eri_threshold,
-    gpuStream_t     stream);
+    gpuStream_t     stream,
+    unsigned long long* d_work_counts = nullptr);
 
 }  // namespace gpu
 

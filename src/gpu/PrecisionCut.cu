@@ -606,6 +606,66 @@ build_exchange_cuts_kernel(
     }
 }
 
+__global__ void
+accumulate_exchange_cut_work_kernel(
+    const uint32_t* d_prec_cut_flat,
+    const uint32_t* d_screen_cut_flat,
+    const uint32_t* d_displ_cuts,
+    const uint32_t* d_pair_inds_i,
+    const uint32_t* d_pair_inds_k,
+    const uint32_t* d_pair_counts_AB,
+    const uint32_t* d_pair_counts_CD,
+    uint32_t        n_ik,
+    uint32_t        tile_dim_y,
+    uint32_t        tile_dim_x,
+    unsigned long long* d_work_counts)
+{
+    const uint32_t ik = blockIdx.x;
+    if (ik >= n_ik) {
+        return;
+    }
+
+    const uint32_t i = d_pair_inds_i[ik];
+    const uint32_t k = d_pair_inds_k[ik];
+    const uint32_t n_m = (d_pair_counts_AB[i] + tile_dim_y - 1) / tile_dim_y;
+    const uint32_t n_n = (d_pair_counts_CD[k] + tile_dim_x - 1) / tile_dim_x;
+
+    unsigned long long fp64 = 0;
+    unsigned long long fp32 = 0;
+    unsigned long long screened = 0;
+
+    for (uint32_t m = threadIdx.x; m < n_m; m += blockDim.x) {
+        const uint32_t entry = d_displ_cuts[ik] + m;
+        const uint32_t prec = d_prec_cut_flat[entry];
+        const uint32_t screen = d_screen_cut_flat[entry];
+
+        fp64 += prec;
+        fp32 += screen - prec;
+        screened += n_n - screen;
+    }
+
+    __shared__ unsigned long long block_counts[3][128];
+    block_counts[0][threadIdx.x] = fp64;
+    block_counts[1][threadIdx.x] = fp32;
+    block_counts[2][threadIdx.x] = screened;
+    __syncthreads();
+
+    for (uint32_t stride = blockDim.x / 2; stride > 0; stride /= 2) {
+        if (threadIdx.x < stride) {
+            block_counts[0][threadIdx.x] += block_counts[0][threadIdx.x + stride];
+            block_counts[1][threadIdx.x] += block_counts[1][threadIdx.x + stride];
+            block_counts[2][threadIdx.x] += block_counts[2][threadIdx.x + stride];
+        }
+        __syncthreads();
+    }
+
+    if (threadIdx.x == 0) {
+        atomicAdd(&d_work_counts[0], block_counts[0][0]);
+        atomicAdd(&d_work_counts[1], block_counts[1][0]);
+        atomicAdd(&d_work_counts[2], block_counts[2][0]);
+    }
+}
+
 // Grouped-m cut builder kept for benchmarking/reference. The active PPPP MP path
 // uses build_exchange_cuts_kernel because testing showed m_group_size=1 is fastest.
 __global__ void
@@ -693,7 +753,8 @@ build_exchange_cuts_device(
     double          max_D,
     double          tau,
     double          eri_threshold,
-    gpuStream_t     stream)
+    gpuStream_t     stream,
+    unsigned long long* d_work_counts)
 {
     if (n_ik == 0) {
         return;
@@ -718,6 +779,21 @@ build_exchange_cuts_device(
         max_D,
         tau,
         eri_threshold);
+
+    if (d_work_counts != nullptr) {
+        accumulate_exchange_cut_work_kernel<<<n_ik, threads_per_block, 0, stream>>>(
+            d_prec_cut_flat,
+            d_screen_cut_flat,
+            d_displ_cuts,
+            d_pair_inds_i,
+            d_pair_inds_k,
+            d_pair_counts_AB,
+            d_pair_counts_CD,
+            n_ik,
+            tile_dim_y,
+            tile_dim_x,
+            d_work_counts);
+    }
 }
 
 void

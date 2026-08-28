@@ -35,6 +35,7 @@
 #include <omp.h>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -4487,6 +4488,16 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     std::vector<CMultiTimer> omptimers(nthreads);
 
+    const bool collect_exchange_fraction_stats = []() {
+        const char* value = std::getenv("VLX_EXCHANGE_FRACTION_STATS");
+        return value != nullptr && std::strcmp(value, "1") == 0;
+    }();
+    std::vector<std::array<unsigned long long, 3>> exchange_work_counts;
+    if (collect_exchange_fraction_stats)
+    {
+        exchange_work_counts.resize(num_gpus_per_node);
+    }
+
 #pragma omp parallel
     {
     auto thread_id = omp_get_thread_num();
@@ -8700,6 +8711,14 @@ computeFockOnGPU(const              CMolecule& molecule,
     uint32_t* d_exchange_displ_cuts      = nullptr;
     size_t exchange_cut_capacity   = 0;
     size_t exchange_displ_capacity = 0;
+    unsigned long long* d_exchange_work_counts = nullptr;
+
+    if (collect_exchange_fraction_stats)
+    {
+        gpuSafe(gpuMallocAsync(&d_exchange_work_counts, 3 * sizeof(unsigned long long), stream));
+        gpuSafe(gpuMemcpyAsync(d_exchange_work_counts, exchange_work_counts[gpu_id].data(),
+                               3 * sizeof(unsigned long long), gpuMemcpyHostToDevice, stream));
+    }
 
     auto ensure_exchange_cut_workspace = [&](size_t cut_count, size_t displ_count) {
         if (cut_count > exchange_cut_capacity)
@@ -8932,7 +8951,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_ss, d_pair_inds_k_for_K_ss, d_Q_K_ss, d_Q_K_ss, d_pair_displs_K_ss, d_pair_displs_K_ss, d_pair_counts_K_ss, d_pair_counts_K_ss,
-            static_cast<uint32_t>(pair_inds_count_for_K_ss), TILE_DIM_Y_K, TILE_DIM_X_K, ss_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_ss), TILE_DIM_Y_K, TILE_DIM_X_K, ss_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSSSS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_ss,
@@ -8983,7 +9002,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_ss, d_pair_inds_k_for_K_ss, d_Q_K_ss, d_Q_K_sp, d_pair_displs_K_ss, d_pair_displs_K_sp, d_pair_counts_K_ss, d_pair_counts_K_sp,
-            static_cast<uint32_t>(pair_inds_count_for_K_ss), TILE_DIM_Y_K, TILE_DIM_X_K, sp_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_ss), TILE_DIM_Y_K, TILE_DIM_X_K, sp_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSSSP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_ss,
@@ -9048,7 +9067,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_ss, d_pair_inds_k_for_K_ss, d_Q_K_sp, d_Q_K_ss, d_pair_displs_K_sp, d_pair_displs_K_ss, d_pair_counts_K_sp, d_pair_counts_K_ss,
-            static_cast<uint32_t>(pair_inds_count_for_K_ss), TILE_DIM_Y_K, TILE_DIM_X_K, ps_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_ss), TILE_DIM_Y_K, TILE_DIM_X_K, ps_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSPSS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_ss,
@@ -9113,7 +9132,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_ss, d_pair_inds_k_for_K_ss, d_Q_K_sp, d_Q_K_sp, d_pair_displs_K_sp, d_pair_displs_K_sp, d_pair_counts_K_sp, d_pair_counts_K_sp,
-            static_cast<uint32_t>(pair_inds_count_for_K_ss), TILE_DIM_Y_K, TILE_DIM_X_K, pp_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_ss), TILE_DIM_Y_K, TILE_DIM_X_K, pp_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSPSP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_ss,
@@ -9170,7 +9189,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_ss, d_pair_inds_k_for_K_ss, d_Q_K_ss, d_Q_K_sd, d_pair_displs_K_ss, d_pair_displs_K_sd, d_pair_counts_K_ss, d_pair_counts_K_sd,
-            static_cast<uint32_t>(pair_inds_count_for_K_ss), TILE_DIM_Y_K, TILE_DIM_X_K, sd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_ss), TILE_DIM_Y_K, TILE_DIM_X_K, sd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSSSD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_ss,
@@ -9235,7 +9254,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_ss, d_pair_inds_k_for_K_ss, d_Q_K_sd, d_Q_K_ss, d_pair_displs_K_sd, d_pair_displs_K_ss, d_pair_counts_K_sd, d_pair_counts_K_ss,
-            static_cast<uint32_t>(pair_inds_count_for_K_ss), TILE_DIM_Y_K, TILE_DIM_X_K, ds_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_ss), TILE_DIM_Y_K, TILE_DIM_X_K, ds_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSDSS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_ss,
@@ -9300,7 +9319,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_ss, d_pair_inds_k_for_K_ss, d_Q_K_sp, d_Q_K_sd, d_pair_displs_K_sp, d_pair_displs_K_sd, d_pair_counts_K_sp, d_pair_counts_K_sd,
-            static_cast<uint32_t>(pair_inds_count_for_K_ss), TILE_DIM_Y_K, TILE_DIM_X_K, pd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_ss), TILE_DIM_Y_K, TILE_DIM_X_K, pd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSPSD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_ss,
@@ -9371,7 +9390,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_ss, d_pair_inds_k_for_K_ss, d_Q_K_sd, d_Q_K_sp, d_pair_displs_K_sd, d_pair_displs_K_sp, d_pair_counts_K_sd, d_pair_counts_K_sp,
-            static_cast<uint32_t>(pair_inds_count_for_K_ss), TILE_DIM_Y_K, TILE_DIM_X_K, dp_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_ss), TILE_DIM_Y_K, TILE_DIM_X_K, dp_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSDSP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_ss,
@@ -9442,7 +9461,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_ss, d_pair_inds_k_for_K_ss, d_Q_K_sd, d_Q_K_sd, d_pair_displs_K_sd, d_pair_displs_K_sd, d_pair_counts_K_sd, d_pair_counts_K_sd,
-            static_cast<uint32_t>(pair_inds_count_for_K_ss), TILE_DIM_Y_K, TILE_DIM_X_K, dd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_ss), TILE_DIM_Y_K, TILE_DIM_X_K, dd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSDSD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_ss,
@@ -9543,7 +9562,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_sp, d_pair_inds_k_for_K_sp, d_Q_K_ss, d_Q_K_ps, d_pair_displs_K_ss, d_pair_displs_K_ps, d_pair_counts_K_ss, d_pair_counts_K_ps,
-            static_cast<uint32_t>(pair_inds_count_for_K_sp), TILE_DIM_Y_K, TILE_DIM_X_K, ss_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_sp), TILE_DIM_Y_K, TILE_DIM_X_K, ss_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSSPS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_sp,
@@ -9608,7 +9627,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_sp, d_pair_inds_k_for_K_sp, d_Q_K_ss, d_Q_K_pp, d_pair_displs_K_ss, d_pair_displs_K_pp, d_pair_counts_K_ss, d_pair_counts_K_pp,
-            static_cast<uint32_t>(pair_inds_count_for_K_sp), TILE_DIM_Y_K, TILE_DIM_X_K, sp_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_sp), TILE_DIM_Y_K, TILE_DIM_X_K, sp_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSSPP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_sp,
@@ -9673,7 +9692,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_sp, d_pair_inds_k_for_K_sp, d_Q_K_sp, d_Q_K_ps, d_pair_displs_K_sp, d_pair_displs_K_ps, d_pair_counts_K_sp, d_pair_counts_K_ps,
-            static_cast<uint32_t>(pair_inds_count_for_K_sp), TILE_DIM_Y_K, TILE_DIM_X_K, ps_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_sp), TILE_DIM_Y_K, TILE_DIM_X_K, ps_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSPPS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_sp,
@@ -9738,7 +9757,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_sp, d_pair_inds_k_for_K_sp, d_Q_K_sp, d_Q_K_pp, d_pair_displs_K_sp, d_pair_displs_K_pp, d_pair_counts_K_sp, d_pair_counts_K_pp,
-            static_cast<uint32_t>(pair_inds_count_for_K_sp), TILE_DIM_Y_K, TILE_DIM_X_K, pp_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_sp), TILE_DIM_Y_K, TILE_DIM_X_K, pp_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSPPP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_sp,
@@ -9803,7 +9822,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_sp, d_pair_inds_k_for_K_sp, d_Q_K_ss, d_Q_K_pd, d_pair_displs_K_ss, d_pair_displs_K_pd, d_pair_counts_K_ss, d_pair_counts_K_pd,
-            static_cast<uint32_t>(pair_inds_count_for_K_sp), TILE_DIM_Y_K, TILE_DIM_X_K, sd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_sp), TILE_DIM_Y_K, TILE_DIM_X_K, sd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSSPD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_sp,
@@ -9874,7 +9893,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_sp, d_pair_inds_k_for_K_sp, d_Q_K_sd, d_Q_K_ps, d_pair_displs_K_sd, d_pair_displs_K_ps, d_pair_counts_K_sd, d_pair_counts_K_ps,
-            static_cast<uint32_t>(pair_inds_count_for_K_sp), TILE_DIM_Y_K, TILE_DIM_X_K, ds_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_sp), TILE_DIM_Y_K, TILE_DIM_X_K, ds_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSDPS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_sp,
@@ -9945,7 +9964,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_sp, d_pair_inds_k_for_K_sp, d_Q_K_sp, d_Q_K_pd, d_pair_displs_K_sp, d_pair_displs_K_pd, d_pair_counts_K_sp, d_pair_counts_K_pd,
-            static_cast<uint32_t>(pair_inds_count_for_K_sp), TILE_DIM_Y_K, TILE_DIM_X_K, pd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_sp), TILE_DIM_Y_K, TILE_DIM_X_K, pd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSPPD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_sp,
@@ -10016,7 +10035,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_sp, d_pair_inds_k_for_K_sp, d_Q_K_sd, d_Q_K_pp, d_pair_displs_K_sd, d_pair_displs_K_pp, d_pair_counts_K_sd, d_pair_counts_K_pp,
-            static_cast<uint32_t>(pair_inds_count_for_K_sp), TILE_DIM_Y_K, TILE_DIM_X_K, dp_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_sp), TILE_DIM_Y_K, TILE_DIM_X_K, dp_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSDPP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_sp,
@@ -10087,7 +10106,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_sp, d_pair_inds_k_for_K_sp, d_Q_K_sd, d_Q_K_pd, d_pair_displs_K_sd, d_pair_displs_K_pd, d_pair_counts_K_sd, d_pair_counts_K_pd,
-            static_cast<uint32_t>(pair_inds_count_for_K_sp), TILE_DIM_Y_K, TILE_DIM_X_K, dd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_sp), TILE_DIM_Y_K, TILE_DIM_X_K, dd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSDPD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_sp,
@@ -10213,7 +10232,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_pp, d_pair_inds_k_for_K_pp, d_Q_K_ps, d_Q_K_ps, d_pair_displs_K_ps, d_pair_displs_K_ps, d_pair_counts_K_ps, d_pair_counts_K_ps,
-            static_cast<uint32_t>(pair_inds_count_for_K_pp), TILE_DIM_Y_K, TILE_DIM_X_K, ss_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_pp), TILE_DIM_Y_K, TILE_DIM_X_K, ss_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockPSPS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pp,
@@ -10274,7 +10293,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_pp, d_pair_inds_k_for_K_pp, d_Q_K_ps, d_Q_K_pp, d_pair_displs_K_ps, d_pair_displs_K_pp, d_pair_counts_K_ps, d_pair_counts_K_pp,
-            static_cast<uint32_t>(pair_inds_count_for_K_pp), TILE_DIM_Y_K, TILE_DIM_X_K, sp_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_pp), TILE_DIM_Y_K, TILE_DIM_X_K, sp_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockPSPP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pp,
@@ -10343,7 +10362,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_pp, d_pair_inds_k_for_K_pp, d_Q_K_pp, d_Q_K_ps, d_pair_displs_K_pp, d_pair_displs_K_ps, d_pair_counts_K_pp, d_pair_counts_K_ps,
-            static_cast<uint32_t>(pair_inds_count_for_K_pp), TILE_DIM_Y_K, TILE_DIM_X_K, ps_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_pp), TILE_DIM_Y_K, TILE_DIM_X_K, ps_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockPPPS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pp,
@@ -10490,7 +10509,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_pp, d_pair_inds_k_for_K_pp, d_Q_K_ps, d_Q_K_pd, d_pair_displs_K_ps, d_pair_displs_K_pd, d_pair_counts_K_ps, d_pair_counts_K_pd,
-            static_cast<uint32_t>(pair_inds_count_for_K_pp), TILE_DIM_Y_K, TILE_DIM_X_K, sd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_pp), TILE_DIM_Y_K, TILE_DIM_X_K, sd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockPSPD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pp,
@@ -10565,7 +10584,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_pp, d_pair_inds_k_for_K_pp, d_Q_K_pd, d_Q_K_ps, d_pair_displs_K_pd, d_pair_displs_K_ps, d_pair_counts_K_pd, d_pair_counts_K_ps,
-            static_cast<uint32_t>(pair_inds_count_for_K_pp), TILE_DIM_Y_K, TILE_DIM_X_K, ds_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_pp), TILE_DIM_Y_K, TILE_DIM_X_K, ds_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockPDPS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pp,
@@ -10640,7 +10659,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_pp, d_pair_inds_k_for_K_pp, d_Q_K_pp, d_Q_K_pd, d_pair_displs_K_pp, d_pair_displs_K_pd, d_pair_counts_K_pp, d_pair_counts_K_pd,
-            static_cast<uint32_t>(pair_inds_count_for_K_pp), TILE_DIM_Y_K, TILE_DIM_X_K, pd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_pp), TILE_DIM_Y_K, TILE_DIM_X_K, pd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockPPPD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pp,
@@ -10709,7 +10728,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_pp, d_pair_inds_k_for_K_pp, d_Q_K_pd, d_Q_K_pp, d_pair_displs_K_pd, d_pair_displs_K_pp, d_pair_counts_K_pd, d_pair_counts_K_pp,
-            static_cast<uint32_t>(pair_inds_count_for_K_pp), TILE_DIM_Y_K, TILE_DIM_X_K, dp_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_pp), TILE_DIM_Y_K, TILE_DIM_X_K, dp_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockPDPP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pp,
@@ -10778,7 +10797,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_pp, d_pair_inds_k_for_K_pp, d_Q_K_pd, d_Q_K_pd, d_pair_displs_K_pd, d_pair_displs_K_pd, d_pair_counts_K_pd, d_pair_counts_K_pd,
-            static_cast<uint32_t>(pair_inds_count_for_K_pp), TILE_DIM_Y_K, TILE_DIM_X_K, dd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_pp), TILE_DIM_Y_K, TILE_DIM_X_K, dd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockPDPD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pp,
@@ -10897,7 +10916,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_sd, d_pair_inds_k_for_K_sd, d_Q_K_ss, d_Q_K_ds, d_pair_displs_K_ss, d_pair_displs_K_ds, d_pair_counts_K_ss, d_pair_counts_K_ds,
-            static_cast<uint32_t>(pair_inds_count_for_K_sd), TILE_DIM_Y_K, TILE_DIM_X_K, ss_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_sd), TILE_DIM_Y_K, TILE_DIM_X_K, ss_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSSDS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_sd,
@@ -10962,7 +10981,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_sd, d_pair_inds_k_for_K_sd, d_Q_K_ss, d_Q_K_dp, d_pair_displs_K_ss, d_pair_displs_K_dp, d_pair_counts_K_ss, d_pair_counts_K_dp,
-            static_cast<uint32_t>(pair_inds_count_for_K_sd), TILE_DIM_Y_K, TILE_DIM_X_K, sp_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_sd), TILE_DIM_Y_K, TILE_DIM_X_K, sp_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSSDP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_sd,
@@ -11033,7 +11052,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_sd, d_pair_inds_k_for_K_sd, d_Q_K_sp, d_Q_K_ds, d_pair_displs_K_sp, d_pair_displs_K_ds, d_pair_counts_K_sp, d_pair_counts_K_ds,
-            static_cast<uint32_t>(pair_inds_count_for_K_sd), TILE_DIM_Y_K, TILE_DIM_X_K, ps_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_sd), TILE_DIM_Y_K, TILE_DIM_X_K, ps_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSPDS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_sd,
@@ -11106,7 +11125,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_sd, d_pair_inds_k_for_K_sd, d_Q_K_sp, d_Q_K_dp, d_pair_displs_K_sp, d_pair_displs_K_dp, d_pair_counts_K_sp, d_pair_counts_K_dp,
-            static_cast<uint32_t>(pair_inds_count_for_K_sd), TILE_DIM_Y_K, TILE_DIM_X_K, pp_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_sd), TILE_DIM_Y_K, TILE_DIM_X_K, pp_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSPDP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_sd,
@@ -11181,7 +11200,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_sd, d_pair_inds_k_for_K_sd, d_Q_K_ss, d_Q_K_dd, d_pair_displs_K_ss, d_pair_displs_K_dd, d_pair_counts_K_ss, d_pair_counts_K_dd,
-            static_cast<uint32_t>(pair_inds_count_for_K_sd), TILE_DIM_Y_K, TILE_DIM_X_K, sd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_sd), TILE_DIM_Y_K, TILE_DIM_X_K, sd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSSDD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_sd,
@@ -11250,7 +11269,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_sd, d_pair_inds_k_for_K_sd, d_Q_K_sd, d_Q_K_ds, d_pair_displs_K_sd, d_pair_displs_K_ds, d_pair_counts_K_sd, d_pair_counts_K_ds,
-            static_cast<uint32_t>(pair_inds_count_for_K_sd), TILE_DIM_Y_K, TILE_DIM_X_K, ds_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_sd), TILE_DIM_Y_K, TILE_DIM_X_K, ds_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSDDS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_sd,
@@ -11319,7 +11338,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_sd, d_pair_inds_k_for_K_sd, d_Q_K_sp, d_Q_K_dd, d_pair_displs_K_sp, d_pair_displs_K_dd, d_pair_counts_K_sp, d_pair_counts_K_dd,
-            static_cast<uint32_t>(pair_inds_count_for_K_sd), TILE_DIM_Y_K, TILE_DIM_X_K, pd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_sd), TILE_DIM_Y_K, TILE_DIM_X_K, pd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSPDD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_sd,
@@ -11394,7 +11413,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_sd, d_pair_inds_k_for_K_sd, d_Q_K_sd, d_Q_K_dp, d_pair_displs_K_sd, d_pair_displs_K_dp, d_pair_counts_K_sd, d_pair_counts_K_dp,
-            static_cast<uint32_t>(pair_inds_count_for_K_sd), TILE_DIM_Y_K, TILE_DIM_X_K, dp_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_sd), TILE_DIM_Y_K, TILE_DIM_X_K, dp_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSDDP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_sd,
@@ -11469,7 +11488,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_sd, d_pair_inds_k_for_K_sd, d_Q_K_sd, d_Q_K_dd, d_pair_displs_K_sd, d_pair_displs_K_dd, d_pair_counts_K_sd, d_pair_counts_K_dd,
-            static_cast<uint32_t>(pair_inds_count_for_K_sd), TILE_DIM_Y_K, TILE_DIM_X_K, dd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_sd), TILE_DIM_Y_K, TILE_DIM_X_K, dd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockSDDD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_sd,
@@ -11590,7 +11609,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_ps, d_Q_K_ds, d_pair_displs_K_ps, d_pair_displs_K_ds, d_pair_counts_K_ps, d_pair_counts_K_ds,
-            static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, ss_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, ss_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockPSDS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pd,
@@ -11665,7 +11684,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_ps, d_Q_K_dp, d_pair_displs_K_ps, d_pair_displs_K_dp, d_pair_counts_K_ps, d_pair_counts_K_dp,
-            static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, sp_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, sp_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockPSDP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pd,
@@ -11740,7 +11759,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_pp, d_Q_K_ds, d_pair_displs_K_pp, d_pair_displs_K_ds, d_pair_counts_K_pp, d_pair_counts_K_ds,
-            static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, ps_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, ps_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockPPDS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pd,
@@ -11815,7 +11834,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_ps, d_Q_K_dd, d_pair_displs_K_ps, d_pair_displs_K_dd, d_pair_counts_K_ps, d_pair_counts_K_dd,
-            static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, sd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, sd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockPSDD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pd,
@@ -11890,7 +11909,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_pd, d_Q_K_ds, d_pair_displs_K_pd, d_pair_displs_K_ds, d_pair_counts_K_pd, d_pair_counts_K_ds,
-            static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, ds_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, ds_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockPDDS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pd,
@@ -11965,7 +11984,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_pp, d_Q_K_dp, d_pair_displs_K_pp, d_pair_displs_K_dp, d_pair_counts_K_pp, d_pair_counts_K_dp,
-            static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, pp_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, pp_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockPPDP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pd,
@@ -12034,7 +12053,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_pp, d_Q_K_dd, d_pair_displs_K_pp, d_pair_displs_K_dd, d_pair_counts_K_pp, d_pair_counts_K_dd,
-            static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, pd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, pd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockPPDD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pd,
@@ -12102,7 +12121,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_pd, d_Q_K_dp, d_pair_displs_K_pd, d_pair_displs_K_dp, d_pair_counts_K_pd, d_pair_counts_K_dp,
-            static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, dp_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, dp_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockPDDP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pd,
@@ -12171,7 +12190,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_pd, d_Q_K_dd, d_pair_displs_K_pd, d_pair_displs_K_dd, d_pair_counts_K_pd, d_pair_counts_K_dd,
-            static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, dd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, dd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockPDDD0_K4_M23_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pd,
@@ -12456,7 +12475,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_ds, d_Q_K_ds, d_pair_displs_K_ds, d_pair_displs_K_ds, d_pair_counts_K_ds, d_pair_counts_K_ds,
-            static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, ss_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, ss_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockDSDS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
@@ -12513,7 +12532,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_ds, d_Q_K_dp, d_pair_displs_K_ds, d_pair_displs_K_dp, d_pair_counts_K_ds, d_pair_counts_K_dp,
-            static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, sp_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, sp_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockDSDP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
@@ -12584,7 +12603,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_dp, d_Q_K_ds, d_pair_displs_K_dp, d_pair_displs_K_ds, d_pair_counts_K_dp, d_pair_counts_K_ds,
-            static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, ps_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, ps_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockDPDS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
@@ -12657,7 +12676,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_ds, d_Q_K_dd, d_pair_displs_K_ds, d_pair_displs_K_dd, d_pair_counts_K_ds, d_pair_counts_K_dd,
-            static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, sd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, sd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockDSDD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
@@ -12725,7 +12744,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_dd, d_Q_K_ds, d_pair_displs_K_dd, d_pair_displs_K_ds, d_pair_counts_K_dd, d_pair_counts_K_ds,
-            static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, ds_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, ds_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockDDDS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
@@ -12793,7 +12812,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_dp, d_Q_K_dp, d_pair_displs_K_dp, d_pair_displs_K_dp, d_pair_counts_K_dp, d_pair_counts_K_dp,
-            static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, pp_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, pp_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockDPDP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
@@ -12854,7 +12873,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_dp, d_Q_K_dd, d_pair_displs_K_dp, d_pair_displs_K_dd, d_pair_counts_K_dp, d_pair_counts_K_dd,
-            static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, pd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, pd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockDPDD0_K4_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
@@ -13081,7 +13100,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_dd, d_Q_K_dp, d_pair_displs_K_dd, d_pair_displs_K_dp, d_pair_counts_K_dd, d_pair_counts_K_dp,
-            static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, dp_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, dp_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockDDDP0_K5_OLD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
@@ -13361,7 +13380,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuMemcpyAsync(d_exchange_displ_cuts, exchange_cuts.displ_cuts.data(), exchange_cuts.displ_cuts.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_dd, d_Q_K_dd, d_pair_displs_K_dd, d_pair_displs_K_dd, d_pair_counts_K_dd, d_pair_counts_K_dd,
-            static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, dd_max_D, mixed_precision_threshold_k, eri_threshold, stream);
+            static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, dd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
             gpu::computeExchangeFockDDDD0_K16_OLD_RUNTIME_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
@@ -14087,6 +14106,12 @@ computeFockOnGPU(const              CMolecule& molecule,
     {
         gpuSafe(gpuFreeAsync(d_exchange_displ_cuts, stream));
     }
+    if (d_exchange_work_counts != nullptr)
+    {
+        gpuSafe(gpuMemcpyAsync(exchange_work_counts[gpu_id].data(), d_exchange_work_counts,
+                               3 * sizeof(unsigned long long), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuFreeAsync(d_exchange_work_counts, stream));
+    }
 
     gpuSafe(gpuFreeAsync(d_pair_inds_i_for_K_ss, stream));
     gpuSafe(gpuFreeAsync(d_pair_inds_k_for_K_ss, stream));
@@ -14133,6 +14158,36 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuDeviceSynchronize());
 
     omptimers[thread_id].stop("K compute");
+    }
+
+    if (collect_exchange_fraction_stats)
+    {
+        unsigned long long fp64_work = 0;
+        unsigned long long fp32_work = 0;
+        unsigned long long screened_work = 0;
+
+        for (const auto& counts : exchange_work_counts)
+        {
+            fp64_work += counts[0];
+            fp32_work += counts[1];
+            screened_work += counts[2];
+        }
+
+        const auto computed_work = fp64_work + fp32_work;
+        const auto total_work = computed_work + screened_work;
+        const double fp32_fraction = computed_work > 0
+            ? static_cast<double>(fp32_work) / static_cast<double>(computed_work)
+            : 0.0;
+
+        std::ostringstream output;
+        output << "Exchange work fractions (rank-local tile pairs):\n"
+               << "  FP64: " << fp64_work << "\n"
+               << "  FP32: " << fp32_work << "\n"
+               << "  Screened: " << screened_work << "\n"
+               << "  Computed: " << computed_work << "\n"
+               << "  Total before screening: " << total_work << "\n"
+               << "  FP32 fraction of computed work: " << fp32_fraction << "\n";
+        std::cout << output.str();
     }
 
     timer.stop("Compute Fockmat");
