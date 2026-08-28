@@ -75,6 +75,8 @@ debug: $(VLX_LIBS)
 	mkdir -p ../build/python/veloxchem
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
+	$(RM) -r $(CURDIR)/../build/python/veloxchem/mofbuilder
+	$(CP) -r pymodule/mofbuilder $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
 	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py
@@ -89,6 +91,8 @@ release: $(VLX_LIBS)
 	mkdir -p ../build/python/veloxchem
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
+	$(RM) -r $(CURDIR)/../build/python/veloxchem/mofbuilder
+	$(CP) -r pymodule/mofbuilder $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
 	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py

@@ -30,8 +30,8 @@ CXX_DEB_FLG += -fPIC $(PYTHON_INC)
 
 # OpenMP interface
 
-OPENMP_INC := -I /opt/homebrew/Cellar/libomp/21.1.6/include 
-OPENMP_LD  := -L /opt/homebrew/Cellar/libomp/21.1.6/lib -lomp
+OPENMP_INC := -I /opt/homebrew/opt/libomp/include
+OPENMP_LD  := -L /opt/homebrew/opt/libomp/lib -lomp
 
 CXX_REL_FLG += $(OPENMP_INC)
 CXX_DEB_FLG += $(OPENMP_INC)
@@ -39,15 +39,15 @@ CXX_DEB_FLG += $(OPENMP_INC)
 # LibXC interface
 
 LIBXC_INC := -I /opt/libxc/include
-LIBXC_LD  := -L /opt/libxc/lib -lxc
+LIBXC_LD  := -L /opt/libxc/lib -lxc -Wl,-rpath,/opt/libxc/lib
 
 CXX_REL_FLG += $(LIBXC_INC)
 CXX_DEB_FLG += $(LIBXC_INC)
 
 # Boost interface
 
-LIBBST_INC := -I /opt/homebrew/Cellar/boost/1.90.0_1/include
-LIBBST_LD  := -L /opt/homebrew/Cellar/boost/1.90.0_1/lib -lboost_math_c99
+LIBBST_INC := -I /opt/homebrew/opt/boost/include
+LIBBST_LD  := -L /opt/homebrew/opt/boost/lib -lboost_math_c99
 
 CXX_REL_FLG += $(LIBBST_INC)
 CXX_DEB_FLG += $(LIBBST_INC)
