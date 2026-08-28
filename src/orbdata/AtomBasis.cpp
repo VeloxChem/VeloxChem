@@ -33,7 +33,6 @@
 #include "AtomBasis.hpp"
 
 #include <algorithm>
-#include <numeric>
 #include <ranges>
 
 #include "ChemicalElement.hpp"
@@ -292,9 +291,13 @@ CAtomBasis::number_of_basis_functions(const int angular_momentum, const size_t n
 auto
 CAtomBasis::number_of_primitive_functions(const int angular_momentum) const -> size_t
 {
-    return std::accumulate(_functions.begin(), _functions.end(), size_t{0}, [=](const size_t &sum, const auto &bf) {
-        return (bf.get_angular_momentum() == angular_momentum) ? sum + bf.number_of_primitive_functions() : sum;
+    auto npgtos = size_t{0};
+
+    std::ranges::for_each(_functions, [&](const auto &bf) {
+        if (bf.get_angular_momentum() == angular_momentum) npgtos += bf.number_of_primitive_functions();
     });
+
+    return npgtos;
 }
 
 auto
