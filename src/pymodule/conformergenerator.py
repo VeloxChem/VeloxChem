@@ -289,6 +289,21 @@ class ConformerGenerator:
         # convert to zero based index
         rotatable_bonds_zero_based = [(i - 1, j - 1) for (i, j) in rotatable_bonds]
 
+        # Reject bonds that remain connected through a ring. Atom typing only
+        # detects cycles up to size 10, but rigid dihedral rotation cannot
+        # handle rings of any size.
+        rotatable_bonds_zero_based_refined = []
+        conn_matrix = molecule.get_connectivity_matrix()
+        for atom_i, atom_j in rotatable_bonds_zero_based:
+            conn_mat_copy = np.copy(conn_matrix)
+            conn_mat_copy[atom_i, atom_j] = 0
+            conn_mat_copy[atom_j, atom_i] = 0
+            atoms_connected_to_j = molecule.find_connected_atoms(
+                atom_j, conn_mat_copy)
+            if atom_i not in atoms_connected_to_j:
+                rotatable_bonds_zero_based_refined.append((atom_i, atom_j))
+        rotatable_bonds_zero_based = rotatable_bonds_zero_based_refined
+
         rotatable_dihedrals_dict = {}
 
         def get_max_periodicity(periodicity):
