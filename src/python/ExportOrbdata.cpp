@@ -106,8 +106,7 @@ export_orbdata(py::module &m)
         .def(py::pickle(
             [](const CBasisFunction &bf) { return py::make_tuple(bf.get_exponents(), bf.get_normalization_factors(), bf.get_angular_momentum()); },
             [](py::tuple t) { return CBasisFunction(t[0].cast<std::vector<double>>(), t[1].cast<std::vector<double>>(), t[2].cast<int>()); }))
-        .def("set_exponents", &CBasisFunction::set_exponents, "Sets exponents of basis function.")
-        .def("set_normalization_factors", &CBasisFunction::set_normalization_factors, "Gets name of chemical element.")
+        .def("set_primitives", &CBasisFunction::set_primitives, "Sets exponents and normalization factors of basis function.")
         .def("set_angular_momentum", &CBasisFunction::set_angular_momentum, "Sets angular momentum of basis function.")
         .def("add",
              &CBasisFunction::add,
@@ -118,6 +117,11 @@ export_orbdata(py::module &m)
         .def("get_normalization_factors", &CBasisFunction::get_normalization_factors, "Gets vector of normalization factors in basis function.")
         .def("get_angular_momentum", &CBasisFunction::get_angular_momentum, "Gets angular momentum of basis function.")
         .def("number_of_primitives", &CBasisFunction::number_of_primitive_functions, "Gets number of primitives in basis function.")
+        .def("largest_exponent", &CBasisFunction::largest_exponent, "Gets largest exponent in basis function.")
+        .def("smallest_exponent", &CBasisFunction::smallest_exponent, "Gets smallest exponent in basis function.")
+        .def("sum_of_absolute_norms",
+             &CBasisFunction::sum_of_absolute_norms,
+             "Gets sum of absolute values of normalization factors in basis function.")
         .def("__eq__", [](const CBasisFunction &self, const CBasisFunction &other) { return self == other; })
         .def("__copy__", [](const CBasisFunction &self) { return CBasisFunction(self); })
         .def("__deepcopy__", [](const CBasisFunction &self, py::dict) { return CBasisFunction(self); });

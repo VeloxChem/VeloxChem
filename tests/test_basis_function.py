@@ -28,18 +28,11 @@ class TestBasisFunction:
         bf_b.add(2.7, -0.5)
         assert bf_a == bf_b
 
-    def test_set_exponents(self):
+    def test_set_primitives(self):
 
         bf_a = self.basis_funtion(2)
-        bf_a.set_exponents([0.2, 0.9, 1.7])
+        bf_a.set_primitives([0.2, 0.9, 1.7], [2.4, 0.7, -0.5])
         bf_b = BasisFunction([0.2, 0.9, 1.7], [2.4, 0.7, -0.5], 2)
-        assert bf_a == bf_b
-
-    def test_set_normalization_factors(self):
-
-        bf_a = self.basis_funtion(2)
-        bf_a.set_normalization_factors([0.2, 0.9, 1.7])
-        bf_b = BasisFunction([0.8, 1.5, 2.7], [0.2, 0.9, 1.7], 2)
         assert bf_a == bf_b
 
     def test_set_angular_momentum(self):
@@ -107,13 +100,29 @@ class TestBasisFunction:
             [0.1678350767963739, 0.5170401872124587, -3.3470959216753484], 6)
         assert bf_a == bf_b
 
+        # testing normalization for k functions
+        bf_a = self.basis_funtion(7)
+        bf_a.normalize()
+        bf_b = BasisFunction(
+            [0.8000000000000000, 1.5000000000000000, 2.700000000000000],
+            [0.08319205663560489, 0.35093288395965505, -3.0479243001972063], 7)
+        assert bf_a == bf_b
+
+        # testing normalization for l functions
+        bf_a = self.basis_funtion(8)
+        bf_a.normalize()
+        bf_b = BasisFunction(
+            [0.8000000000000000, 1.5000000000000000, 2.700000000000000],
+            [0.038419661506011345, 0.2219199647901377, -2.5859060270839938], 8)
+        assert bf_a == bf_b
+
     def test_get_exponents(self):
 
         tol = 1.0e-12
 
         bf = self.basis_funtion(2)
         fe_a = np.array(bf.get_exponents())
-        fe_b = np.array([0.8, 1.5, 2.7])
+        fe_b = np.array([2.7, 1.5, 0.8])
         assert np.allclose(fe_a, fe_b, tol, tol, False)
 
     def test_get_normalization_factors(self):
@@ -122,7 +131,7 @@ class TestBasisFunction:
 
         bf = self.basis_funtion(2)
         fn_a = np.array(bf.get_normalization_factors())
-        fn_b = np.array([2.4, 0.7, -0.5])
+        fn_b = np.array([-0.5, 0.7, 2.4])
         assert np.allclose(fn_a, fn_b, tol, tol, False)
 
     def test_get_angular_momentum(self):
@@ -134,6 +143,50 @@ class TestBasisFunction:
 
         bf = self.basis_funtion(2)
         assert bf.number_of_primitives() == 3
+
+    def test_descending_order(self):
+
+        tol = 1.0e-12
+
+        # primitives are stored by descending exponent, norms follow
+
+        bf = self.basis_funtion(2)
+        assert np.allclose(np.array(bf.get_exponents()),
+                           np.array([2.7, 1.5, 0.8]), tol, tol, False)
+        assert np.allclose(np.array(bf.get_normalization_factors()),
+                           np.array([-0.5, 0.7, 2.4]), tol, tol, False)
+
+        # ordering is also established when built incrementally
+
+        bf = BasisFunction([], [], 2)
+        bf.add(0.8, 2.4)
+        bf.add(2.7, -0.5)
+        bf.add(1.5, 0.7)
+        assert bf == self.basis_funtion(2)
+
+    def test_largest_and_smallest_exponent(self):
+
+        bf = self.basis_funtion(2)
+        assert bf.largest_exponent() == 2.7
+        assert bf.smallest_exponent() == 0.8
+
+        bf = BasisFunction([], [], 2)
+        assert bf.largest_exponent() == 0.0
+        assert bf.smallest_exponent() == 0.0
+
+    def test_sum_of_absolute_norms(self):
+
+        tol = 1.0e-12
+
+        bf = self.basis_funtion(2)
+        assert abs(bf.sum_of_absolute_norms() - 3.6) < tol
+
+        bf.normalize()
+        ref = sum([abs(c) for c in bf.get_normalization_factors()])
+        assert abs(bf.sum_of_absolute_norms() - ref) < tol
+
+        bf = BasisFunction([], [], 2)
+        assert bf.sum_of_absolute_norms() == 0.0
 
     def test_mpi_bcast(self):
 

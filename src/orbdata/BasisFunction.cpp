@@ -34,9 +34,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 #include <ranges>
 
 #include "CustomViews.hpp"
+#include "ErrorHandler.hpp"
 #include "MathConst.hpp"
 #include "MathFunc.hpp"
 
@@ -47,6 +49,8 @@ CBasisFunction::CBasisFunction()
     , _norms{}
 
     , _angular_momentum(-1)
+
+    , _sum_abs_norms(0.0)
 {
 }
 
@@ -57,7 +61,12 @@ CBasisFunction::CBasisFunction(const std::vector<double> &exponents, const std::
     , _norms(norms)
 
     , _angular_momentum(angular_momentum)
+
+    , _sum_abs_norms(0.0)
 {
+    _sort();
+
+    _update_sum_abs_norms();
 }
 
 CBasisFunction::CBasisFunction(const CBasisFunction &other)
@@ -67,6 +76,8 @@ CBasisFunction::CBasisFunction(const CBasisFunction &other)
     , _norms(other._norms)
 
     , _angular_momentum(other._angular_momentum)
+
+    , _sum_abs_norms(other._sum_abs_norms)
 {
 }
 
@@ -76,7 +87,9 @@ CBasisFunction::CBasisFunction(CBasisFunction &&other) noexcept
 
     , _norms(std::move(other._norms))
 
-    , _angular_momentum(std::move(other._angular_momentum))
+    , _angular_momentum(other._angular_momentum)
+
+    , _sum_abs_norms(other._sum_abs_norms)
 {
 }
 
@@ -88,6 +101,8 @@ CBasisFunction::operator=(const CBasisFunction &other) -> CBasisFunction &
     _norms = other._norms;
 
     _angular_momentum = other._angular_momentum;
+
+    _sum_abs_norms = other._sum_abs_norms;
 
     return *this;
 }
@@ -101,7 +116,9 @@ CBasisFunction::operator=(CBasisFunction &&other) noexcept -> CBasisFunction &
 
         _norms = std::move(other._norms);
 
-        _angular_momentum = std::move(other._angular_momentum);
+        _angular_momentum = other._angular_momentum;
+
+        _sum_abs_norms = other._sum_abs_norms;
     }
 
     return *this;
@@ -132,15 +149,18 @@ CBasisFunction::operator!=(const CBasisFunction &other) const -> bool
 }
 
 auto
-CBasisFunction::set_exponents(const std::vector<double> &exponents) -> void
+CBasisFunction::set_primitives(const std::vector<double> &exponents, const std::vector<double> &norms) -> void
 {
-    _exponents = exponents;
-}
+    errors::assertMsgCritical(exponents.size() == norms.size(),
+                              std::string("BasisFunction: Inconsistent number of exponents and normalization factors"));
 
-auto
-CBasisFunction::set_normalization_factors(const std::vector<double> &norms) -> void
-{
+    _exponents = exponents;
+
     _norms = norms;
+
+    _sort();
+
+    _update_sum_abs_norms();
 }
 
 auto
@@ -155,13 +175,17 @@ CBasisFunction::add(const double exponent, const double norm) -> void
     _exponents.push_back(exponent);
 
     _norms.push_back(norm);
+
+    _sort();
+
+    _update_sum_abs_norms();
 }
 
 auto
 CBasisFunction::normalize() -> void
 {
-    // TODO: Implemented for l > 6
-    if (_angular_momentum > 6) return;
+    errors::assertMsgCritical(_exponents.size() == _norms.size(),
+                              std::string("BasisFunction: Inconsistent number of exponents and normalization factors"));
 
     if (_exponents.size() == 1) _norms[0] = 1.0;
 
@@ -174,6 +198,8 @@ CBasisFunction::normalize() -> void
     fact = 1.0 / std::sqrt(fact);
 
     std::ranges::for_each(_norms, [=](double &norm) { norm *= fact; });
+
+    _update_sum_abs_norms();
 }
 
 auto
@@ -201,6 +227,72 @@ CBasisFunction::number_of_primitive_functions() const -> size_t
 }
 
 auto
+CBasisFunction::exponents() const -> const std::vector<double> &
+{
+    return _exponents;
+}
+
+auto
+CBasisFunction::normalization_factors() const -> const std::vector<double> &
+{
+    return _norms;
+}
+
+auto
+CBasisFunction::largest_exponent() const -> double
+{
+    return _exponents.empty() ? 0.0 : _exponents.front();
+}
+
+auto
+CBasisFunction::smallest_exponent() const -> double
+{
+    return _exponents.empty() ? 0.0 : _exponents.back();
+}
+
+auto
+CBasisFunction::sum_of_absolute_norms() const -> double
+{
+    return _sum_abs_norms;
+}
+
+auto
+CBasisFunction::_sort() -> void
+{
+    if (_exponents.size() != _norms.size()) return;
+
+    std::vector<size_t> indices(_exponents.size());
+
+    std::iota(indices.begin(), indices.end(), size_t{0});
+
+    std::ranges::stable_sort(indices, [&](const auto i, const auto j) { return _exponents[i] > _exponents[j]; });
+
+    std::vector<double> exponents, norms;
+
+    exponents.reserve(_exponents.size());
+
+    norms.reserve(_norms.size());
+
+    std::ranges::for_each(indices, [&](const auto i) {
+        exponents.push_back(_exponents[i]);
+
+        norms.push_back(_norms[i]);
+    });
+
+    _exponents = std::move(exponents);
+
+    _norms = std::move(norms);
+}
+
+auto
+CBasisFunction::_update_sum_abs_norms() -> void
+{
+    _sum_abs_norms = 0.0;
+
+    std::ranges::for_each(_norms, [&](const auto norm) { _sum_abs_norms += std::fabs(norm); });
+}
+
+auto
 CBasisFunction::_rescale() -> void
 {
     // NOTE: Primitive Gaussians are normalized using standard solid harmonic
@@ -208,58 +300,22 @@ CBasisFunction::_rescale() -> void
     // N_eta = 1 / sqrt(integral |S^l_m(r)exp(-eta r^2)| dr)
     //       = (2 eta / pi)^3/4 sqrt[(4 eta)^l / (2l - 1)!!]
     // J. Chem. Theory Comput. 2020, https://doi.org/10.1021/acs.jctc.9b01296
-    
+
     constexpr auto fpi = 2.0 / mathconst::pi_value();
 
-    std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()), [&](const auto i) { _norms[i] *= std::pow(_exponents[i] * fpi, 0.75); });
+    const auto fact = 1.0 / std::sqrt(mathfunc::double_factorial(2 * _angular_momentum - 1));
 
-    if (_angular_momentum == 1)
-    {
-        std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()), [&](const auto i) { _norms[i] *= 2.0 * std::sqrt(_exponents[i]); });
-    }
-    else if (_angular_momentum == 2)
-    {
-        const double fact = 4.0 / std::sqrt(3.0);
-
-        std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()), [&](const auto i) { _norms[i] *= fact * _exponents[i]; });
-    }
-    else if (_angular_momentum == 3)
-    {
-        const double fact = 8.0 / std::sqrt(15.0);
-
-        std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
-                              [&](const auto i) { _norms[i] *= fact * _exponents[i] * std::sqrt(_exponents[i]); });
-    }
-    else if (_angular_momentum == 4)
-    {
-        const double fact = 16.0 / std::sqrt(105.0);
-
-        std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
-                              [&](const auto i) { _norms[i] *= fact * _exponents[i] * _exponents[i]; });
-    }
-    else if (_angular_momentum == 5)
-    {
-        const double fact = 32.0 / std::sqrt(945.0);
-
-        std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
-                              [&](const auto i) { _norms[i] *= fact * _exponents[i] * _exponents[i] * std::sqrt(_exponents[i]); });
-    }
-    else if (_angular_momentum == 6)
-    {
-        const double fact = 64.0 / std::sqrt(10395.0);
-
-        std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
-                              [&](const auto i) { _norms[i] *= fact * _exponents[i] * _exponents[i] * _exponents[i]; });
-    }
-    else
-    {
-        // TODO: implement l > 6
-    }
+    std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()), [&](const auto i) {
+        _norms[i] *= fact * std::pow(_exponents[i] * fpi, 0.75) * std::pow(2.0 * std::sqrt(_exponents[i]), _angular_momentum);
+    });
 }
 
 auto
 CBasisFunction::_overlap(const std::pair<size_t, size_t> &index) const -> double
 {
+    // NOTE: Self-overlap of solid harmonic primitives reduces to
+    // (2l - 1)!! (1 / (2 (eta_i + eta_j)))^l times the S type overlap.
+
     const auto [i, j] = index;
 
     const auto fab = 1.0 / (_exponents[i] + _exponents[j]);
@@ -270,37 +326,5 @@ CBasisFunction::_overlap(const std::pair<size_t, size_t> &index) const -> double
 
     if (i != j) fovl *= 2.0;
 
-    if (_angular_momentum == 0)
-    {
-        return fovl;
-    }
-    else if (_angular_momentum == 1)
-    {
-        return 0.5 * fab * fovl;
-    }
-    else if (_angular_momentum == 2)
-    {
-        return 0.75 * fab * fab * fovl;
-    }
-    else if (_angular_momentum == 3)
-    {
-        return 1.875 * fab * fab * fab * fovl;
-    }
-    else if (_angular_momentum == 4)
-    {
-        return 6.5625 * fab * fab * fab * fab * fovl;
-    }
-    else if (_angular_momentum == 5)
-    {
-        return 29.53125 * fab * fab * fab * fab * fab * fovl;
-    }
-    else if (_angular_momentum == 6)
-    {
-        return 162.421875 * fab * fab * fab * fab * fab * fab * fovl;
-    }
-    else
-    {
-        // TODO: implement l > 6
-        return 0.0;
-    }
+    return mathfunc::double_factorial(2 * _angular_momentum - 1) * std::pow(0.5 * fab, _angular_momentum) * fovl;
 }

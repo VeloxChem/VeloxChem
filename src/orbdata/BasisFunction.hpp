@@ -84,15 +84,11 @@ class CBasisFunction
     /// @return True if basis functions are not equal, False otherwise.
     auto operator!=(const CBasisFunction &other) const -> bool;
 
-    /// @brief Sets exponents of primittive Gaussian functions to specific vector
-    /// of exponents.
+    /// @brief Sets primitive Gaussian functions to specific vectors of exponents
+    /// and normalization factors.
     /// @param exponents The vector of exponents.
-    auto set_exponents(const std::vector<double> &exponents) -> void;
-
-    /// @brief Sets normalization factors of primitive Gaussian functions to
-    /// specific vector of normalization factors.
     /// @param norms The vector of normalization factors.
-    auto set_normalization_factors(const std::vector<double> &norms) -> void;
+    auto set_primitives(const std::vector<double> &exponents, const std::vector<double> &norms) -> void;
 
     /// @brief Set angular momentum of basis function.
     /// @param angular_momentum The angular momentum value to set.
@@ -124,6 +120,27 @@ class CBasisFunction
     /// @return The number of primitive Gaussian functions in basis function.
     auto number_of_primitive_functions() const -> size_t;
 
+    /// @brief Gets vector of exponents of primitive Gaussian functions.
+    /// @return The constant reference to vector of exponents.
+    auto exponents() const -> const std::vector<double> &;
+
+    /// @brief Gets vector of normalization factors of primitive Gaussian
+    /// functions.
+    /// @return The constant reference to vector of normalization factors.
+    auto normalization_factors() const -> const std::vector<double> &;
+
+    /// @brief Gets largest exponent of primitive Gaussian functions.
+    /// @return The largest exponent, 0.0 if basis function has no primitives.
+    auto largest_exponent() const -> double;
+
+    /// @brief Gets smallest exponent of primitive Gaussian functions.
+    /// @return The smallest exponent, 0.0 if basis function has no primitives.
+    auto smallest_exponent() const -> double;
+
+    /// @brief Gets sum of absolute values of normalization factors.
+    /// @return The sum of absolute values of normalization factors.
+    auto sum_of_absolute_norms() const -> double;
+
    private:
     /// @brief The vector of exponents of primitive Gaussian functions.
     std::vector<double> _exponents;
@@ -134,6 +151,16 @@ class CBasisFunction
 
     /// @brief The angular momentum of basis function.
     int _angular_momentum;
+
+    /// @brief The sum of absolute values of normalization factors.
+    double _sum_abs_norms;
+
+    /// @brief Sorts primitive Gaussian functions by descending exponent,
+    /// permuting exponents and normalization factors together.
+    auto _sort() -> void;
+
+    /// @brief Updates sum of absolute values of normalization factors.
+    auto _update_sum_abs_norms() -> void;
 
     /// @brief Rescales normalization factors to match normalization of spherical
     /// (l,0) component of basis function.
