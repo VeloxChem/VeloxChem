@@ -512,6 +512,14 @@ class ConformerGenerator:
             self.bh_perturb in ('grid', 'continuous'),
             "ConformerGenerator: bh_perturb must be 'grid' or 'continuous'."
         )
+        assert_msg_critical(
+            isinstance(self.bh_steps, (int, np.integer)) and self.bh_steps > 0,
+            "ConformerGenerator: bh_steps must be a positive integer."
+        )
+        assert_msg_critical(
+            np.isfinite(self.bh_temperature) and self.bh_temperature > 0.0,
+            "ConformerGenerator: bh_temperature must be positive and finite."
+        )
 
         # minimize the starting geometry first
         current_energy, current_coords = self._minimize_energy(
