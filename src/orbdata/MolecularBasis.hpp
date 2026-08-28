@@ -39,6 +39,7 @@
 #include <vector>
 
 #include "AtomBasis.hpp"
+#include "AtomBasisGroup.hpp"
 #include "Molecule.hpp"
 #include "AtomCorePotential.hpp"
 
@@ -99,6 +100,12 @@ class CMolecularBasis
     /// @param atoms The vector of atoms.
     /// @return The molecular basis for selected atoms.
     auto slice(const std::vector<int> &atoms) const -> CMolecularBasis;
+
+    /// @brief Gets vector of atom basis groups, one per unique atom basis in
+    /// molecular basis. Groups refer to atom bases owned by this molecular
+    /// basis and are invalidated by any modification of it.
+    /// @return The vector of atom basis groups.
+    auto basis_groups() const -> std::vector<CAtomBasisGroup>;
 
     /// @brief Gets vector of unique atom bases.
     /// @return The vector of atom bases.

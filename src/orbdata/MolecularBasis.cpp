@@ -157,6 +157,23 @@ CMolecularBasis::slice(const std::vector<int> &atoms) const -> CMolecularBasis
 }
 
 auto
+CMolecularBasis::basis_groups() const -> std::vector<CAtomBasisGroup>
+{
+    std::vector<std::vector<int>> atoms(_basis_sets.size());
+
+    std::ranges::for_each(std::views::iota(0, static_cast<int>(_indices.size())), [&](const int i) { atoms[_indices[i]].push_back(i); });
+
+    std::vector<CAtomBasisGroup> groups;
+
+    groups.reserve(_basis_sets.size());
+
+    std::ranges::for_each(std::views::iota(size_t{0}, _basis_sets.size()),
+                          [&](const auto i) { groups.push_back(CAtomBasisGroup(_basis_sets[i], atoms[i])); });
+
+    return groups;
+}
+
+auto
 CMolecularBasis::basis_sets() const -> std::vector<CAtomBasis>
 {
     return _basis_sets;
