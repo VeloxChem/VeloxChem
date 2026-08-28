@@ -195,6 +195,10 @@ class CMolecularBasis
     /// @return The vector of atomic indices.
     auto atomic_indices(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const -> std::vector<int>;
 
+    /// @brief Determines number of basis functions in molecular basis.
+    /// @return The number of basis functions.
+    auto number_of_basis_functions() const -> size_t;
+
     /// @brief Determines number of basis functions with specific angular
     /// momentum in molecular basis.
     /// @param angular_momentum The angular momentum of basis functions.

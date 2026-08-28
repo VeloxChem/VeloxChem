@@ -245,6 +245,7 @@ export_orbdata(py::module &m)
              "momentum and number of primitive GTOs from molecular basis for "
              "list of "
              "specific atoms.")
+        .def("number_of_basis_functions", py::overload_cast<>(&CMolecularBasis::number_of_basis_functions, py::const_), "Gets number of GTOs.")
         .def("number_of_basis_functions",
              py::overload_cast<const int>(&CMolecularBasis::number_of_basis_functions, py::const_),
              "Gets number of GTOs with specific angular momentum from molecular "

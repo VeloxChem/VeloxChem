@@ -615,6 +615,20 @@ class TestMolecularBasis:
         b_indexes = [0]
         assert a_indexes == b_indexes
 
+    def test_total_number_of_basis_functions(self):
+
+        basis = self.get_h2o_svp()
+
+        # total count matches the sum over angular momenta
+
+        assert basis.number_of_basis_functions() == 12
+        assert basis.number_of_basis_functions() == sum(
+            [basis.number_of_basis_functions(i) for i in range(4)])
+
+        # and matches the number of basis functions actually returned
+
+        assert basis.number_of_basis_functions() == len(basis.basis_functions())
+
     def test_number_of_basis_functions(self):
 
         # set up basis for water
