@@ -46,6 +46,7 @@ import logging
 import os
 import time
 import itertools
+import traceback
 from collections import Counter
 from dataclasses import dataclass
 from typing import Optional
@@ -62,14 +63,90 @@ from pathlib import Path
 from rdkit import Chem
 from rdkit.Chem import Draw, AllChem
 from veloxchem.atomtypeidentifier import AtomTypeIdentifier 
-
+import gc
+import ctypes
+try:
+    _LIBC = ctypes.CDLL("libc.so.6")
+except Exception:
+    _LIBC = None
 
 
 log = logging.getLogger(__name__)
 
 
+
+
+
+
+
+# ---------------------------------------------------------------------------
+# MPI helpers
+# ---------------------------------------------------------------------------
+try:
+    from mpi4py import MPI
+
+    MPI_COMM = MPI.COMM_WORLD
+    MPI_CTRL_COMM = MPI_COMM.Dup()  # separate communicator for Python control messages
+    MPI_RANK = MPI_COMM.Get_rank()
+    MPI_SIZE = MPI_COMM.Get_size()
+except Exception as exc:
+    # Serial fallback is OK. If the script was launched under MPI but mpi4py is
+    # missing, fail clearly instead of silently running duplicated serial jobs.
+    _mpi_env_vars = (
+        "OMPI_COMM_WORLD_RANK",
+        "PMI_RANK",
+        "PMIX_RANK",
+        "MV2_COMM_WORLD_RANK",
+        "SLURM_PROCID",
+    )
+    if any(var in os.environ for var in _mpi_env_vars):
+        raise RuntimeError(
+            "This script was launched under MPI, but mpi4py could not be imported. "
+            "Load/install mpi4py in the same environment as VeloxChem."
+        ) from exc
+
+    MPI_COMM = None
+    MPI_CTRL_COMM = None
+    MPI_RANK = 0
+    MPI_SIZE = 1
+
+def _cleanup_memory(where: str = "") -> None:
+    """Best-effort Python + glibc heap cleanup."""
+    gc.collect()
+
+    if _LIBC is not None:
+        try:
+            _LIBC.malloc_trim(0)
+        except Exception:
+            pass
+
+    if where:
+        _print0(f"[memory cleanup] {where}")
+
+def _is_rank0() -> bool:
+    return MPI_RANK == 0
+
+
+def _print0(*args, **kwargs) -> None:
+    if _is_rank0():
+        print(*args, flush=True, **kwargs)
+
+
+def _barrier() -> None:
+    if MPI_CTRL_COMM is not None:
+        MPI_CTRL_COMM.Barrier()
+
+
+def _bcast_from_rank0(obj):
+    if MPI_CTRL_COMM is None:
+        return obj
+    return MPI_CTRL_COMM.bcast(obj, root=0)
+
+
 def _status(msg: str, *args) -> None:
-    """Print and log a status message."""
+    """Print and log a status message from MPI rank 0 only."""
+    if not _is_rank0():
+        return
     rendered = msg % args if args else msg
     print(rendered, flush=True)
     log.info(rendered)
@@ -819,9 +896,20 @@ def _load_gibbs_from_h5(path: str) -> GibbsResult:
     return GibbsResult(**kwargs)
 
 def _save_to_h5(path: str, result: GibbsResult) -> None:
-    """Persist a GibbsResult to HDF5.  Warns if overwriting."""
+    """Persist a GibbsResult to HDF5 from MPI rank 0 only.
+
+    Deliberately NO MPI barrier here.  A barrier immediately after a rank-0
+    HDF5 write can hide the real failure point on multi-node runs: the other
+    ranks wait forever while rank 0 is still in filesystem/HDF5 finalisation.
+    State HDF5 writes are now queued and flushed after the expensive MPI
+    ET-state calculations have returned, so M can hand off cleanly to M+.
+    """
+    if not _is_rank0():
+        return
+
     if os.path.exists(path):
         log.warning("Overwriting HDF5 file: %s", path)
+
     with h5py.File(path, "w") as f:
         for key, val in result.as_dict().items():
             if val is None:
@@ -830,6 +918,7 @@ def _save_to_h5(path: str, result: GibbsResult) -> None:
                 f.create_dataset(key, data=val)
             except TypeError:
                 f.create_dataset(key, data=str(val))
+        f.flush()
 
 def _run_sp(
     mol_obj,
@@ -839,17 +928,17 @@ def _run_sp(
     dispersion: bool,
     solvation: Optional[str],
     mult: int,
-    tmp_prefix: str,
     smd_solvent: Optional[str] = None,
     cpcm_epsilon: Optional[float] = None,
     return_objects: bool = False,
 ) -> dict:
-    """Run one DFT single-point and return the SCF result dictionary.
+    """Run one DFT single-point.
 
-    If return_objects=True, also return the SCF driver and basis object so
-    density matrices can be reused for spin-density plotting without rerunning SCF.
+    If return_objects=False, return only small scalar values and explicitly
+    release the VeloxChem driver/basis before returning.
     """
     drv = vlx.ScfUnrestrictedDriver() if mult > 1 else vlx.ScfRestrictedDriver()
+
     drv.xcfun = xcfun
     drv.conv_thresh = 1e-6
     drv.ri_jk = ri_jk
@@ -862,17 +951,42 @@ def _run_sp(
     elif solvation == "cpcm" and cpcm_epsilon is not None and hasattr(drv, "cpcm_epsilon"):
         drv.cpcm_epsilon = cpcm_epsilon
 
-    drv.filename = tmp_prefix
-    drv.ostream.mute()
-
     basis = vlx.MolecularBasis.read(mol_obj, basis_name)
     results = drv.compute(mol_obj, basis)
 
     if return_objects:
         results["scf_driver"] = drv
         results["basis"] = basis
+        return results
 
-    return results
+    # Keep only plain Python scalars needed downstream.
+    clean = {}
+
+    for key in (
+        "scf_energy",
+        "energy",
+        "smd_energy",
+        "smd_solvation_energy",
+        "solvation_energy",
+    ):
+        if key in results:
+            try:
+                clean[key] = float(results[key])
+            except Exception:
+                clean[key] = results[key]
+
+    # Your downstream code expects this key.
+    if "scf_energy" not in clean and "energy" in clean:
+        clean["scf_energy"] = clean["energy"]
+
+    # Explicitly release big objects before the next SCF.
+    del results
+    del basis
+    del drv
+
+    _cleanup_memory("_run_sp finished")
+
+    return clean
 
 
 # ---------------------------------------------------------------------------
@@ -1116,16 +1230,12 @@ def _xtb_gibbs_correction(
     from veloxchem import XtbDriver, VibrationalAnalysis
 
     xtb_drv = XtbDriver()
-    xtb_drv.ostream.mute()
-
+    
     vib = VibrationalAnalysis(xtb_drv)
-    vib.ostream.mute()
+    
     vib.temperature = temperature
 
-    import io
-    from contextlib import redirect_stdout, redirect_stderr
-    with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
-        vib_results = vib.compute(mol_obj)
+    vib_results = vib.compute(mol_obj)
 
     gibbs  = float(vib_results['gibbs_free_energy'])
     e_xtb  = float(vib.hessian_driver.elec_energy)
@@ -1148,7 +1258,6 @@ def _scf_gibbs_correction(
     dispersion: bool = True,
     solvation: Optional[str] = None,
     mult: Optional[int] = None,
-    tmp_prefix: str = "scf_gibbs",
     smd_solvent: Optional[str] = None,
     cpcm_epsilon: Optional[float] = None,
 ) -> float:
@@ -1164,8 +1273,6 @@ def _scf_gibbs_correction(
         G_total = E_SP(solvent) + g_corr
     """
     from veloxchem import VibrationalAnalysis
-    import io
-    from contextlib import redirect_stdout, redirect_stderr
 
     if mult is None:
         mult = int(mol_obj.get_multiplicity())
@@ -1177,18 +1284,14 @@ def _scf_gibbs_correction(
     scf_drv.max_iter = 200
     scf_drv.dispersion = dispersion
 
-    scf_drv.filename = tmp_prefix
-    scf_drv.ostream.mute()
 
     basis = vlx.MolecularBasis.read(mol_obj, basis_name)
     scf_results = scf_drv.compute(mol_obj, basis)
 
     vib = VibrationalAnalysis(scf_drv)
-    vib.ostream.mute()
     vib.temperature = temperature
 
-    with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
-        vib_results = vib.compute(mol_obj, basis)
+    vib_results = vib.compute(mol_obj, basis)
 
     gibbs = float(vib_results["gibbs_free_energy"])
 
@@ -1301,97 +1404,74 @@ def _mm_gibbs_correction(
     hessian_step_size: float,
     openmm_platform: str,
     temperature: float = 298.15,
+    workdir: Optional[str] = None,
 ) -> float:
     """
-    Compute G_corr = G_thermal(MM) - E_MM  in Hartree.
+    Compute G_corr = G_thermal(MM) - E_MM in Hartree.
 
-    After building the GAFF topology, ``_repair_ff_bonds`` validates the
-    bonding against the DFT geometry and adds any missing bonds with
-    distance-scaled force constants before rebuilding the topology.  This
-    prevents radical cations and other unusual charge states from having
-    broken connectivity that produces unphysical Hessian eigenvalues.
-
-    All intermediate files are written to a TemporaryDirectory and deleted
-    automatically on exit.
-
-    Parameters
-    ----------
-    mol_obj           : VeloxChem Molecule at the optimised geometry.
-    hessian_step_size : Adaptive step ratio for MMHessianDriver.
-    openmm_platform   : OpenMM platform string ("CPU", "CUDA", ...).
-    temperature       : Temperature in Kelvin (default 298.15 K).
-
-    Returns
-    -------
-    float : G_corr in Hartree.
+    This helper no longer creates transient per-rank scratch directories.
+    If a work directory is supplied by the caller, all auxiliary files are
+    written there. If no directory is supplied, a deterministic local
+    ``_vlx_mm_gibbs_work`` directory is used.
     """
-    import tempfile
     from veloxchem import MMForceFieldGenerator, MMHessianDriver
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-
-        # ---- 1. Force field (EEM charges, no QM) ---------------------
-        ff_gen = MMForceFieldGenerator()
-        ff_gen.ostream.mute()
-        ff_gen.molecule_name = os.path.join(tmpdir, "mol")
-        ff_gen.create_topology(mol_obj, resp=False)
-
-        # ---- 2. Bond repair ------------------------------------------
-        # Check that every bond in the DFT geometry is present in the GAFF
-        # topology.  Missing bonds (common for radical cations) are added
-        # with geometry-derived force constants and the topology is rebuilt.
-        n_repaired = _repair_ff_bonds(ff_gen, mol_obj)
-        if n_repaired:
-            log.warning(
-                "  Bond repair: %d bond(s) missing from GAFF topology added "
-                "from DFT geometry with scaled force constants.  "
-                "Thermal correction for this state is approximate.",
-                n_repaired,
-            )
-
-        # ---- 3. Numerical MM Hessian + frequencies -------------------
-        # MMDriver is no longer needed for the energy -- E_MM is not used
-        # in the composite protocol (see comment at step 5 below).
-        # MMHessianDriver builds its own OpenMM simulation from ff_gen.
-        hess_drv = MMHessianDriver()
-        hess_drv.ostream.mute()
-        hess_drv.step_size       = hessian_step_size
-        hess_drv.openmm_platform = openmm_platform
-        hess_drv.filename_prefix = os.path.join(tmpdir, "hess_res")
-        hess_drv.compute(mol_obj, ff_gen)
-
-        # Sanity check: after skipping the 6 lowest modes (translations +
-        # rotations), count how many genuine vibrational modes are negative.
-        # A well-behaved GAFF force field should give zero or at most 1-2
-        # slightly negative modes from numerical noise in the finite differences.
-        # More than 20% negative internal modes indicates a broken force field.
-        n_atoms        = mol_obj.number_of_atoms()
-        n_internal     = max(1, 3 * n_atoms - 6)
-        sorted_freqs   = np.sort(hess_drv.frequencies)
-        internal_freqs = sorted_freqs[6:]   # skip 6 rigid-body modes
-        n_negative     = int(np.sum(internal_freqs < -10.0))   # < -10 cm^-1 is clearly unphysical
-        if n_negative > max(1, n_internal // 5):
-            raise ValueError(
-                f"MM Hessian has {n_negative}/{n_internal} negative internal "
-                f"frequencies (< -10 cm^-1) -- GAFF force field cannot describe "
-                f"charge={mol_obj.get_charge()}, mult={mol_obj.get_multiplicity()}. "
-                f"Most negative: {internal_freqs[0]:.1f} cm^-1."
-            )
-
-        # ---- 5. Vibrational and rigid-body thermal corrections -------
-        # We return three quantities:
-        #   g_vib       -- purely vibrational (ZPE + H_vib - T*S_vib)
-        #   g_trans_rot -- translational + rotational free energy
-        #   g_full      -- g_vib + g_trans_rot  (complete thermal correction)
-        #
-        # G_total = E_SP(DFT, solvent) + g_vib + g_trans_rot
-        #
-        # All three are stored in the HDF5 output for inspection.
-        # The DFT single-point provides the electronic energy reference;
-        # E_MM is never subtracted (it plays no role in the composite protocol).
-        g_vib, g_trans_rot, g_full = _thermal_gibbs(
-            mol_obj, hess_drv.frequencies, temperature
+    if workdir is None:
+        formula = _mol_formula(mol_obj)
+        charge = int(mol_obj.get_charge())
+        mult = int(mol_obj.get_multiplicity())
+        workdir = os.path.join(
+            os.getcwd(),
+            "_vlx_mm_gibbs_work",
+            f"{formula}_q{charge}_m{mult}_rank{MPI_RANK}",
         )
+
+    if _is_rank0():
+        os.makedirs(workdir, exist_ok=True)
+    _barrier()
+
+    # ---- 1. Force field (EEM charges, no QM) ---------------------
+    ff_gen = MMForceFieldGenerator()
+    ff_gen.molecule_name = os.path.join(workdir, "mol")
+    ff_gen.create_topology(mol_obj, resp=False)
+
+    # ---- 2. Bond repair ------------------------------------------
+    # Check that every bond in the DFT geometry is present in the GAFF
+    # topology. Missing bonds are added with geometry-derived force constants.
+    n_repaired = _repair_ff_bonds(ff_gen, mol_obj)
+    if n_repaired:
+        log.warning(
+            "  Bond repair: %d bond(s) missing from GAFF topology added "
+            "from DFT geometry with scaled force constants. Thermal correction "
+            "for this state is approximate.",
+            n_repaired,
+        )
+
+    # ---- 3. Numerical MM Hessian + frequencies -------------------
+    hess_drv = MMHessianDriver()
+    hess_drv.step_size = hessian_step_size
+    hess_drv.openmm_platform = openmm_platform
+    hess_drv.compute(mol_obj, ff_gen)
+
+    # Sanity check: after skipping the 6 lowest modes (translations +
+    # rotations), count how many genuine vibrational modes are negative.
+    n_atoms = mol_obj.number_of_atoms()
+    n_internal = max(1, 3 * n_atoms - 6)
+    sorted_freqs = np.sort(hess_drv.frequencies)
+    internal_freqs = sorted_freqs[6:]
+    n_negative = int(np.sum(internal_freqs < -10.0))
+    if n_negative > max(1, n_internal // 5):
+        raise ValueError(
+            f"MM Hessian has {n_negative}/{n_internal} negative internal "
+            f"frequencies (< -10 cm^-1) -- GAFF force field cannot describe "
+            f"charge={mol_obj.get_charge()}, mult={mol_obj.get_multiplicity()}. "
+            f"Most negative: {internal_freqs[0]:.1f} cm^-1."
+        )
+
+    # ---- 4. Vibrational and rigid-body thermal corrections -------
+    g_vib, g_trans_rot, g_full = _thermal_gibbs(
+        mol_obj, hess_drv.frequencies, temperature
+    )
 
     log.debug(
         "_mm_gibbs_correction: G_vib=%.6f  G_trans_rot=%.6f  G_full=%.6f au",
@@ -1409,7 +1489,6 @@ def _equiv_atom_groups(mol_obj) -> list[list[int]]:
     #from veloxchem import atomtypeidentifier
     try:
         idtf = AtomTypeIdentifier()
-        idtf.ostream.mute()
 
         # Generates the internal typing needed before identify_equivalences()
         idtf.generate_gaff_atomtypes(mol_obj)
@@ -1493,11 +1572,9 @@ class RedoxCalculator:
         G_total = E_SP(solvent, basis_sp, xcfun_sp)
                 + G_vib(xTB) + G_trans_rot(xTB)
 
-    The thermal correction uses xTB (GFN2-xTB) via VeloxChem's XtbDriver
-    and VibrationalAnalysis.  xTB correctly assigns X-H bond parameters
-    (O-H, N-H, C-H) and produces reliable vibrational frequencies for all
-    common organic and organometallic molecules without force-field typing
-    failures.
+    The thermal correction can be selected with ``gibbs_correction_method``:
+    ``"xtb"`` uses xTB/VibrationalAnalysis, ``"scf"`` uses an SCF Hessian,
+    and ``"none"`` skips the correction entirely so ``G_total = E_SP(solvent)``.
 
     Parameters
     ----------
@@ -1537,7 +1614,7 @@ class RedoxCalculator:
         conformer_cpcm_epsilon: float = 78.39,
         max_conformers: int = 5,
         conformer_basis: str = "def2-svp",
-        gibbs_correction_method: str = "xtb",
+        gibbs_correction_method: str = "none",
         scf_gibbs_basis: Optional[str] = None,
         scf_gibbs_xcfun: Optional[str] = None,
         scf_gibbs_solvation: Optional[str] = None,
@@ -1557,7 +1634,14 @@ class RedoxCalculator:
         self.conformer_cpcm_epsilon = conformer_cpcm_epsilon
         self.max_conformers = max_conformers
         self.conformer_basis = conformer_basis
-        self.gibbs_correction_method = str(gibbs_correction_method).lower()
+        self.gibbs_correction_method = str(gibbs_correction_method).strip().lower()
+        if self.gibbs_correction_method in {"no", "off", "skip", "zero"}:
+            self.gibbs_correction_method = "none"
+        if self.gibbs_correction_method not in {"none", "xtb", "scf"}:
+            raise ValueError(
+                f"Unsupported gibbs_correction_method {gibbs_correction_method!r}. "
+                "Use 'none', 'xtb', or 'scf'."
+            )
         self.scf_gibbs_basis = scf_gibbs_basis or basis_opt
         self.scf_gibbs_xcfun = scf_gibbs_xcfun or xcfun_opt
         self.scf_gibbs_solvation = scf_gibbs_solvation
@@ -1567,7 +1651,9 @@ class RedoxCalculator:
         self.sp_dispersion = sp_dispersion
 
         self._solvation_registry: dict[str, dict[str, float]] = {}
-        os.makedirs(self.output_folder, exist_ok=True)
+        if _is_rank0():
+            os.makedirs(self.output_folder, exist_ok=True)
+        _barrier()
 
     def _state_h5_path(self, mol_obj, label: str, file_tag: str = "") -> str:
         """Return the exact HDF5 path for one state."""
@@ -2003,6 +2089,10 @@ class RedoxCalculator:
     def calculate_spin_density_and_plot_from_scf(self, result: GibbsResult, mol_obj, basis, scf_driver,
         file_tag: str, state_name: str, out_subdir: str = "spin_density", threshold: float = 0.02) -> Optional[str]: 
         
+        # RDKit image generation and PNG writing are serial side effects.
+        if not _is_rank0():
+            return None
+
         if result is None:
             return None
 
@@ -2101,56 +2191,284 @@ class RedoxCalculator:
         return str(path)
     
     def _conformer_search(self, input_data, label: str):
+        """
+        MPI-safe conformer search.
+
+        Strategy
+        --------
+        1. Count systematic ConformerGenerator combinations on rank 0 only.
+           The private _get_dihedral_candidates() call is forced onto COMM_SELF
+           because it calls internal MPI barriers.
+        2. Broadcast the rank-0 count/decision to all ranks.
+        3. If combinations < 10000:
+           - all MPI ranks enter ConformerGenerator.generate(), because it is
+             already MPI-aware internally.
+           - only rank 0 receives/serializes the returned conformer dictionary.
+        4. If combinations >= 10000 or counting fails:
+           - only rank 0 runs OpenMMDynamics.conformational_sampling().
+        5. Rank 0 serializes conformers to XYZ and broadcasts them to all ranks.
+        6. All ranks enter the same SCF-ranking loop.
+        7. Rank 0 selects the lowest-energy conformer and broadcasts it.
+        """
         max_conformers = self.max_conformers
         basis_label = self.conformer_basis
 
-        conf_probe = vlx.ConformerGenerator()
-        dihedrals_candidates, _, _ = conf_probe._get_dihedral_candidates(input_data, f"mol_{label}",None)
+        charge = int(input_data.get_charge())
+        multiplicity = int(input_data.get_multiplicity())
 
-        dih_angles = [item[1] for item in dihedrals_candidates]
+        # ---------------------------------------------------------------
+        # Count systematic conformer combinations.
+        # Rank 0 only, using COMM_SELF, because _get_dihedral_candidates()
+        # calls internal MPI barriers and must not touch MPI_COMM_WORLD here.
+        # ---------------------------------------------------------------
+        n_combinations = None
+        count_failed = False
+        count_error = None
 
-        n_combinations = 1
-        for angles in dih_angles:
-            n_combinations *= len(angles)
+        if _is_rank0():
+            try:
+                if MPI_COMM is not None:
+                    try:
+                        conf_probe = vlx.ConformerGenerator(MPI.COMM_SELF)
+                    except TypeError:
+                        conf_probe = vlx.ConformerGenerator()
+                        if hasattr(conf_probe, "_comm"):
+                            conf_probe._comm = MPI.COMM_SELF
+                else:
+                    conf_probe = vlx.ConformerGenerator()
 
-        if n_combinations < 10000:
-            conf = vlx.ConformerGenerator()
-            conf.implicit_solvent_model = "gbn"
-            conf.partial_charges = input_data.get_partial_charges(input_data.get_charge())
-            conf.top_file_name = f"conf_{uuid.uuid4().hex[:8]}"
-            conf.solvent_dielectric = self.conformer_cpcm_epsilon
-            conformers_dict = conf.generate(input_data)
-            molecules = conformers_dict.get("molecules", [])
-        else:
-            _status(
-                "[%s] Too many conformer combinations (%d); using OpenMM conformational sampling.",
-                label,
-                n_combinations,
+                conf_probe.top_file_name = f"mol_{label}_probe"
+
+                dihedrals_candidates, _, _ = conf_probe._get_dihedral_candidates(
+                    input_data,
+                    conf_probe.top_file_name,
+                    None,
+                )
+
+                dih_angles = [item[1] for item in dihedrals_candidates]
+
+                n_combinations = 1
+                for angles in dih_angles:
+                    n_combinations *= len(angles)
+
+            except Exception as exc:
+                count_failed = True
+                count_error = str(exc)
+
+        # Broadcast rank-0 decision to all ranks on the control communicator.
+        n_combinations = _bcast_from_rank0(n_combinations)
+        count_failed = _bcast_from_rank0(count_failed)
+        count_error = _bcast_from_rank0(count_error)
+
+        if n_combinations is not None and not isinstance(n_combinations, int):
+            raise RuntimeError(
+                f"Internal MPI broadcast error for {label}: "
+                f"n_combinations should be int/None, got {type(n_combinations).__name__}. "
+                "Python broadcasts are still colliding with VeloxChem collectives."
             )
-            ff_gen = vlx.MMForceFieldGenerator()
-            ff_gen.partial_charges = input_data.get_partial_charges(input_data.get_charge())
-            ff_gen.create_topology(input_data)
 
-            omm = vlx.OpenMMDynamics()
-            omm.create_system_from_molecule(input_data, ff_gen, solvent="implicit")
-            omm.solvent_dielectric = self.conformer_cpcm_epsilon
+        if count_failed or n_combinations is None:
+            _status(
+                "[%s] Could not count conformer combinations (%s); "
+                "using OpenMM conformational sampling.",
+                label,
+                count_error,
+            )
+        else:
+            _status("[%s] Conformer combinations: %d", label, n_combinations)
 
-            sampled = omm.conformational_sampling(nsteps=10000, snapshots=100)
-            molecules = sampled.get("molecules", [])
+        use_openmm_sampling = (
+            count_failed
+            or n_combinations is None
+            or n_combinations >= 10000
+        )
+
+        # ---------------------------------------------------------------
+        # Generate conformers.
+        # - ConformerGenerator branch: all ranks enter generate().
+        # - OpenMMDynamics branch: rank 0 only, then broadcast.
+        # ---------------------------------------------------------------
+        generation_payload = None
+
+        if not use_openmm_sampling:
+            # ConformerGenerator is MPI-aware, so all ranks must enter.
+            if _is_rank0():
+                top_file_name = f"conf_{uuid.uuid4().hex[:8]}"
+            else:
+                top_file_name = None
+            top_file_name = _bcast_from_rank0(top_file_name)
+
+            try:
+                _status(
+                    "[%s] Using MPI ConformerGenerator (%d combinations).",
+                    label,
+                    n_combinations,
+                )
+
+                conf = vlx.ConformerGenerator()
+                conf.implicit_solvent_model = "gbn"
+                partial_charges = input_data.get_partial_charges(charge)
+                if partial_charges is not None:
+                    conf.partial_charges = partial_charges
+                conf.top_file_name = top_file_name
+                conf.solvent_dielectric = self.conformer_cpcm_epsilon
+
+                conformers_dict = conf.generate(input_data)
+
+                if _is_rank0():
+                    if isinstance(conformers_dict, dict):
+                        molecules_rank0 = conformers_dict.get("molecules", [])
+                    else:
+                        molecules_rank0 = []
+
+                    molecule_xyz = []
+                    for mol in molecules_rank0:
+                        mol.set_charge(charge)
+                        mol.set_multiplicity(multiplicity)
+                        molecule_xyz.append(_xyz_block(mol))
+
+                    generation_payload = {
+                        "ok": True,
+                        "molecule_xyz": molecule_xyz,
+                        "error": None,
+                    }
+
+            except Exception:
+                if _is_rank0():
+                    generation_payload = {
+                        "ok": False,
+                        "molecule_xyz": [],
+                        "error": traceback.format_exc(),
+                    }
+
+            generation_payload = _bcast_from_rank0(generation_payload)
+
+            if not isinstance(generation_payload, dict):
+                raise RuntimeError(
+                    f"Internal MPI broadcast error in ConformerGenerator branch for {label}: "
+                    f"expected dict, got {type(generation_payload).__name__}"
+                )
+
+            if not generation_payload["ok"]:
+                raise RuntimeError(
+                    f"ConformerGenerator failed for {label}:\n"
+                    + generation_payload["error"]
+                )
+
+        else:
+            # OpenMMDynamics is not used as an MPI-collective calculation here.
+            # Only rank 0 runs sampling, then all ranks receive the geometries.
+            if _is_rank0():
+                try:
+                    if n_combinations is None:
+                        _status(
+                            "[%s] Conformer count unknown; "
+                            "using rank-0 OpenMM conformational sampling.",
+                            label,
+                        )
+                    else:
+                        _status(
+                            "[%s] Too many conformer combinations (%d); "
+                            "using rank-0 OpenMM conformational sampling.",
+                            label,
+                            n_combinations,
+                        )
+
+                    if MPI_COMM is not None:
+                        try:
+                            ff_gen = vlx.MMForceFieldGenerator(MPI.COMM_SELF)
+                        except TypeError:
+                            ff_gen = vlx.MMForceFieldGenerator()
+                            if hasattr(ff_gen, "_comm"):
+                                ff_gen._comm = MPI.COMM_SELF
+                    else:
+                        ff_gen = vlx.MMForceFieldGenerator()
+
+                    partial_charges = input_data.get_partial_charges(charge)
+                    if partial_charges is not None:
+                        ff_gen.partial_charges = partial_charges
+                    ff_gen.molecule_name = f"mol_{uuid.uuid4().hex[:8]}"
+                    ff_gen.create_topology(input_data)
+
+                    omm = vlx.OpenMMDynamics()
+                    omm.create_system_from_molecule(input_data, ff_gen, solvent="implicit")
+                    omm.solvent_dielectric = self.conformer_cpcm_epsilon
+
+                    sampled = omm.conformational_sampling(
+                        nsteps=10000,
+                        snapshots=100,
+                    )
+
+                    if isinstance(sampled, dict):
+                        molecules_rank0 = sampled.get("molecules", [])
+                    else:
+                        molecules_rank0 = sampled or []
+
+                    molecule_xyz = []
+                    for mol in molecules_rank0:
+                        mol.set_charge(charge)
+                        mol.set_multiplicity(multiplicity)
+                        molecule_xyz.append(_xyz_block(mol))
+
+                    generation_payload = {
+                        "ok": True,
+                        "molecule_xyz": molecule_xyz,
+                        "error": None,
+                    }
+
+                except Exception:
+                    generation_payload = {
+                        "ok": False,
+                        "molecule_xyz": [],
+                        "error": traceback.format_exc(),
+                    }
+
+            generation_payload = _bcast_from_rank0(generation_payload)
+
+            if not isinstance(generation_payload, dict):
+                raise RuntimeError(
+                    f"Internal MPI broadcast error in OpenMM branch for {label}: "
+                    f"expected dict, got {type(generation_payload).__name__}"
+                )
+
+            if not generation_payload["ok"]:
+                raise RuntimeError(
+                    f"Rank 0 failed during OpenMM conformer sampling for {label}:\n"
+                    + generation_payload["error"]
+                )
+
+        molecules = []
+        for xyz in generation_payload["molecule_xyz"]:
+            mol = vlx.Molecule.read_xyz_string(xyz)
+            mol.set_charge(charge)
+            mol.set_multiplicity(multiplicity)
+            molecules.append(mol)
 
         if not molecules:
             _status("[%s] Conformer search produced no molecules; using input geometry.", label)
             return input_data
 
+        _status(
+            "[%s] Conformer search produced %d molecule(s); ranking up to %d.",
+            label,
+            len(molecules),
+            min(max_conformers, len(molecules)),
+        )
+
+        # ---------------------------------------------------------------
+        # Collective MPI section: SCF conformer ranking.
+        # Every rank must enter the same SCF calls in the same order.
+        # Do not catch-and-continue here: if one rank fails during a collective
+        # SCF call while another continues, MPI can hang.
+        # ---------------------------------------------------------------
         ranked_results = []
         n_to_rank = min(max_conformers, len(molecules))
 
         for i, molecule in enumerate(molecules[:n_to_rank], start=1):
-            
             _status("[%s] SMD SCF-ranking conformer %d/%d", label, i, n_to_rank)
 
-            molecule.set_charge(input_data.get_charge())
-            molecule.set_multiplicity(input_data.get_multiplicity())
+            molecule.set_charge(charge)
+            molecule.set_multiplicity(multiplicity)
 
             try:
                 basis = vlx.MolecularBasis.read(molecule, basis_label)
@@ -2163,53 +2481,67 @@ class RedoxCalculator:
 
                 scf_drv.xcfun = "b3lyp"
                 scf_drv.ri_jk = True
-                #if hasattr(scf_drv, "ri_coulomb"):
-                #    scf_drv.ri_coulomb = True
                 scf_drv.dispersion = True
                 scf_drv.solvation_model = "smd"
                 scf_drv.smd_solvent = self.smd_solvent
                 scf_drv.max_iter = 300
-                scf_drv.ostream.mute()
 
                 scf_results = scf_drv.compute(molecule, basis)
 
-                if scf_results is None:
-                    _status("[%s] Conformer %d SCF returned None; skipping.", label, i)
-                    continue
+                if _is_rank0():
+                    if scf_results is None:
+                        _status("[%s] Conformer %d SCF returned None; skipping.", label, i)
+                        continue
 
-                if "scf_energy" not in scf_results:
-                    _status("[%s] Conformer %d has no scf_energy; skipping.", label, i)
-                    continue
+                    if "scf_energy" not in scf_results:
+                        _status("[%s] Conformer %d has no scf_energy; skipping.", label, i)
+                        continue
 
-                scf_energy = float(scf_results["scf_energy"])
+                    scf_energy = float(scf_results["scf_energy"])
+                    ranked_results.append({
+                        "conformer_index": i,
+                        "energy_au": scf_energy,
+                        "geometry_xyz": _xyz_block(molecule),
+                    })
 
-                ranked_results.append({
-                    "conformer_index": i,
-                    "energy_au": scf_energy,
-                    "geometry_xyz": _xyz_block(molecule),
-                })
             except Exception as exc:
-                _status("[%s] Conformer %d SCF-ranking failed: %s", label, i, exc)
-                continue
+                raise RuntimeError(
+                    f"[{label}] Conformer {i} SCF-ranking failed on rank {MPI_RANK}: {exc}"
+                ) from exc
 
-        if not ranked_results:
-            _status("[%s] No conformers passed SMD SCF ranking; using input geometry.", label)
-            return input_data
+        # Rank 0 selects the best conformer and broadcasts it.
+        best_payload = None
+        if _is_rank0():
+            if not ranked_results:
+                _status("[%s] No conformers passed SMD SCF ranking; using input geometry.", label)
+                best_payload = {
+                    "geometry_xyz": _xyz_block(input_data),
+                    "conformer_index": 0,
+                    "energy_au": None,
+                }
+            else:
+                ranked_results.sort(key=lambda x: x["energy_au"])
+                best_payload = ranked_results[0]
+                _status(
+                    "[%s] Selected conformer %d with SMD SCF energy %.8f au.",
+                    label,
+                    best_payload["conformer_index"],
+                    best_payload["energy_au"],
+                )
 
-        ranked_results.sort(key=lambda x: x["energy_au"])
-        best = ranked_results[0]
+        best_payload = _bcast_from_rank0(best_payload)
 
-        _status(
-            "[%s] Selected conformer %d with SMD SCF energy %.8f au.",
-            label,
-            best["conformer_index"],
-            best["energy_au"],
-        )
+        if not isinstance(best_payload, dict):
+            raise RuntimeError(
+                f"Internal MPI broadcast error for best conformer in {label}: "
+                f"expected dict, got {type(best_payload).__name__}"
+            )
 
-        mol = vlx.Molecule.read_xyz_string(best["geometry_xyz"])
-        mol.set_charge(input_data.get_charge())
-        mol.set_multiplicity(input_data.get_multiplicity())
+        mol = vlx.Molecule.read_xyz_string(best_payload["geometry_xyz"])
+        mol.set_charge(charge)
+        mol.set_multiplicity(multiplicity)
 
+        _barrier()
         return mol
 
     def register_solvation(
@@ -2488,27 +2820,67 @@ class RedoxCalculator:
         file_name_base = f"{formula}_q{charge}_m{mult}_{label}{suffix}"
         h5_path = os.path.join(self.output_folder, f"{file_name_base}.h5")
 
-        if reuse_existing and os.path.exists(h5_path):
-            try:
-                log.info("compute_gibbs skip: loading existing state from %s", h5_path)
-                return _load_gibbs_from_h5(h5_path)
-            except Exception as exc:
+        existing_payload = None
+        # When corrections are disabled, do not reuse old state H5 files that
+        # may contain a previous xTB/SCF g_corr folded into g_total.
+        if reuse_existing and self.gibbs_correction_method != "none":
+            if _is_rank0() and os.path.exists(h5_path):
+                try:
+                    log.info("compute_gibbs skip: loading existing state from %s", h5_path)
+                    existing_payload = {
+                        "ok": True,
+                        "result": _load_gibbs_from_h5(h5_path),
+                        "error": None,
+                    }
+                except Exception as exc:
+                    existing_payload = {
+                        "ok": False,
+                        "result": None,
+                        "error": str(exc),
+                    }
+            elif _is_rank0():
+                existing_payload = {"ok": True, "result": None, "error": None}
+
+            existing_payload = _bcast_from_rank0(existing_payload)
+
+            if existing_payload is not None and existing_payload.get("result") is not None:
+                return existing_payload["result"]
+
+            if (
+                existing_payload is not None
+                and not existing_payload.get("ok", True)
+                and _is_rank0()
+            ):
                 log.warning(
                     "Existing HDF5 could not be read for %s (%s). Recomputing.",
                     h5_path,
-                    exc,
+                    existing_payload.get("error"),
                 )
 
         log.info("compute_gibbs start: %s", file_name_base)
 
-        import tempfile
-        with tempfile.TemporaryDirectory() as tmpdir:
-            return self._compute_gibbs_in_tmpdir(
-                mol_obj, label, file_name_base, charge, mult, tmpdir,
-            )
+        # IMPORTANT FOR MPI:
+        # Use one persistent shared work directory for all MPI ranks in this state.
+        # No per-rank scratch directory is created anywhere in compute_gibbs.
+        work_root = os.path.join(self.output_folder, "_vlx_work")
+        safe_file_name_base = (
+            str(file_name_base)
+            .replace("/", "_")
+            .replace("\\", "_")
+            .replace(" ", "_")
+        )
+        workdir = os.path.join(work_root, safe_file_name_base)
+
+        if _is_rank0():
+            os.makedirs(workdir, exist_ok=True)
+        _barrier()
+
+        return self._compute_gibbs_in_workdir(
+            mol_obj, label, file_name_base, charge, mult, workdir,
+        )
         
-    def _compute_gibbs_in_tmpdir(self, mol_obj, label, file_name_base, charge, mult, tmpdir):
-        """Inner implementation of compute_gibbs running inside a temp dir."""
+    def _compute_gibbs_in_workdir(self, mol_obj, label, file_name_base, charge, mult, workdir):
+        """Inner implementation of compute_gibbs running inside the per-state work directory."""
 
         # ---- DFT geometry optimisation --------------------------------
         # ri_jk is forced off here: ScfGradientDriver (called internally by
@@ -2567,25 +2939,27 @@ class RedoxCalculator:
         scf_opt.conv_thresh = 1e-5
         scf_opt.dispersion  = True
         scf_opt.grid_level  = 4
-        scf_opt.filename = os.path.join(tmpdir, "opt")
-        scf_opt.ostream.mute()
+        # Do not assign a VeloxChem checkpoint/output file name to the
+        # optimizer driver. On 2-node runs this can hang during finalization.
+        # The final state HDF5 is written explicitly by _save_to_h5() on
+        # rank 0 later, so the optimizer checkpoint file is unnecessary.
+        
         
         try:
             log.info("  [%s] Step 1: reading basis %s", label, self.basis_opt)
             basis_opt            = vlx.MolecularBasis.read(mol_obj, self.basis_opt)
             log.info("  [%s] Step 2: geometry optimisation", label)
             opt_drv              = vlx.OptimizationDriver(scf_opt)
-            opt_drv.conv_energy  = 1e-5
-            opt_drv.conv_grms    = 3e-4
-            opt_drv.conv_gmax    = 1.2e-3
-            opt_drv.max_iter     = 50
+            opt_drv.max_iter     = 150
             opt_drv.conv_maxiter = True
-            opt_drv.ostream.mute()
+            
 
-            import io
-            from contextlib import redirect_stdout, redirect_stderr
-            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
-                opt_res = opt_drv.compute(mol_obj, basis_opt)
+            _status("  [%s] DEBUG before OptimizationDriver.compute", label)
+            _print0('optimizing here')
+            opt_res = opt_drv.compute(mol_obj, basis_opt)
+            _status("  [%s] DEBUG after OptimizationDriver.compute returned", label)
+            _status("###########opt is done#########")
+            _status("€%€%€%€%€%€%€%€%€%€%€%€%€%€%€%€%€%€%€")
             final_xyz = opt_res["final_geometry"]
             log.info("  [%s] Step 2 done: geometry converged", label)
 
@@ -2632,114 +3006,62 @@ class RedoxCalculator:
 
             # ---- Gibbs thermal correction -----------------------------
             method = self.gibbs_correction_method
-
-            if method == "none":
-                log.info(
-                    "  [%s] Step 3: Gibbs correction SKIPPED",
-                    label,
-                )
-
-                g_corr = 0.0
-
-                # True here means this is intentional, not a failed correction.
-                # This prevents the later code from flagging the state as
-                # "SP-ONLY: Hessian failed".
-                mm_corr_ok = True
-
-            else:
-                log.info(
-                    "  [%s] Step 3: %s Gibbs correction",
-                    label,
-                    method.upper(),
-                )
-
-                try:
-                    if method == "xtb":
-                        g_corr = _xtb_gibbs_correction(
-                            opt_mol,
-                            temperature=self.temperature,
-                        )
-
-                    elif method == "scf":
-                        g_corr = _scf_gibbs_correction(
-                            opt_mol,
-                            basis_name=self.scf_gibbs_basis,
-                            xcfun=self.scf_gibbs_xcfun,
-                            temperature=self.temperature,
-                            ri_jk=False,
-                            dispersion=self.sp_dispersion,
-                            solvation=self.scf_gibbs_solvation,
-                            mult=mult,
-                            tmp_prefix=os.path.join(
-                                tmpdir,
-                                "scf_gibbs",
-                            ),
-                            smd_solvent=self.smd_solvent,
-                        )
-
-                    else:
-                        raise ValueError(
-                            f"Unsupported gibbs_correction_method "
-                            f"{method!r}. "
-                            "Use 'none', 'xtb', or 'scf'."
-                        )
-
-                    n_atoms_check = (
-                        opt_mol.number_of_atoms()
-                    )
-
-                    g_corr_limit = (
-                        0.05 * n_atoms_check
-                    )
-
-                    if abs(g_corr) > g_corr_limit:
-                        raise ValueError(
-                            f"g_corr = {g_corr:.4f} au "
-                            f"exceeds the plausible limit of "
-                            f"+/-{g_corr_limit:.3f} au for a "
-                            f"{n_atoms_check}-atom molecule."
-                        )
-
+            log.info("  [%s] Step 3: %s Gibbs correction", label, method.upper())
+            try:
+                if method == "none":
                     log.info(
-                        "  [%s] Step 3 done: "
-                        "g_corr = %.6f au",
+                        "  [%s] Step 3 skipped: gibbs_correction_method='none' "
+                        "so g_corr = 0.0 au",
                         label,
-                        g_corr,
                     )
-
-                    mm_corr_ok = True
-
-                except Exception as corr_exc:
-                    log.warning(
-                        "  [%s] Gibbs correction failed (%s). "
-                        "Setting g_corr = 0.0 and continuing "
-                        "with E_SP only.",
-                        label,
-                        corr_exc,
-                    )
-
                     g_corr = 0.0
-                    mm_corr_ok = False
+                elif method == "xtb":
+                    g_corr = _xtb_gibbs_correction(
+                        opt_mol,
+                        temperature=self.temperature,
+                    )
+                elif method == "scf":
+                    g_corr = _scf_gibbs_correction(
+                        opt_mol,
+                        basis_name=self.scf_gibbs_basis,
+                        xcfun=self.scf_gibbs_xcfun,
+                        temperature=self.temperature,
+                        ri_jk=False,
+                        dispersion=self.sp_dispersion,
+                        solvation=self.scf_gibbs_solvation,
+                        mult=mult,
+                        smd_solvent=self.smd_solvent,
+                    )
+                else:
+                    raise ValueError(
+                        f"Unsupported gibbs_correction_method {method!r}. "
+                        "Use 'none', 'xtb', or 'scf'."
+                    )
+
+                # Sanity check: thermal correction should be small relative
+                # to molecule size. A broken thermochemistry run can give
+                # wildly wrong values.
+                n_atoms_check = opt_mol.number_of_atoms()
+                g_corr_limit = 0.05 * n_atoms_check
+                if abs(g_corr) > g_corr_limit:
+                    raise ValueError(
+                        f"g_corr = {g_corr:.4f} au exceeds the plausible "
+                        f"limit of +/-{g_corr_limit:.3f} au for a "
+                        f"{n_atoms_check}-atom molecule."
+                    )
+                log.info("  [%s] Step 3 done: g_corr = %.6f au", label, g_corr)
+            except Exception as corr_exc:
+                log.warning(
+                    "  [%s] Gibbs correction failed (%s). "
+                    "Setting g_corr = 0.0 and continuing with E_SP only.",
+                    label, corr_exc,
+                )
+                g_corr = 0.0
+            mm_corr_ok = (g_corr != 0.0)
 
             # ---- DFT single-points --------------------------------------
-            log.info("  [%s] Step 4: solvent single-point (%s/%s)", label, self.xcfun_sp, self.basis_sp)
-
-            sp_solv = _run_sp(
-                opt_mol,
-                self.basis_sp,
-                self.xcfun_sp,
-                self.ri_jk,
-                self.sp_dispersion,
-                self.solvation_model,
-                mult,
-                os.path.join(tmpdir, "sp_solv"),
-                smd_solvent=self.smd_solvent,
-                return_objects=(mult != 1))
-
-            log.info("  [%s] Step 4 done: E_solvent = %.6f au", label, sp_solv["scf_energy"])
-
-            log.info("  [%s] Step 5: vacuum single-point", label)
-
+            _print0('vac single point')
+            _status("  [%s] vacuum SP starting", label)
             sp_vac = _run_sp(
                 opt_mol,
                 self.basis_sp,
@@ -2748,8 +3070,29 @@ class RedoxCalculator:
                 self.sp_dispersion,
                 None,
                 mult,
-                os.path.join(tmpdir, "sp_vac"),
                 smd_solvent=None)
+            _status("  [%s] vacuum SP returned", label)
+            _print0('vaccum done')
+            
+            
+            log.info("  [%s] Step 4: solvent single-point (%s/%s)", label, self.xcfun_sp, self.basis_sp)
+            _print0('single point')
+            _status("  [%s] solvent SP starting", label)
+            sp_solv = _run_sp(
+                opt_mol,
+                self.basis_sp,
+                self.xcfun_sp,
+                self.ri_jk,
+                self.sp_dispersion,
+                self.solvation_model,
+                mult,
+                smd_solvent=self.smd_solvent,
+                return_objects=(mult != 1))
+            _status("  [%s] solvent SP returned", label)
+
+            log.info("  [%s] Step 4 done: E_solvent = %.6f au", label, sp_solv["scf_energy"])
+
+            log.info("  [%s] Step 5: vacuum single-point", label)
 
             log.info("  [%s] Step 5 done: E_vacuum = %.6f au", label, sp_vac["scf_energy"])
 
@@ -2847,8 +3190,20 @@ class RedoxCalculator:
                     )
 
             h5_path = os.path.join(self.output_folder, f"{file_name_base}.h5")
-            _save_to_h5(h5_path, result)
+
+            # Do not write the state HDF5 before returning to the ET-state loop.
+            # The expected healthy output is:
+            #   M solvent/vacuum SP finishes -> [M+] Conformer combinations
+            # not:
+            #   M finishes -> ranks wait in HDF5/barrier before M+ starts.
+            if _is_rank0():
+                if not hasattr(self, "_pending_h5_writes"):
+                    self._pending_h5_writes = []
+                self._pending_h5_writes.append((h5_path, result))
+                log.info("  [%s] Queued HDF5 write: %s", label, h5_path)
+
             log.info("compute_gibbs done: %s  G = %.6f au", label, g_total)
+            _status("  [%s] compute_gibbs returned; next ET state may start now", label)
             return result
 
         except BaseException as exc:
@@ -2856,11 +3211,34 @@ class RedoxCalculator:
             msg = traceback.format_exc()
             log.error("compute_gibbs failed for '%s': %s", label, exc)
             log.error("Full traceback:\n%s", msg)
-            print(f"\n[ERROR] compute_gibbs failed for '{label}': {exc}\n{msg}",
-                  flush=True)
+            _print0(f"\n[ERROR] compute_gibbs failed for '{label}': {exc}\n{msg}")
             if isinstance(exc, (KeyboardInterrupt, SystemExit)):
                 raise
             return None
+
+    def _flush_pending_h5_writes(self) -> None:
+        """Write queued state HDF5 files from rank 0, without MPI barriers."""
+        if not _is_rank0():
+            return
+
+        pending = getattr(self, "_pending_h5_writes", [])
+        if not pending:
+            return
+
+        log.info("Flushing %d queued state HDF5 file(s).", len(pending))
+        _print0(f"Flushing {len(pending)} queued state HDF5 file(s).")
+
+        still_pending = []
+        for h5_path, result in pending:
+            try:
+                log.info("HDF5 write start: %s", h5_path)
+                _save_to_h5(h5_path, result)
+                log.info("HDF5 write done: %s", h5_path)
+            except Exception as exc:
+                log.error("HDF5 write failed for %s: %s", h5_path, exc)
+                still_pending.append((h5_path, result))
+
+        self._pending_h5_writes = still_pending
 
     # ------------------------------------------------------------------
     # Full thermodynamic profile
@@ -2896,11 +3274,17 @@ class RedoxCalculator:
         profile = RedoxProfile()
 
         run_formula = _mol_formula(mol_obj)
-        run_tag = self._resolve_run_tag_for_molecule(
-            mol_obj,
-            file_tag=file_tag,
-            row_index=row_index,
-        )
+        # Resolve the run tag on rank 0 and broadcast it so every rank uses
+        # the exact same output filenames and rerun/reuse policy.
+        if _is_rank0():
+            run_tag = self._resolve_run_tag_for_molecule(
+                mol_obj,
+                file_tag=file_tag,
+                row_index=row_index,
+            )
+        else:
+            run_tag = None
+        run_tag = _bcast_from_rank0(run_tag)
         log.info("Using file tag %s for formula %s", run_tag, run_formula)
 
         # ---- neutral, oxidised, reduced --------------------------------
@@ -2909,12 +3293,14 @@ class RedoxCalculator:
             ("M_ox", "M+", 1),
             ("M_red","M-", -1),
         ]:
+            _status("\n========== START ET state %s (%s) ==========" , lbl, attr)
             m_tmp = vlx.Molecule.read_xyz_string(init_xyz)
             m_tmp.set_charge(init_charge + dq)
             m_tmp.set_multiplicity(_valid_multiplicity(m_tmp, init_charge + dq))
 
             res = self._get_or_compute_et_state(m_tmp, lbl, file_tag=run_tag)
             setattr(profile, attr, res)
+            _status("========== END ET state %s (%s): %s ==========", lbl, attr, "OK" if res is not None else "FAILED")
 
         acidic_H, basic_atoms = self.find_protic_sites(mol_obj)
         log.info("Basic atoms found: %s", basic_atoms)
@@ -3023,6 +3409,10 @@ class RedoxCalculator:
             if g_ox is not None:
                 profile.pKa_M_plus = self.pka(g_acid=g_ox, g_base=g_mdr)
 
+        # HDF5 writes are intentionally deferred until after ET/PCET state
+        # transitions, so the output can reach M+ and M- immediately after M.
+        self._flush_pending_h5_writes()
+
         self._print_summary(profile, label=mol_label)
         return profile
 
@@ -3032,11 +3422,11 @@ class RedoxCalculator:
 
     def _print_summary(self, profile: RedoxProfile, label: str = "") -> None:
         sep = "=" * 52
-        print(f"\n{sep}")
+        _print0(f"\n{sep}")
         if label:
-            print(f"  MOLECULE : {label}")
-        print(f"  THERMODYNAMIC SUMMARY  (pH {self.pH:.1f})")
-        print(sep)
+            _print0(f"  MOLECULE : {label}")
+        _print0(f"  THERMODYNAMIC SUMMARY  (pH {self.pH:.1f})")
+        _print0(sep)
 
         # Build a lookup of which states have quality issues so we can
         # annotate individual values inline rather than just at the bottom.
@@ -3072,10 +3462,10 @@ class RedoxCalculator:
             val = getattr(profile, attr)
             if val is not None:
                 if not any_pka:
-                    print("\n  pKa values:")
+                    _print0("\n  pKa values:")
                     any_pka = True
                 flags = _flags(states)
-                print(f"    {lbl:38s}  {val:7.2f}{flags}")
+                _print0(f"    {lbl:38s}  {val:7.2f}{flags}")
 
         # ---- reduction potentials --------------------------------------
         pot_entries = [
@@ -3089,30 +3479,30 @@ class RedoxCalculator:
             val = getattr(profile, attr)
             if val is not None:
                 if not any_pot:
-                    print("\n  Reduction potentials (V vs SHE):")
+                    _print0("\n  Reduction potentials (V vs SHE):")
                     any_pot = True
                 flags = _flags(states)
-                print(f"    {lbl:42s}  {val:+8.3f} V{flags}")
+                _print0(f"    {lbl:42s}  {val:+8.3f} V{flags}")
 
         # ---- per-state warnings ----------------------------------------
-        print("")
+        _print0("")
         for attr in (
             "M", "M_ox", "M_red", "MH_plus", "MH_rad",
             "M_deprot", "M_deprot_rad",
         ):
             res: Optional[GibbsResult] = getattr(profile, attr)
             if res and res.is_fragmented:
-                print(
+                _print0(
                     f"  [WARNING] {attr}: molecule fragmented during "
                     "optimisation -- energies are unreliable."
                 )
             if res and not res.mm_corr_available:
-                print(
+                _print0(
                     f"  [WARNING] {attr}: MM Gibbs correction failed -- "
                     "G_total = E_SP(solvent) only, no thermal correction."
                 )
 
-        print(sep + "\n")
+        _print0(sep + "\n")
 
 
 # ---------------------------------------------------------------------------
@@ -3149,7 +3539,11 @@ class pKaCalculator(RedoxCalculator):
         init_charge = int(mol_obj.get_charge())
         profile     = RedoxProfile()
         run_formula = _mol_formula(mol_obj)
-        run_tag = _next_formula_iso_tag(self.output_folder, run_formula)
+        if _is_rank0():
+            run_tag = _next_formula_iso_tag(self.output_folder, run_formula)
+        else:
+            run_tag = None
+        run_tag = _bcast_from_rank0(run_tag)
         log.info("Using file tag %s for formula %s", run_tag, run_formula)
 
         profile.M = self._get_or_compute_state(mol_obj, "M", file_tag=run_tag)
@@ -3382,7 +3776,7 @@ def monitor_csv(
     """
     last_hash: Optional[str] = None
     iteration = 0
-    print(f"Monitoring {file_path} every {interval_seconds}s. Ctrl-C to stop.")
+    _print0(f"Monitoring {file_path} every {interval_seconds}s. Ctrl-C to stop.")
     try:
         while max_iterations is None or iteration < max_iterations:
             if os.path.exists(file_path):
@@ -3390,11 +3784,11 @@ def monitor_csv(
                     with open(file_path, "rb") as fh:
                         current_hash = hashlib.md5(fh.read()).hexdigest()
                     if current_hash != last_hash:
-                        print(f"\n[!] Change detected at {time.ctime()}")
+                        _print0(f"\n[!] Change detected at {time.ctime()}")
                         process_csv(pd.read_csv(file_path), calc)
                         last_hash = current_hash
                     else:
-                        print(".", end="", flush=True)
+                        _print0(".", end="", flush=True)
                 except Exception as exc:
                     log.error("Error reading CSV: %s", exc)
             else:
@@ -3402,7 +3796,7 @@ def monitor_csv(
             time.sleep(interval_seconds)
             iteration += 1
     except KeyboardInterrupt:
-        print("\nMonitoring stopped.")
+        _print0("\nMonitoring stopped.")
 
 
 # ---------------------------------------------------------------------------
@@ -3423,10 +3817,10 @@ def _demo() -> RedoxProfile:
         sp_dispersion = False,
         pH            = 7.0,
     )
-    print("Running full redox/pKa profile for phenol ...")
+    _print0("Running full redox/pKa profile for phenol ...")
     profile = calc.run("c1ccccc1O")
 
-    print("\nRunning pKa-only profile for acetic acid ...")
+    _print0("\nRunning pKa-only profile for acetic acid ...")
     pka_calc = pKaCalculator(
         output_folder = "demo_results",
         xcfun_opt     = "pbe0",
@@ -3440,3 +3834,4 @@ def _demo() -> RedoxProfile:
 
 if __name__ == "__main__":
     _demo()
+
