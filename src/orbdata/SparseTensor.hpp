@@ -164,6 +164,75 @@ class CSparseTensor
         _add_blocks(molecule, groups, aux_basis.basis_groups(), screener, threshold);
     }
 
+    /// @brief The constructor with molecule, molecular basis on a and b sides,
+    /// molecular basis on c side, integral screener, screening threshold and the
+    /// batch of atoms on c side to describe.
+    /// @param molecule The molecule to compute interatomic distances from.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The molecular basis on c side.
+    /// @param screener The integral bound.
+    /// @param threshold The screening threshold.
+    /// @param mat_type The type of tensor.
+    /// @param natoms_per_batch The number of atoms on c side in a batch.
+    /// @param batch_index The index of batch.
+    /// @note Each atom basis group on c side is sliced with the same offset and
+    /// number of atoms, so that every atom on c side belongs to exactly one
+    /// batch. A group shorter than the offset contributes no blocks, and the
+    /// last batch of a group is short rather than out of range.
+    template <typename B>
+    CSparseTensor(const CMolecule       &molecule,
+                  const CMolecularBasis &basis,
+                  const CMolecularBasis &aux_basis,
+                  const B               &screener,
+                  const double           threshold,
+                  const mat_t            mat_type,
+                  const size_t           natoms_per_batch,
+                  const size_t           batch_index)
+
+        : _blocks{}
+
+        , _values{}
+
+        , _type(mat_type)
+
+        , _values_state(valstat::empty)
+    {
+        errors::assertMsgCritical(natoms_per_batch > 0, std::string("SparseTensor: Number of atoms in a batch must be positive"));
+
+        auto groups = (mat_type == mat_t::general) ? basis.basis_pair_groups(basis) : basis.basis_pair_groups();
+
+        const auto offset = batch_index * natoms_per_batch;
+
+        std::vector<CAtomBasisGroup> aux_groups;
+
+        std::ranges::for_each(aux_basis.basis_groups(), [&](const auto &group) {
+            const auto slice = group.slice(offset, natoms_per_batch);
+
+            if (slice.number_of_atoms() > 0) aux_groups.push_back(slice);
+        });
+
+        _add_blocks(molecule, groups, aux_groups, screener, threshold);
+    }
+
+    /// @brief Gets number of batches of atoms on c side.
+    /// @param aux_basis The molecular basis on c side.
+    /// @param natoms_per_batch The number of atoms on c side in a batch.
+    /// @return The number of batches.
+    /// @note The number of batches follows from the largest atom basis group on
+    /// c side, as the groups are sliced with the same offset and number of atoms.
+    static auto
+    number_of_batches(const CMolecularBasis &aux_basis, const size_t natoms_per_batch) -> size_t
+    {
+        errors::assertMsgCritical(natoms_per_batch > 0,
+                                  std::string("SparseTensor.number_of_batches: Number of atoms in a batch must be positive"));
+
+        size_t natoms = 0;
+
+        std::ranges::for_each(aux_basis.basis_groups(), [&](const auto &group) { natoms = std::max(natoms, group.number_of_atoms()); });
+
+        return (natoms + natoms_per_batch - 1) / natoms_per_batch;
+    }
+
     /// @brief The copy constructor.
     /// @param other The sparse tensor to be copied.
     CSparseTensor(const CSparseTensor &other)
