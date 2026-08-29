@@ -106,6 +106,8 @@ class CAtomBasisTripleSparsity
         , _b_offsets(pair_group.ket_basis().basis_function_offsets())
 
         , _c_offsets(group.basis().basis_function_offsets())
+
+        , _value_offsets{}
     {
         errors::assertMsgCritical(pair_group.ordering() == pairord::distance,
                                   std::string("AtomBasisTripleSparsity: Atom pairs are not ordered by interatomic distance"));
@@ -143,6 +145,8 @@ class CAtomBasisTripleSparsity
         _a_atoms.shrink_to_fit();
 
         _b_atoms.shrink_to_fit();
+
+        _value_offsets = _make_value_offsets(_counts, _a_offsets, _b_offsets, _c_offsets, _c_atoms.size());
     }
 
     /// @brief Gets index of atom basis on a side among the unique atom bases of
@@ -223,6 +227,49 @@ class CAtomBasisTripleSparsity
                          const int    c_angular_momentum,
                          const size_t c_index) const -> size_t;
 
+    /// @brief Gets number of values required to store the integrals of specific
+    /// combination of basis functions on a, b and c sides. The values span the
+    /// surviving atom pairs on a and b sides, the atoms on c side, and the
+    /// angular components of the three basis functions.
+    /// @param a_angular_momentum The angular momentum of basis function on a side.
+    /// @param a_index The index of basis function on a side.
+    /// @param b_angular_momentum The angular momentum of basis function on b side.
+    /// @param b_index The index of basis function on b side.
+    /// @param c_angular_momentum The angular momentum of basis function on c side.
+    /// @param c_index The index of basis function on c side.
+    /// @return The number of values.
+    auto number_of_elements(const int    a_angular_momentum,
+                            const size_t a_index,
+                            const int    b_angular_momentum,
+                            const size_t b_index,
+                            const int    c_angular_momentum,
+                            const size_t c_index) const -> size_t;
+
+    /// @brief Gets offset of the values of specific combination of basis
+    /// functions on a, b and c sides in the values block.
+    /// @param a_angular_momentum The angular momentum of basis function on a side.
+    /// @param a_index The index of basis function on a side.
+    /// @param b_angular_momentum The angular momentum of basis function on b side.
+    /// @param b_index The index of basis function on b side.
+    /// @param c_angular_momentum The angular momentum of basis function on c side.
+    /// @param c_index The index of basis function on c side.
+    /// @return The offset of the values.
+    auto element_offset(const int    a_angular_momentum,
+                        const size_t a_index,
+                        const int    b_angular_momentum,
+                        const size_t b_index,
+                        const int    c_angular_momentum,
+                        const size_t c_index) const -> size_t;
+
+    /// @brief Gets number of values required to store the integrals of all
+    /// combinations of basis functions, i.e. the size of the values block.
+    /// @return The number of values.
+    auto
+    number_of_elements() const -> size_t
+    {
+        return _value_offsets.back();
+    }
+
     /// @brief Gets number of atoms on c side.
     /// @return The number of atoms.
     auto
@@ -256,6 +303,38 @@ class CAtomBasisTripleSparsity
     }
 
    private:
+    /// @brief Computes the flat index of a combination of basis functions.
+    /// @param a_angular_momentum The angular momentum of basis function on a side.
+    /// @param a_index The index of basis function on a side.
+    /// @param b_angular_momentum The angular momentum of basis function on b side.
+    /// @param b_index The index of basis function on b side.
+    /// @param c_angular_momentum The angular momentum of basis function on c side.
+    /// @param c_index The index of basis function on c side.
+    /// @return The flat index of the combination of basis functions.
+    auto _cell_index(const int    a_angular_momentum,
+                     const size_t a_index,
+                     const int    b_angular_momentum,
+                     const size_t b_index,
+                     const int    c_angular_momentum,
+                     const size_t c_index) const -> size_t;
+
+    /// @brief Computes the offsets of the values of each combination of basis
+    /// functions.
+    /// @param counts The number of surviving atom pairs of each combination of
+    /// basis functions.
+    /// @param a_offsets The offsets of the basis functions on a side.
+    /// @param b_offsets The offsets of the basis functions on b side.
+    /// @param c_offsets The offsets of the basis functions on c side.
+    /// @param natoms The number of atoms on c side, each of which contributes a
+    /// block of values for every surviving atom pair on a and b sides.
+    /// @return The vector of offsets, with the total number of values as last
+    /// element.
+    static auto _make_value_offsets(const std::vector<size_t> &counts,
+                                    const std::vector<size_t> &a_offsets,
+                                    const std::vector<size_t> &b_offsets,
+                                    const std::vector<size_t> &c_offsets,
+                                    const size_t               natoms) -> std::vector<size_t>;
+
     /// @brief The index of atom basis on a side.
     int _a_index;
 
@@ -290,6 +369,12 @@ class CAtomBasisTripleSparsity
     /// @brief The offsets of the first basis function of each angular momentum
     /// on c side, with the total number of basis functions as last element.
     std::vector<size_t> _c_offsets;
+
+    /// @brief The offsets of the values of each combination of basis functions
+    /// in the values block, with the total number of values as last element. The
+    /// combinations are ordered as the counts, i.e. with the a side as the
+    /// slowest and the c side as the fastest running index.
+    std::vector<size_t> _value_offsets;
 };
 
 #endif /* AtomBasisTripleSparsity_hpp */

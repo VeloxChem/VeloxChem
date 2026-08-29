@@ -37,6 +37,7 @@
 #include <ranges>
 
 #include "ErrorHandler.hpp"
+#include "TensorComponents.hpp"
 
 CAtomBasisTripleSparsity::CAtomBasisTripleSparsity(const CAtomBasisPairGroup &pair_group, const CAtomBasisGroup &group)
 
@@ -59,6 +60,8 @@ CAtomBasisTripleSparsity::CAtomBasisTripleSparsity(const CAtomBasisPairGroup &pa
     , _b_offsets(pair_group.ket_basis().basis_function_offsets())
 
     , _c_offsets(group.basis().basis_function_offsets())
+
+    , _value_offsets{}
 {
     // NOTE: the diagonal atom pairs precede the off-diagonal atom pairs, as their
     // interatomic distance is zero. All atom pairs survive for every combination
@@ -69,6 +72,80 @@ CAtomBasisTripleSparsity::CAtomBasisTripleSparsity(const CAtomBasisPairGroup &pa
     _b_atoms.insert(_b_atoms.end(), pair_group.ket_atoms().begin(), pair_group.ket_atoms().end());
 
     _counts.assign(number_of_a_basis_functions() * number_of_b_basis_functions() * number_of_c_basis_functions(), _a_atoms.size());
+
+    _value_offsets = _make_value_offsets(_counts, _a_offsets, _b_offsets, _c_offsets, _c_atoms.size());
+}
+
+auto
+CAtomBasisTripleSparsity::_make_value_offsets(const std::vector<size_t> &counts,
+                                              const std::vector<size_t> &a_offsets,
+                                              const std::vector<size_t> &b_offsets,
+                                              const std::vector<size_t> &c_offsets,
+                                              const size_t               natoms) -> std::vector<size_t>
+{
+    // NOTE: the angular momentum of a basis function follows from the offsets,
+    // as the basis functions are kept sorted by ascending angular momentum.
+
+    const auto momenta = [](const std::vector<size_t> &offsets) {
+        std::vector<int> moments(offsets.back(), 0);
+
+        std::ranges::for_each(std::views::iota(size_t{0}, offsets.size() - 1), [&](const auto i) {
+            std::ranges::fill(moments.begin() + offsets[i], moments.begin() + offsets[i + 1], static_cast<int>(i));
+        });
+
+        return moments;
+    };
+
+    const auto a_moments = momenta(a_offsets);
+
+    const auto b_moments = momenta(b_offsets);
+
+    const auto c_moments = momenta(c_offsets);
+
+    const auto nb = b_moments.size();
+
+    const auto nc = c_moments.size();
+
+    std::vector<size_t> value_offsets(counts.size() + 1, 0);
+
+    std::ranges::for_each(std::views::iota(size_t{0}, counts.size()), [&](const auto i) {
+        const auto ncomps = tensor::number_of_spherical_components(
+            std::array<int, 3>{a_moments[i / (nb * nc)], b_moments[(i / nc) % nb], c_moments[i % nc]});
+
+        // NOTE: the counts track the surviving atom pairs on a and b sides only,
+        // so each atom on c side contributes a block of angular components for
+        // every one of them.
+
+        value_offsets[i + 1] = value_offsets[i] + counts[i] * natoms * static_cast<size_t>(ncomps);
+    });
+
+    return value_offsets;
+}
+
+auto
+CAtomBasisTripleSparsity::_cell_index(const int    a_angular_momentum,
+                                      const size_t a_index,
+                                      const int    b_angular_momentum,
+                                      const size_t b_index,
+                                      const int    c_angular_momentum,
+                                      const size_t c_index) const -> size_t
+{
+    errors::assertMsgCritical((a_angular_momentum >= 0) && (a_angular_momentum + 2 <= static_cast<int>(_a_offsets.size())) &&
+                                  (b_angular_momentum >= 0) && (b_angular_momentum + 2 <= static_cast<int>(_b_offsets.size())) &&
+                                  (c_angular_momentum >= 0) && (c_angular_momentum + 2 <= static_cast<int>(_c_offsets.size())),
+                              std::string("AtomBasisTripleSparsity: Angular momentum is out of range"));
+
+    const auto arow = _a_offsets[a_angular_momentum] + a_index;
+
+    const auto brow = _b_offsets[b_angular_momentum] + b_index;
+
+    const auto ccol = _c_offsets[c_angular_momentum] + c_index;
+
+    errors::assertMsgCritical((arow < _a_offsets[a_angular_momentum + 1]) && (brow < _b_offsets[b_angular_momentum + 1]) &&
+                                  (ccol < _c_offsets[c_angular_momentum + 1]),
+                              std::string("AtomBasisTripleSparsity: Index of basis function is out of range"));
+
+    return (arow * number_of_b_basis_functions() + brow) * number_of_c_basis_functions() + ccol;
 }
 
 auto
@@ -79,20 +156,29 @@ CAtomBasisTripleSparsity::number_of_pairs(const int    a_angular_momentum,
                                           const int    c_angular_momentum,
                                           const size_t c_index) const -> size_t
 {
-    errors::assertMsgCritical((a_angular_momentum >= 0) && (a_angular_momentum + 2 <= static_cast<int>(_a_offsets.size())) &&
-                                  (b_angular_momentum >= 0) && (b_angular_momentum + 2 <= static_cast<int>(_b_offsets.size())) &&
-                                  (c_angular_momentum >= 0) && (c_angular_momentum + 2 <= static_cast<int>(_c_offsets.size())),
-                              std::string("AtomBasisTripleSparsity.number_of_pairs: Angular momentum is out of range"));
+    return _counts[_cell_index(a_angular_momentum, a_index, b_angular_momentum, b_index, c_angular_momentum, c_index)];
+}
 
-    const auto arow = _a_offsets[a_angular_momentum] + a_index;
+auto
+CAtomBasisTripleSparsity::number_of_elements(const int    a_angular_momentum,
+                                             const size_t a_index,
+                                             const int    b_angular_momentum,
+                                             const size_t b_index,
+                                             const int    c_angular_momentum,
+                                             const size_t c_index) const -> size_t
+{
+    const auto index = _cell_index(a_angular_momentum, a_index, b_angular_momentum, b_index, c_angular_momentum, c_index);
 
-    const auto brow = _b_offsets[b_angular_momentum] + b_index;
+    return _value_offsets[index + 1] - _value_offsets[index];
+}
 
-    const auto ccol = _c_offsets[c_angular_momentum] + c_index;
-
-    errors::assertMsgCritical((arow < _a_offsets[a_angular_momentum + 1]) && (brow < _b_offsets[b_angular_momentum + 1]) &&
-                                  (ccol < _c_offsets[c_angular_momentum + 1]),
-                              std::string("AtomBasisTripleSparsity.number_of_pairs: Index of basis function is out of range"));
-
-    return _counts[(arow * number_of_b_basis_functions() + brow) * number_of_c_basis_functions() + ccol];
+auto
+CAtomBasisTripleSparsity::element_offset(const int    a_angular_momentum,
+                                         const size_t a_index,
+                                         const int    b_angular_momentum,
+                                         const size_t b_index,
+                                         const int    c_angular_momentum,
+                                         const size_t c_index) const -> size_t
+{
+    return _value_offsets[_cell_index(a_angular_momentum, a_index, b_angular_momentum, b_index, c_angular_momentum, c_index)];
 }
