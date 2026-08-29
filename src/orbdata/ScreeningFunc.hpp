@@ -257,6 +257,68 @@ two_center_overlap_primitive_bound(const CBasisFunction &bra, const size_t iprim
     return fact * fpi * std::sqrt(fpi) * std::exp(-fmu * r * r);
 }
 
+/// @brief Computes upper bound of two-center kinetic energy integral between
+/// primitive basis functions on bra and ket sides.
+/// @param bra The basis function on bra side.
+/// @param iprim The index of primitive of basis function on bra side.
+/// @param ket The basis function on ket side.
+/// @param jprim The index of primitive of basis function on ket side.
+/// @param r The distance between the atoms carrying the basis functions.
+/// @return The upper bound of two-center kinetic energy integral.
+/// @note A primitive has a single exponent on each side, so the overlap part and
+/// the kinetic energy part share the same reduced exponent, unlike the bound of
+/// the contracted basis functions where they are taken from the smallest and the
+/// largest exponents of the contractions.
+inline auto
+two_center_kinetic_energy_primitive_bound(const CBasisFunction &bra, const size_t iprim, const CBasisFunction &ket,
+                                          const size_t jprim, const double r) -> double
+{
+    const auto aexp = bra.exponents()[iprim];
+
+    const auto bexp = ket.exponents()[jprim];
+
+    const auto fexp = aexp + bexp;
+
+    const auto fmu = aexp * bexp / fexp;
+
+    const auto fpi = mathconst::pi_value() / fexp;
+
+    const auto fact = std::fabs(bra.normalization_factors()[iprim]) * std::fabs(ket.normalization_factors()[jprim]) *
+                      distance_factor(r, bra.get_angular_momentum() + ket.get_angular_momentum());
+
+    return fact * fmu * (3.0 + 2.0 * fmu * r * r) * fpi * std::sqrt(fpi) * std::exp(-fmu * r * r);
+}
+
+/// @brief Computes upper bound of two-center nuclear potential integral between
+/// primitive basis functions on bra and ket sides.
+/// @param bra The basis function on bra side.
+/// @param iprim The index of primitive of basis function on bra side.
+/// @param ket The basis function on ket side.
+/// @param jprim The index of primitive of basis function on ket side.
+/// @param r The distance between the atoms carrying the basis functions.
+/// @return The upper bound of two-center nuclear potential integral.
+/// @note The Boys function is set to its maximum value of one, as for the bound
+/// of the contracted basis functions.
+inline auto
+two_center_nuclear_potential_primitive_bound(const CBasisFunction &bra, const size_t iprim, const CBasisFunction &ket,
+                                             const size_t jprim, const double r) -> double
+{
+    const auto aexp = bra.exponents()[iprim];
+
+    const auto bexp = ket.exponents()[jprim];
+
+    const auto fexp = aexp + bexp;
+
+    const auto fmu = aexp * bexp / fexp;
+
+    const auto lsum = bra.get_angular_momentum() + ket.get_angular_momentum();
+
+    const auto fact = std::fabs(bra.normalization_factors()[iprim]) * std::fabs(ket.normalization_factors()[jprim]) *
+                      distance_factor(r, lsum);
+
+    return fact * static_cast<double>(lsum + 1) * (2.0 * mathconst::pi_value() / fexp) * std::exp(-fmu * r * r);
+}
+
 }  // namespace screenfunc
 
 #endif /* ScreeningFunc_hpp */
