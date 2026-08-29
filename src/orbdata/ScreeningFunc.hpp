@@ -75,6 +75,22 @@ number_of_leading(const std::vector<T> &values, P predicate) -> size_t
     return static_cast<size_t>(std::ranges::distance(values.begin(), std::ranges::partition_point(values, predicate)));
 }
 
+/// @brief Counts leading indices satisfying predicate.
+/// @param nvalues The number of indices to count leading indices in.
+/// @param predicate The predicate to partition indices with.
+/// @return The number of leading indices satisfying predicate.
+/// @note The indices must be partitioned with respect to predicate, as for the
+/// range taking overload. This overload is used where the values are computed
+/// from an index rather than stored, so that a linear pass over them is avoided.
+template <typename P>
+inline auto
+number_of_leading(const size_t nvalues, P predicate) -> size_t
+{
+    const auto indices = std::views::iota(size_t{0}, nvalues);
+
+    return static_cast<size_t>(std::ranges::distance(indices.begin(), std::ranges::partition_point(indices, predicate)));
+}
+
 /// @brief Computes the distance prefactor of the two-center integral bounds.
 /// @param r The distance between the atoms carrying the basis functions.
 /// @param lsum The sum of angular momenta of the basis functions.
@@ -208,6 +224,37 @@ three_center_electron_repulsion_bound(const CBasisFunction &a, const CBasisFunct
                       static_cast<double>(lsum + 1);
 
     return fact * (2.0 * fpi * fpi * std::sqrt(fpi)) / (fexp * cexp * std::sqrt(qexp)) * std::exp(-fmu * r * r);
+}
+
+/// @brief Computes upper bound of two-center overlap integral between primitive
+/// basis functions on bra and ket sides.
+/// @param bra The basis function on bra side.
+/// @param iprim The index of primitive of basis function on bra side.
+/// @param ket The basis function on ket side.
+/// @param jprim The index of primitive of basis function on ket side.
+/// @param r The distance between the atoms carrying the basis functions.
+/// @return The upper bound of two-center overlap integral.
+/// @note The bound is the contracted overlap bound with the exponent and the
+/// absolute normalization factor of a single primitive in place of the smallest
+/// exponent and the sum of absolute normalization factors.
+inline auto
+two_center_overlap_primitive_bound(const CBasisFunction &bra, const size_t iprim, const CBasisFunction &ket, const size_t jprim,
+                                   const double r) -> double
+{
+    const auto aexp = bra.exponents()[iprim];
+
+    const auto bexp = ket.exponents()[jprim];
+
+    const auto fexp = aexp + bexp;
+
+    const auto fmu = aexp * bexp / fexp;
+
+    const auto fpi = mathconst::pi_value() / fexp;
+
+    const auto fact = std::fabs(bra.normalization_factors()[iprim]) * std::fabs(ket.normalization_factors()[jprim]) *
+                      distance_factor(r, bra.get_angular_momentum() + ket.get_angular_momentum());
+
+    return fact * fpi * std::sqrt(fpi) * std::exp(-fmu * r * r);
 }
 
 }  // namespace screenfunc
