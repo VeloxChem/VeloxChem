@@ -35,9 +35,13 @@
 #define ScreeningFunc_hpp
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <ranges>
 #include <vector>
+
+#include "BasisFunction.hpp"
+#include "MathConst.hpp"
 
 namespace screenfunc {  // screenfunc namespace
 
@@ -56,6 +60,44 @@ inline auto
 number_of_leading(const std::vector<T> &values, P predicate) -> size_t
 {
     return static_cast<size_t>(std::ranges::distance(values.begin(), std::ranges::partition_point(values, predicate)));
+}
+
+/// @brief Computes upper bound of two-center overlap integral between basis
+/// functions on bra and ket sides.
+/// @param bra The basis function on bra side.
+/// @param ket The basis function on ket side.
+/// @param r The distance between the atoms carrying the basis functions.
+/// @return The upper bound of two-center overlap integral.
+/// @note The bound rises with distance beyond unit distance before the Gaussian
+/// decay takes over, so it is not monotone. It is nonetheless partitioned by any
+/// threshold below its value at unit distance, which is the regime of screening
+/// thresholds, and may thus be bisected with number_of_leading.
+inline auto
+two_center_overlap_bound(const CBasisFunction &bra, const CBasisFunction &ket, const double r) -> double
+{
+    const auto fexp = bra.smallest_exponent() + ket.smallest_exponent();
+
+    const auto fmu = bra.smallest_exponent() * ket.smallest_exponent() / fexp;
+
+    const auto fpi = mathconst::pi_value() / fexp;
+
+    auto fact = bra.sum_of_absolute_norms() * ket.sum_of_absolute_norms();
+
+    // NOTE: the distance prefactor is clamped to one below unit distance, where
+    // it would lower the bound instead of raising it. Repeated multiplication is
+    // used, as the total angular momentum is small.
+
+    if (r > 1.0)
+    {
+        const auto lsum = bra.get_angular_momentum() + ket.get_angular_momentum();
+
+        for (int i = 0; i < lsum; i++)
+        {
+            fact *= r;
+        }
+    }
+
+    return fact * fpi * std::sqrt(fpi) * std::exp(-fmu * r * r);
 }
 
 }  // namespace screenfunc
