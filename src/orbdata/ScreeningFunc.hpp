@@ -62,6 +62,29 @@ number_of_leading(const std::vector<T> &values, P predicate) -> size_t
     return static_cast<size_t>(std::ranges::distance(values.begin(), std::ranges::partition_point(values, predicate)));
 }
 
+/// @brief Computes the distance prefactor of the two-center integral bounds.
+/// @param r The distance between the atoms carrying the basis functions.
+/// @param lsum The sum of angular momenta of the basis functions.
+/// @return The distance prefactor.
+/// @note The prefactor is clamped to one below unit distance, where it would
+/// lower the bound instead of raising it. Repeated multiplication is used, as
+/// the sum of angular momenta is small.
+inline auto
+distance_factor(const double r, const int lsum) -> double
+{
+    auto fact = 1.0;
+
+    if (r > 1.0)
+    {
+        for (int i = 0; i < lsum; i++)
+        {
+            fact *= r;
+        }
+    }
+
+    return fact;
+}
+
 /// @brief Computes upper bound of two-center overlap integral between basis
 /// functions on bra and ket sides.
 /// @param bra The basis function on bra side.
@@ -81,23 +104,62 @@ two_center_overlap_bound(const CBasisFunction &bra, const CBasisFunction &ket, c
 
     const auto fpi = mathconst::pi_value() / fexp;
 
-    auto fact = bra.sum_of_absolute_norms() * ket.sum_of_absolute_norms();
-
-    // NOTE: the distance prefactor is clamped to one below unit distance, where
-    // it would lower the bound instead of raising it. Repeated multiplication is
-    // used, as the total angular momentum is small.
-
-    if (r > 1.0)
-    {
-        const auto lsum = bra.get_angular_momentum() + ket.get_angular_momentum();
-
-        for (int i = 0; i < lsum; i++)
-        {
-            fact *= r;
-        }
-    }
+    const auto fact = bra.sum_of_absolute_norms() * ket.sum_of_absolute_norms() *
+                      distance_factor(r, bra.get_angular_momentum() + ket.get_angular_momentum());
 
     return fact * fpi * std::sqrt(fpi) * std::exp(-fmu * r * r);
+}
+
+/// @brief Computes upper bound of two-center kinetic energy integral between
+/// basis functions on bra and ket sides.
+/// @param bra The basis function on bra side.
+/// @param ket The basis function on ket side.
+/// @param r The distance between the atoms carrying the basis functions.
+/// @return The upper bound of two-center kinetic energy integral.
+/// @note The overlap part is computed with the smallest exponents, as for the
+/// overlap bound, while the kinetic energy part is computed with the largest
+/// exponents. The bound is partitioned by any threshold below its value at unit
+/// distance, and may thus be bisected with number_of_leading.
+inline auto
+two_center_kinetic_energy_bound(const CBasisFunction &bra, const CBasisFunction &ket, const double r) -> double
+{
+    const auto fexp = bra.smallest_exponent() + ket.smallest_exponent();
+
+    const auto fmu = bra.smallest_exponent() * ket.smallest_exponent() / fexp;
+
+    const auto fpi = mathconst::pi_value() / fexp;
+
+    const auto gexp = bra.largest_exponent() + ket.largest_exponent();
+
+    const auto gmu = bra.largest_exponent() * ket.largest_exponent() / gexp;
+
+    const auto fact = bra.sum_of_absolute_norms() * ket.sum_of_absolute_norms() *
+                      distance_factor(r, bra.get_angular_momentum() + ket.get_angular_momentum());
+
+    return fact * gmu * (3.0 + 2.0 * gmu * r * r) * fpi * std::sqrt(fpi) * std::exp(-fmu * r * r);
+}
+
+/// @brief Computes upper bound of two-center nuclear potential integral between
+/// basis functions on bra and ket sides.
+/// @param bra The basis function on bra side.
+/// @param ket The basis function on ket side.
+/// @param r The distance between the atoms carrying the basis functions.
+/// @return The upper bound of two-center nuclear potential integral.
+/// @note The Boys function is set to its maximum value of one. The bound is
+/// partitioned by any threshold below its value at unit distance, and may thus
+/// be bisected with number_of_leading.
+inline auto
+two_center_nuclear_potential_bound(const CBasisFunction &bra, const CBasisFunction &ket, const double r) -> double
+{
+    const auto fexp = bra.smallest_exponent() + ket.smallest_exponent();
+
+    const auto fmu = bra.smallest_exponent() * ket.smallest_exponent() / fexp;
+
+    const auto lsum = bra.get_angular_momentum() + ket.get_angular_momentum();
+
+    const auto fact = bra.sum_of_absolute_norms() * ket.sum_of_absolute_norms() * distance_factor(r, lsum);
+
+    return fact * static_cast<double>(lsum + 1) * (2.0 * mathconst::pi_value() / fexp) * std::exp(-fmu * r * r);
 }
 
 }  // namespace screenfunc
