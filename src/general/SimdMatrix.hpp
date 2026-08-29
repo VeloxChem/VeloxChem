@@ -205,7 +205,10 @@ class CSimdMatrix
     auto
     data(const size_t row) -> double *
     {
-        errors::assertMsgCritical(row < _rows, std::string("SimdMatrix.data: Index of row is out of range"));
+        // NOTE: the message is built only when the check fails, as constructing
+        // it eagerly allocates on every access of a row.
+
+        if (row >= _rows) errors::assertMsgCritical(false, std::string("SimdMatrix.data: Index of row is out of range"));
 
         return _data + row * _pitch;
     }
@@ -217,7 +220,7 @@ class CSimdMatrix
     auto
     data(const size_t row) const -> const double *
     {
-        errors::assertMsgCritical(row < _rows, std::string("SimdMatrix.data: Index of row is out of range"));
+        if (row >= _rows) errors::assertMsgCritical(false, std::string("SimdMatrix.data: Index of row is out of range"));
 
         return _data + row * _pitch;
     }

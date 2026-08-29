@@ -286,7 +286,10 @@ class CSimdVariableMatrix
     auto
     number_of_columns(const size_t row) const -> size_t
     {
-        errors::assertMsgCritical(row < _columns.size(), std::string("SimdVariableMatrix.number_of_columns: Index of row is out of range"));
+        if (row >= _columns.size())
+        {
+            errors::assertMsgCritical(false, std::string("SimdVariableMatrix.number_of_columns: Index of row is out of range"));
+        }
 
         return _columns[row];
     }
@@ -297,7 +300,10 @@ class CSimdVariableMatrix
     auto
     pitch(const size_t row) const -> size_t
     {
-        errors::assertMsgCritical(row < _pitches.size(), std::string("SimdVariableMatrix.pitch: Index of row is out of range"));
+        if (row >= _pitches.size())
+        {
+            errors::assertMsgCritical(false, std::string("SimdVariableMatrix.pitch: Index of row is out of range"));
+        }
 
         return _pitches[row];
     }
@@ -357,9 +363,18 @@ class CSimdVariableMatrix
     auto
     _check_index(const size_t block, const size_t row) const -> void
     {
-        errors::assertMsgCritical(block < _blocks, std::string("SimdVariableMatrix.data: Index of block is out of range"));
+        // NOTE: the messages are built only when a check fails, as constructing
+        // them eagerly allocates on every access of a row.
 
-        errors::assertMsgCritical(row < _columns.size(), std::string("SimdVariableMatrix.data: Index of row is out of range"));
+        if (block >= _blocks)
+        {
+            errors::assertMsgCritical(false, std::string("SimdVariableMatrix.data: Index of block is out of range"));
+        }
+
+        if (row >= _columns.size())
+        {
+            errors::assertMsgCritical(false, std::string("SimdVariableMatrix.data: Index of row is out of range"));
+        }
     }
 
     /// @brief Allocates the values of matrix, leaving their content undefined.
