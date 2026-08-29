@@ -37,6 +37,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <ranges>
+#include <utility>
 #include <vector>
 
 #include "AtomBasisDiagonalSparsity.hpp"
@@ -191,6 +192,127 @@ class CSparseMatrix
         _values.assign(_pair_blocks.size() + _diagonal_blocks.size(), nullptr);
     }
 
+    /// @brief The copy constructor.
+    /// @param other The sparse matrix to be copied.
+    CSparseMatrix(const CSparseMatrix &other)
+
+        : _pair_blocks(other._pair_blocks)
+
+        , _diagonal_blocks(other._diagonal_blocks)
+
+        , _values(other._values.size(), nullptr)
+
+        , _type(other._type)
+
+        , _values_state(other._values_state)
+    {
+        if (_values_state == valstat::allocated) _copy_values(other);
+    }
+
+    /// @brief The move constructor.
+    /// @param other The sparse matrix to be moved.
+    CSparseMatrix(CSparseMatrix &&other) noexcept
+
+        : _pair_blocks(std::move(other._pair_blocks))
+
+        , _diagonal_blocks(std::move(other._diagonal_blocks))
+
+        , _values(std::move(other._values))
+
+        , _type(other._type)
+
+        , _values_state(other._values_state)
+    {
+        other._values.clear();
+
+        other._values_state = valstat::empty;
+    }
+
+    /// @brief The destructor.
+    ~CSparseMatrix()
+    {
+        _deallocate();
+    }
+
+    /// @brief The copy assignment operator.
+    /// @param other The sparse matrix to be copy assigned.
+    /// @return The assigned sparse matrix.
+    auto
+    operator=(const CSparseMatrix &other) -> CSparseMatrix &
+    {
+        if (this != &other)
+        {
+            _deallocate();
+
+            _pair_blocks = other._pair_blocks;
+
+            _diagonal_blocks = other._diagonal_blocks;
+
+            _values.assign(other._values.size(), nullptr);
+
+            _type = other._type;
+
+            _values_state = other._values_state;
+
+            if (_values_state == valstat::allocated) _copy_values(other);
+        }
+
+        return *this;
+    }
+
+    /// @brief The move assignment operator.
+    /// @param other The sparse matrix to be move assigned.
+    /// @return The assigned sparse matrix.
+    auto
+    operator=(CSparseMatrix &&other) noexcept -> CSparseMatrix &
+    {
+        if (this != &other)
+        {
+            _deallocate();
+
+            _pair_blocks = std::move(other._pair_blocks);
+
+            _diagonal_blocks = std::move(other._diagonal_blocks);
+
+            _values = std::move(other._values);
+
+            _type = other._type;
+
+            _values_state = other._values_state;
+
+            other._values.clear();
+
+            other._values_state = valstat::empty;
+        }
+
+        return *this;
+    }
+
+    /// @brief Allocates the values blocks of matrix, leaving their content
+    /// undefined. Each values block is allocated separately, so no single
+    /// allocation spans the whole matrix.
+    auto
+    allocate() -> void
+    {
+        if (_values_state == valstat::allocated) return;
+
+        std::ranges::for_each(std::views::iota(size_t{0}, _values.size()),
+                              [&](const auto i) { _values[i] = new double[number_of_elements(i)]; });
+
+        _values_state = valstat::allocated;
+    }
+
+    /// @brief Sets the values of all values blocks of matrix to zero.
+    auto
+    zero() -> void
+    {
+        errors::assertMsgCritical(_values_state == valstat::allocated,
+                                  std::string("SparseMatrix.zero: Values blocks of matrix are not allocated"));
+
+        std::ranges::for_each(std::views::iota(size_t{0}, _values.size()),
+                              [&](const auto i) { std::fill(_values[i], _values[i] + number_of_elements(i), 0.0); });
+    }
+
     /// @brief Sets type of matrix.
     /// @param mat_type The type of matrix.
     auto
@@ -292,6 +414,16 @@ class CSparseMatrix
         return nvals;
     }
 
+    /// @brief Gets memory required to store the values blocks of matrix.
+    /// @return The memory in bytes.
+    /// @note Only the values blocks are counted, as they are what allocate()
+    /// reserves. The sparsity patterns describing the blocks are not included.
+    auto
+    memory_size() const -> size_t
+    {
+        return number_of_elements() * sizeof(double);
+    }
+
     /// @brief Gets number of off-diagonal blocks in matrix.
     /// @return The number of off-diagonal blocks.
     auto
@@ -309,6 +441,32 @@ class CSparseMatrix
     }
 
    private:
+    /// @brief Deallocates the values blocks of matrix.
+    auto
+    _deallocate() -> void
+    {
+        std::ranges::for_each(_values, [](double *block) { delete[] block; });
+
+        std::ranges::fill(_values, nullptr);
+
+        _values_state = valstat::empty;
+    }
+
+    /// @brief Allocates the values blocks of matrix and copies the values of
+    /// another matrix into them.
+    /// @param other The sparse matrix to copy the values of.
+    auto
+    _copy_values(const CSparseMatrix &other) -> void
+    {
+        std::ranges::for_each(std::views::iota(size_t{0}, _values.size()), [&](const auto i) {
+            const auto nvals = number_of_elements(i);
+
+            _values[i] = new double[nvals];
+
+            std::copy(other._values[i], other._values[i] + nvals, _values[i]);
+        });
+    }
+
     /// @brief Adds the sparsity patterns of the non-empty blocks of the atom
     /// basis pair groups.
     /// @param molecule The molecule to compute interatomic distances from.
