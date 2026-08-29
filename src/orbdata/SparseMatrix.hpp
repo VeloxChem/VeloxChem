@@ -48,15 +48,7 @@
 #include "Matrix.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
-
-/// @brief Defines supported states of the values blocks of a sparse matrix:
-/// valstat::empty     - the values blocks are not allocated
-/// valstat::allocated - the values blocks are allocated, with undefined content
-enum class valstat
-{
-    empty,
-    allocated
-};
+#include "ValuesState.hpp"
 
 /// @brief Class CSparseMatrix stores the sparsity pattern of a matrix in atomic
 /// orbital basis, as the sparsity patterns of its off-diagonal and diagonal atom
