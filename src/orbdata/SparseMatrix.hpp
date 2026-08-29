@@ -34,13 +34,18 @@
 #ifndef SparseMatrix_hpp
 #define SparseMatrix_hpp
 
+#include <algorithm>
 #include <cstddef>
+#include <ranges>
 #include <vector>
 
 #include "AtomBasisDiagonalSparsity.hpp"
+#include "AtomBasisPairGroup.hpp"
 #include "AtomBasisPairSparsity.hpp"
 #include "ErrorHandler.hpp"
 #include "Matrix.hpp"
+#include "MolecularBasis.hpp"
+#include "Molecule.hpp"
 
 /// @brief Class CSparseMatrix stores the sparsity pattern of a matrix in atomic
 /// orbital basis, as the sparsity patterns of its off-diagonal and diagonal atom
@@ -54,6 +59,9 @@
 /// on both sides, while a general matrix has a molecular basis on each side,
 /// with the bra index referring to the bra molecular basis and the ket index to
 /// the ket molecular basis.
+/// @note The blocks without atom pairs or atoms are dropped, so a block index is
+/// not an index of the atom basis pair group it originates from, and the numbers
+/// of off-diagonal and diagonal blocks need not agree.
 class CSparseMatrix
 {
    public:
@@ -82,6 +90,68 @@ class CSparseMatrix
 
         , _type(mat_type)
     {
+    }
+
+    /// @brief The constructor with molecule, molecular basis, integral screener
+    /// and screening threshold.
+    /// @param molecule The molecule to compute interatomic distances from.
+    /// @param basis The molecular basis on bra and ket sides.
+    /// @param screener The integral bound, evaluated as screener(bra_function,
+    /// ket_function, distance).
+    /// @param threshold The screening threshold.
+    /// @param mat_type The type of matrix.
+    template <typename B>
+    CSparseMatrix(const CMolecule       &molecule,
+                  const CMolecularBasis &basis,
+                  const B               &screener,
+                  const double           threshold,
+                  const mat_t            mat_type)
+
+        : _pair_blocks{}
+
+        , _diagonal_blocks{}
+
+        , _type(mat_type)
+    {
+        // NOTE: a symmetric or antisymmetric matrix needs the upper triangle of
+        // the atom basis pair groups only, while a general matrix needs their
+        // full direct product, which the two molecular bases factory delivers
+        // even when handed the same molecular basis twice.
+
+        auto groups = (mat_type == mat_t::general) ? basis.basis_pair_groups(basis) : basis.basis_pair_groups();
+
+        _add_blocks(molecule, groups, screener, threshold);
+    }
+
+    /// @brief The constructor with molecule, molecular bases on bra and ket
+    /// sides, integral screener and screening threshold.
+    /// @param molecule The molecule to compute interatomic distances from.
+    /// @param bra_basis The molecular basis on bra side.
+    /// @param ket_basis The molecular basis on ket side.
+    /// @param screener The integral bound, evaluated as screener(bra_function,
+    /// ket_function, distance).
+    /// @param threshold The screening threshold.
+    /// @param mat_type The type of matrix, which must be general.
+    template <typename B>
+    CSparseMatrix(const CMolecule       &molecule,
+                  const CMolecularBasis &bra_basis,
+                  const CMolecularBasis &ket_basis,
+                  const B               &screener,
+                  const double           threshold,
+                  const mat_t            mat_type)
+
+        : _pair_blocks{}
+
+        , _diagonal_blocks{}
+
+        , _type(mat_type)
+    {
+        errors::assertMsgCritical(mat_type == mat_t::general,
+                                  std::string("SparseMatrix: Matrix with two molecular bases must be of general type"));
+
+        auto groups = bra_basis.basis_pair_groups(ket_basis);
+
+        _add_blocks(molecule, groups, screener, threshold);
     }
 
     /// @brief Sets type of matrix.
@@ -156,6 +226,29 @@ class CSparseMatrix
     }
 
    private:
+    /// @brief Adds the sparsity patterns of the non-empty blocks of the atom
+    /// basis pair groups.
+    /// @param molecule The molecule to compute interatomic distances from.
+    /// @param groups The atom basis pair groups to describe.
+    /// @param screener The integral bound.
+    /// @param threshold The screening threshold.
+    template <typename B>
+    auto
+    _add_blocks(const CMolecule &molecule, std::vector<CAtomBasisPairGroup> &groups, const B &screener, const double threshold) -> void
+    {
+        std::ranges::for_each(groups, [&](auto &group) {
+            group.sort_by_distance(molecule);
+
+            const auto pair_block = CAtomBasisPairSparsity(group, screener, threshold);
+
+            if (pair_block.number_of_pairs() > 0) _pair_blocks.push_back(pair_block);
+
+            const auto diagonal_block = CAtomBasisDiagonalSparsity(group);
+
+            if (diagonal_block.number_of_atoms() > 0) _diagonal_blocks.push_back(diagonal_block);
+        });
+    }
+
     /// @brief The sparsity patterns of the off-diagonal blocks.
     std::vector<CAtomBasisPairSparsity> _pair_blocks;
 
