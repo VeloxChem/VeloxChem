@@ -12,6 +12,7 @@ pybind11_add_module(veloxchemlib
     ExportMoldata.cpp
     ExportOneElecInts.cpp
     ExportOrbdata.cpp
+    ExportSparse.cpp
     ExportVisualization.cpp
     ExportT2CIntegrals.cpp
     ExportT3CIntegrals.cpp

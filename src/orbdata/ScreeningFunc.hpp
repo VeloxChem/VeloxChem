@@ -43,6 +43,19 @@
 #include "BasisFunction.hpp"
 #include "MathConst.hpp"
 
+/// @brief Defines supported integral bounds for screening of atom pairs:
+/// screener::overlap           - the two-center overlap integral bound
+/// screener::kinetic_energy    - the two-center kinetic energy integral bound
+/// screener::nuclear_potential - the two-center nuclear potential integral bound
+/// screener::electron_repulsion - the three-center electron repulsion integral bound
+enum class screener
+{
+    overlap,
+    kinetic_energy,
+    nuclear_potential,
+    electron_repulsion
+};
+
 namespace screenfunc {  // screenfunc namespace
 
 /// @brief Counts leading elements of range satisfying predicate.

@@ -48,6 +48,7 @@
 #include "Matrix.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
+#include "ScreeningFunc.hpp"
 #include "ValuesState.hpp"
 
 /// @brief Class CSparseTensor stores the sparsity pattern of a three-dimensional
@@ -212,6 +213,53 @@ class CSparseTensor
         });
 
         _add_blocks(molecule, groups, aux_groups, screener, threshold);
+    }
+
+    /// @brief The constructor with molecule, molecular bases, named integral
+    /// bound, screening threshold and the batch of atoms on c side to describe.
+    /// @param molecule The molecule to compute interatomic distances from.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The molecular basis on c side.
+    /// @param bound The integral bound to screen atom pairs with.
+    /// @param threshold The screening threshold.
+    /// @param mat_type The type of tensor.
+    /// @param natoms_per_batch The number of atoms on c side in a batch.
+    /// @param batch_index The index of batch.
+    CSparseTensor(const CMolecule       &molecule,
+                  const CMolecularBasis &basis,
+                  const CMolecularBasis &aux_basis,
+                  const screener         bound,
+                  const double           threshold,
+                  const mat_t            mat_type,
+                  const size_t           natoms_per_batch,
+                  const size_t           batch_index)
+
+        : _blocks{}
+
+        , _values{}
+
+        , _type(mat_type)
+
+        , _values_state(valstat::empty)
+    {
+        errors::assertMsgCritical(bound == screener::electron_repulsion,
+                                  std::string("SparseTensor: Integral bound is not a three-center bound"));
+
+        errors::assertMsgCritical(natoms_per_batch > 0, std::string("SparseTensor: Number of atoms in a batch must be positive"));
+
+        auto groups = (mat_type == mat_t::general) ? basis.basis_pair_groups(basis) : basis.basis_pair_groups();
+
+        const auto offset = batch_index * natoms_per_batch;
+
+        std::vector<CAtomBasisGroup> aux_groups;
+
+        std::ranges::for_each(aux_basis.basis_groups(), [&](const auto &group) {
+            const auto slice = group.slice(offset, natoms_per_batch);
+
+            if (slice.number_of_atoms() > 0) aux_groups.push_back(slice);
+        });
+
+        _add_blocks(molecule, groups, aux_groups, screenfunc::three_center_electron_repulsion_bound, threshold);
     }
 
     /// @brief Gets number of batches of atoms on c side.
