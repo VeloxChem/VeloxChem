@@ -40,20 +40,25 @@
 #include "AtomBasis.hpp"
 
 /// @brief Class CAtomBasisGroup associates an atom basis with the atoms which
-/// share it. The atom basis is not owned by the group: it must outlive the
-/// group, and modifying the molecular basis it originates from invalidates the
-/// group.
+/// share it, and with its index among the unique atom bases of the molecular
+/// basis it originates from. The atom basis is not owned by the group: it must
+/// outlive the group, and modifying the molecular basis it originates from
+/// invalidates the group.
 class CAtomBasisGroup
 {
    public:
-    /// @brief The constructor with atom basis and its atoms.
+    /// @brief The constructor with atom basis, its atoms and its index.
     /// @param basis The atom basis shared by the atoms.
     /// @param atoms The vector of atomic indices using the atom basis.
-    CAtomBasisGroup(const CAtomBasis &basis, const std::vector<int> &atoms)
+    /// @param index The index of atom basis among the unique atom bases of the
+    /// molecular basis.
+    CAtomBasisGroup(const CAtomBasis &basis, const std::vector<int> &atoms, const int index)
 
         : _basis(basis)
 
         , _atoms(atoms)
+
+        , _index(index)
     {
     }
 
@@ -73,6 +78,15 @@ class CAtomBasisGroup
         return _atoms;
     }
 
+    /// @brief Gets index of atom basis among the unique atom bases of the
+    /// molecular basis the group originates from.
+    /// @return The index of atom basis.
+    auto
+    index() const -> int
+    {
+        return _index;
+    }
+
     /// @brief Gets number of atoms in group.
     /// @return The number of atoms in group.
     auto
@@ -87,6 +101,10 @@ class CAtomBasisGroup
 
     /// @brief The vector of atomic indices using the atom basis.
     std::vector<int> _atoms;
+
+    /// @brief The index of atom basis among the unique atom bases of the
+    /// molecular basis.
+    int _index;
 };
 
 #endif /* AtomBasisGroup_hpp */

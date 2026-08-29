@@ -36,7 +36,6 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <functional>
 #include <ranges>
 #include <vector>
 
@@ -50,8 +49,14 @@
 /// themselves and the number of atom pairs surviving screening for each
 /// combination of basis functions on bra and ket sides. Atom pairs of diagonal
 /// atom pairs are not described here, as their storage requirements differ. The
-/// atom bases are not owned by the sparsity pattern: they must outlive it, and
-/// modifying the molecular bases they originate from invalidates it.
+/// atom bases are referred to by their index among the unique atom bases of the
+/// molecular basis they originate from, so the sparsity pattern is a self
+/// contained value which outlives the atom bases it was constructed from.
+/// @note The indices do not record which molecular basis they refer to. For a
+/// sparsity pattern of a single molecular basis both indices refer to it, while
+/// for a pair of molecular bases the bra index refers to the bra molecular basis
+/// and the ket index to the ket molecular basis. Resolving an index against the
+/// wrong molecular basis addresses the wrong atom basis instead of failing.
 class CAtomBasisPairSparsity
 {
    public:
@@ -72,9 +77,9 @@ class CAtomBasisPairSparsity
     template <typename B>
     CAtomBasisPairSparsity(const CAtomBasisPairGroup &group, const B &bound, const double threshold)
 
-        : _bra_basis(group.bra_basis())
+        : _bra_index(group.bra_index())
 
-        , _ket_basis(group.ket_basis())
+        , _ket_index(group.ket_index())
 
         , _bra_atoms(group.bra_atoms())
 
@@ -108,20 +113,22 @@ class CAtomBasisPairSparsity
         });
     }
 
-    /// @brief Gets atom basis on bra side.
-    /// @return The constant reference to atom basis.
+    /// @brief Gets index of atom basis on bra side among the unique atom bases
+    /// of the molecular basis it originates from.
+    /// @return The index of atom basis.
     auto
-    bra_basis() const -> const CAtomBasis &
+    bra_index() const -> int
     {
-        return _bra_basis.get();
+        return _bra_index;
     }
 
-    /// @brief Gets atom basis on ket side.
-    /// @return The constant reference to atom basis.
+    /// @brief Gets index of atom basis on ket side among the unique atom bases
+    /// of the molecular basis it originates from.
+    /// @return The index of atom basis.
     auto
-    ket_basis() const -> const CAtomBasis &
+    ket_index() const -> int
     {
-        return _ket_basis.get();
+        return _ket_index;
     }
 
     /// @brief Gets atomic indices of atom pairs on bra side.
@@ -165,7 +172,9 @@ class CAtomBasisPairSparsity
     auto
     number_of_bra_basis_functions() const -> size_t
     {
-        return _bra_basis.get().number_of_basis_functions();
+        // NOTE: the last offset is the total number of basis functions.
+
+        return _bra_offsets.back();
     }
 
     /// @brief Gets number of basis functions on ket side.
@@ -173,7 +182,7 @@ class CAtomBasisPairSparsity
     auto
     number_of_ket_basis_functions() const -> size_t
     {
-        return _ket_basis.get().number_of_basis_functions();
+        return _ket_offsets.back();
     }
 
    private:
@@ -184,11 +193,13 @@ class CAtomBasisPairSparsity
     /// as last element.
     static auto _make_offsets(const CAtomBasis &basis) -> std::vector<size_t>;
 
-    /// @brief The atom basis on bra side.
-    std::reference_wrapper<const CAtomBasis> _bra_basis;
+    /// @brief The index of atom basis on bra side among the unique atom bases
+    /// of the molecular basis.
+    int _bra_index;
 
-    /// @brief The atom basis on ket side.
-    std::reference_wrapper<const CAtomBasis> _ket_basis;
+    /// @brief The index of atom basis on ket side among the unique atom bases
+    /// of the molecular basis.
+    int _ket_index;
 
     /// @brief The atomic indices of atom pairs on bra side.
     std::vector<int> _bra_atoms;

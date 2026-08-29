@@ -51,9 +51,9 @@ CAtomBasisPairSparsity::_make_offsets(const CAtomBasis &basis) -> std::vector<si
 
 CAtomBasisPairSparsity::CAtomBasisPairSparsity(const CAtomBasisPairGroup &group)
 
-    : _bra_basis(group.bra_basis())
+    : _bra_index(group.bra_index())
 
-    , _ket_basis(group.ket_basis())
+    , _ket_index(group.ket_index())
 
     , _bra_atoms(group.bra_atoms())
 

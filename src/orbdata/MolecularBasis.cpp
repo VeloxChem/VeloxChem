@@ -38,6 +38,7 @@
 #include <sstream>
 
 #include "ChemicalElement.hpp"
+#include "ErrorHandler.hpp"
 #include "StringFormat.hpp"
 #include "TensorComponents.hpp"
 #include "TensorLabels.hpp"
@@ -168,7 +169,7 @@ CMolecularBasis::basis_groups() const -> std::vector<CAtomBasisGroup>
     groups.reserve(_basis_sets.size());
 
     std::ranges::for_each(std::views::iota(size_t{0}, _basis_sets.size()),
-                          [&](const auto i) { groups.push_back(CAtomBasisGroup(_basis_sets[i], atoms[i])); });
+                          [&](const auto i) { groups.push_back(CAtomBasisGroup(_basis_sets[i], atoms[i], static_cast<int>(i))); });
 
     return groups;
 }
@@ -221,6 +222,15 @@ auto
 CMolecularBasis::basis_sets() const -> std::vector<CAtomBasis>
 {
     return _basis_sets;
+}
+
+auto
+CMolecularBasis::basis_set(const int index) const -> const CAtomBasis &
+{
+    errors::assertMsgCritical((index >= 0) && (index < static_cast<int>(_basis_sets.size())),
+                              std::string("MolecularBasis.basis_set: Index of atom basis is out of range"));
+
+    return _basis_sets[index];
 }
 
 auto

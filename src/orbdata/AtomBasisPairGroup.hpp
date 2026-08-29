@@ -83,6 +83,10 @@ class CAtomBasisPairGroup
 
         , _distances{}
 
+        , _bra_index(group.index())
+
+        , _ket_index(group.index())
+
         , _symmetric(true)
 
         , _order(pairord::none)
@@ -123,6 +127,10 @@ class CAtomBasisPairGroup
         , _diagonal_atoms{}
 
         , _distances{}
+
+        , _bra_index(bra.index())
+
+        , _ket_index(ket.index())
 
         , _symmetric(false)
 
@@ -175,6 +183,24 @@ class CAtomBasisPairGroup
     ket_basis() const -> const CAtomBasis &
     {
         return _ket_basis.get();
+    }
+
+    /// @brief Gets index of atom basis on bra side among the unique atom bases
+    /// of the molecular basis it originates from.
+    /// @return The index of atom basis.
+    auto
+    bra_index() const -> int
+    {
+        return _bra_index;
+    }
+
+    /// @brief Gets index of atom basis on ket side among the unique atom bases
+    /// of the molecular basis it originates from.
+    /// @return The index of atom basis.
+    auto
+    ket_index() const -> int
+    {
+        return _ket_index;
     }
 
     /// @brief Gets maximum angular momentum of basis functions on bra side.
@@ -325,6 +351,14 @@ class CAtomBasisPairGroup
 
     /// @brief The interatomic distances of off-diagonal atom pairs.
     std::vector<double> _distances;
+
+    /// @brief The index of atom basis on bra side among the unique atom bases
+    /// of the molecular basis.
+    int _bra_index;
+
+    /// @brief The index of atom basis on ket side among the unique atom bases
+    /// of the molecular basis.
+    int _ket_index;
 
     /// @brief The flag indicating that bra and ket sides are interchangeable.
     bool _symmetric;
