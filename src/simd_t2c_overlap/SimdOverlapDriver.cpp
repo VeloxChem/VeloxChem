@@ -33,11 +33,16 @@
 
 #include "SimdOverlapDriver.hpp"
 
+#include <algorithm>
+#include <ranges>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "ErrorHandler.hpp"
 #include "Matrix.hpp"
 #include "ScreeningFunc.hpp"
+#include "SimdOverlapFunc.hpp"
 
 auto
 CSimdOverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis) const -> CSparseMatrix
@@ -96,17 +101,68 @@ CSimdOverlapDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
     errors::assertMsgCritical(false, std::string("SimdOverlapDriver: Computation of off-diagonal blocks is not implemented"));
 }
 
+/// @brief Gets the angular momentum and the index within it of each basis
+/// function of an atom basis.
+/// @param basis The atom basis to index the basis functions of.
+/// @return The vector of angular momenta and indices within them.
+static auto
+_index_functions(const CAtomBasis &basis) -> std::vector<std::pair<int, size_t>>
+{
+    std::vector<std::pair<int, size_t>> indices;
+
+    std::vector<size_t> counts(static_cast<size_t>(basis.max_angular_momentum() + 1), 0);
+
+    std::ranges::for_each(basis.functions(), [&](const auto &bfn) {
+        const auto lval = bfn.get_angular_momentum();
+
+        indices.push_back({lval, counts[lval]});
+
+        counts[lval]++;
+    });
+
+    return indices;
+}
+
 auto
 CSimdOverlapDriver::_compute_diagonal_blocks(CSparseMatrix         &matrix,
                                              const CMolecule       &molecule,
                                              const CMolecularBasis &bra_basis,
                                              const CMolecularBasis &ket_basis) const -> void
 {
-    // TODO: for each diagonal block of the matrix
-    //         for each combination of basis functions with the same angular
-    //           momentum on bra and ket sides
-    //           compute the one-center overlap of the pair of basis functions
-    //           add the value to the values of the block
+    // NOTE: the overlap of two basis functions on the same atom does not depend
+    // on the position of the atom, so a single value is stored for each pair of
+    // basis functions with the same angular momentum and the molecule is not
+    // needed here.
 
-    errors::assertMsgCritical(false, std::string("SimdOverlapDriver: Computation of diagonal blocks is not implemented"));
+    std::ranges::for_each(std::views::iota(size_t{0}, matrix.number_of_diagonal_blocks()), [&](const auto iblk) {
+        const auto &block = matrix.diagonal_block(iblk);
+
+        const auto &a_basis = bra_basis.basis_set(block.bra_index());
+
+        const auto &b_basis = ket_basis.basis_set(block.ket_index());
+
+        const auto a_indices = _index_functions(a_basis);
+
+        const auto b_indices = _index_functions(b_basis);
+
+        auto *values = matrix.diagonal_values(iblk);
+
+        std::ranges::for_each(std::views::iota(size_t{0}, a_indices.size()), [&](const auto i) {
+            std::ranges::for_each(std::views::iota(size_t{0}, b_indices.size()), [&](const auto j) {
+                // NOTE: only the stored combinations are computed, as the values
+                // of the reverse order share their storage.
+
+                if (block.is_triangular() && (i > j)) return;
+
+                const auto [la, ia] = a_indices[i];
+
+                const auto [lb, jb] = b_indices[j];
+
+                if (block.number_of_elements(la, ia, lb, jb) == 0) return;
+
+                values[block.element_offset(la, ia, lb, jb)] =
+                    simdovl::one_center_overlap(a_basis.functions()[i], b_basis.functions()[j]);
+            });
+        });
+    });
 }
