@@ -52,19 +52,6 @@ cache_line_size() -> size_t
 #endif
 }
 
-/// @brief Checks if the exponential function is vectorized on the target.
-/// @return True if a vector exponential is available, false otherwise.
-/// @note The exponential is issued as a scalar call inside a vector loop, as no
-/// vector math library is linked. Vectorizing a loop which contains it is then a
-/// loss, since the values are unpacked and repacked around each call. Kernels use
-/// this predicate to condition their vectorization, and turn it on once a vector
-/// exponential is in place.
-constexpr auto
-has_vector_exp() -> bool
-{
-    return false;
-}
-
 /// @brief Gets number of values which fit into a cache line.
 /// @return The number of values in a cache line.
 constexpr auto

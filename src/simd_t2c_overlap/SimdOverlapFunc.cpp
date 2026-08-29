@@ -142,10 +142,14 @@ compute_ss_overlap(double               *values,
 
             // NOTE: the rows of the buffer and of the coordinates start at a cache
             // line boundary, so the loop is vectorized with aligned loads and
-            // stores. The vectorization is conditional on the exponential being
-            // vectorized as well, as it is otherwise slower than the scalar loop.
+            // stores.
 
-#pragma omp simd aligned(prim, ab_2 : simd::cache_line_size()) if (simd::has_vector_exp())
+            // NOTE: the exponential is issued as a scalar call, as no vector math
+            // library is linked, and it dominates the cost of the loop. Vectorizing
+            // around it still pays, as the squared distance leaves only a load, two
+            // multiplications and a store to be packed into the lanes.
+
+#pragma omp simd aligned(prim, ab_2 : simd::cache_line_size())
             for (size_t k = 0; k < ncols; k++)
             {
                 prim[k] = ffact * std::exp(-fmu * ab_2[k]);
