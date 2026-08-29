@@ -37,6 +37,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <ranges>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -313,6 +314,147 @@ class CSparseMatrix
                               [&](const auto i) { std::fill(_values[i], _values[i] + number_of_elements(i), 0.0); });
     }
 
+    /// @brief Deallocates the values blocks of matrix, leaving its sparsity
+    /// patterns intact.
+    auto
+    deallocate() -> void
+    {
+        _deallocate();
+    }
+
+    /// @brief Scales the values of all values blocks of matrix.
+    /// @param factor The scaling factor.
+    auto
+    scale(const double factor) -> void
+    {
+        errors::assertMsgCritical(_values_state == valstat::allocated,
+                                  std::string("SparseMatrix.scale: Values blocks of matrix are not allocated"));
+
+        std::ranges::for_each(std::views::iota(size_t{0}, _values.size()), [&](const auto i) {
+            std::ranges::for_each(std::views::iota(size_t{0}, number_of_elements(i)), [&](const auto k) { _values[i][k] *= factor; });
+        });
+    }
+
+    /// @brief Gets values of the off-diagonal block with specific index.
+    /// @param index The index of off-diagonal block.
+    /// @return The pointer to the values of the block.
+    auto
+    pair_values(const size_t index) -> double *
+    {
+        _check_values(index, _pair_blocks.size(), std::string("pair_values"));
+
+        return _values[index];
+    }
+
+    /// @brief Gets values of the off-diagonal block with specific index.
+    /// @param index The index of off-diagonal block.
+    /// @return The constant pointer to the values of the block.
+    auto
+    pair_values(const size_t index) const -> const double *
+    {
+        _check_values(index, _pair_blocks.size(), std::string("pair_values"));
+
+        return _values[index];
+    }
+
+    /// @brief Gets values of the diagonal block with specific index.
+    /// @param index The index of diagonal block.
+    /// @return The pointer to the values of the block.
+    auto
+    diagonal_values(const size_t index) -> double *
+    {
+        _check_values(index, _diagonal_blocks.size(), std::string("diagonal_values"));
+
+        return _values[_pair_blocks.size() + index];
+    }
+
+    /// @brief Gets values of the diagonal block with specific index.
+    /// @param index The index of diagonal block.
+    /// @return The constant pointer to the values of the block.
+    auto
+    diagonal_values(const size_t index) const -> const double *
+    {
+        _check_values(index, _diagonal_blocks.size(), std::string("diagonal_values"));
+
+        return _values[_pair_blocks.size() + index];
+    }
+
+    /// @brief Gets values of specific combination of basis functions in the
+    /// off-diagonal block with specific index.
+    /// @param index The index of off-diagonal block.
+    /// @param bra_angular_momentum The angular momentum of basis function on bra side.
+    /// @param bra_index The index of basis function on bra side.
+    /// @param ket_angular_momentum The angular momentum of basis function on ket side.
+    /// @param ket_index The index of basis function on ket side.
+    /// @return The pointer to the values of the combination of basis functions.
+    auto
+    pair_values(const size_t index,
+                const int    bra_angular_momentum,
+                const size_t bra_index,
+                const int    ket_angular_momentum,
+                const size_t ket_index) -> double *
+    {
+        return pair_values(index) +
+               _pair_blocks[index].element_offset(bra_angular_momentum, bra_index, ket_angular_momentum, ket_index);
+    }
+
+    /// @brief Gets values of specific combination of basis functions in the
+    /// off-diagonal block with specific index.
+    /// @param index The index of off-diagonal block.
+    /// @param bra_angular_momentum The angular momentum of basis function on bra side.
+    /// @param bra_index The index of basis function on bra side.
+    /// @param ket_angular_momentum The angular momentum of basis function on ket side.
+    /// @param ket_index The index of basis function on ket side.
+    /// @return The constant pointer to the values of the combination of basis functions.
+    auto
+    pair_values(const size_t index,
+                const int    bra_angular_momentum,
+                const size_t bra_index,
+                const int    ket_angular_momentum,
+                const size_t ket_index) const -> const double *
+    {
+        return pair_values(index) +
+               _pair_blocks[index].element_offset(bra_angular_momentum, bra_index, ket_angular_momentum, ket_index);
+    }
+
+    /// @brief Gets values of specific combination of basis functions in the
+    /// diagonal block with specific index.
+    /// @param index The index of diagonal block.
+    /// @param bra_angular_momentum The angular momentum of basis function on bra side.
+    /// @param bra_index The index of basis function on bra side.
+    /// @param ket_angular_momentum The angular momentum of basis function on ket side.
+    /// @param ket_index The index of basis function on ket side.
+    /// @return The pointer to the values of the combination of basis functions.
+    auto
+    diagonal_values(const size_t index,
+                    const int    bra_angular_momentum,
+                    const size_t bra_index,
+                    const int    ket_angular_momentum,
+                    const size_t ket_index) -> double *
+    {
+        return diagonal_values(index) +
+               _diagonal_blocks[index].element_offset(bra_angular_momentum, bra_index, ket_angular_momentum, ket_index);
+    }
+
+    /// @brief Gets values of specific combination of basis functions in the
+    /// diagonal block with specific index.
+    /// @param index The index of diagonal block.
+    /// @param bra_angular_momentum The angular momentum of basis function on bra side.
+    /// @param bra_index The index of basis function on bra side.
+    /// @param ket_angular_momentum The angular momentum of basis function on ket side.
+    /// @param ket_index The index of basis function on ket side.
+    /// @return The constant pointer to the values of the combination of basis functions.
+    auto
+    diagonal_values(const size_t index,
+                    const int    bra_angular_momentum,
+                    const size_t bra_index,
+                    const int    ket_angular_momentum,
+                    const size_t ket_index) const -> const double *
+    {
+        return diagonal_values(index) +
+               _diagonal_blocks[index].element_offset(bra_angular_momentum, bra_index, ket_angular_momentum, ket_index);
+    }
+
     /// @brief Sets type of matrix.
     /// @param mat_type The type of matrix.
     auto
@@ -441,6 +583,21 @@ class CSparseMatrix
     }
 
    private:
+    /// @brief Checks that the values blocks are allocated and that a block index
+    /// is in range.
+    /// @param index The index of block.
+    /// @param nblocks The number of blocks of that kind.
+    /// @param label The name of the accessor requesting the check.
+    auto
+    _check_values(const size_t index, const size_t nblocks, const std::string &label) const -> void
+    {
+        errors::assertMsgCritical(_values_state == valstat::allocated,
+                                  std::string("SparseMatrix.") + label + std::string(": Values blocks of matrix are not allocated"));
+
+        errors::assertMsgCritical(index < nblocks,
+                                  std::string("SparseMatrix.") + label + std::string(": Index of block is out of range"));
+    }
+
     /// @brief Deallocates the values blocks of matrix.
     auto
     _deallocate() -> void
