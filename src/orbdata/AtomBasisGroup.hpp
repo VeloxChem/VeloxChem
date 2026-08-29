@@ -34,6 +34,8 @@
 #ifndef AtomBasisGroup_hpp
 #define AtomBasisGroup_hpp
 
+#include <algorithm>
+#include <cstddef>
 #include <functional>
 #include <vector>
 
@@ -60,6 +62,28 @@ class CAtomBasisGroup
 
         , _index(index)
     {
+    }
+
+    /// @brief Slices atom basis group by selecting a range of its atoms.
+    /// @param offset The index of the first selected atom in group.
+    /// @param natoms The number of selected atoms.
+    /// @return The atom basis group with the selected atoms.
+    /// @note The selected range is clamped to the atoms of the group, so an
+    /// offset beyond the last atom gives an empty atom basis group and the last
+    /// slice of a fixed stride is short rather than out of range. The sliced
+    /// group refers to the same atom basis and keeps its index, as it describes
+    /// the same atom basis of the same molecular basis.
+    auto
+    slice(const size_t offset, const size_t natoms) const -> CAtomBasisGroup
+    {
+        const auto first = std::min(offset, _atoms.size());
+
+        // NOTE: the count is clamped against the atoms left after the offset, so
+        // that a large number of atoms cannot overflow into an inverted range.
+
+        const auto count = std::min(natoms, _atoms.size() - first);
+
+        return CAtomBasisGroup(_basis.get(), std::vector<int>(_atoms.begin() + first, _atoms.begin() + first + count), _index);
     }
 
     /// @brief Gets atom basis shared by the atoms in group.
