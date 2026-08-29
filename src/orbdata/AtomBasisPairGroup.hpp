@@ -43,6 +43,17 @@
 #include "AtomBasis.hpp"
 #include "AtomBasisGroup.hpp"
 
+class CMolecule;
+
+/// @brief Defines supported orderings of atom pairs:
+/// pairord::none     - the atom pairs are in their construction order
+/// pairord::distance - the atom pairs are ordered by ascending interatomic distance
+enum class pairord
+{
+    none,
+    distance
+};
+
 /// @brief Class CAtomBasisPairGroup associates a pair of atom bases with the
 /// atom pairs formed by the atoms sharing them. Off-diagonal atom pairs are
 /// stored as parallel bra and ket vectors, while atoms of diagonal atom pairs
@@ -50,7 +61,9 @@
 /// from the atom bases: the single argument constructor builds a symmetric
 /// group, the two arguments constructor a non-symmetric one. The atom bases are
 /// not owned by the group: they must outlive the group, and modifying the
-/// molecular bases they originate from invalidates the group.
+/// molecular bases they originate from invalidates the group. Atom pairs are
+/// created unordered and are reordered by sort_by_distance(), which also fills
+/// in the interatomic distances.
 class CAtomBasisPairGroup
 {
    public:
@@ -68,7 +81,11 @@ class CAtomBasisPairGroup
 
         , _diagonal_atoms(group.atoms())
 
+        , _distances{}
+
         , _symmetric(true)
+
+        , _order(pairord::none)
     {
         const auto npairs = group.number_of_atoms() * (group.number_of_atoms() - 1) / 2;
 
@@ -105,7 +122,11 @@ class CAtomBasisPairGroup
 
         , _diagonal_atoms{}
 
+        , _distances{}
+
         , _symmetric(false)
+
+        , _order(pairord::none)
     {
         _bra_atoms.reserve(bra.number_of_atoms() * ket.number_of_atoms());
 
@@ -133,6 +154,12 @@ class CAtomBasisPairGroup
 
         std::ranges::set_intersection(bra.atoms(), ket.atoms(), std::back_inserter(_diagonal_atoms));
     }
+
+    /// @brief Orders atom pairs by ascending interatomic distance and fills in
+    /// the interatomic distances. Atoms of diagonal atom pairs are not affected,
+    /// as their interatomic distance is zero.
+    /// @param molecule The molecule providing the atomic coordinates.
+    auto sort_by_distance(const CMolecule &molecule) -> void;
 
     /// @brief Gets atom basis on bra side.
     /// @return The constant reference to atom basis.
@@ -183,6 +210,23 @@ class CAtomBasisPairGroup
         return _diagonal_atoms;
     }
 
+    /// @brief Gets interatomic distances of off-diagonal atom pairs.
+    /// @return The constant reference to vector of interatomic distances, empty
+    /// if atom pairs are not ordered by interatomic distance.
+    auto
+    distances() const -> const std::vector<double> &
+    {
+        return _distances;
+    }
+
+    /// @brief Gets ordering of atom pairs in group.
+    /// @return The ordering of atom pairs.
+    auto
+    ordering() const -> pairord
+    {
+        return _order;
+    }
+
     /// @brief Gets number of off-diagonal atom pairs in group.
     /// @return The number of off-diagonal atom pairs.
     auto
@@ -215,8 +259,14 @@ class CAtomBasisPairGroup
     /// @brief The atomic indices of atoms in diagonal atom pairs.
     std::vector<int> _diagonal_atoms;
 
+    /// @brief The interatomic distances of off-diagonal atom pairs.
+    std::vector<double> _distances;
+
     /// @brief The flag indicating that bra and ket sides are interchangeable.
     bool _symmetric;
+
+    /// @brief The ordering of atom pairs in group.
+    pairord _order;
 };
 
 #endif /* AtomBasisPairGroup_hpp */
