@@ -70,6 +70,16 @@ _OPENQP_CONVERGENCE_FAILURES = tuple(
         globals().get('SCFnotConverged'), SystemExit, RuntimeError)
     if failure is not None)
 
+# OpenQP's public input calls all three choices ``tdhf.tlf``, but the audited
+# implementation is unambiguous: value 0 calls exact determinant minors while
+# values 1 and 2 are finite-order truncated Leibniz expansions.  Keep those
+# historical integers behind a descriptive VeloxChem setting.
+_MRSF_TRACKING_OVERLAP_ALGORITHMS = {
+    'exact': 0,
+    'tlf1': 1,
+    'tlf2': 2,
+}
+
 
 class OpenQPReferenceStabilityError(RuntimeError):
     """Raised when a requested OpenQP stability check cannot be validated."""
@@ -383,6 +393,10 @@ class OpenQPScfDriver:
         self.d4 = False
         self.stability = False
 
+        # Preserve OpenQP's historical default for generic driver users.
+        # Production state-tracking inputs select ``exact`` explicitly.
+        self.tracking_overlap_algorithm = 'tlf2'
+
         # OpenMP threads for the OpenQP native kernels
         self.omp_threads = None
 
@@ -545,6 +559,35 @@ class OpenQPScfDriver:
             self.reuse_scf_guess = bool(enabled)
             if not self.reuse_scf_guess:
                 self.clear_scf_guess()
+
+    def set_tracking_overlap_algorithm(self, algorithm):
+        """Selects determinant minors for cross-geometry MRSF tracking.
+
+        ``exact`` maps to OpenQP ``tdhf.tlf=0``; ``tlf1`` and ``tlf2`` map
+        to the historical finite-order approximations.  This setting is used
+        only by the two MRSF tracking entry points, not by generic TDHF/NAC
+        calculations made through :meth:`run_oqp`.
+        """
+
+        label = str(algorithm).strip().lower()
+        assert_msg_critical(
+            label in _MRSF_TRACKING_OVERLAP_ALGORITHMS,
+            'OpenQPScfDriver: tracking_overlap_algorithm must be one of '
+            f'{tuple(_MRSF_TRACKING_OVERLAP_ALGORITHMS)}; got "{algorithm}".')
+        self.tracking_overlap_algorithm = label
+        self._invalidate_cache()
+
+    def _tracking_overlap_tlf_value(self):
+        return _MRSF_TRACKING_OVERLAP_ALGORITHMS[
+            self.tracking_overlap_algorithm]
+
+    def tracking_overlap_method(self):
+        """Returns an unambiguous provenance label for the selected mode."""
+
+        value = self._tracking_overlap_tlf_value()
+        if self.tracking_overlap_algorithm == 'exact':
+            return 'openqp_exact_determinant_minors_tdhf_tlf_0'
+        return f'openqp_{self.tracking_overlap_algorithm}_tdhf_tlf_{value}'
 
     def clear_scf_guess(self):
         """Discards the stored previous-geometry SCF guess."""
@@ -1066,7 +1109,8 @@ class OpenQPScfDriver:
             exc_multiplicity=exc_multiplicity,
             tdhf_type='mrsf',
             nstate=nstate,
-            grad_state=None)
+            grad_state=None,
+            tlf=self._tracking_overlap_tlf_value())
         mol = self._new_oqp_molecule(config)
         self._oqp_mol = mol
         self._calc_signature = calc_signature
@@ -1281,7 +1325,8 @@ class OpenQPScfDriver:
             tdhf_type='mrsf',
             nstate=n_states,
             grad_state=None,
-            stability=stability_override)
+            stability=stability_override,
+            tlf=self._tracking_overlap_tlf_value())
         mol = self._new_oqp_molecule(config)
 
         self._oqp_mol = mol
@@ -1434,6 +1479,7 @@ class OpenQPScfDriver:
             'selected_spectral_norm': selected_spectral_norm,
             'overlap_is_conditioned': overlap_is_conditioned,
             'overlap_warnings': overlap_warnings,
+            'state_overlap_method': self.tracking_overlap_method(),
             'xyz': snapshot_xyz,
             'data': snapshot_data,
             'scf_converged': True,
@@ -1531,7 +1577,7 @@ class OpenQPScfDriver:
 
     def _build_config(self, molecule, *, method, functional, scf_type,
                       multiplicity, exc_multiplicity=1, tdhf_type=None,
-                      nstate=1, grad_state=None, stability=None):
+                      nstate=1, grad_state=None, stability=None, tlf=None):
         """
         Builds an OpenQP configuration dictionary (ini-style, string values)
         from the VeloxChem molecule and the requested calculation settings.
@@ -1577,6 +1623,8 @@ class OpenQPScfDriver:
                 'nstate': str(int(nstate)),
                 'multiplicity':str(int(exc_multiplicity))
             }
+            if tlf is not None:
+                config['tdhf']['tlf'] = str(int(tlf))
 
         return config
 

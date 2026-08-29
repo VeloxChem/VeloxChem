@@ -797,6 +797,7 @@ class LandauZenerSurfaceHoppingDynamics:
         continuity_record = (None if snapshot is None else
                              getattr(snapshot, 'reference_continuity', None))
 
+        tracking = None
         try:
             if not result.scf_converged:
                 raise SurfaceHoppingError(
@@ -835,6 +836,8 @@ class LandauZenerSurfaceHoppingDynamics:
             proposed_spin_multiplicities = (
                 self._validate_serenity_spin_policy(result, tracking))
         except SurfaceHoppingError as exc:
+            self._archive_rejected_electronic_trial(
+                step, result, tracking, exc)
             rollback_electronic_transaction()
             if (continuity_record is not None and
                     not continuity_record.get('reference_continuous', True)):
@@ -918,6 +921,76 @@ class LandauZenerSurfaceHoppingDynamics:
             self._scf_stability_initial_completed = True
 
         return result, tracking
+
+    def _archive_rejected_electronic_trial(
+            self, step, result, tracking, error):
+        """Archives a failed trial before its provider transaction is rolled back."""
+
+        archive = getattr(
+            self.provider, 'archive_rejected_provenance', None)
+        if not callable(archive) or getattr(result, 'snapshot', None) is None:
+            return None
+
+        history = self.detector.get_history_snapshot()
+        pairs = set(history.get('gap_history', {}))
+        pairs.update(history.get('step_history', {}))
+        serializable_history = {
+            'pairs': [
+                {
+                    'states': [int(value) for value in pair],
+                    'gaps': [float(value) for value in
+                             history.get('gap_history', {}).get(pair, ())],
+                    'steps': [int(value) for value in
+                              history.get('step_history', {}).get(pair, ())],
+                }
+                for pair in sorted(pairs)
+            ],
+            'last_event_steps': [
+                {
+                    'states': [int(value) for value in pair],
+                    'step': int(value),
+                }
+                for pair, value in sorted(
+                    history.get('last_event_step', {}).items())
+            ],
+        }
+
+        self._electronic_provenance_calculation_index = int(getattr(
+            self, '_electronic_provenance_calculation_index', 0)) + 1
+        try:
+            path = archive(
+                step=int(step),
+                result=result,
+                tracking=tracking,
+                directory=self.settings.electronic_provenance_dir,
+                calculation_index=(
+                    self._electronic_provenance_calculation_index),
+                lz_history_before_rejection=serializable_history)
+        except Exception as archive_error:
+            self._write_diagnostics_record({
+                'record_type': 'rejected_electronic_provenance_error',
+                'trajectory_id': self.settings.trajectory_id,
+                'trajectory_step': int(step),
+                'accepted': False,
+                'eligible_for_lz': False,
+                'failure': str(error),
+                'archive_failure': str(archive_error),
+            })
+            return None
+
+        self._write_diagnostics_record({
+            'record_type': 'rejected_electronic_trial',
+            'trajectory_id': self.settings.trajectory_id,
+            'trajectory_step': int(step),
+            'accepted': False,
+            'eligible_for_lz': False,
+            'active_raw_state': int(result.active_raw_state),
+            'active_tracked_state': int(result.active_tracked_state),
+            'failure': str(error),
+            'electronic_provenance_path': path,
+            'lz_history_before_rejection': serializable_history,
+        })
+        return path
 
     # ------------------------------------------------------------------
     # hopping

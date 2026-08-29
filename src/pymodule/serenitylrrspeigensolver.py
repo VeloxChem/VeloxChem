@@ -772,7 +772,7 @@ class SerenityLinearResponseSolver:
             eigvecs = eigvecs.reshape(-1, 1)
 
         for state in range(eigvecs.shape[1]):
-            write_rsp_full_solution_to_hdf5(fname, f"S{state + 1}", eigvecs[:, state])
+            write_rsp_full_solution_to_hdf5(fname, eigvecs[:, state], state + 1, self.nstates)
         
     def _write_final_hdf5(self, molecule, rsp_results):
         final_h5_fname = self.scf_driver.get_final_h5py_file()

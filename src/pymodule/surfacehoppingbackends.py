@@ -296,6 +296,8 @@ class ElectronicSnapshot:
         against.  Reversing the pair is a different quantity.
     :param overlap_source:
         Name of the conditioned descriptor selected for assignment.
+    :param state_overlap_method:
+        Backend algorithm that produced the native cross-geometry overlap.
     :param native_overlap_matrix:
         Signed native OpenQP MRSF overlap retained for provenance.
     :param response_overlap_matrix:
@@ -352,6 +354,7 @@ class ElectronicSnapshot:
     overlap_to_previous: np.ndarray = None
     previous_calculation_id: str = None
     overlap_source: str = None
+    state_overlap_method: str = None
     native_overlap_matrix: np.ndarray = None
     response_overlap_matrix: np.ndarray = None
     native_spectral_norm: float = None
@@ -484,6 +487,7 @@ class ElectronicSnapshot:
             'reference_continuity': (
                 None if self.reference_continuity is None else
                 dict(self.reference_continuity)),
+            'state_overlap_method': self.state_overlap_method,
         }
 
     @classmethod
@@ -522,6 +526,7 @@ class ElectronicSnapshot:
                 int(s) for s in payload['derivative_selectors']),
             reference_energy=float(payload['reference_energy']),
             response_energies=_frozen(payload['response_energies']),
+            state_overlap_method=payload.get('state_overlap_method'),
             reference_stability=(
                 None if payload.get('reference_stability') is None else
                 dict(payload['reference_stability'])),
@@ -553,6 +558,7 @@ def build_snapshot(*,
                    overlap_to_previous=None,
                    previous_calculation_id=None,
                    overlap_source=None,
+                   state_overlap_method=None,
                    native_overlap_matrix=None,
                    response_overlap_matrix=None,
                    native_spectral_norm=None,
@@ -675,6 +681,8 @@ def build_snapshot(*,
                                  str(previous_calculation_id)),
         overlap_source=(None if overlap_source is None else
                         str(overlap_source)),
+        state_overlap_method=(None if state_overlap_method is None else
+                              str(state_overlap_method)),
         native_overlap_matrix=_frozen(native_overlap_matrix),
         response_overlap_matrix=_frozen(response_overlap_matrix),
         native_spectral_norm=(None if native_spectral_norm is None else
@@ -900,7 +908,7 @@ class OpenQPMRSFAdapter(ElectronicBackendAdapter):
 
     backend = 'openqp'
     method = 'mrsf-tddft'
-    adapter_revision = '2'
+    adapter_revision = '3'
     target_manifold = 'singlet'
 
     #: OpenQP MRSF requires a high-spin triplet ROHF working reference.
@@ -961,6 +969,8 @@ class OpenQPMRSFAdapter(ElectronicBackendAdapter):
             'd4': bool(getattr(driver, 'd4', False)),
             'exc_multiplicity': self.exc_multiplicity,
             'tddft_type': 'mrsf',
+            'tracking_overlap_algorithm': str(
+                driver.tracking_overlap_algorithm),
         })
 
         return payload
@@ -1028,7 +1038,9 @@ class OpenQPMRSFAdapter(ElectronicBackendAdapter):
             'multi_state_total_energies': True,
             'state_specific_gradients': True,
             'cross_geometry_descriptor':
-                'conditioned_openqp_mrsf_overlap_with_response_fallback',
+                'conditioned_openqp_mrsf_'
+                f'{self.scf_driver.tracking_overlap_algorithm}_overlap_'
+                'with_response_fallback',
             'scf_reference_stability': True,
             'scf_reference_continuity':
                 'docc_somo_subspace_singular_values',
@@ -1141,6 +1153,7 @@ class OpenQPMRSFAdapter(ElectronicBackendAdapter):
                 previous_snapshot.calculation_id),
             overlap_source=(None if overlap_selection is None else
                             overlap_selection.overlap_source),
+            state_overlap_method=native.get('state_overlap_method', None),
             native_overlap_matrix=(None if overlap_selection is None else
                                    overlap_selection.native_overlap),
             response_overlap_matrix=(None if overlap_selection is None else

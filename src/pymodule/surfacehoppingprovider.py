@@ -77,6 +77,7 @@ For linear-response TDA/TDDFT the state energies are
 """
 
 from dataclasses import dataclass
+import itertools
 import json
 import os
 import shutil
@@ -1257,7 +1258,35 @@ class BackendStateProvider(ElectronicStateProvider):
 
     def archive_accepted_provenance(self, *, step, result, tracking,
                                     directory, calculation_index):
-        """Writes one atomic, non-overwriting accepted-step archive.
+        """Writes provenance for one accepted electronic transaction."""
+
+        return self._archive_electronic_provenance(
+            step=step,
+            result=result,
+            tracking=tracking,
+            directory=directory,
+            calculation_index=calculation_index,
+            accepted=True,
+            lz_history_before_rejection=None)
+
+    def archive_rejected_provenance(
+            self, *, step, result, tracking, directory, calculation_index,
+            lz_history_before_rejection):
+        """Writes a non-LZ-eligible trial archive before rollback."""
+
+        return self._archive_electronic_provenance(
+            step=step,
+            result=result,
+            tracking=tracking,
+            directory=directory,
+            calculation_index=calculation_index,
+            accepted=False,
+            lz_history_before_rejection=lz_history_before_rejection)
+
+    def _archive_electronic_provenance(
+            self, *, step, result, tracking, directory, calculation_index,
+            accepted, lz_history_before_rejection):
+        """Writes one atomic, non-overwriting electronic-step archive.
 
         The adapter first materializes OpenQP's native JSON/settings/log
         bundle in a staging directory.  Compact, backend-neutral summaries are
@@ -1272,14 +1301,17 @@ class BackendStateProvider(ElectronicStateProvider):
         if snapshot is None or not callable(writer):
             return None
 
+        expected = (self._accepted_snapshot if accepted else
+                    self._pending_snapshot)
         assert_msg_critical(
-            self._accepted_snapshot is snapshot,
-            'BackendStateProvider: provenance may be written only for the '
-            'accepted electronic snapshot.')
+            expected is snapshot,
+            'BackendStateProvider: provenance snapshot does not match the '
+            f'{"accepted" if accepted else "pending trial"} transaction.')
 
         root = os.path.abspath(str(directory))
         os.makedirs(root, exist_ok=True)
-        base = f'step_{int(step):08d}'
+        prefix = 'step' if accepted else 'rejected_step'
+        base = f'{prefix}_{int(step):08d}'
         target = os.path.join(root, base)
         if os.path.exists(target):
             base += f'_calculation_{int(calculation_index):08d}'
@@ -1305,6 +1337,8 @@ class BackendStateProvider(ElectronicStateProvider):
 
             scf_reference = {
                 'trajectory_step': int(step),
+                'accepted': bool(accepted),
+                'eligible_for_lz': bool(accepted),
                 'electronic_calculation_index': int(calculation_index),
                 'calculation_id': str(snapshot.calculation_id),
                 'previous_calculation_id': snapshot.previous_calculation_id,
@@ -1322,6 +1356,8 @@ class BackendStateProvider(ElectronicStateProvider):
                 dtype=int)
             write_json('mrsf_states.json', {
                 'trajectory_step': int(step),
+                'accepted': bool(accepted),
+                'eligible_for_lz': bool(accepted),
                 'calculation_id': str(snapshot.calculation_id),
                 'target_state_energies': np.asarray(
                     snapshot.target_energies, dtype=float).tolist(),
@@ -1342,9 +1378,73 @@ class BackendStateProvider(ElectronicStateProvider):
             if snapshot.overlap_source == 'mrsf_response_vector_overlap':
                 fallback_reason = '; '.join(snapshot.warnings) or (
                     'native OpenQP state overlap was not conditioned')
+            signed_selected = (None if snapshot.overlap_to_previous is None
+                               else np.asarray(
+                                   snapshot.overlap_to_previous,
+                                   dtype=float))
+            signed_native = (None if snapshot.native_overlap_matrix is None
+                             else np.asarray(
+                                 snapshot.native_overlap_matrix,
+                                 dtype=float))
+            permutation = np.asarray(
+                getattr(tracking, 'permutation',
+                        np.arange(snapshot.n_states)),
+                dtype=int)
+            selected_values = None
+            selected_singular_values = None
+            selected_row_norms = None
+            if signed_selected is not None:
+                selected_values = [
+                    float(signed_selected[row, column])
+                    for row, column in enumerate(permutation)
+                ]
+                selected_singular_values = np.linalg.svd(
+                    signed_selected, compute_uv=False).tolist()
+                selected_row_norms = np.linalg.norm(
+                    signed_selected, axis=1).tolist()
+
+            similarity = getattr(tracking, 'similarity_matrix', None)
+            assignment_scores = []
+            if similarity is not None and snapshot.n_states <= 8:
+                similarity = np.asarray(similarity, dtype=float)
+                for candidate in itertools.permutations(
+                        range(snapshot.n_states)):
+                    assignment_scores.append(float(sum(
+                        similarity[row, column]
+                        for row, column in enumerate(candidate))))
+                assignment_scores.sort(reverse=True)
+
             write_json('state_tracking.json', {
                 'trajectory_step': int(step),
+                'accepted': bool(accepted),
+                'eligible_for_lz': bool(accepted),
                 'calculation_id': str(snapshot.calculation_id),
+                'state_overlap_method': snapshot.state_overlap_method,
+                'state_overlap_raw': (
+                    None if signed_native is None else signed_native.tolist()),
+                'state_overlap_selected': (
+                    None if signed_selected is None else
+                    signed_selected.tolist()),
+                'state_overlap_exact': (
+                    signed_native.tolist()
+                    if (signed_native is not None and
+                        snapshot.state_overlap_method ==
+                        'openqp_exact_determinant_minors_tdhf_tlf_0') else
+                    None),
+                'state_overlap_tlf2': None,
+                'max_abs_exact_minus_tlf2': None,
+                'selected_assignment': permutation.tolist(),
+                'selected_overlap_values': selected_values,
+                'minimum_selected_overlap': (
+                    None if not selected_values else
+                    float(np.min(np.abs(selected_values)))),
+                'state_overlap_singular_values': selected_singular_values,
+                'state_overlap_row_norms': selected_row_norms,
+                'best_assignment_score': (
+                    None if not assignment_scores else assignment_scores[0]),
+                'second_best_assignment_score': (
+                    None if len(assignment_scores) < 2 else
+                    assignment_scores[1]),
                 'native_overlap_spectral_norm':
                     snapshot.native_spectral_norm,
                 'response_overlap_spectral_norm': (
@@ -1362,12 +1462,18 @@ class BackendStateProvider(ElectronicStateProvider):
                     getattr(tracking, 'ambiguity_ratio', 0.0)),
                 'state_tracking_reliable': bool(
                     getattr(tracking, 'is_reliable', False)),
+                'openqp_version': str(snapshot.backend_version),
+                'openqp_source_commit': None,
+                'lz_history_before_rejection': (
+                    None if accepted else lz_history_before_rejection),
             })
 
             continuity = ({} if snapshot.reference_continuity is None else
                           dict(snapshot.reference_continuity))
             continuity.update({
                 'trajectory_step': int(step),
+                'accepted': bool(accepted),
+                'eligible_for_lz': bool(accepted),
                 'calculation_id': str(snapshot.calculation_id),
                 'previous_calculation_id': snapshot.previous_calculation_id,
             })
