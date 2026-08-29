@@ -177,6 +177,60 @@ class CAtomBasisPairGroup
         return _ket_basis.get();
     }
 
+    /// @brief Gets maximum angular momentum of basis functions on bra side.
+    /// @return The maximum angular momentum, -1 if atom basis is empty.
+    auto
+    bra_max_angular_momentum() const -> int
+    {
+        return _bra_basis.get().max_angular_momentum();
+    }
+
+    /// @brief Gets maximum angular momentum of basis functions on ket side.
+    /// @return The maximum angular momentum, -1 if atom basis is empty.
+    auto
+    ket_max_angular_momentum() const -> int
+    {
+        return _ket_basis.get().max_angular_momentum();
+    }
+
+    /// @brief Gets number of basis functions with specific angular momentum on bra side.
+    /// @param angular_momentum The angular momentum of basis functions.
+    /// @return The number of basis functions.
+    auto
+    bra_number_of_basis_functions(const int angular_momentum) const -> size_t
+    {
+        return _bra_basis.get().number_of_basis_functions(angular_momentum);
+    }
+
+    /// @brief Gets number of basis functions with specific angular momentum on ket side.
+    /// @param angular_momentum The angular momentum of basis functions.
+    /// @return The number of basis functions.
+    auto
+    ket_number_of_basis_functions(const int angular_momentum) const -> size_t
+    {
+        return _ket_basis.get().number_of_basis_functions(angular_momentum);
+    }
+
+    /// @brief Gets basis function with specific angular momentum and index on bra side.
+    /// @param angular_momentum The angular momentum of basis function.
+    /// @param index The index of basis function with given angular momentum.
+    /// @return The constant reference to basis function.
+    auto
+    bra_basis_function(const int angular_momentum, const size_t index) const -> const CBasisFunction &
+    {
+        return _bra_basis.get().basis_function(angular_momentum, index);
+    }
+
+    /// @brief Gets basis function with specific angular momentum and index on ket side.
+    /// @param angular_momentum The angular momentum of basis function.
+    /// @param index The index of basis function with given angular momentum.
+    /// @return The constant reference to basis function.
+    auto
+    ket_basis_function(const int angular_momentum, const size_t index) const -> const CBasisFunction &
+    {
+        return _ket_basis.get().basis_function(angular_momentum, index);
+    }
+
     /// @brief Checks if bra and ket sides are interchangeable, i.e. atom pairs
     /// are stored as strict upper triangle of the atom pairs matrix.
     /// @return True if pair group is symmetric, False otherwise.
@@ -217,6 +271,16 @@ class CAtomBasisPairGroup
     distances() const -> const std::vector<double> &
     {
         return _distances;
+    }
+
+    /// @brief Gets pointer to interatomic distances of off-diagonal atom pairs.
+    /// @return The constant pointer to interatomic distances. The pointed to
+    /// range is empty, and must not be dereferenced, if atom pairs are not
+    /// ordered by interatomic distance.
+    auto
+    distances_data() const -> const double *
+    {
+        return _distances.data();
     }
 
     /// @brief Gets ordering of atom pairs in group.

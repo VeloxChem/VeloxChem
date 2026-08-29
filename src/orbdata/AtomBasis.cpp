@@ -36,6 +36,7 @@
 #include <ranges>
 
 #include "ChemicalElement.hpp"
+#include "ErrorHandler.hpp"
 #include "TensorLabels.hpp"
 
 CAtomBasis::CAtomBasis()
@@ -220,6 +221,20 @@ CAtomBasis::basis_functions(const int angular_momentum) const -> std::vector<CBa
     std::ranges::copy_if(_functions, std::back_inserter(bfs), [=](const auto &bf) { return bf.get_angular_momentum() == angular_momentum; });
 
     return bfs;
+}
+
+auto
+CAtomBasis::basis_function(const int angular_momentum, const size_t index) const -> const CBasisFunction &
+{
+    // NOTE: basis functions are kept sorted by ascending angular momentum, so
+    // basis functions with requested angular momentum form a contiguous range.
+
+    const auto bfs = std::ranges::equal_range(_functions, angular_momentum, {}, [](const auto &bf) { return bf.get_angular_momentum(); });
+
+    errors::assertMsgCritical(index < static_cast<size_t>(std::ranges::size(bfs)),
+                              std::string("AtomBasis.basis_function: Index of basis function is out of range"));
+
+    return bfs[index];
 }
 
 auto

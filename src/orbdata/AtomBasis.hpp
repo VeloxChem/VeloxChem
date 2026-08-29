@@ -128,6 +128,12 @@ class CAtomBasis
     /// @return The vector of basis functions.
     auto basis_functions(const int angular_momentum) const -> std::vector<CBasisFunction>;
 
+    /// @brief Gets basis function with specific angular momentum and index.
+    /// @param angular_momentum The angular momentum of basis function.
+    /// @param index The index of basis function with given angular momentum.
+    /// @return The constant reference to basis function.
+    auto basis_function(const int angular_momentum, const size_t index) const -> const CBasisFunction &;
+
     /// @brief Gets vector of GTOs with specific angular momentum and number of
     /// primitive basis functions.
     /// @param angular_momentum The angular momentum of requested basis

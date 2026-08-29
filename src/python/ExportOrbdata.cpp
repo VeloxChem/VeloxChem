@@ -151,6 +151,11 @@ export_orbdata(py::module &m)
         .def("get_basis_functions",
              py::overload_cast<const int, const size_t>(&CAtomBasis::basis_functions, py::const_),
              "Gets GTOs with specific angular momentum and number of primitives.")
+        .def("get_basis_function",
+             &CAtomBasis::basis_function,
+             "Gets GTO with specific angular momentum and index.",
+             py::arg("angular_momentum"),
+             py::arg("index"))
         .def("get_identifier", &CAtomBasis::get_identifier, "Gets identifier of atom basis.")
         .def("get_name", &CAtomBasis::get_name, "Gets name of atom basis.")
         .def("get_ecp_potential", &CAtomBasis::get_ecp_potential, "Gets effective core potential of atom basis.")
