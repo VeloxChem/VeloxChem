@@ -37,6 +37,7 @@
 #include <ranges>
 
 #include "ErrorHandler.hpp"
+#include "TensorComponents.hpp"
 
 CAtomBasisPairSparsity::CAtomBasisPairSparsity(const CAtomBasisPairGroup &group)
 
@@ -58,6 +59,63 @@ CAtomBasisPairSparsity::CAtomBasisPairSparsity(const CAtomBasisPairGroup &group)
     // functions until screening is applied, which can only lower the counts.
 
     _counts.assign(number_of_bra_basis_functions() * number_of_ket_basis_functions(), _bra_atoms.size());
+
+    _value_offsets = _make_value_offsets(_counts, _bra_offsets, _ket_offsets);
+}
+
+auto
+CAtomBasisPairSparsity::_make_value_offsets(const std::vector<size_t> &counts,
+                                            const std::vector<size_t> &bra_offsets,
+                                            const std::vector<size_t> &ket_offsets) -> std::vector<size_t>
+{
+    // NOTE: the angular momentum of a basis function follows from the offsets,
+    // as the basis functions are kept sorted by ascending angular momentum.
+
+    const auto momenta = [](const std::vector<size_t> &offsets) {
+        std::vector<int> moments(offsets.back(), 0);
+
+        std::ranges::for_each(std::views::iota(size_t{0}, offsets.size() - 1), [&](const auto i) {
+            std::ranges::fill(moments.begin() + offsets[i], moments.begin() + offsets[i + 1], static_cast<int>(i));
+        });
+
+        return moments;
+    };
+
+    const auto bra_moments = momenta(bra_offsets);
+
+    const auto ket_moments = momenta(ket_offsets);
+
+    std::vector<size_t> value_offsets(counts.size() + 1, 0);
+
+    const auto nket = ket_moments.size();
+
+    std::ranges::for_each(std::views::iota(size_t{0}, counts.size()), [&](const auto i) {
+        const auto ncomps = tensor::number_of_spherical_components(std::array<int, 2>{bra_moments[i / nket], ket_moments[i % nket]});
+
+        value_offsets[i + 1] = value_offsets[i] + counts[i] * static_cast<size_t>(ncomps);
+    });
+
+    return value_offsets;
+}
+
+auto
+CAtomBasisPairSparsity::_cell_index(const int    bra_angular_momentum,
+                                    const size_t bra_index,
+                                    const int    ket_angular_momentum,
+                                    const size_t ket_index) const -> size_t
+{
+    errors::assertMsgCritical((bra_angular_momentum >= 0) && (bra_angular_momentum + 2 <= static_cast<int>(_bra_offsets.size())) &&
+                                  (ket_angular_momentum >= 0) && (ket_angular_momentum + 2 <= static_cast<int>(_ket_offsets.size())),
+                              std::string("AtomBasisPairSparsity: Angular momentum is out of range"));
+
+    const auto bra_row = _bra_offsets[bra_angular_momentum] + bra_index;
+
+    const auto ket_col = _ket_offsets[ket_angular_momentum] + ket_index;
+
+    errors::assertMsgCritical((bra_row < _bra_offsets[bra_angular_momentum + 1]) && (ket_col < _ket_offsets[ket_angular_momentum + 1]),
+                              std::string("AtomBasisPairSparsity: Index of basis function is out of range"));
+
+    return bra_row * number_of_ket_basis_functions() + ket_col;
 }
 
 auto
@@ -66,16 +124,25 @@ CAtomBasisPairSparsity::number_of_pairs(const int    bra_angular_momentum,
                                         const int    ket_angular_momentum,
                                         const size_t ket_index) const -> size_t
 {
-    errors::assertMsgCritical((bra_angular_momentum >= 0) && (bra_angular_momentum + 2 <= static_cast<int>(_bra_offsets.size())) &&
-                                  (ket_angular_momentum >= 0) && (ket_angular_momentum + 2 <= static_cast<int>(_ket_offsets.size())),
-                              std::string("AtomBasisPairSparsity.number_of_pairs: Angular momentum is out of range"));
+    return _counts[_cell_index(bra_angular_momentum, bra_index, ket_angular_momentum, ket_index)];
+}
 
-    const auto bra_row = _bra_offsets[bra_angular_momentum] + bra_index;
+auto
+CAtomBasisPairSparsity::number_of_elements(const int    bra_angular_momentum,
+                                           const size_t bra_index,
+                                           const int    ket_angular_momentum,
+                                           const size_t ket_index) const -> size_t
+{
+    const auto index = _cell_index(bra_angular_momentum, bra_index, ket_angular_momentum, ket_index);
 
-    const auto ket_col = _ket_offsets[ket_angular_momentum] + ket_index;
+    return _value_offsets[index + 1] - _value_offsets[index];
+}
 
-    errors::assertMsgCritical((bra_row < _bra_offsets[bra_angular_momentum + 1]) && (ket_col < _ket_offsets[ket_angular_momentum + 1]),
-                              std::string("AtomBasisPairSparsity.number_of_pairs: Index of basis function is out of range"));
-
-    return _counts[bra_row * number_of_ket_basis_functions() + ket_col];
+auto
+CAtomBasisPairSparsity::element_offset(const int    bra_angular_momentum,
+                                       const size_t bra_index,
+                                       const int    ket_angular_momentum,
+                                       const size_t ket_index) const -> size_t
+{
+    return _value_offsets[_cell_index(bra_angular_momentum, bra_index, ket_angular_momentum, ket_index)];
 }

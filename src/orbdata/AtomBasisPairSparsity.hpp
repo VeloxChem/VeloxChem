@@ -92,6 +92,8 @@ class CAtomBasisPairSparsity
         , _bra_offsets(group.bra_basis().basis_function_offsets())
 
         , _ket_offsets(group.ket_basis().basis_function_offsets())
+
+        , _value_offsets{}
     {
         // NOTE: bisection over the atom pairs requires them to be ordered by
         // ascending interatomic distance, as the integral bound decreases
@@ -127,6 +129,8 @@ class CAtomBasisPairSparsity
         _bra_atoms.shrink_to_fit();
 
         _ket_atoms.shrink_to_fit();
+
+        _value_offsets = _make_value_offsets(_counts, _bra_offsets, _ket_offsets);
     }
 
     /// @brief Gets index of atom basis on bra side among the unique atom bases
@@ -186,6 +190,39 @@ class CAtomBasisPairSparsity
                          const int    ket_angular_momentum,
                          const size_t ket_index) const -> size_t;
 
+    /// @brief Gets number of values required to store the integrals of specific
+    /// combination of basis functions on bra and ket sides.
+    /// @param bra_angular_momentum The angular momentum of basis function on bra side.
+    /// @param bra_index The index of basis function on bra side.
+    /// @param ket_angular_momentum The angular momentum of basis function on ket side.
+    /// @param ket_index The index of basis function on ket side.
+    /// @return The number of values.
+    auto number_of_elements(const int    bra_angular_momentum,
+                            const size_t bra_index,
+                            const int    ket_angular_momentum,
+                            const size_t ket_index) const -> size_t;
+
+    /// @brief Gets offset of the values of specific combination of basis
+    /// functions on bra and ket sides in the values block.
+    /// @param bra_angular_momentum The angular momentum of basis function on bra side.
+    /// @param bra_index The index of basis function on bra side.
+    /// @param ket_angular_momentum The angular momentum of basis function on ket side.
+    /// @param ket_index The index of basis function on ket side.
+    /// @return The offset of the values.
+    auto element_offset(const int    bra_angular_momentum,
+                        const size_t bra_index,
+                        const int    ket_angular_momentum,
+                        const size_t ket_index) const -> size_t;
+
+    /// @brief Gets number of values required to store the integrals of all
+    /// combinations of basis functions, i.e. the size of the values block.
+    /// @return The number of values.
+    auto
+    number_of_elements() const -> size_t
+    {
+        return _value_offsets.back();
+    }
+
     /// @brief Gets number of basis functions on bra side.
     /// @return The number of basis functions.
     auto
@@ -205,6 +242,29 @@ class CAtomBasisPairSparsity
     }
 
    private:
+    /// @brief Computes the flat index of a combination of basis functions.
+    /// @param bra_angular_momentum The angular momentum of basis function on bra side.
+    /// @param bra_index The index of basis function on bra side.
+    /// @param ket_angular_momentum The angular momentum of basis function on ket side.
+    /// @param ket_index The index of basis function on ket side.
+    /// @return The flat index of the combination of basis functions.
+    auto _cell_index(const int    bra_angular_momentum,
+                     const size_t bra_index,
+                     const int    ket_angular_momentum,
+                     const size_t ket_index) const -> size_t;
+
+    /// @brief Computes the offsets of the values of each combination of basis
+    /// functions.
+    /// @param counts The number of surviving atom pairs of each combination of
+    /// basis functions.
+    /// @param bra_offsets The offsets of the basis functions on bra side.
+    /// @param ket_offsets The offsets of the basis functions on ket side.
+    /// @return The vector of offsets, with the total number of values as last
+    /// element.
+    static auto _make_value_offsets(const std::vector<size_t> &counts,
+                                    const std::vector<size_t> &bra_offsets,
+                                    const std::vector<size_t> &ket_offsets) -> std::vector<size_t>;
+
     /// @brief The index of atom basis on bra side among the unique atom bases
     /// of the molecular basis.
     int _bra_index;
@@ -231,6 +291,12 @@ class CAtomBasisPairSparsity
     /// @brief The offsets of the first basis function of each angular momentum
     /// on ket side, with the total number of basis functions as last element.
     std::vector<size_t> _ket_offsets;
+
+    /// @brief The offsets of the values of each combination of basis functions
+    /// in the values block, with the total number of values as last element. The
+    /// combinations are ordered as the counts, i.e. with the basis functions on
+    /// bra side as rows.
+    std::vector<size_t> _value_offsets;
 };
 
 #endif /* AtomBasisPairSparsity_hpp */
