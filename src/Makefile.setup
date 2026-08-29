@@ -9,6 +9,19 @@ CXX := clang++
 CXX_REL_FLG := -std=c++20 -O3 -Xpreprocessor -fopenmp -march=native -Wall
 CXX_DEB_FLG := -std=c++20 -O3 -Xpreprocessor -fopenmp -march=native -Wall -g 
 
+# Vector math library, so that the vectorizer replaces the scalar math calls of
+# the integral kernels, the exponential above all, with their vector
+# counterparts. Apple systems carry them in libsystem_m, glibc in libmvec.
+
+ifeq ($(shell uname -s),Darwin)
+VECLIB_FLG := -fveclib=Darwin_libsystem_m
+else
+VECLIB_FLG := -fveclib=libmvec
+endif
+
+CXX_REL_FLG += $(VECLIB_FLG)
+CXX_DEB_FLG += $(VECLIB_FLG)
+
 # Generic preprocessor flags
 
 CPP_REL_FLG := 

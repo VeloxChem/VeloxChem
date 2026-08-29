@@ -18,6 +18,7 @@ target_compile_options(vlxobjs
     "${VLX_CXX_FLAGS}"
   PUBLIC
     "${ARCH_FLAG}"
+    "${VECLIB_FLAG}"
   )
 
 # flags to append
