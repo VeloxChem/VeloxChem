@@ -49,6 +49,8 @@
 /// themselves and the number of atom pairs surviving screening for each
 /// combination of basis functions on bra and ket sides. Atom pairs of diagonal
 /// atom pairs are not described here, as their storage requirements differ. The
+/// atom pairs retained by no combination of basis functions are dropped, so the
+/// atom pair list is as long as the largest number of surviving atom pairs. The
 /// atom bases are referred to by their index among the unique atom bases of the
 /// molecular basis they originate from, so the sparsity pattern is a self
 /// contained value which outlives the atom bases it was constructed from.
@@ -111,6 +113,20 @@ class CAtomBasisPairSparsity
                     group.distances(), [&](const double r) { return bound(bra_function, ket_function, r) > threshold; }));
             });
         });
+
+        // NOTE: every combination of basis functions retains a leading subrange
+        // of the atom pairs, so the atom pairs beyond the largest count are used
+        // by no combination and are dropped to compress the sparsity pattern.
+
+        const auto nkept = _counts.empty() ? size_t{0} : std::ranges::max(_counts);
+
+        _bra_atoms.resize(nkept);
+
+        _ket_atoms.resize(nkept);
+
+        _bra_atoms.shrink_to_fit();
+
+        _ket_atoms.shrink_to_fit();
     }
 
     /// @brief Gets index of atom basis on bra side among the unique atom bases
@@ -147,7 +163,10 @@ class CAtomBasisPairSparsity
         return _ket_atoms;
     }
 
-    /// @brief Gets number of atom pairs in sparsity pattern.
+    /// @brief Gets number of atom pairs in sparsity pattern, i.e. the atom pairs
+    /// retained by at least one combination of basis functions. This is the
+    /// largest number of surviving atom pairs over all combinations of basis
+    /// functions, and zero if the sparsity pattern is screened out entirely.
     /// @return The number of atom pairs.
     auto
     number_of_pairs() const -> size_t
