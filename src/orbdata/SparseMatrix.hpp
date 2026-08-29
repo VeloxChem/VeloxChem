@@ -47,6 +47,15 @@
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 
+/// @brief Defines supported states of the values blocks of a sparse matrix:
+/// valstat::empty     - the values blocks are not allocated
+/// valstat::allocated - the values blocks are allocated, with undefined content
+enum class valstat
+{
+    empty,
+    allocated
+};
+
 /// @brief Class CSparseMatrix stores the sparsity pattern of a matrix in atomic
 /// orbital basis, as the sparsity patterns of its off-diagonal and diagonal atom
 /// pair blocks. The off-diagonal blocks are described by CAtomBasisPairSparsity
@@ -62,6 +71,10 @@
 /// @note The blocks without atom pairs or atoms are dropped, so a block index is
 /// not an index of the atom basis pair group it originates from, and the numbers
 /// of off-diagonal and diagonal blocks need not agree.
+/// @note The values blocks are not allocated by the constructors, which set up
+/// the sparsity patterns only. The values blocks are addressed as one pointer per
+/// block, with the off-diagonal blocks preceding the diagonal blocks, and the
+/// state of the values blocks is reported by get_values_state().
 class CSparseMatrix
 {
    public:
@@ -72,7 +85,11 @@ class CSparseMatrix
 
         , _diagonal_blocks{}
 
+        , _values{}
+
         , _type(mat_t::general)
+
+        , _values_state(valstat::empty)
     {
     }
 
@@ -88,7 +105,11 @@ class CSparseMatrix
 
         , _diagonal_blocks(diagonal_blocks)
 
+        , _values(pair_blocks.size() + diagonal_blocks.size(), nullptr)
+
         , _type(mat_type)
+
+        , _values_state(valstat::empty)
     {
     }
 
@@ -113,7 +134,11 @@ class CSparseMatrix
 
         , _diagonal_blocks{}
 
+        , _values{}
+
         , _type(mat_type)
+
+        , _values_state(valstat::empty)
     {
         // NOTE: a symmetric or antisymmetric matrix needs the upper triangle of
         // the atom basis pair groups only, while a general matrix needs their
@@ -123,6 +148,8 @@ class CSparseMatrix
         auto groups = (mat_type == mat_t::general) ? basis.basis_pair_groups(basis) : basis.basis_pair_groups();
 
         _add_blocks(molecule, groups, screener, threshold, storage);
+
+        _values.assign(_pair_blocks.size() + _diagonal_blocks.size(), nullptr);
     }
 
     /// @brief The constructor with molecule, molecular bases on bra and ket
@@ -148,7 +175,11 @@ class CSparseMatrix
 
         , _diagonal_blocks{}
 
+        , _values{}
+
         , _type(mat_type)
+
+        , _values_state(valstat::empty)
     {
         errors::assertMsgCritical(mat_type == mat_t::general,
                                   std::string("SparseMatrix: Matrix with two molecular bases must be of general type"));
@@ -156,6 +187,8 @@ class CSparseMatrix
         auto groups = bra_basis.basis_pair_groups(ket_basis);
 
         _add_blocks(molecule, groups, screener, threshold, storage);
+
+        _values.assign(_pair_blocks.size() + _diagonal_blocks.size(), nullptr);
     }
 
     /// @brief Sets type of matrix.
@@ -213,6 +246,52 @@ class CSparseMatrix
         return _diagonal_blocks[index];
     }
 
+    /// @brief Gets state of the values blocks of matrix.
+    /// @return The state of the values blocks.
+    auto
+    get_values_state() const -> valstat
+    {
+        return _values_state;
+    }
+
+    /// @brief Gets number of values blocks in matrix, i.e. the number of
+    /// off-diagonal and diagonal blocks.
+    /// @return The number of values blocks.
+    auto
+    number_of_value_blocks() const -> size_t
+    {
+        return _values.size();
+    }
+
+    /// @brief Gets number of values required to store the integrals of specific
+    /// values block.
+    /// @param index The index of values block, with the off-diagonal blocks
+    /// preceding the diagonal blocks.
+    /// @return The number of values.
+    auto
+    number_of_elements(const size_t index) const -> size_t
+    {
+        errors::assertMsgCritical(index < _values.size(), std::string("SparseMatrix.number_of_elements: Index of block is out of range"));
+
+        return (index < _pair_blocks.size()) ? _pair_blocks[index].number_of_elements()
+                                             : _diagonal_blocks[index - _pair_blocks.size()].number_of_elements();
+    }
+
+    /// @brief Gets number of values required to store the integrals of all
+    /// values blocks.
+    /// @return The number of values.
+    auto
+    number_of_elements() const -> size_t
+    {
+        size_t nvals = 0;
+
+        std::ranges::for_each(_pair_blocks, [&](const auto &block) { nvals += block.number_of_elements(); });
+
+        std::ranges::for_each(_diagonal_blocks, [&](const auto &block) { nvals += block.number_of_elements(); });
+
+        return nvals;
+    }
+
     /// @brief Gets number of off-diagonal blocks in matrix.
     /// @return The number of off-diagonal blocks.
     auto
@@ -264,8 +343,16 @@ class CSparseMatrix
     /// @brief The sparsity patterns of the diagonal blocks.
     std::vector<CAtomBasisDiagonalSparsity> _diagonal_blocks;
 
+    /// @brief The values blocks of matrix, one pointer per block, with the
+    /// off-diagonal blocks preceding the diagonal blocks. The pointers are null
+    /// while the values blocks are not allocated.
+    std::vector<double *> _values;
+
     /// @brief The type of matrix.
     mat_t _type;
+
+    /// @brief The state of the values blocks of matrix.
+    valstat _values_state;
 };
 
 #endif /* SparseMatrix_hpp */
