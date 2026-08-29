@@ -36,8 +36,10 @@
 
 #include <cmath>
 #include <cstddef>
+#include <string>
 
 #include "BasisFunction.hpp"
+#include "ErrorHandler.hpp"
 #include "MathConst.hpp"
 #include "MathFunc.hpp"
 #include "SimdMatrix.hpp"
@@ -110,20 +112,36 @@ one_center_overlap(const CBasisFunction &bra, const CBasisFunction &ket) -> doub
 /// surviving the screening of the combination of basis functions.
 /// @param bra The basis function on bra side.
 /// @param ket The basis function on ket side.
-/// @param npairs The number of atom pairs of the sparsity pattern.
-/// @param coordinates The coordinates of the atom pairs, as six rows of npairs
-/// columns, ordered by ascending interatomic distance.
-/// @param threshold The screening threshold of the integrals.
-/// @note The pairs of primitives are screened with a hundred times tighter
-/// threshold than the integrals, so that the accumulated contributions of the
-/// discarded pairs of primitives stay below the threshold of the integrals.
+/// @param coordinates The coordinates of the atom pairs, as six rows ordered by
+/// ascending interatomic distance. Only the leading nvalues columns are read, as
+/// the atom pairs surviving the screening are the closest ones.
+/// @note The primitive integrals of all pairs of primitives are computed into a
+/// single matrix of one row per pair of primitives, with one further row reserved
+/// for the contracted integrals.
 auto compute_ss_overlap(double               *values,
                         const size_t          nvalues,
                         const CBasisFunction &bra,
                         const CBasisFunction &ket,
-                        const size_t          npairs,
-                        const CSimdMatrix    &coordinates,
-                        const double          threshold) -> void;
+                        const CSimdMatrix    &coordinates) -> void;
+
+/// @brief Computes the overlap integrals of a combination of basis functions by
+/// dispatching to the kernel of their angular momenta.
+/// @param values The values of the combination of basis functions in the values
+/// block of the sparsity pattern.
+/// @param nvalues The number of values to compute, i.e. the number of atom pairs
+/// surviving the screening of the combination of basis functions.
+/// @param bra The basis function on bra side.
+/// @param ket The basis function on ket side.
+/// @param coordinates The coordinates of the atom pairs, as six rows ordered by
+/// ascending interatomic distance.
+/// @note The values of the combination of basis functions are stored as one row
+/// of nvalues columns for each of the (2 l_bra + 1) (2 l_ket + 1) spherical
+/// components, with the components of the bra side running slowest.
+auto compute_overlap(double               *values,
+                     const size_t          nvalues,
+                     const CBasisFunction &bra,
+                     const CBasisFunction &ket,
+                     const CSimdMatrix    &coordinates) -> void;
 
 }  // namespace simdovl
 

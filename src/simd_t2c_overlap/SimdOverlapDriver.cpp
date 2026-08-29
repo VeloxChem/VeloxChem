@@ -42,6 +42,7 @@
 #include "ErrorHandler.hpp"
 #include "Matrix.hpp"
 #include "ScreeningFunc.hpp"
+#include "SimdCoordinates.hpp"
 #include "SimdOverlapFunc.hpp"
 
 auto
@@ -81,26 +82,6 @@ CSimdOverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &br
     return matrix;
 }
 
-auto
-CSimdOverlapDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
-                                         const CMolecule       &molecule,
-                                         const CMolecularBasis &bra_basis,
-                                         const CMolecularBasis &ket_basis) const -> void
-{
-    // TODO: for each off-diagonal block of the matrix
-    //         create the coordinates of its atom pairs
-    //         for each combination of basis functions on bra and ket sides
-    //           determine the number of surviving atom pairs of each pair of
-    //             primitives
-    //           set up the primitive factors of the pairs of primitives
-    //           compute the primitive integrals with the overlap recursion
-    //           contract the primitive integrals
-    //           transform the contracted integrals to the spherical basis
-    //           add the integrals to the values of the block
-
-    errors::assertMsgCritical(false, std::string("SimdOverlapDriver: Computation of off-diagonal blocks is not implemented"));
-}
-
 /// @brief Gets the angular momentum and the index within it of each basis
 /// function of an atom basis.
 /// @param basis The atom basis to index the basis functions of.
@@ -121,6 +102,57 @@ _index_functions(const CAtomBasis &basis) -> std::vector<std::pair<int, size_t>>
     });
 
     return indices;
+}
+
+auto
+CSimdOverlapDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
+                                         const CMolecule       &molecule,
+                                         const CMolecularBasis &bra_basis,
+                                         const CMolecularBasis &ket_basis) const -> void
+{
+    for (size_t iblk = 0; iblk < matrix.number_of_pair_blocks(); iblk++)
+    {
+        const auto &block = matrix.pair_block(iblk);
+
+        if (block.number_of_pairs() == 0) continue;
+
+        // NOTE: the coordinates of the atom pairs are created once for the whole
+        // block, as all combinations of basis functions of the block share them.
+
+        const auto coordinates = simdfunc::make_coordinates(block, molecule);
+
+        const auto &a_basis = bra_basis.basis_set(block.bra_index());
+
+        const auto &b_basis = ket_basis.basis_set(block.ket_index());
+
+        const auto a_indices = _index_functions(a_basis);
+
+        const auto b_indices = _index_functions(b_basis);
+
+        // NOTE: the atom bases of an off-diagonal block sit on different atoms,
+        // so all combinations of basis functions are computed and none of them
+        // shares its storage with the reverse order.
+
+        for (size_t i = 0; i < a_indices.size(); i++)
+        {
+            const auto [la, ia] = a_indices[i];
+
+            for (size_t j = 0; j < b_indices.size(); j++)
+            {
+                const auto [lb, jb] = b_indices[j];
+
+                const auto nvalues = block.number_of_pairs(la, ia, lb, jb);
+
+                if (nvalues == 0) continue;
+
+                simdovl::compute_overlap(matrix.pair_values(iblk, la, ia, lb, jb),
+                                         nvalues,
+                                         a_basis.functions()[i],
+                                         b_basis.functions()[j],
+                                         coordinates);
+            }
+        }
+    }
 }
 
 auto
