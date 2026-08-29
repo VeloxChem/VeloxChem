@@ -149,7 +149,8 @@ CSimdOverlapDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
                                          nvalues,
                                          a_basis.functions()[i],
                                          b_basis.functions()[j],
-                                         coordinates);
+                                         coordinates,
+                                         _threshold);
             }
         }
     }

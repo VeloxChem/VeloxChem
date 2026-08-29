@@ -39,6 +39,8 @@
 #include <vector>
 
 #include "ErrorHandler.hpp"
+#include "ScreeningFunc.hpp"
+#include "SimdDimensions.hpp"
 #include "SimdAlign.hpp"
 
 namespace simdovl {  // simdovl namespace
@@ -48,7 +50,8 @@ compute_ss_overlap(double               *values,
                    const size_t          nvalues,
                    const CBasisFunction &bra,
                    const CBasisFunction &ket,
-                   const CSimdMatrix    &coordinates) -> void
+                   const CSimdMatrix    &coordinates,
+                   const double          threshold) -> void
 {
     if ((bra.get_angular_momentum() != 0) || (ket.get_angular_momentum() != 0))
     {
@@ -78,31 +81,42 @@ compute_ss_overlap(double               *values,
 
     const auto nprims = nprim_a * nprim_b;
 
-    // NOTE: the primitive integrals of a pair of primitives occupy one row, and
-    // the last row is reserved for the contracted integrals, so that a single
-    // allocation holds both and every row starts on a cache line boundary.
+    // NOTE: the pairs of primitives are screened with a tighter threshold than
+    // the integrals, as their contributions accumulate into a single value.
 
-    // NOTE: the rows span the atom pairs surviving the screening of this
-    // combination of basis functions and not all atom pairs of the sparsity
-    // pattern. The atom pairs are ordered by ascending interatomic distance, so
-    // the survivors are the leading ones, and the integrals of the remaining
-    // pairs would be discarded when the values are written out.
+    const auto dimensions = simdfunc::make_column_dimensions(
+        bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, 1.0e-2 * threshold);
 
-    auto buffer = CSimdMatrix(nprims + 1, nvalues);
+    // NOTE: the primitives are sorted by descending exponent, so the numbers of
+    // surviving atom pairs do not decrease along either index and the last pair
+    // of primitives is the one reaching furthest.
 
-    const auto *a_x = coordinates.data(0);
-    const auto *a_y = coordinates.data(1);
-    const auto *a_z = coordinates.data(2);
-    const auto *b_x = coordinates.data(3);
-    const auto *b_y = coordinates.data(4);
-    const auto *b_z = coordinates.data(5);
+    const auto nmax = dimensions.back();
+
+    if (nmax == 0)
+    {
+        std::fill(values, values + nvalues, 0.0);
+
+        return;
+    }
+
+    // NOTE: each row holds the primitive integrals of one pair of primitives, and
+    // the rows span the atom pairs surviving the screening of that pair and not
+    // all atom pairs of the sparsity pattern. The atom pairs are ordered by
+    // ascending interatomic distance, so the survivors are the leading ones and
+    // the integrals of the remaining pairs are below threshold.
+
+    auto buffer = CSimdMatrix(nprims, nmax);
+
+    // NOTE: the squared distances of the atom pairs are carried by the
+    // coordinates, so that they are formed once for the whole block instead of
+    // once for every combination of basis functions.
+
+    const auto *ab_2 = coordinates.data(6);
 
     constexpr auto fpi = mathconst::pi_value();
 
     // compute the primitive integrals of each pair of primitives
-
-    // NOTE: the loops run over the atom pairs and not over the padded row, as
-    // the padding of the coordinates is left undefined by their construction.
 
     for (size_t i = 0; i < nprim_a; i++)
     {
@@ -120,48 +134,61 @@ compute_ss_overlap(double               *values,
 
             const auto ffact = anorm * b_norms[j] * fovl * std::sqrt(fovl);
 
+            const auto ncols = dimensions[i * nprim_b + j];
+
+            if (ncols == 0) continue;
+
             auto *prim = buffer.data(i * nprim_b + j);
 
-            // NOTE: the rows of the coordinates and of the buffer start at a cache
-            // line boundary, so the loop is vectorized with aligned loads and stores.
-            // The vectorization is conditional on the exponential being vectorized as
-            // well, as it is otherwise slower than the scalar loop.
+            // NOTE: the rows of the buffer and of the coordinates start at a cache
+            // line boundary, so the loop is vectorized with aligned loads and
+            // stores. The vectorization is conditional on the exponential being
+            // vectorized as well, as it is otherwise slower than the scalar loop.
 
-#pragma omp simd aligned(prim, a_x, a_y, a_z, b_x, b_y, b_z : simd::cache_line_size()) if (simd::has_vector_exp())
-            for (size_t k = 0; k < nvalues; k++)
+#pragma omp simd aligned(prim, ab_2 : simd::cache_line_size()) if (simd::has_vector_exp())
+            for (size_t k = 0; k < ncols; k++)
             {
-                const auto rx = a_x[k] - b_x[k];
-
-                const auto ry = a_y[k] - b_y[k];
-
-                const auto rz = a_z[k] - b_z[k];
-
-                prim[k] = ffact * std::exp(-fmu * (rx * rx + ry * ry + rz * rz));
+                prim[k] = ffact * std::exp(-fmu * ab_2[k]);
             }
         }
     }
 
-    // contract the primitive integrals into the reserved row
+    // contract the primitive integrals into the values of the sparsity block
 
-    // NOTE: the reserved row is seeded with the integrals of the first pair of
-    // primitives instead of being zeroed, which saves a sweep over the row.
+    // NOTE: the integrals of the pair of primitives reaching furthest are written
+    // to the values and those of the remaining pairs are added to them, so that
+    // the contraction needs neither a sweep to initialize the values nor a sweep
+    // to copy them out of the buffer. Only the rows of the buffer are declared
+    // aligned, as the values start at the offset of this combination of basis
+    // functions in the values block.
 
-    auto *cvals = buffer.data(nprims);
+    const auto *head = buffer.data(nprims - 1);
 
-    std::copy(buffer.data(0), buffer.data(0) + nvalues, cvals);
-
-    for (size_t irow = 1; irow < nprims; irow++)
+#pragma omp simd aligned(head : simd::cache_line_size())
+    for (size_t k = 0; k < nmax; k++)
     {
-        const auto *prim = buffer.data(irow);
-
-#pragma omp simd aligned(cvals, prim : simd::cache_line_size())
-        for (size_t k = 0; k < nvalues; k++)
-        {
-            cvals[k] += prim[k];
-        }
+        values[k] = head[k];
     }
 
-    std::copy(cvals, cvals + nvalues, values);
+    // NOTE: the atom pairs beyond the reach of every pair of primitives have no
+    // contribution and are set to zero.
+
+    std::fill(values + nmax, values + nvalues, 0.0);
+
+    for (size_t irow = 0; irow + 1 < nprims; irow++)
+    {
+        const auto ncols = dimensions[irow];
+
+        if (ncols == 0) continue;
+
+        const auto *prim = buffer.data(irow);
+
+#pragma omp simd aligned(prim : simd::cache_line_size())
+        for (size_t k = 0; k < ncols; k++)
+        {
+            values[k] += prim[k];
+        }
+    }
 }
 
 auto
@@ -169,7 +196,8 @@ compute_overlap(double               *values,
                 const size_t          nvalues,
                 const CBasisFunction &bra,
                 const CBasisFunction &ket,
-                const CSimdMatrix    &coordinates) -> void
+                const CSimdMatrix    &coordinates,
+                const double          threshold) -> void
 {
     const auto lbra = bra.get_angular_momentum();
 
@@ -177,7 +205,7 @@ compute_overlap(double               *values,
 
     if ((lbra == 0) && (lket == 0))
     {
-        compute_ss_overlap(values, nvalues, bra, ket, coordinates);
+        compute_ss_overlap(values, nvalues, bra, ket, coordinates, threshold);
 
         return;
     }

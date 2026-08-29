@@ -44,9 +44,10 @@ namespace simdfunc {  // simdfunc namespace
 /// @brief Creates the coordinates of the atom pairs of a sparsity pattern.
 /// @param sparsity The sparsity pattern of the atom pairs.
 /// @param molecule The molecule to take the atomic coordinates from.
-/// @return The matrix of coordinates with six rows and as many columns as there
+/// @return The matrix of coordinates with seven rows and as many columns as there
 /// are atom pairs, holding the coordinates of the atoms on bra side in rows zero
-/// to two and of the atoms on ket side in rows three to five.
+/// to two, of the atoms on ket side in rows three to five, and the squared
+/// distance of the atom pair in row six.
 /// @note The coordinates are given in atomic units. The padding of the rows is
 /// left undefined, as the atom pairs beyond the number of atom pairs are not
 /// part of the sparsity pattern.
@@ -56,9 +57,10 @@ auto make_coordinates(const CAtomBasisPairSparsity &sparsity, const CMolecule &m
 /// sparsity pattern.
 /// @param sparsity The sparsity pattern of the atom pairs.
 /// @param molecule The molecule to take the atomic coordinates from.
-/// @return The matrix of coordinates with six rows and as many columns as there
+/// @return The matrix of coordinates with seven rows and as many columns as there
 /// are atom pairs, holding the coordinates of the atoms on a side in rows zero to
-/// two and of the atoms on b side in rows three to five.
+/// two, of the atoms on b side in rows three to five, and the squared distance of
+/// the atom pair in row six.
 /// @note The atoms on c side are not part of the matrix, as they form a separate
 /// and shorter dimension than the atom pairs on a and b sides.
 auto make_coordinates(const CAtomBasisTripleSparsity &sparsity, const CMolecule &molecule) -> CSimdMatrix;

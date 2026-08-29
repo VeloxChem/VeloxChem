@@ -47,7 +47,7 @@ namespace simdfunc {  // simdfunc namespace
 /// @param ket_atoms The atomic indices of the atom pairs on ket side.
 /// @param npairs The number of atom pairs.
 /// @param molecule The molecule to take the atomic coordinates from.
-/// @return The matrix of coordinates with six rows and npairs columns.
+/// @return The matrix of coordinates with seven rows and npairs columns.
 static auto
 _make_coordinates(const std::vector<int> &bra_atoms, const std::vector<int> &ket_atoms, const size_t npairs,
                   const CMolecule &molecule) -> CSimdMatrix
@@ -59,7 +59,7 @@ _make_coordinates(const std::vector<int> &bra_atoms, const std::vector<int> &ket
             std::ranges::all_of(ket_atoms, [&](const int i) { return i < static_cast<int>(coords.size()); }),
         std::string("SimdCoordinates.make_coordinates: Atomic index out of range of molecule"));
 
-    auto matrix = CSimdMatrix(6, npairs);
+    auto matrix = CSimdMatrix(7, npairs);
 
     // NOTE: the coordinates of an axis are stored contiguously over the atom
     // pairs, so that a recursion loads them with aligned SIMD instructions. The
@@ -72,6 +72,8 @@ _make_coordinates(const std::vector<int> &bra_atoms, const std::vector<int> &ket
     auto *b_x = matrix.data(3);
     auto *b_y = matrix.data(4);
     auto *b_z = matrix.data(5);
+
+    auto *ab_2 = matrix.data(6);
 
     const auto *rxyz = coords.data();
 
@@ -106,6 +108,18 @@ _make_coordinates(const std::vector<int> &bra_atoms, const std::vector<int> &ket
         b_y[i] = r_b[1];
 
         b_z[i] = r_b[2];
+
+        // NOTE: the squared distance of an atom pair is stored alongside the
+        // coordinates, as the recursions and the screening would otherwise
+        // recompute it for every combination of basis functions of the block.
+
+        const auto rx = r_a[0] - r_b[0];
+
+        const auto ry = r_a[1] - r_b[1];
+
+        const auto rz = r_a[2] - r_b[2];
+
+        ab_2[i] = rx * rx + ry * ry + rz * rz;
     }
 
     return matrix;

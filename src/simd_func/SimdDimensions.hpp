@@ -53,7 +53,7 @@ namespace simdfunc {  // simdfunc namespace
 /// @param bra The basis function on bra side.
 /// @param ket The basis function on ket side.
 /// @param npairs The number of atom pairs to screen.
-/// @param coordinates The coordinates of the atom pairs, as six rows of npairs
+/// @param coordinates The coordinates of the atom pairs, as seven rows of npairs
 /// columns, ordered by ascending interatomic distance.
 /// @param bound The integral bound, evaluated as bound(bra, iprim, ket, jprim,
 /// distance).
@@ -72,32 +72,19 @@ make_column_dimensions(const CBasisFunction &bra,
                        const B              &bound,
                        const double          threshold) -> std::vector<size_t>
 {
-    errors::assertMsgCritical(coordinates.number_of_rows() == 6,
-                              std::string("SimdDimensions.make_column_dimensions: Coordinates must have six rows"));
+    errors::assertMsgCritical(coordinates.number_of_rows() == 7,
+                              std::string("SimdDimensions.make_column_dimensions: Coordinates must have seven rows"));
 
     errors::assertMsgCritical(npairs <= coordinates.number_of_columns(),
                               std::string("SimdDimensions.make_column_dimensions: Number of atom pairs exceeds coordinates"));
 
-    const auto *a_x = coordinates.data(0);
-    const auto *a_y = coordinates.data(1);
-    const auto *a_z = coordinates.data(2);
-    const auto *b_x = coordinates.data(3);
-    const auto *b_y = coordinates.data(4);
-    const auto *b_z = coordinates.data(5);
+    // NOTE: the squared distance of an atom pair is carried by the coordinates,
+    // so that the bisection below reads it instead of recomputing it from the
+    // coordinates of the atoms.
 
-    // NOTE: the interatomic distance is recomputed from the coordinates of an
-    // atom pair, so that the bisection below evaluates it a logarithmic number
-    // of times rather than storing it for every atom pair.
+    const auto *ab_2 = coordinates.data(6);
 
-    const auto distance = [&](const size_t i) {
-        const auto rx = a_x[i] - b_x[i];
-
-        const auto ry = a_y[i] - b_y[i];
-
-        const auto rz = a_z[i] - b_z[i];
-
-        return std::sqrt(rx * rx + ry * ry + rz * rz);
-    };
+    const auto distance = [&](const size_t i) { return std::sqrt(ab_2[i]); };
 
     const auto nprim_a = bra.exponents().size();
 
@@ -123,8 +110,8 @@ make_column_dimensions(const CBasisFunction &bra,
 /// @param b The basis function on b side.
 /// @param c The basis function on c side.
 /// @param npairs The number of atom pairs to screen.
-/// @param coordinates The coordinates of the atom pairs on a and b sides, as six
-/// rows of npairs columns, ordered by ascending interatomic distance.
+/// @param coordinates The coordinates of the atom pairs on a and b sides, as
+/// seven rows of npairs columns, ordered by ascending interatomic distance.
 /// @param bound The integral bound, evaluated as bound(a, iprim, b, jprim, c,
 /// kprim, distance).
 /// @param threshold The screening threshold.
@@ -145,28 +132,19 @@ make_column_dimensions(const CBasisFunction &a,
                        const B              &bound,
                        const double          threshold) -> std::vector<size_t>
 {
-    errors::assertMsgCritical(coordinates.number_of_rows() == 6,
-                              std::string("SimdDimensions.make_column_dimensions: Coordinates must have six rows"));
+    errors::assertMsgCritical(coordinates.number_of_rows() == 7,
+                              std::string("SimdDimensions.make_column_dimensions: Coordinates must have seven rows"));
 
     errors::assertMsgCritical(npairs <= coordinates.number_of_columns(),
                               std::string("SimdDimensions.make_column_dimensions: Number of atom pairs exceeds coordinates"));
 
-    const auto *a_x = coordinates.data(0);
-    const auto *a_y = coordinates.data(1);
-    const auto *a_z = coordinates.data(2);
-    const auto *b_x = coordinates.data(3);
-    const auto *b_y = coordinates.data(4);
-    const auto *b_z = coordinates.data(5);
+    // NOTE: the squared distance of an atom pair is carried by the coordinates,
+    // so that the bisection below reads it instead of recomputing it from the
+    // coordinates of the atoms.
 
-    const auto distance = [&](const size_t i) {
-        const auto rx = a_x[i] - b_x[i];
+    const auto *ab_2 = coordinates.data(6);
 
-        const auto ry = a_y[i] - b_y[i];
-
-        const auto rz = a_z[i] - b_z[i];
-
-        return std::sqrt(rx * rx + ry * ry + rz * rz);
-    };
+    const auto distance = [&](const size_t i) { return std::sqrt(ab_2[i]); };
 
     const auto nprim_a = a.exponents().size();
 

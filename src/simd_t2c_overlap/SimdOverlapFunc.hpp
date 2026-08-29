@@ -112,17 +112,22 @@ one_center_overlap(const CBasisFunction &bra, const CBasisFunction &ket) -> doub
 /// surviving the screening of the combination of basis functions.
 /// @param bra The basis function on bra side.
 /// @param ket The basis function on ket side.
-/// @param coordinates The coordinates of the atom pairs, as six rows ordered by
-/// ascending interatomic distance. Only the leading nvalues columns are read, as
-/// the atom pairs surviving the screening are the closest ones.
+/// @param coordinates The coordinates of the atom pairs, as seven rows ordered by
+/// ascending interatomic distance, the last of which holds the squared distance
+/// of the atom pair. Only the leading nvalues columns are read, as the atom pairs
+/// surviving the screening are the closest ones.
+/// @param threshold The screening threshold of the integrals.
 /// @note The primitive integrals of all pairs of primitives are computed into a
-/// single matrix of one row per pair of primitives, with one further row reserved
-/// for the contracted integrals.
+/// single matrix of one row per pair of primitives.
+/// @note The pairs of primitives are screened with a hundred times tighter
+/// threshold than the integrals, so that the accumulated contributions of the
+/// discarded pairs of primitives stay below the threshold of the integrals.
 auto compute_ss_overlap(double               *values,
                         const size_t          nvalues,
                         const CBasisFunction &bra,
                         const CBasisFunction &ket,
-                        const CSimdMatrix    &coordinates) -> void;
+                        const CSimdMatrix    &coordinates,
+                        const double          threshold) -> void;
 
 /// @brief Computes the overlap integrals of a combination of basis functions by
 /// dispatching to the kernel of their angular momenta.
@@ -132,8 +137,10 @@ auto compute_ss_overlap(double               *values,
 /// surviving the screening of the combination of basis functions.
 /// @param bra The basis function on bra side.
 /// @param ket The basis function on ket side.
-/// @param coordinates The coordinates of the atom pairs, as six rows ordered by
-/// ascending interatomic distance.
+/// @param coordinates The coordinates of the atom pairs, as seven rows ordered by
+/// ascending interatomic distance, the last of which holds the squared distance
+/// of the atom pair.
+/// @param threshold The screening threshold of the integrals.
 /// @note The values of the combination of basis functions are stored as one row
 /// of nvalues columns for each of the (2 l_bra + 1) (2 l_ket + 1) spherical
 /// components, with the components of the bra side running slowest.
@@ -141,7 +148,8 @@ auto compute_overlap(double               *values,
                      const size_t          nvalues,
                      const CBasisFunction &bra,
                      const CBasisFunction &ket,
-                     const CSimdMatrix    &coordinates) -> void;
+                     const CSimdMatrix    &coordinates,
+                     const double          threshold) -> void;
 
 }  // namespace simdovl
 
