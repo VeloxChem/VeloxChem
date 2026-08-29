@@ -1,5 +1,7 @@
 target_sources(vlxobjs
   PRIVATE
+    SimdBoysFunc.cpp
+    SimdBoysTable.cpp
     SimdCoordinates.cpp
   )
 
