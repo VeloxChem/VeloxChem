@@ -35,26 +35,28 @@
 
 #include <algorithm>
 #include <ranges>
+#include <vector>
 
 #include "ErrorHandler.hpp"
 
 namespace simdfunc {  // simdfunc namespace
 
-auto
-make_coordinates(const CAtomBasisPairSparsity &sparsity, const CMolecule &molecule) -> CSimdMatrix
+/// @brief Creates the coordinates of the atom pairs given by their atomic indices.
+/// @param bra_atoms The atomic indices of the atom pairs on bra side.
+/// @param ket_atoms The atomic indices of the atom pairs on ket side.
+/// @param npairs The number of atom pairs.
+/// @param molecule The molecule to take the atomic coordinates from.
+/// @return The matrix of coordinates with six rows and npairs columns.
+static auto
+_make_coordinates(const std::vector<int> &bra_atoms, const std::vector<int> &ket_atoms, const size_t npairs,
+                  const CMolecule &molecule) -> CSimdMatrix
 {
     const auto coords = molecule.coordinates();
-
-    const auto &bra_atoms = sparsity.bra_atoms();
-
-    const auto &ket_atoms = sparsity.ket_atoms();
 
     errors::assertMsgCritical(
         std::ranges::all_of(bra_atoms, [&](const int i) { return i < static_cast<int>(coords.size()); }) &&
             std::ranges::all_of(ket_atoms, [&](const int i) { return i < static_cast<int>(coords.size()); }),
         std::string("SimdCoordinates.make_coordinates: Atomic index out of range of molecule"));
-
-    const auto npairs = sparsity.number_of_pairs();
 
     auto matrix = CSimdMatrix(6, npairs);
 
@@ -80,6 +82,18 @@ make_coordinates(const CAtomBasisPairSparsity &sparsity, const CMolecule &molecu
     });
 
     return matrix;
+}
+
+auto
+make_coordinates(const CAtomBasisPairSparsity &sparsity, const CMolecule &molecule) -> CSimdMatrix
+{
+    return _make_coordinates(sparsity.bra_atoms(), sparsity.ket_atoms(), sparsity.number_of_pairs(), molecule);
+}
+
+auto
+make_coordinates(const CAtomBasisTripleSparsity &sparsity, const CMolecule &molecule) -> CSimdMatrix
+{
+    return _make_coordinates(sparsity.a_atoms(), sparsity.b_atoms(), sparsity.number_of_pairs(), molecule);
 }
 
 }  // namespace simdfunc

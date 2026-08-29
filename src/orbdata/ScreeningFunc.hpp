@@ -319,6 +319,51 @@ two_center_nuclear_potential_primitive_bound(const CBasisFunction &bra, const si
     return fact * static_cast<double>(lsum + 1) * (2.0 * mathconst::pi_value() / fexp) * std::exp(-fmu * r * r);
 }
 
+/// @brief Computes upper bound of three-center electron repulsion integral
+/// between primitive basis functions on a, b and c sides.
+/// @param a The basis function on a side.
+/// @param iprim The index of primitive of basis function on a side.
+/// @param b The basis function on b side.
+/// @param jprim The index of primitive of basis function on b side.
+/// @param c The basis function on c side.
+/// @param kprim The index of primitive of basis function on c side.
+/// @param r The distance between the atoms carrying the basis functions on a and
+/// b sides.
+/// @return The upper bound of three-center electron repulsion integral.
+/// @note The Boys function is set to its maximum value of one, so the distance to
+/// the atom on c side does not enter and the c side contributes through the
+/// exponent and the absolute normalization factor of its primitive only.
+inline auto
+three_center_electron_repulsion_primitive_bound(const CBasisFunction &a,
+                                                const size_t          iprim,
+                                                const CBasisFunction &b,
+                                                const size_t          jprim,
+                                                const CBasisFunction &c,
+                                                const size_t          kprim,
+                                                const double          r) -> double
+{
+    const auto aexp = a.exponents()[iprim];
+
+    const auto bexp = b.exponents()[jprim];
+
+    const auto cexp = c.exponents()[kprim];
+
+    const auto fexp = aexp + bexp;
+
+    const auto fmu = aexp * bexp / fexp;
+
+    const auto qexp = fexp + cexp;
+
+    const auto lsum = a.get_angular_momentum() + b.get_angular_momentum() + c.get_angular_momentum();
+
+    constexpr auto fpi = mathconst::pi_value();
+
+    const auto fact = std::fabs(a.normalization_factors()[iprim]) * std::fabs(b.normalization_factors()[jprim]) *
+                      std::fabs(c.normalization_factors()[kprim]) * distance_factor(r, lsum) * static_cast<double>(lsum + 1);
+
+    return fact * (2.0 * fpi * fpi * std::sqrt(fpi)) / (fexp * cexp * std::sqrt(qexp)) * std::exp(-fmu * r * r);
+}
+
 }  // namespace screenfunc
 
 #endif /* ScreeningFunc_hpp */
