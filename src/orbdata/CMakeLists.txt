@@ -4,6 +4,7 @@ target_sources(vlxobjs
     AOIndices.cpp
     AtomBasis.cpp
     AtomBasisPairGroup.cpp
+    AtomBasisPairSparsity.cpp
     AtomCorePotential.cpp
     BaseCorePotential.cpp
     BasisFunction.cpp
