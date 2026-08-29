@@ -34,6 +34,7 @@
 #include "SimdCoordinates.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <ranges>
 #include <vector>
 
@@ -61,25 +62,51 @@ _make_coordinates(const std::vector<int> &bra_atoms, const std::vector<int> &ket
     auto matrix = CSimdMatrix(6, npairs);
 
     // NOTE: the coordinates of an axis are stored contiguously over the atom
-    // pairs, so that a recursion loads them with aligned SIMD instructions.
+    // pairs, so that a recursion loads them with aligned SIMD instructions. The
+    // pointers to the rows are taken once, as the accessor of a row is bounds
+    // checked and would otherwise be called for every coordinate of every pair.
 
-    std::ranges::for_each(std::views::iota(size_t{0}, npairs), [&](const auto i) {
-        const auto r_a = coords[bra_atoms[i]].coordinates();
+    auto *a_x = matrix.data(0);
+    auto *a_y = matrix.data(1);
+    auto *a_z = matrix.data(2);
+    auto *b_x = matrix.data(3);
+    auto *b_y = matrix.data(4);
+    auto *b_z = matrix.data(5);
 
-        const auto r_b = coords[ket_atoms[i]].coordinates();
+    const auto *rxyz = coords.data();
 
-        matrix.data(0)[i] = r_a[0];
+    const auto *bra = bra_atoms.data();
 
-        matrix.data(1)[i] = r_a[1];
+    const auto *ket = ket_atoms.data();
 
-        matrix.data(2)[i] = r_a[2];
+    const auto npnts = static_cast<int64_t>(npairs);
 
-        matrix.data(3)[i] = r_b[0];
+    // NOTE: the parallel region is entered only for the larger atom basis pair
+    // groups. Forking and joining the threads costs a fixed thirty microseconds
+    // while the loop itself runs at about one nanosecond per atom pair, so the
+    // threads pay for themselves only well above ten thousand atom pairs.
 
-        matrix.data(4)[i] = r_b[1];
+    const auto nthreshold = int64_t{32000};
 
-        matrix.data(5)[i] = r_b[2];
-    });
+#pragma omp parallel for schedule(static) if (npnts > nthreshold)
+    for (int64_t i = 0; i < npnts; i++)
+    {
+        const auto r_a = rxyz[bra[i]].coordinates();
+
+        const auto r_b = rxyz[ket[i]].coordinates();
+
+        a_x[i] = r_a[0];
+
+        a_y[i] = r_a[1];
+
+        a_z[i] = r_a[2];
+
+        b_x[i] = r_b[0];
+
+        b_y[i] = r_b[1];
+
+        b_z[i] = r_b[2];
+    }
 
     return matrix;
 }
