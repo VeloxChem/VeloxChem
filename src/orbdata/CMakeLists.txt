@@ -3,6 +3,7 @@ target_sources(vlxobjs
     AODensityMatrix.cpp
     AOIndices.cpp
     AtomBasis.cpp
+    AtomBasisDiagonalSparsity.cpp
     AtomBasisPairGroup.cpp
     AtomBasisPairSparsity.cpp
     AtomBasisTripleSparsity.cpp

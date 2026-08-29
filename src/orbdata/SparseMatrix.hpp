@@ -100,12 +100,14 @@ class CSparseMatrix
     /// ket_function, distance).
     /// @param threshold The screening threshold.
     /// @param mat_type The type of matrix.
+    /// @param storage The storage layout of the diagonal blocks.
     template <typename B>
     CSparseMatrix(const CMolecule       &molecule,
                   const CMolecularBasis &basis,
                   const B               &screener,
                   const double           threshold,
-                  const mat_t            mat_type)
+                  const mat_t            mat_type,
+                  const diagstor         storage)
 
         : _pair_blocks{}
 
@@ -120,7 +122,7 @@ class CSparseMatrix
 
         auto groups = (mat_type == mat_t::general) ? basis.basis_pair_groups(basis) : basis.basis_pair_groups();
 
-        _add_blocks(molecule, groups, screener, threshold);
+        _add_blocks(molecule, groups, screener, threshold, storage);
     }
 
     /// @brief The constructor with molecule, molecular bases on bra and ket
@@ -132,13 +134,15 @@ class CSparseMatrix
     /// ket_function, distance).
     /// @param threshold The screening threshold.
     /// @param mat_type The type of matrix, which must be general.
+    /// @param storage The storage layout of the diagonal blocks.
     template <typename B>
     CSparseMatrix(const CMolecule       &molecule,
                   const CMolecularBasis &bra_basis,
                   const CMolecularBasis &ket_basis,
                   const B               &screener,
                   const double           threshold,
-                  const mat_t            mat_type)
+                  const mat_t            mat_type,
+                  const diagstor         storage)
 
         : _pair_blocks{}
 
@@ -151,7 +155,7 @@ class CSparseMatrix
 
         auto groups = bra_basis.basis_pair_groups(ket_basis);
 
-        _add_blocks(molecule, groups, screener, threshold);
+        _add_blocks(molecule, groups, screener, threshold, storage);
     }
 
     /// @brief Sets type of matrix.
@@ -232,9 +236,14 @@ class CSparseMatrix
     /// @param groups The atom basis pair groups to describe.
     /// @param screener The integral bound.
     /// @param threshold The screening threshold.
+    /// @param storage The storage layout of the diagonal blocks.
     template <typename B>
     auto
-    _add_blocks(const CMolecule &molecule, std::vector<CAtomBasisPairGroup> &groups, const B &screener, const double threshold) -> void
+    _add_blocks(const CMolecule                  &molecule,
+                std::vector<CAtomBasisPairGroup> &groups,
+                const B                          &screener,
+                const double                      threshold,
+                const diagstor                    storage) -> void
     {
         std::ranges::for_each(groups, [&](auto &group) {
             group.sort_by_distance(molecule);
@@ -243,7 +252,7 @@ class CSparseMatrix
 
             if (pair_block.number_of_pairs() > 0) _pair_blocks.push_back(pair_block);
 
-            const auto diagonal_block = CAtomBasisDiagonalSparsity(group);
+            const auto diagonal_block = CAtomBasisDiagonalSparsity(group, storage);
 
             if (diagonal_block.number_of_atoms() > 0) _diagonal_blocks.push_back(diagonal_block);
         });
