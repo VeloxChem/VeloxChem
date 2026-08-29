@@ -482,9 +482,22 @@ class CSparseMatrix
                 const double                      threshold,
                 const diagstor                    storage) -> void
     {
-        std::ranges::for_each(groups, [&](auto &group) {
-            group.sort_by_distance(molecule);
+        // NOTE: the atom basis pair groups are independent, so their atom pairs are
+        // ordered by interatomic distance in parallel. Dynamic scheduling is used
+        // as the groups differ widely in the number of atom pairs.
 
+        const auto ngroups = static_cast<int>(groups.size());
+
+#pragma omp parallel for schedule(dynamic)
+        for (int i = 0; i < ngroups; i++)
+        {
+            groups[i].sort_by_distance(molecule);
+        }
+
+        // NOTE: the blocks are added in the order of the groups, so that the
+        // layout of the values blocks does not depend on the scheduling above.
+
+        std::ranges::for_each(groups, [&](const auto &group) {
             const auto pair_block = CAtomBasisPairSparsity(group, screener, threshold);
 
             if (pair_block.number_of_pairs() > 0) _pair_blocks.push_back(pair_block);
