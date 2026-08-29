@@ -1,6 +1,7 @@
 target_sources(vlxobjs
   PRIVATE
     SimdOverlapDriver.cpp
+    SimdOverlapFunc.cpp
   )
 
 target_include_directories(vlxobjs
