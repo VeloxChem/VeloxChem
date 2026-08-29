@@ -162,6 +162,41 @@ two_center_nuclear_potential_bound(const CBasisFunction &bra, const CBasisFuncti
     return fact * static_cast<double>(lsum + 1) * (2.0 * mathconst::pi_value() / fexp) * std::exp(-fmu * r * r);
 }
 
+/// @brief Computes upper bound of three-center electron repulsion integral
+/// between basis functions on a, b and c sides.
+/// @param a The basis function on a side.
+/// @param b The basis function on b side.
+/// @param c The basis function on c side.
+/// @param r The distance between the atoms carrying the basis functions on a and
+/// b sides.
+/// @return The upper bound of three-center electron repulsion integral.
+/// @note The Boys function is set to its maximum value of one, so the distance
+/// to the atom on c side does not enter and the c side contributes through the
+/// exponents and contraction of its basis function only. The sum of angular
+/// momenta runs over all three sides. The bound is partitioned by any threshold
+/// below its value at unit distance, and may thus be bisected with
+/// number_of_leading.
+inline auto
+three_center_electron_repulsion_bound(const CBasisFunction &a, const CBasisFunction &b, const CBasisFunction &c, const double r) -> double
+{
+    const auto fexp = a.smallest_exponent() + b.smallest_exponent();
+
+    const auto fmu = a.smallest_exponent() * b.smallest_exponent() / fexp;
+
+    const auto cexp = c.smallest_exponent();
+
+    const auto qexp = fexp + cexp;
+
+    const auto lsum = a.get_angular_momentum() + b.get_angular_momentum() + c.get_angular_momentum();
+
+    constexpr auto fpi = mathconst::pi_value();
+
+    const auto fact = a.sum_of_absolute_norms() * b.sum_of_absolute_norms() * c.sum_of_absolute_norms() * distance_factor(r, lsum) *
+                      static_cast<double>(lsum + 1);
+
+    return fact * (2.0 * fpi * fpi * std::sqrt(fpi)) / (fexp * cexp * std::sqrt(qexp)) * std::exp(-fmu * r * r);
+}
+
 }  // namespace screenfunc
 
 #endif /* ScreeningFunc_hpp */

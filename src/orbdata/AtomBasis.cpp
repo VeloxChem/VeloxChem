@@ -346,6 +346,20 @@ CAtomBasis::smallest_exponent(const int angular_momentum) const -> double
 }
 
 auto
+CAtomBasis::basis_function_offsets() const -> std::vector<size_t>
+{
+    // NOTE: basis functions are kept sorted by ascending angular momentum, so
+    // the offsets partition them into contiguous ranges.
+
+    std::vector<size_t> offsets(static_cast<size_t>(max_angular_momentum() + 2), 0);
+
+    std::ranges::for_each(std::views::iota(0, max_angular_momentum() + 1),
+                          [&](const int i) { offsets[i + 1] = offsets[i] + number_of_basis_functions(i); });
+
+    return offsets;
+}
+
+auto
 CAtomBasis::contraction_depths(const int angular_momentum) const -> std::set<size_t>
 {
     std::set<size_t> depths;

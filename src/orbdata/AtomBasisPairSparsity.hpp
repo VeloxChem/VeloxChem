@@ -89,9 +89,9 @@ class CAtomBasisPairSparsity
 
         , _counts{}
 
-        , _bra_offsets(_make_offsets(group.bra_basis()))
+        , _bra_offsets(group.bra_basis().basis_function_offsets())
 
-        , _ket_offsets(_make_offsets(group.ket_basis()))
+        , _ket_offsets(group.ket_basis().basis_function_offsets())
     {
         // NOTE: bisection over the atom pairs requires them to be ordered by
         // ascending interatomic distance, as the integral bound decreases
@@ -205,13 +205,6 @@ class CAtomBasisPairSparsity
     }
 
    private:
-    /// @brief Computes offsets of the first basis function of each angular
-    /// momentum in atom basis.
-    /// @param basis The atom basis to compute offsets for.
-    /// @return The vector of offsets, with the total number of basis functions
-    /// as last element.
-    static auto _make_offsets(const CAtomBasis &basis) -> std::vector<size_t>;
-
     /// @brief The index of atom basis on bra side among the unique atom bases
     /// of the molecular basis.
     int _bra_index;

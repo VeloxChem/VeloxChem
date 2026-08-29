@@ -5,6 +5,7 @@ target_sources(vlxobjs
     AtomBasis.cpp
     AtomBasisPairGroup.cpp
     AtomBasisPairSparsity.cpp
+    AtomBasisTripleSparsity.cpp
     AtomCorePotential.cpp
     BaseCorePotential.cpp
     BasisFunction.cpp

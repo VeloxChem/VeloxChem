@@ -38,17 +38,6 @@
 
 #include "ErrorHandler.hpp"
 
-auto
-CAtomBasisPairSparsity::_make_offsets(const CAtomBasis &basis) -> std::vector<size_t>
-{
-    std::vector<size_t> offsets(static_cast<size_t>(basis.max_angular_momentum() + 2), 0);
-
-    std::ranges::for_each(std::views::iota(0, basis.max_angular_momentum() + 1),
-                          [&](const int i) { offsets[i + 1] = offsets[i] + basis.number_of_basis_functions(i); });
-
-    return offsets;
-}
-
 CAtomBasisPairSparsity::CAtomBasisPairSparsity(const CAtomBasisPairGroup &group)
 
     : _bra_index(group.bra_index())
@@ -61,9 +50,9 @@ CAtomBasisPairSparsity::CAtomBasisPairSparsity(const CAtomBasisPairGroup &group)
 
     , _counts{}
 
-    , _bra_offsets(_make_offsets(group.bra_basis()))
+    , _bra_offsets(group.bra_basis().basis_function_offsets())
 
-    , _ket_offsets(_make_offsets(group.ket_basis()))
+    , _ket_offsets(group.ket_basis().basis_function_offsets())
 {
     // NOTE: all atom pairs of the group survive for every combination of basis
     // functions until screening is applied, which can only lower the counts.

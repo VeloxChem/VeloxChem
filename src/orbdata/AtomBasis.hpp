@@ -205,6 +205,12 @@ class CAtomBasis
     /// @return The smallest exponent, 0.0 if there are no such basis functions.
     auto smallest_exponent(const int angular_momentum) const -> double;
 
+    /// @brief Gets offsets of the first basis function of each angular momentum
+    /// in atom basis.
+    /// @return The vector of offsets, with the total number of basis functions
+    /// as last element. The vector holds a single zero for an empty atom basis.
+    auto basis_function_offsets() const -> std::vector<size_t>;
+
     /// @brief Get set of unique contraction numbers of basis functions with
     /// given angular momentum in atom basis.
     /// @param angular_momentum The requested angular momentum of basis
