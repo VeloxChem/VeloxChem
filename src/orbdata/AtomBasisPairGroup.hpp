@@ -46,12 +46,50 @@
 /// @brief Class CAtomBasisPairGroup associates a pair of atom bases with the
 /// atom pairs formed by the atoms sharing them. Off-diagonal atom pairs are
 /// stored as parallel bra and ket vectors, while atoms of diagonal atom pairs
-/// are stored separately. The atom bases are not owned by the group: they must
-/// outlive the group, and modifying the molecular bases they originate from
-/// invalidates the group.
+/// are stored separately. Symmetry is established by construction, not derived
+/// from the atom bases: the single argument constructor builds a symmetric
+/// group, the two arguments constructor a non-symmetric one. The atom bases are
+/// not owned by the group: they must outlive the group, and modifying the
+/// molecular bases they originate from invalidates the group.
 class CAtomBasisPairGroup
 {
    public:
+    /// @brief The constructor with atom basis group shared by bra and ket sides.
+    /// @param group The atom basis group on bra and ket sides.
+    explicit CAtomBasisPairGroup(const CAtomBasisGroup &group)
+
+        : _bra_basis(group.basis())
+
+        , _ket_basis(group.basis())
+
+        , _bra_atoms{}
+
+        , _ket_atoms{}
+
+        , _diagonal_atoms(group.atoms())
+
+        , _symmetric(true)
+    {
+        const auto npairs = group.number_of_atoms() * (group.number_of_atoms() - 1) / 2;
+
+        _bra_atoms.reserve(npairs);
+
+        _ket_atoms.reserve(npairs);
+
+        // NOTE: diagonal atom pairs are excluded here, as their atoms are all
+        // atoms in group. Only the strict upper triangle is retained.
+
+        std::ranges::for_each(group.atoms(), [&](const int i) {
+            std::ranges::for_each(group.atoms(), [&](const int j) {
+                if (i >= j) return;
+
+                _bra_atoms.push_back(i);
+
+                _ket_atoms.push_back(j);
+            });
+        });
+    }
+
     /// @brief The constructor with bra and ket atom basis groups.
     /// @param bra The atom basis group on bra side.
     /// @param ket The atom basis group on ket side.
@@ -67,20 +105,19 @@ class CAtomBasisPairGroup
 
         , _diagonal_atoms{}
 
-        , _symmetric((&bra.basis() == &ket.basis()) || (bra.basis() == ket.basis()))
+        , _symmetric(false)
     {
         _bra_atoms.reserve(bra.number_of_atoms() * ket.number_of_atoms());
 
         _ket_atoms.reserve(bra.number_of_atoms() * ket.number_of_atoms());
 
-        // NOTE: diagonal atom pairs are excluded here and collected below. For
-        // symmetric pair groups only the strict upper triangle is retained.
+        // NOTE: diagonal atom pairs are excluded here and collected below. The
+        // full direct product of bra and ket atoms is retained, even if bra and
+        // ket atom bases happen to be equal.
 
         std::ranges::for_each(bra.atoms(), [&](const int i) {
             std::ranges::for_each(ket.atoms(), [&](const int j) {
                 if (i == j) return;
-
-                if (_symmetric && (i > j)) return;
 
                 _bra_atoms.push_back(i);
 
@@ -89,9 +126,10 @@ class CAtomBasisPairGroup
         });
 
         // NOTE: atoms of diagonal atom pairs are the atoms carrying both atom
-        // bases. Within a single molecular basis this is empty unless the pair
-        // group is symmetric, but bra and ket may come from different molecular
-        // bases, where the atom sets do overlap.
+        // bases. Within a single molecular basis this is empty, but bra and ket
+        // may come from different molecular bases, where the atom sets do
+        // overlap. This assumes ascending atomic indices in both groups, as
+        // provided by CMolecularBasis::basis_groups().
 
         std::ranges::set_intersection(bra.atoms(), ket.atoms(), std::back_inserter(_diagonal_atoms));
     }
@@ -112,8 +150,9 @@ class CAtomBasisPairGroup
         return _ket_basis.get();
     }
 
-    /// @brief Checks if bra and ket sides share the same atom basis.
-    /// @return True if atom bases are the same, False otherwise.
+    /// @brief Checks if bra and ket sides are interchangeable, i.e. atom pairs
+    /// are stored as strict upper triangle of the atom pairs matrix.
+    /// @return True if pair group is symmetric, False otherwise.
     auto
     is_symmetric() const -> bool
     {
@@ -176,7 +215,7 @@ class CAtomBasisPairGroup
     /// @brief The atomic indices of atoms in diagonal atom pairs.
     std::vector<int> _diagonal_atoms;
 
-    /// @brief The flag indicating that bra and ket atom bases are the same.
+    /// @brief The flag indicating that bra and ket sides are interchangeable.
     bool _symmetric;
 };
 

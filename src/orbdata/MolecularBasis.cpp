@@ -186,7 +186,9 @@ CMolecularBasis::basis_pair_groups() const -> std::vector<CAtomBasisPairGroup>
     pair_groups.reserve(groups.size() * (groups.size() + 1) / 2);
 
     std::ranges::for_each(std::views::iota(size_t{0}, groups.size()), [&](const auto i) {
-        std::ranges::for_each(std::views::iota(i, groups.size()),
+        pair_groups.push_back(CAtomBasisPairGroup(groups[i]));
+
+        std::ranges::for_each(std::views::iota(i + 1, groups.size()),
                               [&](const auto j) { pair_groups.push_back(CAtomBasisPairGroup(groups[i], groups[j])); });
     });
 
@@ -196,6 +198,10 @@ CMolecularBasis::basis_pair_groups() const -> std::vector<CAtomBasisPairGroup>
 auto
 CMolecularBasis::basis_pair_groups(const CMolecularBasis &other) const -> std::vector<CAtomBasisPairGroup>
 {
+    // NOTE: pair groups are non-symmetric by contract, i.e. the full direct
+    // product of bra and ket atoms is retained, even if the molecular bases
+    // share an atom basis.
+
     const auto bra_groups = basis_groups();
 
     const auto ket_groups = other.basis_groups();
