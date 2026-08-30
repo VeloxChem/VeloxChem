@@ -49,7 +49,7 @@ static auto
 _make_coordinates(const std::vector<int> &bra_atoms, const std::vector<int> &ket_atoms, const size_t npairs,
                   const CMolecule &molecule) -> CSimdMatrix
 {
-    const auto coords = molecule.coordinates();
+    const auto &coords = molecule.coordinates();
 
     const auto natoms = static_cast<int>(coords.size());
 

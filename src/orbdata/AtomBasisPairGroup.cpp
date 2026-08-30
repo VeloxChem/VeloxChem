@@ -43,7 +43,7 @@
 auto
 CAtomBasisPairGroup::sort_by_distance(const CMolecule &molecule) -> void
 {
-    const auto coords = molecule.coordinates();
+    const auto &coords = molecule.coordinates();
 
     errors::assertMsgCritical(
         std::ranges::all_of(_bra_atoms, [&](const int i) { return i < static_cast<int>(coords.size()); }) &&
