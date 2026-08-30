@@ -225,6 +225,13 @@ functions of a block. See the section below.
 
 ## The SIMD overlap driver against the reference overlap driver
 
+**The tables of this section are superseded by the section on the cold and the
+warm cost near the end, for two reasons. They were taken before the atom pairs
+were sorted by radix, which more than halves the construction of the sparsity
+pattern, and they timed the cases above twelve thousand basis functions once and
+cold while timing the smaller ones as the best of three and warm, which mixes two
+different measurements in one column.**
+
 Measured once every combination of angular momenta up to six was implemented, so
 that the driver runs an arbitrary basis. Each case runs in its own process, as
 the largest of them hold twenty one gigabytes and the memory pressure of one case
@@ -458,3 +465,85 @@ combination of angular momenta, in the same shape as the `t2c_overlap` directory
 which they parallel and which is 2535 KB across 50 files. The three largest are
 `IH`, `HI` and `II`, at 267, 266 and 200 KB, carrying 143, 143 and 91 rows of
 angular components.
+
+## The cost when the memory is cold and when it is warm
+
+Every table above this one timed the larger cases once and the smaller ones as
+the best of three. That mixes two measurements in one column, as the first call
+faults in the pages of a freshly allocated sparse matrix and the later ones do
+not. The tables below give every case the same treatment, one cold call followed
+by the best of three warm ones, and separate the two rather than choosing between
+them. Which is the honest number depends on the caller: a single overlap matrix
+pays the cold cost, a loop which computes one repeatedly pays the warm one.
+
+The difference is not small, and it falls on the driver harder than on the
+reference, which allocates less: crambin in def2-qzvp on fourteen threads is
+0.0385 seconds cold against 0.0141 warm. It also falls harder as the threads
+grow, the faults of the first touch being serialized by the kernel, which is why
+the cold column scales worse than the warm one.
+
+### Single thread
+
+| molecule | basis | nao | sparse GB | compute cold | compute warm | ref cold | ref warm | cold | warm |
+|---|---|---|---|---|---|---|---|---|---|
+| tagrisso | def2-svp | 683 | 0.001 | 0.0019 | 0.0012 | 0.0014 | 0.0012 | 0.71x | 0.99x |
+| tagrisso | def2-tzvp | 1345 | 0.004 | 0.0028 | 0.0018 | 0.0046 | 0.0040 | 1.66x | 2.19x |
+| tagrisso | def2-qzvp | 3099 | 0.017 | 0.0051 | 0.0037 | 0.0233 | 0.0204 | 4.60x | 5.53x |
+| taxol | def2-svp | 1099 | 0.002 | 0.0024 | 0.0014 | 0.0029 | 0.0027 | 1.24x | 1.96x |
+| taxol | def2-tzvp | 2185 | 0.009 | 0.0034 | 0.0024 | 0.0106 | 0.0097 | 3.10x | 3.96x |
+| taxol | def2-qzvp | 4947 | 0.037 | 0.0078 | 0.0059 | 0.0588 | 0.0524 | 7.58x | 8.93x |
+| crambin | def2-svp | 6177 | 0.025 | 0.0093 | 0.0074 | 0.1050 | 0.0977 | 11.26x | 13.14x |
+| crambin | def2-tzvp | 12063 | 0.097 | 0.0210 | 0.0150 | 0.3543 | 0.3249 | 16.87x | 21.60x |
+| crambin | def2-qzvp | 28167 | 0.409 | 0.0629 | 0.0438 | 1.8982 | 1.7470 | 30.17x | 39.90x |
+| ubiquitin | def2-svp | 11577 | 0.052 | 0.0219 | 0.0181 | 0.3850 | 0.3502 | 17.55x | 19.33x |
+| ubiquitin | def2-tzvp | 22442 | 0.200 | 0.0444 | 0.0344 | 1.2773 | 1.1472 | 28.79x | 33.34x |
+| ubiquitin | def2-qzvp | 53197 | 0.872 | 0.1210 | 0.0877 | too large | | | |
+
+### All fourteen threads
+
+| molecule | basis | compute cold | compute warm | ref cold | ref warm | cold | warm |
+|---|---|---|---|---|---|---|---|
+| tagrisso | def2-svp | 0.0016 | 0.0006 | 0.0016 | 0.0016 | 1.06x | 2.48x |
+| tagrisso | def2-tzvp | 0.0027 | 0.0013 | 0.0019 | 0.0017 | 0.68x | 1.33x |
+| tagrisso | def2-qzvp | 0.0047 | 0.0032 | 0.0065 | 0.0037 | 1.37x | 1.17x |
+| taxol | def2-svp | 0.0019 | 0.0009 | 0.0023 | 0.0009 | 1.19x | 1.09x |
+| taxol | def2-tzvp | 0.0029 | 0.0019 | 0.0030 | 0.0023 | 1.01x | 1.25x |
+| taxol | def2-qzvp | 0.0069 | 0.0048 | 0.0128 | 0.0064 | 1.85x | 1.34x |
+| crambin | def2-svp | 0.0057 | 0.0033 | 0.0206 | 0.0127 | 3.59x | 3.83x |
+| crambin | def2-tzvp | 0.0129 | 0.0064 | 0.0750 | 0.0440 | 5.79x | 6.92x |
+| crambin | def2-qzvp | 0.0385 | 0.0141 | 0.3411 | 0.2099 | 8.86x | 14.85x |
+| ubiquitin | def2-svp | 0.0123 | 0.0080 | 0.0697 | 0.0436 | 5.68x | 5.45x |
+| ubiquitin | def2-tzvp | 0.0255 | 0.0120 | 0.2386 | 0.1396 | 9.35x | 11.65x |
+| ubiquitin | def2-qzvp | 0.0642 | 0.0251 | too large | | | |
+
+### What the threads buy, fourteen against one
+
+| molecule | basis | compute cold | compute warm | reference warm |
+|---|---|---|---|---|
+| tagrisso | def2-svp | 1.24x | 1.87x | 0.75x |
+| tagrisso | def2-tzvp | 1.03x | 1.44x | 2.37x |
+| tagrisso | def2-qzvp | 1.07x | 1.16x | 5.48x |
+| taxol | def2-svp | 1.23x | 1.63x | 2.93x |
+| taxol | def2-tzvp | 1.16x | 1.32x | 4.16x |
+| taxol | def2-qzvp | 1.12x | 1.23x | 8.15x |
+| crambin | def2-svp | 1.62x | 2.24x | 7.67x |
+| crambin | def2-tzvp | 1.62x | 2.36x | 7.38x |
+| crambin | def2-qzvp | 1.63x | 3.10x | 8.32x |
+| ubiquitin | def2-svp | 1.79x | 2.26x | 8.03x |
+| ubiquitin | def2-tzvp | 1.74x | 2.87x | 8.22x |
+| ubiquitin | def2-qzvp | 1.89x | 3.50x | |
+
+### What these numbers say
+
+The driver is strongest on a single thread, where it is between eleven and forty
+times the reference on the large cases. The reference threads better than the
+driver does, seven to eight times against two to three and a half, so its
+disadvantage narrows to between four and fifteen times on fourteen threads. The
+small molecules are a wash or a loss, tagrisso in def2-svp being level on one
+thread and behind on fourteen, as they take a millisecond or two and never enter
+the parallel region of the driver at all.
+
+The anomaly which the earlier section reported, that `compute` scales worse than
+either of its phases, was the cold and the warm being mixed in one column and is
+not real. Measured warm throughout, `compute` scales between 2.2 and 3.5 times,
+which is what its phases scale to.
