@@ -33,7 +33,6 @@
 
 #include "SimdCoordinates.hpp"
 
-#include <cstdint>
 #include <vector>
 
 #include "ErrorHandler.hpp"
@@ -88,17 +87,7 @@ _make_coordinates(const std::vector<int> &bra_atoms, const std::vector<int> &ket
 
     const auto *ket = ket_atoms.data();
 
-    const auto npnts = static_cast<int64_t>(npairs);
-
-    // NOTE: the parallel region is entered only for the larger atom basis pair
-    // groups. Forking and joining the threads costs a fixed thirty microseconds
-    // while the loop itself runs at about one nanosecond per atom pair, so the
-    // threads pay for themselves only well above ten thousand atom pairs.
-
-    const auto nthreshold = int64_t{32000};
-
-#pragma omp parallel for schedule(static) if (npnts > nthreshold)
-    for (int64_t i = 0; i < npnts; i++)
+    for (size_t i = 0; i < npairs; i++)
     {
         const auto r_a = rxyz[bra[i]].coordinates();
 

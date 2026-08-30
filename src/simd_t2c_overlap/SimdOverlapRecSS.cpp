@@ -149,6 +149,8 @@ compute_ss_overlap(double               *values,
 
             // NOTE: the exponential is issued as a call to the vector math library
             // of the platform, so it does not break the vectorization of the loop.
+            // It costs about nine tenths of the loop, which is therefore bound by
+            // the throughput of the exponential and not by the memory it touches.
 
 #pragma omp simd aligned(prim, ab_2 : simd::cache_line_size())
             for (size_t k = 0; k < ncols; k++)
