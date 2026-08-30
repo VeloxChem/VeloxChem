@@ -49,6 +49,7 @@
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "ScreeningFunc.hpp"
+#include "TensorComponents.hpp"
 #include "ValuesState.hpp"
 
 /// @brief Class CSparseMatrix stores the sparsity pattern of a matrix in atomic
@@ -636,7 +637,299 @@ class CSparseMatrix
         return _diagonal_blocks.size();
     }
 
+    /// @brief Reconstructs the dense matrix in atomic orbital basis from the
+    /// values blocks of matrix.
+    /// @param bra_basis The molecular basis on bra side.
+    /// @param ket_basis The molecular basis on ket side.
+    /// @param values The values of the dense matrix, as a row major array of
+    /// bra_basis.dimensions_of_basis() rows and ket_basis.dimensions_of_basis()
+    /// columns, which must be allocated by the caller.
+    /// @note The atomic orbitals are ordered as in CMatrix, i.e. by ascending
+    /// angular momentum, and within an angular momentum by angular component and
+    /// then by basis function. The elements not covered by the sparsity patterns
+    /// are set to zero.
+    auto
+    to_dense(const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis, double *values) const -> void
+    {
+        errors::assertMsgCritical(_values_state != valstat::empty,
+                                  std::string("SparseMatrix.to_dense: Values blocks of matrix are not allocated"));
+
+        const auto nrows = bra_basis.dimensions_of_basis();
+
+        const auto ncols = ket_basis.dimensions_of_basis();
+
+        std::fill(values, values + nrows * ncols, 0.0);
+
+        // NOTE: the dense index of an atomic orbital is looked up instead of
+        // recomputed, as the innermost loops below run over the atom pairs and
+        // would otherwise scan the basis for every value.
+
+        const auto bra_starts = _make_dense_starts(bra_basis);
+
+        const auto ket_starts = _make_dense_starts(ket_basis);
+
+        const auto bra_strides = _make_dense_strides(bra_basis);
+
+        const auto ket_strides = _make_dense_strides(ket_basis);
+
+        const auto bra_nmoms = bra_strides.size();
+
+        const auto ket_nmoms = ket_strides.size();
+
+        // NOTE: an element of the dense matrix belongs to a single atom pair, so
+        // the blocks write to disjoint elements and need no synchronization.
+
+        const auto nblocks = static_cast<int>(_pair_blocks.size());
+
+#pragma omp parallel for schedule(dynamic)
+        for (int iblk = 0; iblk < nblocks; iblk++)
+        {
+            const auto &block = _pair_blocks[iblk];
+
+            const auto *block_values = pair_values(static_cast<size_t>(iblk));
+
+            const auto &bra_atoms = block.bra_atoms();
+
+            const auto &ket_atoms = block.ket_atoms();
+
+            const auto a_indices = _index_functions(bra_basis.basis_set(block.bra_index()));
+
+            const auto b_indices = _index_functions(ket_basis.basis_set(block.ket_index()));
+
+            for (size_t i = 0; i < a_indices.size(); i++)
+            {
+                const auto [la, ia] = a_indices[i];
+
+                for (size_t j = 0; j < b_indices.size(); j++)
+                {
+                    const auto [lb, jb] = b_indices[j];
+
+                    const auto npairs = block.number_of_pairs(la, ia, lb, jb);
+
+                    if (npairs == 0) continue;
+
+                    const auto *cell = block_values + block.element_offset(la, ia, lb, jb);
+
+                    const auto bra_ncomps = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{la}));
+
+                    const auto ket_ncomps = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{lb}));
+
+                    // NOTE: the values of a combination of basis functions are
+                    // stored as one row of atom pairs per angular component, with
+                    // the component on bra side as the slowest running index.
+
+                    for (size_t ma = 0; ma < bra_ncomps; ma++)
+                    {
+                        for (size_t mb = 0; mb < ket_ncomps; mb++)
+                        {
+                            const auto *prim = cell + (ma * ket_ncomps + mb) * npairs;
+
+                            for (size_t k = 0; k < npairs; k++)
+                            {
+                                const auto row = bra_starts[static_cast<size_t>(bra_atoms[k]) * bra_nmoms + la] + ia + ma * bra_strides[la];
+
+                                const auto col = ket_starts[static_cast<size_t>(ket_atoms[k]) * ket_nmoms + lb] + jb + mb * ket_strides[lb];
+
+                                values[row * ncols + col] = prim[k];
+
+                                // NOTE: only one of the two atom pairs is stored
+                                // when the matrix is symmetric or antisymmetric,
+                                // so the transposed element is filled here.
+
+                                if (_type == mat_t::symmetric) values[col * ncols + row] = prim[k];
+
+                                if (_type == mat_t::antisymmetric) values[col * ncols + row] = -prim[k];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        _diagonal_to_dense(bra_basis, ket_basis, bra_starts, ket_starts, bra_strides, ket_strides, values, ncols);
+    }
+
+    /// @brief Reconstructs the dense matrix in atomic orbital basis from the
+    /// values blocks of matrix.
+    /// @param basis The molecular basis on bra and ket sides.
+    /// @param values The values of the dense matrix, as a row major array of
+    /// basis.dimensions_of_basis() rows and columns, which must be allocated by
+    /// the caller.
+    auto
+    to_dense(const CMolecularBasis &basis, double *values) const -> void
+    {
+        to_dense(basis, basis, values);
+    }
+
    private:
+    /// @brief Gets the angular momentum and the index within it of each basis
+    /// function of an atom basis.
+    /// @param basis The atom basis to index the basis functions of.
+    /// @return The vector of angular momenta and indices within them.
+    static auto
+    _index_functions(const CAtomBasis &basis) -> std::vector<std::pair<int, size_t>>
+    {
+        std::vector<std::pair<int, size_t>> indices;
+
+        std::vector<size_t> counts(static_cast<size_t>(basis.max_angular_momentum() + 1), 0);
+
+        const auto &functions = basis.functions();
+
+        for (size_t i = 0; i < functions.size(); i++)
+        {
+            const auto lval = functions[i].get_angular_momentum();
+
+            indices.push_back({lval, counts[lval]});
+
+            counts[lval]++;
+        }
+
+        return indices;
+    }
+
+    /// @brief Creates the dense index of the first angular component of the first
+    /// basis function of each angular momentum of each atom.
+    /// @param basis The molecular basis to index the basis functions of.
+    /// @return The vector of dense indices, with the atom as the slowest running
+    /// index and the angular momentum as the fastest.
+    static auto
+    _make_dense_starts(const CMolecularBasis &basis) -> std::vector<size_t>
+    {
+        const auto indices = basis.basis_sets_indices();
+
+        const auto nmoms = static_cast<size_t>(basis.max_angular_momentum() + 1);
+
+        std::vector<size_t> starts(indices.size() * nmoms, 0);
+
+        // NOTE: the basis functions of an angular momentum are numbered from the
+        // dimension of the basis functions of the lower angular momenta, as the
+        // dense matrix is ordered by ascending angular momentum.
+
+        std::vector<size_t> counts(nmoms, 0);
+
+        for (size_t l = 0; l < nmoms; l++)
+        {
+            counts[l] = basis.dimensions_of_basis(static_cast<int>(l));
+        }
+
+        for (size_t i = 0; i < indices.size(); i++)
+        {
+            const auto &abas = basis.basis_set(indices[i]);
+
+            for (size_t l = 0; l < nmoms; l++)
+            {
+                starts[i * nmoms + l] = counts[l];
+
+                counts[l] += abas.number_of_basis_functions(static_cast<int>(l));
+            }
+        }
+
+        return starts;
+    }
+
+    /// @brief Creates the distance between the dense indices of two consecutive
+    /// angular components of a basis function of each angular momentum.
+    /// @param basis The molecular basis to index the basis functions of.
+    /// @return The vector of distances.
+    static auto
+    _make_dense_strides(const CMolecularBasis &basis) -> std::vector<size_t>
+    {
+        const auto nmoms = static_cast<size_t>(basis.max_angular_momentum() + 1);
+
+        std::vector<size_t> strides(nmoms, 0);
+
+        for (size_t l = 0; l < nmoms; l++)
+        {
+            strides[l] = basis.number_of_basis_functions(static_cast<int>(l));
+        }
+
+        return strides;
+    }
+
+    /// @brief Adds the values of the diagonal blocks to the dense matrix.
+    /// @param bra_basis The molecular basis on bra side.
+    /// @param ket_basis The molecular basis on ket side.
+    /// @param bra_starts The dense indices of the basis functions on bra side.
+    /// @param ket_starts The dense indices of the basis functions on ket side.
+    /// @param bra_strides The distances between angular components on bra side.
+    /// @param ket_strides The distances between angular components on ket side.
+    /// @param values The values of the dense matrix.
+    /// @param ncols The number of columns of the dense matrix.
+    auto
+    _diagonal_to_dense(const CMolecularBasis     &bra_basis,
+                       const CMolecularBasis     &ket_basis,
+                       const std::vector<size_t> &bra_starts,
+                       const std::vector<size_t> &ket_starts,
+                       const std::vector<size_t> &bra_strides,
+                       const std::vector<size_t> &ket_strides,
+                       double                    *values,
+                       const size_t               ncols) const -> void
+    {
+        const auto bra_nmoms = bra_strides.size();
+
+        const auto ket_nmoms = ket_strides.size();
+
+        const auto nblocks = static_cast<int>(_diagonal_blocks.size());
+
+#pragma omp parallel for schedule(dynamic)
+        for (int iblk = 0; iblk < nblocks; iblk++)
+        {
+            const auto &block = _diagonal_blocks[iblk];
+
+            errors::assertMsgCritical(block.get_storage() == diagstor::scalar,
+                                      std::string("SparseMatrix.to_dense: Storage layout of the diagonal blocks is not supported"));
+
+            const auto *block_values = diagonal_values(static_cast<size_t>(iblk));
+
+            const auto &atoms = block.atoms();
+
+            const auto a_indices = _index_functions(bra_basis.basis_set(block.bra_index()));
+
+            const auto b_indices = _index_functions(ket_basis.basis_set(block.ket_index()));
+
+            for (size_t i = 0; i < a_indices.size(); i++)
+            {
+                const auto [la, ia] = a_indices[i];
+
+                for (size_t j = 0; j < b_indices.size(); j++)
+                {
+                    // NOTE: only the stored combinations are visited, as the
+                    // values of the reverse order share their storage.
+
+                    if (block.is_triangular() && (i > j)) continue;
+
+                    const auto [lb, jb] = b_indices[j];
+
+                    if (block.number_of_elements(la, ia, lb, jb) == 0) continue;
+
+                    // NOTE: the operator is spherically symmetric about the atom,
+                    // so a single value is stored for the whole block and it is
+                    // diagonal in the angular components.
+
+                    const auto fval = block_values[block.element_offset(la, ia, lb, jb)];
+
+                    const auto ncomps = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{la}));
+
+                    for (size_t k = 0; k < atoms.size(); k++)
+                    {
+                        const auto atom = static_cast<size_t>(atoms[k]);
+
+                        for (size_t m = 0; m < ncomps; m++)
+                        {
+                            const auto row = bra_starts[atom * bra_nmoms + la] + ia + m * bra_strides[la];
+
+                            const auto col = ket_starts[atom * ket_nmoms + lb] + jb + m * ket_strides[lb];
+
+                            values[row * ncols + col] = fval;
+
+                            if (block.is_triangular() && (row != col)) values[col * ncols + row] = fval;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// @brief Adds the blocks screened with a named two-center integral bound.
     /// @param molecule The molecule to compute interatomic distances from.
     /// @param groups The atom basis pair groups to describe.

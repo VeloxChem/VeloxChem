@@ -37,6 +37,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -44,11 +45,48 @@
 #include "AtomBasisPairSparsity.hpp"
 #include "AtomBasisTripleSparsity.hpp"
 #include "ExportGeneral.hpp"
+#include "MolecularBasis.hpp"
 #include "ScreeningFunc.hpp"
 #include "SparseMatrix.hpp"
 #include "SparseTensor.hpp"
 
 namespace vlx_sparse {  // vlx_sparse namespace
+
+/// @brief Reconstructs the dense matrix of a sparse matrix as a numpy array.
+/// @param matrix The sparse matrix to reconstruct the dense matrix of.
+/// @param bra_basis The molecular basis on bra side.
+/// @param ket_basis The molecular basis on ket side.
+/// @param max_memory The maximum memory of the dense matrix in gigabytes.
+/// @return The dense matrix.
+static auto
+dense_to_numpy(const CSparseMatrix   &matrix,
+               const CMolecularBasis &bra_basis,
+               const CMolecularBasis &ket_basis,
+               const double           max_memory) -> py::array_t<double>
+{
+    const auto nrows = bra_basis.dimensions_of_basis();
+
+    const auto ncols = ket_basis.dimensions_of_basis();
+
+    // NOTE: the dense matrix is reconstructed without regard to the sparsity, so
+    // its memory is checked against a limit before it is allocated. The limit is
+    // enforced with an exception rather than with a critical error, as the latter
+    // would terminate the Python interpreter.
+
+    const auto memory = static_cast<double>(nrows) * static_cast<double>(ncols) * static_cast<double>(sizeof(double));
+
+    if (const auto limit = max_memory * 1024.0 * 1024.0 * 1024.0; memory > limit)
+    {
+        throw std::runtime_error("SparseMatrix.to_numpy: Dense matrix of " + std::to_string(memory / (1024.0 * 1024.0 * 1024.0)) +
+                                 " GB exceeds limit of " + std::to_string(max_memory) + " GB");
+    }
+
+    auto array = py::array_t<double>(std::vector<py::ssize_t>{static_cast<py::ssize_t>(nrows), static_cast<py::ssize_t>(ncols)});
+
+    matrix.to_dense(bra_basis, ket_basis, array.mutable_data());
+
+    return array;
+}
 
 auto
 export_sparse(py::module &m) -> void
@@ -257,7 +295,24 @@ export_sparse(py::module &m) -> void
                                                      {static_cast<int>(self.diagonal_block(index).number_of_elements())});
             },
             "Gets copy of the values of the diagonal block. The copy may be large.",
-            py::arg("index"));
+            py::arg("index"))
+        .def(
+            "to_numpy",
+            [](const CSparseMatrix &self, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis, const double max_memory) -> py::array_t<double> {
+                return vlx_sparse::dense_to_numpy(self, bra_basis, ket_basis, max_memory);
+            },
+            "Gets the dense matrix in atomic orbital basis. The matrix may be large.",
+            py::arg("bra_basis"),
+            py::arg("ket_basis"),
+            py::arg("max_memory") = 8.0)
+        .def(
+            "to_numpy",
+            [](const CSparseMatrix &self, const CMolecularBasis &basis, const double max_memory) -> py::array_t<double> {
+                return vlx_sparse::dense_to_numpy(self, basis, basis, max_memory);
+            },
+            "Gets the dense matrix in atomic orbital basis. The matrix may be large.",
+            py::arg("basis"),
+            py::arg("max_memory") = 8.0);
 
     // CSparseTensor class
 
