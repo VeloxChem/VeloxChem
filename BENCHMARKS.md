@@ -117,3 +117,105 @@ of s functions only, which is as far as the kernel currently reaches. The
 angular component and stride handling of the dense mapping runs structurally in
 the def2-qzvp cases above, up to g functions, but has never been checked against
 reference values for non-zero angular momentum.
+
+## Profile of the (s|s) overlap kernel
+
+Measured with the kernel single threaded, on hydrogen and hydrogen/helium
+lattices, which are the largest systems the kernel reaches while only the
+`(s|s)` case is implemented.
+
+### Where the time of the driver goes
+
+Phases of `CSimdOverlapDriver::compute`, with the sparsity construction timed
+separately through the exported `SparseMatrix` constructor.
+
+| case | atoms | total s | sparsity s | alloc+zero s | integrals s | integrals % |
+|---|---|---|---|---|---|---|
+| H512 sto-3g | 512 | 0.0097 | 0.0088 | 0.0000 | 0.0009 | 8.9% |
+| H1331 sto-3g | 1331 | 0.0780 | 0.0750 | 0.0000 | 0.0029 | 3.7% |
+| H1331 sto-6g | 1331 | 0.0920 | 0.0769 | 0.0000 | 0.0150 | 16.3% |
+| H2197 sto-6g | 2197 | 0.2536 | 0.2329 | 0.0001 | 0.0207 | 8.1% |
+
+The integrals are 4 to 16 percent of the call. The rest is building the
+sparsity pattern, which a sampling profiler attributes almost entirely to the
+stable sort of atom pairs by distance in `CAtomBasisPairGroup::sort_by_distance`:
+11380 leaf samples against 1518 for the vector exponential and 81 for the body
+of the kernel itself.
+
+### Where the time of the kernel goes
+
+Phases of `compute_ss_overlap`, measured with temporary timers.
+
+| case | calls | mean nvalues | dimensions | alloc+zero | accumulate | copy+fill |
+|---|---|---|---|---|---|---|
+| H1331 sto-3g | 5 | 496903 | 0.3% | 0.7% | 97.3% | 1.7% |
+| H1331 sto-6g | 5 | 758887 | 0.3% | 0.3% | 98.7% | 0.7% |
+| H/He729 6-311g | 81 | 35022 | 1.7% | 4.0% | 90.1% | 4.2% |
+| H/He125 6-31g | 36 | 2222 | 11.2% | 2.3% | 84.7% | 1.9% |
+
+The accumulation loop is 85 to 99 percent of the kernel. The screening of the
+pairs of primitives costs under two percent except on the smallest calls, where
+the kernel itself takes a fraction of a millisecond, so precomputing the reach of
+a pair of primitives to take the square root and the exponential out of the
+bisection would gain nothing.
+
+### What limits the accumulation loop
+
+A standalone benchmark of the loop, built with the flags of the project, in
+nanoseconds per atom pair.
+
+| n | array MB | loop as written | same loop without exp | copy only | loop on all threads | threading |
+|---|---|---|---|---|---|---|
+| 8192 | 0.1 | 3.372 | 0.208 | 0.208 | 6.022 | 0.56x |
+| 131072 | 1.0 | 2.623 | 0.279 | 0.279 | 0.603 | 4.35x |
+| 500000 | 3.8 | 1.888 | 0.201 | 0.190 | 0.293 | 6.45x |
+| 4000000 | 30.5 | 1.403 | 0.147 | 0.146 | 0.206 | 6.81x |
+
+The loop is bound by the throughput of the exponential and not by the memory it
+touches. Removing the exponential and keeping the same loads, multiplications
+and store makes the loop nine times faster, and the loop sustains 12 to 16 GB/s
+where the same loop without the exponential reaches 111 to 152 GB/s. The vector
+exponential of the platform is two wide and there is no four wide version, as
+linking against `_simd_exp_d4` fails, so the cost of a single evaluation is not
+ours to improve. Only evaluating the exponential fewer times would help, and the
+number of evaluations is the number of pairs of primitives times the number of
+atom pairs they reach, which the screening already minimizes.
+
+### What threading the loop would buy
+
+Measured with a parallel region around the loop, entered above a threshold on
+the number of atom pairs, in nanoseconds per atom pair.
+
+| threads | H1331 sto-6g | speedup | H2197 sto-6g | speedup |
+|---|---|---|---|---|
+| 1 | 1.449 | 1.00x | 1.474 | 1.00x |
+| 2 | 0.785 | 1.85x | 0.759 | 1.94x |
+| 4 | 0.512 | 2.83x | 0.454 | 3.25x |
+| 6 | 0.395 | 3.67x | 0.339 | 4.35x |
+| 8 | 0.382 | 3.79x | 0.318 | 4.64x |
+| 10 | 0.383 | 3.78x | 0.298 | 4.95x |
+| 12 | 0.418 | 3.46x | 0.332 | 4.44x |
+| 14 | 0.428 | 3.39x | 0.327 | 4.51x |
+
+Scaling is close to linear to four threads, peaks at ten, which is the number of
+performance cores, and degrades beyond it as the remaining threads land on
+efficiency cores and the static schedule waits for them. The peak of 4.95x falls
+short of the 6.81x of the standalone loop because the pairs of primitives which
+reach few atom pairs stay below the threshold and run serially.
+
+The cost of forking and joining the threads is repaid between sixteen thousand
+and thirty three thousand atom pairs, measured as 0.86x at 16384 and 1.45x at
+32768.
+
+### Why the parallelization was removed again
+
+The kernel and the coordinates carried parallel regions and no longer do. The
+runtime of the platform reports `max_active_levels` of one, so a parallel region
+inside an active parallel region runs with a single thread. A parallel region in
+the kernel and a parallel region over the combinations of basis functions of a
+block therefore do not combine, and the outer one silently disables the inner
+one. Which of the two levels is right depends on how the work divides between
+combinations of basis functions and atom pairs, and with only the `(s|s)` case
+implemented every system available is either a single very large call or too few
+calls to be representative. The decision is postponed until the kernels of higher
+angular momenta exist and the choice can be measured on a real molecule.
