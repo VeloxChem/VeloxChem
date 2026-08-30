@@ -4,6 +4,7 @@ target_sources(vlxobjs
     SimdOverlapFunc.cpp
     SimdOverlapRecSS.cpp
     SimdOverlapRecSP.cpp
+    SimdOverlapRecPP.cpp
     SimdOverlapRecPS.cpp
     SimdOverlapRecSD.cpp
     SimdOverlapRecDS.cpp

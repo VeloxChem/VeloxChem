@@ -37,6 +37,7 @@
 
 #include "ErrorHandler.hpp"
 #include "SimdOverlapRecSP.hpp"
+#include "SimdOverlapRecPP.hpp"
 #include "SimdOverlapRecPS.hpp"
 #include "SimdOverlapRecSD.hpp"
 #include "SimdOverlapRecDS.hpp"
@@ -119,6 +120,13 @@ compute_overlap(double                         *values,
             return;
         }
 
+    }
+
+    if ((lbra == 1) && (lket == 1))
+    {
+        compute_pp_overlap(values, nvalues, bra, ket, harmonics, coordinates, threshold);
+
+        return;
     }
 
     if (lket == 0)
