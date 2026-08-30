@@ -31,35 +31,43 @@
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-#include "SimdOverlapFunc.hpp"
 
-#include <string>
+#ifndef SimdOverlapRecSS_hpp
+#define SimdOverlapRecSS_hpp
 
-#include "ErrorHandler.hpp"
+#include <cstddef>
+
+#include "BasisFunction.hpp"
+#include "SimdMatrix.hpp"
 
 namespace simdovl {  // simdovl namespace
 
-auto
-compute_overlap(double               *values,
-                const size_t          nvalues,
-                const CBasisFunction &bra,
-                const CBasisFunction &ket,
-                const CSimdMatrix    &coordinates,
-                const double          threshold) -> void
-{
-    const auto lbra = bra.get_angular_momentum();
-
-    const auto lket = ket.get_angular_momentum();
-
-    if ((lbra == 0) && (lket == 0))
-    {
-        compute_ss_overlap(values, nvalues, bra, ket, coordinates, threshold);
-
-        return;
-    }
-
-    errors::assertMsgCritical(
-        false, std::string("SimdOverlapFunc.compute_overlap: Overlap integrals of the requested angular momenta are not implemented"));
-}
+/// @brief Computes the overlap integrals of a combination of basis functions of
+/// zero angular momentum on bra and ket sides.
+/// @param values The values of the combination of basis functions in the values
+/// block of the sparsity pattern.
+/// @param nvalues The number of values to compute, i.e. the number of atom pairs
+/// surviving the screening of the combination of basis functions.
+/// @param bra The basis function on bra side.
+/// @param ket The basis function on ket side.
+/// @param coordinates The coordinates of the atom pairs, as seven rows ordered by
+/// ascending interatomic distance, the last of which holds the squared distance
+/// of the atom pair. Only the leading nvalues columns are read, as the atom pairs
+/// surviving the screening are the closest ones.
+/// @param threshold The screening threshold of the integrals.
+/// @note The integrals of all pairs of primitives are accumulated in a single
+/// row, which spans only the atom pairs reached by the furthest reaching pair of
+/// primitives.
+/// @note The pairs of primitives are screened with the threshold of the integrals
+/// divided by their number, so that the accumulated contributions of the
+/// discarded pairs of primitives stay below the threshold of the integrals.
+auto compute_ss_overlap(double               *values,
+                        const size_t          nvalues,
+                        const CBasisFunction &bra,
+                        const CBasisFunction &ket,
+                        const CSimdMatrix    &coordinates,
+                        const double          threshold) -> void;
 
 }  // namespace simdovl
+
+#endif /* SimdOverlapRecSS_hpp */

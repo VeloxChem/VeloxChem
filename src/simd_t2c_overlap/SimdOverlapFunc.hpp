@@ -43,6 +43,7 @@
 #include "MathConst.hpp"
 #include "MathFunc.hpp"
 #include "SimdMatrix.hpp"
+#include "SimdOverlapRecSS.hpp"
 
 namespace simdovl {  // simdovl namespace
 
@@ -103,31 +104,6 @@ one_center_overlap(const CBasisFunction &bra, const CBasisFunction &ket) -> doub
 
     return fsum;
 }
-
-/// @brief Computes the overlap integrals of a combination of basis functions of
-/// zero angular momentum on bra and ket sides.
-/// @param values The values of the combination of basis functions in the values
-/// block of the sparsity pattern.
-/// @param nvalues The number of values to compute, i.e. the number of atom pairs
-/// surviving the screening of the combination of basis functions.
-/// @param bra The basis function on bra side.
-/// @param ket The basis function on ket side.
-/// @param coordinates The coordinates of the atom pairs, as seven rows ordered by
-/// ascending interatomic distance, the last of which holds the squared distance
-/// of the atom pair. Only the leading nvalues columns are read, as the atom pairs
-/// surviving the screening are the closest ones.
-/// @param threshold The screening threshold of the integrals.
-/// @note The primitive integrals of all pairs of primitives are computed into a
-/// single matrix of one row per pair of primitives.
-/// @note The pairs of primitives are screened with a hundred times tighter
-/// threshold than the integrals, so that the accumulated contributions of the
-/// discarded pairs of primitives stay below the threshold of the integrals.
-auto compute_ss_overlap(double               *values,
-                        const size_t          nvalues,
-                        const CBasisFunction &bra,
-                        const CBasisFunction &ket,
-                        const CSimdMatrix    &coordinates,
-                        const double          threshold) -> void;
 
 /// @brief Computes the overlap integrals of a combination of basis functions by
 /// dispatching to the kernel of their angular momenta.
