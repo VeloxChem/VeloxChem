@@ -103,26 +103,26 @@ through the CMatrix chain on this machine, where it would need about 53 GB.
 The default limit of `SparseMatrix.to_numpy` is 8 GB, so crambin in def2-qzvp
 passes by default and ubiquitin in def2-qzvp requires an explicit `max_memory`.
 
-## What the timings do not cover
+## What the timings of the dense reconstruction do not cover
 
-The SIMD overlap kernel implements `(s|s)` only, so the sparse matrices timed
-above are built with the real screening structure of the basis, allocated and
-zeroed, rather than computed. The traversal visits every block, combination of
-basis functions, angular component and atom pair exactly as it would for a
-computed matrix, and both sides of the comparison are handicapped equally, but
-the values are zeros.
-
-The reconstruction was verified against the CMatrix chain to 1.1e-16 on systems
-of s functions only, which is as far as the kernel currently reaches. The
-angular component and stride handling of the dense mapping runs structurally in
-the def2-qzvp cases above, up to g functions, but has never been checked against
-reference values for non-zero angular momentum.
+At the time the two sections above were measured the kernel implemented `(s|s)`
+alone, so the sparse matrices timed there are built with the real screening
+structure of the basis, allocated and zeroed, rather than computed. The traversal
+visits every block, combination of basis functions, angular component and atom
+pair exactly as it would for a computed matrix, and both sides of the comparison
+are handicapped equally, but the values are zeros. The timings therefore stand,
+as the work is the same. The note which followed them, that the angular component
+handling had never been checked against reference values, does not: every
+combination of angular momenta up to six has since been implemented and checked
+against the reference driver.
 
 ## Profile of the (s|s) overlap kernel
 
-Measured with the kernel single threaded, on hydrogen and hydrogen/helium
-lattices, which are the largest systems the kernel reaches while only the
-`(s|s)` case is implemented.
+Measured when `(s|s)` was the only kernel, single threaded, on hydrogen and
+hydrogen/helium lattices, which were the largest systems it could then reach. The
+kernel has since been rewritten, so the shares below describe that kernel and not
+the present one, but the conclusion which mattered, that the loop is bound by the
+throughput of the exponential and not by the memory it touches, still holds.
 
 ### Where the time of the driver goes
 
@@ -420,3 +420,41 @@ thousand gives ten tasks for ten threads. With the combinations parallel inside
 serial batches the result improves as the batch grows, which is to say as the
 batching is switched off. The working set of the harmonics is therefore not what
 limits the threads.
+
+## What the kernels are checked against
+
+The integrals have no test in the suite, as no test reaches the driver, so the
+evidence that they are right is the comparison below. Every figure is the largest
+absolute deviation over the whole matrix unless it says otherwise.
+
+| what | against | over | worst |
+|---|---|---|---|
+| solid harmonics, l = 1 to 12 | the spherical harmonics of scipy, Racah normalized | 400 random atom pairs, every order and every m | 5.8e-15 relative |
+| solid harmonics, l = 1 to 4 | the explicit expressions of Table II of the paper | the same | 1.1e-13 |
+| the (s\|l) and (l\|s) kernels, l = 1 to 6 | the analytic form, the overlap of the S functions times the ratio of the exponents raised to l times the harmonic | a custom basis carrying l on one atom and s on the others | 1.7e-16 |
+| the (s\|l) and (l\|s) kernels, l = 1 to 6 | the reference overlap driver | the same custom basis | 1.2e-15 |
+| every combination up to l = 6 | the reference overlap driver | CO, water and methane in sto-3g, 6-31g, def2-svp, def2-tzvp, def2-qzvp, cc-pvdz, cc-pvtz, cc-pvqz, cc-pv5z and cc-pv6z | 1.8e-15 |
+| every combination up to l = 4 | the reference overlap driver | tagrisso, taxol, crambin and ubiquitin in def2-svp, def2-tzvp and def2-qzvp | 1.0e-14 |
+| the dense reconstruction | the reference driver through its own dense conversion | the same molecules | 1.0e-14 |
+
+Two of these deserve a note. The reference driver implements angular momenta up
+to `I`, i.e. six, so cc-pv6z is the highest basis on which the two can be compared
+at all. And the harmonics were taken to twelve because the recursions of the
+integrals reach the sum of the two angular momenta, which is twelve when both
+sides carry six, so the orders seven to twelve are verified against scipy alone,
+no integral of that order existing to compare against.
+
+## The size of the generated code
+
+| | |
+|---|---|
+| kernels, 49 files | 2609 KB of source, 175 KB of headers |
+| driver and dispatcher | 349 KB |
+| solid harmonics, 12 orders | 105 KB |
+| largest kernel | `SimdOverlapRecIH.cpp`, 267 KB |
+
+The kernels are generated from the recursion descriptors, one file per
+combination of angular momenta, in the same shape as the `t2c_overlap` directory
+which they parallel and which is 2535 KB across 50 files. The three largest are
+`IH`, `HI` and `II`, at 267, 266 and 200 KB, carrying 143, 143 and 91 rows of
+angular components.
