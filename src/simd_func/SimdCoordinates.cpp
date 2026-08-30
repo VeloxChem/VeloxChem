@@ -33,9 +33,11 @@
 
 #include "SimdCoordinates.hpp"
 
+#include <cstdint>
 #include <vector>
 
 #include "ErrorHandler.hpp"
+#include "OpenMPFunc.hpp"
 
 namespace simdfunc {  // simdfunc namespace
 
@@ -87,6 +89,21 @@ _make_coordinates(const std::vector<int> &bra_atoms, const std::vector<int> &ket
 
     const auto *ket = ket_atoms.data();
 
+    // NOTE: the coordinates are formed by the threads only when they hold enough
+    // work to repay the fixed cost of forking and joining them. The region does not
+    // nest inside the one over the combinations of basis functions of a block, as
+    // the coordinates are formed before that region opens.
+
+    const auto npnts = static_cast<int64_t>(7 * npairs);
+
+    // NOTE: the work needed to repay the threads is taken per thread, as forking
+    // and joining them costs more the more of them there are. The constant is
+    // measured on fourteen threads, where the threshold it gives is the smallest
+    // one which does not lose on the blocks too small to fill them.
+
+    const auto nthreshold = int64_t{12000} * omp::get_number_of_threads();
+
+#pragma omp parallel for schedule(static) if (npnts > nthreshold)
     for (size_t i = 0; i < npairs; i++)
     {
         const auto r_a = rxyz[bra[i]].coordinates();

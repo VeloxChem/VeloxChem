@@ -36,9 +36,11 @@
 
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 
 #include "ErrorHandler.hpp"
+#include "OpenMPFunc.hpp"
 #include "SimdAlign.hpp"
 
 namespace simdfunc {  // simdfunc namespace
@@ -115,50 +117,111 @@ make_g_solid_harmonics(const CSimdMatrix &f_harmonics, const CSimdMatrix &d_harm
     auto *ps_p3 = matrix.data(7);
     auto *ps_p4 = matrix.data(8);
 
+    // NOTE: the rows are filled by the threads only when they hold enough work
+    // to repay the fixed cost of forking and joining them. The two loops are
+    // written out, as a loop under a pragma with an if clause does not vectorize
+    // as well as one without it when the clause is false.
+
+    const auto npnts = static_cast<int64_t>(9 * ncols);
+
+    // NOTE: the work needed to repay the threads is taken per thread, as forking
+    // and joining them costs more the more of them there are. The constant is
+    // measured on fourteen threads, where the threshold it gives is the smallest
+    // one which does not lose on the blocks too small to fill them.
+
+    const auto nthreshold = int64_t{12000} * omp::get_number_of_threads();
+
     // NOTE: every value entering the recursion is loaded before any result is
     // stored, so that the rows of the previous orders are read once and the
     // stores cannot force the loads to be repeated.
 
-#pragma omp simd aligned(pr_x, pr_y, pr_z, pr_2, pt_m3, pt_m2, pt_m1, pt_0, pt_p1, pt_p2, pt_p3, pu_m2, pu_m1, pu_0, pu_p1, pu_p2, ps_m4, ps_m3, ps_m2, ps_m1, ps_0, ps_p1, ps_p2, ps_p3, ps_p4 : simd::cache_line_size())
-    for (size_t i = 0; i < ncols; i++)
+    if (npnts > nthreshold)
     {
-        const auto x = pr_x[i];
-        const auto y = pr_y[i];
-        const auto z = pr_z[i];
+#pragma omp parallel for simd schedule(static) aligned(pr_x, pr_y, pr_z, pr_2, pt_m3, pt_m2, pt_m1, pt_0, pt_p1, pt_p2, pt_p3, pu_m2, pu_m1, pu_0, pu_p1, pu_p2, ps_m4, ps_m3, ps_m2, ps_m1, ps_0, ps_p1, ps_p2, ps_p3, ps_p4 : simd::cache_line_size())
+        for (int64_t i = 0; i < static_cast<int64_t>(ncols); i++)
+        {
+            const auto x = pr_x[i];
+            const auto y = pr_y[i];
+            const auto z = pr_z[i];
 
-        const auto r_2 = pr_2[i];
+            const auto r_2 = pr_2[i];
 
-        const auto t_m3 = pt_m3[i];
-        const auto t_m2 = pt_m2[i];
-        const auto t_m1 = pt_m1[i];
-        const auto t_0 = pt_0[i];
-        const auto t_p1 = pt_p1[i];
-        const auto t_p2 = pt_p2[i];
-        const auto t_p3 = pt_p3[i];
+            const auto t_m3 = pt_m3[i];
+            const auto t_m2 = pt_m2[i];
+            const auto t_m1 = pt_m1[i];
+            const auto t_0 = pt_0[i];
+            const auto t_p1 = pt_p1[i];
+            const auto t_p2 = pt_p2[i];
+            const auto t_p3 = pt_p3[i];
 
-        const auto u_m2 = pu_m2[i];
-        const auto u_m1 = pu_m1[i];
-        const auto u_0 = pu_0[i];
-        const auto u_p1 = pu_p1[i];
-        const auto u_p2 = pu_p2[i];
+            const auto u_m2 = pu_m2[i];
+            const auto u_m1 = pu_m1[i];
+            const auto u_0 = pu_0[i];
+            const auto u_p1 = pu_p1[i];
+            const auto u_p2 = pu_p2[i];
 
-        ps_p4[i] = fact * (x * t_p3 - y * t_m3);
+            ps_p4[i] = fact * (x * t_p3 - y * t_m3);
 
-        ps_m4[i] = fact * (y * t_p3 + x * t_m3);
+            ps_m4[i] = fact * (y * t_p3 + x * t_m3);
 
-        ps_m3[i] = fz_m3 * z * t_m3;
+            ps_m3[i] = fz_m3 * z * t_m3;
 
-        ps_m2[i] = fz_m2 * z * t_m2 - fr_m2 * r_2 * u_m2;
+            ps_m2[i] = fz_m2 * z * t_m2 - fr_m2 * r_2 * u_m2;
 
-        ps_m1[i] = fz_m1 * z * t_m1 - fr_m1 * r_2 * u_m1;
+            ps_m1[i] = fz_m1 * z * t_m1 - fr_m1 * r_2 * u_m1;
 
-        ps_0[i] = fz_0 * z * t_0 - fr_0 * r_2 * u_0;
+            ps_0[i] = fz_0 * z * t_0 - fr_0 * r_2 * u_0;
 
-        ps_p1[i] = fz_p1 * z * t_p1 - fr_p1 * r_2 * u_p1;
+            ps_p1[i] = fz_p1 * z * t_p1 - fr_p1 * r_2 * u_p1;
 
-        ps_p2[i] = fz_p2 * z * t_p2 - fr_p2 * r_2 * u_p2;
+            ps_p2[i] = fz_p2 * z * t_p2 - fr_p2 * r_2 * u_p2;
 
-        ps_p3[i] = fz_p3 * z * t_p3;
+            ps_p3[i] = fz_p3 * z * t_p3;
+        }
+    }
+    else
+    {
+#pragma omp simd aligned(pr_x, pr_y, pr_z, pr_2, pt_m3, pt_m2, pt_m1, pt_0, pt_p1, pt_p2, pt_p3, pu_m2, pu_m1, pu_0, pu_p1, pu_p2, ps_m4, ps_m3, ps_m2, ps_m1, ps_0, ps_p1, ps_p2, ps_p3, ps_p4 : simd::cache_line_size())
+        for (size_t i = 0; i < ncols; i++)
+        {
+            const auto x = pr_x[i];
+            const auto y = pr_y[i];
+            const auto z = pr_z[i];
+
+            const auto r_2 = pr_2[i];
+
+            const auto t_m3 = pt_m3[i];
+            const auto t_m2 = pt_m2[i];
+            const auto t_m1 = pt_m1[i];
+            const auto t_0 = pt_0[i];
+            const auto t_p1 = pt_p1[i];
+            const auto t_p2 = pt_p2[i];
+            const auto t_p3 = pt_p3[i];
+
+            const auto u_m2 = pu_m2[i];
+            const auto u_m1 = pu_m1[i];
+            const auto u_0 = pu_0[i];
+            const auto u_p1 = pu_p1[i];
+            const auto u_p2 = pu_p2[i];
+
+            ps_p4[i] = fact * (x * t_p3 - y * t_m3);
+
+            ps_m4[i] = fact * (y * t_p3 + x * t_m3);
+
+            ps_m3[i] = fz_m3 * z * t_m3;
+
+            ps_m2[i] = fz_m2 * z * t_m2 - fr_m2 * r_2 * u_m2;
+
+            ps_m1[i] = fz_m1 * z * t_m1 - fr_m1 * r_2 * u_m1;
+
+            ps_0[i] = fz_0 * z * t_0 - fr_0 * r_2 * u_0;
+
+            ps_p1[i] = fz_p1 * z * t_p1 - fr_p1 * r_2 * u_p1;
+
+            ps_p2[i] = fz_p2 * z * t_p2 - fr_p2 * r_2 * u_p2;
+
+            ps_p3[i] = fz_p3 * z * t_p3;
+        }
     }
 
     return matrix;
