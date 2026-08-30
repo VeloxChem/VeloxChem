@@ -32,7 +32,7 @@
 
 
 
-#include "SimdOverlapRecPP.hpp"
+#include "SimdOverlapRecDP.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -47,7 +47,7 @@
 namespace simdovl {  // simdovl namespace
 
 auto
-compute_pp_overlap(double                         *values,
+compute_dp_overlap(double                         *values,
                    const size_t                    nvalues,
                    const CBasisFunction           &bra,
                    const CBasisFunction           &ket,
@@ -55,22 +55,22 @@ compute_pp_overlap(double                         *values,
                    const CSimdMatrix              &coordinates,
                    const double                    threshold) -> void
 {
-    if ((bra.get_angular_momentum() != 1) || (ket.get_angular_momentum() != 1))
+    if ((bra.get_angular_momentum() != 2) || (ket.get_angular_momentum() != 1))
     {
         errors::assertMsgCritical(
-            false, std::string("SimdOverlapRecPP.compute_pp_overlap: Basis functions must be of angular momenta one and one"));
+            false, std::string("SimdOverlapRecDP.compute_dp_overlap: Basis functions must be of angular momenta two and one"));
     }
 
-    if (harmonics.size() < 2)
+    if (harmonics.size() < 3)
     {
         errors::assertMsgCritical(
-            false, std::string("SimdOverlapRecPP.compute_pp_overlap: Harmonics must reach angular momentum two"));
+            false, std::string("SimdOverlapRecDP.compute_dp_overlap: Harmonics must reach angular momentum three"));
     }
 
     if (nvalues > coordinates.number_of_columns())
     {
         errors::assertMsgCritical(
-            false, std::string("SimdOverlapRecPP.compute_pp_overlap: Number of values exceeds number of atom pairs"));
+            false, std::string("SimdOverlapRecDP.compute_dp_overlap: Number of values exceeds number of atom pairs"));
     }
 
     if (nvalues == 0) return;
@@ -100,16 +100,16 @@ compute_pp_overlap(double                         *values,
 
     if (nmax == 0)
     {
-        std::fill(values, values + 9 * nvalues, 0.0);
+        std::fill(values, values + 15 * nvalues, 0.0);
 
         return;
     }
 
     // NOTE: the first two rows accumulate the contracted prefactors of the terms,
-    // and the remaining six rows hold the integrals of the combinations of angular
-    // components which are not related by symmetry.
+    // and the remaining 15 rows hold the integrals of the combinations of angular
+    // components.
 
-    auto buffer = CSimdMatrix(8, nmax);
+    auto buffer = CSimdMatrix(17, nmax);
 
     auto *pe_0 = buffer.data(0);
     auto *pe_1 = buffer.data(1);
@@ -145,9 +145,9 @@ compute_pp_overlap(double                         *values,
 
             const auto fbase = anorm * b_norms[j] * fovl * std::sqrt(fovl);
 
-            const auto f_0 = fbase * fmu / fexp;
+            const auto f_0 = fbase * bexp * fmu / fexp / fexp;
 
-            const auto f_1 = fbase / fexp;
+            const auto f_1 = fbase * bexp / fexp / fexp;
 
             // NOTE: the exponential depends on the pair of primitives alone, so it is
             // evaluated once and shared by the prefactors of all terms.
@@ -166,11 +166,16 @@ compute_pp_overlap(double                         *values,
     // NOTE: the geometry of a term is a solid harmonic of the vector between the
     // atoms times a power of their squared distance.
 
-    const auto *ph2_m2 = harmonics[1].data(0);
-    const auto *ph2_m1 = harmonics[1].data(1);
-    const auto *ph2_0 = harmonics[1].data(2);
-    const auto *ph2_p1 = harmonics[1].data(3);
-    const auto *ph2_p2 = harmonics[1].data(4);
+    const auto *ph1_m1 = harmonics[0].data(0);
+    const auto *ph1_0 = harmonics[0].data(1);
+    const auto *ph1_p1 = harmonics[0].data(2);
+    const auto *ph3_m3 = harmonics[2].data(0);
+    const auto *ph3_m2 = harmonics[2].data(1);
+    const auto *ph3_m1 = harmonics[2].data(2);
+    const auto *ph3_0 = harmonics[2].data(3);
+    const auto *ph3_p1 = harmonics[2].data(4);
+    const auto *ph3_p2 = harmonics[2].data(5);
+    const auto *ph3_p3 = harmonics[2].data(6);
 
     auto *pc_0 = buffer.data(2);
     auto *pc_1 = buffer.data(3);
@@ -178,16 +183,36 @@ compute_pp_overlap(double                         *values,
     auto *pc_3 = buffer.data(5);
     auto *pc_4 = buffer.data(6);
     auto *pc_5 = buffer.data(7);
+    auto *pc_6 = buffer.data(8);
+    auto *pc_7 = buffer.data(9);
+    auto *pc_8 = buffer.data(10);
+    auto *pc_9 = buffer.data(11);
+    auto *pc_10 = buffer.data(12);
+    auto *pc_11 = buffer.data(13);
+    auto *pc_12 = buffer.data(14);
+    auto *pc_13 = buffer.data(15);
+    auto *pc_14 = buffer.data(16);
 
     // NOTE: the factors of the terms depend on the angular momenta alone, so they
     // are formed once for the whole matrix instead of once for every atom pair.
 
-    const auto f_1_3 = 1.0 / 3.0;
-    const auto fs_1_3 = std::sqrt(1.0 / 3.0);
+    const auto fs_1_50 = std::sqrt(1.0 / 50.0);
+    const auto fs_3_10 = std::sqrt(3.0 / 10.0);
+    const auto fs_3_25 = std::sqrt(3.0 / 25.0);
+    const auto fs_3_4 = std::sqrt(0.75);
+    const auto fs_1_5 = std::sqrt(1.0 / 5.0);
+    const auto fs_8_25 = std::sqrt(8.0 / 25.0);
+    const auto fs_6_25 = std::sqrt(6.0 / 25.0);
+    const auto f_1_5 = 1.0 / 5.0;
     const auto f_1_2 = 0.5;
-    const auto f_2_3 = 2.0 / 3.0;
+    const auto f_3_5 = 3.0 / 5.0;
+    const auto f_2_5 = 2.0 / 5.0;
+    const auto f_1 = 1.0;
 
-#pragma omp simd aligned(pe_0, pe_1, ph2_m2, ph2_m1, ph2_0, ph2_p1, ph2_p2, ab_2, pc_0, pc_1, pc_2, pc_3, pc_4, pc_5 : simd::cache_line_size())
+    // NOTE: the rows are formed in 2 loops, as the vectorizer runs out of
+    // registers with all 15 of them in one.
+
+#pragma omp simd aligned(pe_0, pe_1, ph1_m1, ph1_0, ph1_p1, ph3_m3, ph3_m2, ph3_m1, ph3_0, ph3_p1, ph3_p2, ph3_p3, ab_2, pc_0, pc_1, pc_2, pc_3, pc_4, pc_5, pc_6, pc_7, pc_8, pc_9, pc_10, pc_11 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
         const auto e_0 = pe_0[k];
@@ -195,32 +220,75 @@ compute_pp_overlap(double                         *values,
 
         const auto r_2 = ab_2[k];
 
-        const auto h2_m2 = ph2_m2[k];
-        const auto h2_m1 = ph2_m1[k];
-        const auto h2_0 = ph2_0[k];
-        const auto h2_p1 = ph2_p1[k];
-        const auto h2_p2 = ph2_p2[k];
+        const auto h1_m1 = ph1_m1[k];
+        const auto h1_0 = ph1_0[k];
+        const auto h1_p1 = ph1_p1[k];
+        const auto h3_m3 = ph3_m3[k];
+        const auto h3_m2 = ph3_m2[k];
+        const auto h3_m1 = ph3_m1[k];
+        const auto h3_0 = ph3_0[k];
+        const auto h3_p1 = ph3_p1[k];
+        const auto h3_p2 = ph3_p2[k];
+        const auto h3_p3 = ph3_p3[k];
 
-        pc_0[k] = e_0 * (f_1_3 * h2_0 + fs_1_3 * h2_p2 - f_1_3 * r_2) + f_1_2 * e_1;
+        pc_0[k] = e_0 * (-fs_1_50 * h3_p1 - fs_3_10 * h3_p3 + fs_3_25 * r_2 * h1_p1) - fs_3_4 * e_1 * h1_p1;
 
-        pc_1[k] = -fs_1_3 * e_0 * h2_m1;
+        pc_1[k] = fs_1_5 * e_0 * h3_m2;
 
-        pc_2[k] = -fs_1_3 * e_0 * h2_m2;
+        pc_2[k] = e_0 * (fs_3_10 * h3_m3 - fs_1_50 * h3_m1 + fs_3_25 * r_2 * h1_m1) - fs_3_4 * e_1 * h1_m1;
 
-        pc_3[k] = e_0 * (-f_2_3 * h2_0 - f_1_3 * r_2) + f_1_2 * e_1;
+        pc_3[k] = e_0 * (-fs_3_25 * h3_0 - fs_1_5 * h3_p2 + fs_3_25 * r_2 * h1_0) - fs_3_4 * e_1 * h1_0;
 
-        pc_4[k] = -fs_1_3 * e_0 * h2_p1;
+        pc_4[k] = e_0 * (fs_8_25 * h3_m1 + fs_3_25 * r_2 * h1_m1) - fs_3_4 * e_1 * h1_m1;
 
-        pc_5[k] = e_0 * (f_1_3 * h2_0 - fs_1_3 * h2_p2 - f_1_3 * r_2) + f_1_2 * e_1;
+        pc_5[k] = fs_1_5 * e_0 * h3_m2;
+
+        pc_6[k] = e_0 * (fs_6_25 * h3_m1 - f_1_5 * r_2 * h1_m1) + f_1_2 * e_1 * h1_m1;
+
+        pc_7[k] = e_0 * (f_3_5 * h3_0 + f_2_5 * r_2 * h1_0) - f_1 * e_1 * h1_0;
+
+        pc_8[k] = e_0 * (fs_6_25 * h3_p1 - f_1_5 * r_2 * h1_p1) + f_1_2 * e_1 * h1_p1;
+
+        pc_9[k] = fs_1_5 * e_0 * h3_m2;
+
+        pc_10[k] = e_0 * (fs_8_25 * h3_p1 + fs_3_25 * r_2 * h1_p1) - fs_3_4 * e_1 * h1_p1;
+
+        pc_11[k] = e_0 * (-fs_3_25 * h3_0 + fs_1_5 * h3_p2 + fs_3_25 * r_2 * h1_0) - fs_3_4 * e_1 * h1_0;
+    }
+
+    // NOTE: the rows are formed in 2 loops, as the vectorizer runs out of
+    // registers with all 15 of them in one.
+
+#pragma omp simd aligned(pe_0, pe_1, ph1_m1, ph1_p1, ph3_m3, ph3_m1, ph3_p1, ph3_p2, ph3_p3, ab_2, pc_12, pc_13, pc_14 : simd::cache_line_size())
+    for (size_t k = 0; k < nmax; k++)
+    {
+        const auto e_0 = pe_0[k];
+        const auto e_1 = pe_1[k];
+
+        const auto r_2 = ab_2[k];
+
+        const auto h1_m1 = ph1_m1[k];
+        const auto h1_p1 = ph1_p1[k];
+        const auto h3_m3 = ph3_m3[k];
+        const auto h3_m1 = ph3_m1[k];
+        const auto h3_p1 = ph3_p1[k];
+        const auto h3_p2 = ph3_p2[k];
+        const auto h3_p3 = ph3_p3[k];
+
+        pc_12[k] = e_0 * (fs_3_10 * h3_m3 + fs_1_50 * h3_m1 - fs_3_25 * r_2 * h1_m1) + fs_3_4 * e_1 * h1_m1;
+
+        pc_13[k] = fs_1_5 * e_0 * h3_p2;
+
+        pc_14[k] = e_0 * (-fs_1_50 * h3_p1 + fs_3_10 * h3_p3 + fs_3_25 * r_2 * h1_p1) - fs_3_4 * e_1 * h1_p1;
     }
 
     // NOTE: the values of a combination of angular components are stored as one
     // row of nvalues columns, with the component on bra side running slowest, and
     // the atom pairs beyond the reach of every pair of primitives are set to zero.
 
-    const size_t sources[9] = {0, 1, 2, 1, 3, 4, 2, 4, 5};
+    const size_t sources[15] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
 
-    for (size_t m = 0; m < 9; m++)
+    for (size_t m = 0; m < 15; m++)
     {
         const auto *pc = buffer.data(2 + sources[m]);
 
