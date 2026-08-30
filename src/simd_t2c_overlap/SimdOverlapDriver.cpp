@@ -33,8 +33,6 @@
 
 #include "SimdOverlapDriver.hpp"
 
-#include <algorithm>
-#include <ranges>
 #include <string>
 #include <utility>
 #include <vector>
@@ -93,13 +91,16 @@ _index_functions(const CAtomBasis &basis) -> std::vector<std::pair<int, size_t>>
 
     std::vector<size_t> counts(static_cast<size_t>(basis.max_angular_momentum() + 1), 0);
 
-    std::ranges::for_each(basis.functions(), [&](const auto &bfn) {
-        const auto lval = bfn.get_angular_momentum();
+    const auto &functions = basis.functions();
+
+    for (size_t i = 0; i < functions.size(); i++)
+    {
+        const auto lval = functions[i].get_angular_momentum();
 
         indices.push_back({lval, counts[lval]});
 
         counts[lval]++;
-    });
+    }
 
     return indices;
 }
@@ -167,7 +168,8 @@ CSimdOverlapDriver::_compute_diagonal_blocks(CSparseMatrix         &matrix,
     // basis functions with the same angular momentum and the molecule is not
     // needed here.
 
-    std::ranges::for_each(std::views::iota(size_t{0}, matrix.number_of_diagonal_blocks()), [&](const auto iblk) {
+    for (size_t iblk = 0; iblk < matrix.number_of_diagonal_blocks(); iblk++)
+    {
         const auto &block = matrix.diagonal_block(iblk);
 
         const auto &a_basis = bra_basis.basis_set(block.bra_index());
@@ -180,22 +182,24 @@ CSimdOverlapDriver::_compute_diagonal_blocks(CSparseMatrix         &matrix,
 
         auto *values = matrix.diagonal_values(iblk);
 
-        std::ranges::for_each(std::views::iota(size_t{0}, a_indices.size()), [&](const auto i) {
-            std::ranges::for_each(std::views::iota(size_t{0}, b_indices.size()), [&](const auto j) {
+        for (size_t i = 0; i < a_indices.size(); i++)
+        {
+            for (size_t j = 0; j < b_indices.size(); j++)
+            {
                 // NOTE: only the stored combinations are computed, as the values
                 // of the reverse order share their storage.
 
-                if (block.is_triangular() && (i > j)) return;
+                if (block.is_triangular() && (i > j)) continue;
 
                 const auto [la, ia] = a_indices[i];
 
                 const auto [lb, jb] = b_indices[j];
 
-                if (block.number_of_elements(la, ia, lb, jb) == 0) return;
+                if (block.number_of_elements(la, ia, lb, jb) == 0) continue;
 
                 values[block.element_offset(la, ia, lb, jb)] =
                     simdovl::one_center_overlap(a_basis.functions()[i], b_basis.functions()[j]);
-            });
-        });
-    });
+            }
+        }
+    }
 }

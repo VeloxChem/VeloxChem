@@ -97,11 +97,12 @@ class CSimdVariableMatrix
 
         _offsets.push_back(0);
 
-        std::ranges::for_each(_columns, [&](const auto ncols) {
-            _pitches.push_back(simd::pitch_of(ncols));
+        for (size_t i = 0; i < _columns.size(); i++)
+        {
+            _pitches.push_back(simd::pitch_of(_columns[i]));
 
             _offsets.push_back(_offsets.back() + _pitches.back());
-        });
+        }
 
         _allocate();
     }

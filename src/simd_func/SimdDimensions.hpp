@@ -34,10 +34,8 @@
 #ifndef SimdDimensions_hpp
 #define SimdDimensions_hpp
 
-#include <algorithm>
 #include <cmath>
 #include <cstddef>
-#include <ranges>
 #include <string>
 #include <vector>
 
@@ -94,12 +92,14 @@ make_column_dimensions(const CBasisFunction &bra,
 
     dimensions.reserve(nprim_a * nprim_b);
 
-    std::ranges::for_each(std::views::iota(size_t{0}, nprim_a), [&](const auto i) {
-        std::ranges::for_each(std::views::iota(size_t{0}, nprim_b), [&](const auto j) {
+    for (size_t i = 0; i < nprim_a; i++)
+    {
+        for (size_t j = 0; j < nprim_b; j++)
+        {
             dimensions.push_back(screenfunc::number_of_leading(
                 npairs, [&](const size_t k) { return bound(bra, i, ket, j, distance(k)) > threshold; }));
-        });
-    });
+        }
+    }
 
     return dimensions;
 }
@@ -156,14 +156,17 @@ make_column_dimensions(const CBasisFunction &a,
 
     dimensions.reserve(nprim_a * nprim_b * nprim_c);
 
-    std::ranges::for_each(std::views::iota(size_t{0}, nprim_a), [&](const auto i) {
-        std::ranges::for_each(std::views::iota(size_t{0}, nprim_b), [&](const auto j) {
-            std::ranges::for_each(std::views::iota(size_t{0}, nprim_c), [&](const auto k) {
+    for (size_t i = 0; i < nprim_a; i++)
+    {
+        for (size_t j = 0; j < nprim_b; j++)
+        {
+            for (size_t k = 0; k < nprim_c; k++)
+            {
                 dimensions.push_back(screenfunc::number_of_leading(
                     npairs, [&](const size_t l) { return bound(a, i, b, j, c, k, distance(l)) > threshold; }));
-            });
-        });
-    });
+            }
+        }
+    }
 
     return dimensions;
 }

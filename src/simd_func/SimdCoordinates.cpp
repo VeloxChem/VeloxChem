@@ -33,9 +33,7 @@
 
 #include "SimdCoordinates.hpp"
 
-#include <algorithm>
 #include <cstdint>
-#include <ranges>
 #include <vector>
 
 #include "ErrorHandler.hpp"
@@ -54,10 +52,19 @@ _make_coordinates(const std::vector<int> &bra_atoms, const std::vector<int> &ket
 {
     const auto coords = molecule.coordinates();
 
-    errors::assertMsgCritical(
-        std::ranges::all_of(bra_atoms, [&](const int i) { return i < static_cast<int>(coords.size()); }) &&
-            std::ranges::all_of(ket_atoms, [&](const int i) { return i < static_cast<int>(coords.size()); }),
-        std::string("SimdCoordinates.make_coordinates: Atomic index out of range of molecule"));
+    const auto natoms = static_cast<int>(coords.size());
+
+    const auto in_range = [&](const std::vector<int> &atoms) {
+        for (size_t i = 0; i < atoms.size(); i++)
+        {
+            if (atoms[i] >= natoms) return false;
+        }
+
+        return true;
+    };
+
+    errors::assertMsgCritical(in_range(bra_atoms) && in_range(ket_atoms),
+                              std::string("SimdCoordinates.make_coordinates: Atomic index out of range of molecule"));
 
     auto matrix = CSimdMatrix(7, npairs);
 
