@@ -105,11 +105,11 @@ compute_pp_overlap(double                         *values,
         return;
     }
 
-    // NOTE: the first two rows accumulate the contracted prefactors of the terms,
-    // and the remaining six rows hold the integrals of the combinations of angular
-    // components which are not related by symmetry.
+    // NOTE: the buffer holds the contracted prefactors of the terms alone, as the
+    // integrals of the angular components are formed straight into the values and
+    // are not written a second time.
 
-    auto buffer = CSimdMatrix(8, nmax);
+    auto buffer = CSimdMatrix(2, nmax);
 
     auto *pe_0 = buffer.data(0);
     auto *pe_1 = buffer.data(1);
@@ -172,12 +172,16 @@ compute_pp_overlap(double                         *values,
     const auto *ph2_p1 = harmonics[1].data(3);
     const auto *ph2_p2 = harmonics[1].data(4);
 
-    auto *pc_0 = buffer.data(2);
-    auto *pc_1 = buffer.data(3);
-    auto *pc_2 = buffer.data(4);
-    auto *pc_3 = buffer.data(5);
-    auto *pc_4 = buffer.data(6);
-    auto *pc_5 = buffer.data(7);
+    // NOTE: the rows of the values are not aligned, as they start at the offset
+    // of this combination of basis functions in the values block, so they are kept
+    // out of the aligned clauses below.
+
+    auto *pc_0 = values + 0 * nvalues;
+    auto *pc_1 = values + 1 * nvalues;
+    auto *pc_2 = values + 2 * nvalues;
+    auto *pc_3 = values + 4 * nvalues;
+    auto *pc_4 = values + 5 * nvalues;
+    auto *pc_5 = values + 8 * nvalues;
 
     // NOTE: the factors of the terms depend on the angular momenta alone, so they
     // are formed once for the whole matrix instead of once for every atom pair.
@@ -187,7 +191,7 @@ compute_pp_overlap(double                         *values,
     const auto f_1_2 = 0.5;
     const auto f_2_3 = 2.0 / 3.0;
 
-#pragma omp simd aligned(pe_0, pe_1, ph2_m2, ph2_m1, ph2_0, ph2_p1, ph2_p2, ab_2, pc_0, pc_1, pc_2, pc_3, pc_4, pc_5 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, ph2_m2, ph2_m1, ph2_0, ph2_p1, ph2_p2, ab_2 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
         const auto e_0 = pe_0[k];
@@ -215,18 +219,22 @@ compute_pp_overlap(double                         *values,
     }
 
     // NOTE: the values of a combination of angular components are stored as one
-    // row of nvalues columns, with the component on bra side running slowest, and
-    // the atom pairs beyond the reach of every pair of primitives are set to zero.
+    // row of nvalues columns, with the component on bra side running slowest. The
+    // rows which the symmetry relates to an already formed one are copied from it,
+    // and the atom pairs beyond the reach of every pair of primitives are set to
+    // zero.
 
-    const size_t sources[9] = {0, 1, 2, 1, 3, 4, 2, 4, 5};
+    const size_t sources[9] = {0, 1, 2, 1, 4, 5, 2, 5, 8};
 
     for (size_t m = 0; m < 9; m++)
     {
-        const auto *pc = buffer.data(2 + sources[m]);
+        auto *pv = values + m * nvalues;
 
-        std::copy(pc, pc + nmax, values + m * nvalues);
+        const auto *pc = values + sources[m] * nvalues;
 
-        std::fill(values + m * nvalues + nmax, values + (m + 1) * nvalues, 0.0);
+        if (pv != pc) std::copy(pc, pc + nmax, pv);
+
+        std::fill(pv + nmax, pv + nvalues, 0.0);
     }
 }
 

@@ -105,11 +105,11 @@ compute_dp_overlap(double                         *values,
         return;
     }
 
-    // NOTE: the first two rows accumulate the contracted prefactors of the terms,
-    // and the remaining 15 rows hold the integrals of the combinations of angular
-    // components.
+    // NOTE: the buffer holds the contracted prefactors of the terms alone, as the
+    // integrals of the angular components are formed straight into the values and
+    // are not written a second time.
 
-    auto buffer = CSimdMatrix(17, nmax);
+    auto buffer = CSimdMatrix(2, nmax);
 
     auto *pe_0 = buffer.data(0);
     auto *pe_1 = buffer.data(1);
@@ -177,21 +177,25 @@ compute_dp_overlap(double                         *values,
     const auto *ph3_p2 = harmonics[2].data(5);
     const auto *ph3_p3 = harmonics[2].data(6);
 
-    auto *pc_0 = buffer.data(2);
-    auto *pc_1 = buffer.data(3);
-    auto *pc_2 = buffer.data(4);
-    auto *pc_3 = buffer.data(5);
-    auto *pc_4 = buffer.data(6);
-    auto *pc_5 = buffer.data(7);
-    auto *pc_6 = buffer.data(8);
-    auto *pc_7 = buffer.data(9);
-    auto *pc_8 = buffer.data(10);
-    auto *pc_9 = buffer.data(11);
-    auto *pc_10 = buffer.data(12);
-    auto *pc_11 = buffer.data(13);
-    auto *pc_12 = buffer.data(14);
-    auto *pc_13 = buffer.data(15);
-    auto *pc_14 = buffer.data(16);
+    // NOTE: the rows of the values are not aligned, as they start at the offset
+    // of this combination of basis functions in the values block, so they are kept
+    // out of the aligned clauses below.
+
+    auto *pc_0 = values + 0 * nvalues;
+    auto *pc_1 = values + 1 * nvalues;
+    auto *pc_2 = values + 2 * nvalues;
+    auto *pc_3 = values + 3 * nvalues;
+    auto *pc_4 = values + 4 * nvalues;
+    auto *pc_5 = values + 5 * nvalues;
+    auto *pc_6 = values + 6 * nvalues;
+    auto *pc_7 = values + 7 * nvalues;
+    auto *pc_8 = values + 8 * nvalues;
+    auto *pc_9 = values + 9 * nvalues;
+    auto *pc_10 = values + 10 * nvalues;
+    auto *pc_11 = values + 11 * nvalues;
+    auto *pc_12 = values + 12 * nvalues;
+    auto *pc_13 = values + 13 * nvalues;
+    auto *pc_14 = values + 14 * nvalues;
 
     // NOTE: the factors of the terms depend on the angular momenta alone, so they
     // are formed once for the whole matrix instead of once for every atom pair.
@@ -212,7 +216,7 @@ compute_dp_overlap(double                         *values,
     // NOTE: the rows are formed in 2 loops, as the vectorizer runs out of
     // registers with all 15 of them in one.
 
-#pragma omp simd aligned(pe_0, pe_1, ph1_m1, ph1_0, ph1_p1, ph3_m3, ph3_m2, ph3_m1, ph3_0, ph3_p1, ph3_p2, ph3_p3, ab_2, pc_0, pc_1, pc_2, pc_3, pc_4, pc_5, pc_6, pc_7, pc_8, pc_9, pc_10, pc_11 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, ph1_m1, ph1_0, ph1_p1, ph3_m3, ph3_m2, ph3_m1, ph3_0, ph3_p1, ph3_p2, ph3_p3, ab_2 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
         const auto e_0 = pe_0[k];
@@ -259,7 +263,7 @@ compute_dp_overlap(double                         *values,
     // NOTE: the rows are formed in 2 loops, as the vectorizer runs out of
     // registers with all 15 of them in one.
 
-#pragma omp simd aligned(pe_0, pe_1, ph1_m1, ph1_p1, ph3_m3, ph3_m1, ph3_p1, ph3_p2, ph3_p3, ab_2, pc_12, pc_13, pc_14 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, ph1_m1, ph1_p1, ph3_m3, ph3_m1, ph3_p1, ph3_p2, ph3_p3, ab_2 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
         const auto e_0 = pe_0[k];
@@ -283,18 +287,22 @@ compute_dp_overlap(double                         *values,
     }
 
     // NOTE: the values of a combination of angular components are stored as one
-    // row of nvalues columns, with the component on bra side running slowest, and
-    // the atom pairs beyond the reach of every pair of primitives are set to zero.
+    // row of nvalues columns, with the component on bra side running slowest. The
+    // rows which the symmetry relates to an already formed one are copied from it,
+    // and the atom pairs beyond the reach of every pair of primitives are set to
+    // zero.
 
     const size_t sources[15] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
 
     for (size_t m = 0; m < 15; m++)
     {
-        const auto *pc = buffer.data(2 + sources[m]);
+        auto *pv = values + m * nvalues;
 
-        std::copy(pc, pc + nmax, values + m * nvalues);
+        const auto *pc = values + sources[m] * nvalues;
 
-        std::fill(values + m * nvalues + nmax, values + (m + 1) * nvalues, 0.0);
+        if (pv != pc) std::copy(pc, pc + nmax, pv);
+
+        std::fill(pv + nmax, pv + nvalues, 0.0);
     }
 }
 

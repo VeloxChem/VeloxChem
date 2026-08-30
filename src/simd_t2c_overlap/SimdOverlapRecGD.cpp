@@ -105,11 +105,11 @@ compute_gd_overlap(double                         *values,
         return;
     }
 
-    // NOTE: the first three rows accumulate the contracted prefactors of the terms,
-    // and the remaining 45 rows hold the integrals of the combinations of angular
-    // components.
+    // NOTE: the buffer holds the contracted prefactors of the terms alone, as the
+    // integrals of the angular components are formed straight into the values and
+    // are not written a second time.
 
-    auto buffer = CSimdMatrix(48, nmax);
+    auto buffer = CSimdMatrix(3, nmax);
 
     auto *pe_0 = buffer.data(0);
     auto *pe_1 = buffer.data(1);
@@ -199,51 +199,55 @@ compute_gd_overlap(double                         *values,
     const auto *ph6_p5 = harmonics[5].data(11);
     const auto *ph6_p6 = harmonics[5].data(12);
 
-    auto *pc_0 = buffer.data(3);
-    auto *pc_1 = buffer.data(4);
-    auto *pc_2 = buffer.data(5);
-    auto *pc_3 = buffer.data(6);
-    auto *pc_4 = buffer.data(7);
-    auto *pc_5 = buffer.data(8);
-    auto *pc_6 = buffer.data(9);
-    auto *pc_7 = buffer.data(10);
-    auto *pc_8 = buffer.data(11);
-    auto *pc_9 = buffer.data(12);
-    auto *pc_10 = buffer.data(13);
-    auto *pc_11 = buffer.data(14);
-    auto *pc_12 = buffer.data(15);
-    auto *pc_13 = buffer.data(16);
-    auto *pc_14 = buffer.data(17);
-    auto *pc_15 = buffer.data(18);
-    auto *pc_16 = buffer.data(19);
-    auto *pc_17 = buffer.data(20);
-    auto *pc_18 = buffer.data(21);
-    auto *pc_19 = buffer.data(22);
-    auto *pc_20 = buffer.data(23);
-    auto *pc_21 = buffer.data(24);
-    auto *pc_22 = buffer.data(25);
-    auto *pc_23 = buffer.data(26);
-    auto *pc_24 = buffer.data(27);
-    auto *pc_25 = buffer.data(28);
-    auto *pc_26 = buffer.data(29);
-    auto *pc_27 = buffer.data(30);
-    auto *pc_28 = buffer.data(31);
-    auto *pc_29 = buffer.data(32);
-    auto *pc_30 = buffer.data(33);
-    auto *pc_31 = buffer.data(34);
-    auto *pc_32 = buffer.data(35);
-    auto *pc_33 = buffer.data(36);
-    auto *pc_34 = buffer.data(37);
-    auto *pc_35 = buffer.data(38);
-    auto *pc_36 = buffer.data(39);
-    auto *pc_37 = buffer.data(40);
-    auto *pc_38 = buffer.data(41);
-    auto *pc_39 = buffer.data(42);
-    auto *pc_40 = buffer.data(43);
-    auto *pc_41 = buffer.data(44);
-    auto *pc_42 = buffer.data(45);
-    auto *pc_43 = buffer.data(46);
-    auto *pc_44 = buffer.data(47);
+    // NOTE: the rows of the values are not aligned, as they start at the offset
+    // of this combination of basis functions in the values block, so they are kept
+    // out of the aligned clauses below.
+
+    auto *pc_0 = values + 0 * nvalues;
+    auto *pc_1 = values + 1 * nvalues;
+    auto *pc_2 = values + 2 * nvalues;
+    auto *pc_3 = values + 3 * nvalues;
+    auto *pc_4 = values + 4 * nvalues;
+    auto *pc_5 = values + 5 * nvalues;
+    auto *pc_6 = values + 6 * nvalues;
+    auto *pc_7 = values + 7 * nvalues;
+    auto *pc_8 = values + 8 * nvalues;
+    auto *pc_9 = values + 9 * nvalues;
+    auto *pc_10 = values + 10 * nvalues;
+    auto *pc_11 = values + 11 * nvalues;
+    auto *pc_12 = values + 12 * nvalues;
+    auto *pc_13 = values + 13 * nvalues;
+    auto *pc_14 = values + 14 * nvalues;
+    auto *pc_15 = values + 15 * nvalues;
+    auto *pc_16 = values + 16 * nvalues;
+    auto *pc_17 = values + 17 * nvalues;
+    auto *pc_18 = values + 18 * nvalues;
+    auto *pc_19 = values + 19 * nvalues;
+    auto *pc_20 = values + 20 * nvalues;
+    auto *pc_21 = values + 21 * nvalues;
+    auto *pc_22 = values + 22 * nvalues;
+    auto *pc_23 = values + 23 * nvalues;
+    auto *pc_24 = values + 24 * nvalues;
+    auto *pc_25 = values + 25 * nvalues;
+    auto *pc_26 = values + 26 * nvalues;
+    auto *pc_27 = values + 27 * nvalues;
+    auto *pc_28 = values + 28 * nvalues;
+    auto *pc_29 = values + 29 * nvalues;
+    auto *pc_30 = values + 30 * nvalues;
+    auto *pc_31 = values + 31 * nvalues;
+    auto *pc_32 = values + 32 * nvalues;
+    auto *pc_33 = values + 33 * nvalues;
+    auto *pc_34 = values + 34 * nvalues;
+    auto *pc_35 = values + 35 * nvalues;
+    auto *pc_36 = values + 36 * nvalues;
+    auto *pc_37 = values + 37 * nvalues;
+    auto *pc_38 = values + 38 * nvalues;
+    auto *pc_39 = values + 39 * nvalues;
+    auto *pc_40 = values + 40 * nvalues;
+    auto *pc_41 = values + 41 * nvalues;
+    auto *pc_42 = values + 42 * nvalues;
+    auto *pc_43 = values + 43 * nvalues;
+    auto *pc_44 = values + 44 * nvalues;
 
     // NOTE: the factors of the terms depend on the angular momenta alone, so they
     // are formed once for the whole matrix instead of once for every atom pair.
@@ -326,7 +330,7 @@ compute_gd_overlap(double                         *values,
     // NOTE: the rows are formed in 13 loops, as the vectorizer runs out of
     // registers with all 45 of them in one.
 
-#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_p2, ph4_m4, ph4_m3, ph4_p2, ph4_p3, ph6_m5, ph6_m4, ph6_m3, ph6_p2, ph6_p3, ph6_p5, ph6_p6, ab_2, pc_0, pc_1, pc_2, pc_3 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_p2, ph4_m4, ph4_m3, ph4_p2, ph4_p3, ph6_m5, ph6_m4, ph6_m3, ph6_p2, ph6_p3, ph6_p5, ph6_p6, ab_2 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
         const auto e_0 = pe_0[k];
@@ -361,7 +365,7 @@ compute_gd_overlap(double                         *values,
     // NOTE: the rows are formed in 13 loops, as the vectorizer runs out of
     // registers with all 45 of them in one.
 
-#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_m2, ph2_p1, ph2_p2, ph4_m2, ph4_p1, ph4_p2, ph4_p4, ph6_m6, ph6_m2, ph6_p1, ph6_p2, ph6_p4, ph6_p5, ab_2, pc_4, pc_5, pc_6 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_m2, ph2_p1, ph2_p2, ph4_m2, ph4_p1, ph4_p2, ph4_p4, ph6_m6, ph6_m2, ph6_p1, ph6_p2, ph6_p4, ph6_p5, ab_2 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
         const auto e_0 = pe_0[k];
@@ -395,7 +399,7 @@ compute_gd_overlap(double                         *values,
     // NOTE: the rows are formed in 13 loops, as the vectorizer runs out of
     // registers with all 45 of them in one.
 
-#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_m2, ph2_m1, ph4_m4, ph4_m3, ph4_m2, ph4_m1, ph6_m5, ph6_m4, ph6_m3, ph6_m2, ph6_m1, ab_2, pc_7, pc_8, pc_9 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_m2, ph2_m1, ph4_m4, ph4_m3, ph4_m2, ph4_m1, ph6_m5, ph6_m4, ph6_m3, ph6_m2, ph6_m1, ab_2 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
         const auto e_0 = pe_0[k];
@@ -427,7 +431,7 @@ compute_gd_overlap(double                         *values,
     // NOTE: the rows are formed in 13 loops, as the vectorizer runs out of
     // registers with all 45 of them in one.
 
-#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_m2, ph2_0, ph2_p1, ph4_m2, ph4_0, ph4_p1, ph4_p3, ph4_p4, ph6_m2, ph6_0, ph6_p1, ph6_p3, ph6_p4, ab_2, pc_10, pc_11, pc_12 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_m2, ph2_0, ph2_p1, ph4_m2, ph4_0, ph4_p1, ph4_p3, ph4_p4, ph6_m2, ph6_0, ph6_p1, ph6_p3, ph6_p4, ab_2 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
         const auto e_0 = pe_0[k];
@@ -461,7 +465,7 @@ compute_gd_overlap(double                         *values,
     // NOTE: the rows are formed in 13 loops, as the vectorizer runs out of
     // registers with all 45 of them in one.
 
-#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_m1, ph2_p1, ph4_m4, ph4_m3, ph4_m1, ph4_p1, ph4_p3, ph6_m4, ph6_m3, ph6_m1, ph6_p1, ph6_p3, ab_2, pc_13, pc_14, pc_15 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_m1, ph2_p1, ph4_m4, ph4_m3, ph4_m1, ph4_p1, ph4_p3, ph6_m4, ph6_m3, ph6_m1, ph6_p1, ph6_p3, ab_2 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
         const auto e_0 = pe_0[k];
@@ -494,7 +498,7 @@ compute_gd_overlap(double                         *values,
     // NOTE: the rows are formed in 13 loops, as the vectorizer runs out of
     // registers with all 45 of them in one.
 
-#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_m2, ph2_m1, ph2_0, ph2_p2, ph4_m3, ph4_m2, ph4_m1, ph4_0, ph4_p2, ph6_m3, ph6_m2, ph6_m1, ph6_0, ph6_p2, ab_2, pc_16, pc_17, pc_18, pc_19, pc_20, pc_21, pc_22 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_m2, ph2_m1, ph2_0, ph2_p2, ph4_m3, ph4_m2, ph4_m1, ph4_0, ph4_p2, ph6_m3, ph6_m2, ph6_m1, ph6_0, ph6_p2, ab_2 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
         const auto e_0 = pe_0[k];
@@ -537,7 +541,7 @@ compute_gd_overlap(double                         *values,
     // NOTE: the rows are formed in 13 loops, as the vectorizer runs out of
     // registers with all 45 of them in one.
 
-#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_m2, ph2_m1, ph2_p1, ph2_p2, ph4_m3, ph4_m2, ph4_m1, ph4_p1, ph4_p2, ph6_m3, ph6_m2, ph6_m1, ph6_p1, ph6_p2, ab_2, pc_23, pc_24, pc_25, pc_26, pc_27 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_m2, ph2_m1, ph2_p1, ph2_p2, ph4_m3, ph4_m2, ph4_m1, ph4_p1, ph4_p2, ph6_m3, ph6_m2, ph6_m1, ph6_p1, ph6_p2, ab_2 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
         const auto e_0 = pe_0[k];
@@ -576,7 +580,7 @@ compute_gd_overlap(double                         *values,
     // NOTE: the rows are formed in 13 loops, as the vectorizer runs out of
     // registers with all 45 of them in one.
 
-#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_0, ph2_p1, ph2_p2, ph4_m4, ph4_0, ph4_p1, ph4_p2, ph4_p3, ph6_m4, ph6_0, ph6_p1, ph6_p2, ph6_p3, ab_2, pc_28, pc_29, pc_30 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_0, ph2_p1, ph2_p2, ph4_m4, ph4_0, ph4_p1, ph4_p2, ph4_p3, ph6_m4, ph6_0, ph6_p1, ph6_p2, ph6_p3, ab_2 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
         const auto e_0 = pe_0[k];
@@ -610,7 +614,7 @@ compute_gd_overlap(double                         *values,
     // NOTE: the rows are formed in 13 loops, as the vectorizer runs out of
     // registers with all 45 of them in one.
 
-#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_m1, ph2_p1, ph2_p2, ph4_m3, ph4_m1, ph4_p1, ph4_p2, ph4_p3, ph6_m3, ph6_m1, ph6_p1, ph6_p2, ph6_p3, ab_2, pc_31, pc_32, pc_33 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_m1, ph2_p1, ph2_p2, ph4_m3, ph4_m1, ph4_p1, ph4_p2, ph4_p3, ph6_m3, ph6_m1, ph6_p1, ph6_p2, ph6_p3, ab_2 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
         const auto e_0 = pe_0[k];
@@ -644,7 +648,7 @@ compute_gd_overlap(double                         *values,
     // NOTE: the rows are formed in 13 loops, as the vectorizer runs out of
     // registers with all 45 of them in one.
 
-#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_m2, ph2_m1, ph2_0, ph4_m4, ph4_m2, ph4_m1, ph4_0, ph4_p4, ph6_m5, ph6_m4, ph6_m2, ph6_m1, ph6_0, ph6_p4, ab_2, pc_34, pc_35, pc_36 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_m2, ph2_m1, ph2_0, ph4_m4, ph4_m2, ph4_m1, ph4_0, ph4_p4, ph6_m5, ph6_m4, ph6_m2, ph6_m1, ph6_0, ph6_p4, ab_2 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
         const auto e_0 = pe_0[k];
@@ -679,7 +683,7 @@ compute_gd_overlap(double                         *values,
     // NOTE: the rows are formed in 13 loops, as the vectorizer runs out of
     // registers with all 45 of them in one.
 
-#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_p1, ph2_p2, ph4_p1, ph4_p2, ph4_p3, ph4_p4, ph6_p1, ph6_p2, ph6_p3, ph6_p4, ph6_p5, ab_2, pc_37, pc_38, pc_39 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_p1, ph2_p2, ph4_p1, ph4_p2, ph4_p3, ph4_p4, ph6_p1, ph6_p2, ph6_p3, ph6_p4, ph6_p5, ab_2 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
         const auto e_0 = pe_0[k];
@@ -711,7 +715,7 @@ compute_gd_overlap(double                         *values,
     // NOTE: the rows are formed in 13 loops, as the vectorizer runs out of
     // registers with all 45 of them in one.
 
-#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_m2, ph4_m3, ph4_m2, ph4_p3, ph4_p4, ph6_m6, ph6_m5, ph6_m3, ph6_m2, ph6_p3, ph6_p4, ph6_p5, ab_2, pc_40, pc_41, pc_42, pc_43 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_m2, ph4_m3, ph4_m2, ph4_p3, ph4_p4, ph6_m6, ph6_m5, ph6_m3, ph6_m2, ph6_p3, ph6_p4, ph6_p5, ab_2 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
         const auto e_0 = pe_0[k];
@@ -746,7 +750,7 @@ compute_gd_overlap(double                         *values,
     // NOTE: the rows are formed in 13 loops, as the vectorizer runs out of
     // registers with all 45 of them in one.
 
-#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_p2, ph4_p2, ph6_p2, ph6_p6, ab_2, pc_44 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_p2, ph4_p2, ph6_p2, ph6_p6, ab_2 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
         const auto e_0 = pe_0[k];
@@ -765,18 +769,22 @@ compute_gd_overlap(double                         *values,
     }
 
     // NOTE: the values of a combination of angular components are stored as one
-    // row of nvalues columns, with the component on bra side running slowest, and
-    // the atom pairs beyond the reach of every pair of primitives are set to zero.
+    // row of nvalues columns, with the component on bra side running slowest. The
+    // rows which the symmetry relates to an already formed one are copied from it,
+    // and the atom pairs beyond the reach of every pair of primitives are set to
+    // zero.
 
     const size_t sources[45] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44};
 
     for (size_t m = 0; m < 45; m++)
     {
-        const auto *pc = buffer.data(3 + sources[m]);
+        auto *pv = values + m * nvalues;
 
-        std::copy(pc, pc + nmax, values + m * nvalues);
+        const auto *pc = values + sources[m] * nvalues;
 
-        std::fill(values + m * nvalues + nmax, values + (m + 1) * nvalues, 0.0);
+        if (pv != pc) std::copy(pc, pc + nmax, pv);
+
+        std::fill(pv + nmax, pv + nvalues, 0.0);
     }
 }
 
