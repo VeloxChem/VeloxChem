@@ -30,44 +30,39 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+
+
+#include "ExportSimdIntegrals.hpp"
+
 #include <pybind11/pybind11.h>
 
-#include "ExportDft.hpp"
-#include "ExportGeneral.hpp"
-#include "ExportMath.hpp"
-#include "ExportMoldata.hpp"
-#include "ExportOneElecInts.hpp"
-#include "ExportOrbdata.hpp"
-#include "ExportSimdIntegrals.hpp"
-#include "ExportSparse.hpp"
-#include "ExportVisualization.hpp"
-#include "ExportT2CIntegrals.hpp"
-#include "ExportT3CIntegrals.hpp"
-#include "ExportT4CIntegrals.hpp"
+#include "MolecularBasis.hpp"
+#include "Molecule.hpp"
+#include "SimdOverlapDriver.hpp"
+#include "SparseMatrix.hpp"
 
-PYBIND11_MODULE(veloxchemlib, m)
+namespace vlx_simdintegrals {  // vlx_simdintegrals namespace
+
+auto
+export_simdintegrals(py::module &m) -> void
 {
-    vlx_general::export_general(m);
+    // CSimdOverlapDriver class
 
-    vlx_math::export_math(m);
-
-    vlx_moldata::export_moldata(m);
-
-    vlx_orbdata::export_orbdata(m);
-
-    vlx_sparse::export_sparse(m);
-
-    vlx_dft::export_dft(m);
-
-    vlx_oneeints::export_oneeints(m);
-
-    vlx_visualization::export_visualization(m);
-
-    vlx_t2cintegrals::export_t2cintegrals(m);
-    
-    vlx_t3cintegrals::export_t3cintegrals(m);
-
-    vlx_t4cintegrals::export_t4cintegrals(m);
-
-    vlx_simdintegrals::export_simdintegrals(m);
+    PyClass<CSimdOverlapDriver>(m, "SimdOverlapDriver")
+        .def(py::init<>())
+        .def(py::init<const double>(), "Creates an overlap driver with given screening threshold.", py::arg("threshold"))
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &>(&CSimdOverlapDriver::compute, py::const_),
+             "Computes sparse overlap matrix for given molecule and basis.",
+             py::arg("molecule"),
+             py::arg("basis"))
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const CMolecularBasis &>(&CSimdOverlapDriver::compute, py::const_),
+             "Computes sparse overlap matrix for given molecule and pair of bases.",
+             py::arg("molecule"),
+             py::arg("bra_basis"),
+             py::arg("ket_basis"))
+        .def("get_threshold", &CSimdOverlapDriver::get_threshold, "Gets screening threshold of the integrals.");
 }
+
+}  // namespace vlx_simdintegrals
