@@ -160,15 +160,21 @@ CSimdOverlapDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
         // of the block without changing them. They differ widely in the number of
         // atom pairs they reach and in the cost of their kernel, so the work is
         // distributed dynamically. The loops are collapsed, as the basis functions
-        // of one side alone can be fewer than the threads. The parallel region is
-        // entered only for the blocks reaching many atom pairs, as forking and
-        // joining the threads costs a fixed time the smaller blocks do not repay.
+        // of one side alone can be fewer than the threads.
 
-        const auto npairs = static_cast<int64_t>(block.number_of_pairs());
+        // NOTE: the parallel region is entered only for the blocks holding enough
+        // work to repay the fixed cost of forking and joining the threads, and the
+        // work of a block is the number of its atom pairs times the number of the
+        // combinations of basis functions, not the number of atom pairs alone. A
+        // block of few atom pairs and many combinations, which is what a small
+        // molecule in a large basis gives, carries as much work as a block of many
+        // atom pairs and few combinations and is worth the threads just as much.
 
-        const auto nthreshold = int64_t{4000};
+        const auto nwork = static_cast<int64_t>(block.number_of_pairs() * a_indices.size() * b_indices.size());
 
-#pragma omp parallel for collapse(2) schedule(dynamic) if (npairs > nthreshold)
+        const auto nthreshold = int64_t{500};
+
+#pragma omp parallel for collapse(2) schedule(dynamic) if (nwork > nthreshold)
         for (size_t i = 0; i < a_indices.size(); i++)
         {
             for (size_t j = 0; j < b_indices.size(); j++)
