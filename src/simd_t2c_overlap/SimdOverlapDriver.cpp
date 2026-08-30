@@ -41,6 +41,7 @@
 #include "Matrix.hpp"
 #include "ScreeningFunc.hpp"
 #include "SimdCoordinates.hpp"
+#include "SimdHarmonics.hpp"
 #include "SimdOverlapFunc.hpp"
 
 auto
@@ -126,6 +127,17 @@ CSimdOverlapDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
 
         const auto &b_basis = ket_basis.basis_set(block.ket_index());
 
+        // NOTE: the solid harmonics of the vectors between the atoms are created
+        // once for the whole block, as all combinations of basis functions of the
+        // block share them. They reach the sum of the angular momenta of the atom
+        // bases of the block, as that is the highest angular momentum the
+        // recursions of the integrals reach, and are empty when both atom bases
+        // carry S type functions only.
+
+        const auto lmax = a_basis.max_angular_momentum() + b_basis.max_angular_momentum();
+
+        const auto harmonics = simdfunc::make_solid_harmonics(coordinates, lmax);
+
         const auto a_indices = _index_functions(a_basis);
 
         const auto b_indices = _index_functions(b_basis);
@@ -150,6 +162,7 @@ CSimdOverlapDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
                                          nvalues,
                                          a_basis.functions()[i],
                                          b_basis.functions()[j],
+                                         harmonics,
                                          coordinates,
                                          _threshold);
             }

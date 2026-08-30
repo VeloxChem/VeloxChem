@@ -36,16 +36,29 @@
 #include <string>
 
 #include "ErrorHandler.hpp"
+#include "SimdOverlapRecSP.hpp"
+#include "SimdOverlapRecPS.hpp"
+#include "SimdOverlapRecSD.hpp"
+#include "SimdOverlapRecDS.hpp"
+#include "SimdOverlapRecSF.hpp"
+#include "SimdOverlapRecFS.hpp"
+#include "SimdOverlapRecSG.hpp"
+#include "SimdOverlapRecGS.hpp"
+#include "SimdOverlapRecSH.hpp"
+#include "SimdOverlapRecHS.hpp"
+#include "SimdOverlapRecSI.hpp"
+#include "SimdOverlapRecIS.hpp"
 
 namespace simdovl {  // simdovl namespace
 
 auto
-compute_overlap(double               *values,
-                const size_t          nvalues,
-                const CBasisFunction &bra,
-                const CBasisFunction &ket,
-                const CSimdMatrix    &coordinates,
-                const double          threshold) -> void
+compute_overlap(double                         *values,
+                const size_t                    nvalues,
+                const CBasisFunction           &bra,
+                const CBasisFunction           &ket,
+                const std::vector<CSimdMatrix> &harmonics,
+                const CSimdMatrix              &coordinates,
+                const double                    threshold) -> void
 {
     const auto lbra = bra.get_angular_momentum();
 
@@ -56,6 +69,102 @@ compute_overlap(double               *values,
         compute_ss_overlap(values, nvalues, bra, ket, coordinates, threshold);
 
         return;
+    }
+
+    // NOTE: the solid harmonics of angular momentum l are the element of index
+    // l - 1, as the harmonics of angular momentum zero are one for every atom
+    // pair and are not stored.
+
+    if (lbra == 0)
+    {
+        if (lket == 1)
+        {
+            compute_sp_overlap(values, nvalues, bra, ket, harmonics[0], coordinates, threshold);
+
+            return;
+        }
+
+        if (lket == 2)
+        {
+            compute_sd_overlap(values, nvalues, bra, ket, harmonics[1], coordinates, threshold);
+
+            return;
+        }
+
+        if (lket == 3)
+        {
+            compute_sf_overlap(values, nvalues, bra, ket, harmonics[2], coordinates, threshold);
+
+            return;
+        }
+
+        if (lket == 4)
+        {
+            compute_sg_overlap(values, nvalues, bra, ket, harmonics[3], coordinates, threshold);
+
+            return;
+        }
+
+        if (lket == 5)
+        {
+            compute_sh_overlap(values, nvalues, bra, ket, harmonics[4], coordinates, threshold);
+
+            return;
+        }
+
+        if (lket == 6)
+        {
+            compute_si_overlap(values, nvalues, bra, ket, harmonics[5], coordinates, threshold);
+
+            return;
+        }
+
+    }
+
+    if (lket == 0)
+    {
+        if (lbra == 1)
+        {
+            compute_ps_overlap(values, nvalues, bra, ket, harmonics[0], coordinates, threshold);
+
+            return;
+        }
+
+        if (lbra == 2)
+        {
+            compute_ds_overlap(values, nvalues, bra, ket, harmonics[1], coordinates, threshold);
+
+            return;
+        }
+
+        if (lbra == 3)
+        {
+            compute_fs_overlap(values, nvalues, bra, ket, harmonics[2], coordinates, threshold);
+
+            return;
+        }
+
+        if (lbra == 4)
+        {
+            compute_gs_overlap(values, nvalues, bra, ket, harmonics[3], coordinates, threshold);
+
+            return;
+        }
+
+        if (lbra == 5)
+        {
+            compute_hs_overlap(values, nvalues, bra, ket, harmonics[4], coordinates, threshold);
+
+            return;
+        }
+
+        if (lbra == 6)
+        {
+            compute_is_overlap(values, nvalues, bra, ket, harmonics[5], coordinates, threshold);
+
+            return;
+        }
+
     }
 
     errors::assertMsgCritical(

@@ -3,6 +3,18 @@ target_sources(vlxobjs
     SimdOverlapDriver.cpp
     SimdOverlapFunc.cpp
     SimdOverlapRecSS.cpp
+    SimdOverlapRecSP.cpp
+    SimdOverlapRecPS.cpp
+    SimdOverlapRecSD.cpp
+    SimdOverlapRecDS.cpp
+    SimdOverlapRecSF.cpp
+    SimdOverlapRecFS.cpp
+    SimdOverlapRecSG.cpp
+    SimdOverlapRecGS.cpp
+    SimdOverlapRecSH.cpp
+    SimdOverlapRecHS.cpp
+    SimdOverlapRecSI.cpp
+    SimdOverlapRecIS.cpp
   )
 
 target_include_directories(vlxobjs
