@@ -543,7 +543,10 @@ small molecules are a wash or a loss, tagrisso in def2-svp being level on one
 thread and behind on fourteen, as they take a millisecond or two and never enter
 the parallel region of the driver at all.
 
-The anomaly which the earlier section reported, that `compute` scales worse than
-either of its phases, was the cold and the warm being mixed in one column and is
-not real. Measured warm throughout, `compute` scales between 2.2 and 3.5 times,
-which is what its phases scale to.
+A measurement taken before this one appeared to show `compute` scaling worse than
+either of its phases, which would have meant that something inside it grows with
+the threads and belongs to neither. It does not. The phases were warm by the time
+they were measured within a run while the total was not, so the two were not
+comparable. Measured warm throughout, `compute` scales between 2.2 and 3.5 times,
+which is what its phases scale to, and the whole of it is accounted for: the
+phases and the time the caller sees agree to thirty microseconds.
