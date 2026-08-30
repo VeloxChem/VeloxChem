@@ -3,6 +3,7 @@ target_sources(vlxobjs
     SimdBoysFunc.cpp
     SimdBoysTable.cpp
     SimdCoordinates.cpp
+    SimdHarmonics.cpp
   )
 
 target_include_directories(vlxobjs
