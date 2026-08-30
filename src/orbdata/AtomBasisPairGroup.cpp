@@ -34,8 +34,10 @@
 #include "AtomBasisPairGroup.hpp"
 
 #include <algorithm>
-#include <numeric>
+#include <cstdint>
+#include <cstring>
 #include <ranges>
+#include <vector>
 
 #include "ErrorHandler.hpp"
 #include "Molecule.hpp"
@@ -56,28 +58,78 @@ CAtomBasisPairGroup::sort_by_distance(const CMolecule &molecule) -> void
                           [&](const auto i) { _distances[i] = coords[_bra_atoms[i]].distance(coords[_ket_atoms[i]]); });
 
     // NOTE: parallel vectors are reordered through a permutation of their common
-    // indices. Sorting is stable, so atom pairs at equal interatomic distances
-    // retain their construction order.
+    // indices, which is formed by sorting the interatomic distances.
 
-    std::vector<size_t> perm(_bra_atoms.size());
+    // NOTE: the distances are positive, and a positive double compares as its bit
+    // pattern does when the pattern is read as an unsigned integer, so the order
+    // is found by sorting the patterns by radix instead of by comparison. The
+    // order is the same one a comparison sort gives and not an approximation of
+    // it. The sort is stable, as the counting passes preserve the order of equal
+    // keys, so atom pairs at equal interatomic distances retain their
+    // construction order.
 
-    std::iota(perm.begin(), perm.end(), size_t{0});
+    const auto npairs = _distances.size();
 
-    std::ranges::stable_sort(perm, std::ranges::less{}, [&](const auto i) { return _distances[i]; });
+    std::vector<std::pair<uint64_t, uint32_t>> keys(npairs), work(npairs);
 
-    std::vector<int> bra_atoms(_bra_atoms.size());
+    for (size_t i = 0; i < npairs; i++)
+    {
+        uint64_t bits = 0;
 
-    std::vector<int> ket_atoms(_ket_atoms.size());
+        std::memcpy(&bits, &_distances[i], sizeof(double));
 
-    std::vector<double> distances(_distances.size());
+        keys[i] = {bits, static_cast<uint32_t>(i)};
+    }
 
-    std::ranges::for_each(std::views::iota(size_t{0}, perm.size()), [&](const auto i) {
-        bra_atoms[i] = _bra_atoms[perm[i]];
+    // NOTE: the sixty four bits of a pattern are consumed in four passes of
+    // sixteen bits, so the counters of one pass fit in the cache.
 
-        ket_atoms[i] = _ket_atoms[perm[i]];
+    constexpr auto nbits = 16;
 
-        distances[i] = _distances[perm[i]];
-    });
+    constexpr auto nbins = size_t{1} << nbits;
+
+    std::vector<uint32_t> counts(nbins);
+
+    for (int pass = 0; pass < 4; pass++)
+    {
+        const auto shift = pass * nbits;
+
+        std::ranges::fill(counts, 0);
+
+        for (size_t i = 0; i < npairs; i++) counts[(keys[i].first >> shift) & (nbins - 1)]++;
+
+        uint32_t total = 0;
+
+        for (size_t i = 0; i < nbins; i++)
+        {
+            const auto count = counts[i];
+
+            counts[i] = total;
+
+            total += count;
+        }
+
+        for (size_t i = 0; i < npairs; i++) work[counts[(keys[i].first >> shift) & (nbins - 1)]++] = keys[i];
+
+        keys.swap(work);
+    }
+
+    std::vector<int> bra_atoms(npairs);
+
+    std::vector<int> ket_atoms(npairs);
+
+    std::vector<double> distances(npairs);
+
+    for (size_t i = 0; i < npairs; i++)
+    {
+        const auto index = static_cast<size_t>(keys[i].second);
+
+        bra_atoms[i] = _bra_atoms[index];
+
+        ket_atoms[i] = _ket_atoms[index];
+
+        distances[i] = _distances[index];
+    }
 
     _bra_atoms = std::move(bra_atoms);
 
