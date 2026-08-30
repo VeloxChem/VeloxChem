@@ -33,6 +33,7 @@
 
 #include "SimdOverlapDriver.hpp"
 
+#include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>
@@ -146,12 +147,26 @@ CSimdOverlapDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
         // so all combinations of basis functions are computed and none of them
         // shares its storage with the reverse order.
 
+        // NOTE: the combinations of basis functions are independent, as each of
+        // them writes its own values and reads the coordinates and the harmonics
+        // of the block without changing them. They differ widely in the number of
+        // atom pairs they reach and in the cost of their kernel, so the work is
+        // distributed dynamically. The loops are collapsed, as the basis functions
+        // of one side alone can be fewer than the threads. The parallel region is
+        // entered only for the blocks reaching many atom pairs, as forking and
+        // joining the threads costs a fixed time the smaller blocks do not repay.
+
+        const auto npairs = static_cast<int64_t>(block.number_of_pairs());
+
+        const auto nthreshold = int64_t{4000};
+
+#pragma omp parallel for collapse(2) schedule(dynamic) if (npairs > nthreshold)
         for (size_t i = 0; i < a_indices.size(); i++)
         {
-            const auto [la, ia] = a_indices[i];
-
             for (size_t j = 0; j < b_indices.size(); j++)
             {
+                const auto [la, ia] = a_indices[i];
+
                 const auto [lb, jb] = b_indices[j];
 
                 const auto nvalues = block.number_of_pairs(la, ia, lb, jb);
