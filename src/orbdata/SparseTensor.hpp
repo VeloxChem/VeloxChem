@@ -624,17 +624,11 @@ class CSparseTensor
                 const B                             &screener,
                 const double                         threshold) -> void
     {
-        // NOTE: the atom basis pair groups are independent, so their atom pairs
-        // are ordered by interatomic distance in parallel. Dynamic scheduling is
-        // used as the groups differ widely in the number of atom pairs.
+        // NOTE: the atom pairs of all the groups are ordered by interatomic
+        // distance together, as the groups differ widely in the number of atom
+        // pairs and ordering a group per thread is bounded by the largest of them.
 
-        const auto ngroups = static_cast<int>(groups.size());
-
-#pragma omp parallel for schedule(dynamic)
-        for (int i = 0; i < ngroups; i++)
-        {
-            groups[i].sort_by_distance(molecule);
-        }
+        CAtomBasisPairGroup::sort_by_distance(groups, molecule);
 
         // NOTE: the blocks are added in the order of the groups, so that the
         // layout of the values blocks does not depend on the scheduling above.

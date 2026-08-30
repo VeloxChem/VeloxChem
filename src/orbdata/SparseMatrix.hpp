@@ -1025,10 +1025,10 @@ class CSparseMatrix
                 const double                      threshold,
                 const diagstor                    storage) -> void
     {
-        // NOTE: the atom basis pair groups are independent, so the atom pairs of a
-        // group are ordered by interatomic distance and the sparsity patterns of
-        // the group are described in parallel. Dynamic scheduling is used as the
-        // groups differ widely in the number of atom pairs.
+        // NOTE: the atom pairs of all the groups are ordered by interatomic
+        // distance together, and the sparsity patterns of the groups, which are
+        // independent, are then described in parallel. Dynamic scheduling is used
+        // as the groups differ widely in the number of atom pairs.
 
         const auto ngroups = static_cast<int>(groups.size());
 
@@ -1040,11 +1040,11 @@ class CSparseMatrix
 
         std::vector<std::optional<CAtomBasisDiagonalSparsity>> diagonal_blocks(groups.size());
 
+        CAtomBasisPairGroup::sort_by_distance(groups, molecule);
+
 #pragma omp parallel for schedule(dynamic)
         for (int i = 0; i < ngroups; i++)
         {
-            groups[i].sort_by_distance(molecule);
-
             pair_blocks[i].emplace(groups[i], screener, threshold);
 
             diagonal_blocks[i].emplace(groups[i], storage);

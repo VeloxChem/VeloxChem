@@ -163,11 +163,15 @@ class CAtomBasisPairGroup
         std::ranges::set_intersection(bra.atoms(), ket.atoms(), std::back_inserter(_diagonal_atoms));
     }
 
-    /// @brief Orders atom pairs by ascending interatomic distance and fills in
-    /// the interatomic distances. Atoms of diagonal atom pairs are not affected,
-    /// as their interatomic distance is zero.
+    /// @brief Orders atom pairs of the groups by ascending interatomic distance
+    /// and fills in the interatomic distances. Atoms of diagonal atom pairs are
+    /// not affected, as their interatomic distance is zero.
+    /// @param groups The atom basis pair groups to order.
     /// @param molecule The molecule providing the atomic coordinates.
-    auto sort_by_distance(const CMolecule &molecule) -> void;
+    /// @note All the groups are ordered together, as the groups differ widely in
+    /// the number of atom pairs and ordering a group per thread is bounded well
+    /// below the number of the threads by the largest of them.
+    static auto sort_by_distance(std::vector<CAtomBasisPairGroup> &groups, const CMolecule &molecule) -> void;
 
     /// @brief Gets atom basis on bra side.
     /// @return The constant reference to atom basis.
