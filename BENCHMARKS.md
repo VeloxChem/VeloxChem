@@ -217,5 +217,108 @@ block therefore do not combine, and the outer one silently disables the inner
 one. Which of the two levels is right depends on how the work divides between
 combinations of basis functions and atom pairs, and with only the `(s|s)` case
 implemented every system available is either a single very large call or too few
-calls to be representative. The decision is postponed until the kernels of higher
-angular momenta exist and the choice can be measured on a real molecule.
+calls to be representative. The decision was postponed until the kernels of higher
+angular momenta existed and the choice could be measured on a real molecule.
+
+That decision has since been taken, and the level is the combinations of basis
+functions of a block. See the section below.
+
+## The SIMD overlap driver against the reference overlap driver
+
+Measured once every combination of angular momenta up to six was implemented, so
+that the driver runs an arbitrary basis. Each case runs in its own process, as
+the largest of them hold twenty one gigabytes and the memory pressure of one case
+would otherwise distort the next. Times are the best of three runs, or of a
+single run above twelve thousand basis functions, in seconds.
+
+The phases are separated. `sparsity` is the construction of the sparsity pattern,
+which the exported constructor of the sparse matrix performs on its own;
+`integrals` is the remainder of `compute`, i.e. the coordinates, the solid
+harmonics and the kernels; `compute` is their sum, which is what the driver does.
+`to dense` is the reconstruction of the dense matrix as a numpy array, and the
+two reference columns are the same two steps of the reference driver.
+
+### Single thread
+
+| molecule | basis | nao | dense GB | sparse GB | sparsity | integrals | compute | ref compute | total | integrals | to dense | ref dense |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| tagrisso | def2-svp | 683 | 0.00 | 0.001 | 0.0001 | 0.0004 | 0.0005 | 0.0012 | 2.3x | 3.0x | 0.0002 | 0.0003 |
+| tagrisso | def2-tzvp | 1345 | 0.01 | 0.004 | 0.0002 | 0.0010 | 0.0012 | 0.0042 | 3.6x | 4.2x | 0.0008 | 0.0010 |
+| tagrisso | def2-qzvp | 3099 | 0.07 | 0.017 | 0.0003 | 0.0029 | 0.0033 | 0.0193 | 5.9x | 6.6x | 0.0042 | 0.0062 |
+| taxol | def2-svp | 1099 | 0.01 | 0.002 | 0.0003 | 0.0006 | 0.0008 | 0.0027 | 3.4x | 4.9x | 0.0004 | 0.0007 |
+| taxol | def2-tzvp | 2185 | 0.04 | 0.009 | 0.0003 | 0.0016 | 0.0019 | 0.0093 | 4.9x | 5.9x | 0.0020 | 0.0032 |
+| taxol | def2-qzvp | 4947 | 0.18 | 0.037 | 0.0005 | 0.0050 | 0.0054 | 0.0486 | 8.9x | 9.8x | 0.0102 | 0.0172 |
+| crambin | def2-svp | 6177 | 0.28 | 0.025 | 0.0105 | 0.0044 | 0.0149 | 0.0943 | 6.4x | 21.5x | 0.0087 | 0.0268 |
+| crambin | def2-tzvp | 12063 | 1.08 | 0.097 | 0.0107 | 0.0170 | 0.0277 | 0.3483 | 12.6x | 20.5x | 0.0849 | 0.1536 |
+| crambin | def2-qzvp | 28167 | 5.91 | 0.409 | 0.0112 | 0.0605 | 0.0717 | 1.8501 | 25.8x | 30.6x | 0.4500 | 1.1526 |
+| ubiquitin | def2-svp | 11577 | 1.00 | 0.052 | 0.0481 | 0.0081 | 0.0562 | 0.3383 | 6.0x | 41.9x | 0.0220 | 0.1080 |
+| ubiquitin | def2-tzvp | 22442 | 3.75 | 0.200 | 0.0505 | 0.0383 | 0.0888 | 1.2537 | 14.1x | 32.7x | 0.2673 | 0.5746 |
+| ubiquitin | def2-qzvp | 53197 | 21.09 | 0.872 | 0.0487 | 0.1289 | 0.1777 | too large | | | 3.9617 | |
+
+### All fourteen threads
+
+| molecule | basis | sparsity | integrals | compute | ref compute | total | integrals | to dense | ref dense |
+|---|---|---|---|---|---|---|---|---|---|
+| tagrisso | def2-svp | 0.0001 | 0.0004 | 0.0006 | 0.0005 | 0.9x | 1.2x | 0.0002 | 0.0003 |
+| tagrisso | def2-tzvp | 0.0002 | 0.0010 | 0.0012 | 0.0014 | 1.1x | 1.3x | 0.0005 | 0.0010 |
+| tagrisso | def2-qzvp | 0.0004 | 0.0029 | 0.0033 | 0.0033 | 1.0x | 1.1x | 0.0018 | 0.0062 |
+| taxol | def2-svp | 0.0002 | 0.0006 | 0.0008 | 0.0017 | 2.2x | 2.9x | 0.0003 | 0.0007 |
+| taxol | def2-tzvp | 0.0003 | 0.0015 | 0.0018 | 0.0024 | 1.3x | 1.6x | 0.0010 | 0.0031 |
+| taxol | def2-qzvp | 0.0004 | 0.0050 | 0.0054 | 0.0068 | 1.3x | 1.4x | 0.0043 | 0.0152 |
+| crambin | def2-svp | 0.0044 | 0.0023 | 0.0067 | 0.0125 | 1.9x | 5.5x | 0.0039 | 0.0249 |
+| crambin | def2-tzvp | 0.0050 | 0.0096 | 0.0145 | 0.0689 | 4.7x | 7.2x | 0.0496 | 0.1351 |
+| crambin | def2-qzvp | 0.0051 | 0.0298 | 0.0349 | 0.3223 | 9.2x | 10.8x | 0.2648 | 1.1073 |
+| ubiquitin | def2-svp | 0.0191 | 0.0034 | 0.0225 | 0.0445 | 2.0x | 13.2x | 0.0097 | 0.1012 |
+| ubiquitin | def2-tzvp | 0.0200 | 0.0170 | 0.0370 | 0.2530 | 6.8x | 14.9x | 0.1633 | 0.6791 |
+| ubiquitin | def2-qzvp | 0.0201 | 0.0572 | 0.0773 | too large | | | 1.6281 | |
+
+### What the threads buy, fourteen against one
+
+| molecule | basis | sparsity | integrals | compute | to dense | reference |
+|---|---|---|---|---|---|---|
+| tagrisso | def2-svp | 0.93x | 0.91x | 0.93x | 0.92x | 2.31x |
+| tagrisso | def2-tzvp | 0.90x | 0.94x | 0.94x | 1.56x | 3.03x |
+| tagrisso | def2-qzvp | 0.92x | 1.00x | 0.99x | 2.31x | 5.78x |
+| taxol | def2-svp | 1.30x | 0.96x | 1.05x | 1.41x | 1.63x |
+| taxol | def2-tzvp | 1.14x | 1.02x | 1.04x | 1.93x | 3.90x |
+| taxol | def2-qzvp | 1.07x | 0.99x | 1.00x | 2.39x | 7.12x |
+| crambin | def2-svp | 2.38x | 1.91x | 2.22x | 2.22x | 7.53x |
+| crambin | def2-tzvp | 2.15x | 1.78x | 1.90x | 1.71x | 5.06x |
+| crambin | def2-qzvp | 2.20x | 2.03x | 2.06x | 1.70x | 5.74x |
+| ubiquitin | def2-svp | 2.52x | 2.39x | 2.50x | 2.25x | 7.61x |
+| ubiquitin | def2-tzvp | 2.52x | 2.26x | 2.40x | 1.64x | 4.95x |
+| ubiquitin | def2-qzvp | 2.42x | 2.26x | 2.30x | 2.43x | |
+
+### What the numbers say
+
+The integrals are twenty to forty two times faster than the reference on a single
+thread, which is the comparison of the kernels alone, with the handling of the
+matrix excluded from both sides. The advantage is largest where the reference is
+weakest, namely many atoms with a small basis, as that is where the screening
+discards the most: ubiquitin in def2-svp reaches 41.9x.
+
+The threads are the weak point of the driver, and the cause is not the driver.
+The construction of the sparsity pattern, the integrals and the reconstruction of
+the dense matrix all saturate at the same 2.2 to 2.5 times, and the last of them
+was already parallel before the others were. Three unrelated paths saturating
+together, on a machine where a single core already sustains 111 to 152 GB/s,
+points at the memory and not at the work distribution. The reference scales five
+to seven and a half times because it is bound by the redundant arithmetic it
+performs, which the memory is nowhere near limiting.
+
+The threads therefore let the reference catch up. The advantage of the whole
+`compute` falls from between 2.3 and 25.8 times on one thread to between 1.0 and
+9.2 times on fourteen, and on the smallest molecules the two are level. Those
+cases take under four milliseconds and are below the threshold of the parallel
+region of the driver, which is why the driver does not scale on them at all.
+
+The memory is the difference which does not narrow. Ubiquitin in def2-qzvp holds
+twenty one gigabytes as a dense matrix and the reference driver cannot compute it
+on this machine at all, while the sparse matrix holds 0.872 gigabytes, four
+percent of the dense form, and is computed in 0.077 seconds.
+
+The construction of the sparsity pattern is the floor for the large molecules
+with a small basis, at 0.048 seconds of the 0.056 seconds of the whole `compute`
+for ubiquitin in def2-svp. It threads, as the sort of the atom pairs by distance
+was parallel already, but it does not shrink with the basis the way the integrals
+do, as it depends on the number of atoms alone.
