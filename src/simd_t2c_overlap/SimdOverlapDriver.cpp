@@ -54,9 +54,13 @@ CSimdOverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &ba
 
     auto matrix = CSparseMatrix(molecule, basis, screener::overlap, _threshold, mat_t::symmetric, diagstor::scalar);
 
-    matrix.allocate();
+    // NOTE: the values blocks are not set to zero after they are allocated, as
+    // every value of every block is written below. A combination of basis
+    // functions reaching no atom pair holds no values, and a kernel writes the
+    // integrals of the atom pairs it reaches and zeros of the remaining ones, so
+    // no value is left with the undefined content of the allocation.
 
-    matrix.zero();
+    matrix.allocate();
 
     _compute_pair_blocks(matrix, molecule, basis, basis);
 
@@ -71,9 +75,13 @@ CSimdOverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &br
 {
     auto matrix = CSparseMatrix(molecule, bra_basis, ket_basis, screener::overlap, _threshold, mat_t::general, diagstor::scalar);
 
-    matrix.allocate();
+    // NOTE: the values blocks are not set to zero after they are allocated, as
+    // every value of every block is written below. A combination of basis
+    // functions reaching no atom pair holds no values, and a kernel writes the
+    // integrals of the atom pairs it reaches and zeros of the remaining ones, so
+    // no value is left with the undefined content of the allocation.
 
-    matrix.zero();
+    matrix.allocate();
 
     _compute_pair_blocks(matrix, molecule, bra_basis, ket_basis);
 
