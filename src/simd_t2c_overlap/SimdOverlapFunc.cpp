@@ -81,11 +81,12 @@ compute_ss_overlap(double               *values,
 
     const auto nprims = nprim_a * nprim_b;
 
-    // NOTE: the pairs of primitives are screened with a tighter threshold than
-    // the integrals, as their contributions accumulate into a single value.
+    // NOTE: the pairs of primitives are screened with the threshold of the
+    // integrals divided by their number, as their contributions accumulate into
+    // a single value and the error of the sum is bounded by the number of terms.
 
     const auto dimensions = simdfunc::make_column_dimensions(
-        bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, 1.0e-2 * threshold);
+        bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, threshold / static_cast<double>(nprims));
 
     // NOTE: the primitives are sorted by descending exponent, so the numbers of
     // surviving atom pairs do not decrease along either index and the last pair
@@ -100,13 +101,15 @@ compute_ss_overlap(double               *values,
         return;
     }
 
-    // NOTE: each row holds the primitive integrals of one pair of primitives, and
-    // the rows span the atom pairs surviving the screening of that pair and not
-    // all atom pairs of the sparsity pattern. The atom pairs are ordered by
-    // ascending interatomic distance, so the survivors are the leading ones and
-    // the integrals of the remaining pairs are below threshold.
+    // NOTE: the integrals of all pairs of primitives are accumulated in a single
+    // row, which starts at a cache line boundary and spans only the atom pairs
+    // reached by the furthest reaching pair of primitives.
 
-    auto buffer = CSimdMatrix(nprims, nmax);
+    auto buffer = CSimdMatrix(1, nmax);
+
+    buffer.zero();
+
+    auto *prim = buffer.data(0);
 
     // NOTE: the squared distances of the atom pairs are carried by the
     // coordinates, so that they are formed once for the whole block instead of
@@ -116,7 +119,7 @@ compute_ss_overlap(double               *values,
 
     constexpr auto fpi = mathconst::pi_value();
 
-    // compute the primitive integrals of each pair of primitives
+    // accumulate the integrals of each pair of primitives
 
     for (size_t i = 0; i < nprim_a; i++)
     {
@@ -126,6 +129,10 @@ compute_ss_overlap(double               *values,
 
         for (size_t j = 0; j < nprim_b; j++)
         {
+            const auto ncols = dimensions[i * nprim_b + j];
+
+            if (ncols == 0) continue;
+
             const auto fexp = aexp + b_exps[j];
 
             const auto fmu = aexp * b_exps[j] / fexp;
@@ -134,65 +141,28 @@ compute_ss_overlap(double               *values,
 
             const auto ffact = anorm * b_norms[j] * fovl * std::sqrt(fovl);
 
-            const auto ncols = dimensions[i * nprim_b + j];
+            // NOTE: the row of the buffer and the row of the coordinates start at
+            // a cache line boundary, so the loop is vectorized with aligned loads
+            // and stores. A pair of primitives contributes only to the atom pairs
+            // it reaches, so the loop shortens as the primitives get tighter.
 
-            if (ncols == 0) continue;
-
-            auto *prim = buffer.data(i * nprim_b + j);
-
-            // NOTE: the rows of the buffer and of the coordinates start at a cache
-            // line boundary, so the loop is vectorized with aligned loads and
-            // stores.
-
-            // NOTE: the exponential is issued as a scalar call, as no vector math
-            // library is linked, and it dominates the cost of the loop. Vectorizing
-            // around it still pays, as the squared distance leaves only a load, two
-            // multiplications and a store to be packed into the lanes.
+            // NOTE: the exponential is issued as a call to the vector math library
+            // of the platform, so it does not break the vectorization of the loop.
 
 #pragma omp simd aligned(prim, ab_2 : simd::cache_line_size())
             for (size_t k = 0; k < ncols; k++)
             {
-                prim[k] = ffact * std::exp(-fmu * ab_2[k]);
+                prim[k] += ffact * std::exp(-fmu * ab_2[k]);
             }
         }
-    }
-
-    // contract the primitive integrals into the values of the sparsity block
-
-    // NOTE: the integrals of the pair of primitives reaching furthest are written
-    // to the values and those of the remaining pairs are added to them, so that
-    // the contraction needs neither a sweep to initialize the values nor a sweep
-    // to copy them out of the buffer. Only the rows of the buffer are declared
-    // aligned, as the values start at the offset of this combination of basis
-    // functions in the values block.
-
-    const auto *head = buffer.data(nprims - 1);
-
-#pragma omp simd aligned(head : simd::cache_line_size())
-    for (size_t k = 0; k < nmax; k++)
-    {
-        values[k] = head[k];
     }
 
     // NOTE: the atom pairs beyond the reach of every pair of primitives have no
     // contribution and are set to zero.
 
+    std::copy(prim, prim + nmax, values);
+
     std::fill(values + nmax, values + nvalues, 0.0);
-
-    for (size_t irow = 0; irow + 1 < nprims; irow++)
-    {
-        const auto ncols = dimensions[irow];
-
-        if (ncols == 0) continue;
-
-        const auto *prim = buffer.data(irow);
-
-#pragma omp simd aligned(prim : simd::cache_line_size())
-        for (size_t k = 0; k < ncols; k++)
-        {
-            values[k] += prim[k];
-        }
-    }
 }
 
 auto
