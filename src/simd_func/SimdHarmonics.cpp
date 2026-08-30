@@ -150,7 +150,7 @@ make_d_solid_harmonics(const CSimdMatrix &p_harmonics, const CSimdMatrix &coordi
     // NOTE: the factors of the recursion depend on the angular momentum alone, so
     // they are formed once for the whole matrix instead of once for every atom pair.
 
-    const auto fact = 0.5 * std::sqrt(3.0);
+    const auto fact = std::sqrt(0.75);
     const auto fact_xy = std::sqrt(3.0);
     const auto fz_m1 = std::sqrt(3.0);
     const auto fz_0 = 1.5;
@@ -221,14 +221,14 @@ make_f_solid_harmonics(const CSimdMatrix &d_harmonics, const CSimdMatrix &p_harm
     // NOTE: the factors of the recursion depend on the angular momentum alone, so
     // they are formed once for the whole matrix instead of once for every atom pair.
 
-    const auto fact = (1.0 / 6.0) * std::sqrt(30.0);
+    const auto fact = std::sqrt(5.0 / 6.0);
     const auto fz_m2 = std::sqrt(5.0);
-    const auto fz_m1 = 1.25 * std::sqrt(2.0);
-    const auto fr_m1 = 0.25 * std::sqrt(6.0);
+    const auto fz_m1 = std::sqrt(3.125);
+    const auto fr_m1 = std::sqrt(0.375);
     const auto fz_0 = 5.0 / 3.0;
     const auto fr_0 = 2.0 / 3.0;
-    const auto fz_p1 = 1.25 * std::sqrt(2.0);
-    const auto fr_p1 = 0.25 * std::sqrt(6.0);
+    const auto fz_p1 = std::sqrt(3.125);
+    const auto fr_p1 = std::sqrt(0.375);
     const auto fz_p2 = std::sqrt(5.0);
 
     // NOTE: the pointers to the rows are taken once, as the accessor of a row is
@@ -316,18 +316,18 @@ make_g_solid_harmonics(const CSimdMatrix &f_harmonics, const CSimdMatrix &d_harm
     // NOTE: the factors of the recursion depend on the angular momentum alone, so
     // they are formed once for the whole matrix instead of once for every atom pair.
 
-    const auto fact = 0.25 * std::sqrt(14.0);
+    const auto fact = std::sqrt(0.875);
     const auto fz_m3 = std::sqrt(7.0);
-    const auto fz_m2 = (7.0 / 6.0) * std::sqrt(3.0);
-    const auto fr_m2 = (1.0 / 6.0) * std::sqrt(15.0);
-    const auto fz_m1 = (7.0 / 15.0) * std::sqrt(15.0);
-    const auto fr_m1 = (2.0 / 15.0) * std::sqrt(30.0);
+    const auto fz_m2 = std::sqrt(49.0 / 12.0);
+    const auto fr_m2 = std::sqrt(5.0 / 12.0);
+    const auto fz_m1 = std::sqrt(49.0 / 15.0);
+    const auto fr_m1 = std::sqrt(8.0 / 15.0);
     const auto fz_0 = 1.75;
     const auto fr_0 = 0.75;
-    const auto fz_p1 = (7.0 / 15.0) * std::sqrt(15.0);
-    const auto fr_p1 = (2.0 / 15.0) * std::sqrt(30.0);
-    const auto fz_p2 = (7.0 / 6.0) * std::sqrt(3.0);
-    const auto fr_p2 = (1.0 / 6.0) * std::sqrt(15.0);
+    const auto fz_p1 = std::sqrt(49.0 / 15.0);
+    const auto fr_p1 = std::sqrt(8.0 / 15.0);
+    const auto fz_p2 = std::sqrt(49.0 / 12.0);
+    const auto fr_p2 = std::sqrt(5.0 / 12.0);
     const auto fz_p3 = std::sqrt(7.0);
 
     // NOTE: the pointers to the rows are taken once, as the accessor of a row is
@@ -437,22 +437,22 @@ make_h_solid_harmonics(const CSimdMatrix &g_harmonics, const CSimdMatrix &f_harm
     // NOTE: the factors of the recursion depend on the angular momentum alone, so
     // they are formed once for the whole matrix instead of once for every atom pair.
 
-    const auto fact = (3.0 / 10.0) * std::sqrt(10.0);
+    const auto fact = std::sqrt(9.0 / 10.0);
     const auto fz_m4 = 3.0;
     const auto fz_m3 = 2.25;
-    const auto fr_m3 = 0.25 * std::sqrt(7.0);
-    const auto fz_m2 = (3.0 / 7.0) * std::sqrt(21.0);
-    const auto fr_m2 = (2.0 / 7.0) * std::sqrt(7.0);
-    const auto fz_m1 = 0.75 * std::sqrt(6.0);
-    const auto fr_m1 = 0.25 * std::sqrt(10.0);
+    const auto fr_m3 = std::sqrt(0.4375);
+    const auto fz_m2 = std::sqrt(27.0 / 7.0);
+    const auto fr_m2 = std::sqrt(4.0 / 7.0);
+    const auto fz_m1 = std::sqrt(3.375);
+    const auto fr_m1 = std::sqrt(0.625);
     const auto fz_0 = 9.0 / 5.0;
     const auto fr_0 = 4.0 / 5.0;
-    const auto fz_p1 = 0.75 * std::sqrt(6.0);
-    const auto fr_p1 = 0.25 * std::sqrt(10.0);
-    const auto fz_p2 = (3.0 / 7.0) * std::sqrt(21.0);
-    const auto fr_p2 = (2.0 / 7.0) * std::sqrt(7.0);
+    const auto fz_p1 = std::sqrt(3.375);
+    const auto fr_p1 = std::sqrt(0.625);
+    const auto fz_p2 = std::sqrt(27.0 / 7.0);
+    const auto fr_p2 = std::sqrt(4.0 / 7.0);
     const auto fz_p3 = 2.25;
-    const auto fr_p3 = 0.25 * std::sqrt(7.0);
+    const auto fr_p3 = std::sqrt(0.4375);
     const auto fz_p4 = 3.0;
 
     // NOTE: the pointers to the rows are taken once, as the accessor of a row is
@@ -576,26 +576,26 @@ make_i_solid_harmonics(const CSimdMatrix &h_harmonics, const CSimdMatrix &g_harm
     // NOTE: the factors of the recursion depend on the angular momentum alone, so
     // they are formed once for the whole matrix instead of once for every atom pair.
 
-    const auto fact = (1.0 / 6.0) * std::sqrt(33.0);
+    const auto fact = std::sqrt(11.0 / 12.0);
     const auto fz_m5 = std::sqrt(11.0);
-    const auto fz_m4 = (11.0 / 10.0) * std::sqrt(5.0);
-    const auto fr_m4 = (3.0 / 10.0) * std::sqrt(5.0);
-    const auto fz_m3 = (11.0 / 9.0) * std::sqrt(3.0);
-    const auto fr_m3 = (4.0 / 9.0) * std::sqrt(3.0);
-    const auto fz_m2 = 1.375 * std::sqrt(2.0);
-    const auto fr_m2 = 0.125 * std::sqrt(42.0);
-    const auto fz_m1 = (11.0 / 35.0) * std::sqrt(35.0);
-    const auto fr_m1 = (2.0 / 35.0) * std::sqrt(210.0);
+    const auto fz_m4 = std::sqrt(121.0 / 20.0);
+    const auto fr_m4 = std::sqrt(9.0 / 20.0);
+    const auto fz_m3 = std::sqrt(121.0 / 27.0);
+    const auto fr_m3 = std::sqrt(16.0 / 27.0);
+    const auto fz_m2 = std::sqrt(3.78125);
+    const auto fr_m2 = std::sqrt(0.65625);
+    const auto fz_m1 = std::sqrt(121.0 / 35.0);
+    const auto fr_m1 = std::sqrt(24.0 / 35.0);
     const auto fz_0 = 11.0 / 6.0;
     const auto fr_0 = 5.0 / 6.0;
-    const auto fz_p1 = (11.0 / 35.0) * std::sqrt(35.0);
-    const auto fr_p1 = (2.0 / 35.0) * std::sqrt(210.0);
-    const auto fz_p2 = 1.375 * std::sqrt(2.0);
-    const auto fr_p2 = 0.125 * std::sqrt(42.0);
-    const auto fz_p3 = (11.0 / 9.0) * std::sqrt(3.0);
-    const auto fr_p3 = (4.0 / 9.0) * std::sqrt(3.0);
-    const auto fz_p4 = (11.0 / 10.0) * std::sqrt(5.0);
-    const auto fr_p4 = (3.0 / 10.0) * std::sqrt(5.0);
+    const auto fz_p1 = std::sqrt(121.0 / 35.0);
+    const auto fr_p1 = std::sqrt(24.0 / 35.0);
+    const auto fz_p2 = std::sqrt(3.78125);
+    const auto fr_p2 = std::sqrt(0.65625);
+    const auto fz_p3 = std::sqrt(121.0 / 27.0);
+    const auto fr_p3 = std::sqrt(16.0 / 27.0);
+    const auto fz_p4 = std::sqrt(121.0 / 20.0);
+    const auto fr_p4 = std::sqrt(9.0 / 20.0);
     const auto fz_p5 = std::sqrt(11.0);
 
     // NOTE: the pointers to the rows are taken once, as the accessor of a row is
@@ -733,30 +733,30 @@ make_k_solid_harmonics(const CSimdMatrix &i_harmonics, const CSimdMatrix &h_harm
     // NOTE: the factors of the recursion depend on the angular momentum alone, so
     // they are formed once for the whole matrix instead of once for every atom pair.
 
-    const auto fact = (1.0 / 14.0) * std::sqrt(182.0);
+    const auto fact = std::sqrt(13.0 / 14.0);
     const auto fz_m6 = std::sqrt(13.0);
-    const auto fz_m5 = (13.0 / 12.0) * std::sqrt(6.0);
-    const auto fr_m5 = (1.0 / 12.0) * std::sqrt(66.0);
-    const auto fz_m4 = (13.0 / 33.0) * std::sqrt(33.0);
-    const auto fr_m4 = (2.0 / 33.0) * std::sqrt(165.0);
-    const auto fz_m3 = (13.0 / 20.0) * std::sqrt(10.0);
-    const auto fr_m3 = (3.0 / 20.0) * std::sqrt(30.0);
-    const auto fz_m2 = (13.0 / 15.0) * std::sqrt(5.0);
-    const auto fr_m2 = (4.0 / 15.0) * std::sqrt(10.0);
-    const auto fz_m1 = (13.0 / 12.0) * std::sqrt(3.0);
-    const auto fr_m1 = (1.0 / 12.0) * std::sqrt(105.0);
+    const auto fz_m5 = std::sqrt(169.0 / 24.0);
+    const auto fr_m5 = std::sqrt(11.0 / 24.0);
+    const auto fz_m4 = std::sqrt(169.0 / 33.0);
+    const auto fr_m4 = std::sqrt(20.0 / 33.0);
+    const auto fz_m3 = std::sqrt(169.0 / 40.0);
+    const auto fr_m3 = std::sqrt(27.0 / 40.0);
+    const auto fz_m2 = std::sqrt(169.0 / 45.0);
+    const auto fr_m2 = std::sqrt(32.0 / 45.0);
+    const auto fz_m1 = std::sqrt(169.0 / 48.0);
+    const auto fr_m1 = std::sqrt(35.0 / 48.0);
     const auto fz_0 = 13.0 / 7.0;
     const auto fr_0 = 6.0 / 7.0;
-    const auto fz_p1 = (13.0 / 12.0) * std::sqrt(3.0);
-    const auto fr_p1 = (1.0 / 12.0) * std::sqrt(105.0);
-    const auto fz_p2 = (13.0 / 15.0) * std::sqrt(5.0);
-    const auto fr_p2 = (4.0 / 15.0) * std::sqrt(10.0);
-    const auto fz_p3 = (13.0 / 20.0) * std::sqrt(10.0);
-    const auto fr_p3 = (3.0 / 20.0) * std::sqrt(30.0);
-    const auto fz_p4 = (13.0 / 33.0) * std::sqrt(33.0);
-    const auto fr_p4 = (2.0 / 33.0) * std::sqrt(165.0);
-    const auto fz_p5 = (13.0 / 12.0) * std::sqrt(6.0);
-    const auto fr_p5 = (1.0 / 12.0) * std::sqrt(66.0);
+    const auto fz_p1 = std::sqrt(169.0 / 48.0);
+    const auto fr_p1 = std::sqrt(35.0 / 48.0);
+    const auto fz_p2 = std::sqrt(169.0 / 45.0);
+    const auto fr_p2 = std::sqrt(32.0 / 45.0);
+    const auto fz_p3 = std::sqrt(169.0 / 40.0);
+    const auto fr_p3 = std::sqrt(27.0 / 40.0);
+    const auto fz_p4 = std::sqrt(169.0 / 33.0);
+    const auto fr_p4 = std::sqrt(20.0 / 33.0);
+    const auto fz_p5 = std::sqrt(169.0 / 24.0);
+    const auto fr_p5 = std::sqrt(11.0 / 24.0);
     const auto fz_p6 = std::sqrt(13.0);
 
     // NOTE: the pointers to the rows are taken once, as the accessor of a row is
@@ -908,34 +908,34 @@ make_l_solid_harmonics(const CSimdMatrix &k_harmonics, const CSimdMatrix &i_harm
     // NOTE: the factors of the recursion depend on the angular momentum alone, so
     // they are formed once for the whole matrix instead of once for every atom pair.
 
-    const auto fact = 0.25 * std::sqrt(15.0);
+    const auto fact = std::sqrt(0.9375);
     const auto fz_m7 = std::sqrt(15.0);
-    const auto fz_m6 = (15.0 / 14.0) * std::sqrt(7.0);
-    const auto fr_m6 = (1.0 / 14.0) * std::sqrt(91.0);
-    const auto fz_m5 = (5.0 / 13.0) * std::sqrt(39.0);
-    const auto fr_m5 = (2.0 / 13.0) * std::sqrt(26.0);
-    const auto fz_m4 = 1.25 * std::sqrt(3.0);
-    const auto fr_m4 = 0.25 * std::sqrt(11.0);
-    const auto fz_m3 = (3.0 / 11.0) * std::sqrt(55.0);
-    const auto fr_m3 = (2.0 / 11.0) * std::sqrt(22.0);
-    const auto fz_m2 = 0.5 * std::sqrt(15.0);
-    const auto fr_m2 = 0.5 * std::sqrt(3.0);
-    const auto fz_m1 = (5.0 / 7.0) * std::sqrt(7.0);
-    const auto fr_m1 = (4.0 / 21.0) * std::sqrt(21.0);
+    const auto fz_m6 = std::sqrt(225.0 / 28.0);
+    const auto fr_m6 = std::sqrt(13.0 / 28.0);
+    const auto fz_m5 = std::sqrt(75.0 / 13.0);
+    const auto fr_m5 = std::sqrt(8.0 / 13.0);
+    const auto fz_m4 = std::sqrt(4.6875);
+    const auto fr_m4 = std::sqrt(0.6875);
+    const auto fz_m3 = std::sqrt(45.0 / 11.0);
+    const auto fr_m3 = std::sqrt(8.0 / 11.0);
+    const auto fz_m2 = std::sqrt(3.75);
+    const auto fr_m2 = std::sqrt(0.75);
+    const auto fz_m1 = std::sqrt(25.0 / 7.0);
+    const auto fr_m1 = std::sqrt(16.0 / 21.0);
     const auto fz_0 = 1.875;
     const auto fr_0 = 0.875;
-    const auto fz_p1 = (5.0 / 7.0) * std::sqrt(7.0);
-    const auto fr_p1 = (4.0 / 21.0) * std::sqrt(21.0);
-    const auto fz_p2 = 0.5 * std::sqrt(15.0);
-    const auto fr_p2 = 0.5 * std::sqrt(3.0);
-    const auto fz_p3 = (3.0 / 11.0) * std::sqrt(55.0);
-    const auto fr_p3 = (2.0 / 11.0) * std::sqrt(22.0);
-    const auto fz_p4 = 1.25 * std::sqrt(3.0);
-    const auto fr_p4 = 0.25 * std::sqrt(11.0);
-    const auto fz_p5 = (5.0 / 13.0) * std::sqrt(39.0);
-    const auto fr_p5 = (2.0 / 13.0) * std::sqrt(26.0);
-    const auto fz_p6 = (15.0 / 14.0) * std::sqrt(7.0);
-    const auto fr_p6 = (1.0 / 14.0) * std::sqrt(91.0);
+    const auto fz_p1 = std::sqrt(25.0 / 7.0);
+    const auto fr_p1 = std::sqrt(16.0 / 21.0);
+    const auto fz_p2 = std::sqrt(3.75);
+    const auto fr_p2 = std::sqrt(0.75);
+    const auto fz_p3 = std::sqrt(45.0 / 11.0);
+    const auto fr_p3 = std::sqrt(8.0 / 11.0);
+    const auto fz_p4 = std::sqrt(4.6875);
+    const auto fr_p4 = std::sqrt(0.6875);
+    const auto fz_p5 = std::sqrt(75.0 / 13.0);
+    const auto fr_p5 = std::sqrt(8.0 / 13.0);
+    const auto fz_p6 = std::sqrt(225.0 / 28.0);
+    const auto fr_p6 = std::sqrt(13.0 / 28.0);
     const auto fz_p7 = std::sqrt(15.0);
 
     // NOTE: the pointers to the rows are taken once, as the accessor of a row is
@@ -1116,38 +1116,38 @@ make_m_solid_harmonics(const CSimdMatrix &l_harmonics, const CSimdMatrix &k_harm
     // NOTE: the factors of the recursion depend on the angular momentum alone, so
     // they are formed once for the whole matrix instead of once for every atom pair.
 
-    const auto fact = (1.0 / 6.0) * std::sqrt(34.0);
+    const auto fact = std::sqrt(17.0 / 18.0);
     const auto fz_m8 = std::sqrt(17.0);
-    const auto fz_m7 = 2.125 * std::sqrt(2.0);
-    const auto fr_m7 = 0.125 * std::sqrt(30.0);
-    const auto fz_m6 = (17.0 / 15.0) * std::sqrt(5.0);
-    const auto fr_m6 = (2.0 / 15.0) * std::sqrt(35.0);
-    const auto fz_m5 = (17.0 / 28.0) * std::sqrt(14.0);
-    const auto fr_m5 = (1.0 / 28.0) * std::sqrt(546.0);
-    const auto fz_m4 = (17.0 / 65.0) * std::sqrt(65.0);
-    const auto fr_m4 = (4.0 / 65.0) * std::sqrt(195.0);
-    const auto fz_m3 = (17.0 / 12.0) * std::sqrt(2.0);
-    const auto fr_m3 = (1.0 / 12.0) * std::sqrt(110.0);
-    const auto fz_m2 = (17.0 / 77.0) * std::sqrt(77.0);
-    const auto fr_m2 = (2.0 / 77.0) * std::sqrt(1155.0);
-    const auto fz_m1 = (17.0 / 20.0) * std::sqrt(5.0);
-    const auto fr_m1 = (3.0 / 20.0) * std::sqrt(35.0);
+    const auto fz_m7 = std::sqrt(9.03125);
+    const auto fr_m7 = std::sqrt(0.46875);
+    const auto fz_m6 = std::sqrt(289.0 / 45.0);
+    const auto fr_m6 = std::sqrt(28.0 / 45.0);
+    const auto fz_m5 = std::sqrt(289.0 / 56.0);
+    const auto fr_m5 = std::sqrt(39.0 / 56.0);
+    const auto fz_m4 = std::sqrt(289.0 / 65.0);
+    const auto fr_m4 = std::sqrt(48.0 / 65.0);
+    const auto fz_m3 = std::sqrt(289.0 / 72.0);
+    const auto fr_m3 = std::sqrt(55.0 / 72.0);
+    const auto fz_m2 = std::sqrt(289.0 / 77.0);
+    const auto fr_m2 = std::sqrt(60.0 / 77.0);
+    const auto fz_m1 = std::sqrt(289.0 / 80.0);
+    const auto fr_m1 = std::sqrt(63.0 / 80.0);
     const auto fz_0 = 17.0 / 9.0;
     const auto fr_0 = 8.0 / 9.0;
-    const auto fz_p1 = (17.0 / 20.0) * std::sqrt(5.0);
-    const auto fr_p1 = (3.0 / 20.0) * std::sqrt(35.0);
-    const auto fz_p2 = (17.0 / 77.0) * std::sqrt(77.0);
-    const auto fr_p2 = (2.0 / 77.0) * std::sqrt(1155.0);
-    const auto fz_p3 = (17.0 / 12.0) * std::sqrt(2.0);
-    const auto fr_p3 = (1.0 / 12.0) * std::sqrt(110.0);
-    const auto fz_p4 = (17.0 / 65.0) * std::sqrt(65.0);
-    const auto fr_p4 = (4.0 / 65.0) * std::sqrt(195.0);
-    const auto fz_p5 = (17.0 / 28.0) * std::sqrt(14.0);
-    const auto fr_p5 = (1.0 / 28.0) * std::sqrt(546.0);
-    const auto fz_p6 = (17.0 / 15.0) * std::sqrt(5.0);
-    const auto fr_p6 = (2.0 / 15.0) * std::sqrt(35.0);
-    const auto fz_p7 = 2.125 * std::sqrt(2.0);
-    const auto fr_p7 = 0.125 * std::sqrt(30.0);
+    const auto fz_p1 = std::sqrt(289.0 / 80.0);
+    const auto fr_p1 = std::sqrt(63.0 / 80.0);
+    const auto fz_p2 = std::sqrt(289.0 / 77.0);
+    const auto fr_p2 = std::sqrt(60.0 / 77.0);
+    const auto fz_p3 = std::sqrt(289.0 / 72.0);
+    const auto fr_p3 = std::sqrt(55.0 / 72.0);
+    const auto fz_p4 = std::sqrt(289.0 / 65.0);
+    const auto fr_p4 = std::sqrt(48.0 / 65.0);
+    const auto fz_p5 = std::sqrt(289.0 / 56.0);
+    const auto fr_p5 = std::sqrt(39.0 / 56.0);
+    const auto fz_p6 = std::sqrt(289.0 / 45.0);
+    const auto fr_p6 = std::sqrt(28.0 / 45.0);
+    const auto fz_p7 = std::sqrt(9.03125);
+    const auto fr_p7 = std::sqrt(0.46875);
     const auto fz_p8 = std::sqrt(17.0);
 
     // NOTE: the pointers to the rows are taken once, as the accessor of a row is
@@ -1342,42 +1342,42 @@ make_n_solid_harmonics(const CSimdMatrix &m_harmonics, const CSimdMatrix &l_harm
     // NOTE: the factors of the recursion depend on the angular momentum alone, so
     // they are formed once for the whole matrix instead of once for every atom pair.
 
-    const auto fact = (1.0 / 10.0) * std::sqrt(95.0);
+    const auto fact = std::sqrt(19.0 / 20.0);
     const auto fz_m9 = std::sqrt(19.0);
     const auto fz_m8 = 19.0 / 6.0;
-    const auto fr_m8 = (1.0 / 6.0) * std::sqrt(17.0);
-    const auto fz_m7 = (19.0 / 51.0) * std::sqrt(51.0);
-    const auto fr_m7 = (4.0 / 51.0) * std::sqrt(102.0);
+    const auto fr_m8 = std::sqrt(17.0 / 36.0);
+    const auto fz_m7 = std::sqrt(361.0 / 51.0);
+    const auto fr_m7 = std::sqrt(32.0 / 51.0);
     const auto fz_m6 = 2.375;
-    const auto fr_m6 = 0.375 * std::sqrt(5.0);
-    const auto fz_m5 = (19.0 / 15.0) * std::sqrt(3.0);
-    const auto fr_m5 = (2.0 / 15.0) * std::sqrt(42.0);
-    const auto fz_m4 = (19.0 / 42.0) * std::sqrt(21.0);
-    const auto fr_m4 = (1.0 / 42.0) * std::sqrt(1365.0);
-    const auto fz_m3 = (19.0 / 91.0) * std::sqrt(91.0);
-    const auto fr_m3 = (6.0 / 91.0) * std::sqrt(182.0);
-    const auto fz_m2 = (19.0 / 24.0) * std::sqrt(6.0);
-    const auto fr_m2 = (1.0 / 24.0) * std::sqrt(462.0);
-    const auto fz_m1 = (19.0 / 33.0) * std::sqrt(11.0);
-    const auto fr_m1 = (4.0 / 33.0) * std::sqrt(55.0);
+    const auto fr_m6 = std::sqrt(0.703125);
+    const auto fz_m5 = std::sqrt(361.0 / 75.0);
+    const auto fr_m5 = std::sqrt(56.0 / 75.0);
+    const auto fz_m4 = std::sqrt(361.0 / 84.0);
+    const auto fr_m4 = std::sqrt(65.0 / 84.0);
+    const auto fz_m3 = std::sqrt(361.0 / 91.0);
+    const auto fr_m3 = std::sqrt(72.0 / 91.0);
+    const auto fz_m2 = std::sqrt(361.0 / 96.0);
+    const auto fr_m2 = std::sqrt(77.0 / 96.0);
+    const auto fz_m1 = std::sqrt(361.0 / 99.0);
+    const auto fr_m1 = std::sqrt(80.0 / 99.0);
     const auto fz_0 = 19.0 / 10.0;
     const auto fr_0 = 9.0 / 10.0;
-    const auto fz_p1 = (19.0 / 33.0) * std::sqrt(11.0);
-    const auto fr_p1 = (4.0 / 33.0) * std::sqrt(55.0);
-    const auto fz_p2 = (19.0 / 24.0) * std::sqrt(6.0);
-    const auto fr_p2 = (1.0 / 24.0) * std::sqrt(462.0);
-    const auto fz_p3 = (19.0 / 91.0) * std::sqrt(91.0);
-    const auto fr_p3 = (6.0 / 91.0) * std::sqrt(182.0);
-    const auto fz_p4 = (19.0 / 42.0) * std::sqrt(21.0);
-    const auto fr_p4 = (1.0 / 42.0) * std::sqrt(1365.0);
-    const auto fz_p5 = (19.0 / 15.0) * std::sqrt(3.0);
-    const auto fr_p5 = (2.0 / 15.0) * std::sqrt(42.0);
+    const auto fz_p1 = std::sqrt(361.0 / 99.0);
+    const auto fr_p1 = std::sqrt(80.0 / 99.0);
+    const auto fz_p2 = std::sqrt(361.0 / 96.0);
+    const auto fr_p2 = std::sqrt(77.0 / 96.0);
+    const auto fz_p3 = std::sqrt(361.0 / 91.0);
+    const auto fr_p3 = std::sqrt(72.0 / 91.0);
+    const auto fz_p4 = std::sqrt(361.0 / 84.0);
+    const auto fr_p4 = std::sqrt(65.0 / 84.0);
+    const auto fz_p5 = std::sqrt(361.0 / 75.0);
+    const auto fr_p5 = std::sqrt(56.0 / 75.0);
     const auto fz_p6 = 2.375;
-    const auto fr_p6 = 0.375 * std::sqrt(5.0);
-    const auto fz_p7 = (19.0 / 51.0) * std::sqrt(51.0);
-    const auto fr_p7 = (4.0 / 51.0) * std::sqrt(102.0);
+    const auto fr_p6 = std::sqrt(0.703125);
+    const auto fz_p7 = std::sqrt(361.0 / 51.0);
+    const auto fr_p7 = std::sqrt(32.0 / 51.0);
     const auto fz_p8 = 19.0 / 6.0;
-    const auto fr_p8 = (1.0 / 6.0) * std::sqrt(17.0);
+    const auto fr_p8 = std::sqrt(17.0 / 36.0);
     const auto fz_p9 = std::sqrt(19.0);
 
     // NOTE: the pointers to the rows are taken once, as the accessor of a row is
@@ -1586,46 +1586,46 @@ make_o_solid_harmonics(const CSimdMatrix &n_harmonics, const CSimdMatrix &m_harm
     // NOTE: the factors of the recursion depend on the angular momentum alone, so
     // they are formed once for the whole matrix instead of once for every atom pair.
 
-    const auto fact = (1.0 / 22.0) * std::sqrt(462.0);
+    const auto fact = std::sqrt(21.0 / 22.0);
     const auto fz_m10 = std::sqrt(21.0);
-    const auto fz_m9 = (21.0 / 20.0) * std::sqrt(10.0);
-    const auto fr_m9 = (1.0 / 20.0) * std::sqrt(190.0);
-    const auto fz_m8 = (7.0 / 19.0) * std::sqrt(57.0);
-    const auto fr_m8 = (2.0 / 19.0) * std::sqrt(57.0);
-    const auto fz_m7 = 1.75 * std::sqrt(2.0);
-    const auto fr_m7 = (1.0 / 12.0) * std::sqrt(102.0);
-    const auto fz_m6 = (21.0 / 85.0) * std::sqrt(85.0);
-    const auto fr_m6 = (8.0 / 85.0) * std::sqrt(85.0);
-    const auto fz_m5 = 0.875 * std::sqrt(6.0);
-    const auto fr_m5 = 0.625 * std::sqrt(2.0);
-    const auto fz_m4 = (1.0 / 5.0) * std::sqrt(105.0);
-    const auto fr_m4 = (2.0 / 5.0) * std::sqrt(5.0);
-    const auto fz_m3 = 0.75 * std::sqrt(7.0);
-    const auto fr_m3 = 0.25 * std::sqrt(13.0);
-    const auto fz_m2 = (7.0 / 13.0) * std::sqrt(13.0);
-    const auto fr_m2 = (4.0 / 39.0) * std::sqrt(78.0);
-    const auto fz_m1 = (7.0 / 20.0) * std::sqrt(30.0);
-    const auto fr_m1 = (1.0 / 20.0) * std::sqrt(330.0);
+    const auto fz_m9 = std::sqrt(441.0 / 40.0);
+    const auto fr_m9 = std::sqrt(19.0 / 40.0);
+    const auto fz_m8 = std::sqrt(147.0 / 19.0);
+    const auto fr_m8 = std::sqrt(12.0 / 19.0);
+    const auto fz_m7 = std::sqrt(6.125);
+    const auto fr_m7 = std::sqrt(17.0 / 24.0);
+    const auto fz_m6 = std::sqrt(441.0 / 85.0);
+    const auto fr_m6 = std::sqrt(64.0 / 85.0);
+    const auto fz_m5 = std::sqrt(4.59375);
+    const auto fr_m5 = std::sqrt(0.78125);
+    const auto fz_m4 = std::sqrt(21.0 / 5.0);
+    const auto fr_m4 = std::sqrt(4.0 / 5.0);
+    const auto fz_m3 = std::sqrt(3.9375);
+    const auto fr_m3 = std::sqrt(0.8125);
+    const auto fz_m2 = std::sqrt(49.0 / 13.0);
+    const auto fr_m2 = std::sqrt(32.0 / 39.0);
+    const auto fz_m1 = std::sqrt(147.0 / 40.0);
+    const auto fr_m1 = std::sqrt(33.0 / 40.0);
     const auto fz_0 = 21.0 / 11.0;
     const auto fr_0 = 10.0 / 11.0;
-    const auto fz_p1 = (7.0 / 20.0) * std::sqrt(30.0);
-    const auto fr_p1 = (1.0 / 20.0) * std::sqrt(330.0);
-    const auto fz_p2 = (7.0 / 13.0) * std::sqrt(13.0);
-    const auto fr_p2 = (4.0 / 39.0) * std::sqrt(78.0);
-    const auto fz_p3 = 0.75 * std::sqrt(7.0);
-    const auto fr_p3 = 0.25 * std::sqrt(13.0);
-    const auto fz_p4 = (1.0 / 5.0) * std::sqrt(105.0);
-    const auto fr_p4 = (2.0 / 5.0) * std::sqrt(5.0);
-    const auto fz_p5 = 0.875 * std::sqrt(6.0);
-    const auto fr_p5 = 0.625 * std::sqrt(2.0);
-    const auto fz_p6 = (21.0 / 85.0) * std::sqrt(85.0);
-    const auto fr_p6 = (8.0 / 85.0) * std::sqrt(85.0);
-    const auto fz_p7 = 1.75 * std::sqrt(2.0);
-    const auto fr_p7 = (1.0 / 12.0) * std::sqrt(102.0);
-    const auto fz_p8 = (7.0 / 19.0) * std::sqrt(57.0);
-    const auto fr_p8 = (2.0 / 19.0) * std::sqrt(57.0);
-    const auto fz_p9 = (21.0 / 20.0) * std::sqrt(10.0);
-    const auto fr_p9 = (1.0 / 20.0) * std::sqrt(190.0);
+    const auto fz_p1 = std::sqrt(147.0 / 40.0);
+    const auto fr_p1 = std::sqrt(33.0 / 40.0);
+    const auto fz_p2 = std::sqrt(49.0 / 13.0);
+    const auto fr_p2 = std::sqrt(32.0 / 39.0);
+    const auto fz_p3 = std::sqrt(3.9375);
+    const auto fr_p3 = std::sqrt(0.8125);
+    const auto fz_p4 = std::sqrt(21.0 / 5.0);
+    const auto fr_p4 = std::sqrt(4.0 / 5.0);
+    const auto fz_p5 = std::sqrt(4.59375);
+    const auto fr_p5 = std::sqrt(0.78125);
+    const auto fz_p6 = std::sqrt(441.0 / 85.0);
+    const auto fr_p6 = std::sqrt(64.0 / 85.0);
+    const auto fz_p7 = std::sqrt(6.125);
+    const auto fr_p7 = std::sqrt(17.0 / 24.0);
+    const auto fz_p8 = std::sqrt(147.0 / 19.0);
+    const auto fr_p8 = std::sqrt(12.0 / 19.0);
+    const auto fz_p9 = std::sqrt(441.0 / 40.0);
+    const auto fr_p9 = std::sqrt(19.0 / 40.0);
     const auto fz_p10 = std::sqrt(21.0);
 
     // NOTE: the pointers to the rows are taken once, as the accessor of a row is
@@ -1848,50 +1848,50 @@ make_q_solid_harmonics(const CSimdMatrix &o_harmonics, const CSimdMatrix &n_harm
     // NOTE: the factors of the recursion depend on the angular momentum alone, so
     // they are formed once for the whole matrix instead of once for every atom pair.
 
-    const auto fact = (1.0 / 12.0) * std::sqrt(138.0);
+    const auto fact = std::sqrt(23.0 / 24.0);
     const auto fz_m11 = std::sqrt(23.0);
-    const auto fz_m10 = (23.0 / 22.0) * std::sqrt(11.0);
-    const auto fr_m10 = (1.0 / 22.0) * std::sqrt(231.0);
-    const auto fz_m9 = (23.0 / 21.0) * std::sqrt(7.0);
-    const auto fr_m9 = (2.0 / 21.0) * std::sqrt(70.0);
-    const auto fz_m8 = (23.0 / 20.0) * std::sqrt(5.0);
-    const auto fr_m8 = (1.0 / 20.0) * std::sqrt(285.0);
-    const auto fz_m7 = (23.0 / 95.0) * std::sqrt(95.0);
-    const auto fr_m7 = (6.0 / 95.0) * std::sqrt(190.0);
-    const auto fz_m6 = (23.0 / 18.0) * std::sqrt(3.0);
-    const auto fr_m6 = (1.0 / 18.0) * std::sqrt(255.0);
-    const auto fz_m5 = (23.0 / 119.0) * std::sqrt(119.0);
-    const auto fr_m5 = (4.0 / 119.0) * std::sqrt(714.0);
-    const auto fz_m4 = 1.4375 * std::sqrt(2.0);
-    const auto fr_m4 = 0.0625 * std::sqrt(210.0);
-    const auto fz_m3 = (23.0 / 45.0) * std::sqrt(15.0);
-    const auto fr_m3 = (4.0 / 45.0) * std::sqrt(105.0);
-    const auto fz_m2 = (23.0 / 70.0) * std::sqrt(35.0);
-    const auto fr_m2 = (3.0 / 70.0) * std::sqrt(455.0);
-    const auto fz_m1 = (23.0 / 143.0) * std::sqrt(143.0);
-    const auto fr_m1 = (2.0 / 143.0) * std::sqrt(4290.0);
+    const auto fz_m10 = std::sqrt(529.0 / 44.0);
+    const auto fr_m10 = std::sqrt(21.0 / 44.0);
+    const auto fz_m9 = std::sqrt(529.0 / 63.0);
+    const auto fr_m9 = std::sqrt(40.0 / 63.0);
+    const auto fz_m8 = std::sqrt(529.0 / 80.0);
+    const auto fr_m8 = std::sqrt(57.0 / 80.0);
+    const auto fz_m7 = std::sqrt(529.0 / 95.0);
+    const auto fr_m7 = std::sqrt(72.0 / 95.0);
+    const auto fz_m6 = std::sqrt(529.0 / 108.0);
+    const auto fr_m6 = std::sqrt(85.0 / 108.0);
+    const auto fz_m5 = std::sqrt(529.0 / 119.0);
+    const auto fr_m5 = std::sqrt(96.0 / 119.0);
+    const auto fz_m4 = std::sqrt(4.1328125);
+    const auto fr_m4 = std::sqrt(0.8203125);
+    const auto fz_m3 = std::sqrt(529.0 / 135.0);
+    const auto fr_m3 = std::sqrt(112.0 / 135.0);
+    const auto fz_m2 = std::sqrt(529.0 / 140.0);
+    const auto fr_m2 = std::sqrt(117.0 / 140.0);
+    const auto fz_m1 = std::sqrt(529.0 / 143.0);
+    const auto fr_m1 = std::sqrt(120.0 / 143.0);
     const auto fz_0 = 23.0 / 12.0;
     const auto fr_0 = 11.0 / 12.0;
-    const auto fz_p1 = (23.0 / 143.0) * std::sqrt(143.0);
-    const auto fr_p1 = (2.0 / 143.0) * std::sqrt(4290.0);
-    const auto fz_p2 = (23.0 / 70.0) * std::sqrt(35.0);
-    const auto fr_p2 = (3.0 / 70.0) * std::sqrt(455.0);
-    const auto fz_p3 = (23.0 / 45.0) * std::sqrt(15.0);
-    const auto fr_p3 = (4.0 / 45.0) * std::sqrt(105.0);
-    const auto fz_p4 = 1.4375 * std::sqrt(2.0);
-    const auto fr_p4 = 0.0625 * std::sqrt(210.0);
-    const auto fz_p5 = (23.0 / 119.0) * std::sqrt(119.0);
-    const auto fr_p5 = (4.0 / 119.0) * std::sqrt(714.0);
-    const auto fz_p6 = (23.0 / 18.0) * std::sqrt(3.0);
-    const auto fr_p6 = (1.0 / 18.0) * std::sqrt(255.0);
-    const auto fz_p7 = (23.0 / 95.0) * std::sqrt(95.0);
-    const auto fr_p7 = (6.0 / 95.0) * std::sqrt(190.0);
-    const auto fz_p8 = (23.0 / 20.0) * std::sqrt(5.0);
-    const auto fr_p8 = (1.0 / 20.0) * std::sqrt(285.0);
-    const auto fz_p9 = (23.0 / 21.0) * std::sqrt(7.0);
-    const auto fr_p9 = (2.0 / 21.0) * std::sqrt(70.0);
-    const auto fz_p10 = (23.0 / 22.0) * std::sqrt(11.0);
-    const auto fr_p10 = (1.0 / 22.0) * std::sqrt(231.0);
+    const auto fz_p1 = std::sqrt(529.0 / 143.0);
+    const auto fr_p1 = std::sqrt(120.0 / 143.0);
+    const auto fz_p2 = std::sqrt(529.0 / 140.0);
+    const auto fr_p2 = std::sqrt(117.0 / 140.0);
+    const auto fz_p3 = std::sqrt(529.0 / 135.0);
+    const auto fr_p3 = std::sqrt(112.0 / 135.0);
+    const auto fz_p4 = std::sqrt(4.1328125);
+    const auto fr_p4 = std::sqrt(0.8203125);
+    const auto fz_p5 = std::sqrt(529.0 / 119.0);
+    const auto fr_p5 = std::sqrt(96.0 / 119.0);
+    const auto fz_p6 = std::sqrt(529.0 / 108.0);
+    const auto fr_p6 = std::sqrt(85.0 / 108.0);
+    const auto fz_p7 = std::sqrt(529.0 / 95.0);
+    const auto fr_p7 = std::sqrt(72.0 / 95.0);
+    const auto fz_p8 = std::sqrt(529.0 / 80.0);
+    const auto fr_p8 = std::sqrt(57.0 / 80.0);
+    const auto fz_p9 = std::sqrt(529.0 / 63.0);
+    const auto fr_p9 = std::sqrt(40.0 / 63.0);
+    const auto fz_p10 = std::sqrt(529.0 / 44.0);
+    const auto fr_p10 = std::sqrt(21.0 / 44.0);
     const auto fz_p11 = std::sqrt(23.0);
 
     // NOTE: the pointers to the rows are taken once, as the accessor of a row is
