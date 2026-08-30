@@ -36,6 +36,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <optional>
 #include <ranges>
 #include <string>
 #include <utility>
@@ -1024,30 +1025,37 @@ class CSparseMatrix
                 const double                      threshold,
                 const diagstor                    storage) -> void
     {
-        // NOTE: the atom basis pair groups are independent, so their atom pairs are
-        // ordered by interatomic distance in parallel. Dynamic scheduling is used
-        // as the groups differ widely in the number of atom pairs.
+        // NOTE: the atom basis pair groups are independent, so the atom pairs of a
+        // group are ordered by interatomic distance and the sparsity patterns of
+        // the group are described in parallel. Dynamic scheduling is used as the
+        // groups differ widely in the number of atom pairs.
 
         const auto ngroups = static_cast<int>(groups.size());
+
+        // NOTE: the patterns are held in a vector indexed by the group, so that
+        // they are formed in any order and added in the order of the groups. The
+        // layout of the values blocks therefore does not depend on the scheduling.
+
+        std::vector<std::optional<CAtomBasisPairSparsity>> pair_blocks(groups.size());
+
+        std::vector<std::optional<CAtomBasisDiagonalSparsity>> diagonal_blocks(groups.size());
 
 #pragma omp parallel for schedule(dynamic)
         for (int i = 0; i < ngroups; i++)
         {
             groups[i].sort_by_distance(molecule);
+
+            pair_blocks[i].emplace(groups[i], screener, threshold);
+
+            diagonal_blocks[i].emplace(groups[i], storage);
         }
 
-        // NOTE: the blocks are added in the order of the groups, so that the
-        // layout of the values blocks does not depend on the scheduling above.
+        for (int i = 0; i < ngroups; i++)
+        {
+            if (pair_blocks[i]->number_of_pairs() > 0) _pair_blocks.push_back(std::move(*pair_blocks[i]));
 
-        std::ranges::for_each(groups, [&](const auto &group) {
-            const auto pair_block = CAtomBasisPairSparsity(group, screener, threshold);
-
-            if (pair_block.number_of_pairs() > 0) _pair_blocks.push_back(pair_block);
-
-            const auto diagonal_block = CAtomBasisDiagonalSparsity(group, storage);
-
-            if (diagonal_block.number_of_atoms() > 0) _diagonal_blocks.push_back(diagonal_block);
-        });
+            if (diagonal_blocks[i]->number_of_atoms() > 0) _diagonal_blocks.push_back(std::move(*diagonal_blocks[i]));
+        }
 
         // NOTE: one values block per sparsity pattern, sized here so that every
         // construction path leaves the values blocks consistent with the blocks.
