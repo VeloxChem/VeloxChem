@@ -300,11 +300,13 @@ discards the most: ubiquitin in def2-svp reaches 41.9x.
 The threads are the weak point of the driver, and the cause is not the driver.
 The construction of the sparsity pattern, the integrals and the reconstruction of
 the dense matrix all saturate at the same 2.2 to 2.5 times, and the last of them
-was already parallel before the others were. Three unrelated paths saturating
-together, on a machine where a single core already sustains 111 to 152 GB/s,
-points at the memory and not at the work distribution. The reference scales five
-to seven and a half times because it is bound by the redundant arithmetic it
-performs, which the memory is nowhere near limiting.
+was already parallel before the others were.
+
+**This paragraph originally concluded that the memory bandwidth is the cause.
+That conclusion was wrong and is corrected in the section on the phases of
+`compute` below.** The integrals scale better than 2.2 times, the figure above
+having been measured as `compute` less the sparsity, which silently includes a
+serial allocation and zeroing of the values blocks.
 
 The threads therefore let the reference catch up. The advantage of the whole
 `compute` falls from between 2.3 and 25.8 times on one thread to between 1.0 and
@@ -322,3 +324,76 @@ with a small basis, at 0.048 seconds of the 0.056 seconds of the whole `compute`
 for ubiquitin in def2-svp. It threads, as the sort of the atom pairs by distance
 was parallel already, but it does not shrink with the basis the way the integrals
 do, as it depends on the number of atoms alone.
+
+## The phases of `compute` and what limits their threads
+
+The measurements above take the cost of the integrals as `compute` less the
+construction of the sparsity pattern. That is wrong: `compute` also allocates the
+values blocks and, at the time, set them to zero, both of which are serial. The
+numbers below split `compute` into its four phases directly and supersede the
+scaling figures of the previous section.
+
+### Where the time of `compute` goes
+
+Seconds, best of three runs, with the values blocks no longer set to zero.
+
+| molecule | basis | sparsity 1 thr | 14 thr | pair blocks 1 thr | 14 thr | scaling |
+|---|---|---|---|---|---|---|
+| tagrisso | def2-qzvp | 0.00034 | 0.00040 | 0.00269 | 0.00289 | 0.9x |
+| taxol | def2-qzvp | 0.00049 | 0.00043 | 0.00438 | 0.00438 | 1.0x |
+| crambin | def2-svp | 0.01085 | 0.00427 | 0.00422 | 0.00198 | 2.1x |
+| crambin | def2-tzvp | 0.01121 | 0.00464 | 0.01213 | 0.00444 | 2.7x |
+| crambin | def2-qzvp | 0.01186 | 0.00500 | 0.03842 | 0.01159 | 3.3x |
+| ubiquitin | def2-svp | 0.05071 | 0.01951 | 0.00850 | 0.00304 | 2.8x |
+| ubiquitin | def2-tzvp | 0.04913 | 0.01993 | 0.02424 | 0.00766 | 3.2x |
+| ubiquitin | def2-qzvp | 0.05074 | 0.02062 | 0.07841 | 0.02091 | 3.7x |
+
+The allocation of the values blocks is a few tens of microseconds and the
+diagonal blocks are tens of nanoseconds, so both are omitted. The two smallest
+molecules do not enter the parallel region at all, as their blocks stay below the
+threshold of four thousand atom pairs.
+
+The integrals scale between 2.7 and 3.7 times where the molecule is large enough
+to enter the parallel region, not the 2.2 times of the previous section. The
+construction of the sparsity pattern scales between 2.4 and 2.6 times and is what
+the large molecules with a small basis spend their time in: for ubiquitin in
+def2-svp it is 0.051 of the 0.059 seconds of the whole `compute`, and the
+integrals are almost free beside it.
+
+### What was ruled out, and how
+
+The gap between the threads which are used and the threads which are available
+was chased through a series of measurements, each of which excluded a cause.
+
+| cause | measurement | verdict |
+|---|---|---|
+| memory bandwidth | traffic accounted at 1.86 GB against 0.0298 s, i.e. 62 GB/s of a 296 GB/s ceiling | ruled out, 21 percent used |
+| core clocks | pure register arithmetic scales 11.2x on fourteen threads | ruled out |
+| page faults | 1 to 256 minor faults per `compute` | ruled out |
+| the allocator | 0.0014 s of allocation in a 0.030 s phase | ruled out, five percent |
+| the parallel threshold | work in blocks below it is 7.5 percent | ruled out |
+| imbalance between combinations | the largest is 1.3 to 3.8 percent of the total | ruled out |
+| the working set | batching the atom pairs was slower in both arrangements | ruled out |
+| spinning at the barriers | the wait policy changes the wall time by nothing | a symptom, not a cause |
+
+The counters of the CPU showed 2.69e8 cycles per `compute` on one thread against
+2.64e9 on ten, i.e. ten times the cycles for twice the speed. That is idle
+threads rather than stalled ones, which pointed at the serial phases and led to
+the split above.
+
+### What helped and what did not
+
+| change | effect |
+|---|---|
+| parallel over the combinations of basis functions of a block | the integrals scale 2.7 to 3.7 times |
+| the integrals formed straight into the values block | 1.13 to 1.27 times, and it helps a single thread as well |
+| the values blocks no longer set to zero | 4 to 10 percent, as every value is written anyway |
+| the coordinates and the harmonics made parallel | nothing, measured either way |
+| the atom pairs of a block computed in batches | slower, in both arrangements which were tried |
+
+The batches were tried twice. With the batch as the unit of work there are too
+few of them, as a block of eighty thousand atom pairs in batches of eight
+thousand gives ten tasks for ten threads. With the combinations parallel inside
+serial batches the result improves as the batch grows, which is to say as the
+batching is switched off. The working set of the harmonics is therefore not what
+limits the threads.
