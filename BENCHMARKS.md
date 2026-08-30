@@ -289,6 +289,29 @@ two reference columns are the same two steps of the reference driver.
 | ubiquitin | def2-tzvp | 2.52x | 2.26x | 2.40x | 1.64x | 4.95x |
 | ubiquitin | def2-qzvp | 2.42x | 2.26x | 2.30x | 2.43x | |
 
+The two tables above predate the integrals being formed straight into the values
+block and the values blocks no longer being set to zero. Measured again on
+fourteen threads with both of those in place, `compute` against the reference:
+
+| molecule | basis | nao | compute | ref compute | speedup |
+|---|---|---|---|---|---|
+| tagrisso | def2-svp | 683 | 0.0005 | 0.0005 | 1.0x |
+| tagrisso | def2-tzvp | 1345 | 0.0012 | 0.0031 | 2.6x |
+| tagrisso | def2-qzvp | 3099 | 0.0033 | 0.0045 | 1.4x |
+| taxol | def2-svp | 1099 | 0.0008 | 0.0011 | 1.4x |
+| taxol | def2-tzvp | 2185 | 0.0018 | 0.0016 | 0.9x |
+| taxol | def2-qzvp | 4947 | 0.0050 | 0.0065 | 1.3x |
+| crambin | def2-svp | 6177 | 0.0064 | 0.0136 | 2.1x |
+| crambin | def2-tzvp | 12063 | 0.0090 | 0.0756 | 8.4x |
+| crambin | def2-qzvp | 28167 | 0.0216 | 0.3722 | 17.2x |
+| ubiquitin | def2-svp | 11577 | 0.0237 | 0.0492 | 2.1x |
+| ubiquitin | def2-tzvp | 22442 | 0.0285 | 0.1668 | 5.9x |
+| ubiquitin | def2-qzvp | 53197 | 0.0613 | too large | |
+
+The smallest molecules are level with the reference or behind it, as they take
+well under a millisecond and their blocks never enter the parallel region.
+
+
 ### What the numbers say
 
 The integrals are twenty to forty two times faster than the reference on a single
