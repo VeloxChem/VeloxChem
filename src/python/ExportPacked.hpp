@@ -30,47 +30,19 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <pybind11/pybind11.h>
 
-#include "ExportDft.hpp"
-#include "ExportGeneral.hpp"
-#include "ExportMath.hpp"
-#include "ExportMoldata.hpp"
-#include "ExportOneElecInts.hpp"
-#include "ExportOrbdata.hpp"
-#include "ExportSimdIntegrals.hpp"
-#include "ExportPacked.hpp"
-#include "ExportSparse.hpp"
-#include "ExportVisualization.hpp"
-#include "ExportT2CIntegrals.hpp"
-#include "ExportT3CIntegrals.hpp"
-#include "ExportT4CIntegrals.hpp"
 
-PYBIND11_MODULE(veloxchemlib, m)
-{
-    vlx_general::export_general(m);
+#ifndef ExportPacked_hpp
+#define ExportPacked_hpp
 
-    vlx_math::export_math(m);
+#include "ExportHelpers.hpp"
 
-    vlx_moldata::export_moldata(m);
+namespace vlx_packed {  // vlx_packed namespace
 
-    vlx_orbdata::export_orbdata(m);
+/// @brief Exports packed matrix class in src/orbdata to Python module.
+/// @param m The Python module.
+auto export_packed(py::module &m) -> void;
 
-    vlx_packed::export_packed(m);
+}  // namespace vlx_packed
 
-    vlx_sparse::export_sparse(m);
-
-    vlx_dft::export_dft(m);
-
-    vlx_oneeints::export_oneeints(m);
-
-    vlx_visualization::export_visualization(m);
-
-    vlx_t2cintegrals::export_t2cintegrals(m);
-    
-    vlx_t3cintegrals::export_t3cintegrals(m);
-
-    vlx_t4cintegrals::export_t4cintegrals(m);
-
-    vlx_simdintegrals::export_simdintegrals(m);
-}
+#endif /* ExportPacked_hpp */

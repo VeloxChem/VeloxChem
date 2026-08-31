@@ -40,6 +40,7 @@
 #include <utility>
 #include <vector>
 
+#include "DenseIndexFunc.hpp"
 #include "ErrorHandler.hpp"
 #include "Matrix.hpp"
 #include "ScreeningFunc.hpp"
@@ -69,31 +70,6 @@ CSimdKineticEnergyDriver::compute(const CMolecule &molecule, const CMolecularBas
     _compute_diagonal_blocks(matrix, molecule, basis);
 
     return matrix;
-}
-
-/// @brief Gets the angular momentum and the index within it of each basis
-/// function of an atom basis.
-/// @param basis The atom basis to index the basis functions of.
-/// @return The vector of angular momenta and indices within them.
-static auto
-_index_functions(const CAtomBasis &basis) -> std::vector<std::pair<int, size_t>>
-{
-    std::vector<std::pair<int, size_t>> indices;
-
-    std::vector<size_t> counts(static_cast<size_t>(basis.max_angular_momentum() + 1), 0);
-
-    const auto &functions = basis.functions();
-
-    for (size_t i = 0; i < functions.size(); i++)
-    {
-        const auto lval = functions[i].get_angular_momentum();
-
-        indices.push_back({lval, counts[lval]});
-
-        counts[lval]++;
-    }
-
-    return indices;
 }
 
 auto
@@ -127,9 +103,9 @@ CSimdKineticEnergyDriver::_compute_pair_blocks(CSparseMatrix &matrix, const CMol
     {
         const auto &block = matrix.pair_block(static_cast<size_t>(iblk));
 
-        const auto a_indices = _index_functions(basis.basis_set(block.bra_index()));
+        const auto a_indices = denseidx::index_functions(basis.basis_set(block.bra_index()));
 
-        const auto b_indices = _index_functions(basis.basis_set(block.ket_index()));
+        const auto b_indices = denseidx::index_functions(basis.basis_set(block.ket_index()));
 
         double weight = 0.0;
 
@@ -179,9 +155,9 @@ CSimdKineticEnergyDriver::_compute_pair_blocks(CSparseMatrix &matrix, const CMol
 
         const auto harmonics = simdfunc::make_solid_harmonics(coordinates, lmax);
 
-        const auto a_indices = _index_functions(a_basis);
+        const auto a_indices = denseidx::index_functions(a_basis);
 
-        const auto b_indices = _index_functions(b_basis);
+        const auto b_indices = denseidx::index_functions(b_basis);
 
         // NOTE: the atom bases of an off-diagonal block sit on different atoms,
         // so all combinations of basis functions are computed and none of them
@@ -233,9 +209,9 @@ CSimdKineticEnergyDriver::_compute_diagonal_blocks(CSparseMatrix &matrix, const 
 
         const auto &b_basis = basis.basis_set(block.ket_index());
 
-        const auto a_indices = _index_functions(a_basis);
+        const auto a_indices = denseidx::index_functions(a_basis);
 
-        const auto b_indices = _index_functions(b_basis);
+        const auto b_indices = denseidx::index_functions(b_basis);
 
         auto *values = matrix.diagonal_values(iblk);
 

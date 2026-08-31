@@ -128,6 +128,12 @@ make_coordinates(const CAtomBasisPairSparsity &sparsity, const CMolecule &molecu
 }
 
 auto
+make_coordinates(const CAtomBasisPairGroup &group, const CMolecule &molecule) -> CSimdMatrix
+{
+    return _make_coordinates(group.bra_atoms(), group.ket_atoms(), group.number_of_pairs(), molecule);
+}
+
+auto
 make_coordinates(const CAtomBasisTripleSparsity &sparsity, const CMolecule &molecule) -> CSimdMatrix
 {
     return _make_coordinates(sparsity.a_atoms(), sparsity.b_atoms(), sparsity.number_of_pairs(), molecule);

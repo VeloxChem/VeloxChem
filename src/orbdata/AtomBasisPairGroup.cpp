@@ -36,11 +36,13 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <iterator>
 #include <utility>
 #include <vector>
 
 #include "ErrorHandler.hpp"
 #include "Molecule.hpp"
+#include "OpenMPFunc.hpp"
 
 namespace {  // anonymous namespace
 
@@ -416,4 +418,45 @@ CAtomBasisPairGroup::make_pair_groups(const std::vector<CAtomBasisGroup> &groups
     }
 
     return pair_groups;
+}
+
+auto
+CAtomBasisPairGroup::divide(const std::vector<CAtomBasisPairGroup> &groups, const size_t block_size) -> std::vector<CAtomBasisPairGroup>
+{
+    std::vector<CAtomBasisPairGroup> blocks;
+
+    blocks.reserve(groups.size());
+
+    for (const auto &group : groups)
+    {
+        const auto npairs = group.number_of_pairs();
+
+        // NOTE: the blocks are counted by a division and a remainder rather than
+        // by rounding the division up, as adding the target size to the atom
+        // pairs overflows for a target size near the largest one.
+
+        const auto nblocks = std::max(size_t{1}, npairs / block_size + ((npairs % block_size == 0) ? size_t{0} : size_t{1}));
+
+        auto parts = group.partition(nblocks);
+
+        blocks.insert(blocks.end(), std::make_move_iterator(parts.begin()), std::make_move_iterator(parts.end()));
+    }
+
+    return blocks;
+}
+
+auto
+CAtomBasisPairGroup::make_block_size(const std::vector<CAtomBasisPairGroup> &groups,
+                                     const size_t                           blocks_per_thread,
+                                     const size_t                           min_block_size) -> size_t
+{
+    const auto nthreads = omp_in_parallel() ? 1 : omp::get_number_of_threads();
+
+    if (nthreads < 2) return 0;
+
+    size_t npairs = 0;
+
+    for (const auto &group : groups) npairs += group.number_of_pairs();
+
+    return std::max(npairs / (blocks_per_thread * static_cast<size_t>(nthreads)), min_block_size);
 }

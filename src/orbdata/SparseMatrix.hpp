@@ -46,6 +46,7 @@
 #include "AtomBasisDiagonalSparsity.hpp"
 #include "AtomBasisPairGroup.hpp"
 #include "AtomBasisPairSparsity.hpp"
+#include "DenseIndexFunc.hpp"
 #include "ErrorHandler.hpp"
 #include "Matrix.hpp"
 #include "MolecularBasis.hpp"
@@ -713,13 +714,13 @@ class CSparseMatrix
         // recomputed, as the innermost loops below run over the atom pairs and
         // would otherwise scan the basis for every value.
 
-        const auto bra_starts = _make_dense_starts(bra_basis);
+        const auto bra_starts = denseidx::make_dense_starts(bra_basis);
 
-        const auto ket_starts = _make_dense_starts(ket_basis);
+        const auto ket_starts = denseidx::make_dense_starts(ket_basis);
 
-        const auto bra_strides = _make_dense_strides(bra_basis);
+        const auto bra_strides = denseidx::make_dense_strides(bra_basis);
 
-        const auto ket_strides = _make_dense_strides(ket_basis);
+        const auto ket_strides = denseidx::make_dense_strides(ket_basis);
 
         const auto bra_nmoms = bra_strides.size();
 
@@ -743,9 +744,9 @@ class CSparseMatrix
 
             const auto &ket_atoms = block.ket_atoms();
 
-            const auto a_indices = _index_functions(bra_basis.basis_set(block.bra_index()));
+            const auto a_indices = denseidx::index_functions(bra_basis.basis_set(block.bra_index()));
 
-            const auto b_indices = _index_functions(ket_basis.basis_set(block.ket_index()));
+            const auto b_indices = denseidx::index_functions(ket_basis.basis_set(block.ket_index()));
 
             for (size_t i = 0; i < a_indices.size(); i++)
             {
@@ -813,90 +814,6 @@ class CSparseMatrix
     }
 
    private:
-    /// @brief Gets the angular momentum and the index within it of each basis
-    /// function of an atom basis.
-    /// @param basis The atom basis to index the basis functions of.
-    /// @return The vector of angular momenta and indices within them.
-    static auto
-    _index_functions(const CAtomBasis &basis) -> std::vector<std::pair<int, size_t>>
-    {
-        std::vector<std::pair<int, size_t>> indices;
-
-        std::vector<size_t> counts(static_cast<size_t>(basis.max_angular_momentum() + 1), 0);
-
-        const auto &functions = basis.functions();
-
-        for (size_t i = 0; i < functions.size(); i++)
-        {
-            const auto lval = functions[i].get_angular_momentum();
-
-            indices.push_back({lval, counts[lval]});
-
-            counts[lval]++;
-        }
-
-        return indices;
-    }
-
-    /// @brief Creates the dense index of the first angular component of the first
-    /// basis function of each angular momentum of each atom.
-    /// @param basis The molecular basis to index the basis functions of.
-    /// @return The vector of dense indices, with the atom as the slowest running
-    /// index and the angular momentum as the fastest.
-    static auto
-    _make_dense_starts(const CMolecularBasis &basis) -> std::vector<size_t>
-    {
-        const auto indices = basis.basis_sets_indices();
-
-        const auto nmoms = static_cast<size_t>(basis.max_angular_momentum() + 1);
-
-        std::vector<size_t> starts(indices.size() * nmoms, 0);
-
-        // NOTE: the basis functions of an angular momentum are numbered from the
-        // dimension of the basis functions of the lower angular momenta, as the
-        // dense matrix is ordered by ascending angular momentum.
-
-        std::vector<size_t> counts(nmoms, 0);
-
-        for (size_t l = 0; l < nmoms; l++)
-        {
-            counts[l] = basis.dimensions_of_basis(static_cast<int>(l));
-        }
-
-        for (size_t i = 0; i < indices.size(); i++)
-        {
-            const auto &abas = basis.basis_set(indices[i]);
-
-            for (size_t l = 0; l < nmoms; l++)
-            {
-                starts[i * nmoms + l] = counts[l];
-
-                counts[l] += abas.number_of_basis_functions(static_cast<int>(l));
-            }
-        }
-
-        return starts;
-    }
-
-    /// @brief Creates the distance between the dense indices of two consecutive
-    /// angular components of a basis function of each angular momentum.
-    /// @param basis The molecular basis to index the basis functions of.
-    /// @return The vector of distances.
-    static auto
-    _make_dense_strides(const CMolecularBasis &basis) -> std::vector<size_t>
-    {
-        const auto nmoms = static_cast<size_t>(basis.max_angular_momentum() + 1);
-
-        std::vector<size_t> strides(nmoms, 0);
-
-        for (size_t l = 0; l < nmoms; l++)
-        {
-            strides[l] = basis.number_of_basis_functions(static_cast<int>(l));
-        }
-
-        return strides;
-    }
-
     /// @brief Adds the values of the diagonal blocks to the dense matrix.
     /// @param bra_basis The molecular basis on bra side.
     /// @param ket_basis The molecular basis on ket side.
@@ -937,9 +854,9 @@ class CSparseMatrix
 
             const auto &atoms = block.atoms();
 
-            const auto a_indices = _index_functions(bra_basis.basis_set(block.bra_index()));
+            const auto a_indices = denseidx::index_functions(bra_basis.basis_set(block.bra_index()));
 
-            const auto b_indices = _index_functions(ket_basis.basis_set(block.ket_index()));
+            const auto b_indices = denseidx::index_functions(ket_basis.basis_set(block.ket_index()));
 
             for (size_t i = 0; i < a_indices.size(); i++)
             {
@@ -1106,9 +1023,9 @@ class CSparseMatrix
         // the molecule instead, so the work of every stage below divides for any
         // number of threads.
 
-        const auto nblock_pairs = (block_size == 0) ? _make_block_size(groups) : block_size;
+        const auto nblock_pairs = (block_size == 0) ? CAtomBasisPairGroup::make_block_size(groups, blocks_per_thread, min_block_size) : block_size;
 
-        auto blocks = (nblock_pairs == 0) ? std::move(groups) : _divide_groups(groups, nblock_pairs);
+        auto blocks = (nblock_pairs == 0) ? std::move(groups) : CAtomBasisPairGroup::divide(groups, nblock_pairs);
 
         // NOTE: the atom pairs of all the blocks are ordered by interatomic
         // distance before the sparsity patterns are described, as the patterns
@@ -1152,62 +1069,6 @@ class CSparseMatrix
         // construction path leaves the values blocks consistent with the blocks.
 
         _values.assign(_pair_blocks.size() + _diagonal_blocks.size(), nullptr);
-    }
-
-    /// @brief Divides the atom pairs of the atom basis pair groups into blocks of
-    /// a target number of atom pairs.
-    /// @param groups The atom basis pair groups to divide.
-    /// @param block_size The target number of atom pairs of a block.
-    /// @return The vector of blocks, in the order of the groups they divide.
-    /// @note A group is divided into as few blocks as hold its atom pairs at the
-    /// target size, so a group below the target is left whole and a group with no
-    /// atom pair is kept for the atoms of its diagonal atom pairs.
-    static auto
-    _divide_groups(const std::vector<CAtomBasisPairGroup> &groups, const size_t block_size) -> std::vector<CAtomBasisPairGroup>
-    {
-        std::vector<CAtomBasisPairGroup> blocks;
-
-        blocks.reserve(groups.size());
-
-        for (const auto &group : groups)
-        {
-            const auto npairs = group.number_of_pairs();
-
-            // NOTE: the blocks are counted by a division and a remainder rather
-            // than by rounding the division up, as adding the target size to the
-            // atom pairs overflows for a target size near the largest one.
-
-            const auto nblocks = std::max(size_t{1}, npairs / block_size + ((npairs % block_size == 0) ? size_t{0} : size_t{1}));
-
-            auto parts = group.partition(nblocks);
-
-            blocks.insert(blocks.end(), std::make_move_iterator(parts.begin()), std::make_move_iterator(parts.end()));
-        }
-
-        return blocks;
-    }
-
-    /// @brief Gets the target number of atom pairs of a block from the number of
-    /// the threads and the number of the atom pairs of the atom basis pair groups.
-    /// @param groups The atom basis pair groups to divide.
-    /// @return The target number of atom pairs of a block, zero to leave the
-    /// groups undivided.
-    /// @note The threads are read here rather than passed in, so that the
-    /// division follows the threads the matrix is built with. A single thread
-    /// leaves the groups undivided, as the blocks would then carry their fixed
-    /// cost with no work to divide.
-    static auto
-    _make_block_size(const std::vector<CAtomBasisPairGroup> &groups) -> size_t
-    {
-        const auto nthreads = omp_in_parallel() ? 1 : omp::get_number_of_threads();
-
-        if (nthreads < 2) return 0;
-
-        size_t npairs = 0;
-
-        for (const auto &group : groups) npairs += group.number_of_pairs();
-
-        return std::max(npairs / (blocks_per_thread * static_cast<size_t>(nthreads)), min_block_size);
     }
 
     /// @brief The sparsity patterns of the off-diagonal blocks.

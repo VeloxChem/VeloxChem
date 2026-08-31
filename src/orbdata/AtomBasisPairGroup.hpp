@@ -203,6 +203,30 @@ class CAtomBasisPairGroup
     /// made.
     static auto make_pair_groups(const std::vector<CAtomBasisGroup> &groups) -> std::vector<CAtomBasisPairGroup>;
 
+    /// @brief Divides the atom pairs of the atom basis pair groups into blocks of
+    /// a target number of atom pairs.
+    /// @param groups The atom basis pair groups to divide.
+    /// @param block_size The target number of atom pairs of a block.
+    /// @return The vector of blocks, in the order of the groups they divide.
+    /// @note A group is divided into as few blocks as hold its atom pairs at the
+    /// target size, so a group below the target is left whole and a group with no
+    /// atom pair is kept for the atoms of its diagonal atom pairs.
+    static auto divide(const std::vector<CAtomBasisPairGroup> &groups, const size_t block_size) -> std::vector<CAtomBasisPairGroup>;
+
+    /// @brief Gets the target number of atom pairs of a block from the number of
+    /// the threads and the number of the atom pairs of the atom basis pair groups.
+    /// @param groups The atom basis pair groups to divide.
+    /// @param blocks_per_thread The number of blocks per thread aimed at.
+    /// @param min_block_size The smallest target number of atom pairs chosen.
+    /// @return The target number of atom pairs of a block, zero to leave the
+    /// groups undivided.
+    /// @note The threads are read here rather than passed in, so that the
+    /// division follows the threads the work is done with. A single thread leaves
+    /// the groups undivided, as the blocks would then carry their fixed cost with
+    /// no work to divide.
+    static auto make_block_size(const std::vector<CAtomBasisPairGroup> &groups, const size_t blocks_per_thread, const size_t min_block_size)
+        -> size_t;
+
     /// @brief The number of atom pairs one thread forms at a time.
     static constexpr size_t _pairs_per_chunk = 4096;
 

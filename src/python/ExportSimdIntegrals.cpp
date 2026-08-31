@@ -39,6 +39,7 @@
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "SimdKineticEnergyDriver.hpp"
+#include "SimdTwoCenterElectronRepulsionDriver.hpp"
 #include "SimdOverlapDriver.hpp"
 #include "SparseMatrix.hpp"
 
@@ -76,6 +77,16 @@ export_simdintegrals(py::module &m) -> void
              py::arg("molecule"),
              py::arg("basis"))
         .def("get_threshold", &CSimdKineticEnergyDriver::get_threshold, "Gets screening threshold of the integrals.");
+
+    // CSimdTwoCenterElectronRepulsionDriver class
+
+    PyClass<CSimdTwoCenterElectronRepulsionDriver>(m, "SimdTwoCenterElectronRepulsionDriver")
+        .def(py::init<>())
+        .def("compute",
+             &CSimdTwoCenterElectronRepulsionDriver::compute,
+             "Computes two-center electron repulsion matrix for given molecule and molecular basis.",
+             py::arg("molecule"),
+             py::arg("basis"));
 }
 
 }  // namespace vlx_simdintegrals

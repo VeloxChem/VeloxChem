@@ -34,6 +34,7 @@
 #ifndef SimdCoordinates_hpp
 #define SimdCoordinates_hpp
 
+#include "AtomBasisPairGroup.hpp"
 #include "AtomBasisPairSparsity.hpp"
 #include "AtomBasisTripleSparsity.hpp"
 #include "Molecule.hpp"
@@ -52,6 +53,17 @@ namespace simdfunc {  // simdfunc namespace
 /// left undefined, as the atom pairs beyond the number of atom pairs are not
 /// part of the sparsity pattern.
 auto make_coordinates(const CAtomBasisPairSparsity &sparsity, const CMolecule &molecule) -> CSimdMatrix;
+
+/// @brief Creates the coordinates of the atom pairs of an atom basis pair group.
+/// @param group The atom basis pair group to create the coordinates of.
+/// @param molecule The molecule to take the atomic coordinates from.
+/// @return The matrix of seven rows and as many columns as the atom pairs of the
+/// group, with the coordinates of the atoms on bra side in rows zero to two, of
+/// the atoms on ket side in rows three to five, and the squared distances of the
+/// atom pairs in row six.
+/// @note This is the overload for the integrals which are not screened, whose
+/// blocks are atom basis pair groups and carry no sparsity pattern.
+auto make_coordinates(const CAtomBasisPairGroup &group, const CMolecule &molecule) -> CSimdMatrix;
 
 /// @brief Creates the coordinates of the atom pairs on a and b sides of a
 /// sparsity pattern.
