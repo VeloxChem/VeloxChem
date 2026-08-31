@@ -108,13 +108,13 @@ def _Molecule_smiles_to_xyz(smiles_str,
                 reordering = []
                 for atom in mol_full.GetAtoms():
                     # add non-hydrogen atom
-                    if (atom.GetAtomicNum() != 1 and
-                            atom.GetIdx() not in reordering):
+                    if (atom.GetAtomicNum() != 1
+                            and atom.GetIdx() not in reordering):
                         reordering.append(atom.GetIdx())
                         for nbr in atom.GetNeighbors():
                             # add neighboring hydrogen atoms
-                            if (nbr.GetAtomicNum() == 1 and
-                                    nbr.GetIdx() not in reordering):
+                            if (nbr.GetAtomicNum() == 1
+                                    and nbr.GetIdx() not in reordering):
                                 reordering.append(nbr.GetIdx())
                 for atom in mol_full.GetAtoms():
                     # For completeness, add remaining atoms
@@ -666,8 +666,8 @@ def _Molecule_find_connected_atoms(self, atom_idx, connectivity_matrix=None):
         more_connected_atoms = set()
         for a in connected_atoms:
             for b in range(connectivity_matrix.shape[0]):
-                if (b not in connected_atoms and
-                        connectivity_matrix[a, b] == 1):
+                if (b not in connected_atoms
+                        and connectivity_matrix[a, b] == 1):
                     more_connected_atoms.add(b)
         if more_connected_atoms:
             connected_atoms.update(more_connected_atoms)
@@ -1448,7 +1448,8 @@ def _add_molecule_to_viewer(mol,
                             breaking_bonds=None,
                             forming_width=0.15,
                             breaking_width=0.15,
-                            label_font_size=16):
+                            label_font_size=16,
+                            overlay=None):
     """
     Draws a molecule into an existing py3dmol viewer.
 
@@ -1496,6 +1497,13 @@ def _add_molecule_to_viewer(mol,
         dashed_bonds = None
 
     if bonds is None:
+
+        if overlay is not None:
+            viewer.addModel(mol.get_xyz_string())
+            for mol in overlay:
+                viewer.addModel(mol.get_xyz_string())
+        else:
+            viewer.addModel(mol.get_xyz_string())
         viewer.addModel(mol.get_xyz_string(), **vkw)
 
         if gradient is not None:
@@ -1548,8 +1556,7 @@ def _add_molecule_to_viewer(mol,
 
         for bond in bonds:
             if dashed_bonds is not None:
-                if bond in dashed_bonds or (bond[1],
-                                            bond[0]) in dashed_bonds:
+                if bond in dashed_bonds or (bond[1], bond[0]) in dashed_bonds:
                     continue
             edit_mol.AddBond(bond[0], bond[1], Chem.BondType.SINGLE)
 
@@ -1625,19 +1632,7 @@ def _add_molecule_to_viewer(mol,
                 }, **vkw)
 
 
-def _Molecule_show(self,
-                   width=400,
-                   height=300,
-                   atom_indices=False,
-                   atom_labels=False,
-                   gradient=None,
-                   starting_index=1,
-                   bonds=None,
-                   forming_bonds=None,
-                   breaking_bonds=None,
-                   forming_width=0.15,
-                   breaking_width=0.15,
-                   label_font_size=16):
+def _Molecule_show(self, width=400, height=300, **show_kwargs):
     """
     Creates a 3D view with py3dmol.
 
@@ -1676,20 +1671,7 @@ def _Molecule_show(self,
 
     viewer = py3Dmol.view(width=width, height=height)
 
-    _add_molecule_to_viewer(
-        self,
-        viewer,
-        atom_indices=atom_indices,
-        atom_labels=atom_labels,
-        gradient=gradient,
-        starting_index=starting_index,
-        bonds=bonds,
-        forming_bonds=forming_bonds,
-        breaking_bonds=breaking_bonds,
-        forming_width=forming_width,
-        breaking_width=breaking_width,
-        label_font_size=label_font_size,
-    )
+    _add_molecule_to_viewer(self, viewer, **show_kwargs)
 
     viewer.setViewStyle({"style": "outline", "width": 0.05})
     viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
@@ -2108,10 +2090,8 @@ def _Molecule_is_water_molecule(self):
     conn = self.get_connectivity_matrix()
 
     bond_labels = [
-        sorted([labels[i], labels[j]])
-        for i in range(natoms)
-        for j in range(i, natoms)
-        if conn[i, j] == 1
+        sorted([labels[i], labels[j]]) for i in range(natoms)
+        for j in range(i, natoms) if conn[i, j] == 1
     ]
 
     if bond_labels != [['H', 'O'], ['H', 'O']]:
