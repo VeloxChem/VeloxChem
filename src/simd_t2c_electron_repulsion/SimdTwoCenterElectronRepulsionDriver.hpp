@@ -75,7 +75,17 @@ class CSimdTwoCenterElectronRepulsionDriver
     /// chiefly the coordinates and the solid harmonics it forms, so a molecule
     /// too small to fill the threads is divided into fewer blocks rather than
     /// into blocks whose fixed cost outweighs their work.
-    static constexpr size_t min_block_size = 2048;
+    /// @note This is far below the two thousand and forty eight of the sparse
+    /// matrix, whose blocks carry the bisection of the screening as their fixed
+    /// cost. Nothing is screened here and a block does much more arithmetic per
+    /// atom pair, so its fixed cost is repaid by far fewer of them. Measured on
+    /// fourteen threads over the def2 universal fitting sets: sixty four is never
+    /// worse than one hundred and twenty eight outside the noise and a quarter
+    /// better on a molecule of thirty atoms, it is worth twice the throughput of
+    /// two thousand and forty eight on tagrisso and taxol, and below it the fixed
+    /// cost of the blocks starts to show. It binds for the small molecules alone,
+    /// as a large one asks for blocks larger than this of its own accord.
+    static constexpr size_t min_block_size = 64;
 
     /// @brief Computes the two-center electron repulsion matrix of a molecular
     /// basis.
