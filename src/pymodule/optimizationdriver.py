@@ -473,12 +473,19 @@ class OptimizationDriver:
                         input=optinp_filename)
                 except geometric.errors.HessianExit:
                     hessian_exit = True
+                # Catch BaseException so a master-only interrupt or exit does
+                # not leave MPI workers blocked in the worker loop.
                 except BaseException as exc:
-                    # Any failure on the master aborts the whole MPI job.
+                    # In serial, preserve the original exception and traceback.
+                    if self.comm.Get_size() == 1:
+                        raise
+
+                    # In MPI, abort the job because workers may be blocked
+                    # waiting for the next geometry broadcast.
                     assert_msg_critical(
                         False,
-                        'OptimizationDriver: geometry optimization failed: '
-                        f'{exc}')
+                        'OptimizationDriver: geometry optimization failed due '
+                        f'to {type(exc).__name__}: {exc}')
             opt_engine.comm.bcast('stop', root=mpi_master())
         else:
             opt_engine.run_worker()

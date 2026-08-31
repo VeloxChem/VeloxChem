@@ -294,3 +294,39 @@ class TestOptimizeMiscellaneous:
                 np.abs(opt_mol.get_coordinates_in_bohr() -
                        molecule.get_coordinates_in_bohr())) < 1.0e-6
             assert set(opt_results.keys()) == {'final_geometry'}
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_opt_preserves_serial_optimizer_exception(self, monkeypatch,
+                                                      tmp_path):
+        """A serial optimizer failure retains its type and message."""
+
+        class _OptimizerFailure(RuntimeError):
+            pass
+
+        def fail_optimizer(**kwargs):
+            raise _OptimizerFailure('expected optimizer failure')
+
+        monkeypatch.setattr(
+            'veloxchem.optimizationdriver.geometric.optimize.run_optimizer',
+            fail_optimizer)
+
+        molecule, basis = self.get_ch3_molecule_and_basis()
+        scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.filename = str(tmp_path / 'opt_failure')
+        opt_drv = OptimizationDriver(scf_drv)
+
+        with pytest.raises(_OptimizerFailure,
+                           match='expected optimizer failure'):
+            opt_drv.compute(molecule, basis)
+
+        def interrupt_optimizer(**kwargs):
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr(
+            'veloxchem.optimizationdriver.geometric.optimize.run_optimizer',
+            interrupt_optimizer)
+
+        with pytest.raises(KeyboardInterrupt):
+            opt_drv.compute(molecule, basis)
