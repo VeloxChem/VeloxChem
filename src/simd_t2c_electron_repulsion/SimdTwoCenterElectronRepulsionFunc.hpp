@@ -53,6 +53,42 @@
 #include "SimdTwoCenterElectronRepulsionRecGS.hpp"
 #include "SimdTwoCenterElectronRepulsionRecHS.hpp"
 #include "SimdTwoCenterElectronRepulsionRecIS.hpp"
+#include "SimdTwoCenterElectronRepulsionRecPP.hpp"
+#include "SimdTwoCenterElectronRepulsionRecPD.hpp"
+#include "SimdTwoCenterElectronRepulsionRecPF.hpp"
+#include "SimdTwoCenterElectronRepulsionRecPG.hpp"
+#include "SimdTwoCenterElectronRepulsionRecPH.hpp"
+#include "SimdTwoCenterElectronRepulsionRecPI.hpp"
+#include "SimdTwoCenterElectronRepulsionRecDP.hpp"
+#include "SimdTwoCenterElectronRepulsionRecDD.hpp"
+#include "SimdTwoCenterElectronRepulsionRecDF.hpp"
+#include "SimdTwoCenterElectronRepulsionRecDG.hpp"
+#include "SimdTwoCenterElectronRepulsionRecDH.hpp"
+#include "SimdTwoCenterElectronRepulsionRecDI.hpp"
+#include "SimdTwoCenterElectronRepulsionRecFP.hpp"
+#include "SimdTwoCenterElectronRepulsionRecFD.hpp"
+#include "SimdTwoCenterElectronRepulsionRecFF.hpp"
+#include "SimdTwoCenterElectronRepulsionRecFG.hpp"
+#include "SimdTwoCenterElectronRepulsionRecFH.hpp"
+#include "SimdTwoCenterElectronRepulsionRecFI.hpp"
+#include "SimdTwoCenterElectronRepulsionRecGP.hpp"
+#include "SimdTwoCenterElectronRepulsionRecGD.hpp"
+#include "SimdTwoCenterElectronRepulsionRecGF.hpp"
+#include "SimdTwoCenterElectronRepulsionRecGG.hpp"
+#include "SimdTwoCenterElectronRepulsionRecGH.hpp"
+#include "SimdTwoCenterElectronRepulsionRecGI.hpp"
+#include "SimdTwoCenterElectronRepulsionRecHP.hpp"
+#include "SimdTwoCenterElectronRepulsionRecHD.hpp"
+#include "SimdTwoCenterElectronRepulsionRecHF.hpp"
+#include "SimdTwoCenterElectronRepulsionRecHG.hpp"
+#include "SimdTwoCenterElectronRepulsionRecHH.hpp"
+#include "SimdTwoCenterElectronRepulsionRecHI.hpp"
+#include "SimdTwoCenterElectronRepulsionRecIP.hpp"
+#include "SimdTwoCenterElectronRepulsionRecID.hpp"
+#include "SimdTwoCenterElectronRepulsionRecIF.hpp"
+#include "SimdTwoCenterElectronRepulsionRecIG.hpp"
+#include "SimdTwoCenterElectronRepulsionRecIH.hpp"
+#include "SimdTwoCenterElectronRepulsionRecII.hpp"
 
 namespace simdt2ceri {  // simdt2ceri namespace
 
@@ -91,8 +127,10 @@ auto one_center_electron_repulsion(const CBasisFunction &bra, const CBasisFuncti
 /// distance, so neither an atom pair nor a pair of primitives falls below a
 /// threshold at any distance a molecule reaches, and every combination of basis
 /// functions is computed over every atom pair of the block.
-/// @note The kernels of two non-zero angular momenta are not implemented yet and
-/// their values are set to zero.
+/// @note The kernels of two non-zero angular momenta take the whole vector of
+/// solid harmonics, as their integrals are a sum of terms which carry the
+/// harmonics of every angular momentum from the difference of the two up to
+/// their sum.
 auto compute_electron_repulsion(double                         *values,
                                 const size_t                    nvalues,
                                 const CBasisFunction           &bra,

@@ -34,7 +34,6 @@
 
 #include "SimdTwoCenterElectronRepulsionFunc.hpp"
 
-#include <algorithm>
 #include <cmath>
 #include <string>
 
@@ -213,20 +212,266 @@ compute_electron_repulsion(double                         *values,
         return;
     }
 
-    // NOTE: the kernels of two non-zero angular momenta are not implemented yet.
-    // The values are set to zero until they are, so that the matrix the driver
-    // returns is defined.
+    // NOTE: the kernels of two non-zero angular momenta take the whole vector of
+    // solid harmonics, as their integrals are a sum of terms which carry the
+    // harmonics of every angular momentum from the difference of the two up to
+    // their sum, and read the ones they need from it.
 
-    const auto ncomps = static_cast<size_t>((2 * lbra + 1) * (2 * lket + 1));
-
-    if (nvalues > coordinates.number_of_columns())
+    if ((lbra == 1) && (lket == 1))
     {
-        errors::assertMsgCritical(
-            false,
-            std::string("SimdTwoCenterElectronRepulsionFunc.compute_electron_repulsion: Number of values exceeds number of atom pairs"));
+        compute_pp_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
     }
 
-    std::fill(values, values + ncomps * nvalues, 0.0);
+    if ((lbra == 1) && (lket == 2))
+    {
+        compute_pd_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 1) && (lket == 3))
+    {
+        compute_pf_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 1) && (lket == 4))
+    {
+        compute_pg_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 1) && (lket == 5))
+    {
+        compute_ph_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 1) && (lket == 6))
+    {
+        compute_pi_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 2) && (lket == 1))
+    {
+        compute_dp_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 2) && (lket == 2))
+    {
+        compute_dd_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 2) && (lket == 3))
+    {
+        compute_df_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 2) && (lket == 4))
+    {
+        compute_dg_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 2) && (lket == 5))
+    {
+        compute_dh_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 2) && (lket == 6))
+    {
+        compute_di_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 3) && (lket == 1))
+    {
+        compute_fp_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 3) && (lket == 2))
+    {
+        compute_fd_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 3) && (lket == 3))
+    {
+        compute_ff_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 3) && (lket == 4))
+    {
+        compute_fg_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 3) && (lket == 5))
+    {
+        compute_fh_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 3) && (lket == 6))
+    {
+        compute_fi_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 4) && (lket == 1))
+    {
+        compute_gp_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 4) && (lket == 2))
+    {
+        compute_gd_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 4) && (lket == 3))
+    {
+        compute_gf_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 4) && (lket == 4))
+    {
+        compute_gg_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 4) && (lket == 5))
+    {
+        compute_gh_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 4) && (lket == 6))
+    {
+        compute_gi_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 5) && (lket == 1))
+    {
+        compute_hp_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 5) && (lket == 2))
+    {
+        compute_hd_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 5) && (lket == 3))
+    {
+        compute_hf_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 5) && (lket == 4))
+    {
+        compute_hg_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 5) && (lket == 5))
+    {
+        compute_hh_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 5) && (lket == 6))
+    {
+        compute_hi_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 6) && (lket == 1))
+    {
+        compute_ip_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 6) && (lket == 2))
+    {
+        compute_id_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 6) && (lket == 3))
+    {
+        compute_if_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 6) && (lket == 4))
+    {
+        compute_ig_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 6) && (lket == 5))
+    {
+        compute_ih_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    if ((lbra == 6) && (lket == 6))
+    {
+        compute_ii_electron_repulsion(values, nvalues, bra, ket, harmonics, coordinates);
+
+        return;
+    }
+
+    errors::assertMsgCritical(
+        false,
+        std::string("SimdTwoCenterElectronRepulsionFunc.compute_electron_repulsion: Angular momenta of basis functions are out of range"));
 }
 
 }  // namespace simdt2ceri

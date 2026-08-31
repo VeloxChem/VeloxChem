@@ -70,21 +70,41 @@ deviation is 8.5e-13 on values up to 1.9e2, i.e. 5e-15 relative.
 ## make_recursion_kernels.py
 
 Emits the kernels of two non-zero angular momenta from the recursion data in
-`data/`, for both the overlap and the kinetic energy: the two share the format of
-the data and the shape of the generated code, and differ only in the name, the
-namespace and the bound they screen the pairs of primitives with, which the file
-reports on its `KERNEL` line.
+`data/`, for the overlap, the kinetic energy and the two-center Coulomb
+integrals: the three share the format of the data and the shape of the generated
+code, and the file reports which it is on its `KERNEL` line.
 
     RECURSION_KIND=kinetic python3 make_recursion_kernels.py pp pd dd ...
     RECURSION_KIND=overlap python3 make_recursion_kernels.py pp pd dd ...
+    RECURSION_KIND=coulomb python3 make_recursion_kernels.py pp pd dd ...
 
-Each term of the data is `(num/den) sqrt(radicand) E G (s|S|s)`, where `E` is
+Each term of the data is `(num/den) sqrt(radicand) E G (s|.|s)`, where `E` is
 `alpha^a beta^b mu^m p^q` and `G` is `R^{2k} S_{L,M}(AB)`. Neither `R^{2k}` nor
 `S_{L,M}` depends on the pair of primitives, so one accumulator per `E` suffices
 and the terms are combined against the harmonics afterwards.
 
+The overlap and the kinetic energy differ only in the name, the namespace and the
+bound they screen the pairs of primitives with. The Coulomb data is `FORMAT 2`
+and differs in more: its source integral `(s|J|s)^(m)` carries an order, so every
+term has the order of its Boys function as a sixth field and the file declares
+the range of orders it uses on its `ORDERS` line. Every exponent factor of the
+data is used with one order alone, so an accumulator per exponent factor still
+suffices and the order follows from the factor. Nothing is screened, so the
+generated kernel has no column dimensions, no `nmax` and no threshold, and the
+exponential of a pair of primitives is replaced by the Boys function, which
+`simdfunc::compute_boys_function` evaluates for all pairs of primitives in one
+call.
+
+Verified against `CTwoCenterElectronRepulsionDriver` on ethanol in cc-pV6Z, where
+three heavy atoms carry every angular momentum up to six and all thirty six
+kernels are exercised: no combination deviates by more than 1.4e-13 relative.
+
 **It reproduces the thirty six kinetic energy kernels in the repository byte for
 byte**, which is how it is checked: regenerate them and diff.
+
+**It reproduces the thirty six kinetic energy kernels after the Coulomb kernels
+were added to it**, which is the check to run after any change: regenerate them
+and diff.
 
 **It does not reproduce the overlap kernels in the repository**, which came from
 another generator which is not here. What it emits for the overlap is equivalent

@@ -1,0 +1,44 @@
+FORMAT 2
+KERNEL J
+SOURCE (s|J|s)^(m)
+SHELLS 1 1
+ORDERS 1 2
+
+# E <id> <alpha> <beta> <mu> <p>
+E 0 0 0 0 -1
+E 1 0 0 1 -1
+
+# G <id> <2k> <L> <M>
+G 0 0 0 0
+G 1 0 2 0
+G 2 0 2 2
+G 3 2 0 0
+G 4 0 2 -1
+G 5 0 2 -2
+G 6 0 2 1
+
+# TABLE <l> <l'> <rows> [SYMMETRIC]
+# ROW <m> <m'> <terms>
+# T <prefactor> <num> <den> <radicand> <geometry> <boys order>
+
+TABLE 1 1 6 SYMMETRIC
+ROW -1 -1 4
+T 0  1 2 1  0  1
+T 1  1 3 1  1  2
+T 1  1 3 3  2  2
+T 1  -1 3 1  3  2
+ROW -1 0 1
+T 1  -1 3 3  4  2
+ROW -1 1 1
+T 1  -1 3 3  5  2
+ROW 0 0 3
+T 0  1 2 1  0  1
+T 1  -2 3 1  1  2
+T 1  -1 3 1  3  2
+ROW 0 1 1
+T 1  -1 3 3  6  2
+ROW 1 1 4
+T 0  1 2 1  0  1
+T 1  1 3 1  1  2
+T 1  -1 3 3  2  2
+T 1  -1 3 1  3  2
