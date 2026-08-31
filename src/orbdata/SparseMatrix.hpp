@@ -36,7 +36,6 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <optional>
 #include <ranges>
 #include <string>
 #include <utility>
@@ -677,17 +676,11 @@ class CSparseMatrix
 
         const auto ket_nmoms = ket_strides.size();
 
-        // NOTE: an element of the dense matrix belongs to a single atom pair, so
-        // the blocks write to disjoint elements and need no synchronization.
-
-        const auto nblocks = static_cast<int>(_pair_blocks.size());
-
-#pragma omp parallel for schedule(dynamic)
-        for (int iblk = 0; iblk < nblocks; iblk++)
+        for (size_t iblk = 0; iblk < _pair_blocks.size(); iblk++)
         {
             const auto &block = _pair_blocks[iblk];
 
-            const auto *block_values = pair_values(static_cast<size_t>(iblk));
+            const auto *block_values = pair_values(iblk);
 
             const auto &bra_atoms = block.bra_atoms();
 
@@ -870,17 +863,14 @@ class CSparseMatrix
 
         const auto ket_nmoms = ket_strides.size();
 
-        const auto nblocks = static_cast<int>(_diagonal_blocks.size());
-
-#pragma omp parallel for schedule(dynamic)
-        for (int iblk = 0; iblk < nblocks; iblk++)
+        for (size_t iblk = 0; iblk < _diagonal_blocks.size(); iblk++)
         {
             const auto &block = _diagonal_blocks[iblk];
 
             errors::assertMsgCritical(block.get_storage() == diagstor::scalar,
                                       std::string("SparseMatrix.to_dense: Storage layout of the diagonal blocks is not supported"));
 
-            const auto *block_values = diagonal_values(static_cast<size_t>(iblk));
+            const auto *block_values = diagonal_values(iblk);
 
             const auto &atoms = block.atoms();
 
@@ -1026,35 +1016,26 @@ class CSparseMatrix
                 const diagstor                    storage) -> void
     {
         // NOTE: the atom pairs of all the groups are ordered by interatomic
-        // distance together, and the sparsity patterns of the groups, which are
-        // independent, are then described in parallel. Dynamic scheduling is used
-        // as the groups differ widely in the number of atom pairs.
-
-        const auto ngroups = static_cast<int>(groups.size());
-
-        // NOTE: the patterns are held in a vector indexed by the group, so that
-        // they are formed in any order and added in the order of the groups. The
-        // layout of the values blocks therefore does not depend on the scheduling.
-
-        std::vector<std::optional<CAtomBasisPairSparsity>> pair_blocks(groups.size());
-
-        std::vector<std::optional<CAtomBasisDiagonalSparsity>> diagonal_blocks(groups.size());
+        // distance before the sparsity patterns are described, as the patterns
+        // are read off the leading atom pairs which survive the screening.
 
         CAtomBasisPairGroup::sort_by_distance(groups, molecule);
 
-#pragma omp parallel for schedule(dynamic)
-        for (int i = 0; i < ngroups; i++)
+        // NOTE: the patterns are added in the order of the groups, so that the
+        // layout of the values blocks follows from the groups alone. An empty
+        // pattern is left out, as it carries no values block of its own.
+
+        for (const auto &group : groups)
         {
-            pair_blocks[i].emplace(groups[i], screener, threshold);
+            if (auto pair_block = CAtomBasisPairSparsity(group, screener, threshold); pair_block.number_of_pairs() > 0)
+            {
+                _pair_blocks.push_back(std::move(pair_block));
+            }
 
-            diagonal_blocks[i].emplace(groups[i], storage);
-        }
-
-        for (int i = 0; i < ngroups; i++)
-        {
-            if (pair_blocks[i]->number_of_pairs() > 0) _pair_blocks.push_back(std::move(*pair_blocks[i]));
-
-            if (diagonal_blocks[i]->number_of_atoms() > 0) _diagonal_blocks.push_back(std::move(*diagonal_blocks[i]));
+            if (auto diagonal_block = CAtomBasisDiagonalSparsity(group, storage); diagonal_block.number_of_atoms() > 0)
+            {
+                _diagonal_blocks.push_back(std::move(diagonal_block));
+            }
         }
 
         // NOTE: one values block per sparsity pattern, sized here so that every

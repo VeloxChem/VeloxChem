@@ -625,13 +625,13 @@ class CSparseTensor
                 const double                         threshold) -> void
     {
         // NOTE: the atom pairs of all the groups are ordered by interatomic
-        // distance together, as the groups differ widely in the number of atom
-        // pairs and ordering a group per thread is bounded by the largest of them.
+        // distance before the sparsity patterns are described, as the patterns
+        // are read off the leading atom pairs which survive the screening.
 
         CAtomBasisPairGroup::sort_by_distance(groups, molecule);
 
         // NOTE: the blocks are added in the order of the groups, so that the
-        // layout of the values blocks does not depend on the scheduling above.
+        // layout of the values blocks follows from the groups alone.
 
         std::ranges::for_each(groups, [&](const auto &group) {
             std::ranges::for_each(aux_groups, [&](const auto &aux_group) {
