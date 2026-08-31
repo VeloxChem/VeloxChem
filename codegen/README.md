@@ -1,6 +1,7 @@
 # Generators of the SIMD integral kernels
 
-The kernels under `src/simd_func` and `src/simd_t2c_kinetic_energy` are generated,
+The kernels under `src/simd_func`, `src/simd_t2c_kinetic_energy` and
+`src/simd_t2c_electron_repulsion` are generated,
 and these are the generators which produced them. The generator which produced the
 overlap kernels under `src/simd_t2c_overlap` is not in this repository, and the
 recursion generator here reads the overlap data but does not reproduce those files
@@ -35,6 +36,36 @@ Emits the thirteen kinetic energy kernels which follow a closed formula:
 The ratio belongs to the side carrying no angular momentum, which is easy to get
 backwards: `(s|.|l)` takes `alpha / p` and `(l|.|s)` takes `-beta / p`, as the
 overlap kernels of the same combinations do.
+
+## make_coulomb_formula_kernels.py
+
+Emits the thirteen two-center electron repulsion kernels which follow a closed
+formula:
+
+    (s|J|s)     = (s|J|s)^(0)
+    (s|J|l)_m   = ( alpha / p)^l S_{l,m}(AB) (s|J|s)^(l)
+    (l|J|s)_m   = (-beta  / p)^l S_{l,m}(AB) (s|J|s)^(l)
+
+where the auxiliary integral of order n is
+
+    (s|J|s)^(n) = 2 pi^(5/2) N_a N_b F_n(mu R^2) / (alpha beta sqrt(p))
+
+with `p = alpha + beta` and `mu = alpha beta / p`. The same rule for the ratio
+applies as for the kinetic energy: it belongs to the side carrying no angular
+momentum.
+
+These differ from the overlap and the kinetic energy in two ways. Nothing is
+screened, so there are no column dimensions, no `nmax` and no threshold, and
+every row spans the atom pairs of the block. And the exponential of a pair of
+primitives is replaced by the Boys function, which `simdfunc::compute_boys_function`
+evaluates for all pairs of primitives of a kernel in one call, on a
+`CSimdVariableMatrix` with the arguments in block zero and the orders zero to `l`
+in the blocks above it. Only order `l` is read; the lower orders are formed on
+the way to it.
+
+Verified against `CTwoCenterElectronRepulsionDriver` on water in cc-pVQZ, cc-pV5Z
+and cc-pV6Z, which reaches every angular momentum up to six: the largest
+deviation is 8.5e-13 on values up to 1.9e2, i.e. 5e-15 relative.
 
 ## make_recursion_kernels.py
 

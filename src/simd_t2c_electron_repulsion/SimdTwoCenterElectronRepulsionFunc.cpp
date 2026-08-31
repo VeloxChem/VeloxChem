@@ -35,21 +35,56 @@
 #include "SimdTwoCenterElectronRepulsionFunc.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 
 #include "ErrorHandler.hpp"
+#include "MathConst.hpp"
 
 namespace simdt2ceri {  // simdt2ceri namespace
 
 auto
 one_center_electron_repulsion(const CBasisFunction &bra, const CBasisFunction &ket) -> double
 {
-    if (bra.get_angular_momentum() != ket.get_angular_momentum()) return 0.0;
+    const auto lbra = bra.get_angular_momentum();
 
-    // NOTE: the kernels are not implemented yet. The dispatch over the angular
-    // momenta of the basis functions replaces this.
+    const auto lket = ket.get_angular_momentum();
 
-    return 0.0;
+    if (lbra != lket) return 0.0;
+
+    // NOTE: the integral of two functions of a non-zero angular momentum on one
+    // atom comes with the recursion of two non-zero angular momenta, which is
+    // not implemented yet.
+
+    if (lbra > 0) return 0.0;
+
+    // NOTE: the atoms meet, so the argument of the Boys function is zero and the
+    // Boys function of order zero is one there. What is left is the prefactor of
+    // the repulsion of a pair of s type primitives.
+
+    constexpr auto fpi = mathconst::pi_value();
+
+    const auto fcoul = 2.0 * fpi * fpi * std::sqrt(fpi);
+
+    const auto &a_exps = bra.exponents();
+
+    const auto &b_exps = ket.exponents();
+
+    const auto &a_norms = bra.normalization_factors();
+
+    const auto &b_norms = ket.normalization_factors();
+
+    auto fsum = 0.0;
+
+    for (size_t i = 0; i < a_exps.size(); i++)
+    {
+        for (size_t j = 0; j < b_exps.size(); j++)
+        {
+            fsum += a_norms[i] * b_norms[j] / (a_exps[i] * b_exps[j] * std::sqrt(a_exps[i] + b_exps[j]));
+        }
+    }
+
+    return fcoul * fsum;
 }
 
 auto
@@ -60,31 +95,120 @@ compute_electron_repulsion(double                         *values,
                            const std::vector<CSimdMatrix> &harmonics,
                            const CSimdMatrix              &coordinates) -> void
 {
+    const auto lbra = bra.get_angular_momentum();
+
+    const auto lket = ket.get_angular_momentum();
+
+    // NOTE: the kernel of two S type functions needs no solid harmonics, as the
+    // harmonics of angular momentum zero are one for every atom pair.
+
+    if ((lbra == 0) && (lket == 0))
+    {
+        compute_ss_electron_repulsion(values, nvalues, bra, ket, coordinates);
+
+        return;
+    }
+
+    // NOTE: the kernels of the combinations with one S type function take the
+    // solid harmonics of the angular momentum of the other side alone, as their
+    // integrals are a single term.
+
+    if ((lbra == 0) && (lket == 1))
+    {
+        compute_sp_electron_repulsion(values, nvalues, bra, ket, harmonics[0], coordinates);
+
+        return;
+    }
+
+    if ((lbra == 0) && (lket == 2))
+    {
+        compute_sd_electron_repulsion(values, nvalues, bra, ket, harmonics[1], coordinates);
+
+        return;
+    }
+
+    if ((lbra == 0) && (lket == 3))
+    {
+        compute_sf_electron_repulsion(values, nvalues, bra, ket, harmonics[2], coordinates);
+
+        return;
+    }
+
+    if ((lbra == 0) && (lket == 4))
+    {
+        compute_sg_electron_repulsion(values, nvalues, bra, ket, harmonics[3], coordinates);
+
+        return;
+    }
+
+    if ((lbra == 0) && (lket == 5))
+    {
+        compute_sh_electron_repulsion(values, nvalues, bra, ket, harmonics[4], coordinates);
+
+        return;
+    }
+
+    if ((lbra == 0) && (lket == 6))
+    {
+        compute_si_electron_repulsion(values, nvalues, bra, ket, harmonics[5], coordinates);
+
+        return;
+    }
+
+    if ((lbra == 1) && (lket == 0))
+    {
+        compute_ps_electron_repulsion(values, nvalues, bra, ket, harmonics[0], coordinates);
+
+        return;
+    }
+
+    if ((lbra == 2) && (lket == 0))
+    {
+        compute_ds_electron_repulsion(values, nvalues, bra, ket, harmonics[1], coordinates);
+
+        return;
+    }
+
+    if ((lbra == 3) && (lket == 0))
+    {
+        compute_fs_electron_repulsion(values, nvalues, bra, ket, harmonics[2], coordinates);
+
+        return;
+    }
+
+    if ((lbra == 4) && (lket == 0))
+    {
+        compute_gs_electron_repulsion(values, nvalues, bra, ket, harmonics[3], coordinates);
+
+        return;
+    }
+
+    if ((lbra == 5) && (lket == 0))
+    {
+        compute_hs_electron_repulsion(values, nvalues, bra, ket, harmonics[4], coordinates);
+
+        return;
+    }
+
+    if ((lbra == 6) && (lket == 0))
+    {
+        compute_is_electron_repulsion(values, nvalues, bra, ket, harmonics[5], coordinates);
+
+        return;
+    }
+
+    // NOTE: the kernels of two non-zero angular momenta are not implemented yet.
+    // The values are set to zero until they are, so that the matrix the driver
+    // returns is defined.
+
+    const auto ncomps = static_cast<size_t>((2 * lbra + 1) * (2 * lket + 1));
+
     if (nvalues > coordinates.number_of_columns())
     {
         errors::assertMsgCritical(
             false,
             std::string("SimdTwoCenterElectronRepulsionFunc.compute_electron_repulsion: Number of values exceeds number of atom pairs"));
     }
-
-    const auto lbra = bra.get_angular_momentum();
-
-    const auto lket = ket.get_angular_momentum();
-
-    // NOTE: the geometry of the integrals reaches the sum of the angular momenta
-    // of the basis functions, so the harmonics of the block must reach it too.
-
-    if (const auto lsum = lbra + lket; (lsum > 0) && (harmonics.size() < static_cast<size_t>(lsum)))
-    {
-        errors::assertMsgCritical(
-            false, std::string("SimdTwoCenterElectronRepulsionFunc.compute_electron_repulsion: Harmonics do not reach the angular momenta"));
-    }
-
-    // NOTE: the kernels are not implemented yet. The dispatch over the angular
-    // momenta of the basis functions replaces this, and the values are set to
-    // zero until then so that the matrix the driver returns is defined.
-
-    const auto ncomps = static_cast<size_t>((2 * lbra + 1) * (2 * lket + 1));
 
     std::fill(values, values + ncomps * nvalues, 0.0);
 }

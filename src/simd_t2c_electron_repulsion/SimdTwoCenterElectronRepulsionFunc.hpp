@@ -40,6 +40,19 @@
 
 #include "BasisFunction.hpp"
 #include "SimdMatrix.hpp"
+#include "SimdTwoCenterElectronRepulsionRecSS.hpp"
+#include "SimdTwoCenterElectronRepulsionRecSP.hpp"
+#include "SimdTwoCenterElectronRepulsionRecSD.hpp"
+#include "SimdTwoCenterElectronRepulsionRecSF.hpp"
+#include "SimdTwoCenterElectronRepulsionRecSG.hpp"
+#include "SimdTwoCenterElectronRepulsionRecSH.hpp"
+#include "SimdTwoCenterElectronRepulsionRecSI.hpp"
+#include "SimdTwoCenterElectronRepulsionRecPS.hpp"
+#include "SimdTwoCenterElectronRepulsionRecDS.hpp"
+#include "SimdTwoCenterElectronRepulsionRecFS.hpp"
+#include "SimdTwoCenterElectronRepulsionRecGS.hpp"
+#include "SimdTwoCenterElectronRepulsionRecHS.hpp"
+#include "SimdTwoCenterElectronRepulsionRecIS.hpp"
 
 namespace simdt2ceri {  // simdt2ceri namespace
 
@@ -53,7 +66,12 @@ namespace simdt2ceri {  // simdt2ceri namespace
 /// components and does not depend on the component or on the position of the
 /// atom, as the overlap and the kinetic energy are. Basis functions of different
 /// angular momenta have no integral and give zero.
-/// @note The kernels are not implemented yet and this returns zero.
+/// @note Only the integral of two S type functions is computed. The integral of
+/// two functions of the same non-zero angular momentum on one atom is the value
+/// the integrals of two atoms approach as the atoms meet, which the closed
+/// formulas of one S type function do not carry: they hold the solid harmonic of
+/// the vector between the atoms, which vanishes there. It comes with the
+/// recursion of two non-zero angular momenta, and zero is returned until then.
 auto one_center_electron_repulsion(const CBasisFunction &bra, const CBasisFunction &ket) -> double;
 
 /// @brief Computes the two-center electron repulsion integrals of a combination
@@ -71,7 +89,8 @@ auto one_center_electron_repulsion(const CBasisFunction &bra, const CBasisFuncti
 /// distance, so neither an atom pair nor a pair of primitives falls below a
 /// threshold at any distance a molecule reaches, and every combination of basis
 /// functions is computed over every atom pair of the block.
-/// @note The kernels are not implemented yet and this sets the values to zero.
+/// @note The kernels of two non-zero angular momenta are not implemented yet and
+/// their values are set to zero.
 auto compute_electron_repulsion(double                         *values,
                                 const size_t                    nvalues,
                                 const CBasisFunction           &bra,
