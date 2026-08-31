@@ -25,6 +25,10 @@ Geometries are the usual benchmark set.
 | crambin | 642 |
 | ubiquitin | 1231 |
 
+The bases are def2-svp, def2-tzvp and def2-qzvp throughout, and their diffuse
+counterparts def2-svpd, def2-tzvpd and def2-qzvpd in the section on them at the
+end.
+
 ## Dense reconstruction of a sparse matrix
 
 `CSparseMatrix::to_dense`, through the `SparseMatrix.to_numpy` binding, on a
@@ -905,6 +909,10 @@ Warm, seconds, best of three after one cold call, each case in its own process.
 
 ### Against the reference driver
 
+**Taken before the atom pairs of the groups were formed in batches. The table of
+the same name in the section on the batched groups supersedes this one, and in
+particular tagrisso in def2-svp is no longer a loss on fourteen threads.**
+
 The same runs, warm, seconds, with the ratio of the reference to the driver.
 
 | molecule | basis | driver 1 thr | reference 1 thr | 1 thr | driver 14 thr | reference 14 thr | 14 thr |
@@ -1152,3 +1160,74 @@ reasoning, that the work per atom pair differs by the atom bases and the blocks
 should follow it, and both were beaten by a constant. A third attempt should
 weigh that the cost a block carries is large enough that any heuristic which
 makes more blocks starts behind.
+
+## The diffuse basis sets
+
+The same four molecules in def2-svpd, def2-tzvpd and def2-qzvpd. Diffuse
+functions carry small exponents and so reach far, which is what the screening
+lives on, so these are the cases where the bound of the driver discards the least.
+
+### Where the time goes
+
+Warm, seconds.
+
+| molecule | basis | nao | sparse GB | sparsity 14 thr | compute 1 thr | compute 14 thr | scaling | reference 14 thr | against it |
+|---|---|---|---|---|---|---|---|---|---|
+| tagrisso | def2-svpd | 1010 | 0.003 | 0.0004 | 0.0015 | 0.0007 | 2.30x | 0.0007 | 1.09x |
+| tagrisso | def2-tzvpd | 1672 | 0.007 | 0.0005 | 0.0021 | 0.0008 | 2.64x | 0.0012 | 1.45x |
+| tagrisso | def2-qzvpd | 3426 | 0.024 | 0.0005 | 0.0040 | 0.0013 | 3.11x | 0.0034 | 2.59x |
+| taxol | def2-svpd | 1657 | 0.007 | 0.0004 | 0.0018 | 0.0008 | 2.20x | 0.0013 | 1.59x |
+| taxol | def2-tzvpd | 2743 | 0.018 | 0.0005 | 0.0029 | 0.0012 | 2.47x | 0.0022 | 1.85x |
+| taxol | def2-qzvpd | 5505 | 0.057 | 0.0005 | 0.0068 | 0.0022 | 3.15x | 0.0078 | 3.61x |
+| crambin | def2-svpd | 9294 | 0.106 | 0.0009 | 0.0141 | 0.0026 | 5.37x | 0.0239 | 9.12x |
+| crambin | def2-tzvpd | 15180 | 0.262 | 0.0009 | 0.0277 | 0.0046 | 5.97x | 0.0651 | 14.01x |
+| crambin | def2-qzvpd | 31284 | 0.791 | 0.0010 | 0.0663 | 0.0105 | 6.29x | 0.2473 | 23.45x |
+| ubiquitin | def2-svpd | 17433 | 0.240 | 0.0017 | 0.0326 | 0.0053 | 6.19x | 0.0825 | 15.66x |
+| ubiquitin | def2-tzvpd | 28298 | 0.593 | 0.0017 | 0.0644 | 0.0106 | 6.09x | 0.1929 | 18.27x |
+| ubiquitin | def2-qzvpd | 59053 | 1.821 | 0.0018 | 0.1626 | 0.0229 | 7.11x | too large |  |
+
+### What the diffuse functions cost
+
+The basis grows by half and the sparse matrix by four and a half.
+
+| molecule | basis | nao | nao diffuse | sparse GB | sparse GB diffuse | growth | compute 14 thr | diffuse | growth |
+|---|---|---|---|---|---|---|---|---|---|
+| tagrisso | def2-svp | 683 | 1010 | 0.001 | 0.003 | 2.9x | 0.0005 | 0.0007 | 1.3x |
+| tagrisso | def2-tzvp | 1345 | 1672 | 0.004 | 0.007 | 1.9x | 0.0006 | 0.0008 | 1.3x |
+| tagrisso | def2-qzvp | 3099 | 3426 | 0.017 | 0.024 | 1.5x | 0.0011 | 0.0013 | 1.2x |
+| taxol | def2-svp | 1099 | 1657 | 0.002 | 0.007 | 3.2x | 0.0006 | 0.0008 | 1.3x |
+| taxol | def2-tzvp | 2185 | 2743 | 0.009 | 0.018 | 2.1x | 0.0009 | 0.0012 | 1.3x |
+| taxol | def2-qzvp | 4947 | 5505 | 0.037 | 0.057 | 1.5x | 0.0016 | 0.0022 | 1.3x |
+| crambin | def2-svp | 6177 | 9294 | 0.025 | 0.106 | 4.2x | 0.0016 | 0.0026 | 1.6x |
+| crambin | def2-tzvp | 12063 | 15180 | 0.097 | 0.262 | 2.7x | 0.0029 | 0.0046 | 1.6x |
+| crambin | def2-qzvp | 28167 | 31284 | 0.409 | 0.791 | 1.9x | 0.0065 | 0.0105 | 1.6x |
+| ubiquitin | def2-svp | 11577 | 17433 | 0.052 | 0.240 | 4.6x | 0.0028 | 0.0053 | 1.9x |
+| ubiquitin | def2-tzvp | 22442 | 28298 | 0.200 | 0.593 | 3.0x | 0.0050 | 0.0106 | 2.1x |
+| ubiquitin | def2-qzvp | 53197 | 59053 | 0.872 | 1.821 | 2.1x | 0.0127 | 0.0229 | 1.8x |
+
+Ubiquitin in def2-svp against def2-svpd is the clearest of them: 11577 basis
+functions become 17433, a factor of 1.5, while the sparse matrix goes from 0.052
+to 0.240 gigabytes, a factor of 4.6, and `compute` from 0.0028 to 0.0053 seconds.
+The extra cost is not the basis, it is the atom pairs which the screening no
+longer discards and the combinations of basis functions which survive on the atom
+pairs it keeps.
+
+### What these numbers say
+
+The scaling holds and improves a little, 7.11 times on ubiquitin in def2-qzvpd
+against 6.91 for the same molecule in def2-qzvp, which is the highest this driver
+has reached. More surviving atom pairs mean more work in a block and a smaller
+share for the cost a block carries whatever it holds.
+
+The advantage over the reference narrows, as it should. Crambin in def2-qzvp is
+31.6 times on fourteen threads and in def2-qzvpd 23.5. The driver wins on the
+screening, and diffuse functions are precisely what defeats screening, so the
+case where it discards the least is the case where the reference closes the most
+ground. It still wins everywhere, tagrisso in def2-svpd included, at 1.09 times.
+
+The construction of the sparsity pattern does not move at all: every ubiquitin
+case is 0.0017 or 0.0018 seconds on fourteen threads whatever the basis, as it
+follows the atoms of the molecule and not the functions on them.
+
+Ubiquitin in def2-qzvpd is the largest case in these notes, 59053 basis
+functions, 1.82 gigabytes sparse against 26 dense, computed in 0.0229 seconds.
