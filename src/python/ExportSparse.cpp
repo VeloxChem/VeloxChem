@@ -88,6 +88,48 @@ dense_to_numpy(const CSparseMatrix   &matrix,
     return array;
 }
 
+/// @brief Reconstructs the dense matrix in atomic orbital basis into an array
+/// given by the caller.
+/// @param matrix The sparse matrix to reconstruct the dense matrix of.
+/// @param bra_basis The molecular basis on bra side.
+/// @param ket_basis The molecular basis on ket side.
+/// @param array The array to reconstruct the dense matrix into.
+/// @note The array is taken without conversion, as an array of another type
+/// would be converted into a temporary and the reconstruction would fill that
+/// rather than the array of the caller, leaving it untouched and saying nothing.
+/// @note The dense matrix of a large basis is several gigabytes, which the
+/// allocator returns to the system when it is freed, so a caller reconstructing
+/// one matrix after another pays for faulting in every page of it every time.
+/// Filling an array which the caller keeps avoids that, and is the reason this
+/// exists beside to_numpy.
+static auto
+dense_to_numpy(const CSparseMatrix   &matrix,
+               const CMolecularBasis &bra_basis,
+               const CMolecularBasis &ket_basis,
+               py::array_t<double>   &array) -> void
+{
+    const auto nrows = bra_basis.dimensions_of_basis();
+
+    const auto ncols = ket_basis.dimensions_of_basis();
+
+    // NOTE: the array is checked here rather than by a critical error, as the
+    // latter would terminate the Python interpreter, and the reconstruction
+    // would write outside the array of a caller which got the shape wrong.
+
+    if ((array.ndim() != 2) || (static_cast<size_t>(array.shape(0)) != nrows) || (static_cast<size_t>(array.shape(1)) != ncols))
+    {
+        throw std::runtime_error("SparseMatrix.fill_numpy: Array must have " + std::to_string(nrows) + " rows and " +
+                                 std::to_string(ncols) + " columns");
+    }
+
+    if ((array.flags() & py::array::c_style) == 0)
+    {
+        throw std::runtime_error("SparseMatrix.fill_numpy: Array must be C contiguous");
+    }
+
+    matrix.to_dense(bra_basis, ket_basis, array.mutable_data());
+}
+
 auto
 export_sparse(py::module &m) -> void
 {
@@ -312,7 +354,23 @@ export_sparse(py::module &m) -> void
             },
             "Gets the dense matrix in atomic orbital basis. The matrix may be large.",
             py::arg("basis"),
-            py::arg("max_memory") = 8.0);
+            py::arg("max_memory") = 8.0)
+        .def(
+            "fill_numpy",
+            [](const CSparseMatrix &self, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis,
+               py::array_t<double> &array) -> void { vlx_sparse::dense_to_numpy(self, bra_basis, ket_basis, array); },
+            "Reconstructs the dense matrix in atomic orbital basis into the array of the caller.",
+            py::arg("bra_basis"),
+            py::arg("ket_basis"),
+            py::arg("array").noconvert())
+        .def(
+            "fill_numpy",
+            [](const CSparseMatrix &self, const CMolecularBasis &basis, py::array_t<double> &array) -> void {
+                vlx_sparse::dense_to_numpy(self, basis, basis, array);
+            },
+            "Reconstructs the dense matrix in atomic orbital basis into the array of the caller.",
+            py::arg("basis"),
+            py::arg("array").noconvert());
 
     // CSparseTensor class
 
