@@ -12,7 +12,7 @@ cover.
 | Memory | 36 GB |
 | OS | macOS 26.6.2 |
 | Build | `make -j 12 release` from `src/` |
-| Threads | `OMP_NUM_THREADS` unset, OpenMP default |
+| Threads | stated per table, `OMP_NUM_THREADS` set explicitly where it matters |
 
 ## Molecules
 
@@ -220,8 +220,10 @@ implemented every system available is either a single very large call or too few
 calls to be representative. The decision was postponed until the kernels of higher
 angular momenta existed and the choice could be measured on a real molecule.
 
-That decision has since been taken, and the level is the combinations of basis
-functions of a block. See the section below.
+That decision was taken, and the level was the combinations of basis functions
+of a block. It has since been removed again, along with every other parallel
+region of this path, leaving the vectorization alone. See the section on the
+single-threaded driver at the end.
 
 ## The SIMD overlap driver against the reference overlap driver
 
@@ -357,6 +359,10 @@ do, as it depends on the number of atoms alone.
 
 ## The phases of `compute` and what limits their threads
 
+**The scaling columns of this section describe parallel regions which have since
+been removed; see the section on the single-threaded driver at the end. The split
+of `compute` into its phases, and the causes ruled out below, still stand.**
+
 The measurements above take the cost of the integrals as `compute` less the
 construction of the sparsity pattern. That is wrong: `compute` also allocates the
 values blocks and, at the time, set them to zero, both of which are serial. The
@@ -413,6 +419,10 @@ the split above.
 
 ### What helped and what did not
 
+**Three of the rows below concern parallelizations which no longer exist. They
+record what the threads bought while they were there, not what the driver does
+now.**
+
 | change | effect |
 |---|---|
 | parallel over the combinations of basis functions of a block | the integrals scale 2.7 to 3.7 times |
@@ -467,6 +477,11 @@ which they parallel and which is 2535 KB across 50 files. The three largest are
 angular components.
 
 ## The cost when the memory is cold and when it is warm
+
+**The single-thread table of this section still describes the driver. The
+fourteen-thread table and the one which follows it do not, the parallel regions
+having since been removed; see the section on the single-threaded driver at the
+end.**
 
 Every table above this one timed the larger cases once and the smaller ones as
 the best of three. That mixes two measurements in one column, as the first call
@@ -550,3 +565,119 @@ they were measured within a run while the total was not, so the two were not
 comparable. Measured warm throughout, `compute` scales between 2.2 and 3.5 times,
 which is what its phases scale to, and the whole of it is accounted for: the
 phases and the time the caller sees agree to thirty microseconds.
+
+## The single-threaded driver
+
+Every parallel region of this path was removed: the coordinates, the solid
+harmonics, the combinations of basis functions of a block, the description of the
+sparsity patterns, the ordering of the atom pairs and the reconstruction of the
+dense matrix. The `omp simd` directives of the kernels and of the harmonics are
+untouched, so the vectorization is what it was and only the threads are gone.
+Every table above which carries a thread count describes the code before that.
+
+Measured with the methodology of the section above, one cold call followed by the
+best of three warm ones, each case in its own process. The molecules and the
+dimensions of their bases are the same as everywhere else in this file, so the
+cases compare one for one.
+
+### Where the time goes
+
+One thread, seconds. `sparsity` is the construction of the sparsity pattern
+through the exported `SparseMatrix` constructor, `compute` is the whole driver
+call, and the two reference columns are the same call on the reference driver.
+
+| molecule | basis | nao | sparse GB | sparsity cold | sparsity warm | compute cold | compute warm | ref cold | ref warm | cold | warm |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| tagrisso | def2-svp | 683 | 0.001 | 0.0009 | 0.0008 | 0.0012 | 0.0012 | 0.0021 | 0.0012 | 1.68x | 1.06x |
+| tagrisso | def2-tzvp | 1345 | 0.004 | 0.0010 | 0.0009 | 0.0020 | 0.0018 | 0.0052 | 0.0041 | 2.65x | 2.25x |
+| tagrisso | def2-qzvp | 3099 | 0.017 | 0.0011 | 0.0010 | 0.0045 | 0.0036 | 0.0226 | 0.0201 | 5.05x | 5.60x |
+| taxol | def2-svp | 1099 | 0.002 | 0.0009 | 0.0008 | 0.0013 | 0.0013 | 0.0038 | 0.0028 | 2.82x | 2.15x |
+| taxol | def2-tzvp | 2185 | 0.009 | 0.0009 | 0.0009 | 0.0026 | 0.0023 | 0.0113 | 0.0094 | 4.27x | 4.06x |
+| taxol | def2-qzvp | 4947 | 0.037 | 0.0011 | 0.0010 | 0.0073 | 0.0055 | 0.0575 | 0.0502 | 7.90x | 9.06x |
+| crambin | def2-svp | 6177 | 0.025 | 0.0039 | 0.0036 | 0.0089 | 0.0078 | 0.1074 | 0.0976 | 12.05x | 12.50x |
+| crambin | def2-tzvp | 12063 | 0.097 | 0.0041 | 0.0038 | 0.0194 | 0.0157 | 0.3592 | 0.3311 | 18.52x | 21.10x |
+| crambin | def2-qzvp | 28167 | 0.409 | 0.0046 | 0.0043 | 0.0564 | 0.0415 | 1.9867 | 1.7735 | 35.23x | 42.77x |
+| ubiquitin | def2-svp | 11577 | 0.052 | 0.0109 | 0.0102 | 0.0211 | 0.0186 | 0.3769 | 0.3488 | 17.85x | 18.73x |
+| ubiquitin | def2-tzvp | 22442 | 0.200 | 0.0115 | 0.0106 | 0.0417 | 0.0339 | 1.2594 | 1.1611 | 30.17x | 34.20x |
+| ubiquitin | def2-qzvp | 53197 | 0.872 | 0.0120 | 0.0111 | 0.1230 | 0.0892 | too large | | | |
+
+### Why there is no fourteen-thread table
+
+Nothing is left in the driver for the threads to divide, and the numbers say so:
+`compute` for crambin in def2-qzvp is 0.0418 warm on fourteen threads against
+0.0415 on one, and for ubiquitin in def2-qzvp 0.0891 against 0.0892. What does
+change with the threads is the reference driver, which still threads, so the
+reference is given at both counts and the driver at one. Warm, seconds.
+
+| molecule | basis | driver 1 thr | driver 14 thr | ref 1 thr | ref 14 thr | against ref, 1 thr | against ref, 14 thr |
+|---|---|---|---|---|---|---|---|
+| tagrisso | def2-svp | 0.0012 | 0.0011 | 0.0012 | 0.0005 | 1.06x | 0.42x |
+| tagrisso | def2-tzvp | 0.0018 | 0.0018 | 0.0041 | 0.0011 | 2.25x | 0.59x |
+| tagrisso | def2-qzvp | 0.0036 | 0.0036 | 0.0201 | 0.0031 | 5.60x | 0.87x |
+| taxol | def2-svp | 0.0013 | 0.0013 | 0.0028 | 0.0008 | 2.15x | 0.57x |
+| taxol | def2-tzvp | 0.0023 | 0.0023 | 0.0094 | 0.0018 | 4.06x | 0.77x |
+| taxol | def2-qzvp | 0.0055 | 0.0054 | 0.0502 | 0.0066 | 9.06x | 1.22x |
+| crambin | def2-svp | 0.0078 | 0.0078 | 0.0976 | 0.0129 | 12.50x | 1.66x |
+| crambin | def2-tzvp | 0.0157 | 0.0157 | 0.3311 | 0.0417 | 21.10x | 2.65x |
+| crambin | def2-qzvp | 0.0415 | 0.0418 | 1.7735 | 0.2044 | 42.77x | 4.89x |
+| ubiquitin | def2-svp | 0.0186 | 0.0184 | 0.3488 | 0.0422 | 18.73x | 2.29x |
+| ubiquitin | def2-tzvp | 0.0339 | 0.0345 | 1.1611 | 0.1369 | 34.20x | 3.97x |
+| ubiquitin | def2-qzvp | 0.0892 | 0.0891 | too large | too large | | |
+
+### What removing the threads cost
+
+The previous commit, `ebd67c3b7`, was built and measured in the same session
+rather than compared against the numbers recorded further up, so both sides share
+the machine and its state. The ratio is the old time over the new one: above one
+the single-threaded version is faster, below one the threaded version was, and
+0.22x is the threaded version at four and a half times the speed.
+
+| molecule | basis | 1 thread cold | 1 thread warm | 14 threads cold | 14 threads warm |
+|---|---|---|---|---|---|
+| tagrisso | def2-svp | 1.03x | 0.99x | 0.93x | 0.89x |
+| tagrisso | def2-tzvp | 1.04x | 1.00x | 1.20x | 0.61x |
+| tagrisso | def2-qzvp | 1.11x | 0.97x | 0.95x | 0.49x |
+| taxol | def2-svp | 1.08x | 1.02x | 0.77x | 0.74x |
+| taxol | def2-tzvp | 1.00x | 0.94x | 0.91x | 0.55x |
+| taxol | def2-qzvp | 0.94x | 0.97x | 0.79x | 0.35x |
+| crambin | def2-svp | 0.99x | 1.01x | 0.53x | 0.44x |
+| crambin | def2-tzvp | 1.00x | 0.99x | 0.59x | 0.30x |
+| crambin | def2-qzvp | 1.02x | 1.01x | 0.62x | 0.22x |
+| ubiquitin | def2-svp | 1.00x | 1.01x | 0.47x | 0.39x |
+| ubiquitin | def2-tzvp | 1.00x | 1.02x | 0.55x | 0.30x |
+| ubiquitin | def2-qzvp | 1.01x | 1.03x | 0.59x | 0.22x |
+
+### What these numbers say
+
+On a single thread the removal is free. The twelve cases land between 0.94 and
+1.11 times, which is the spread of the measurement, and none of them moves in a
+way the noise does not explain. That is worth more than it appears: it says the
+machinery which is now gone really was gated off when it was given one thread,
+and that the sample sort, the predicate which chose it and the thresholds on the
+parallel regions cost nothing in the cases where they declined to act.
+
+On fourteen threads the threaded version was 2.3 to 4.6 times faster warm on the
+six crambin and ubiquitin cases and 1.1 to 2.9 times on the small ones. That is the price, and
+it is paid in full.
+
+Against the reference driver the picture divides by thread count. On one thread
+the driver is stronger than anything else recorded in this file, 12.5 to 42.8
+times on crambin and ubiquitin, because the reference has no threads either and
+the comparison is kernel against kernel. On fourteen threads the reference
+catches up and then passes: the driver now loses on all three bases of tagrisso
+and on taxol in def2-svp and def2-tzvp, at 0.42 to 0.87 times, where it was ahead
+of the reference in every one of those cases before, and its margin on crambin
+and ubiquitin falls from between 4.9 and 14.9 times to between 1.7 and 4.9.
+
+Two things do not move with any of this. Ubiquitin in def2-qzvp holds twenty one
+gigabytes as a dense matrix, which the reference driver cannot compute on this
+machine at all, against 0.872 gigabytes sparse computed in 0.089 seconds. And the
+construction of the sparsity pattern is still the floor for a large molecule in a
+small basis, 0.0102 of the 0.0186 seconds of ubiquitin in def2-svp.
+
+### A note on the sparsity column
+
+That column is far below the 0.0507 seconds recorded for ubiquitin in def2-svp in
+the phases section, 0.0102 warm against it. The gain is not from removing the
+threads. It is the radix sort of the bit patterns of the interatomic distances,
+which landed between the two measurements, and the phases section predates it.
