@@ -50,6 +50,8 @@
 #include "SimdHarmonicsRecN.hpp"
 #include "SimdHarmonicsRecO.hpp"
 #include "SimdHarmonicsRecQ.hpp"
+#include "SimdHarmonicsRecR.hpp"
+#include "SimdHarmonicsRecT.hpp"
 
 namespace simdfunc {  // simdfunc namespace
 

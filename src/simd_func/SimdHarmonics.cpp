@@ -45,8 +45,8 @@ namespace simdfunc {  // simdfunc namespace
 auto
 make_solid_harmonics(const CSimdMatrix &coordinates, const int lmax) -> std::vector<CSimdMatrix>
 {
-    errors::assertMsgCritical(lmax <= 12,
-                              std::string("SimdHarmonics.make_solid_harmonics: Solid harmonics above angular momentum twelve are not implemented"));
+    errors::assertMsgCritical(lmax <= 14,
+                              std::string("SimdHarmonics.make_solid_harmonics: Solid harmonics above angular momentum fourteen are not implemented"));
 
     std::vector<CSimdMatrix> harmonics;
 
@@ -81,6 +81,10 @@ make_solid_harmonics(const CSimdMatrix &coordinates, const int lmax) -> std::vec
     if (lmax > 10) harmonics.push_back(make_o_solid_harmonics(harmonics[9], harmonics[8], harmonics[0], coordinates));
 
     if (lmax > 11) harmonics.push_back(make_q_solid_harmonics(harmonics[10], harmonics[9], harmonics[0], coordinates));
+
+    if (lmax > 12) harmonics.push_back(make_r_solid_harmonics(harmonics[11], harmonics[10], harmonics[0], coordinates));
+
+    if (lmax > 13) harmonics.push_back(make_t_solid_harmonics(harmonics[12], harmonics[11], harmonics[0], coordinates));
 
     return harmonics;
 }
