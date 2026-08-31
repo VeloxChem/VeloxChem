@@ -603,6 +603,11 @@ call, and the two reference columns are the same call on the reference driver.
 
 ### Why there is no fourteen-thread table
 
+**The atom basis pair groups have since been divided into blocks, which gives the
+threads something to divide again; see the section on the blocks and the threads
+at the end. The single-thread table above still describes the driver, this
+subsection no longer does.**
+
 Nothing is left in the driver for the threads to divide, and the numbers say so:
 `compute` for crambin in def2-qzvp is 0.0418 warm on fourteen threads against
 0.0415 on one, and for ubiquitin in def2-qzvp 0.0891 against 0.0892. What does
@@ -681,3 +686,97 @@ That column is far below the 0.0507 seconds recorded for ubiquitin in def2-svp i
 the phases section, 0.0102 warm against it. The gain is not from removing the
 threads. It is the radix sort of the bit patterns of the interatomic distances,
 which landed between the two measurements, and the phases section predates it.
+
+## The blocks and the threads
+
+The atom basis pair groups are as many as the pairs of the unique atom bases, so
+their number is set by the variety of the elements and not by the size of the
+molecule: fifteen for crambin, fourteen for ubiquitin, and the largest of them
+holds a third of the atom pairs. That is what bounded the earlier attempts at
+threading the driver near three times, whatever they parallelised.
+
+The groups are now divided into blocks of a target number of atom pairs, chosen
+from the threads and the atom pairs as `npairs / (4 * nthreads)` and no smaller
+than 2048, and every stage below works on the blocks: the atom pairs are ordered
+one block per thread, the sparsity patterns are described one block per thread,
+and the values blocks are computed one block per thread. A single thread leaves
+the groups undivided. Crambin in def2-svp gives 15 blocks on one thread, 18 on
+two, 26 on four and 65 on fourteen.
+
+### Where the time goes
+
+Warm, seconds, best of three after one cold call, each case in its own process.
+The last two columns are the one thread time over the fourteen thread time.
+
+| molecule | basis | nao | sparsity 1 thr | sparsity 14 thr | compute 1 thr | compute 14 thr | sparsity | compute |
+|---|---|---|---|---|---|---|---|---|
+| tagrisso | def2-svp | 683 | 0.0008 | 0.0004 | 0.0011 | 0.0006 | 2.09x | 2.01x |
+| tagrisso | def2-tzvp | 1345 | 0.0008 | 0.0004 | 0.0017 | 0.0009 | 2.19x | 2.04x |
+| tagrisso | def2-qzvp | 3099 | 0.0010 | 0.0004 | 0.0034 | 0.0011 | 2.30x | 3.11x |
+| taxol | def2-svp | 1099 | 0.0008 | 0.0004 | 0.0012 | 0.0007 | 1.83x | 1.79x |
+| taxol | def2-tzvp | 2185 | 0.0008 | 0.0004 | 0.0022 | 0.0010 | 1.97x | 2.20x |
+| taxol | def2-qzvp | 4947 | 0.0010 | 0.0004 | 0.0051 | 0.0020 | 2.37x | 2.53x |
+| crambin | def2-svp | 6177 | 0.0035 | 0.0015 | 0.0074 | 0.0024 | 2.35x | 3.04x |
+| crambin | def2-tzvp | 12063 | 0.0037 | 0.0016 | 0.0148 | 0.0040 | 2.33x | 3.69x |
+| crambin | def2-qzvp | 28167 | 0.0041 | 0.0017 | 0.0400 | 0.0082 | 2.36x | 4.88x |
+| ubiquitin | def2-svp | 11577 | 0.0099 | 0.0036 | 0.0179 | 0.0048 | 2.74x | 3.76x |
+| ubiquitin | def2-tzvp | 22442 | 0.0101 | 0.0035 | 0.0331 | 0.0071 | 2.91x | 4.63x |
+| ubiquitin | def2-qzvp | 53197 | 0.0107 | 0.0036 | 0.0850 | 0.0154 | 2.96x | 5.52x |
+
+The scaling now rises with the basis, from twice on tagrisso in def2-svp to five
+and a half times on ubiquitin in def2-qzvp, which is the ordering the work
+predicts: the larger the basis, the more arithmetic there is per atom pair to
+divide. The construction of the sparsity pattern scales separately, between 1.8
+and 3.0 times, and is what the cheap cases end up waiting on: ubiquitin in
+def2-svp spends 0.0036 of its 0.0048 seconds there.
+
+### Against the single threaded driver
+
+| molecule | basis | single threaded | divided, 1 thr | divided, 14 thr | against the single threaded driver |
+|---|---|---|---|---|---|
+| tagrisso | def2-svp | 0.0012 | 0.0011 | 0.0006 | 2.11x |
+| tagrisso | def2-tzvp | 0.0018 | 0.0017 | 0.0009 | 2.12x |
+| tagrisso | def2-qzvp | 0.0036 | 0.0034 | 0.0011 | 3.25x |
+| taxol | def2-svp | 0.0013 | 0.0012 | 0.0007 | 1.88x |
+| taxol | def2-tzvp | 0.0023 | 0.0022 | 0.0010 | 2.33x |
+| taxol | def2-qzvp | 0.0055 | 0.0051 | 0.0020 | 2.74x |
+| crambin | def2-svp | 0.0078 | 0.0074 | 0.0024 | 3.20x |
+| crambin | def2-tzvp | 0.0157 | 0.0148 | 0.0040 | 3.91x |
+| crambin | def2-qzvp | 0.0415 | 0.0400 | 0.0082 | 5.06x |
+| ubiquitin | def2-svp | 0.0186 | 0.0179 | 0.0048 | 3.91x |
+| ubiquitin | def2-tzvp | 0.0339 | 0.0331 | 0.0071 | 4.76x |
+| ubiquitin | def2-qzvp | 0.0892 | 0.0850 | 0.0154 | 5.80x |
+
+### The blocks are not what limits this
+
+Per block timings on crambin in def2-qzvp, which divides into 65 blocks on
+fourteen threads, with the cost of every block measured separately.
+
+| threads | blocks | summed block work | largest block | work / threads |
+|---|---|---|---|---|
+| 1 | 15 | 0.0550 | 0.0155 | 0.0550 |
+| 2 | 18 | 0.0530 | 0.0104 | 0.0265 |
+| 4 | 26 | 0.0648 | 0.0068 | 0.0162 |
+| 14 | 65 | 0.1452 | 0.0087 | 0.0104 |
+
+The largest block is 6.1 percent of the work and lies below the work divided by
+the threads at every count, so the division itself permits the full fourteen
+times and imbalance bounds nothing. The blocks are not the limit.
+
+What the table shows instead is that the same work costs more the more threads
+run it: 0.0550 seconds of block work on one thread against 0.1452 on fourteen,
+the same blocks inflated 2.6 times. That inflation is the whole of the gap
+between the 5 times measured and the 14 times the division allows. One block
+spent 76 percent of its time in `make_solid_harmonics` where an identically
+shaped sibling spent 4 percent, which points at the per block harmonics, about
+1.35 MB at lmax 8, as the contended resource rather than at the kernels.
+
+### A measurement which was wrong
+
+A first sweep of these cases reported the fourteen thread `compute` as slower
+than the single thread one on crambin and ubiquitin in def2-qzvp, 0.0447 against
+0.0394 and 0.0853 against 0.0846, and a regression was recorded on that basis.
+Re-running the same script on the same build gives 0.0082 and 0.0154. The cause
+of the first reading was never established; the code was not changed between the
+two. It is recorded here because it was reported as a property of the driver and
+it was not one.
