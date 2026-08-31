@@ -981,6 +981,7 @@ buffers carried across the blocks rather than a small fix.
 |---|---|
 | blocks sized so that each carries the same cost, the atom pairs of a group scaled by the angular momenta of its atom bases | 0.98 times, and no exponent from zero to three of the momentum sum reached 1.05 |
 | the atom pairs of `to_dense` tiled, so that the writes of a tile fall in fewer rows | a loss at every tile size from 32 to 4096 |
+| the values of `CSimdMatrix` taken from a pool held by the thread, so that the coordinates and the solid harmonics of a block reuse those of the block before | 1.017 times, for a custom allocator in a core class and 41 megabytes retained |
 
 The equal cost sizing fails because it gives the most costly groups the smallest
 blocks, and those are the groups whose fixed cost per block, chiefly the solid
@@ -989,3 +990,17 @@ of `to_dense` fails because the scatter is already at the limit of the memory
 system for random access, 203 gigabytes per second of line traffic against the
 352 the machine reaches on a linear write, so there was no locality left to
 recover.
+
+The pool was built on the reading that the allocator is 5.5 percent of the
+samples, and about 1.05 times was expected of it. It measured 1.017 times, every
+one of five cases improving but none by much, and it was removed. The reading was
+right and the inference from it was wrong: most of that 5.5 percent is the values
+blocks of the matrix, 0.87 gigabytes allocated and freed for every `compute` of
+ubiquitin in def2-qzvp through `allocate` and the destructor, which are plain
+`new double[]` and never reach `CSimdMatrix`. The pool could only ever reach the
+coordinates and the solid harmonics. Peak resident memory went from 1.238 to
+1.279 gigabytes with it.
+
+Reusing the values blocks is the part which would pay, and it cannot be done
+under the allocator: it needs the driver to fill a matrix it is given rather than
+return a new one, so that a caller computing repeatedly keeps one.
