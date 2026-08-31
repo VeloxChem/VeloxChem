@@ -1409,3 +1409,135 @@ What is left of the reconstruction on the large case is 0.0535 seconds, which is
 the scatter and almost nothing else, and the scatter is at the limit quoted
 above. A single reconstruction of a matrix which has never been built cannot be
 made faster than the cost of faulting in its memory.
+
+## The kinetic energy driver
+
+The kinetic energy integrals follow the overlap: the same sparse matrix, the same
+division of the atom basis pair groups into blocks, the same ordering of the
+blocks by cost and the same parallel loop over them. Only the kernels differ, and
+they carry more arithmetic for the same atom pair.
+
+The reference driver of VeloxChem implements the kinetic energy to angular
+momentum four alone, so it is compared against only where the basis stays within
+that, and the column says so rather than being left blank.
+
+### The def2 sets
+
+Warm, seconds, best of three after one cold call, each case in its own process.
+
+| molecule | basis | nao | lmax | sparse GB | compute 1 thr | compute 14 thr | scaling | reference 14 thr | against it |
+|---|---|---|---|---|---|---|---|---|---|
+| tagrisso | def2-svp | 683 | 2 | 0.00 | 0.0011 | 0.0006 | 1.95x | 0.0005 | 0.93x |
+| tagrisso | def2-tzvp | 1345 | 3 | 0.00 | 0.0017 | 0.0010 | 1.74x | 0.0010 | 1.03x |
+| tagrisso | def2-qzvp | 3099 | 4 | 0.02 | 0.0036 | 0.0013 | 2.81x | 0.0041 | 3.17x |
+| taxol | def2-svp | 1099 | 2 | 0.00 | 0.0013 | 0.0007 | 1.86x | 0.0011 | 1.60x |
+| taxol | def2-tzvp | 2185 | 3 | 0.01 | 0.0022 | 0.0012 | 1.84x | 0.0024 | 2.00x |
+| taxol | def2-qzvp | 4947 | 4 | 0.04 | 0.0059 | 0.0021 | 2.86x | 0.0092 | 4.47x |
+| crambin | def2-svp | 6177 | 2 | 0.03 | 0.0076 | 0.0017 | 4.50x | 0.0149 | 8.89x |
+| crambin | def2-tzvp | 12063 | 3 | 0.10 | 0.0167 | 0.0031 | 5.43x | 0.0507 | 16.46x |
+| crambin | def2-qzvp | 28167 | 4 | 0.44 | 0.0515 | 0.0080 | 6.40x | 0.2704 | 33.60x |
+| ubiquitin | def2-svp | 11577 | 2 | 0.06 | 0.0179 | 0.0030 | 5.94x | 0.0490 | 16.30x |
+| ubiquitin | def2-tzvp | 22442 | 3 | 0.22 | 0.0358 | 0.0058 | 6.20x | 0.1701 | 29.43x |
+| ubiquitin | def2-qzvp | 53197 | 4 | 0.95 | 0.1145 | 0.0154 | 7.45x | not valid |  |
+
+### The def2 sets with diffuse functions
+
+| molecule | basis | nao | lmax | sparse GB | compute 1 thr | compute 14 thr | scaling | reference 14 thr | against it |
+|---|---|---|---|---|---|---|---|---|---|
+| tagrisso | def2-svpd | 1010 | 2 | 0.00 | 0.0014 | 0.0007 | 1.94x | 0.0008 | 1.18x |
+| tagrisso | def2-tzvpd | 1672 | 3 | 0.01 | 0.0022 | 0.0010 | 2.27x | 0.0015 | 1.59x |
+| tagrisso | def2-qzvpd | 3426 | 4 | 0.03 | 0.0047 | 0.0017 | 2.70x | 0.0049 | 2.83x |
+| taxol | def2-svpd | 1657 | 2 | 0.01 | 0.0019 | 0.0007 | 2.51x | 0.0015 | 1.95x |
+| taxol | def2-tzvpd | 2743 | 3 | 0.02 | 0.0033 | 0.0015 | 2.25x | 0.0036 | 2.42x |
+| taxol | def2-qzvpd | 5505 | 4 | 0.06 | 0.0085 | 0.0030 | 2.79x | 0.0105 | 3.46x |
+| crambin | def2-svpd | 9294 | 2 | 0.11 | 0.0160 | 0.0030 | 5.33x | 0.0276 | 9.20x |
+| crambin | def2-tzvpd | 15180 | 3 | 0.28 | 0.0340 | 0.0056 | 6.03x | 0.0763 | 13.53x |
+| crambin | def2-qzvpd | 31284 | 4 | 0.84 | 0.0919 | 0.0136 | 6.76x | 0.3195 | 23.51x |
+| ubiquitin | def2-svpd | 17433 | 2 | 0.26 | 0.0376 | 0.0058 | 6.42x | 0.0932 | 15.95x |
+| ubiquitin | def2-tzvpd | 28298 | 3 | 0.63 | 0.0805 | 0.0120 | 6.71x | 0.2367 | 19.73x |
+| ubiquitin | def2-qzvpd | 59053 | 4 | 1.94 | 0.2056 | 0.0270 | 7.62x | not valid |  |
+
+### The correlation consistent sets
+
+| molecule | basis | nao | lmax | sparse GB | compute 1 thr | compute 14 thr | scaling | reference 14 thr | against it |
+|---|---|---|---|---|---|---|---|---|---|
+| tagrisso | cc-pvdz | 683 | 2 | 0.00 | 0.0013 | 0.0005 | 2.60x | 0.0009 | 1.84x |
+| tagrisso | cc-pvtz | 1572 | 3 | 0.01 | 0.0021 | 0.0008 | 2.72x | 0.0018 | 2.30x |
+| tagrisso | cc-pvqz | 3025 | 4 | 0.02 | 0.0036 | 0.0013 | 2.86x | 0.0045 | 3.60x |
+| tagrisso | cc-pv5z | 5182 | 5 | 0.04 | 0.0080 | 0.0027 | 2.96x | not valid |  |
+| tagrisso | cc-pv6z | 8183 | 6 | 0.10 | 0.0180 | 0.0058 | 3.09x | not valid |  |
+| tagrisso | aug-cc-pvdz | 1148 | 2 | 0.00 | 0.0019 | 0.0007 | 2.69x | 0.0012 | 1.70x |
+| tagrisso | aug-cc-pvtz | 2461 | 3 | 0.02 | 0.0037 | 0.0012 | 3.01x | 0.0054 | 4.43x |
+| tagrisso | aug-cc-pvqz | 4478 | 4 | 0.05 | 0.0079 | 0.0024 | 3.25x | 0.0084 | 3.47x |
+| tagrisso | aug-cc-pv5z | 7339 | 5 | 0.12 | 0.0188 | 0.0060 | 3.13x | not valid |  |
+| tagrisso | aug-cc-pv6z | 11184 | 6 | 0.25 | 0.0448 | 0.0144 | 3.11x | not valid |  |
+| taxol | cc-pvdz | 1099 | 2 | 0.00 | 0.0016 | 0.0007 | 2.49x | 0.0019 | 2.90x |
+| taxol | cc-pvtz | 2516 | 3 | 0.01 | 0.0028 | 0.0011 | 2.58x | 0.0028 | 2.62x |
+| taxol | cc-pvqz | 4825 | 4 | 0.04 | 0.0059 | 0.0020 | 2.98x | 0.0092 | 4.68x |
+| taxol | cc-pv5z | 8246 | 5 | 0.10 | 0.0143 | 0.0047 | 3.02x | not valid |  |
+| taxol | cc-pv6z | 12999 | 6 | 0.22 | 0.0347 | 0.0112 | 3.09x | not valid |  |
+| taxol | aug-cc-pvdz | 1844 | 2 | 0.01 | 0.0028 | 0.0012 | 2.28x | 0.0022 | 1.82x |
+| taxol | aug-cc-pvtz | 3933 | 3 | 0.04 | 0.0062 | 0.0023 | 2.76x | 0.0055 | 2.43x |
+| taxol | aug-cc-pvqz | 7134 | 4 | 0.11 | 0.0153 | 0.0047 | 3.27x | 0.0191 | 4.10x |
+| taxol | aug-cc-pv5z | 11667 | 5 | 0.27 | 0.0384 | 0.0115 | 3.33x | not valid |  |
+| taxol | aug-cc-pv6z | 17752 | 6 | 0.57 | 0.0936 | 0.0268 | 3.49x | not valid |  |
+| crambin | cc-pvdz | 6177 | 2 | 0.03 | 0.0099 | 0.0019 | 5.12x | 0.0229 | 11.82x |
+| crambin | cc-pvtz | 14244 | 3 | 0.13 | 0.0213 | 0.0036 | 5.87x | 0.0755 | 20.84x |
+| crambin | cc-pvqz | 27459 | 4 | 0.38 | 0.0481 | 0.0072 | 6.69x | 0.2724 | 37.88x |
+| crambin | cc-pv5z | 47106 | 5 | 1.03 | 0.1257 | 0.0188 | 6.67x | not valid |  |
+| crambin | cc-pv6z | 74469 | 6 | 2.38 | 0.3091 | 0.0403 | 7.67x | not valid |  |
+| crambin | aug-cc-pvdz | 10380 | 2 | 0.17 | 0.0300 | 0.0045 | 6.72x | 0.0436 | 9.76x |
+| crambin | aug-cc-pvtz | 22311 | 3 | 0.62 | 0.0734 | 0.0100 | 7.33x | 0.1551 | 15.49x |
+| crambin | aug-cc-pvqz | 40674 | 4 | 1.69 | 0.1852 | 0.0237 | 7.81x | not valid |  |
+| crambin | aug-cc-pv5z | 66753 | 5 | 3.93 | 0.4607 | 0.0588 | 7.83x | not valid |  |
+| crambin | aug-cc-pv6z | 101832 | 6 | 8.05 | 1.0768 | 0.1272 | 8.46x | not valid |  |
+| ubiquitin | cc-pvdz | 11577 | 2 | 0.06 | 0.0214 | 0.0038 | 5.64x | 0.0758 | 19.93x |
+| ubiquitin | cc-pvtz | 26870 | 3 | 0.26 | 0.0422 | 0.0064 | 6.64x | 0.2443 | 38.37x |
+| ubiquitin | cc-pvqz | 51984 | 4 | 0.80 | 0.1031 | 0.0133 | 7.78x | not valid |  |
+| ubiquitin | cc-pv5z | 89381 | 5 | 2.21 | 0.2612 | 0.0363 | 7.19x | not valid |  |
+| ubiquitin | cc-pv6z | 141523 | 6 | 5.15 | 0.6465 | 0.0822 | 7.86x | not valid |  |
+| ubiquitin | aug-cc-pvdz | 19511 | 2 | 0.44 | 0.0724 | 0.0098 | 7.42x | 0.1464 | 15.00x |
+| ubiquitin | aug-cc-pvtz | 42163 | 3 | 1.56 | 0.1773 | 0.0238 | 7.44x | not valid |  |
+| ubiquitin | aug-cc-pvqz | 77098 | 4 | 4.16 | 0.4452 | 0.0585 | 7.61x | not valid |  |
+| ubiquitin | aug-cc-pv5z | 126778 | 5 | 9.61 | 1.1012 | 0.1552 | 7.10x | not valid |  |
+| ubiquitin | aug-cc-pv6z | 193665 | 6 | 19.61 | 2.7711 | 0.3347 | 8.28x | not valid |  |
+
+### Parallel scaling
+
+The speedup of `compute` against one thread, warm.
+
+| molecule | basis | nao | 1 thr | 2 thr | 4 thr | 6 thr | 8 thr | 10 thr | 12 thr | 14 thr |
+|---|---|---|---|---|---|---|---|---|---|---|
+| tagrisso | def2-qzvp | 3099 | 1.00x | 1.82x | 2.39x | 2.88x | 2.78x | 2.76x | 2.36x | 2.71x |
+| taxol | def2-qzvp | 4947 | 1.00x | 1.82x | 2.90x | 3.00x | 3.00x | 3.03x | 3.03x | 2.97x |
+| crambin | def2-svp | 6177 | 1.00x | 1.72x | 2.85x | 3.82x | 4.39x | 4.49x | 4.98x | 4.42x |
+| crambin | def2-qzvp | 28167 | 1.00x | 1.83x | 3.07x | 4.21x | 4.92x | 5.21x | 6.26x | 6.53x |
+| ubiquitin | def2-svp | 11577 | 1.00x | 1.96x | 3.18x | 4.19x | 5.39x | 6.10x | 6.31x | 6.52x |
+| ubiquitin | def2-tzvp | 22442 | 1.00x | 1.81x | 3.15x | 4.28x | 5.07x | 5.06x | 6.40x | 6.41x |
+| ubiquitin | def2-qzvp | 53197 | 1.00x | 1.83x | 3.49x | 4.47x | 5.92x | 6.47x | 7.37x | 7.33x |
+| crambin | cc-pv5z | 47106 | 1.00x | 1.85x | 3.42x | 4.64x | 5.01x | 5.71x | 6.20x | 6.59x |
+| ubiquitin | aug-cc-pvtz | 42163 | 1.00x | 1.88x | 3.28x | 4.66x | 5.76x | 6.17x | 7.55x | 8.08x |
+
+### What these numbers say
+
+The scaling reaches **8.46 times** on crambin in aug-cc-pv6z and 8.28 on
+ubiquitin in the same, which is the best this session has measured on either
+driver. It is slightly better than the overlap, 7.52 times on the same case,
+because an atom pair of the kinetic energy carries more arithmetic and the cost a
+block pays whatever it holds is a smaller share of it.
+
+The scaling is near linear to two threads, 1.7 to 2.0 times, and then divides by
+the size of the molecule: tagrisso reaches 2.9 times and stops, holding too few
+atom pairs to be divided into blocks at all, while ubiquitin climbs to fourteen.
+The knee visible at eight to ten threads on several rows is the machine and not
+the code, its ten performance cores being filled before the four efficiency cores
+are reached.
+
+Against the reference where it is valid, the driver is between 8.9 and 38.4 times
+faster on the four large cases and between 0.9 and 4.7 on the two small ones.
+Tagrisso in def2-svp at 0.93 times is the one loss, and it is half a millisecond
+of work.
+
+The largest case is ubiquitin in aug-cc-pv6z, 193665 basis functions and 19.6
+gigabytes sparse, whose kinetic energy matrix is formed in 0.33 seconds on
+fourteen threads.
