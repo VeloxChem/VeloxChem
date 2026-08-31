@@ -36,11 +36,9 @@
 
 #include <cmath>
 #include <cstddef>
-#include <cstdint>
 #include <string>
 
 #include "ErrorHandler.hpp"
-#include "OpenMPFunc.hpp"
 #include "SimdAlign.hpp"
 
 namespace simdfunc {  // simdfunc namespace
@@ -76,43 +74,14 @@ make_p_solid_harmonics(const CSimdMatrix &coordinates) -> CSimdMatrix
     // NOTE: the rows of the coordinates and of the harmonics start at a cache
     // line boundary, so the loop is vectorized with aligned loads and stores.
 
-    // NOTE: the rows are filled by the threads only when they hold enough work to
-    // repay the fixed cost of forking and joining them. The two loops are written
-    // out, as a loop under a pragma with an if clause does not vectorize as well
-    // as one without it when the clause is false.
-
-    const auto npnts = static_cast<int64_t>(3 * ncols);
-
-    // NOTE: the work needed to repay the threads is taken per thread, as forking
-    // and joining them costs more the more of them there are. The constant is
-    // measured on fourteen threads, where the threshold it gives is the smallest
-    // one which does not lose on the blocks too small to fill them.
-
-    const auto nthreshold = int64_t{12000} * omp::get_number_of_threads();
-
-    if (npnts > nthreshold)
-    {
-#pragma omp parallel for simd schedule(static) aligned(s_m1, s_z0, s_p1, a_x, a_y, a_z, b_x, b_y, b_z : simd::cache_line_size())
-        for (int64_t i = 0; i < static_cast<int64_t>(ncols); i++)
-        {
-            s_m1[i] = a_y[i] - b_y[i];
-
-            s_z0[i] = a_z[i] - b_z[i];
-
-            s_p1[i] = a_x[i] - b_x[i];
-        }
-    }
-    else
-    {
 #pragma omp simd aligned(s_m1, s_z0, s_p1, a_x, a_y, a_z, b_x, b_y, b_z : simd::cache_line_size())
-        for (size_t i = 0; i < ncols; i++)
-        {
-            s_m1[i] = a_y[i] - b_y[i];
+    for (size_t i = 0; i < ncols; i++)
+    {
+        s_m1[i] = a_y[i] - b_y[i];
 
-            s_z0[i] = a_z[i] - b_z[i];
+        s_z0[i] = a_z[i] - b_z[i];
 
-            s_p1[i] = a_x[i] - b_x[i];
-        }
+        s_p1[i] = a_x[i] - b_x[i];
     }
 
     return matrix;
