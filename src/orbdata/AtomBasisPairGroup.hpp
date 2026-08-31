@@ -38,6 +38,7 @@
 #include <functional>
 #include <iterator>
 #include <ranges>
+#include <utility>
 #include <vector>
 
 #include "AtomBasis.hpp"
@@ -168,9 +169,24 @@ class CAtomBasisPairGroup
     /// not affected, as their interatomic distance is zero.
     /// @param groups The atom basis pair groups to order.
     /// @param molecule The molecule providing the atomic coordinates.
-    /// @note All the groups are ordered by one call, so that the scratch space of
-    /// the sort is allocated once and carried across them.
+    /// @note All the groups are ordered by one call, as they are ordered
+    /// independently of each other and one group is thus ordered by one thread.
     static auto sort_by_distance(std::vector<CAtomBasisPairGroup> &groups, const CMolecule &molecule) -> void;
+
+    /// @brief Partitions the atom pairs and the atoms of the diagonal atom pairs
+    /// of the group into groups of similar size.
+    /// @param nblocks The number of groups to partition the group into.
+    /// @return The vector of partitioned groups.
+    /// @note The atom pairs and the atoms of the diagonal atom pairs are divided
+    /// independently, as their numbers are unrelated, and the remainder of a
+    /// division is spread one over the leading groups, so the groups differ in
+    /// size by at most one atom pair and one atom. A group left with no atom pair
+    /// and no atom is dropped, so fewer groups than requested are returned when
+    /// the group holds fewer atom pairs and atoms than that.
+    /// @note The ordering of the atom pairs is carried over, as a leading
+    /// subrange of atom pairs ordered by ascending interatomic distance is
+    /// ordered by ascending interatomic distance as well.
+    auto partition(const size_t nblocks) const -> std::vector<CAtomBasisPairGroup>;
 
     /// @brief Gets atom basis on bra side.
     /// @return The constant reference to atom basis.
@@ -337,6 +353,53 @@ class CAtomBasisPairGroup
     }
 
    private:
+    /// @brief The constructor with the atom bases and the atom pairs of a group.
+    /// @param bra_basis The atom basis on bra side.
+    /// @param ket_basis The atom basis on ket side.
+    /// @param bra_atoms The atomic indices of off-diagonal atom pairs on bra side.
+    /// @param ket_atoms The atomic indices of off-diagonal atom pairs on ket side.
+    /// @param diagonal_atoms The atomic indices of atoms in diagonal atom pairs.
+    /// @param distances The interatomic distances of off-diagonal atom pairs.
+    /// @param bra_index The index of atom basis on bra side.
+    /// @param ket_index The index of atom basis on ket side.
+    /// @param symmetric The flag indicating that bra and ket sides are interchangeable.
+    /// @param order The ordering of the atom pairs.
+    /// @note This constructor takes the state of a group as it is, rather than
+    /// forming the atom pairs from the atom basis groups, so it is private: the
+    /// ordering it is given is not checked against the atom pairs it is given.
+    CAtomBasisPairGroup(const CAtomBasis   &bra_basis,
+                        const CAtomBasis   &ket_basis,
+                        std::vector<int>    bra_atoms,
+                        std::vector<int>    ket_atoms,
+                        std::vector<int>    diagonal_atoms,
+                        std::vector<double> distances,
+                        const int           bra_index,
+                        const int           ket_index,
+                        const bool          symmetric,
+                        const pairord       order)
+
+        : _bra_basis(bra_basis)
+
+        , _ket_basis(ket_basis)
+
+        , _bra_atoms(std::move(bra_atoms))
+
+        , _ket_atoms(std::move(ket_atoms))
+
+        , _diagonal_atoms(std::move(diagonal_atoms))
+
+        , _distances(std::move(distances))
+
+        , _bra_index(bra_index)
+
+        , _ket_index(ket_index)
+
+        , _symmetric(symmetric)
+
+        , _order(order)
+    {
+    }
+
     /// @brief The atom basis on bra side.
     std::reference_wrapper<const CAtomBasis> _bra_basis;
 

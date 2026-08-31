@@ -153,6 +153,26 @@ _move_pairs(const std::vector<TAtomPairKey> &keys,
     }
 }
 
+/// @brief Gets the index of the first item of a block of a partitioned range.
+/// @param nitems The number of items to partition.
+/// @param nblocks The number of blocks to partition the items into.
+/// @param index The index of the block.
+/// @return The index of the first item of the block.
+/// @note The blocks hold the same number of items but for the remainder of the
+/// division, which is spread one over the leading blocks, so the blocks differ
+/// in size by at most one item. Passing the number of the blocks as the index
+/// gives the number of the items, so the bounds of a block are the offsets of
+/// the block and of the one after it.
+static auto
+_block_offset(const size_t nitems, const size_t nblocks, const size_t index) -> size_t
+{
+    const auto base = nitems / nblocks;
+
+    const auto rest = nitems % nblocks;
+
+    return index * base + std::min(index, rest);
+}
+
 }  // namespace
 
 auto
@@ -164,24 +184,30 @@ CAtomBasisPairGroup::sort_by_distance(std::vector<CAtomBasisPairGroup> &groups, 
 
     const auto natoms = static_cast<int>(coords.size());
 
+    const auto ngroups = static_cast<int>(groups.size());
+
     bool valid = true;
 
-    for (const auto &group : groups)
+#pragma omp parallel for schedule(dynamic) reduction(&& : valid)
+    for (int i = 0; i < ngroups; i++)
     {
-        valid = valid && std::ranges::all_of(group._bra_atoms, [&](const int i) { return i < natoms; }) &&
-                std::ranges::all_of(group._ket_atoms, [&](const int i) { return i < natoms; });
+        valid = valid && std::ranges::all_of(groups[i]._bra_atoms, [&](const int j) { return j < natoms; }) &&
+                std::ranges::all_of(groups[i]._ket_atoms, [&](const int j) { return j < natoms; });
     }
 
     errors::assertMsgCritical(valid, std::string("AtomBasisPairGroup.sort_by_distance: Atomic index out of range of molecule"));
 
-    // NOTE: the keys and the scratch space of the counting passes are carried
-    // across the groups, so that the largest group alone decides how much space
-    // is allocated and the groups ordered after it allocate none.
+    // NOTE: the groups are ordered independently of each other, so one group is
+    // ordered by one thread. Dynamic scheduling is used as the groups need not
+    // hold the same number of atom pairs. The keys and the scratch space of the
+    // counting passes are held by the thread ordering the group, so that the
+    // threads share nothing while a group is ordered.
 
-    std::vector<TAtomPairKey> keys, work;
-
-    for (auto &group : groups)
+#pragma omp parallel for schedule(dynamic)
+    for (int i = 0; i < ngroups; i++)
     {
+        auto &group = groups[i];
+
         const auto npairs = group._bra_atoms.size();
 
         group._distances.resize(npairs);
@@ -190,9 +216,7 @@ CAtomBasisPairGroup::sort_by_distance(std::vector<CAtomBasisPairGroup> &groups, 
 
         if (npairs == 0) continue;
 
-        keys.resize(npairs);
-
-        work.resize(npairs);
+        std::vector<TAtomPairKey> keys(npairs), work(npairs);
 
         _make_keys(group._bra_atoms, group._ket_atoms, coords, group._distances, keys);
 
@@ -210,4 +234,54 @@ CAtomBasisPairGroup::sort_by_distance(std::vector<CAtomBasisPairGroup> &groups, 
 
         group._distances = std::move(distances);
     }
+}
+
+auto
+CAtomBasisPairGroup::partition(const size_t nblocks) const -> std::vector<CAtomBasisPairGroup>
+{
+    errors::assertMsgCritical(nblocks > 0, std::string("AtomBasisPairGroup.partition: Number of groups is zero"));
+
+    std::vector<CAtomBasisPairGroup> groups;
+
+    groups.reserve(nblocks);
+
+    const auto npairs = _bra_atoms.size();
+
+    const auto natoms = _diagonal_atoms.size();
+
+    // NOTE: the interatomic distances are sliced along with the atom pairs they
+    // belong to, and are empty when the atom pairs are not ordered by them.
+
+    const auto ordered = !_distances.empty();
+
+    for (size_t i = 0; i < nblocks; i++)
+    {
+        const auto pfirst = _block_offset(npairs, nblocks, i);
+
+        const auto plast = _block_offset(npairs, nblocks, i + 1);
+
+        const auto afirst = _block_offset(natoms, nblocks, i);
+
+        const auto alast = _block_offset(natoms, nblocks, i + 1);
+
+        // NOTE: a group left with neither an atom pair nor an atom of a diagonal
+        // atom pair describes nothing and is dropped, which happens when the
+        // group holds fewer atom pairs and atoms than the groups requested.
+
+        if ((pfirst == plast) && (afirst == alast)) continue;
+
+        groups.push_back(CAtomBasisPairGroup(_bra_basis.get(),
+                                             _ket_basis.get(),
+                                             std::vector<int>(_bra_atoms.begin() + pfirst, _bra_atoms.begin() + plast),
+                                             std::vector<int>(_ket_atoms.begin() + pfirst, _ket_atoms.begin() + plast),
+                                             std::vector<int>(_diagonal_atoms.begin() + afirst, _diagonal_atoms.begin() + alast),
+                                             ordered ? std::vector<double>(_distances.begin() + pfirst, _distances.begin() + plast)
+                                                     : std::vector<double>{},
+                                             _bra_index,
+                                             _ket_index,
+                                             _symmetric,
+                                             _order));
+    }
+
+    return groups;
 }
