@@ -168,9 +168,8 @@ class CAtomBasisPairGroup
     /// not affected, as their interatomic distance is zero.
     /// @param groups The atom basis pair groups to order.
     /// @param molecule The molecule providing the atomic coordinates.
-    /// @note All the groups are ordered together, as the groups differ widely in
-    /// the number of atom pairs and ordering a group per thread is bounded well
-    /// below the number of the threads by the largest of them.
+    /// @note All the groups are ordered by one call, so that the scratch space of
+    /// the sort is allocated once and carried across them.
     static auto sort_by_distance(std::vector<CAtomBasisPairGroup> &groups, const CMolecule &molecule) -> void;
 
     /// @brief Gets atom basis on bra side.
