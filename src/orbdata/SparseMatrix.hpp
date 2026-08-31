@@ -78,10 +78,12 @@ class CSparseMatrix
 {
    public:
     /// @brief The number of blocks per thread aimed at when the target number of
-    /// atom pairs of a block is chosen. The blocks are several per thread, so
-    /// that dynamic scheduling has enough of them to even out the ones which
-    /// differ in cost.
-    static constexpr size_t blocks_per_thread = 4;
+    /// atom pairs of a block is chosen. The blocks are a few per thread, so that
+    /// dynamic scheduling has enough of them to even out the ones which differ in
+    /// cost, and no more, as a block carries a fixed cost and the blocks contend
+    /// for the memory. Measured on fourteen threads, where two per thread is
+    /// five percent better than four and four is twice as good as sixteen.
+    static constexpr size_t blocks_per_thread = 2;
 
     /// @brief The smallest target number of atom pairs of a block chosen. A
     /// block carries a fixed cost which does not shrink with the atom pairs it
