@@ -883,6 +883,9 @@ strings on each of the ten thousand calls a `compute` makes.
 
 ### Where the time goes
 
+**Taken before the atom pairs of the groups were formed in batches. The section
+on the batched groups at the end supersedes this table.**
+
 Warm, seconds, best of three after one cold call, each case in its own process.
 
 | molecule | basis | nao | sparsity 1 thr | sparsity 14 thr | compute 1 thr | compute 14 thr | sparsity | compute |
@@ -1004,3 +1007,100 @@ coordinates and the solid harmonics. Peak resident memory went from 1.238 to
 Reusing the values blocks is the part which would pay, and it cannot be done
 under the allocator: it needs the driver to fill a matrix it is given rather than
 return a new one, so that a caller computing repeatedly keeps one.
+
+## The atom pairs of the groups formed in batches
+
+Instruments had shown a fifth of every `compute` running on one thread, and the
+phases of the sparsity were timed to find it. It was not the division of the
+groups into blocks, which is 0.6 percent, and not the description of the sparsity
+patterns, which is threaded. It was `CMolecularBasis::basis_pair_groups`, which
+formed every atom pair of every group with `push_back` in nested loops, before
+anything was divided at all: 0.00168 seconds of a 0.0044 second call for
+ubiquitin in def2-svp, **37 percent of it**, and 12 percent of the same molecule
+in def2-qzvp.
+
+The atom pairs are now formed in batches by the threads. A group is created with
+its atom pairs sized but not formed, as their number follows from the atoms of the
+atom basis groups it pairs and needs no enumeration, and a pool of chunks
+spanning all the groups is then filled by the threads, each chunk finding its atom
+pairs from their indices alone. Within one molecular basis an atom carries one
+atom basis, so the atom basis groups share no atom: the atom pairs of a symmetric
+group are the strict upper triangle of its atoms and those of a pair of groups are
+the full rectangle of theirs, and both invert in closed form. The two molecular
+bases factory, where an atom does appear on both sides, is left as it was.
+
+### What it bought
+
+Warm, fourteen threads, seconds.
+
+| molecule | basis | sparsity before | sparsity after | compute before | compute after | gain |
+|---|---|---|---|---|---|---|
+| tagrisso | def2-svp | 0.0004 | 0.0004 | 0.0005 | 0.0005 | 0.95x |
+| tagrisso | def2-tzvp | 0.0004 | 0.0003 | 0.0008 | 0.0006 | 1.22x |
+| tagrisso | def2-qzvp | 0.0004 | 0.0004 | 0.0014 | 0.0011 | 1.22x |
+| taxol | def2-svp | 0.0004 | 0.0005 | 0.0006 | 0.0006 | 0.95x |
+| taxol | def2-tzvp | 0.0004 | 0.0004 | 0.0008 | 0.0009 | 0.90x |
+| taxol | def2-qzvp | 0.0003 | 0.0004 | 0.0016 | 0.0016 | 0.96x |
+| crambin | def2-svp | 0.0013 | 0.0009 | 0.0020 | 0.0016 | 1.29x |
+| crambin | def2-tzvp | 0.0013 | 0.0009 | 0.0031 | 0.0029 | 1.09x |
+| crambin | def2-qzvp | 0.0014 | 0.0010 | 0.0069 | 0.0065 | 1.06x |
+| ubiquitin | def2-svp | 0.0032 | 0.0016 | 0.0044 | 0.0028 | 1.59x |
+| ubiquitin | def2-tzvp | 0.0031 | 0.0016 | 0.0065 | 0.0050 | 1.30x |
+| ubiquitin | def2-qzvp | 0.0032 | 0.0018 | 0.0144 | 0.0127 | 1.14x |
+
+The sparsity phase roughly halves on the large cases, which is the serial
+enumeration going away, and the whole of `compute` gains between 1.06 and 1.59
+times. The molecules under a millisecond lose between two and ten percent, which
+is the cost of forming the chunks where there is too little work to repay it.
+
+### Where the time goes
+
+Warm, seconds. This supersedes the table of the previous section.
+
+| molecule | basis | nao | sparsity 1 thr | sparsity 14 thr | compute 1 thr | compute 14 thr | sparsity | compute |
+|---|---|---|---|---|---|---|---|---|
+| tagrisso | def2-svp | 683 | 0.0009 | 0.0004 | 0.0011 | 0.0005 | 2.04x | 2.26x |
+| tagrisso | def2-tzvp | 1345 | 0.0009 | 0.0003 | 0.0017 | 0.0006 | 2.69x | 2.79x |
+| tagrisso | def2-qzvp | 3099 | 0.0011 | 0.0004 | 0.0033 | 0.0011 | 3.04x | 2.98x |
+| taxol | def2-svp | 1099 | 0.0008 | 0.0005 | 0.0013 | 0.0006 | 1.85x | 2.14x |
+| taxol | def2-tzvp | 2185 | 0.0009 | 0.0004 | 0.0022 | 0.0009 | 2.45x | 2.44x |
+| taxol | def2-qzvp | 4947 | 0.0011 | 0.0004 | 0.0051 | 0.0016 | 2.84x | 3.16x |
+| crambin | def2-svp | 6177 | 0.0036 | 0.0009 | 0.0076 | 0.0016 | 4.05x | 4.77x |
+| crambin | def2-tzvp | 12063 | 0.0038 | 0.0009 | 0.0155 | 0.0029 | 4.24x | 5.42x |
+| crambin | def2-qzvp | 28167 | 0.0040 | 0.0010 | 0.0415 | 0.0065 | 4.01x | 6.40x |
+| ubiquitin | def2-svp | 11577 | 0.0099 | 0.0016 | 0.0184 | 0.0028 | 6.02x | 6.67x |
+| ubiquitin | def2-tzvp | 22442 | 0.0100 | 0.0016 | 0.0338 | 0.0050 | 6.21x | 6.76x |
+| ubiquitin | def2-qzvp | 53197 | 0.0107 | 0.0018 | 0.0875 | 0.0127 | 6.06x | 6.91x |
+
+The scaling reaches 6.7 to 6.9 times on the three ubiquitin cases, against 3.9 to
+5.2 before, and rises with the size of the problem throughout.
+
+### Against the reference driver
+
+| molecule | basis | driver 1 thr | reference 1 thr | 1 thr | driver 14 thr | reference 14 thr | 14 thr |
+|---|---|---|---|---|---|---|---|
+| tagrisso | def2-svp | 0.0011 | 0.0013 | 1.15x | 0.0005 | 0.0005 | 1.06x |
+| tagrisso | def2-tzvp | 0.0017 | 0.0042 | 2.42x | 0.0006 | 0.0011 | 1.68x |
+| tagrisso | def2-qzvp | 0.0033 | 0.0207 | 6.27x | 0.0011 | 0.0029 | 2.64x |
+| taxol | def2-svp | 0.0013 | 0.0029 | 2.19x | 0.0006 | 0.0007 | 1.13x |
+| taxol | def2-tzvp | 0.0022 | 0.0096 | 4.32x | 0.0009 | 0.0017 | 1.83x |
+| taxol | def2-qzvp | 0.0051 | 0.0531 | 10.37x | 0.0016 | 0.0066 | 4.04x |
+| crambin | def2-svp | 0.0076 | 0.0997 | 13.16x | 0.0016 | 0.0125 | 7.89x |
+| crambin | def2-tzvp | 0.0155 | 0.3425 | 22.04x | 0.0029 | 0.0409 | 14.27x |
+| crambin | def2-qzvp | 0.0415 | 1.8312 | 44.10x | 0.0065 | 0.2051 | 31.63x |
+| ubiquitin | def2-svp | 0.0184 | 0.3574 | 19.47x | 0.0028 | 0.0425 | 15.44x |
+| ubiquitin | def2-tzvp | 0.0338 | 1.1912 | 35.24x | 0.0050 | 0.1384 | 27.66x |
+| ubiquitin | def2-qzvp | 0.0875 | too large |  | 0.0127 | too large |  |
+
+Every case now beats the reference at both thread counts. Tagrisso in def2-svp,
+which was the one loss on fourteen threads at 0.92 times, is 1.06 times here. The
+margin runs to 44 times on a single thread and 32 on fourteen, and ubiquitin in
+def2-qzvp still has no reference at all, its 21 gigabytes dense against 0.87
+gigabytes sparse formed in 0.0127 seconds.
+
+### What is left
+
+The reconstruction of the dense matrix is now 22 times the integrals it
+reconstructs, 0.1406 seconds against 0.0065 for crambin in def2-qzvp, and the
+notes above record that it is at the limit of the memory system on both of its
+halves. The integrals themselves are no longer where the time of this path goes.
