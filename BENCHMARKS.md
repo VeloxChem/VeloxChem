@@ -705,6 +705,9 @@ two, 26 on four and 65 on fourteen.
 
 ### Where the time goes
 
+**Taken at four blocks per thread, which was the target before it was measured.
+The table below the sweep supersedes this one.**
+
 Warm, seconds, best of three after one cold call, each case in its own process.
 The last two columns are the one thread time over the fourteen thread time.
 
@@ -780,3 +783,87 @@ Re-running the same script on the same build gives 0.0082 and 0.0154. The cause
 of the first reading was never established; the code was not changed between the
 two. It is recorded here because it was reported as a property of the driver and
 it was not one.
+
+## How many blocks per thread
+
+The target number of atom pairs of a block is `npairs / (blocks_per_thread *
+nthreads)`, no smaller than `min_block_size`, so the two constants decide how many
+blocks a molecule is divided into. Both were guessed at four and 2048 when the
+division was written. Swept on fourteen threads over crambin and ubiquitin in
+def2-svp and def2-qzvp, each point the best of four warm calls, as the geometric
+mean of the four cases relative to the best point. Above one is slower.
+
+| blocks per thread | min 512 | min 1024 | min 2048 | min 4096 |
+|---|---|---|---|---|
+| 2 | 1.01x | 1.00x | 1.00x | 1.01x |
+| 4 | 1.04x | 1.04x | 1.05x | 1.03x |
+| 8 | 1.32x | 1.31x | 1.26x | 1.15x |
+| 16 | 1.57x | 1.52x | 1.40x | 1.22x |
+| 32 | 2.03x | 1.70x | 1.47x | 1.21x |
+| 64 | 2.40x | 1.92x | 1.46x | 1.20x |
+
+Fewer blocks is better, monotonically, and the effect is large: sixty four blocks
+per thread costs between 1.2 and 2.4 times the best. `min_block_size` matters
+little at two blocks per thread, where the target is above it anyway, and acts as
+a brake at the high end, where it holds the block count down and recovers most of
+the loss. Two blocks per thread with a floor of 2048 is the best point and is
+what the code now uses, five percent ahead of the four it started with.
+
+The reason is the fixed cost of a block. A block forms its own coordinates and
+solid harmonics and bisects the screening once per pair of primitives, none of
+which shrinks when the block holds fewer atom pairs. Dividing ubiquitin in
+def2-svp into 905 blocks rather than 37 costs 0.0134 seconds against 0.0046, so
+the extra 868 blocks cost about ten microseconds of wall time each on fourteen
+threads.
+
+This was measured on fourteen threads, where two blocks per thread is 28 blocks
+before the per group rounding. The block count follows the threads, so a machine
+with 128 cores would get 256 blocks from the same constant, which is the regime
+the high end of the sweep emulates: the sweep says that regime is fine as long as
+the blocks stay large, and that the floor is what protects it.
+
+### Where the time goes, at two blocks per thread
+
+Warm, seconds. This supersedes the table of the previous section.
+
+| molecule | basis | nao | sparsity 1 thr | sparsity 14 thr | compute 1 thr | compute 14 thr | sparsity | compute |
+|---|---|---|---|---|---|---|---|---|
+| tagrisso | def2-svp | 683 | 0.0008 | 0.0003 | 0.0011 | 0.0006 | 2.32x | 1.88x |
+| tagrisso | def2-tzvp | 1345 | 0.0009 | 0.0004 | 0.0017 | 0.0007 | 2.21x | 2.56x |
+| tagrisso | def2-qzvp | 3099 | 0.0010 | 0.0004 | 0.0034 | 0.0011 | 2.38x | 2.94x |
+| taxol | def2-svp | 1099 | 0.0008 | 0.0004 | 0.0012 | 0.0007 | 1.84x | 1.83x |
+| taxol | def2-tzvp | 2185 | 0.0008 | 0.0004 | 0.0022 | 0.0010 | 2.06x | 2.13x |
+| taxol | def2-qzvp | 4947 | 0.0010 | 0.0004 | 0.0051 | 0.0017 | 2.22x | 3.05x |
+| crambin | def2-svp | 6177 | 0.0035 | 0.0012 | 0.0074 | 0.0021 | 2.78x | 3.48x |
+| crambin | def2-tzvp | 12063 | 0.0036 | 0.0013 | 0.0151 | 0.0035 | 2.76x | 4.26x |
+| crambin | def2-qzvp | 28167 | 0.0041 | 0.0014 | 0.0404 | 0.0076 | 2.95x | 5.33x |
+| ubiquitin | def2-svp | 11577 | 0.0101 | 0.0034 | 0.0181 | 0.0046 | 3.00x | 3.93x |
+| ubiquitin | def2-tzvp | 22442 | 0.0103 | 0.0031 | 0.0331 | 0.0074 | 3.27x | 4.48x |
+| ubiquitin | def2-qzvp | 53197 | 0.0107 | 0.0033 | 0.0860 | 0.0166 | 3.29x | 5.19x |
+
+### The dense reconstruction
+
+`CSparseMatrix::to_dense` through the `SparseMatrix.to_numpy` binding, warm,
+seconds. The zeroing of the dense matrix, the off-diagonal blocks and the
+diagonal blocks are each divided among the threads; an element of the dense
+matrix belongs to one atom pair and an atom pair to one block, so the blocks
+write to disjoint elements and need no synchronization.
+
+| molecule | basis | nao | dense GB | 1 thread | 4 threads | 14 threads | speedup |
+|---|---|---|---|---|---|---|---|
+| crambin | def2-svp | 6177 | 0.28 | 0.0096 | 0.0033 | 0.0024 | 4.00x |
+| crambin | def2-tzvp | 12063 | 1.08 | 0.0419 | 0.0167 | 0.0108 | 3.88x |
+| crambin | def2-qzvp | 28167 | 5.91 | 0.4359 | 0.1714 | 0.1411 | 3.09x |
+| ubiquitin | def2-svp | 11577 | 1.00 | 0.0214 | 0.0087 | 0.0066 | 3.24x |
+
+The notes above record that the memory bandwidth of this machine saturates at
+2.25 times, which would have capped this at about that. It reaches 3.1 to 4.0
+times instead. The comparison which makes the point is the largest case: the
+whole reconstruction of crambin in def2-qzvp takes 0.141 seconds on fourteen
+threads, while numpy takes 0.259 seconds on one thread merely to fill the same
+5.91 gigabytes with zeros. The 2.25 figure is a floor for this access pattern and
+not a ceiling, first touch spread over the threads doing better than one thread
+streaming.
+
+The reconstruction is now much the largest part of the path. Crambin in def2-qzvp
+computes in 0.0076 seconds and reconstructs in 0.141, a factor of eighteen.
