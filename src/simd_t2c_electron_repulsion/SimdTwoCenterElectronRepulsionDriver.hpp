@@ -79,13 +79,14 @@ class CSimdTwoCenterElectronRepulsionDriver
     /// matrix, whose blocks carry the bisection of the screening as their fixed
     /// cost. Nothing is screened here and a block does much more arithmetic per
     /// atom pair, so its fixed cost is repaid by far fewer of them. Measured on
-    /// fourteen threads over the def2 universal fitting sets: sixty four is never
-    /// worse than one hundred and twenty eight outside the noise and a quarter
-    /// better on a molecule of thirty atoms, it is worth twice the throughput of
-    /// two thousand and forty eight on tagrisso and taxol, and below it the fixed
-    /// cost of the blocks starts to show. It binds for the small molecules alone,
-    /// as a large one asks for blocks larger than this of its own accord.
-    static constexpr size_t min_block_size = 64;
+    /// fourteen threads over the def2 universal fitting sets, it is worth twice
+    /// the throughput of two thousand and forty eight on tagrisso and taxol.
+    /// Sixty four is the better choice below about forty atoms, by a third on a
+    /// molecule of thirty, and the worse one from there up, by three to ten per
+    /// cent; the molecules it wins are already under two milliseconds. It binds
+    /// for the small molecules alone, as a large one asks for blocks larger than
+    /// this of its own accord.
+    static constexpr size_t min_block_size = 128;
 
     /// @brief Computes the two-center electron repulsion matrix of a molecular
     /// basis.

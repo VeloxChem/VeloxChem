@@ -1541,3 +1541,137 @@ of work.
 The largest case is ubiquitin in aug-cc-pv6z, 193665 basis functions and 19.6
 gigabytes sparse, whose kinetic energy matrix is formed in 0.33 seconds on
 fourteen threads.
+
+## The two-center Coulomb driver
+
+The two-center Coulomb integrals are not screenable. The operator decays as the
+inverse of the interatomic distance, so no atom pair and no pair of primitives
+falls below a threshold at any separation a molecule reaches, and the matrix is
+dense for every molecule. Three things follow, and they are what this driver does
+differently from the overlap and the kinetic energy.
+
+The matrix is a `CPackedMatrix` rather than a `CSparseMatrix`: the lower triangle
+of a symmetric matrix, in one allocation, with no sparsity pattern to describe.
+For crambin in the jkfit set that is 3.52 gigabytes where the full square would
+be 7.05, which is the difference between fitting in this machine and not.
+
+The blocks divide the work alone and no longer divide the storage. Each of them
+computes one combination of basis functions at a time into a buffer of its own
+and adds it to the matrix, which the blocks share and write disjoint elements of.
+
+The exponential of a pair of primitives is replaced by the Boys function, which
+`simdfunc::compute_boys_function` evaluates for all pairs of primitives of a
+kernel in one call. That routine is scalar and branchy, unlike the vector
+exponential the other two drivers lean on.
+
+### The def2 universal fitting sets
+
+Warm, seconds, best of three after one cold call, each case in its own process.
+Both drivers are timed the same way. The reference reaches angular momentum six
+and both fitting sets stop at four, so it is valid everywhere here.
+
+| molecule | basis | nao | lmax | packed GB | compute 1 thr | compute 14 thr | scaling | reference 14 thr | against it |
+|---|---|---|---|---|---|---|---|---|---|
+| tagrisso | jfit | 2176 | 4 | 0.02 | 0.0068 | 0.0016 | 4.25x | 0.0024 | 1.50x |
+| tagrisso | jkfit | 3387 | 4 | 0.04 | 0.0143 | 0.0028 | 5.11x | 0.0042 | 1.50x |
+| taxol | jfit | 3528 | 4 | 0.05 | 0.0178 | 0.0031 | 5.74x | 0.0050 | 1.61x |
+| taxol | jkfit | 5489 | 4 | 0.11 | 0.0387 | 0.0070 | 5.53x | 0.0090 | 1.29x |
+| crambin | jfit | 19500 | 4 | 1.42 | 0.6092 | 0.1083 | 5.62x | 0.1277 | 1.18x |
+| crambin | jkfit | 30751 | 4 | 3.52 | 1.5338 | 0.3166 | 4.85x | 0.2635 | 0.83x |
+
+The values were checked against the reference on tagrisso and taxol in both sets
+while the timings were taken: the largest deviation is 6.1e-13 on elements
+reaching 92.7, which is 6.6e-15 relative.
+
+### The block floor of the screened path is wrong here
+
+The driver started with the `min_block_size` of the sparse matrix, two thousand
+and forty eight. That floor exists because a block of the screened path carries
+the bisection of the screening as its fixed cost, and a block too small pays it
+for too little work. There is no bisection here, and a Coulomb block does much
+more arithmetic per atom pair, so the fixed cost is repaid by far fewer of them.
+
+The floor was costing about half the throughput on anything below a few hundred
+atoms. Tagrisso holds 2415 atom pairs in ten groups and its largest group holds
+924, so at a floor of two thousand and forty eight nothing was ever divided and
+the driver fell back to parallelism over the groups, whose ceiling is the share
+of that largest group. It is 38 per cent, which bounds the speedup at 2.6 times,
+and 2.59 is what it measured.
+
+Milliseconds, best of three, on fourteen threads.
+
+| case | 2048 | 1024 | 512 | 256 | 128 | 64 | 32 | 16 |
+|---|---|---|---|---|---|---|---|---|
+| tagrisso jfit | 2.7 | 2.8 | 2.7 | 1.9 | 1.4 | 1.5 | 1.6 | 1.5 |
+| tagrisso jkfit | 6.2 | 5.9 | 5.9 | 3.6 | 2.8 | 2.9 | 2.9 | 3.0 |
+| taxol jfit | 6.6 | 6.7 | 4.0 | 3.3 | 3.3 | 3.2 | 3.2 | 3.2 |
+| taxol jkfit | 15.5 | 15.9 | 8.7 | 6.8 | 6.9 | 6.9 | 6.5 | 7.2 |
+
+Everything from two hundred and fifty six down is within a few per cent of
+everything else, and the whole of the gain is in leaving two thousand behind. The
+number of blocks tells the same story: tagrisso goes from ten blocks to
+twenty five at a floor of one hundred and twenty eight, and no further, because
+below eighty six the size computed from the threads takes over and the floor
+stops binding.
+
+### Sixty four against one hundred and twenty eight
+
+The two candidates needed more than one run each to separate. Medians of seven
+process repeats, each the best of three, in milliseconds. The fragments are the
+first thirty and forty five atoms of taxol, sizes at which the floor still binds.
+
+| case | 128 | 64 | 64 against 128 |
+|---|---|---|---|
+| 30 atoms jkfit | 2.10 | 1.60 | 1.31x |
+| 45 atoms jkfit | 2.70 | 3.00 | 0.90x |
+| tagrisso jfit | 1.40 | 1.50 | 0.93x |
+| tagrisso jkfit | 2.90 | 3.00 | 0.97x |
+| taxol jfit | 3.20 | 3.30 | 0.97x |
+| taxol jkfit | 6.80 | 6.80 | 1.00x |
+
+There is a real crossover near forty atoms rather than a single best value. Sixty
+four is a third faster below it and three to ten per cent slower above it, and
+the driver uses one hundred and twenty eight: the molecules sixty four wins are
+already under two milliseconds, and the ones it loses are the ones whose cost is
+worth anything. A first pass with three repeats had chosen sixty four, which four
+of these six cases do not support.
+
+The floor binds for the small molecules alone. Crambin asks for blocks of 7348
+atom pairs of its own accord, so no floor below that can reach it, and measuring
+it confirmed as much: 0.1096 seconds at two thousand and forty eight against
+0.1079 at sixty four, thirty seven blocks either way.
+
+`blocks_per_thread` is still the two of the sparse matrix and has not been swept.
+
+### A trap in timing the reference
+
+The reference driver returns a dense matrix, which for crambin in the jkfit set
+is 7.05 gigabytes. A single call therefore pays for faulting in every page of it,
+and timing one call rather than the best of several overstates it by a factor of
+three: 0.0111 seconds against 0.0024 on tagrisso in jfit, 0.5869 against 0.2635
+on crambin in jkfit. The first comparison this session made was against cold
+calls and reported the driver as 1.2 to 1.9 times faster than the reference. It
+is not. The table above times both warm.
+
+### What these numbers say
+
+The driver is 1.3 to 1.6 times faster than the reference on tagrisso and taxol in
+both sets and 1.18 times on crambin in jfit, and **17 per cent slower** on
+crambin in jkfit. That last one is reproducible: three independent repeats gave
+0.309, 0.307 and 0.313 seconds against 0.266, 0.263 and 0.262.
+
+The margin is nothing like the 30 to 44 times the overlap and the kinetic energy
+reach, and that is expected rather than a defect. Almost all of the earlier win
+came from screening the work away, and there is nothing to screen here. What is
+left is the efficiency of the kernels alone.
+
+The crossover between the two fitting sets is with angular momentum and not with
+size: the same molecule is a win in jfit and a loss in jkfit, and jkfit is the
+set which carries more of the high angular momenta. The kernels of two non-zero
+angular momenta are the closed form expansions, and they grow quickly with the
+momenta, (h|J|i) alone holding 2909 terms, where the reference walks a recursion.
+
+Where the time actually goes between `compute_boys_function` and the combine
+loops has not been measured, and it is the thread to pull next. So is the
+parallel scaling beyond one and fourteen threads, which was not swept for this
+driver.
