@@ -726,8 +726,8 @@ class MetalForceFieldManager:
         """
         Returns the bonds of a connectivity matrix as index pairs.
 
-        The builder derives them the same way for active_site['bond_labels'],
-        so there is one definition of what an edge of the matrix is.
+        The core derives them the same way in connectivity_bonds, so there
+        is one definition of what an edge of the matrix is.
 
         :param connectivity_matrix:
             The connectivity of an active site.
@@ -1261,18 +1261,31 @@ class MetalForceFieldManager:
         topology, positions = core.load_and_prepare_protein(
             structure, prepare=self.do_prepare_protein)
 
-        binding_modes = core.suggest_binding_modes(
-            topology,
-            positions,
-            metal_elements=builder.metal_elements,
-            metal_formal_charges=builder.metal_formal_charges,
-            ostream=self.ostream,
-            **builder._detection_kwargs())
-        topology, positions, binding_modes = core.protonate(
+        request = core.site_request()
+
+        def derive(topology, positions):
+            return core.suggest_binding_modes(
+                topology,
+                positions,
+                metal_elements=builder.metal_elements,
+                metal_formal_charges=builder.metal_formal_charges,
+                ostream=self.ostream,
+                request=request,
+                **builder.detection_settings())
+
+        binding_modes = derive(topology, positions)
+
+        # the coordination is derived again on the protonated structure
+        # rather than remapped onto it, so its atom indices belong to the
+        # topology the active site is extracted from
+        topology, positions, variants, _ = core.protonate(
             topology,
             positions,
             binding_modes,
             protonation_overrides=builder.protonation_overrides)
+        request['variants'] = variants
+        binding_modes = derive(topology, positions)
+
         active_site = core.extract_active_site(
             topology,
             positions,
@@ -1309,7 +1322,7 @@ class MetalForceFieldManager:
         builder = self.builder
         active_site = query['active_site']
 
-        fit_kwargs = builder._fit_kwargs()
+        fit_kwargs = builder.fit_settings()
         if self.mm_fallback_literature_bonds and (
                 fit_kwargs['metal_bond_equilibria'] is None):
             fit_kwargs['metal_bond_equilibria'] = core.LITERATURE_METAL_BONDS
@@ -1898,7 +1911,6 @@ class MetalForceFieldManager:
         active_site = {
             **active_site,
             'connectivity_matrix': matrix,
-            'bond_labels': self._matrix_edges(matrix),
         }
 
         return self._describe(active_site,
@@ -2008,7 +2020,7 @@ class MetalForceFieldManager:
                                            partial_charges=charges,
                                            comm=MPI.COMM_SELF,
                                            ostream=self.ostream,
-                                           **self.builder._fit_kwargs())
+                                           **self.builder.fit_settings())
 
         bonds, angles = self._metal_keys(template)
 
