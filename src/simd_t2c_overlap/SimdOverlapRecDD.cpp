@@ -35,6 +35,7 @@
 #include "SimdOverlapRecDD.hpp"
 
 #include <algorithm>
+#include <ranges>
 #include <cmath>
 #include <string>
 
@@ -96,7 +97,14 @@ compute_dd_overlap(double                         *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, threshold / static_cast<double>(nprims));
 
-    const auto nmax = dimensions.back();
+    // NOTE: the buffer spans the atom pairs reached by the pair of primitives
+    // reaching furthest, which is searched for rather than assumed. The
+    // primitives are sorted by descending exponent, but the bound of a pair of
+    // primitives carries their prefactor as well as their decay, so a tighter
+    // pair with a larger prefactor reaches further than a more diffuse pair with
+    // a smaller one, and the last pair is not always the furthest reaching.
+
+    const auto nmax = *std::ranges::max_element(dimensions);
 
     if (nmax == 0)
     {
