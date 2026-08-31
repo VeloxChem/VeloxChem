@@ -35,7 +35,6 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <stdexcept>
 #include <ranges>
 #include <string>
 #include <utility>
@@ -51,14 +50,6 @@
 auto
 CSimdKineticEnergyDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis) const -> CSparseMatrix
 {
-    // NOTE: the kernels of the kinetic energy are not written yet, so the driver
-    // refuses here rather than where they would be called. The kernels are called
-    // from inside a parallel region, which an exception must not leave, and a
-    // critical error there would end the interpreter of a caller who merely asked
-    // for a matrix which cannot be computed yet.
-
-    throw std::runtime_error("SimdKineticEnergyDriver.compute: Kernels of the kinetic energy are not implemented");
-
     // NOTE: the kinetic energy operator is spherically symmetric about an atom,
     // so the diagonal atom pair blocks hold one value for each pair of basis
     // functions with the same angular momentum, as the overlap does.
@@ -84,14 +75,6 @@ auto
 CSimdKineticEnergyDriver::compute(const CMolecule &molecule, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) const
     -> CSparseMatrix
 {
-    // NOTE: the kernels of the kinetic energy are not written yet, so the driver
-    // refuses here rather than where they would be called. The kernels are called
-    // from inside a parallel region, which an exception must not leave, and a
-    // critical error there would end the interpreter of a caller who merely asked
-    // for a matrix which cannot be computed yet.
-
-    throw std::runtime_error("SimdKineticEnergyDriver.compute: Kernels of the kinetic energy are not implemented");
-
     auto matrix = CSparseMatrix(molecule, bra_basis, ket_basis, screener::kinetic_energy, _threshold, mat_t::general, diagstor::scalar);
 
     // NOTE: the values blocks are not set to zero after they are allocated, as
@@ -215,11 +198,7 @@ CSimdKineticEnergyDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
         // recursions of the integrals reach, and are empty when both atom bases
         // carry S type functions only.
 
-        // NOTE: the recursions of the kinetic energy reach two angular momenta
-        // above the sum of the angular momenta of the atom bases, as the operator
-        // differentiates twice, so the harmonics are created to that sum plus two.
-
-        const auto lmax = a_basis.max_angular_momentum() + b_basis.max_angular_momentum() + 2;
+        const auto lmax = a_basis.max_angular_momentum() + b_basis.max_angular_momentum();
 
         const auto harmonics = simdfunc::make_solid_harmonics(coordinates, lmax);
 

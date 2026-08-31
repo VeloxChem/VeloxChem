@@ -41,6 +41,55 @@
 #include "BasisFunction.hpp"
 #include "ErrorHandler.hpp"
 #include "SimdMatrix.hpp"
+#include "SimdKineticEnergyRecSS.hpp"
+#include "SimdKineticEnergyRecSP.hpp"
+#include "SimdKineticEnergyRecSD.hpp"
+#include "SimdKineticEnergyRecSF.hpp"
+#include "SimdKineticEnergyRecSG.hpp"
+#include "SimdKineticEnergyRecSH.hpp"
+#include "SimdKineticEnergyRecSI.hpp"
+#include "SimdKineticEnergyRecPS.hpp"
+#include "SimdKineticEnergyRecDS.hpp"
+#include "SimdKineticEnergyRecFS.hpp"
+#include "SimdKineticEnergyRecGS.hpp"
+#include "SimdKineticEnergyRecHS.hpp"
+#include "SimdKineticEnergyRecIS.hpp"
+#include "SimdKineticEnergyRecPP.hpp"
+#include "SimdKineticEnergyRecPD.hpp"
+#include "SimdKineticEnergyRecPF.hpp"
+#include "SimdKineticEnergyRecPG.hpp"
+#include "SimdKineticEnergyRecPH.hpp"
+#include "SimdKineticEnergyRecPI.hpp"
+#include "SimdKineticEnergyRecDP.hpp"
+#include "SimdKineticEnergyRecDD.hpp"
+#include "SimdKineticEnergyRecDF.hpp"
+#include "SimdKineticEnergyRecDG.hpp"
+#include "SimdKineticEnergyRecDH.hpp"
+#include "SimdKineticEnergyRecDI.hpp"
+#include "SimdKineticEnergyRecFP.hpp"
+#include "SimdKineticEnergyRecFD.hpp"
+#include "SimdKineticEnergyRecFF.hpp"
+#include "SimdKineticEnergyRecFG.hpp"
+#include "SimdKineticEnergyRecFH.hpp"
+#include "SimdKineticEnergyRecFI.hpp"
+#include "SimdKineticEnergyRecGP.hpp"
+#include "SimdKineticEnergyRecGD.hpp"
+#include "SimdKineticEnergyRecGF.hpp"
+#include "SimdKineticEnergyRecGG.hpp"
+#include "SimdKineticEnergyRecGH.hpp"
+#include "SimdKineticEnergyRecGI.hpp"
+#include "SimdKineticEnergyRecHP.hpp"
+#include "SimdKineticEnergyRecHD.hpp"
+#include "SimdKineticEnergyRecHF.hpp"
+#include "SimdKineticEnergyRecHG.hpp"
+#include "SimdKineticEnergyRecHH.hpp"
+#include "SimdKineticEnergyRecHI.hpp"
+#include "SimdKineticEnergyRecIP.hpp"
+#include "SimdKineticEnergyRecID.hpp"
+#include "SimdKineticEnergyRecIF.hpp"
+#include "SimdKineticEnergyRecIG.hpp"
+#include "SimdKineticEnergyRecIH.hpp"
+#include "SimdKineticEnergyRecII.hpp"
 
 namespace simdkin {  // simdkin namespace
 
@@ -64,9 +113,10 @@ auto one_center_kinetic_energy(const CBasisFunction &bra, const CBasisFunction &
 /// @param harmonics The solid harmonics of the vectors between the atoms.
 /// @param coordinates The coordinates of the atom pairs.
 /// @param threshold The screening threshold of the integrals.
-/// @note The recursions of the kinetic energy reach two angular momenta above the
-/// sum of the angular momenta of the basis functions, so the harmonics must be
-/// created to that sum plus two.
+/// @note The geometry of the kinetic energy reaches the sum of the angular
+/// momenta of the basis functions, as the overlap does, so the harmonics are
+/// created to that sum. The squared distance enters to higher powers, but that
+/// is carried by the coordinates and not by the harmonics.
 auto compute_kinetic_energy(double                         *values,
                             const size_t                    nvalues,
                             const CBasisFunction           &bra,
