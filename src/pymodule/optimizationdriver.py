@@ -448,26 +448,42 @@ class OptimizationDriver:
         else:
             default_tmax = self.tmax
 
-        # redirect geomeTRIC stdout/stderr
+        # Run geomeTRIC on the master rank only.  Non-master ranks run a
+        # worker loop (OptimizationEngine.run_worker) that mirrors the
+        # collective single-point evaluations requested by the master, so the
+        # optimizer state cannot diverge across ranks.
 
-        with redirect_stdout(StringIO()) as fg_out, redirect_stderr(
-                StringIO()) as fg_err:
-            try:
-                m = geometric.optimize.run_optimizer(
-                    customengine=opt_engine,
-                    coordsys=self.coordsys,
-                    check=self.check_interval,
-                    trust=default_trust,
-                    tmax=default_tmax,
-                    maxiter=self.max_iter,
-                    converge=self.conv_flags(),
-                    constraints=constr_filename,
-                    transition=self.transition,
-                    irc=self.irc,
-                    hessian=self.hessian,
-                    input=optinp_filename)
-            except geometric.errors.HessianExit:
-                hessian_exit = True
+        if self.rank == mpi_master():
+            # redirect geomeTRIC stdout/stderr
+            with redirect_stdout(StringIO()) as fg_out, redirect_stderr(
+                    StringIO()) as fg_err:
+                try:
+                    m = geometric.optimize.run_optimizer(
+                        customengine=opt_engine,
+                        coordsys=self.coordsys,
+                        check=self.check_interval,
+                        trust=default_trust,
+                        tmax=default_tmax,
+                        maxiter=self.max_iter,
+                        converge=self.conv_flags(),
+                        constraints=constr_filename,
+                        transition=self.transition,
+                        irc=self.irc,
+                        hessian=self.hessian,
+                        input=optinp_filename)
+                except geometric.errors.HessianExit:
+                    hessian_exit = True
+                except BaseException as exc:
+                    # Any failure on the master aborts the whole MPI job.
+                    assert_msg_critical(
+                        False,
+                        'OptimizationDriver: geometry optimization failed: '
+                        f'{exc}')
+            opt_engine.comm.bcast('stop', root=mpi_master())
+        else:
+            opt_engine.run_worker()
+
+        hessian_exit = opt_engine.comm.bcast(hessian_exit, root=mpi_master())
 
         # post-process and print results while temp_dir is still available
 
@@ -479,11 +495,11 @@ class OptimizationDriver:
             opt_results = {'final_geometry': final_mol.get_xyz_string()}
 
         else:
-            coords = m.xyzs[-1] / geometric.nifty.bohr2ang
             labels = molecule.get_labels()
             atom_basis_labels = molecule.get_atom_basis_labels()
 
             if self.rank == mpi_master():
+                coords = m.xyzs[-1] / geometric.nifty.bohr2ang
                 final_mol = Molecule(labels, coords.reshape(-1, 3), 'au',
                                      atom_basis_labels)
                 final_mol.set_charge(molecule.get_charge())

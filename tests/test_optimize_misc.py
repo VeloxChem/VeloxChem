@@ -4,6 +4,7 @@ from copy import deepcopy
 from mpi4py import MPI
 import numpy as np
 import h5py
+import pytest
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
@@ -11,6 +12,45 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.optimizationengine import OptimizationEngine
 from veloxchem.optimizationdriver import OptimizationDriver
+
+
+class _FakeOStream:
+
+    def print_header(self, *args, **kwargs):
+        pass
+
+    def print_blank(self, *args, **kwargs):
+        pass
+
+    def print_info(self, *args, **kwargs):
+        pass
+
+    def flush(self):
+        pass
+
+
+class _FakeGradientDriver:
+
+    def __init__(self, comm):
+        self.comm = comm
+        self.rank = comm.Get_rank()
+        self.ostream = _FakeOStream()
+
+    def compute_energy(self, molecule, *args):
+        energy = float(np.sum(molecule.get_coordinates_in_bohr()))
+        return self.comm.bcast(energy, root=mpi_master())
+
+    def compute(self, molecule, *args):
+        self.comm.bcast(0, root=mpi_master())
+
+    def get_gradient(self):
+        return np.zeros((3, 3))
+
+
+class _FailingGradientDriver(_FakeGradientDriver):
+
+    def compute_energy(self, molecule, *args):
+        raise AssertionError('SCF did not converge')
 
 
 class TestOptimizeMiscellaneous:
@@ -32,13 +72,26 @@ class TestOptimizeMiscellaneous:
         return molecule, basis
 
     @staticmethod
+    def get_small_molecule():
+
+        xyz_string = """
+        3
+        small
+        O    0.00000000    0.00000000    0.00000000
+        H    1.00000000    0.00000000    0.00000000
+        H    0.00000000    1.00000000    0.00000000
+        """
+        return Molecule.read_xyz_string(xyz_string)
+
+    @staticmethod
     def run_unrestricted_opt(molecule,
                              basis,
                              xcfun='hf',
                              filename=None,
                              constraints=None,
                              first_hessian=False,
-                             last_hessian=False):
+                             last_hessian=False,
+                             hessian_stop=False):
 
         scf_drv = ScfUnrestrictedDriver()
         scf_drv.ostream.mute()
@@ -47,7 +100,9 @@ class TestOptimizeMiscellaneous:
 
         opt_drv = OptimizationDriver(scf_drv)
         opt_drv.constraints = constraints
-        if first_hessian and last_hessian:
+        if hessian_stop:
+            opt_drv.hessian = 'stop'
+        elif first_hessian and last_hessian:
             opt_drv.hessian = 'first+last'
         elif first_hessian:
             opt_drv.hessian = 'first'
@@ -154,3 +209,88 @@ class TestOptimizeMiscellaneous:
                 np.abs(np.array(hf['vib/ir_intensities']) -
                        ref_ir_intens)) < 0.005
             hf.close()
+
+    def test_engine_worker_protocol(self, tmp_path):
+        """
+        Master-driven engine protocol: the master evaluates a few geometries
+        (including a repeated one served from the engine cache), then signals
+        'stop'; non-master ranks mirror the evaluations via run_worker and
+        return on 'stop'.
+        """
+
+        molecule = self.get_small_molecule()
+
+        engine = OptimizationEngine(_FakeGradientDriver(MPI.COMM_WORLD),
+                                    molecule)
+
+        if engine.rank == mpi_master():
+            dirname = str(tmp_path)
+            geometries = [
+                np.array([0.0, 0.0, 0.0, 1.0 + s, 0.0, 0.0, 0.0, 1.0 + s,
+                          0.0]) for s in (0.0, 0.01, 0.02)
+            ]
+            results = [engine.calc(coords, dirname) for coords in geometries]
+            assert len({r['energy'] for r in results}) == 3
+            assert results[0]['gradient'].shape == (9,)
+
+            # repeated geometry: engine cache hit, no collective evaluation
+            # on any rank
+            cached = engine.calc(geometries[0], dirname)
+            assert cached['energy'] == results[0]['energy']
+
+            engine.comm.bcast('stop', root=mpi_master())
+            engine.comm.bcast(True, root=mpi_master())
+        else:
+            engine.run_worker()
+            flag = engine.comm.bcast(None, root=mpi_master())
+            assert flag is True
+
+    def test_engine_worker_protocol_collective_failure(self, tmp_path):
+        """
+        A failure raised inside calc_new on all ranks propagates on every
+        rank (no deadlock) with the original error message.
+        """
+
+        molecule = self.get_small_molecule()
+
+        engine = OptimizationEngine(_FailingGradientDriver(MPI.COMM_WORLD),
+                                    molecule)
+
+        coords = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0])
+
+        if engine.rank == mpi_master():
+            with pytest.raises(AssertionError, match='SCF did not converge'):
+                engine.calc(coords, str(tmp_path))
+        else:
+            with pytest.raises(AssertionError, match='SCF did not converge'):
+                engine.run_worker()
+
+    def test_opt_hessian_exit(self, tmp_path):
+        """
+        geomeTRIC raises HessianExit for hessian='stop': the driver takes the
+        hessian_exit branch (no optimization steps, input geometry is the
+        final geometry) and the 'stop'/'flag' broadcasts keep all ranks in
+        step.
+        """
+
+        molecule, basis = self.get_ch3_molecule_and_basis()
+
+        filename = str(tmp_path / "opt_hessian_exit")
+
+        comm = MPI.COMM_WORLD
+        filename = comm.bcast(filename, root=mpi_master())
+
+        opt_drv, opt_results = self.run_unrestricted_opt(molecule,
+                                                         basis,
+                                                         'hf',
+                                                         filename=filename,
+                                                         hessian_stop=True)
+
+        if opt_drv.rank == mpi_master():
+            # HessianExit: no optimization step is taken, so the final
+            # geometry is the input geometry
+            opt_mol = Molecule.read_xyz_string(opt_results['final_geometry'])
+            assert np.max(
+                np.abs(opt_mol.get_coordinates_in_bohr() -
+                       molecule.get_coordinates_in_bohr())) < 1.0e-6
+            assert set(opt_results.keys()) == {'final_geometry'}
