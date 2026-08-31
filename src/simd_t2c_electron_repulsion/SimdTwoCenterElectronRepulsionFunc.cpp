@@ -40,6 +40,7 @@
 
 #include "ErrorHandler.hpp"
 #include "MathConst.hpp"
+#include "MathFunc.hpp"
 
 namespace simdt2ceri {  // simdt2ceri namespace
 
@@ -52,19 +53,21 @@ one_center_electron_repulsion(const CBasisFunction &bra, const CBasisFunction &k
 
     if (lbra != lket) return 0.0;
 
-    // NOTE: the integral of two functions of a non-zero angular momentum on one
-    // atom comes with the recursion of two non-zero angular momenta, which is
-    // not implemented yet.
-
-    if (lbra > 0) return 0.0;
-
     // NOTE: the atoms meet, so the argument of the Boys function is zero and the
-    // Boys function of order zero is one there. What is left is the prefactor of
-    // the repulsion of a pair of s type primitives.
+    // solid harmonic of the vector between them is one for the angular momentum
+    // zero and vanishes above it. What is left is a closed formula in the
+    // exponents alone, diagonal in the angular components and independent of
+    // which component it is.
 
     constexpr auto fpi = mathconst::pi_value();
 
     const auto fcoul = 2.0 * fpi * fpi * std::sqrt(fpi);
+
+    // NOTE: the double factorial of twice the angular momentum less one over
+    // twice it plus one is the factor the angular momentum contributes, and is
+    // one for the angular momentum zero.
+
+    const auto fang = mathfunc::double_factorial(2 * lbra - 1) / static_cast<double>(2 * lbra + 1);
 
     const auto &a_exps = bra.exponents();
 
@@ -80,11 +83,24 @@ one_center_electron_repulsion(const CBasisFunction &bra, const CBasisFunction &k
     {
         for (size_t j = 0; j < b_exps.size(); j++)
         {
-            fsum += a_norms[i] * b_norms[j] / (a_exps[i] * b_exps[j] * std::sqrt(a_exps[i] + b_exps[j]));
+            const auto fexp = a_exps[i] + b_exps[j];
+
+            auto fden = a_exps[i] * b_exps[j] * std::sqrt(fexp);
+
+            // NOTE: twice the sum of the exponents is raised to the angular
+            // momentum by repeated multiplication, as the angular momentum is
+            // small.
+
+            for (int l = 0; l < lbra; l++)
+            {
+                fden *= 2.0 * fexp;
+            }
+
+            fsum += a_norms[i] * b_norms[j] / fden;
         }
     }
 
-    return fcoul * fsum;
+    return fcoul * fang * fsum;
 }
 
 auto

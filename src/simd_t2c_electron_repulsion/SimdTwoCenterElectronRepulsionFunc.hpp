@@ -66,12 +66,14 @@ namespace simdt2ceri {  // simdt2ceri namespace
 /// components and does not depend on the component or on the position of the
 /// atom, as the overlap and the kinetic energy are. Basis functions of different
 /// angular momenta have no integral and give zero.
-/// @note Only the integral of two S type functions is computed. The integral of
-/// two functions of the same non-zero angular momentum on one atom is the value
-/// the integrals of two atoms approach as the atoms meet, which the closed
-/// formulas of one S type function do not carry: they hold the solid harmonic of
-/// the vector between the atoms, which vanishes there. It comes with the
-/// recursion of two non-zero angular momenta, and zero is returned until then.
+/// @note The integral is the value the integrals of two atoms approach as the
+/// atoms meet, which the closed formulas of one S type function do not carry:
+/// they hold the solid harmonic of the vector between the atoms, which vanishes
+/// there. It is a closed formula in the exponents alone,
+///
+///   (l|J|l')_{m,m'} = 2 pi^(5/2) (2l - 1)!! / (alpha beta (2l + 1) (2p)^l sqrt(p))
+///
+/// for equal angular momenta and equal components, and zero otherwise.
 auto one_center_electron_repulsion(const CBasisFunction &bra, const CBasisFunction &ket) -> double;
 
 /// @brief Computes the two-center electron repulsion integrals of a combination
