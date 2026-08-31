@@ -90,6 +90,10 @@ class CSparseMatrix
     /// fewer blocks rather than into blocks whose fixed cost outweighs their work.
     static constexpr size_t min_block_size = 2048;
 
+    /// @brief The number of elements of the dense matrix one thread sets to zero
+    /// at a time when the matrix is reconstructed.
+    static constexpr size_t _dense_chunk_size = 1 << 20;
+
     /// @brief The default constructor.
     CSparseMatrix()
 
@@ -686,7 +690,22 @@ class CSparseMatrix
 
         const auto ncols = ket_basis.dimensions_of_basis();
 
-        std::fill(values, values + nrows * ncols, 0.0);
+        // NOTE: the elements are set to zero by the threads, as the dense matrix
+        // reaches several gigabytes and its zeroing is a large part of the
+        // reconstruction. Static scheduling is used, as the chunks cost the same
+        // and each thread then zeroes a contiguous stretch of the matrix.
+
+        const auto nchunks = static_cast<int>((nrows * ncols + _dense_chunk_size - 1) / _dense_chunk_size);
+
+#pragma omp parallel for schedule(static) if (nchunks > 1)
+        for (int i = 0; i < nchunks; i++)
+        {
+            const auto first = static_cast<size_t>(i) * _dense_chunk_size;
+
+            const auto last = std::min(first + _dense_chunk_size, nrows * ncols);
+
+            std::fill(values + first, values + last, 0.0);
+        }
 
         // NOTE: the dense index of an atomic orbital is looked up instead of
         // recomputed, as the innermost loops below run over the atom pairs and
@@ -704,11 +723,19 @@ class CSparseMatrix
 
         const auto ket_nmoms = ket_strides.size();
 
-        for (size_t iblk = 0; iblk < _pair_blocks.size(); iblk++)
-        {
-            const auto &block = _pair_blocks[iblk];
+        // NOTE: an element of the dense matrix belongs to a single atom pair, and
+        // an atom pair belongs to a single block, so the blocks write to disjoint
+        // elements and need no synchronization. Dynamic scheduling is used as the
+        // blocks differ in the number of the combinations of basis functions.
 
-            const auto *block_values = pair_values(iblk);
+        const auto nblocks = static_cast<int>(_pair_blocks.size());
+
+#pragma omp parallel for schedule(dynamic) if (nblocks > 1)
+        for (int iblk = 0; iblk < nblocks; iblk++)
+        {
+            const auto &block = _pair_blocks[static_cast<size_t>(iblk)];
+
+            const auto *block_values = pair_values(static_cast<size_t>(iblk));
 
             const auto &bra_atoms = block.bra_atoms();
 
@@ -891,14 +918,20 @@ class CSparseMatrix
 
         const auto ket_nmoms = ket_strides.size();
 
-        for (size_t iblk = 0; iblk < _diagonal_blocks.size(); iblk++)
+        // NOTE: the diagonal blocks carry atoms of their own and write to
+        // disjoint elements, as the off-diagonal blocks above do.
+
+        const auto nblocks = static_cast<int>(_diagonal_blocks.size());
+
+#pragma omp parallel for schedule(dynamic) if (nblocks > 1)
+        for (int iblk = 0; iblk < nblocks; iblk++)
         {
-            const auto &block = _diagonal_blocks[iblk];
+            const auto &block = _diagonal_blocks[static_cast<size_t>(iblk)];
 
             errors::assertMsgCritical(block.get_storage() == diagstor::scalar,
                                       std::string("SparseMatrix.to_dense: Storage layout of the diagonal blocks is not supported"));
 
-            const auto *block_values = diagonal_values(iblk);
+            const auto *block_values = diagonal_values(static_cast<size_t>(iblk));
 
             const auto &atoms = block.atoms();
 
