@@ -180,20 +180,11 @@ CMolecularBasis::basis_pair_groups() const -> std::vector<CAtomBasisPairGroup>
     // NOTE: pair groups refer to atom bases owned by this molecular basis, not
     // by the transient groups below, so they stay valid after groups expires.
 
-    const auto groups = basis_groups();
+    // NOTE: the atom pairs of the groups are formed by the threads, as they are
+    // as many as the square of the atoms of the molecule and forming them one
+    // after another is a large part of the description of a sparse matrix.
 
-    std::vector<CAtomBasisPairGroup> pair_groups;
-
-    pair_groups.reserve(groups.size() * (groups.size() + 1) / 2);
-
-    std::ranges::for_each(std::views::iota(size_t{0}, groups.size()), [&](const auto i) {
-        pair_groups.push_back(CAtomBasisPairGroup(groups[i]));
-
-        std::ranges::for_each(std::views::iota(i + 1, groups.size()),
-                              [&](const auto j) { pair_groups.push_back(CAtomBasisPairGroup(groups[i], groups[j])); });
-    });
-
-    return pair_groups;
+    return CAtomBasisPairGroup::make_pair_groups(basis_groups());
 }
 
 auto

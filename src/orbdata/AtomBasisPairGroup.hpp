@@ -188,6 +188,24 @@ class CAtomBasisPairGroup
     /// ordered by ascending interatomic distance as well.
     auto partition(const size_t nblocks) const -> std::vector<CAtomBasisPairGroup>;
 
+    /// @brief Creates the atom basis pair groups of the atom basis groups of one
+    /// molecular basis, i.e. the symmetric group of every atom basis group and
+    /// the group of every pair of them.
+    /// @param groups The atom basis groups of the molecular basis.
+    /// @return The vector of atom basis pair groups, in the order of the groups.
+    /// @note The atom pairs are formed by the threads. An atom of a molecular
+    /// basis carries one atom basis, so the atom basis groups hold no atom in
+    /// common: the atom pairs of a symmetric group are the strict upper triangle
+    /// of its atoms and the atom pairs of a pair of groups are all their
+    /// combinations, and the atom pair with a given index within a group follows
+    /// from the index alone. The atom pairs are formed in the order the
+    /// constructors form them, so that the groups are the same however they were
+    /// made.
+    static auto make_pair_groups(const std::vector<CAtomBasisGroup> &groups) -> std::vector<CAtomBasisPairGroup>;
+
+    /// @brief The number of atom pairs one thread forms at a time.
+    static constexpr size_t _pairs_per_chunk = 4096;
+
     /// @brief Gets atom basis on bra side.
     /// @return The constant reference to atom basis.
     auto
@@ -353,6 +371,46 @@ class CAtomBasisPairGroup
     }
 
    private:
+    /// @brief The constructor with the atom bases of a group and the number of its
+    /// atom pairs, which are sized but not formed.
+    /// @param bra The atom basis group on bra side.
+    /// @param ket The atom basis group on ket side.
+    /// @param npairs The number of off-diagonal atom pairs of the group.
+    /// @param symmetric The flag indicating that bra and ket sides are interchangeable.
+    /// @note The atom pairs are left with the content of the allocation, so this
+    /// constructor is private and the caller which uses it fills them.
+    CAtomBasisPairGroup(const CAtomBasisGroup &bra, const CAtomBasisGroup &ket, const size_t npairs, const bool symmetric)
+
+        : _bra_basis(bra.basis())
+
+        , _ket_basis(ket.basis())
+
+        , _bra_atoms(npairs)
+
+        , _ket_atoms(npairs)
+
+        , _diagonal_atoms{}
+
+        , _distances{}
+
+        , _bra_index(bra.index())
+
+        , _ket_index(ket.index())
+
+        , _symmetric(symmetric)
+
+        , _order(pairord::none)
+    {
+        if (symmetric)
+        {
+            _diagonal_atoms = bra.atoms();
+        }
+        else
+        {
+            std::ranges::set_intersection(bra.atoms(), ket.atoms(), std::back_inserter(_diagonal_atoms));
+        }
+    }
+
     /// @brief The constructor with the atom bases and the atom pairs of a group.
     /// @param bra_basis The atom basis on bra side.
     /// @param ket_basis The atom basis on ket side.
