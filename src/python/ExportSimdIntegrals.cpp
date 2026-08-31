@@ -38,6 +38,7 @@
 
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
+#include "SimdKineticEnergyDriver.hpp"
 #include "SimdOverlapDriver.hpp"
 #include "SparseMatrix.hpp"
 
@@ -63,6 +64,25 @@ export_simdintegrals(py::module &m) -> void
              py::arg("bra_basis"),
              py::arg("ket_basis"))
         .def("get_threshold", &CSimdOverlapDriver::get_threshold, "Gets screening threshold of the integrals.");
+
+    // CSimdKineticEnergyDriver class
+
+    PyClass<CSimdKineticEnergyDriver>(m, "SimdKineticEnergyDriver")
+        .def(py::init<>())
+        .def(py::init<const double>(), "Creates a kinetic energy driver with given screening threshold.", py::arg("threshold"))
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &>(&CSimdKineticEnergyDriver::compute, py::const_),
+             "Computes sparse kinetic energy matrix for given molecule and basis.",
+             py::arg("molecule"),
+             py::arg("basis"))
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const CMolecularBasis &>(
+                 &CSimdKineticEnergyDriver::compute, py::const_),
+             "Computes sparse kinetic energy matrix for given molecule and pair of bases.",
+             py::arg("molecule"),
+             py::arg("bra_basis"),
+             py::arg("ket_basis"))
+        .def("get_threshold", &CSimdKineticEnergyDriver::get_threshold, "Gets screening threshold of the integrals.");
 }
 
 }  // namespace vlx_simdintegrals

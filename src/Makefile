@@ -37,6 +37,7 @@ VLX_LIBS_DIR += moldata
 VLX_LIBS_DIR += orbdata
 VLX_LIBS_DIR += simd_func
 VLX_LIBS_DIR += simd_t2c_overlap
+VLX_LIBS_DIR += simd_t2c_kinetic_energy
 VLX_LIBS_DIR += python
 VLX_LIBS_DIR += t2c_func
 VLX_LIBS_DIR += t2c_geometrical_derivatives
