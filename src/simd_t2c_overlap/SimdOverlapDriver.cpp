@@ -33,7 +33,9 @@
 
 #include "SimdOverlapDriver.hpp"
 
+#include <algorithm>
 #include <cstdint>
+#include <ranges>
 #include <string>
 #include <utility>
 #include <vector>
@@ -129,10 +131,54 @@ CSimdOverlapDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
 
     const auto nblocks = static_cast<int>(matrix.number_of_pair_blocks());
 
-#pragma omp parallel for schedule(dynamic) if (nblocks > 1)
+    // NOTE: the blocks are visited from the most costly to the least, so that a
+    // costly block is taken while there is still work to fill the other threads
+    // with. The threads draw two or three blocks each, so a costly block drawn
+    // last is finished alone and sets the time of the whole loop.
+
+    // NOTE: the cost of a block is the number of its atom pairs times the cost of
+    // its combinations of basis functions, each weighted by the sum of the
+    // angular momenta it carries, as the recursions of the integrals grow with
+    // that sum. The weight is an estimate and orders the blocks, it is not used
+    // for anything else.
+
+    std::vector<size_t> order(static_cast<size_t>(nblocks));
+
+    std::vector<double> costs(static_cast<size_t>(nblocks), 0.0);
+
     for (int iblk = 0; iblk < nblocks; iblk++)
     {
         const auto &block = matrix.pair_block(static_cast<size_t>(iblk));
+
+        const auto a_indices = _index_functions(bra_basis.basis_set(block.bra_index()));
+
+        const auto b_indices = _index_functions(ket_basis.basis_set(block.ket_index()));
+
+        double weight = 0.0;
+
+        for (const auto &[la, ia] : a_indices)
+        {
+            for (const auto &[lb, jb] : b_indices)
+            {
+                const auto lsum = static_cast<double>(la + lb + 1);
+
+                weight += lsum * lsum;
+            }
+        }
+
+        order[static_cast<size_t>(iblk)] = static_cast<size_t>(iblk);
+
+        costs[static_cast<size_t>(iblk)] = static_cast<double>(block.number_of_pairs()) * weight;
+    }
+
+    std::ranges::sort(order, [&](const size_t a, const size_t b) { return costs[a] > costs[b]; });
+
+#pragma omp parallel for schedule(dynamic) if (nblocks > 1)
+    for (int iblk = 0; iblk < nblocks; iblk++)
+    {
+        const auto jblk = order[static_cast<size_t>(iblk)];
+
+        const auto &block = matrix.pair_block(jblk);
 
         if (block.number_of_pairs() == 0) continue;
 
@@ -180,7 +226,7 @@ CSimdOverlapDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
 
                 if (nvalues == 0) continue;
 
-                simdovl::compute_overlap(matrix.pair_values(static_cast<size_t>(iblk), la, ia, lb, jb),
+                simdovl::compute_overlap(matrix.pair_values(jblk, la, ia, lb, jb),
                                          nvalues,
                                          a_basis.functions()[i],
                                          b_basis.functions()[j],
@@ -189,6 +235,7 @@ CSimdOverlapDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
                                          _threshold);
             }
         }
+
     }
 }
 
