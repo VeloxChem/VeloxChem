@@ -121,9 +121,18 @@ CSimdOverlapDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
                                          const CMolecularBasis &bra_basis,
                                          const CMolecularBasis &ket_basis) const -> void
 {
-    for (size_t iblk = 0; iblk < matrix.number_of_pair_blocks(); iblk++)
+    // NOTE: the blocks are independent, as each of them forms its own coordinates
+    // and solid harmonics and writes the values of its own combinations of basis
+    // functions, which no other block addresses. Dynamic scheduling is used as
+    // the blocks hold a comparable number of atom pairs but differ in the number
+    // of the combinations of basis functions and in the cost of their kernels.
+
+    const auto nblocks = static_cast<int>(matrix.number_of_pair_blocks());
+
+#pragma omp parallel for schedule(dynamic) if (nblocks > 1)
+    for (int iblk = 0; iblk < nblocks; iblk++)
     {
-        const auto &block = matrix.pair_block(iblk);
+        const auto &block = matrix.pair_block(static_cast<size_t>(iblk));
 
         if (block.number_of_pairs() == 0) continue;
 
@@ -171,7 +180,7 @@ CSimdOverlapDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
 
                 if (nvalues == 0) continue;
 
-                simdovl::compute_overlap(matrix.pair_values(iblk, la, ia, lb, jb),
+                simdovl::compute_overlap(matrix.pair_values(static_cast<size_t>(iblk), la, ia, lb, jb),
                                          nvalues,
                                          a_basis.functions()[i],
                                          b_basis.functions()[j],
