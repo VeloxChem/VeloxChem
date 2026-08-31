@@ -1340,3 +1340,72 @@ between 1.5 and 35.6 times slower.
 The largest case of these notes is ubiquitin in aug-cc-pv6z, 193665 basis
 functions, 279 gigabytes as a dense matrix against 18.5 sparse, computed in 0.24
 seconds on fourteen threads and 1.69 on one.
+
+## The dense reconstruction, and where its time actually goes
+
+The reconstruction became the largest part of this path once the integrals were
+threaded, twenty times `compute` on crambin in def2-qzvp, so it was instrumented
+in place: a timer around each of its parts and the minor faults of the process
+counted across the zeroing.
+
+| part | crambin def2-qzvp, fourteen threads |
+|---|---|
+| zeroing the dense matrix | 0.0861 s, and 387393 minor faults |
+| the off-diagonal blocks | 0.0527 s, 109700914 values written |
+| the diagonal blocks | 0.0002 s |
+
+The two halves are limited by different things and neither is the code.
+
+The scatter writes 109700914 values of eight bytes each, and each of them pulls a
+cache line of sixty four, so it moves 7.0 gigabytes in 0.0527 seconds, 133
+gigabytes per second. A linear write on this machine reaches 352. That is the
+limit of the memory system for writes scattered over six gigabytes, not a limit
+of the loop, and the attempt to improve its locality by tiling, recorded above,
+lost at every tile size.
+
+The zeroing faults in every page of the dense matrix: 6.35 gigabytes over pages
+of sixteen kilobytes is 387891 pages against the 387393 faults counted. The same
+zeroing of a warm buffer takes 0.0168 seconds. It is therefore not bandwidth but
+the first touch of newly mapped memory.
+
+### The zeroing is not redundant work, it is the allocation
+
+The obvious idea, to allocate the array zeroed and skip the zeroing, was measured
+and dropped. A fresh allocation with a parallel fill takes 0.1099 seconds and a
+fresh zeroed allocation touched once per page takes 0.1084: writing the zeros
+costs 1.5 milliseconds once the fault is paid, one percent of the whole
+reconstruction. Every page is touched by the scatter in any case, 10 to 18
+percent of the elements being non-zero but spread so that no page of any of the
+cases is empty, so there is nothing for a lazily zeroed page to save.
+
+### What does help is not allocating
+
+The faults are paid on every call only because the binding hands numpy a new
+array each time.
+
+| case | dense | first call | later calls | faults per call |
+|---|---|---|---|---|
+| crambin def2-tzvp | 1.08 GB | 0.0287 | 0.0112 | 71064 then 0 |
+| crambin def2-qzvp | 5.91 GB | 0.1414 | 0.1362, 0.1306 | 387393 every time |
+
+Below about a gigabyte the allocator keeps the block when it is freed and the
+second and later reconstructions cost nothing in faults. Above it the block is
+returned to the system and every call faults the whole matrix in again.
+
+`fill_numpy` reconstructs into an array the caller keeps, so that a caller
+converting one matrix after another pays the faults once.
+
+| case | dense | to_numpy | fill_numpy, kept buffer | gain | faults |
+|---|---|---|---|---|---|
+| crambin def2-tzvp | 1.08 GB | 0.0116 | 0.0114 | 1.01x | 0 to 1 |
+| ubiquitin def2-svp | 1.00 GB | 0.0069 | 0.0069 | 0.99x | 0 to 0 |
+| crambin def2-qzvp | 5.91 GB | 0.1189 | 0.0535 | 2.22x | 387396 to 0 |
+
+The results are bit-identical to `to_numpy`. The gain appears only where there
+were faults to remove, which is the point: the two smaller cases are unchanged
+because the allocator was already keeping their memory.
+
+What is left of the reconstruction on the large case is 0.0535 seconds, which is
+the scatter and almost nothing else, and the scatter is at the limit quoted
+above. A single reconstruction of a matrix which has never been built cannot be
+made faster than the cost of faulting in its memory.
