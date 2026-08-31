@@ -25,9 +25,9 @@ Geometries are the usual benchmark set.
 | crambin | 642 |
 | ubiquitin | 1231 |
 
-The bases are def2-svp, def2-tzvp and def2-qzvp throughout, and their diffuse
-counterparts def2-svpd, def2-tzvpd and def2-qzvpd in the section on them at the
-end.
+The bases are def2-svp, def2-tzvp and def2-qzvp throughout, their diffuse
+counterparts def2-svpd, def2-tzvpd and def2-qzvpd in the section on them, and the
+correlation consistent sets to sextuple zeta in the section at the end.
 
 ## Dense reconstruction of a sparse matrix
 
@@ -1231,3 +1231,112 @@ follows the atoms of the molecule and not the functions on them.
 
 Ubiquitin in def2-qzvpd is the largest case in these notes, 59053 basis
 functions, 1.82 gigabytes sparse against 26 dense, computed in 0.0229 seconds.
+
+## The correlation consistent basis sets
+
+The four molecules in cc-pVXZ and aug-cc-pVXZ from double to sextuple zeta, forty
+cases. These reach angular momentum six, so the recursions of the integrals reach
+twelve, and they are the only cases in these notes which exercise the solid
+harmonics above order eight.
+
+### A bug they found
+
+The first attempt at this table failed on thirteen of the forty cases with a
+memory error, which AddressSanitizer placed exactly. Every one of the forty nine
+kernels sized the buffer its primitives accumulate into as `dimensions.back()`,
+on the assumption that the last pair of primitives is the one reaching furthest.
+The primitives are sorted by descending exponent, so that holds if the reach
+followed the decay alone, but the bound of a pair of primitives carries their
+prefactor as well, and for exponents which are close the prefactor decides. On
+crambin in aug-cc-pvdz, an eight primitive contraction against one diffuse
+primitive gives `back` of 48787 against a true largest of 49175, and the loop
+then writes some three kilobytes past its buffer.
+
+The values were never wrong: the atom pairs between the two are ones whose
+integrals fall below the screening threshold, and the reference driver agrees to
+1.0e-14 with the bug in place as it does without it. The def2 sets never trip it.
+It reproduces on one thread, so it was never a race; the threads only decided
+whether the stray write landed somewhere the allocator noticed.
+
+The kernels now take the largest of the dimensions rather than the last, and
+AddressSanitizer is clean on the cases which reported the overflow.
+
+### Where the time goes
+
+Warm, seconds, best of three after one cold call, each case in its own process.
+The reference driver is run only where the dense matrix fits in memory.
+
+| molecule | basis | nao | dense GB | sparse GB | compute 1 thr | compute 14 thr | scaling | reference 14 thr | against it |
+|---|---|---|---|---|---|---|---|---|---|
+| tagrisso | cc-pvdz | 683 | 0.0 | 0.00 | 0.0013 | 0.0006 | 2.28x | 0.0009 | 1.54x |
+| tagrisso | cc-pvtz | 1572 | 0.0 | 0.00 | 0.0019 | 0.0008 | 2.32x | 0.0014 | 1.78x |
+| tagrisso | cc-pvqz | 3025 | 0.1 | 0.02 | 0.0030 | 0.0010 | 2.86x | 0.0035 | 3.37x |
+| tagrisso | cc-pv5z | 5182 | 0.2 | 0.04 | 0.0058 | 0.0019 | 3.09x | 0.0088 | 4.72x |
+| tagrisso | cc-pv6z | 8183 | 0.5 | 0.10 | 0.0120 | 0.0037 | 3.22x | 0.0229 | 6.16x |
+| tagrisso | aug-cc-pvdz | 1148 | 0.0 | 0.00 | 0.0018 | 0.0007 | 2.74x | 0.0012 | 1.72x |
+| tagrisso | aug-cc-pvtz | 2461 | 0.0 | 0.02 | 0.0030 | 0.0011 | 2.75x | 0.0022 | 2.03x |
+| tagrisso | aug-cc-pvqz | 4478 | 0.1 | 0.05 | 0.0060 | 0.0018 | 3.25x | 0.0058 | 3.15x |
+| tagrisso | aug-cc-pv5z | 7339 | 0.4 | 0.12 | 0.0127 | 0.0041 | 3.12x | 0.0164 | 4.03x |
+| tagrisso | aug-cc-pv6z | 11184 | 0.9 | 0.24 | 0.0272 | 0.0086 | 3.18x | 0.0438 | 5.11x |
+| taxol | cc-pvdz | 1099 | 0.0 | 0.00 | 0.0016 | 0.0007 | 2.38x | 0.0014 | 2.13x |
+| taxol | cc-pvtz | 2516 | 0.0 | 0.01 | 0.0025 | 0.0010 | 2.66x | 0.0025 | 2.64x |
+| taxol | cc-pvqz | 4825 | 0.2 | 0.03 | 0.0045 | 0.0016 | 2.79x | 0.0064 | 3.97x |
+| taxol | cc-pv5z | 8246 | 0.5 | 0.09 | 0.0101 | 0.0033 | 3.04x | 0.0191 | 5.77x |
+| taxol | cc-pv6z | 12999 | 1.3 | 0.21 | 0.0216 | 0.0068 | 3.18x | 0.0558 | 8.23x |
+| taxol | aug-cc-pvdz | 1844 | 0.0 | 0.01 | 0.0026 | 0.0010 | 2.66x | 0.0015 | 1.58x |
+| taxol | aug-cc-pvtz | 3933 | 0.1 | 0.04 | 0.0050 | 0.0017 | 2.98x | 0.0041 | 2.42x |
+| taxol | aug-cc-pvqz | 7134 | 0.4 | 0.11 | 0.0109 | 0.0035 | 3.16x | 0.0127 | 3.67x |
+| taxol | aug-cc-pv5z | 11667 | 1.0 | 0.26 | 0.0247 | 0.0074 | 3.35x | 0.0386 | 5.24x |
+| taxol | aug-cc-pv6z | 17752 | 2.3 | 0.54 | 0.0534 | 0.0157 | 3.41x | 0.1077 | 6.88x |
+| crambin | cc-pvdz | 6177 | 0.3 | 0.03 | 0.0092 | 0.0019 | 4.75x | 0.0187 | 9.62x |
+| crambin | cc-pvtz | 14244 | 1.5 | 0.11 | 0.0178 | 0.0032 | 5.61x | 0.0600 | 18.95x |
+| crambin | cc-pvqz | 27459 | 5.6 | 0.35 | 0.0349 | 0.0058 | 6.02x | 0.1966 | 33.90x |
+| crambin | cc-pv5z | 47106 | 16.5 | 0.95 | 0.0830 | 0.0125 | 6.63x | too large |  |
+| crambin | cc-pv6z | 74469 | 41.3 | 2.21 | 0.1876 | 0.0286 | 6.55x | too large |  |
+| crambin | aug-cc-pvdz | 10380 | 0.8 | 0.17 | 0.0268 | 0.0040 | 6.70x | 0.0369 | 9.22x |
+| crambin | aug-cc-pvtz | 22311 | 3.7 | 0.60 | 0.0581 | 0.0084 | 6.96x | 0.1197 | 14.32x |
+| crambin | aug-cc-pvqz | 40674 | 12.3 | 1.61 | 0.1282 | 0.0184 | 6.97x | too large |  |
+| crambin | aug-cc-pv5z | 66753 | 33.2 | 3.73 | 0.2897 | 0.0418 | 6.93x | too large |  |
+| crambin | aug-cc-pv6z | 101832 | 77.3 | 7.63 | 0.6126 | 0.0826 | 7.41x | too large |  |
+| ubiquitin | cc-pvdz | 11577 | 1.0 | 0.06 | 0.0201 | 0.0031 | 6.58x | 0.0680 | 22.28x |
+| ubiquitin | cc-pvtz | 26870 | 5.4 | 0.24 | 0.0360 | 0.0055 | 6.58x | 0.1950 | 35.58x |
+| ubiquitin | cc-pvqz | 51984 | 20.1 | 0.74 | 0.0753 | 0.0107 | 7.06x | too large |  |
+| ubiquitin | cc-pv5z | 89381 | 59.5 | 2.03 | 0.1743 | 0.0251 | 6.95x | too large |  |
+| ubiquitin | cc-pv6z | 141523 | 149.2 | 4.74 | 0.3939 | 0.0597 | 6.60x | too large |  |
+| ubiquitin | aug-cc-pvdz | 19511 | 2.8 | 0.42 | 0.0657 | 0.0083 | 7.89x | 0.1245 | 14.94x |
+| ubiquitin | aug-cc-pvtz | 42163 | 13.2 | 1.48 | 0.1420 | 0.0196 | 7.25x | too large |  |
+| ubiquitin | aug-cc-pvqz | 77098 | 44.3 | 3.95 | 0.3117 | 0.0466 | 6.69x | too large |  |
+| ubiquitin | aug-cc-pv5z | 126778 | 119.8 | 9.09 | 0.6995 | 0.1083 | 6.46x | too large |  |
+| ubiquitin | aug-cc-pv6z | 193665 | 279.4 | 18.53 | 1.6938 | 0.2386 | 7.10x | too large |  |
+
+### How much of this is noise
+
+The whole table was measured twice, on the same build, to see what a single run
+is worth.
+
+| | median | worst |
+|---|---|---|
+| compute, fourteen threads | 1.7% | 9.5% |
+| compute, one thread | 2.8% | 7.6% |
+
+A single run therefore says nothing below about five percent, which is worth
+remembering when reading any one number in these notes. The differences which
+this session acted on were measured by flipping a switch within one build, and
+one which was not, a supposed regression of the parallel block loop, turned out
+to be this noise and nothing else.
+
+### What these numbers say
+
+The scaling holds from 2.3 to 3.4 times on the two small molecules and from 6.5
+to 7.9 on crambin and ubiquitin, the best of them being ubiquitin in aug-cc-pvdz
+at 7.9. The small molecules gain over their def2 counterparts, where they reached
+2.1 to 3.2, because the higher angular momenta give a block more work to carry
+against the cost it pays whatever it holds.
+
+Fourteen of the forty are beyond what the reference driver can hold: every case
+above about forty thousand basis functions. Where it can be compared it is
+between 1.5 and 35.6 times slower.
+
+The largest case of these notes is ubiquitin in aug-cc-pv6z, 193665 basis
+functions, 279 gigabytes as a dense matrix against 18.5 sparse, computed in 0.24
+seconds on fourteen threads and 1.69 on one.
