@@ -430,7 +430,7 @@ class CSparseMatrix
     auto
     pair_values(const size_t index) -> double *
     {
-        _check_values(index, _pair_blocks.size(), std::string("pair_values"));
+        _check_values(index, _pair_blocks.size(), "pair_values");
 
         return _values[index];
     }
@@ -441,7 +441,7 @@ class CSparseMatrix
     auto
     pair_values(const size_t index) const -> const double *
     {
-        _check_values(index, _pair_blocks.size(), std::string("pair_values"));
+        _check_values(index, _pair_blocks.size(), "pair_values");
 
         return _values[index];
     }
@@ -452,7 +452,7 @@ class CSparseMatrix
     auto
     diagonal_values(const size_t index) -> double *
     {
-        _check_values(index, _diagonal_blocks.size(), std::string("diagonal_values"));
+        _check_values(index, _diagonal_blocks.size(), "diagonal_values");
 
         return _values[_pair_blocks.size() + index];
     }
@@ -463,7 +463,7 @@ class CSparseMatrix
     auto
     diagonal_values(const size_t index) const -> const double *
     {
-        _check_values(index, _diagonal_blocks.size(), std::string("diagonal_values"));
+        _check_values(index, _diagonal_blocks.size(), "diagonal_values");
 
         return _values[_pair_blocks.size() + index];
     }
@@ -1024,20 +1024,34 @@ class CSparseMatrix
     /// @param nblocks The number of blocks of that kind.
     /// @param label The name of the accessor requesting the check.
     auto
-    _check_values(const size_t index, const size_t nblocks, const std::string &label) const -> void
+    _check_values(const size_t index, const size_t nblocks, const char *label) const -> void
     {
-        errors::assertMsgCritical(_values_state == valstat::allocated,
-                                  std::string("SparseMatrix.") + label + std::string(": Values blocks of matrix are not allocated"));
+        // NOTE: the message of a check is formed only where the check fails. The
+        // accessors guarded here are called once for every combination of basis
+        // functions of every block, and forming three messages on every call,
+        // which the arguments of the assertions would do, costs more than the
+        // checks themselves.
 
-        errors::assertMsgCritical(index < nblocks,
-                                  std::string("SparseMatrix.") + label + std::string(": Index of block is out of range"));
+        if (_values_state != valstat::allocated)
+        {
+            errors::assertMsgCritical(
+                false, std::string("SparseMatrix.") + label + std::string(": Values blocks of matrix are not allocated"));
+        }
+
+        if (index >= nblocks)
+        {
+            errors::assertMsgCritical(false, std::string("SparseMatrix.") + label + std::string(": Index of block is out of range"));
+        }
 
         // NOTE: the values blocks are indexed with the off-diagonal blocks first,
         // so the index is checked against them as well as against the blocks of
         // its own kind.
 
-        errors::assertMsgCritical(_values.size() == _pair_blocks.size() + _diagonal_blocks.size(),
-                                  std::string("SparseMatrix.") + label + std::string(": Values blocks are inconsistent with blocks"));
+        if (_values.size() != _pair_blocks.size() + _diagonal_blocks.size())
+        {
+            errors::assertMsgCritical(
+                false, std::string("SparseMatrix.") + label + std::string(": Values blocks are inconsistent with blocks"));
+        }
     }
 
     /// @brief Deallocates the values blocks of matrix.
