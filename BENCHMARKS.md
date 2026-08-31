@@ -1104,3 +1104,51 @@ The reconstruction of the dense matrix is now 22 times the integrals it
 reconstructs, 0.1406 seconds against 0.0065 for crambin in def2-qzvp, and the
 notes above record that it is at the limit of the memory system on both of its
 halves. The integrals themselves are no longer where the time of this path goes.
+
+## Why the small molecules are not divided
+
+`min_block_size` is an absolute count of atom pairs, 2048, and tagrisso holds
+2415 atom pairs in all with its largest group holding 924. Both are below the
+floor, so tagrisso is never divided into blocks whatever the threads, and taxol
+divides only its largest group. The two of them scale 2.1 to 3.2 times on
+fourteen threads where ubiquitin reaches 6.9.
+
+Expressing the floor in atom pairs is also wrong in principle. What it guards is
+the cost a block carries whatever it holds, chiefly the bisection of the screening
+over the pairs of primitives of every combination of basis functions, and that
+cost is set by the atom bases rather than by a count of atom pairs: the same floor
+is far too high for def2-qzvp, where an atom pair is worth many times more, and
+about right for def2-svp on a protein, which is the case it was fitted on.
+
+So the floor was made a floor in work instead, `min_block_work / w`, with `w` the
+weight of an atom pair of the group, the same expression the ordering of the
+blocks uses. Swept on fourteen threads over the molecules where the floor binds,
+warm, seconds, with the blocks in brackets.
+
+| min work | tagrisso def2-svp | tagrisso def2-qzvp | taxol def2-svp | taxol def2-qzvp |
+|---|---|---|---|---|
+| no division | 0.0005 (10) | 0.0010 (10) | 0.0006 (9) | 0.0017 (9) |
+| 73728 | 0.0006 (12) | 0.0013 (34) | 0.0007 (16) | 0.0015 (34) |
+| 36864 | 0.0007 (15) | 0.0013 (34) | 0.0008 (22) | 0.0015 (34) |
+| 18432 | 0.0006 (21) | 0.0012 (34) | 0.0007 (30) | 0.0015 (34) |
+| 9216 | 0.0007 (27) | 0.0013 (34) | 0.0010 (32) | 0.0016 (34) |
+| 4608 | 0.0009 (31) | 0.0013 (34) | 0.0011 (34) | 0.0016 (34) |
+| 2304 | 0.0007 (34) | 0.0012 (34) | 0.0008 (34) | 0.0015 (34) |
+
+Dividing them makes three of the four slower, at every one of the six settings,
+so the direction is not noise. Only taxol in def2-qzvp gains, and by about a
+tenth. The change was reverted.
+
+The premise was right and the conclusion does not follow from it. The small
+molecules are not merely prevented from dividing, they are not worth dividing: a
+call of half a millisecond cannot repay the cost a block carries, however the
+floor is expressed. The flat floor of 2048 atom pairs happens to produce the
+behaviour the sweep finds best for these molecules, for a reason which is not the
+one its comment gives.
+
+This is the second block sizing heuristic to lose to the flat rule, after the
+blocks sized to carry equal cost recorded above. Both were built on the same
+reasoning, that the work per atom pair differs by the atom bases and the blocks
+should follow it, and both were beaten by a constant. A third attempt should
+weigh that the cost a block carries is large enough that any heuristic which
+makes more blocks starts behind.
