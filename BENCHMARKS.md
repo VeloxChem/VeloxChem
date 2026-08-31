@@ -824,6 +824,10 @@ the blocks stay large, and that the floor is what protects it.
 
 ### Where the time goes, at two blocks per thread
 
+**Taken before the blocks were ordered by cost and before the check of the values
+blocks stopped forming its message on every call. The section on the ordered
+blocks at the end supersedes this table.**
+
 Warm, seconds. This supersedes the table of the previous section.
 
 | molecule | basis | nao | sparsity 1 thr | sparsity 14 thr | compute 1 thr | compute 14 thr | sparsity | compute |
@@ -867,3 +871,121 @@ streaming.
 
 The reconstruction is now much the largest part of the path. Crambin in def2-qzvp
 computes in 0.0076 seconds and reconstructs in 0.141, a factor of eighteen.
+
+## The blocks ordered by cost, and what Instruments found
+
+Two changes since the table above. The blocks are now visited from the most
+costly to the least, the cost of a block being its atom pairs times its
+combinations of basis functions each weighted by the square of the sum of the
+angular momenta it carries. And the check guarding the accessors of the values
+blocks now forms its message only where it fails, rather than concatenating three
+strings on each of the ten thousand calls a `compute` makes.
+
+### Where the time goes
+
+Warm, seconds, best of three after one cold call, each case in its own process.
+
+| molecule | basis | nao | sparsity 1 thr | sparsity 14 thr | compute 1 thr | compute 14 thr | sparsity | compute |
+|---|---|---|---|---|---|---|---|---|
+| tagrisso | def2-svp | 683 | 0.0008 | 0.0004 | 0.0011 | 0.0005 | 1.97x | 2.26x |
+| tagrisso | def2-tzvp | 1345 | 0.0008 | 0.0004 | 0.0016 | 0.0008 | 2.12x | 2.10x |
+| tagrisso | def2-qzvp | 3099 | 0.0010 | 0.0004 | 0.0030 | 0.0014 | 2.37x | 2.23x |
+| taxol | def2-svp | 1099 | 0.0008 | 0.0004 | 0.0012 | 0.0006 | 1.87x | 2.05x |
+| taxol | def2-tzvp | 2185 | 0.0008 | 0.0004 | 0.0020 | 0.0008 | 1.94x | 2.47x |
+| taxol | def2-qzvp | 4947 | 0.0010 | 0.0003 | 0.0048 | 0.0016 | 3.08x | 3.04x |
+| crambin | def2-svp | 6177 | 0.0035 | 0.0013 | 0.0074 | 0.0020 | 2.76x | 3.62x |
+| crambin | def2-tzvp | 12063 | 0.0037 | 0.0013 | 0.0145 | 0.0031 | 2.82x | 4.64x |
+| crambin | def2-qzvp | 28167 | 0.0041 | 0.0014 | 0.0394 | 0.0069 | 2.99x | 5.74x |
+| ubiquitin | def2-svp | 11577 | 0.0099 | 0.0032 | 0.0179 | 0.0044 | 3.15x | 4.09x |
+| ubiquitin | def2-tzvp | 22442 | 0.0101 | 0.0031 | 0.0323 | 0.0065 | 3.22x | 4.97x |
+| ubiquitin | def2-qzvp | 53197 | 0.0106 | 0.0032 | 0.0840 | 0.0144 | 3.27x | 5.85x |
+
+### Against the reference driver
+
+The same runs, warm, seconds, with the ratio of the reference to the driver.
+
+| molecule | basis | driver 1 thr | reference 1 thr | 1 thr | driver 14 thr | reference 14 thr | 14 thr |
+|---|---|---|---|---|---|---|---|
+| tagrisso | def2-svp | 0.0011 | 0.0012 | 1.10x | 0.0005 | 0.0004 | 0.92x |
+| tagrisso | def2-tzvp | 0.0016 | 0.0040 | 2.49x | 0.0008 | 0.0009 | 1.16x |
+| tagrisso | def2-qzvp | 0.0030 | 0.0194 | 6.45x | 0.0014 | 0.0031 | 2.32x |
+| taxol | def2-svp | 0.0012 | 0.0027 | 2.21x | 0.0006 | 0.0010 | 1.77x |
+| taxol | def2-tzvp | 0.0020 | 0.0091 | 4.48x | 0.0008 | 0.0017 | 2.08x |
+| taxol | def2-qzvp | 0.0048 | 0.0481 | 10.12x | 0.0016 | 0.0066 | 4.23x |
+| crambin | def2-svp | 0.0074 | 0.0933 | 12.57x | 0.0020 | 0.0124 | 6.03x |
+| crambin | def2-tzvp | 0.0145 | 0.3204 | 22.16x | 0.0031 | 0.0447 | 14.35x |
+| crambin | def2-qzvp | 0.0394 | 1.7118 | 43.44x | 0.0069 | 0.2042 | 29.76x |
+| ubiquitin | def2-svp | 0.0179 | 0.3375 | 18.83x | 0.0044 | 0.0465 | 10.59x |
+| ubiquitin | def2-tzvp | 0.0323 | 1.1237 | 34.79x | 0.0065 | 0.1357 | 20.89x |
+| ubiquitin | def2-qzvp | 0.0840 | too large |  | 0.0144 | too large |  |
+
+The driver is between 12 and 43 times the reference on a single thread and
+between 6 and 30 on fourteen, on the four large cases. Ubiquitin in def2-qzvp has
+no reference at all: 53197 basis functions are 21 gigabytes dense, which this
+machine cannot hold, against 0.87 gigabytes sparse computed in 0.0144 seconds.
+Tagrisso in def2-svp is the one loss on fourteen threads, at 0.92 times. It is
+half a millisecond of work and sits below the floor of 2048 atom pairs, so it is
+never divided into blocks at all.
+
+The scaling of the driver now rises with the size of the problem throughout,
+from 2.1 times on the smallest case to 5.9 times on the largest, which is the
+ordering the work predicts and which the earlier attempts at threading inverted.
+
+### What the ordering of the blocks buys
+
+Measured by flipping the ordering within one build, warm, so that nothing but the
+order differs.
+
+| molecule | basis | unordered | ordered | gain |
+|---|---|---|---|---|
+| crambin | def2-qzvp | 0.0079 | 0.0071 | 1.11x |
+| ubiquitin | def2-svp | 0.0046 | 0.0043 | 1.07x |
+| ubiquitin | def2-tzvp | 0.0075 | 0.0067 | 1.13x |
+| ubiquitin | def2-qzvp | 0.0165 | 0.0147 | 1.12x |
+
+The threads draw two or three blocks each, so a costly block drawn last is
+finished alone. Per thread instrumentation of the block loop, warm, gives the
+idle share of the threads and the ratio of the busiest thread to the mean:
+
+| case | idle, unordered | idle, ordered | imbalance |
+|---|---|---|---|
+| crambin def2-svp | 39.1% | 25.4% | 1.57 to 1.28 |
+| crambin def2-qzvp | 25.6% | 15.7% | 1.34 to 1.18 |
+| ubiquitin def2-svp | 28.1% | 23.5% | 1.36 to 1.27 |
+| ubiquitin def2-qzvp | 26.7% | 12.0% | 1.36 to 1.13 |
+
+### What Instruments says
+
+Recorded with `xctrace`, ubiquitin in def2-qzvp on fourteen threads.
+
+The System Trace, over eight `compute` calls, gives a mean concurrency of **9.0
+of the 14 threads**, so the machine is 64 percent used, with 51 percent of the
+window at twelve threads or more and 19 percent below two. The parallel regions
+reach the full width of the machine; what is left is the serial remainder around
+them, about 3.7 milliseconds of a 15 millisecond call.
+
+The Time Profiler puts `_simd_exp_d2` at the top of the self time at 4.0 percent,
+the kernels together at about 12, the allocator at about 5.5 across
+`_xzm_malloc_large_huge`, `_xzm_free`, `xzm_segment_group_free_chunk` and
+`malloc_type_aligned_alloc`, and the check of the values blocks at 1.0. The last
+of those is now fixed and is worth 1.021 times as the geometric mean of five
+cases, every one of them improving.
+
+The allocator share is the per block coordinates and solid harmonics, allocated
+and freed once per block, and it is the next thing worth attacking. It needs
+buffers carried across the blocks rather than a small fix.
+
+### What did not work
+
+| what was tried | result |
+|---|---|
+| blocks sized so that each carries the same cost, the atom pairs of a group scaled by the angular momenta of its atom bases | 0.98 times, and no exponent from zero to three of the momentum sum reached 1.05 |
+| the atom pairs of `to_dense` tiled, so that the writes of a tile fall in fewer rows | a loss at every tile size from 32 to 4096 |
+
+The equal cost sizing fails because it gives the most costly groups the smallest
+blocks, and those are the groups whose fixed cost per block, chiefly the solid
+harmonics formed to the sum of their angular momenta, is the largest. The tiling
+of `to_dense` fails because the scatter is already at the limit of the memory
+system for random access, 203 gigabytes per second of line traffic against the
+352 the machine reaches on a linear write, so there was no locality left to
+recover.
