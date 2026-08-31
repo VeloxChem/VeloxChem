@@ -64,30 +64,9 @@ CSimdKineticEnergyDriver::compute(const CMolecule &molecule, const CMolecularBas
 
     matrix.allocate();
 
-    _compute_pair_blocks(matrix, molecule, basis, basis);
+    _compute_pair_blocks(matrix, molecule, basis);
 
-    _compute_diagonal_blocks(matrix, molecule, basis, basis);
-
-    return matrix;
-}
-
-auto
-CSimdKineticEnergyDriver::compute(const CMolecule &molecule, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) const
-    -> CSparseMatrix
-{
-    auto matrix = CSparseMatrix(molecule, bra_basis, ket_basis, screener::kinetic_energy, _threshold, mat_t::general, diagstor::scalar);
-
-    // NOTE: the values blocks are not set to zero after they are allocated, as
-    // every value of every block is written below. A combination of basis
-    // functions reaching no atom pair holds no values, and a kernel writes the
-    // integrals of the atom pairs it reaches and zeros of the remaining ones, so
-    // no value is left with the undefined content of the allocation.
-
-    matrix.allocate();
-
-    _compute_pair_blocks(matrix, molecule, bra_basis, ket_basis);
-
-    _compute_diagonal_blocks(matrix, molecule, bra_basis, ket_basis);
+    _compute_diagonal_blocks(matrix, molecule, basis);
 
     return matrix;
 }
@@ -118,10 +97,8 @@ _index_functions(const CAtomBasis &basis) -> std::vector<std::pair<int, size_t>>
 }
 
 auto
-CSimdKineticEnergyDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
-                                         const CMolecule       &molecule,
-                                         const CMolecularBasis &bra_basis,
-                                         const CMolecularBasis &ket_basis) const -> void
+CSimdKineticEnergyDriver::_compute_pair_blocks(CSparseMatrix &matrix, const CMolecule &molecule, const CMolecularBasis &basis) const
+    -> void
 {
     // NOTE: the blocks are independent, as each of them forms its own coordinates
     // and solid harmonics and writes the values of its own combinations of basis
@@ -150,9 +127,9 @@ CSimdKineticEnergyDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
     {
         const auto &block = matrix.pair_block(static_cast<size_t>(iblk));
 
-        const auto a_indices = _index_functions(bra_basis.basis_set(block.bra_index()));
+        const auto a_indices = _index_functions(basis.basis_set(block.bra_index()));
 
-        const auto b_indices = _index_functions(ket_basis.basis_set(block.ket_index()));
+        const auto b_indices = _index_functions(basis.basis_set(block.ket_index()));
 
         double weight = 0.0;
 
@@ -187,9 +164,9 @@ CSimdKineticEnergyDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
 
         const auto coordinates = simdfunc::make_coordinates(block, molecule);
 
-        const auto &a_basis = bra_basis.basis_set(block.bra_index());
+        const auto &a_basis = basis.basis_set(block.bra_index());
 
-        const auto &b_basis = ket_basis.basis_set(block.ket_index());
+        const auto &b_basis = basis.basis_set(block.ket_index());
 
         // NOTE: the solid harmonics of the vectors between the atoms are created
         // once for the whole block, as all combinations of basis functions of the
@@ -240,10 +217,8 @@ CSimdKineticEnergyDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
 }
 
 auto
-CSimdKineticEnergyDriver::_compute_diagonal_blocks(CSparseMatrix         &matrix,
-                                             const CMolecule       &molecule,
-                                             const CMolecularBasis &bra_basis,
-                                             const CMolecularBasis &ket_basis) const -> void
+CSimdKineticEnergyDriver::_compute_diagonal_blocks(CSparseMatrix &matrix, const CMolecule &molecule, const CMolecularBasis &basis) const
+    -> void
 {
     // NOTE: the kinetic energy of two basis functions on the same atom does not
     // depend on the position of the atom, so a single value is stored for each
@@ -254,9 +229,9 @@ CSimdKineticEnergyDriver::_compute_diagonal_blocks(CSparseMatrix         &matrix
     {
         const auto &block = matrix.diagonal_block(iblk);
 
-        const auto &a_basis = bra_basis.basis_set(block.bra_index());
+        const auto &a_basis = basis.basis_set(block.bra_index());
 
-        const auto &b_basis = ket_basis.basis_set(block.ket_index());
+        const auto &b_basis = basis.basis_set(block.ket_index());
 
         const auto a_indices = _index_functions(a_basis);
 

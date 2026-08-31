@@ -59,13 +59,10 @@ class CSimdKineticEnergyDriver
     /// @return The symmetric sparse kinetic energy matrix.
     auto compute(const CMolecule &molecule, const CMolecularBasis &basis) const -> CSparseMatrix;
 
-    /// @brief Computes the kinetic energy matrix of a pair of molecular bases.
-    /// @param molecule The molecule to compute the kinetic energy matrix of.
-    /// @param bra_basis The molecular basis on bra side.
-    /// @param ket_basis The molecular basis on ket side.
-    /// @return The general sparse kinetic energy matrix.
-    auto compute(const CMolecule &molecule, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) const
-        -> CSparseMatrix;
+    // NOTE: there is no overload taking a pair of molecular bases. The kinetic
+    // energy of two basis functions of different molecular bases is not a
+    // quantity this driver is asked for, unlike their overlap, so the driver
+    // takes one molecular basis alone.
 
     /// @brief Gets screening threshold of the integrals.
     /// @return The screening threshold.
@@ -79,22 +76,14 @@ class CSimdKineticEnergyDriver
     /// @brief Computes the integrals of the off-diagonal blocks of a sparse matrix.
     /// @param matrix The sparse matrix to compute the integrals of.
     /// @param molecule The molecule to compute the integrals of.
-    /// @param bra_basis The molecular basis on bra side.
-    /// @param ket_basis The molecular basis on ket side.
-    auto _compute_pair_blocks(CSparseMatrix         &matrix,
-                              const CMolecule       &molecule,
-                              const CMolecularBasis &bra_basis,
-                              const CMolecularBasis &ket_basis) const -> void;
+    /// @param basis The molecular basis on bra and ket sides.
+    auto _compute_pair_blocks(CSparseMatrix &matrix, const CMolecule &molecule, const CMolecularBasis &basis) const -> void;
 
     /// @brief Computes the integrals of the diagonal blocks of a sparse matrix.
     /// @param matrix The sparse matrix to compute the integrals of.
     /// @param molecule The molecule to compute the integrals of.
-    /// @param bra_basis The molecular basis on bra side.
-    /// @param ket_basis The molecular basis on ket side.
-    auto _compute_diagonal_blocks(CSparseMatrix         &matrix,
-                                  const CMolecule       &molecule,
-                                  const CMolecularBasis &bra_basis,
-                                  const CMolecularBasis &ket_basis) const -> void;
+    /// @param basis The molecular basis on bra and ket sides.
+    auto _compute_diagonal_blocks(CSparseMatrix &matrix, const CMolecule &molecule, const CMolecularBasis &basis) const -> void;
 
     /// @brief The screening threshold of the integrals.
     double _threshold;
