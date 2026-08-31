@@ -1,0 +1,61 @@
+FORMAT 1
+KERNEL T
+SOURCE (s|S|s)
+SHELLS 1 1
+
+# E <id> <alpha> <beta> <mu> <p>
+E 0 0 0 1 -1
+E 1 0 0 2 -1
+E 2 0 0 3 -1
+
+# G <id> <2k> <L> <M>
+G 0 0 0 0
+G 1 0 2 0
+G 2 0 2 2
+G 3 2 0 0
+G 4 2 2 0
+G 5 2 2 2
+G 6 4 0 0
+G 7 0 2 -1
+G 8 2 2 -1
+G 9 0 2 -2
+G 10 2 2 -2
+G 11 0 2 1
+G 12 2 2 1
+
+# TABLE <l> <l'> <rows> [SYMMETRIC]
+# ROW <m> <m'> <terms>
+# T <prefactor> <num> <den> <radicand> <geometry>
+
+TABLE 1 1 6 SYMMETRIC
+ROW -1 -1 7
+T 0  5 2 1  0
+T 1  7 3 1  1
+T 1  7 3 3  2
+T 1  -10 3 1  3
+T 2  -2 3 1  4
+T 2  -2 3 3  5
+T 2  2 3 1  6
+ROW -1 0 2
+T 1  -7 3 3  7
+T 2  2 3 3  8
+ROW -1 1 2
+T 1  -7 3 3  9
+T 2  2 3 3  10
+ROW 0 0 5
+T 0  5 2 1  0
+T 1  -14 3 1  1
+T 1  -10 3 1  3
+T 2  4 3 1  4
+T 2  2 3 1  6
+ROW 0 1 2
+T 1  -7 3 3  11
+T 2  2 3 3  12
+ROW 1 1 7
+T 0  5 2 1  0
+T 1  7 3 1  1
+T 1  -7 3 3  2
+T 1  -10 3 1  3
+T 2  -2 3 1  4
+T 2  2 3 3  5
+T 2  2 3 1  6

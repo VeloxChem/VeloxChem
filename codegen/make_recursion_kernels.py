@@ -1,5 +1,9 @@
-"""Emits a kinetic energy kernel of two basis functions of non-zero angular
-momentum from the recursion data."""
+"""Emits an overlap or kinetic energy kernel of two basis functions of non-zero
+angular momentum from the recursion data.
+
+The two kernels share the format of the data and the shape of the generated code,
+and differ only in the name they are given, the namespace they sit in and the
+bound they screen the pairs of primitives with, so one generator emits both."""
 import io
 import os
 from fractions import Fraction as F
@@ -9,11 +13,23 @@ from fractions import Fraction as F
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "src") + "/"
 
-DST = os.path.join(SRC, "simd_t2c_kinetic_energy") + "/"
+# NOTE: the destination and the file the licence is taken from follow the kernel.
 LIC = io.open(SRC + 'simd_t2c_overlap/SimdOverlapRecSS.cpp').read().split('#include "SimdOverlapRecSS.hpp"')[0]
 LIC_H = io.open(SRC + 'simd_t2c_overlap/SimdOverlapRecSS.hpp').read().split('#ifndef')[0]
 
 LET = {0:'s',1:'p',2:'d',3:'f',4:'g',5:'h',6:'i'}
+
+# NOTE: what distinguishes the two kernels. The data of both is read the same way
+# and the code of both has the same shape.
+KERNELS = {
+    "S": dict(word="overlap", ns="simdovl", dir="simd_t2c_overlap", stem="SimdOverlapRec",
+              func="{name}_overlap", header="SimdOverlapFunc",
+              bound="screenfunc::two_center_overlap_primitive_bound"),
+    "T": dict(word="kinetic energy", ns="simdkin", dir="simd_t2c_kinetic_energy",
+              stem="SimdKineticEnergyRec", func="{name}_kinetic_energy",
+              header="SimdKineticEnergyFunc",
+              bound="screenfunc::two_center_kinetic_energy_primitive_bound"),
+}
 WORD = {0:'zero',1:'one',2:'two',3:'three',4:'four',5:'five',6:'six'}
 # NOTE: a loop is grouped so that the values it loads, the prefactors and the
 # harmonics and the powers of the squared distance together, stay within the
@@ -24,13 +40,14 @@ LOAD_BUDGET = 18
 
 
 def parse(path):
-    la = lb = None; sym = False
+    la = lb = None; sym = False; kernel = 'T'
     E, G, rows = [], [], []
     cur = None
     for line in io.open(path):
         t = line.split()
         if not t or t[0].startswith('#'): continue
-        if t[0] == 'SHELLS': la, lb = int(t[1]), int(t[2])
+        if t[0] == 'KERNEL': kernel = t[1]
+        elif t[0] == 'SHELLS': la, lb = int(t[1]), int(t[2])
         elif t[0] == 'E': E.append(tuple(int(v) for v in t[2:6]))       # a b mu p
         elif t[0] == 'G': G.append(tuple(int(v) for v in t[2:5]))       # 2k L M
         elif t[0] == 'TABLE': sym = (len(t) > 4 and t[4] == 'SYMMETRIC')
@@ -39,7 +56,7 @@ def parse(path):
             rows.append(cur)
         elif t[0] == 'T':
             cur[2].append((int(t[1]), int(t[2]), int(t[3]), int(t[4]), int(t[5])))  # e num den rad g
-    return la, lb, sym, E, G, rows
+    return la, lb, sym, E, G, rows, kernel
 
 
 def mname(m):
@@ -62,8 +79,11 @@ def clit(num, den, rad):
 
 
 def emit(path):
-    la, lb, sym, E, G, rows = parse(path)
+    la, lb, sym, E, G, rows, kernel = parse(path)
+    K = KERNELS[kernel]
     name = LET[la] + LET[lb]; up = name.upper()
+    DST = os.path.join(SRC, K["dir"]) + "/"
+    fn = K["func"].format(name=name)
     na, nb = 2 * la + 1, 2 * lb + 1
     nslots = na * nb
     lmax = max((g[1] for g in G), default=0)
@@ -78,8 +98,11 @@ def emit(path):
         for e, num, den, rad, g in terms:
             coeffs[cname(num, den, rad)] = clit(num, den, rad)
 
-    ind = ' ' * (len(name) + 25)
-    sig = (f"compute_{name}_kinetic_energy(double                         *values,\n"
+    # NOTE: the indent is the one the kinetic energy kernels in the repository
+    # carry, so that regenerating them reproduces them exactly. The overlap
+    # kernels came from another generator and are indented one space less.
+    ind = ' ' * (len(fn) + 10)
+    sig = (f"compute_{fn}(double                         *values,\n"
            f"{ind}const size_t                    nvalues,\n"
            f"{ind}const CBasisFunction           &bra,\n"
            f"{ind}const CBasisFunction           &ket,\n"
@@ -87,22 +110,22 @@ def emit(path):
            f"{ind}const CSimdMatrix              &coordinates,\n"
            f"{ind}const double                    threshold) -> void")
 
-    s = LIC + f'#include "SimdKineticEnergyRec{up}.hpp"\n\n'
+    s = LIC + f'#include "{K["stem"]}{up}.hpp"\n\n'
     s += "#include <algorithm>\n#include <ranges>\n#include <cmath>\n#include <string>\n\n"
     s += ('#include "ErrorHandler.hpp"\n#include "MathConst.hpp"\n#include "ScreeningFunc.hpp"\n'
           '#include "SimdAlign.hpp"\n#include "SimdDimensions.hpp"\n\n')
-    s += "namespace simdkin {  // simdkin namespace\n\nauto\n" + sig + "\n{\n"
+    s += f'namespace {K["ns"]} {{  // {K["ns"]} namespace\n\nauto\n' + sig + "\n{\n"
     s += (f'    if ((bra.get_angular_momentum() != {la}) || (ket.get_angular_momentum() != {lb}))\n    {{\n'
           '        errors::assertMsgCritical(\n'
-          f'            false, std::string("SimdKineticEnergyFunc.compute_{name}_kinetic_energy: '
+          f'            false, std::string("{K["header"]}.compute_{fn}: '
           f'Basis functions must be of angular momenta {WORD[la]} and {WORD[lb]}"));\n    }}\n\n')
     s += (f'    if (harmonics.size() < {lmax})\n    {{\n'
           '        errors::assertMsgCritical(\n'
-          f'            false, std::string("SimdKineticEnergyFunc.compute_{name}_kinetic_energy: '
+          f'            false, std::string("{K["header"]}.compute_{fn}: '
           f'Harmonics must reach angular momentum {WORD.get(lmax, str(lmax))}"));\n    }}\n\n')
     s += ('    if (nvalues > coordinates.number_of_columns())\n    {\n'
           '        errors::assertMsgCritical(\n'
-          f'            false, std::string("SimdKineticEnergyFunc.compute_{name}_kinetic_energy: '
+          f'            false, std::string("{K["header"]}.compute_{fn}: '
           'Number of values exceeds number of atom pairs"));\n    }\n\n')
     s += "    if (nvalues == 0) return;\n\n"
     s += ("    const auto &a_exps = bra.exponents();\n\n    const auto &b_exps = ket.exponents();\n\n"
@@ -114,7 +137,7 @@ def emit(path):
           "    // integrals divided by their number, as their contributions accumulate into\n"
           "    // a single value and the error of the sum is bounded by the number of terms.\n\n"
           "    const auto dimensions = simdfunc::make_column_dimensions(\n"
-          "        bra, ket, nvalues, coordinates, screenfunc::two_center_kinetic_energy_primitive_bound,\n"
+          f'        bra, ket, nvalues, coordinates, {K["bound"]},\n'
           "        threshold / static_cast<double>(nprims));\n\n")
     s += ("    // NOTE: the buffer spans the atom pairs reached by the pair of primitives\n"
           "    // reaching furthest, which is searched for rather than assumed. The\n"
@@ -247,12 +270,12 @@ def emit(path):
     s += (f"    for (size_t n = 0; n < {nslots}; n++)\n    {{\n"
           "        if (sources[n] != n) std::copy(values + sources[n] * nvalues, values + sources[n] * nvalues + nmax, values + n * nvalues);\n\n"
           "        std::fill(values + n * nvalues + nmax, values + (n + 1) * nvalues, 0.0);\n    }\n")
-    s += "}\n\n}  // namespace simdkin\n"
+    s += f'}}\n\n}}  // namespace {K["ns"]}\n'
 
-    h = LIC_H + f"#ifndef SimdKineticEnergyRec{up}_hpp\n#define SimdKineticEnergyRec{up}_hpp\n\n"
+    h = LIC_H + f'#ifndef {K["stem"]}{up}_hpp\n#define {K["stem"]}{up}_hpp\n\n'
     h += "#include <cstddef>\n#include <vector>\n\n"
-    h += '#include "BasisFunction.hpp"\n#include "SimdMatrix.hpp"\n\nnamespace simdkin {  // simdkin namespace\n\n'
-    h += (f"/// @brief Computes the kinetic energy integrals of the basis functions of angular\n"
+    h += f'#include "BasisFunction.hpp"\n#include "SimdMatrix.hpp"\n\nnamespace {K["ns"]} {{  // {K["ns"]} namespace\n\n'
+    h += (f'/// @brief Computes the {K["word"]} integrals of the basis functions of angular\n'
           f"/// momenta {WORD[la]} and {WORD[lb]} over the atom pairs of a block.\n"
           "/// @param values The values of the combination of basis functions to compute.\n"
           "/// @param nvalues The number of atom pairs the combination reaches.\n"
@@ -261,17 +284,21 @@ def emit(path):
           f"/// @param harmonics The solid harmonics of the vectors between the atoms, to angular momentum {lmax}.\n"
           "/// @param coordinates The coordinates of the atom pairs.\n"
           "/// @param threshold The screening threshold of the integrals.\n")
-    h += f"auto {sig};\n\n}}  // namespace simdkin\n\n#endif /* SimdKineticEnergyRec{up}_hpp */\n"
-    return up, s, h
+    h += f'auto {sig};\n\n}}  // namespace {K["ns"]}\n\n#endif /* {K["stem"]}{up}_hpp */\n'
+    return up, s, h, K
 
 
 if __name__ == "__main__":
     import sys
 
     # the directory holding the kinetic_harmonics_*.txt recursion data
-    DATA = os.environ.get("KINETIC_DATA", os.path.expanduser("~/Downloads"))
+    # the recursion data ships with the repository
+    DATA = os.environ.get("RECURSION_DATA", os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"))
+    KIND = os.environ.get("RECURSION_KIND", "kinetic")
     for tag in sys.argv[1:]:
-        up, cpp, hpp = emit(os.path.join(DATA, f"kinetic_harmonics_{tag}.txt"))
-        io.open(DST + f'SimdKineticEnergyRec{up}.cpp', 'w').write(cpp)
-        io.open(DST + f'SimdKineticEnergyRec{up}.hpp', 'w').write(hpp)
-        print(f"wrote SimdKineticEnergyRec{up}.cpp, {len(cpp.splitlines())} lines")
+        path = os.path.join(DATA, f"{KIND}_harmonics_{tag}.txt")
+        up, cpp, hpp, K = emit(path)
+        dst = os.path.join(SRC, K["dir"]) + "/"
+        io.open(dst + f'{K["stem"]}{up}.cpp', 'w').write(cpp)
+        io.open(dst + f'{K["stem"]}{up}.hpp', 'w').write(hpp)
+        print(f'wrote {K["stem"]}{up}.cpp, {len(cpp.splitlines())} lines')
