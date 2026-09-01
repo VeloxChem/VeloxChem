@@ -2448,6 +2448,19 @@ class RedoxCalculator:
             _status("[%s] Conformer search produced no molecules; using input geometry.", label)
             return input_data
 
+        if len(molecules) == 1:
+            only_mol = molecules[0]
+            only_mol.set_charge(charge)
+            only_mol.set_multiplicity(multiplicity)
+
+            _status(
+                "[%s] Conformer search produced 1 molecule; skipping SMD SCF ranking.",
+                label,
+            )
+
+            _barrier()
+            return only_mol
+
         _status(
             "[%s] Conformer search produced %d molecule(s); ranking up to %d.",
             label,
