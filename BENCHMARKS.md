@@ -1608,60 +1608,155 @@ included: its dense matrix for jkfit peaks at 15.9 gigabytes resident, not the
 
 | molecule | basis | nao | lmax | packed GB | compute 1 thr | compute 14 thr | scaling | reference 14 thr | against it |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| tagrisso | jfit | 2176 | 4 | 0.02 | 0.0064 | 0.0014 | 4.75x | 0.0024 | 1.77x |
-| tagrisso | jkfit | 3387 | 4 | 0.04 | 0.0134 | 0.0028 | 4.81x | 0.0040 | 1.43x |
-| taxol | jfit | 3528 | 4 | 0.05 | 0.0167 | 0.0031 | 5.33x | 0.0048 | 1.54x |
-| taxol | jkfit | 5489 | 4 | 0.11 | 0.0363 | 0.0067 | 5.39x | 0.0088 | 1.31x |
-| crambin | jfit | 19500 | 4 | 1.42 | 0.5801 | 0.0999 | 5.81x | 0.1234 | 1.24x |
-| crambin | jkfit | 30751 | 4 | 3.52 | 1.4760 | 0.2900 | 5.09x | 0.2543 | 0.88x |
-| ubiquitin | jfit | 36419 | 4 | 4.94 | 2.2367 | 0.5995 | 3.73x | 0.4098 | 0.68x |
-| ubiquitin | jkfit | 56971 | 4 | 12.09 | 5.6014 | 1.6366 | 3.42x | 0.8483 | 0.52x |
+| tagrisso | jfit | 2176 | 4 | 0.02 | 0.0063 | 0.0013 | 4.83x | 0.0024 | 1.83x |
+| tagrisso | jkfit | 3387 | 4 | 0.04 | 0.0137 | 0.0025 | 5.53x | 0.0040 | 1.61x |
+| taxol | jfit | 3528 | 4 | 0.05 | 0.0168 | 0.0027 | 6.15x | 0.0048 | 1.76x |
+| taxol | jkfit | 5489 | 4 | 0.11 | 0.0363 | 0.0060 | 6.06x | 0.0088 | 1.47x |
+| crambin | jfit | 19500 | 4 | 1.42 | 0.5864 | 0.0717 | 8.18x | 0.1234 | 1.72x |
+| crambin | jkfit | 30751 | 4 | 3.52 | 1.4821 | 0.1572 | 9.43x | 0.2543 | 1.62x |
+| ubiquitin | jfit | 36419 | 4 | 4.94 | 2.2069 | 0.3166 | 6.97x | 0.4098 | 1.29x |
+| ubiquitin | jkfit | 56971 | 4 | 12.09 | 5.5086 | 0.7383 | 7.46x | 0.8483 | 1.15x |
 
 The values were checked against the reference on tagrisso and taxol in both sets
 while the timings were taken: the largest deviation is 6.1e-13 on elements
 reaching 92.7, which is 6.6e-15 relative.
 
-### A third of ubiquitin is the allocation
+### The allocation was a third of ubiquitin
 
-The scaling falls from 5.8 times on crambin in jfit to 3.7 on ubiquitin, and the
-driver loses more ground to the reference the larger the molecule gets. Neither
-of those is the integrals. `CPackedMatrix` allocates its values as
+The first version of this driver scaled to 5.8 times on crambin in jfit but only
+3.7 on ubiquitin, and lost more ground to the reference the larger the molecule
+got. Neither was the integrals. `CPackedMatrix` allocated its values with
 `_values.resize(n, 0.0)`, a single serial zero fill of the whole triangle, and
-`compute` pays it on every call.
+`compute` paid it on every call: a tenth of the call up to crambin and **a third
+of it on ubiquitin**, at 23 gigabytes per second, which is one core writing at the
+bandwidth of the memory.
 
-Timed on its own, warm, seconds. The allocation column is the construction of the
-packed matrix alone; the integrals columns are `compute` with it subtracted.
+The values are now allocated without being value initialized, through a
+default-init allocator, and zeroed by the threads with the chunked `zero()` the
+class already had. The fill cannot be dropped altogether: the off-diagonal blocks
+write every element they own, but the diagonal atom blocks do not, as the
+one-center integral is diagonal in the angular components and the elements of two
+differing momenta or components are left at the zero the matrix was constructed
+with.
 
-| molecule | basis | packed GB | allocation | compute 14 thr | share | integrals 1 thr | integrals 14 thr | integrals scaling |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| tagrisso | jfit | 0.02 | 0.0001 | 0.0014 | 10% | 0.0063 | 0.0012 | 5.18x |
-| tagrisso | jkfit | 0.04 | 0.0003 | 0.0028 | 12% | 0.0131 | 0.0024 | 5.33x |
-| taxol | jfit | 0.05 | 0.0004 | 0.0031 | 12% | 0.0163 | 0.0028 | 5.90x |
-| taxol | jkfit | 0.11 | 0.0009 | 0.0067 | 13% | 0.0355 | 0.0058 | 6.07x |
-| crambin | jfit | 1.42 | 0.0108 | 0.0999 | 11% | 0.5693 | 0.0891 | 6.39x |
-| crambin | jkfit | 3.52 | 0.0269 | 0.2900 | 9% | 1.4490 | 0.2631 | 5.51x |
-| ubiquitin | jfit | 4.94 | 0.2149 | 0.5995 | 36% | 2.0247 | 0.3846 | 5.26x |
-| ubiquitin | jkfit | 12.09 | 0.5210 | 1.6366 | 32% | 5.0782 | 1.1156 | 4.55x |
+Seconds, fourteen threads, the construction of the packed matrix alone.
 
-The allocation is a tenth of `compute` up to crambin and **a third of it on
-ubiquitin**, and it does not thread at all: 0.2120 seconds on one thread against
-0.2149 on fourteen for jfit, 0.5233 against 0.5210 for jkfit. Both work out at
-23 gigabytes per second, which is a serial write at the bandwidth of the memory
-and not something the driver is doing wrong within itself.
+| molecule | basis | packed GB | serial fill | threaded fill | gain |
+|---|---|---|---|---|---|
+| taxol | jkfit | 0.11 | 0.0009 | 0.0003 | 2.95x |
+| crambin | jfit | 1.42 | 0.0108 | 0.0038 | 2.82x |
+| crambin | jkfit | 3.52 | 0.0269 | 0.0094 | 2.87x |
+| ubiquitin | jfit | 4.94 | 0.2149 | 0.0734 | 2.93x |
+| ubiquitin | jkfit | 12.09 | 0.5210 | 0.1862 | 2.80x |
 
-Subtracting it recovers most of the scaling. Ubiquitin in jfit goes from 3.73 to
-5.26 times and in jkfit from 3.42 to 4.55, which puts it back in line with
-crambin rather than looking like a collapse. What is left of the gap is Amdahl's
-law on a serial third.
+The fill is the one part of this driver which is purely bandwidth bound, and it
+shows: it saturates at 1.48 times on crambin and 2.84 on ubiquitin whatever the
+threads, where the integrals reach seven to ten. That contrast is what settles
+whether anything else here is memory bound, and nothing else is.
 
-Removing the fill is not free, and this note does not claim it is. The
-off-diagonal blocks do write every element they own, but the diagonal atom blocks
-do not: the one-center integral is diagonal in the angular components, so the
-elements of two differing angular momenta and of two differing components are
-left at the zero the matrix was constructed with, which
-`SimdTwoCenterElectronRepulsionDriver.cpp:270` states as the reason. Dropping the
-fill means writing those zeros explicitly, and threading it means threading them
-too. What is measured here is only where the time goes.
+### The blocks were one to two orders of magnitude too large
+
+`block_size` was `max(npairs / (blocks_per_thread * nthreads), min_block_size)`
+with `blocks_per_thread` at the two inherited from the sparse matrix. On fourteen
+threads that is 7348 atom pairs a block for crambin and 27038 for ubiquitin. The
+right size is between one and three hundred.
+
+A block of the screened path carries the bisection of the screening and is worth
+making large. A block here is cheap to start, so a large molecule is better
+divided into many small blocks: the dynamic loop then has enough of them to even
+out the ones which differ in cost, and each of them keeps its Boys function and
+its buffer in the cache. The size is now capped by `max_block_size`, 256, which
+is a ceiling on the block rather than a count of blocks and so does not move with
+the threads.
+
+Milliseconds, fourteen threads, best of three, against the block size the setting
+produces.
+
+| block size | crambin jfit | crambin jkfit | ubiquitin jkfit |
+|---|---|---|---|
+| 7348 / 27038, the old value | 96.15 | 271.30 | 1252.54 |
+| 918 / 3379 | 75.62 | 194.64 | 1003.15 |
+| 306 / 1126 | 72.85 | 158.97 | 875.34 |
+| 153 / 563 | 74.02 | 158.04 | 797.35 |
+| 128 / 422 | 74.55 | 161.57 | 776.70 |
+| 128 / 211 | 75.66 | 160.25 | 730.84 |
+| 128 / 128 | 74.50 | 160.77 | 718.92 |
+
+The time is flat below about three hundred and rises steeply above it, so the
+exact value matters little and the ceiling is taken inside the flat range rather
+than at the floor, to keep a molecule between the two from being divided more
+finely than it repays. The sweep ran from one to five hundred and twelve blocks
+per thread, rebuilding for each, and the table is the resulting block size because
+that, not the count, is what the timings follow.
+
+The parallel scaling is what moved. Speedup of `compute` against one thread.
+
+| case | 1 thr | 2 thr | 4 thr | 6 thr | 8 thr | 10 thr | 12 thr | 14 thr |
+|---|---|---|---|---|---|---|---|---|
+| crambin jfit, before | 1.00x | 1.69x | 3.00x | 3.17x | 4.72x | 4.82x | 5.72x | 5.96x |
+| crambin jfit, after | 1.00x | 1.97x | 3.60x | 5.16x | 6.65x | 7.93x | 8.11x | 8.23x |
+| crambin jkfit, before | 1.00x | 1.57x | 2.87x | 3.19x | 4.54x | 4.60x | 5.18x | 5.39x |
+| crambin jkfit, after | 1.00x | 2.23x | 4.15x | 5.92x | 7.49x | 8.88x | 9.17x | 9.83x |
+| ubiquitin jkfit, before | 1.00x | 1.55x | 2.61x | 3.05x | 3.41x | 4.05x | 4.28x | 4.31x |
+| ubiquitin jkfit, after | 1.00x | 2.04x | 3.76x | 5.03x | 6.24x | 7.24x | 7.37x | 7.39x |
+
+Crambin in jkfit at **9.83 times** is the best scaling in these notes, ahead of
+the 8.85 of the kinetic energy. The plateau from four to six threads which the
+old setting showed on every one of the three cases, and which the kinetic energy
+did not show on the same machine, was the block decomposition and is gone.
+
+The single threaded column is untouched by any of this: `make_block_size` returns
+zero below two threads and the groups are then left undivided, so no setting of
+either bound can reach it.
+
+### Where the time goes, and what the profile got wrong
+
+Time Profiler on crambin in jkfit, restricted to the samples inside the driver.
+
+| phase | one thread | fourteen threads |
+|---|---|---|
+| the kernels, about twenty of them | 47.7% | 61.0% |
+| `compute_boys_function` itself | 19.7% | 16.3% |
+| `exp` from libm, called by it | 19.4% | 10.1% |
+| memmove and bzero | 5.3% | 3.1% |
+| the scatter into the packed matrix | 1.2% | 0.6% |
+| the coordinates and the solid harmonics | 0.2% | 0.1% |
+
+The kernel share has no hotspot, the largest single kernel being 3.5 per cent and
+the rest tailing off evenly, so anything done there is a change to the generator
+and not to one file.
+
+**The sampling overstates `exp` by about a factor of two, and acting on it would
+have been a mistake.** Building with the call replaced by a cheap expression
+measures its cost directly, and it is 11 per cent of the driver on one thread and
+**2 per cent on fourteen**: crambin in jkfit goes from 1.4688 to 1.3076 seconds on
+one thread and from 0.2665 to 0.2600 on fourteen, and ubiquitin in jkfit shows no
+gain at fourteen at all. The Boys function is the second largest symbol in the
+profile and very nearly free at the thread count the driver is used with.
+
+Two things were tried against it and rejected on measurement:
+
+The exponential is not evaluated where it underflows, `exp(-745.2)` being already
+zero in double precision, which is 27 per cent of the arguments on crambin and 35
+on ubiquitin. It is worth 0.18 nanoseconds of a 4.67 nanosecond point, because
+libm already returns quickly for a large negative argument, so about 0.7 per cent
+on crambin. It was implemented, measured and reverted rather than kept for the
+extra branch.
+
+`CSimdVariableMatrix` is sharply sensitive to the stride between the blocks a row
+is spread over: at order eight a micro-benchmark runs at 26 million points a
+second with 4096 columns and 81 million with 4032, a threefold swing from cache
+set conflicts between the order and one streams. The driver does not reach it. The
+byte stride is `nprims * pitch_of(npairs) * 8` and lands on a multiple of 4096 for
+0.2 per cent of the kernel calls of crambin and 4 per cent of ubiquitin, the large
+blocks giving `pitch_of(7348) = 2^6 * 919` and `pitch_of(27038) = 2^8 * 845`. At
+the real block sizes the Boys function runs at 7.10 to 7.69 nanoseconds a point
+against 7.37 for a small in cache case, and 9.59 to 9.91 for the power of two
+geometries. No padding was added.
+
+The cost of the Boys function itself is 2.65 nanoseconds fixed and 0.61 for each
+order, in cache, so the recursion is about two thirds of it at order eight and the
+exponential and the table the rest.
 
 ### The block floor of the screened path is wrong here
 
@@ -1716,12 +1811,20 @@ already under two milliseconds, and the ones it loses are the ones whose cost is
 worth anything. A first pass with three repeats had chosen sixty four, which four
 of these six cases do not support.
 
-The floor binds for the small molecules alone. Crambin asks for blocks of 7348
-atom pairs of its own accord, so no floor below that can reach it, and measuring
-it confirmed as much: 0.1096 seconds at two thousand and forty eight against
-0.1079 at sixty four, thirty seven blocks either way.
+The floor binds for the small molecules alone. Crambin asked for blocks of 7348
+atom pairs of its own accord at the time, so no floor below that could reach it,
+and measuring it confirmed as much: 0.1096 seconds at two thousand and forty eight
+against 0.1079 at sixty four, thirty seven blocks either way.
 
-`blocks_per_thread` is still the two of the sparse matrix and has not been swept.
+Both of these subsections describe the driver before the ceiling of the section
+above existed, and the sentence they end on is the reason it does. A large
+molecule was asking for blocks two orders of magnitude larger than it wanted, and
+the floor could say nothing about that because a floor only ever raises. The
+measurements themselves stand: the floor is what decides the small molecules and
+the ceiling what decides the large ones, and between them lies a band of a factor
+of two. On fourteen threads tagrisso is held at the floor of 128, taxol asks for
+214 of its own accord and gets it, and crambin and ubiquitin ask for 7348 and
+27038 and are held at the ceiling of 256.
 
 ### A trap in timing the reference
 
@@ -1736,28 +1839,50 @@ the trap and were not measured again.
 
 ### What these numbers say
 
-The driver is 1.3 to 1.8 times faster than the reference on tagrisso and taxol in
-both sets and 1.24 times on crambin in jfit, and then loses: **12 per cent
-slower** on crambin in jkfit, 32 per cent on ubiquitin in jfit and 48 per cent on
-ubiquitin in jkfit. The loss grows monotonically with the size of the matrix, and
-a third of it on the two ubiquitin cases is the serial zero fill of the section
-above rather than the integrals.
+The driver beats the reference everywhere, from **1.15 times** on ubiquitin in
+jkfit to **1.83** on tagrisso in jfit. It did not at first: crambin in jkfit was
+12 per cent slower and ubiquitin in jkfit 48 per cent, and the loss grew
+monotonically with the size of the matrix. Two changes closed it, and the largest
+case more than halved, 1.6366 seconds to 0.7383.
 
-The margin is nothing like the 30 to 75 times the overlap and the kinetic energy
-reach, and that is expected rather than a defect. Almost all of the earlier win
-came from screening the work away, and there is nothing to screen here. What is
-left is the efficiency of the kernels alone.
+| molecule | basis | first version | now | gain | against the reference, then and now |
+|---|---|---|---|---|---|
+| tagrisso | jfit | 0.0014 | 0.0013 | 1.04x | 1.77x → 1.83x |
+| tagrisso | jkfit | 0.0028 | 0.0025 | 1.13x | 1.43x → 1.61x |
+| taxol | jfit | 0.0031 | 0.0027 | 1.14x | 1.54x → 1.76x |
+| taxol | jkfit | 0.0067 | 0.0060 | 1.12x | 1.31x → 1.47x |
+| crambin | jfit | 0.0999 | 0.0717 | 1.39x | 1.24x → 1.72x |
+| crambin | jkfit | 0.2900 | 0.1572 | 1.85x | 0.88x → 1.62x |
+| ubiquitin | jfit | 0.5995 | 0.3166 | 1.89x | 0.68x → 1.29x |
+| ubiquitin | jkfit | 1.6366 | 0.7383 | 2.22x | 0.52x → 1.15x |
 
-Two things move the driver against the reference and they compound. One is
-angular momentum: the same molecule is better in jfit than in jkfit at every
-size, and jkfit is the set which carries more of the high momenta. The kernels of
-two non-zero angular momenta are the closed form expansions, and they grow
-quickly with the momenta, (h|J|i) alone holding 2909 terms, where the reference
-walks a recursion. The other is the size of the matrix, through the allocation,
-and that one is not the kernels at all.
+**Neither change was in the integrals.** One was the zero fill of the packed
+matrix, which is memory and not arithmetic, and the other the size of a block,
+which is scheduling. The kernels are 61 per cent of the driver on fourteen
+threads and were not touched. The line of attack this session first proposed, the
+exponential of the Boys function, was measured at 2 per cent of the driver at
+that thread count and abandoned. On crambin in jkfit the two changes which were
+made save 0.1328 seconds where removing the exponential outright saves 0.0065,
+twenty times as much, and on ubiquitin the exponential is worth nothing
+measurable at all.
 
-Where the time actually goes between `compute_boys_function` and the combine
-loops has still not been measured, and it is the thread to pull next.
-`blocks_per_thread` is still the two of the sparse matrix and has not been swept,
-and neither has the parallel scaling beyond one and fourteen threads for this
-driver.
+The margin over the reference is still nothing like the 30 to 75 times the
+overlap and the kinetic energy reach, and that is expected rather than a defect.
+Almost all of their win comes from screening the work away, and there is nothing
+to screen here. What is left is the efficiency of the kernels alone, and on that
+footing 1.15 to 1.83 times is the honest measure of them.
+
+Angular momentum still moves the driver against the reference, though it no longer
+decides a win from a loss: jkfit is worse than jfit for the same molecule at every
+size, and jkfit is the set carrying more of the high momenta. The kernels of two
+non-zero angular momenta are the closed form expansions and grow quickly with the
+momenta, (h|J|i) alone holding 2909 terms, where the reference walks a recursion.
+Size moves it too, and what is left of that after the threaded fill has not been
+run down.
+
+What is left to try is the kernels themselves, which means the generator: they are
+61 per cent of the time, spread evenly over about twenty of them with no hotspot,
+and they are not memory bound, since the integrals scale to seven and ten times
+where the zero fill of the same data saturates at 1.5 and 2.8. The ceiling and the
+floor on the block size meet within a factor of two of each other and the timings
+are flat between them, so there is nothing more to win there.
