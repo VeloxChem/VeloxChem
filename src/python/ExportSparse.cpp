@@ -326,7 +326,7 @@ export_sparse(py::module &m) -> void
             "pair_block_to_numpy",
             [](const CSparseMatrix &self, const size_t index) -> py::array_t<double> {
                 return vlx_general::pointer_to_numpy(self.pair_values(index),
-                                                     {static_cast<int>(self.pair_block(index).number_of_elements())});
+                                                     {static_cast<py::ssize_t>(self.pair_block(index).number_of_elements())});
             },
             "Gets copy of the values of the off-diagonal block. The copy may be large.",
             py::arg("index"))
@@ -334,7 +334,7 @@ export_sparse(py::module &m) -> void
             "diagonal_block_to_numpy",
             [](const CSparseMatrix &self, const size_t index) -> py::array_t<double> {
                 return vlx_general::pointer_to_numpy(self.diagonal_values(index),
-                                                     {static_cast<int>(self.diagonal_block(index).number_of_elements())});
+                                                     {static_cast<py::ssize_t>(self.diagonal_block(index).number_of_elements())});
             },
             "Gets copy of the values of the diagonal block. The copy may be large.",
             py::arg("index"))
@@ -418,7 +418,7 @@ export_sparse(py::module &m) -> void
         .def(
             "block_to_numpy",
             [](const CSparseTensor &self, const size_t index) -> py::array_t<double> {
-                return vlx_general::pointer_to_numpy(self.values(index), {static_cast<int>(self.block(index).number_of_elements())});
+                return vlx_general::pointer_to_numpy(self.values(index), {static_cast<py::ssize_t>(self.block(index).number_of_elements())});
             },
             "Gets copy of the values of the block. The copy may be large.",
             py::arg("index"));

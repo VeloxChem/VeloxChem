@@ -60,22 +60,22 @@ namespace vlx_general {
 // Gets shape and strides from dimension
 
 static auto
-get_shape_and_strides(const std::vector<int>& dimension) -> std::tuple<std::vector<py::ssize_t>, std::vector<py::ssize_t>>
+get_shape_and_strides(const std::vector<py::ssize_t>& dimension) -> std::tuple<std::vector<py::ssize_t>, std::vector<py::ssize_t>>
 {
     std::vector<py::ssize_t> shape, strides;
 
     for (size_t i = 0; i < dimension.size(); i++)
     {
-        shape.push_back(static_cast<py::ssize_t>(dimension[i]));
+        shape.push_back(dimension[i]);
 
-        size_t strd = 1;
+        py::ssize_t strd = 1;
 
         for (size_t j = i + 1; j < dimension.size(); j++)
         {
             strd *= dimension[j];
         }
 
-        strides.push_back(static_cast<py::ssize_t>(strd * sizeof(double)));
+        strides.push_back(strd * static_cast<py::ssize_t>(sizeof(double)));
     }
 
     return {shape, strides};
@@ -85,7 +85,7 @@ get_shape_and_strides(const std::vector<int>& dimension) -> std::tuple<std::vect
 // Not a static function; used in other files
 
 auto
-pointer_to_numpy(const double* ptr, const std::vector<int>& dimension) -> py::array_t<double>
+pointer_to_numpy(const double* ptr, const std::vector<py::ssize_t>& dimension) -> py::array_t<double>
 {
     if (dimension.size() == 0)
     {
@@ -96,7 +96,7 @@ pointer_to_numpy(const double* ptr, const std::vector<int>& dimension) -> py::ar
         if (ptr == nullptr)
         {
             // double check that total number of elements is zero
-            int num_elems = 1;
+            py::ssize_t num_elems = 1;
             for (const auto& n : dimension)
             {
                 num_elems *= n;

@@ -575,25 +575,25 @@ export_dft(py::module& m)
         .def(
             "x_to_numpy",
             [](const CMolecularGrid& self) -> py::array_t<double> {
-                return vlx_general::pointer_to_numpy(self.getCoordinatesX(), std::vector<int>{self.getNumberOfGridPoints()});
+                return vlx_general::pointer_to_numpy(self.getCoordinatesX(), std::vector<py::ssize_t>{self.getNumberOfGridPoints()});
             },
             "Gets X coordinates of grid as numpy array.")
         .def(
             "y_to_numpy",
             [](const CMolecularGrid& self) -> py::array_t<double> {
-                return vlx_general::pointer_to_numpy(self.getCoordinatesY(), std::vector<int>{self.getNumberOfGridPoints()});
+                return vlx_general::pointer_to_numpy(self.getCoordinatesY(), std::vector<py::ssize_t>{self.getNumberOfGridPoints()});
             },
             "Gets Y coordinates of grid as numpy array.")
         .def(
             "z_to_numpy",
             [](const CMolecularGrid& self) -> py::array_t<double> {
-                return vlx_general::pointer_to_numpy(self.getCoordinatesZ(), std::vector<int>{self.getNumberOfGridPoints()});
+                return vlx_general::pointer_to_numpy(self.getCoordinatesZ(), std::vector<py::ssize_t>{self.getNumberOfGridPoints()});
             },
             "Gets Z coordinates of grid as numpy array.")
         .def(
             "w_to_numpy",
             [](const CMolecularGrid& self) -> py::array_t<double> {
-                return vlx_general::pointer_to_numpy(self.getWeights(), std::vector<int>{self.getNumberOfGridPoints()});
+                return vlx_general::pointer_to_numpy(self.getWeights(), std::vector<py::ssize_t>{self.getNumberOfGridPoints()});
             },
             "Gets weights of grid as numpy array.")
         .def(
