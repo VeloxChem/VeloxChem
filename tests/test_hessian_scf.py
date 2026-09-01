@@ -140,8 +140,8 @@ class TestScfHessianDriver:
                                        vibanalysis_drv.hessian)
             np.testing.assert_allclose(vib_results['dipole_gradient'],
                                        vibanalysis_drv.dipole_gradient)
-            assert vib_results['polarizability_gradient'] == (
-                vibanalysis_drv.polarizability_gradient)
+            np.testing.assert_allclose(vib_results['polarizability_gradient'],
+                                       np.array(list(vibanalysis_drv.polarizability_gradient.values())))
             assert vib_results['number_of_modes'] == len(
                 vib_results['vib_frequencies'])
             assert vib_results['number_of_external_frequencies'] == len(

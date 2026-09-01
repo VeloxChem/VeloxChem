@@ -245,7 +245,7 @@ class TestGtoPairBlock:
 
     def test_coordinates(self):
 
-        tol = 1.0e-12
+        # tol = 1.0e-12
 
         mol_co, bas_svp = self.get_data()
 
@@ -297,7 +297,7 @@ class TestGtoPairBlock:
         p3x1_pairs_a = comm.bcast(p3x1_pairs_a)
         p3x1_pairs_b = GtoPairBlock(p3_gtos, p1_gtos)
         assert p3x1_pairs_a == p3x1_pairs_b
-        
+
     def test_unique_terms(self):
 
         mol_co, bas_svp = self.get_data()
@@ -314,7 +314,7 @@ class TestGtoPairBlock:
 
         p3x1_pairs = GtoPairBlock(p3_gtos, p1_gtos)
         assert p3x1_pairs.unique_terms() == 36
-        
+
     def test_unique_term_indices(self):
 
         mol_co, bas_svp = self.get_data()

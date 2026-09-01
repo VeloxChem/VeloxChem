@@ -11,7 +11,7 @@ pytest.importorskip("pyframe")
 
 
 @pytest.mark.timeconsuming
-class TestEnsembleDriverOptions:
+class TestEnsembleDriver:
 
     def test_compute_with_scf_and_property_options(self, tmp_path):
         """

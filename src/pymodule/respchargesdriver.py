@@ -268,6 +268,7 @@ class RespChargesDriver(EspChargesDriver):
 
         if self.rank == mpi_master():
             q = self.compute_resp_charges([molecule], [grid_m], [esp_m], [1.0])
+            self._write_esp_results_to_hdf5('resp', 'resp_charges', q)
         else:
             q = None
 

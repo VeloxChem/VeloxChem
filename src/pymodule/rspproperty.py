@@ -214,6 +214,24 @@ class ResponseProperty:
             ]:
                 self._rsp_driver.set_cpp_property('ecd')
 
+            elif self.prop_type in [
+                    'optical rotatory dispersion (cpp)',
+                    'optical rotatory dispersion(cpp)',
+                    'optical rotation (cpp)',
+                    'optical rotation(cpp)',
+                    'ord (cpp)',
+                    'ord(cpp)',
+            ]:
+                assert_msg_critical(
+                    method_type == 'restricted',
+                    'ResponseProperty: optical rotatory dispersion is only '
+                    'implemented for restricted reference')
+                assert_msg_critical(
+                    not self.tamm_dancoff,
+                    'ResponseProperty: optical rotatory dispersion is not '
+                    'implemented with the Tamm-Dancoff approximation')
+                self._rsp_driver.set_cpp_property('ord')
+
         # Linear response C6 solver
         elif (self._rsp_dict['order'] == 'linear' and
               self._rsp_dict['residue'] == 'none' and

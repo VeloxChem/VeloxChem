@@ -30,9 +30,12 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from importlib.metadata import version
+import re
+import sys
+
 from mpi4py import MPI
 import numpy as np
-import sys
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
@@ -102,6 +105,47 @@ class EnsembleParser:
         if isinstance(resname, str) and len(resname) == 4 and resname[0] in ("N", "C"):
             return resname
         return f"{prefix}{resname}"
+
+    @staticmethod
+    def _histidine_resname_from_atoms(resname: str, atom_names: set[str]) -> str | None:
+        """
+        Infer CHARMM-style histidine protonation-state residue names from atom names.
+
+        Generic HIS is ambiguous in parameter databases. The presence of HD1
+        identifies delta-protonated histidine (HSD/HID), HE2 identifies
+        epsilon-protonated histidine (HSE/HIE), and both hydrogens identify
+        doubly protonated histidine (HSP/HIP).
+
+        :param resname:
+            Residue name as read from the structure/topology.
+        :param atom_names:
+            Set of atom names in the residue.
+        :return:
+            Refined CHARMM-style histidine residue name, or None if no
+            histidine refinement is needed.
+        """
+        resname = str(resname)
+        prefix = ""
+        core_resname = resname
+
+        if len(resname) == 4 and resname[0] in ("N", "C") and resname[1:] == "HIS":
+            prefix = resname[0]
+            core_resname = resname[1:]
+
+        if core_resname != "HIS":
+            return None
+
+        has_hd1 = "HD1" in atom_names
+        has_he2 = bool({"HE2", "HNE2"} & atom_names)
+
+        if has_hd1 and has_he2:
+            return f"{prefix}HSP"
+        if has_hd1:
+            return f"{prefix}HSD"
+        if has_he2:
+            return f"{prefix}HSE"
+
+        return None
 
     @staticmethod
     def _looks_like_n_terminal(residue) -> bool:
@@ -249,6 +293,7 @@ class EnsembleParser:
         - GLU + HE1/HE2 -> GLH
         - ASP + HD1/HD2 -> ASH
         - CYS without HG/HG1 -> CYX
+        - HIS + HD1/HE2 -> HSD/HSE/HSP
 
         :param env_atoms (MDAnalysis.core.groups.AtomGroup)
             AtomGroup corresponding to the environment selection used in
@@ -263,19 +308,28 @@ class EnsembleParser:
         for res in env_atoms.residues:
             resname = str(res.resname)
             atom_names = {str(name) for name in res.atoms.names}
+            prefix = ""
+            core_resname = resname
 
-            if resname == "GLU" and ({"HE1", "HE2"} & atom_names):
-                prot_map[res.resindex] = "GLH"
-            elif resname == "ASP" and ({"HD1", "HD2"} & atom_names):
-                prot_map[res.resindex] = "ASH"
-            elif resname == "CYS" and not ({"HG", "HG1"} & atom_names):
+            if len(resname) == 4 and resname[0] in ("N", "C"):
+                prefix = resname[0]
+                core_resname = resname[1:]
+
+            histidine_resname = self._histidine_resname_from_atoms(resname, atom_names)
+            if histidine_resname is not None:
+                prot_map[res.resindex] = histidine_resname
+            elif core_resname == "GLU" and ({"HE1", "HE2"} & atom_names):
+                prot_map[res.resindex] = f"{prefix}GLH"
+            elif core_resname == "ASP" and ({"HD1", "HD2"} & atom_names):
+                prot_map[res.resindex] = f"{prefix}ASH"
+            elif core_resname == "CYS" and not ({"HG", "HG1"} & atom_names):
                 # Distinguish thiol-less/disulfide cysteine from protonated CYS.
-                prot_map[res.resindex] = "CYX"
+                prot_map[res.resindex] = f"{prefix}CYX"
 
         return prot_map
 
     def structures(self,
-                   trajectory_file: str,
+                   trajectory_file: str | None = None,
                    num_snapshots: int | None = None,
                    qm_region: str = "",
                    qm_charge: int = 0,
@@ -286,7 +340,8 @@ class EnsembleParser:
                    npe_cutoff: float | None = None,
                    start: float | None = None,
                    end: float | None = None,
-                   last_snapshot_only: bool = False):
+                   last_snapshot_only: bool = False,
+                   pdb_file: str | None = None):
         """
         Parse a set of structures and extract QM and MM region data.
 
@@ -294,6 +349,9 @@ class EnsembleParser:
             Path to the trajectory file:
                 - .xtc with a corresponding topology (.tpr) via topology_file
                 - .pdb (several configurations, or a single configuration; bonds are guessed
+        :param pdb_file:
+            Path to a PDB file. This is a convenience alternative to
+            trajectory_file and cannot be used together with trajectory_file.
         :param topology_file:
             Path to the topology file (e.g., .tpr).
         :param num_snapshots:
@@ -331,6 +389,8 @@ class EnsembleParser:
                 Frame number.
             - qm_coords (numpy.ndarray):
                 QM region Cartesian coordinates, shape (N_qm, 3), in Angstrom.
+            - qm_atom_names (numpy.ndarray):
+                Atom names for each QM atom, shape (N_qm,).
             - qm_elements (numpy.ndarray):
                 Element symbols for each QM atom, shape (N_qm,).
             - qm_charge (int):
@@ -373,6 +433,22 @@ class EnsembleParser:
                 Number of residues in the NPE region.
         """
 
+        if pdb_file is not None and trajectory_file is not None:
+            raise ValueError(
+                "Provide either pdb_file or trajectory_file, not both"
+            )
+
+        if pdb_file is not None:
+            pdb_file = str(pdb_file)
+            if not pdb_file.lower().endswith(".pdb"):
+                raise ValueError("pdb_file must be a .pdb file")
+            trajectory_file = pdb_file
+
+        if trajectory_file is None:
+            raise ValueError("Either pdb_file or trajectory_file must be provided")
+
+        trajectory_file = str(trajectory_file)
+
         assert_msg_critical(
             'MDAnalysis' in sys.modules,
             'MDAnalysis is required for EnsembleParser.')
@@ -388,7 +464,28 @@ class EnsembleParser:
             raise ValueError("qm_multiplicity must be a positive integer")
 
         if trajectory_file.lower().endswith(".pdb"):
-            mda_universe = mda.Universe(trajectory_file, guess_bonds=True)
+            raw_mda_version = version("MDAnalysis")
+            match = re.match(r"^(\d+)\.(\d+)", raw_mda_version)
+            if not match:
+                raise RuntimeError(
+                    "Cannot parse required major.minor version from "
+                    f"MDAnalysis: {raw_mda_version!r}"
+                )
+            mda_version = int(match.group(1)), int(match.group(2))
+            if mda_version >= (2, 8):
+                # https://docs.mdanalysis.org/2.8.0/documentation_pages/core/universe.html
+                # The `guess_bonds` keyword is deprecated and will be removed in MDAnalysis 3.0.
+                # Please pass ("bonds", "angles", "dihedrals") into to_guess or force_guess
+                # instead to guess bonds, angles, and dihedrals respectively.
+                mda_universe = mda.Universe(
+                    trajectory_file,
+                    to_guess=("bonds", "angles", "dihedrals"),
+                )
+            else:
+                mda_universe = mda.Universe(
+                    trajectory_file,
+                    guess_bonds=True,
+                )
         else:
             if topology_file is None:
                 raise ValueError("topology_file is required unless trajectory_file is a .pdb")
@@ -401,6 +498,10 @@ class EnsembleParser:
         total_frames = len(mda_universe.trajectory)
         self.ostream.print_blank()
 
+        def seek_trajectory_frame(iframe):
+            """Move the trajectory cursor to a frame and return its timestep."""
+            return mda_universe.trajectory[iframe]
+
         if last_snapshot_only:
             frame_indices = np.array([total_frames - 1], dtype=int)
         else:
@@ -411,11 +512,9 @@ class EnsembleParser:
                     "time-resilved trajectories (e.g. .ztc), not .pdb input."
                 )
             if use_time_window:
-                mda_universe.trajectory[0]
-                traj_start = float(mda_universe.trajectory.ts.time)
+                traj_start = float(seek_trajectory_frame(0).time)
 
-                mda_universe.trajectory[total_frames - 1]
-                traj_end = float(mda_universe.trajectory.ts.time)
+                traj_end = float(seek_trajectory_frame(total_frames - 1).time)
 
                 if start is None:
                     start = traj_start
@@ -427,8 +526,7 @@ class EnsembleParser:
 
                 window_frames = []
                 for iframe in range(total_frames):
-                    mda_universe.trajectory[iframe]
-                    t = float(mda_universe.trajectory.ts.time)
+                    t = float(seek_trajectory_frame(iframe).time)
                     if float(start) <= t <= float(end):
                         window_frames.append(iframe)
 
@@ -485,8 +583,7 @@ class EnsembleParser:
         # skip transformations.
         has_box = False
         try:
-            mda_universe.trajectory[0]
-            dims = getattr(mda_universe.trajectory.ts, "dimensions", None)
+            dims = getattr(seek_trajectory_frame(0), "dimensions", None)
             if dims is not None:
                 dims = np.asarray(dims, dtype=float)
                 if dims.size > 3 and np.all(dims[:3] > 0):
@@ -507,9 +604,10 @@ class EnsembleParser:
 
         snapshots = []
         for iframe in frame_indices:
-            mda_universe.trajectory[iframe]
+            seek_trajectory_frame(iframe)
 
             qm_coords = np.asarray(qm_atoms.positions, dtype=float).copy()
+            qm_atom_names = np.asarray(qm_atoms.names, dtype=object).copy()
             qm_elements = np.asarray(
                 [atom_guesser.guess_atom_element(n) for n in qm_atoms.names], dtype=object
             )
@@ -567,7 +665,14 @@ class EnsembleParser:
                 # Apply terminal residue renaming (NASN/CASN, etc.) if applicable
                 if term_map and len(pe_resnames) > 0:
                     for ridx, newname in term_map.items():
-                        pe_resnames[pe_resindices == ridx] = newname
+                        term_newname = newname
+                        if ridx in prot_map:
+                            prot_newname = str(prot_map[ridx])
+                            term_newname = self._prefixed_resname(
+                                prot_newname,
+                                str(newname)[0],
+                            )
+                        pe_resnames[pe_resindices == ridx] = term_newname
 
                 number_residues_pe = int(pe_region.residues.n_residues)
 
@@ -609,7 +714,14 @@ class EnsembleParser:
                 # Apply terminal residue renaming (NASN/CASN, etc.) if applicable
                 if term_map and len(npe_resnames) > 0:
                     for ridx, newname in term_map.items():
-                        npe_resnames[npe_resindices == ridx] = newname
+                        term_newname = newname
+                        if ridx in prot_map:
+                            prot_newname = str(prot_map[ridx])
+                            term_newname = self._prefixed_resname(
+                                prot_newname,
+                                str(newname)[0],
+                            )
+                        npe_resnames[npe_resindices == ridx] = term_newname
 
                 number_residues_npe = int(npe_region.residues.n_residues)
 
@@ -637,6 +749,7 @@ class EnsembleParser:
                 "frame": int(mda_universe.trajectory.frame),
 
                 "qm_coords": qm_coords,
+                "qm_atom_names": qm_atom_names,
                 "qm_elements": qm_elements,
                 "qm_charge": qm_charge,
                 "qm_multiplicity": qm_multiplicity,

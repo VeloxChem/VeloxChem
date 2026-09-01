@@ -235,9 +235,16 @@ class TestOptimizationDriverCoverage:
             assert len(opt_results["scan_energies"]) == 3
             assert len(opt_results["scan_geometries"]) == 3
 
+            assert "constraints" in opt_results
+            assert opt_results["constraints"] == opt_drv.constraints
+
             with h5py.File(filename + ".h5") as h5f:
+                assert "opt/constraints" in h5f
                 assert "opt/scan_energies" in h5f
                 assert "opt/scan_coordinates_au" in h5f
+
+            opt_readback = read_results(filename + ".h5", "opt")
+            assert opt_readback["constraints"] == opt_drv.constraints
 
             fpath = Path('scan-final.xyz')
             if fpath.is_file():

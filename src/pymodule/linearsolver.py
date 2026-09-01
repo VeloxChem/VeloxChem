@@ -222,9 +222,6 @@ class LinearSolver:
         self.serial_ratio = 0.05
         self.use_subcomms = False
 
-        # group label used to save the response results in a checkpoint file
-        self.group_label = 'rsp'
-
         # input keywords
         self._input_keywords = {
             'response': {
@@ -690,7 +687,7 @@ class LinearSolver:
 
             if self.print_level > 1:
                 self.ostream.print_info(
-                    f'C-PCM grid with {self.cpcm_drv._cpcm_grid.shape[0]} points '
+                    f'C-PCM grid with {self.cpcm_drv.cpcm_grid.shape[0]} points '
                     + f'generated in {tm.time() - cpcm_grid_t0:.2f} sec.')
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -1979,7 +1976,7 @@ class LinearSolver:
         t0 = tm.time()
 
         fock_drv = FockDriver(comm)
-        fock_drv._set_block_size_factor(self._block_size_factor)
+        fock_drv.set_block_size_factor(self._block_size_factor)
 
         # determine fock_type and exchange_scaling_factor
         fock_type = '2jk'
@@ -2162,7 +2159,7 @@ class LinearSolver:
         t0 = tm.time()
 
         fock_drv = FockDriver(comm)
-        fock_drv._set_block_size_factor(self._block_size_factor)
+        fock_drv.set_block_size_factor(self._block_size_factor)
 
         # determine fock_type and exchange_scaling_factor
         fock_type = '2jk'

@@ -48,8 +48,9 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import read_rsp_hdf5, write_rsp_hdf5
-from .resultsio import (write_lr_rsp_results_to_hdf5,
-                        write_detach_attach_to_hdf5, write_rsp_solution)
+from .resultsio import (write_rsp_results_to_hdf5,
+                        write_detach_attach_to_hdf5, clear_group_in_hdf5,
+                        write_rsp_full_solution_to_hdf5)
 
 
 class TdaEigenSolver(TdaEigenSolverBase):
@@ -353,6 +354,9 @@ class TdaEigenSolver(TdaEigenSolverBase):
             # final hdf5 file to save response results
             if self.filename is not None:
                 final_h5_fname = f'{self.filename}.h5'
+                if self._is_converged:
+                    # clear stale group in final h5
+                    clear_group_in_hdf5(final_h5_fname, 'rsp')
             else:
                 final_h5_fname = None
 
@@ -398,8 +402,9 @@ class TdaEigenSolver(TdaEigenSolverBase):
 
                 # write eigenvectors to h5 file
                 if (self.save_solutions and final_h5_fname is not None):
-                    write_rsp_solution(final_h5_fname, 'S{:d}'.format(s + 1),
-                                       eigvecs[:, s])
+                    eigvec = eigvecs[:, s].copy()
+                    write_rsp_full_solution_to_hdf5(
+                        final_h5_fname, eigvec, s, self.nstates)
 
                 # save excitation details
                 excitation_details.append(
@@ -513,6 +518,17 @@ class TdaEigenSolver(TdaEigenSolverBase):
                 'num_virtual': orbital_details['num_virtual'],
             }
 
+            if self.save_solutions and final_h5_fname is not None:
+                full_solutions_keys = [
+                    'S{:d}'.format(s + 1) for s in range(self.nstates)
+                ]
+                write_rsp_results_to_hdf5(
+                    final_h5_fname,
+                    {'full_solutions_keys': full_solutions_keys})
+
+            # add rsp type
+            ret_dict.update({'rsp_type': 'tda'})
+
             if self.nto:
                 ret_dict['nto_lambdas'] = nto_lambdas
                 if self.nto_cubes:
@@ -528,15 +544,13 @@ class TdaEigenSolver(TdaEigenSolverBase):
                 self.ostream.print_blank()
                 self.ostream.flush()
 
-                # Keep the legacy rsp HDF5 layout for compatibility.
-                # Eigenvectors are written separately as S1/S2/... datasets, so
-                # they do not belong in this HDF5-facing payload.
+            if final_h5_fname is not None:
                 h5_ret_dict = {
                     key: value
                     for key, value in ret_dict.items()
                     if key != 'eigenvectors'
                 }
-                write_lr_rsp_results_to_hdf5(final_h5_fname, h5_ret_dict)
+                write_rsp_results_to_hdf5(final_h5_fname, h5_ret_dict)
 
             self._print_results(ret_dict)
 

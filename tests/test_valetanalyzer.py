@@ -10,7 +10,6 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.valetanalyzer import ValetAnalyzer
-from veloxchem.veloxchemlib import mpi_master
 from veloxchem.errorhandler import VeloxChemError
 
 skip_multi_rank = pytest.mark.skipif(
