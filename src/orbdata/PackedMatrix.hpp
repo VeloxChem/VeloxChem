@@ -37,6 +37,8 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <memory>
+#include <new>
 #include <string>
 #include <utility>
 #include <vector>
@@ -63,8 +65,64 @@
 /// zeroes, unlike CSparseMatrix, whose values are allocated one block at a time
 /// and after its sparsity patterns are set up. There is one allocation here and
 /// nothing to describe before it is made, so deferring it would buy nothing.
+/// @note The allocation is not value initialized by the vector, which would zero
+/// it on the calling thread alone, but left with the content of the allocation
+/// and zeroed by the threads. The matrix reaches gigabytes and the serial zero
+/// fill of a vector runs at the bandwidth of one core, which is a third of the
+/// time of the whole driver for the largest molecules.
 class CPackedMatrix
 {
+    /// @brief The allocator of the values, which leaves them with the content of
+    /// the allocation rather than zeroing them one by one on the calling thread.
+    /// The values are zeroed by the threads instead, in the constructor.
+    template <class T>
+    struct CDefaultInitAllocator
+    {
+        using value_type = T;
+
+        CDefaultInitAllocator() = default;
+
+        template <class U>
+        constexpr CDefaultInitAllocator(const CDefaultInitAllocator<U> &) noexcept
+        {
+        }
+
+        auto
+        allocate(const size_t nvalues) -> T *
+        {
+            return static_cast<T *>(::operator new(nvalues * sizeof(T)));
+        }
+
+        auto
+        deallocate(T *values, const size_t) noexcept -> void
+        {
+            ::operator delete(static_cast<void *>(values));
+        }
+
+        /// @brief Default initializes a value, which for a scalar leaves it with
+        /// the content of the allocation.
+        template <class U>
+        auto
+        construct(U *value) noexcept -> void
+        {
+            ::new (static_cast<void *>(value)) U;
+        }
+
+        template <class U, class... Args>
+        auto
+        construct(U *value, Args &&...args) -> void
+        {
+            ::new (static_cast<void *>(value)) U(std::forward<Args>(args)...);
+        }
+
+        template <class U>
+        auto
+        operator==(const CDefaultInitAllocator<U> &) const noexcept -> bool
+        {
+            return true;
+        }
+    };
+
    public:
     /// @brief The number of values one thread zeroes, scales or copies at a
     /// time. The matrix reaches several gigabytes, so these traversals are
@@ -103,7 +161,9 @@ class CPackedMatrix
             errors::assertMsgCritical(false, std::string("PackedMatrix: Symmetric and antisymmetric matrix must be square"));
         }
 
-        _values.resize(_number_of_elements(nrows, ncols, mat_type), 0.0);
+        _values.resize(_number_of_elements(nrows, ncols, mat_type));
+
+        zero();
     }
 
     /// @brief The constructor with molecular basis and matrix type.
@@ -362,7 +422,7 @@ class CPackedMatrix
     mat_t _type;
 
     /// @brief The values of matrix.
-    std::vector<double> _values;
+    std::vector<double, CDefaultInitAllocator<double>> _values;
 };
 
 #endif /* PackedMatrix_hpp */
