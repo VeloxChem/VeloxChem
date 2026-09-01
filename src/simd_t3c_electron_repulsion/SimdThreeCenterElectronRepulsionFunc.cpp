@@ -40,29 +40,44 @@ auto
 compute_electron_repulsion(double                         *values,
                            const size_t                    npairs,
                            const size_t                    natoms,
+                           const size_t                    iatom,
                            const CBasisFunction           &a_function,
                            const CBasisFunction           &b_function,
                            const CBasisFunction           &c_function,
-                           const std::vector<CSimdMatrix> &harmonics,
-                           const CSimdMatrix              &coordinates,
-                           const CSimdMatrix              &c_coordinates) -> void
+                           const std::vector<CSimdMatrix> &ab_harmonics,
+                           const std::vector<CSimdMatrix> &bc_harmonics,
+                           const CSimdMatrix              &ab_coordinates,
+                           const CSimdMatrix              &bc_coordinates) -> void
 {
     // NOTE: this is the stub of the skeleton and not the integral. It writes the
     // position of every element within the values of the combination, so that
     // the sizes and the offsets the sparsity pattern lays out are checked before
     // the kernels exist: the values of a combination must read 0, 1, 2 and so on
-    // over its whole extent, which no two combinations can do if their storage
-    // overlaps or is sized wrongly.
+    // over its whole extent once every atom on c side has been visited, which no
+    // two combinations can do if their storage overlaps or is sized wrongly.
 
-    const auto ncomps = static_cast<size_t>(2 * a_function.get_angular_momentum() + 1) *
-                        static_cast<size_t>(2 * b_function.get_angular_momentum() + 1) *
-                        static_cast<size_t>(2 * c_function.get_angular_momentum() + 1);
+    const auto ncomps_a = static_cast<size_t>(2 * a_function.get_angular_momentum() + 1);
 
-    const auto nvalues = ncomps * natoms * npairs;
+    const auto ncomps_b = static_cast<size_t>(2 * b_function.get_angular_momentum() + 1);
 
-    for (size_t i = 0; i < nvalues; i++)
+    const auto ncomps_c = static_cast<size_t>(2 * c_function.get_angular_momentum() + 1);
+
+    for (size_t ma = 0; ma < ncomps_a; ma++)
     {
-        values[i] = static_cast<double>(i);
+        for (size_t mb = 0; mb < ncomps_b; mb++)
+        {
+            for (size_t mc = 0; mc < ncomps_c; mc++)
+            {
+                const auto offset = (((ma * ncomps_b + mb) * ncomps_c + mc) * natoms + iatom) * npairs;
+
+                auto *prim = values + offset;
+
+                for (size_t k = 0; k < npairs; k++)
+                {
+                    prim[k] = static_cast<double>(offset + k);
+                }
+            }
+        }
     }
 }
 

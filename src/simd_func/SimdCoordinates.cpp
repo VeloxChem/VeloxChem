@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "ErrorHandler.hpp"
+#include "SimdAlign.hpp"
 
 namespace simdfunc {  // simdfunc namespace
 
@@ -137,6 +138,63 @@ auto
 make_coordinates(const CAtomBasisTripleSparsity &sparsity, const CMolecule &molecule) -> CSimdMatrix
 {
     return _make_coordinates(sparsity.a_atoms(), sparsity.b_atoms(), sparsity.number_of_pairs(), molecule);
+}
+
+auto
+make_coordinates(const CSimdMatrix &coordinates, const TPoint<double> &center) -> CSimdMatrix
+{
+    errors::assertMsgCritical(coordinates.number_of_rows() == 7,
+                              std::string("SimdCoordinates.make_coordinates: Coordinates must have seven rows"));
+
+    const auto ncols = coordinates.number_of_columns();
+
+    auto matrix = CSimdMatrix(7, ncols);
+
+    // NOTE: the pointers to the rows are taken once, as the accessor of a row is
+    // bounds checked and would otherwise be called for every atom pair.
+
+    const auto *b_x = coordinates.data(3);
+    const auto *b_y = coordinates.data(4);
+    const auto *b_z = coordinates.data(5);
+
+    auto *r_x = matrix.data(0);
+    auto *r_y = matrix.data(1);
+    auto *r_z = matrix.data(2);
+    auto *c_x = matrix.data(3);
+    auto *c_y = matrix.data(4);
+    auto *c_z = matrix.data(5);
+    auto *bc_2 = matrix.data(6);
+
+    const auto r_c = center.coordinates();
+
+    const auto p_x = r_c[0];
+    const auto p_y = r_c[1];
+    const auto p_z = r_c[2];
+
+    // NOTE: the rows of the coordinates start at a cache line boundary, so the
+    // loop is vectorized with aligned loads and stores. The atom on c side is a
+    // broadcast scalar and the atoms on b side are copied, which keeps the
+    // layout the one the harmonics and the recursions expect.
+
+#pragma omp simd aligned(r_x, r_y, r_z, c_x, c_y, c_z, bc_2, b_x, b_y, b_z : simd::cache_line_size())
+    for (size_t i = 0; i < ncols; i++)
+    {
+        r_x[i] = b_x[i];
+        r_y[i] = b_y[i];
+        r_z[i] = b_z[i];
+
+        c_x[i] = p_x;
+        c_y[i] = p_y;
+        c_z[i] = p_z;
+
+        const auto d_x = b_x[i] - p_x;
+        const auto d_y = b_y[i] - p_y;
+        const auto d_z = b_z[i] - p_z;
+
+        bc_2[i] = d_x * d_x + d_y * d_y + d_z * d_z;
+    }
+
+    return matrix;
 }
 
 }  // namespace simdfunc

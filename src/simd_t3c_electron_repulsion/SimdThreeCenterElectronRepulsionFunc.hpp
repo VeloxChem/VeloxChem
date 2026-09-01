@@ -44,28 +44,38 @@
 namespace simdt3ceri {  // simdt3ceri namespace
 
 /// @brief Computes the three-center electron repulsion integrals of a
-/// combination of basis functions over the atom pairs and the atoms on c side of
-/// a block.
+/// combination of basis functions over the atom pairs of a block, for one atom
+/// on c side.
 /// @param values The values of the combination of basis functions to compute.
 /// The atom pairs run fastest and are contiguous, the atom on c side runs next,
 /// and the triple of angular components runs slowest, with the component on a
 /// side the slowest of the three and the one on c side the fastest. The value of
-/// the atom pair k, the atom ic on c side and the components ma, mb and mc is
-/// therefore at (((ma * ncomps_b + mb) * ncomps_c + mc) * natoms + ic) * npairs
-/// + k.
+/// the atom pair k and the components ma, mb and mc is therefore at
+/// (((ma * ncomps_b + mb) * ncomps_c + mc) * natoms + iatom) * npairs + k, so
+/// the atom pairs of one triple of components are contiguous and the triples are
+/// natoms * npairs apart.
 /// @param npairs The number of surviving atom pairs of the combination.
+/// @param natoms The number of atoms on c side of the block.
+/// @param iatom The index of the atom on c side among the atoms of the block.
 /// @param a_function The basis function on a side.
 /// @param b_function The basis function on b side.
 /// @param c_function The basis function on c side.
-/// @param harmonics The solid harmonics of the vectors between the atoms of the
-/// atom pairs.
-/// @param coordinates The coordinates of the atom pairs on a and b sides, as
+/// @param ab_harmonics The solid harmonics of the vectors between the atoms of
+/// the atom pairs, reaching the sum of the angular momenta on the a and b sides.
+/// @param bc_harmonics The solid harmonics of the vectors from the atoms on b
+/// side to the atom on c side, reaching the sum of the angular momenta on the b
+/// and c sides.
+/// @param ab_coordinates The coordinates of the atom pairs on a and b sides, as
 /// SimdCoordinates lays them out.
-/// @param c_coordinates The coordinates of the atoms on c side, as three rows of
-/// as many columns as there are atoms.
-/// @note The atoms on c side are a separate and shorter dimension than the atom
-/// pairs, so the values of one triple of angular components hold the atom pairs
-/// contiguously and repeat them for every atom on c side.
+/// @param bc_coordinates The vectors from the atoms on b side to the atom on c
+/// side and their squared lengths, as SimdCoordinates lays them out.
+/// @note One atom on c side is computed at a time, so the geometry of the three
+/// centers is fixed for the whole call and the primitives can be contracted
+/// before the angular components are formed.
+/// @note The surviving atom pairs of a combination are a leading subrange of the
+/// atom pairs of the block, which the ordering by interatomic distance and the
+/// bisection of the screening give, so the coordinates and the harmonics of the
+/// block are read over their first npairs columns and no gathering is needed.
 /// @note This is the stub of the skeleton. It writes a value which encodes the
 /// position of every element it is responsible for, so that the layout of the
 /// values blocks and the loops of the driver are checked before the kernels
@@ -73,12 +83,14 @@ namespace simdt3ceri {  // simdt3ceri namespace
 auto compute_electron_repulsion(double                         *values,
                                 const size_t                    npairs,
                                 const size_t                    natoms,
+                                const size_t                    iatom,
                                 const CBasisFunction           &a_function,
                                 const CBasisFunction           &b_function,
                                 const CBasisFunction           &c_function,
-                                const std::vector<CSimdMatrix> &harmonics,
-                                const CSimdMatrix              &coordinates,
-                                const CSimdMatrix              &c_coordinates) -> void;
+                                const std::vector<CSimdMatrix> &ab_harmonics,
+                                const std::vector<CSimdMatrix> &bc_harmonics,
+                                const CSimdMatrix              &ab_coordinates,
+                                const CSimdMatrix              &bc_coordinates) -> void;
 
 }  // namespace simdt3ceri
 

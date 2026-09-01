@@ -104,12 +104,6 @@ class CSimdThreeCenterElectronRepulsionDriver
                          const CMolecularBasis &basis,
                          const CMolecularBasis &aux_basis) const -> void;
 
-    /// @brief Creates the coordinates of the atoms on c side of a block.
-    /// @param block The sparsity pattern of the block.
-    /// @param molecule The molecule to take the atomic coordinates from.
-    /// @return The matrix of three rows and as many columns as there are atoms on
-    /// c side, holding their coordinates in atomic units.
-    auto _make_c_coordinates(const CAtomBasisTripleSparsity &block, const CMolecule &molecule) const -> CSimdMatrix;
 };
 
 #endif /* SimdThreeCenterElectronRepulsionDriver_hpp */

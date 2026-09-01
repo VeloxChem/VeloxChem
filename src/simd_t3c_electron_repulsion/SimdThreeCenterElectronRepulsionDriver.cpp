@@ -154,13 +154,12 @@ CSimdThreeCenterElectronRepulsionDriver::_compute_blocks(CSparseTensor         &
 
         if (block.number_of_pairs() == 0) continue;
 
-        // NOTE: the coordinates of the atom pairs and of the atoms on c side are
-        // created once for the whole block, as all combinations of basis
-        // functions of the block share them.
+        // NOTE: the coordinates of the atom pairs and the solid harmonics of the
+        // vectors between their atoms are formed once for the whole block, as
+        // every atom on c side and every combination of basis functions of the
+        // block share them.
 
-        const auto coordinates = simdfunc::make_coordinates(block, molecule);
-
-        const auto c_coordinates = _make_c_coordinates(block, molecule);
+        const auto ab_coordinates = simdfunc::make_coordinates(block, molecule);
 
         const auto &a_basis = basis.basis_set(block.a_index());
 
@@ -168,14 +167,7 @@ CSimdThreeCenterElectronRepulsionDriver::_compute_blocks(CSparseTensor         &
 
         const auto &c_basis = aux_basis.basis_set(block.c_index());
 
-        // NOTE: the solid harmonics of the vectors between the atoms of the atom
-        // pairs are created once for the whole block. They reach the sum of the
-        // angular momenta of the atom bases on the a and b sides, as that is the
-        // highest angular momentum the recursions over the atom pairs reach.
-
-        const auto lmax = a_basis.max_angular_momentum() + b_basis.max_angular_momentum();
-
-        const auto harmonics = simdfunc::make_solid_harmonics(coordinates, lmax);
+        const auto ab_harmonics = simdfunc::make_solid_harmonics(ab_coordinates, a_basis.max_angular_momentum() + b_basis.max_angular_momentum());
 
         const auto a_indices = denseidx::index_functions(a_basis);
 
@@ -183,91 +175,74 @@ CSimdThreeCenterElectronRepulsionDriver::_compute_blocks(CSparseTensor         &
 
         const auto c_indices = denseidx::index_functions(c_basis);
 
-        const auto natoms = block.number_of_c_atoms();
+        const auto &c_atoms = block.c_atoms();
 
-        // NOTE: the combinations of basis functions are independent, as each of
-        // them writes its own values and reads the coordinates and the harmonics
-        // of the block without changing them. All combinations are computed, the
-        // reverse order of the a and b sides included, as the sparsity pattern
-        // gives each of them its own values.
+        const auto &centers = molecule.coordinates();
 
-        for (size_t i = 0; i < a_indices.size(); i++)
+        const auto natoms = c_atoms.size();
+
+        // NOTE: the atoms on c side are visited one at a time, so that the
+        // vectors from the atoms on b side to the atom on c side and their solid
+        // harmonics are formed once for the atom and shared by every combination
+        // of basis functions. The geometry of the three centers is then fixed
+        // for the whole of a kernel, which is what lets it contract the
+        // primitives before it forms the angular components.
+
+        // NOTE: this costs the solid harmonics of the atom pairs once for every
+        // atom on c side rather than once for the block. That is the price of
+        // the early contraction and it is paid deliberately.
+
+        for (size_t iatom = 0; iatom < natoms; iatom++)
         {
-            for (size_t j = 0; j < b_indices.size(); j++)
+            const auto bc_coordinates = simdfunc::make_coordinates(ab_coordinates, centers[static_cast<size_t>(c_atoms[iatom])]);
+
+            const auto bc_harmonics =
+                simdfunc::make_solid_harmonics(bc_coordinates, b_basis.max_angular_momentum() + c_basis.max_angular_momentum());
+
+            // NOTE: the combinations of basis functions are independent, as each
+            // of them writes its own values and reads the coordinates and the
+            // harmonics without changing them. All combinations are computed,
+            // the reverse order of the a and b sides included, as the sparsity
+            // pattern gives each of them its own values.
+
+            for (size_t i = 0; i < a_indices.size(); i++)
             {
-                for (size_t k = 0; k < c_indices.size(); k++)
+                for (size_t j = 0; j < b_indices.size(); j++)
                 {
-                    const auto [la, ia] = a_indices[i];
+                    for (size_t k = 0; k < c_indices.size(); k++)
+                    {
+                        const auto [la, ia] = a_indices[i];
 
-                    const auto [lb, jb] = b_indices[j];
+                        const auto [lb, jb] = b_indices[j];
 
-                    const auto [lc, kc] = c_indices[k];
+                        const auto [lc, kc] = c_indices[k];
 
-                    // NOTE: the atom pairs which survive the screening differ
-                    // from one combination of basis functions to another, as the
-                    // bound carries the angular momenta and the exponents of the
-                    // three basis functions.
+                        // NOTE: the atom pairs which survive the screening
+                        // differ from one combination of basis functions to
+                        // another, as the bound carries the angular momenta and
+                        // the exponents of the three basis functions. They are a
+                        // leading subrange of the atom pairs of the block, so a
+                        // kernel reads the coordinates and the harmonics over
+                        // their first columns.
 
-                    const auto npairs = block.number_of_pairs(la, ia, lb, jb, lc, kc);
+                        const auto npairs = block.number_of_pairs(la, ia, lb, jb, lc, kc);
 
-                    if (npairs == 0) continue;
+                        if (npairs == 0) continue;
 
-                    simdt3ceri::compute_electron_repulsion(tensor.values(jblk, la, ia, lb, jb, lc, kc),
-                                                           npairs,
-                                                           natoms,
-                                                           a_basis.functions()[i],
-                                                           b_basis.functions()[j],
-                                                           c_basis.functions()[k],
-                                                           harmonics,
-                                                           coordinates,
-                                                           c_coordinates);
+                        simdt3ceri::compute_electron_repulsion(tensor.values(jblk, la, ia, lb, jb, lc, kc),
+                                                               npairs,
+                                                               natoms,
+                                                               iatom,
+                                                               a_basis.functions()[i],
+                                                               b_basis.functions()[j],
+                                                               c_basis.functions()[k],
+                                                               ab_harmonics,
+                                                               bc_harmonics,
+                                                               ab_coordinates,
+                                                               bc_coordinates);
+                    }
                 }
             }
         }
     }
-}
-
-auto
-CSimdThreeCenterElectronRepulsionDriver::_make_c_coordinates(const CAtomBasisTripleSparsity &block, const CMolecule &molecule) const
-    -> CSimdMatrix
-{
-    // NOTE: the atoms on c side are a separate and shorter dimension than the
-    // atom pairs, so their coordinates are held as three rows of as many columns
-    // as there are atoms, unlike the seven rows of the atom pairs.
-
-    const auto &atoms = block.c_atoms();
-
-    const auto natoms = atoms.size();
-
-    const auto &coords = molecule.coordinates();
-
-    errors::assertMsgCritical(std::ranges::none_of(atoms, [&](const auto atom) { return atom >= static_cast<int>(coords.size()); }),
-                              std::string("SimdThreeCenterElectronRepulsionDriver: Atomic index out of range of molecule"));
-
-    auto matrix = CSimdMatrix(3, natoms);
-
-    // NOTE: the coordinates of an axis are stored contiguously over the atoms on
-    // c side, as they are over the atom pairs, so that a recursion loads them
-    // with aligned SIMD instructions.
-
-    auto *c_x = matrix.data(0);
-
-    auto *c_y = matrix.data(1);
-
-    auto *c_z = matrix.data(2);
-
-    const auto *rxyz = coords.data();
-
-    for (size_t i = 0; i < natoms; i++)
-    {
-        const auto r_c = rxyz[atoms[i]].coordinates();
-
-        c_x[i] = r_c[0];
-
-        c_y[i] = r_c[1];
-
-        c_z[i] = r_c[2];
-    }
-
-    return matrix;
 }
