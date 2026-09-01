@@ -448,7 +448,8 @@ CAtomBasisPairGroup::divide(const std::vector<CAtomBasisPairGroup> &groups, cons
 auto
 CAtomBasisPairGroup::make_block_size(const std::vector<CAtomBasisPairGroup> &groups,
                                      const size_t                           blocks_per_thread,
-                                     const size_t                           min_block_size) -> size_t
+                                     const size_t                           min_block_size,
+                                     const size_t                           max_block_size) -> size_t
 {
     const auto nthreads = omp_in_parallel() ? 1 : omp::get_number_of_threads();
 
@@ -458,5 +459,7 @@ CAtomBasisPairGroup::make_block_size(const std::vector<CAtomBasisPairGroup> &gro
 
     for (const auto &group : groups) npairs += group.number_of_pairs();
 
-    return std::max(npairs / (blocks_per_thread * static_cast<size_t>(nthreads)), min_block_size);
+    const auto size = npairs / (blocks_per_thread * static_cast<size_t>(nthreads));
+
+    return std::min(std::max(size, min_block_size), max_block_size);
 }

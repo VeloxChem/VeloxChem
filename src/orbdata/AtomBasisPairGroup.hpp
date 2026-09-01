@@ -37,6 +37,7 @@
 #include <algorithm>
 #include <functional>
 #include <iterator>
+#include <limits>
 #include <ranges>
 #include <utility>
 #include <vector>
@@ -218,14 +219,22 @@ class CAtomBasisPairGroup
     /// @param groups The atom basis pair groups to divide.
     /// @param blocks_per_thread The number of blocks per thread aimed at.
     /// @param min_block_size The smallest target number of atom pairs chosen.
+    /// @param max_block_size The largest target number of atom pairs chosen.
     /// @return The target number of atom pairs of a block, zero to leave the
     /// groups undivided.
     /// @note The threads are read here rather than passed in, so that the
     /// division follows the threads the work is done with. A single thread leaves
     /// the groups undivided, as the blocks would then carry their fixed cost with
     /// no work to divide.
-    static auto make_block_size(const std::vector<CAtomBasisPairGroup> &groups, const size_t blocks_per_thread, const size_t min_block_size)
-        -> size_t;
+    /// @note The size computed from the threads grows with the molecule, which
+    /// suits a path whose blocks carry a fixed cost worth repaying with a large
+    /// block. A path whose blocks are cheap to start wants a ceiling instead, so
+    /// that a large molecule is divided into many small blocks rather than into
+    /// as many blocks as it has threads. The default leaves the size uncapped.
+    static auto make_block_size(const std::vector<CAtomBasisPairGroup> &groups,
+                                const size_t                           blocks_per_thread,
+                                const size_t                           min_block_size,
+                                const size_t                           max_block_size = std::numeric_limits<size_t>::max()) -> size_t;
 
     /// @brief The number of atom pairs one thread forms at a time.
     static constexpr size_t _pairs_per_chunk = 4096;

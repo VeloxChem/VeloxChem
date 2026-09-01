@@ -75,7 +75,7 @@ CSimdTwoCenterElectronRepulsionDriver::compute(const CMolecule &molecule, const 
     // makes the number of the blocks follow the size of the molecule instead, so
     // the work divides for any number of threads.
 
-    const auto block_size = CAtomBasisPairGroup::make_block_size(groups, blocks_per_thread, min_block_size);
+    const auto block_size = CAtomBasisPairGroup::make_block_size(groups, blocks_per_thread, min_block_size, max_block_size);
 
     // NOTE: the atom pairs are not ordered by interatomic distance, unlike those
     // of a sparse matrix. The ordering is there for the bisection of the

@@ -64,10 +64,10 @@ class CSimdTwoCenterElectronRepulsionDriver
 {
    public:
     /// @brief The number of blocks per thread aimed at when the target number of
-    /// atom pairs of a block is chosen. The blocks are a few per thread, so that
-    /// dynamic scheduling has enough of them to even out the ones which differ in
-    /// cost, and no more, as a block carries a fixed cost and the blocks contend
-    /// for the memory.
+    /// atom pairs of a block is chosen. It sets the size for the molecules which
+    /// fall between the floor and the ceiling below, and those alone: a small
+    /// molecule is held at the floor and a large one at the ceiling whatever this
+    /// is, so it decides little here.
     static constexpr size_t blocks_per_thread = 2;
 
     /// @brief The smallest target number of atom pairs of a block chosen. A block
@@ -87,6 +87,24 @@ class CSimdTwoCenterElectronRepulsionDriver
     /// for the small molecules alone, as a large one asks for blocks larger than
     /// this of its own accord.
     static constexpr size_t min_block_size = 128;
+
+    /// @brief The largest target number of atom pairs of a block chosen. The size
+    /// computed from the threads grows with the molecule, which suits the sparse
+    /// matrix, whose blocks carry the bisection of the screening and are worth
+    /// making large. A block here is cheap to start, so a large molecule is
+    /// better divided into many small blocks than into a few per thread: the
+    /// dynamic loop then has enough of them to even out the ones which differ in
+    /// cost, and each of them keeps its Boys function and its buffer in the cache.
+    /// @note Without this the size followed the threads alone and reached 7348
+    /// atom pairs for crambin and 27038 for ubiquitin, one to two orders of
+    /// magnitude above what the timings want. Measured on fourteen threads over
+    /// the def2 universal fitting sets, the time is flat below about three
+    /// hundred and rises steeply above it: crambin in jkfit takes 271 ms at 7348
+    /// atom pairs a block, 195 at 918, 159 at 306 and 158 at 153, and ubiquitin
+    /// in jkfit 1253 ms at 27038 and 731 at 211. The value is taken inside the
+    /// flat range rather than at the floor, so that a molecule between the two is
+    /// not divided more finely than it repays.
+    static constexpr size_t max_block_size = 256;
 
     /// @brief Computes the two-center electron repulsion matrix of a molecular
     /// basis.
