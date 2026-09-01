@@ -382,13 +382,27 @@ class CSparseMatrix
     /// @brief Allocates the values blocks of matrix, leaving their content
     /// undefined. Each values block is allocated separately, so no single
     /// allocation spans the whole matrix.
+    /// @note A matrix reaches hundreds of gigabytes, so an allocation which
+    /// throws is an outcome to handle rather than one to ignore. The blocks
+    /// already allocated are freed before the exception leaves, so the matrix is
+    /// left empty and consistent: without that the pointers would survive behind
+    /// a state of empty, and the next call would overwrite and leak them.
     auto
     allocate() -> void
     {
         if (_values_state == valstat::allocated) return;
 
-        std::ranges::for_each(std::views::iota(size_t{0}, _values.size()),
-                              [&](const auto i) { _values[i] = new double[number_of_elements(i)]; });
+        try
+        {
+            std::ranges::for_each(std::views::iota(size_t{0}, _values.size()),
+                                  [&](const auto i) { _values[i] = new double[number_of_elements(i)]; });
+        }
+        catch (...)
+        {
+            _deallocate();
+
+            throw;
+        }
 
         _values_state = valstat::allocated;
     }
@@ -985,16 +999,29 @@ class CSparseMatrix
     /// @brief Allocates the values blocks of matrix and copies the values of
     /// another matrix into them.
     /// @param other The sparse matrix to copy the values of.
+    /// @note The blocks already allocated are freed before an exception leaves,
+    /// as this runs from the copy constructor as well, where a matrix whose
+    /// construction did not complete is never destroyed and would leak all of
+    /// them.
     auto
     _copy_values(const CSparseMatrix &other) -> void
     {
-        std::ranges::for_each(std::views::iota(size_t{0}, _values.size()), [&](const auto i) {
-            const auto nvals = number_of_elements(i);
+        try
+        {
+            std::ranges::for_each(std::views::iota(size_t{0}, _values.size()), [&](const auto i) {
+                const auto nvals = number_of_elements(i);
 
-            _values[i] = new double[nvals];
+                _values[i] = new double[nvals];
 
-            std::copy(other._values[i], other._values[i] + nvals, _values[i]);
-        });
+                std::copy(other._values[i], other._values[i] + nvals, _values[i]);
+            });
+        }
+        catch (...)
+        {
+            _deallocate();
+
+            throw;
+        }
     }
 
     /// @brief Adds the sparsity patterns of the non-empty blocks of the atom
