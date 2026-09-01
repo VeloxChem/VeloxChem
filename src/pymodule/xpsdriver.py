@@ -523,6 +523,81 @@ class XPSDriver:
         intensity = abs(amplitude)**2
         return intensity
 
+    def _NEW_compute_shakeup_intensity(self, gs_scf_results, ion_scf_results, rsp_results, state_idx, unrel_occ_b, nalpha, tda=False):
+        """
+        Computes the intensity of shake-up satellites in the sudden approximation.
+
+        :param gs_scf_results:
+            The ground state SCF results dictionary.
+        :param ion_ scf_results:
+            The ion SCF results dictionary.
+        :param rsp_results:
+            The response results dictionary.
+        :param state_idx:
+            The index of the excited state for which to compute the intensity.
+        :param unrel_occ_b:
+            The unrelaxed (sudden-approx.) beta-spin occupied molecular orbital coefficients.
+        :param nalpha:
+            The number of alpha-spin occupied molecular orbitals.
+        :param tda:
+            Whether to use the TDA approximation.
+
+        :return:
+            The shake-up intensity (float).
+        """
+        
+        norb = gs_scf_results['C_alpha'].shape[1]
+        nbeta = nalpha - 1
+        nvir_a = norb - nalpha
+        nvir_b = norb - nbeta
+
+        n_ov_a = nalpha * nvir_a
+        n_ov_b = nbeta * nvir_b
+        if tda:
+            X_a = rsp_results['eigenvectors'][:n_ov_a, state_idx].reshape(nalpha, nvir_a)
+            X_b = rsp_results['eigenvectors'][n_ov_a:, state_idx].reshape(nbeta, nvir_b)
+        else:
+            assert_msg_critical(
+                False,
+                'Only enabled in the TDA approximation currently.')
+
+        S = gs_scf_results['S']
+        # Get the occupied- and virtual MOs of the ionized system, alpha and beta
+        R_a = ion_scf_results['C_alpha'][:, :nalpha]
+        V_a = ion_scf_results['C_alpha'][:, nalpha:]
+        R_b = ion_scf_results['C_beta'][:, :nbeta]
+        V_b = ion_scf_results['C_beta'][:, nbeta:]
+
+        # reference system
+        U_a = gs_scf_results['C_alpha'][:, :nalpha]
+        U_b = unrel_occ_b
+
+        # SU_a = S @ U_a
+        # SU_b = S @ U_b
+
+        M_a = R_a.conj().T @ S @ U_a
+        M_b = R_b.conj().T @ S @ U_b
+        
+        s0_a = np.linalg.det(M_a)
+        s0_b = np.linalg.det(M_b)
+
+        # ampliteude
+        # A_a, A_b = 0, 0
+        # A_a_ia = X_ia * s_ia = X_ia * s0_a*(WM^-1)_ai = X_ia * s0_a * G_ai
+        # A_a = sum_ia A_a_ia = s0_a * sum_ia X_ia * G_ai
+        W_a = V_a.conj().T @ S @ U_a
+        W_b = V_b.conj().T @ S @ U_b
+
+        G_a = np.linalg.solve(M_a.T, W_a.T)
+        G_b = np.linalg.solve(M_b.T, W_b.T)
+
+        A_a = s0_a * np.sum(X_a * G_a)
+        A_b = s0_b * np.sum(X_b * G_b)
+
+        amplitude = A_a * s0_b + A_b * s0_a
+        intensity = abs(amplitude)**2
+        return intensity
+
     def compute(self, molecule, basis, scf_driver, element=None, elements=None):
         """
         Computes core ionization energies for specified element(s) using
