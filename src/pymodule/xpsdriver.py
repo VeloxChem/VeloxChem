@@ -41,6 +41,7 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from .tdaeigensolverunrest import TdaUnrestrictedEigenSolver
 from .orbitallocalization import OrbitalLocalizationDriver
+from .molecularorbitals import MolecularOrbitals, molorb
 from .errorhandler import assert_msg_critical
 from .spectrumplot import plot_xps_spectrum
 from .sanitychecks import scf_results_sanity_check
@@ -62,6 +63,7 @@ class XPSDriver:
     Instance variables
         - energy_ranges: Dictionary of core orbital energy ranges for different elements (in Hartree).
         - shake_ups: Whether to compute shake-up satellites (bool).
+        - density_damping: Whether to use density damping in FCH-SCF (bool).
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -107,8 +109,11 @@ class XPSDriver:
         # Default to DFT ranges for backward compatibility
         self.energy_ranges = self.energy_ranges_dft
 
+        # only for the FCH-SCF calculations, not for the GS-SCF
+        self.density_damping = True
+
         self.shake_ups = False
-        # Temporarily only enabled w/ TDA, but might be preferred for stability in RPA as well
+        # Temporarily only enabled w/ TDA, but might be preferred for stability over RPA as well
         self.tamm_dancoff = True
         # Number of TOTAL states to compute per core ionization (if shake_ups is True)
         # TODO: change so that nstates refers only to shake-ups and exclude emission
@@ -464,6 +469,7 @@ class XPSDriver:
         :return:
             The shake-up intensity (float).
         """
+        # TODO: avoid loops over all occupied and virtual orbitals and parallelize
         S = gs_scf_results['S']
         norb = gs_scf_results['C_alpha'].shape[1]
         #nalpha = ion_scf_results['C_alpha'].shape[1]
@@ -514,7 +520,7 @@ class XPSDriver:
                 A_b += amp_ia
                 
         amplitude = A_a * s0_b + A_b * s0_a
-        intensity = amplitude**2
+        intensity = abs(amplitude)**2
         return intensity
 
     def compute(self, molecule, basis, scf_driver, element=None, elements=None):
@@ -634,8 +640,6 @@ class XPSDriver:
                         if contrib < 0.75:
                             delocalized.append(mo_idx)
                     if delocalized:
-                        # TODO: Localize orbitals. If multiple edges, core orbitals must be
-                        # localized separately for each edge.
                         n_deloc = len(delocalized)
 
                         warning = f' The molecule contains {n_deloc} delocalized core orbitals.'
@@ -647,13 +651,31 @@ class XPSDriver:
                             info += f' MO {mo_idx} '
                         self.ostream.print_info(info)
 
+                        min_moind, max_moind = min(delocalized), max(delocalized) + 1
+
                         orb_drv = OrbitalLocalizationDriver(self.ostream)
-                        # assumes the orbitals are in order
-                        loc_orbs = orb_drv.compute(molecule, basis, scf_results, (min(delocalized)+1, max(delocalized)+1))['loc_orbs']
-                        scf_driver._molecular_orbitals = loc_orbs
-                        orbs = loc_orbs
-                        #scf_results['C_alpha'][:, delocalized] = loc_orbs.alpha_to_numpy()[:, delocalized]
-                        #scf_results['C_beta'][:, delocalized] = loc_orbs.beta_to_numpy()[:, delocalized]
+                        # restricted reference
+                        loc_orbs = orb_drv.compute(molecule, basis, scf_results, (min_moind+1, max_moind))['loc_orbs'].alpha_to_numpy()
+
+                        C_loc = scf_results['C_alpha'].copy()
+                        C_loc[:, min_moind:max_moind] = loc_orbs[:, min_moind:max_moind]
+
+                        scf_results = dict(scf_results)
+                        scf_results['C_alpha'] = C_loc
+                        scf_results['C_beta'] = C_loc.copy()
+
+                        orbs = MolecularOrbitals([C_loc], [scf_results['E_alpha']], 
+                                                 [scf_results['occ_alpha']], molorb.rest)
+
+                        core_orbital_assignments = self._find_core_orbital_indices(molecule, 
+                                                                                   basis, scf_results, elem, method_type)
+                        assert_msg_critical(
+                            all(c >= 0.75 for _,_, c in core_orbital_assignments),
+                            'XPSDriver: orbital localization failed.')
+
+                        for mo_idx, atom_idx, contrib in core_orbital_assignments:
+                            self.ostream.print_info(
+                                f'  (Post localization) MO {mo_idx} -> Atom {atom_idx+1} ({elem}) with {contrib:.1%} contribution')
 
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -691,8 +713,9 @@ class XPSDriver:
                 # Maximum number of iterations (not included in scf_results)
                 scf_ion.max_iter = scf_driver.max_iter
 
-                # propose using density-damping as default for FCH calculations
-                scf_ion.density_damping = True
+                # use density-damping as default for FCH calculations
+                if self.density_damping:
+                    scf_ion.density_damping = True
 
                 # Apply maximum overlap method to maintain core hole
                 scf_ion.maximum_overlap(molecular_ion, basis, orbs, occa, occb)
@@ -703,14 +726,16 @@ class XPSDriver:
                 fch_energy = scf_ion.get_scf_energy()
 
                 # Calculate mainline intensity
-                O_Rb = self._get_unrelaxed_fchgs_det(scf_results, mo_index, nalpha-1)
-                mainline_intensity = self._compute_mainline_intensity(scf_results, scf_ion_results, O_Rb, nalpha)
+                O_Rb = None
+                if self.rank == mpi_master():
+                    O_Rb = self._get_unrelaxed_fchgs_det(scf_results, mo_index, nalpha-1)
+                    mainline_intensity = self._compute_mainline_intensity(scf_results, scf_ion_results, O_Rb, nalpha)
 
-                # Calculate core ionization energy (in eV)
-                # why do we return in eV?
-                ie = (fch_energy - gs_energy) * hartree_in_ev()
+                    # Calculate core ionization energy (in eV)
+                    # why do we return in eV?
+                    ie = (fch_energy - gs_energy) * hartree_in_ev()
 
-                ionization_energies.append((mo_index, atom_index, ie, contribution, mainline_intensity))
+                    ionization_energies.append((mo_index, atom_index, ie, contribution, mainline_intensity))
                 
                 if self.shake_ups:
                     if self.rank == mpi_master():
@@ -735,21 +760,23 @@ class XPSDriver:
                     rsp_drv.nstates = self.nstates + nbeta
                     rsp_results = rsp_drv.compute(molecular_ion, basis, scf_ion_results)
 
-                    positive = rsp_results['eigenvalues'] > 0.0
-                    assert_msg_critical(
-                        positive[-1],
-                        'Need to compute more excited states to reach the shake-up states.'
-                    )
+                    if self.rank == mpi_master():
+                        positive = rsp_results['eigenvalues'] > 0.0
+                        assert_msg_critical(
+                            positive[-1],
+                            'Need to compute more excited states to reach the shake-up states.')
+                        assert_msg_critical(np.sum(~positive) == nbeta,
+                                            'Unexpected number of negative eigenvalues in RSP results.')
 
-                    for n in range(nbeta, nbeta + self.nstates):
-                        energy = rsp_results['eigenvalues'][n] * hartree_in_ev()
+                        for n in range(nbeta, nbeta + self.nstates):
+                            energy = rsp_results['eigenvalues'][n] * hartree_in_ev()
 
-                        # TODO?: only consider shake-up states with significant oscillator strength
-                        #if excitation['oscillator_strength'] > 1e-3:
-                        shakeup_intensity = self._compute_shakeup_intensity(scf_results, scf_ion_results, rsp_results, n, O_Rb, nalpha, tda=self.tamm_dancoff)
-                        # Approximate shake-up IE as mainline IE + excitation energy
-                        shakeup_energy = ie + energy  
-                        ionization_energies.append((mo_index, atom_index, shakeup_energy, contribution, shakeup_intensity))
+                            # TODO?: only consider shake-up states with significant oscillator strength
+                            #if excitation['oscillator_strength'] > 1e-3:
+                            shakeup_intensity = self._compute_shakeup_intensity(scf_results, scf_ion_results, rsp_results, n, O_Rb, nalpha, tda=self.tamm_dancoff)
+                            # Approximate shake-up IE as mainline IE + excitation energy
+                            shakeup_energy = ie + energy  
+                            ionization_energies.append((mo_index, atom_index, shakeup_energy, contribution, shakeup_intensity))
 
                 if self.rank == mpi_master():
                     self.ostream.print_info(
@@ -757,7 +784,8 @@ class XPSDriver:
                     self.ostream.print_blank()
                     self.ostream.flush()
 
-            results[elem] = ionization_energies
+            #results[elem] = ionization_energies
+            results[elem] = self.comm.bcast(ionization_energies, root=mpi_master())
 
         if self.rank == mpi_master():
             self.ostream.print_blank()
