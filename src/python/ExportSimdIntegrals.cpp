@@ -35,13 +35,16 @@
 #include "ExportSimdIntegrals.hpp"
 
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "SimdKineticEnergyDriver.hpp"
+#include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionDriver.hpp"
 #include "SimdOverlapDriver.hpp"
 #include "SparseMatrix.hpp"
+#include "SparseTensor.hpp"
 
 namespace vlx_simdintegrals {  // vlx_simdintegrals namespace
 
@@ -87,6 +90,28 @@ export_simdintegrals(py::module &m) -> void
              "Computes two-center electron repulsion matrix for given molecule and molecular basis.",
              py::arg("molecule"),
              py::arg("basis"));
+
+    // CSimdThreeCenterElectronRepulsionDriver class
+
+    PyClass<CSimdThreeCenterElectronRepulsionDriver>(m, "SimdThreeCenterElectronRepulsionDriver")
+        .def(py::init<>())
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const CMolecularBasis &, const double>(
+                 &CSimdThreeCenterElectronRepulsionDriver::compute, py::const_),
+             "Computes three-center electron repulsion tensor for all atoms on c side.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"))
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const CMolecularBasis &, const double, const std::vector<int> &>(
+                 &CSimdThreeCenterElectronRepulsionDriver::compute, py::const_),
+             "Computes three-center electron repulsion tensor for given atoms on c side.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"),
+             py::arg("atoms"));
 }
 
 }  // namespace vlx_simdintegrals
