@@ -382,22 +382,15 @@ export_sparse(py::module &m) -> void
                       const screener,
                       const double,
                       const mat_t,
-                      const size_t,
-                      const size_t>(),
-             "Creates a sparse tensor for a batch of atoms on c side.",
+                      const std::vector<int> &>(),
+             "Creates a sparse tensor for the given atoms on c side.",
              py::arg("molecule"),
              py::arg("basis"),
              py::arg("aux_basis"),
              py::arg("bound"),
              py::arg("threshold"),
              py::arg("matrix_type"),
-             py::arg("natoms_per_batch"),
-             py::arg("batch_index"))
-        .def_static("number_of_batches",
-                    &CSparseTensor::number_of_batches,
-                    "Gets number of batches of atoms on c side.",
-                    py::arg("aux_basis"),
-                    py::arg("natoms_per_batch"))
+             py::arg("aux_atoms"))
         .def("get_type", &CSparseTensor::get_type, "Gets type of tensor.")
         .def("set_type", &CSparseTensor::set_type, "Sets type of tensor.", py::arg("matrix_type"))
         .def("get_values_state", &CSparseTensor::get_values_state, "Gets state of the values blocks of tensor.")

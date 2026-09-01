@@ -36,8 +36,10 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <iterator>
 #include <optional>
 #include <ranges>
+#include <unordered_set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -123,7 +125,8 @@ class CSparseTensor
     }
 
     /// @brief The constructor with molecule, molecular basis on a and b sides,
-    /// molecular basis on c side, integral screener and screening threshold.
+    /// molecular basis on c side, integral screener and screening threshold. All
+    /// atoms on c side are described.
     /// @param molecule The molecule to compute interatomic distances from.
     /// @param basis The molecular basis on a and b sides.
     /// @param aux_basis The molecular basis on c side.
@@ -131,16 +134,13 @@ class CSparseTensor
     /// b_function, c_function, distance).
     /// @param threshold The screening threshold.
     /// @param mat_type The type of tensor.
-    /// @param block_size The target number of atom pairs of a block, or zero to
-    /// choose it from the number of the threads and the number of the atom pairs.
     template <typename B>
     CSparseTensor(const CMolecule       &molecule,
                   const CMolecularBasis &basis,
                   const CMolecularBasis &aux_basis,
                   const B               &screener,
                   const double           threshold,
-                  const mat_t            mat_type,
-                  const size_t           block_size = 0)
+                  const mat_t            mat_type)
 
         : _blocks{}
 
@@ -156,11 +156,12 @@ class CSparseTensor
 
         auto groups = (mat_type == mat_t::general) ? basis.basis_pair_groups(basis) : basis.basis_pair_groups();
 
-        _add_blocks(molecule, groups, aux_basis.basis_groups(), screener, threshold, block_size);
+        _add_blocks(molecule, groups, aux_basis.basis_groups(), screener, threshold);
     }
 
     /// @brief The constructor with molecule, molecular bases on a and b sides,
-    /// molecular basis on c side, integral screener and screening threshold.
+    /// molecular basis on c side, integral screener and screening threshold. All
+    /// atoms on c side are described.
     /// @param molecule The molecule to compute interatomic distances from.
     /// @param bra_basis The molecular basis on a side.
     /// @param ket_basis The molecular basis on b side.
@@ -168,8 +169,6 @@ class CSparseTensor
     /// @param screener The integral bound.
     /// @param threshold The screening threshold.
     /// @param mat_type The type of tensor, which must be general.
-    /// @param block_size The target number of atom pairs of a block, or zero to
-    /// choose it from the number of the threads and the number of the atom pairs.
     template <typename B>
     CSparseTensor(const CMolecule       &molecule,
                   const CMolecularBasis &bra_basis,
@@ -177,8 +176,7 @@ class CSparseTensor
                   const CMolecularBasis &aux_basis,
                   const B               &screener,
                   const double           threshold,
-                  const mat_t            mat_type,
-                  const size_t           block_size = 0)
+                  const mat_t            mat_type)
 
         : _blocks{}
 
@@ -193,36 +191,29 @@ class CSparseTensor
 
         auto groups = bra_basis.basis_pair_groups(ket_basis);
 
-        _add_blocks(molecule, groups, aux_basis.basis_groups(), screener, threshold, block_size);
+        _add_blocks(molecule, groups, aux_basis.basis_groups(), screener, threshold);
     }
 
     /// @brief The constructor with molecule, molecular basis on a and b sides,
     /// molecular basis on c side, integral screener, screening threshold and the
-    /// batch of atoms on c side to describe.
+    /// atoms on c side to describe. The tensor holds the part of the whole which
+    /// those atoms carry.
     /// @param molecule The molecule to compute interatomic distances from.
     /// @param basis The molecular basis on a and b sides.
     /// @param aux_basis The molecular basis on c side.
     /// @param screener The integral bound.
     /// @param threshold The screening threshold.
     /// @param mat_type The type of tensor.
-    /// @param natoms_per_batch The number of atoms on c side in a batch.
-    /// @param batch_index The index of batch.
-    /// @param block_size The target number of atom pairs of a block, or zero to
-    /// choose it from the number of the threads and the number of the atom pairs.
-    /// @note Each atom basis group on c side is sliced with the same offset and
-    /// number of atoms, so that every atom on c side belongs to exactly one
-    /// batch. A group shorter than the offset contributes no blocks, and the
-    /// last batch of a group is short rather than out of range.
+    /// @param aux_atoms The atoms on c side to describe, as their indices in the
+    /// molecule and without repetition.
     template <typename B>
-    CSparseTensor(const CMolecule       &molecule,
-                  const CMolecularBasis &basis,
-                  const CMolecularBasis &aux_basis,
-                  const B               &screener,
-                  const double           threshold,
-                  const mat_t            mat_type,
-                  const size_t           natoms_per_batch,
-                  const size_t           batch_index,
-                  const size_t           block_size = 0)
+    CSparseTensor(const CMolecule        &molecule,
+                  const CMolecularBasis  &basis,
+                  const CMolecularBasis  &aux_basis,
+                  const B                &screener,
+                  const double            threshold,
+                  const mat_t             mat_type,
+                  const std::vector<int> &aux_atoms)
 
         : _blocks{}
 
@@ -232,44 +223,31 @@ class CSparseTensor
 
         , _values_state(valstat::empty)
     {
-        errors::assertMsgCritical(natoms_per_batch > 0, std::string("SparseTensor: Number of atoms in a batch must be positive"));
-
         auto groups = (mat_type == mat_t::general) ? basis.basis_pair_groups(basis) : basis.basis_pair_groups();
 
-        const auto offset = batch_index * natoms_per_batch;
+        const auto aux_groups = _select_aux_groups(molecule, aux_basis, aux_atoms);
 
-        std::vector<CAtomBasisGroup> aux_groups;
-
-        std::ranges::for_each(aux_basis.basis_groups(), [&](const auto &group) {
-            const auto slice = group.slice(offset, natoms_per_batch);
-
-            if (slice.number_of_atoms() > 0) aux_groups.push_back(slice);
-        });
-
-        _add_blocks(molecule, groups, aux_groups, screener, threshold, block_size);
+        _add_blocks(molecule, groups, aux_groups, screener, threshold);
     }
 
     /// @brief The constructor with molecule, molecular bases, named integral
-    /// bound, screening threshold and the batch of atoms on c side to describe.
+    /// bound, screening threshold and the atoms on c side to describe. The tensor
+    /// holds the part of the whole which those atoms carry.
     /// @param molecule The molecule to compute interatomic distances from.
     /// @param basis The molecular basis on a and b sides.
     /// @param aux_basis The molecular basis on c side.
     /// @param bound The integral bound to screen atom pairs with.
     /// @param threshold The screening threshold.
     /// @param mat_type The type of tensor.
-    /// @param natoms_per_batch The number of atoms on c side in a batch.
-    /// @param batch_index The index of batch.
-    /// @param block_size The target number of atom pairs of a block, or zero to
-    /// choose it from the number of the threads and the number of the atom pairs.
-    CSparseTensor(const CMolecule       &molecule,
-                  const CMolecularBasis &basis,
-                  const CMolecularBasis &aux_basis,
-                  const screener         bound,
-                  const double           threshold,
-                  const mat_t            mat_type,
-                  const size_t           natoms_per_batch,
-                  const size_t           batch_index,
-                  const size_t           block_size = 0)
+    /// @param aux_atoms The atoms on c side to describe, as their indices in the
+    /// molecule and without repetition.
+    CSparseTensor(const CMolecule        &molecule,
+                  const CMolecularBasis  &basis,
+                  const CMolecularBasis  &aux_basis,
+                  const screener          bound,
+                  const double            threshold,
+                  const mat_t             mat_type,
+                  const std::vector<int> &aux_atoms)
 
         : _blocks{}
 
@@ -282,40 +260,11 @@ class CSparseTensor
         errors::assertMsgCritical(bound == screener::electron_repulsion,
                                   std::string("SparseTensor: Integral bound is not a three-center bound"));
 
-        errors::assertMsgCritical(natoms_per_batch > 0, std::string("SparseTensor: Number of atoms in a batch must be positive"));
-
         auto groups = (mat_type == mat_t::general) ? basis.basis_pair_groups(basis) : basis.basis_pair_groups();
 
-        const auto offset = batch_index * natoms_per_batch;
+        const auto aux_groups = _select_aux_groups(molecule, aux_basis, aux_atoms);
 
-        std::vector<CAtomBasisGroup> aux_groups;
-
-        std::ranges::for_each(aux_basis.basis_groups(), [&](const auto &group) {
-            const auto slice = group.slice(offset, natoms_per_batch);
-
-            if (slice.number_of_atoms() > 0) aux_groups.push_back(slice);
-        });
-
-        _add_blocks(molecule, groups, aux_groups, screenfunc::three_center_electron_repulsion_bound, threshold, block_size);
-    }
-
-    /// @brief Gets number of batches of atoms on c side.
-    /// @param aux_basis The molecular basis on c side.
-    /// @param natoms_per_batch The number of atoms on c side in a batch.
-    /// @return The number of batches.
-    /// @note The number of batches follows from the largest atom basis group on
-    /// c side, as the groups are sliced with the same offset and number of atoms.
-    static auto
-    number_of_batches(const CMolecularBasis &aux_basis, const size_t natoms_per_batch) -> size_t
-    {
-        errors::assertMsgCritical(natoms_per_batch > 0,
-                                  std::string("SparseTensor.number_of_batches: Number of atoms in a batch must be positive"));
-
-        size_t natoms = 0;
-
-        std::ranges::for_each(aux_basis.basis_groups(), [&](const auto &group) { natoms = std::max(natoms, group.number_of_atoms()); });
-
-        return (natoms + natoms_per_batch - 1) / natoms_per_batch;
+        _add_blocks(molecule, groups, aux_groups, screenfunc::three_center_electron_repulsion_bound, threshold);
     }
 
     /// @brief The copy constructor.
@@ -673,6 +622,51 @@ class CSparseTensor
         }
     }
 
+    /// @brief Selects the atom basis groups on c side which the given atoms
+    /// belong to, keeping only those atoms.
+    /// @param molecule The molecule the atoms are indexed in.
+    /// @param aux_basis The molecular basis on c side.
+    /// @param aux_atoms The atoms on c side to describe, as their indices in the
+    /// molecule and without repetition.
+    /// @return The atom basis groups holding the given atoms.
+    /// @note The atoms of a group are taken in the order of the given atoms and
+    /// not in the order of the group, so the values of a block follow the order
+    /// the caller asked for. A group holding none of them is left out, as it
+    /// carries no block.
+    /// @note The atoms are not checked for repetition, which the caller answers
+    /// for. A repeated atom would be described twice and its integrals computed
+    /// twice, which is wasteful rather than wrong.
+    static auto
+    _select_aux_groups(const CMolecule        &molecule,
+                       const CMolecularBasis  &aux_basis,
+                       const std::vector<int> &aux_atoms) -> std::vector<CAtomBasisGroup>
+    {
+        errors::assertMsgCritical(!aux_atoms.empty(), std::string("SparseTensor: The atoms on c side must not be empty"));
+
+        const auto natoms = molecule.number_of_atoms();
+
+        std::ranges::for_each(aux_atoms, [&](const auto atom) {
+            errors::assertMsgCritical((atom >= 0) && (atom < natoms),
+                                      std::string("SparseTensor: Index of atom on c side is out of range"));
+        });
+
+        std::vector<CAtomBasisGroup> groups;
+
+        std::ranges::for_each(aux_basis.basis_groups(), [&](const auto &group) {
+            const std::unordered_set<int> atoms(group.atoms().begin(), group.atoms().end());
+
+            std::vector<int> selected;
+
+            selected.reserve(aux_atoms.size());
+
+            std::ranges::copy_if(aux_atoms, std::back_inserter(selected), [&](const auto atom) { return atoms.contains(atom); });
+
+            if (!selected.empty()) groups.push_back(CAtomBasisGroup(group.basis(), selected, group.index()));
+        });
+
+        return groups;
+    }
+
     /// @brief Adds the sparsity patterns of the non-empty blocks of the atom
     /// basis pair groups and atom basis groups.
     /// @param molecule The molecule to compute interatomic distances from.
@@ -680,16 +674,13 @@ class CSparseTensor
     /// @param aux_groups The atom basis groups on c side.
     /// @param screener The integral bound.
     /// @param threshold The screening threshold.
-    /// @param block_size The target number of atom pairs of a block, or zero to
-    /// choose it from the number of the threads and the number of the atom pairs.
     template <typename B>
     auto
     _add_blocks(const CMolecule                     &molecule,
                 std::vector<CAtomBasisPairGroup>    &groups,
                 const std::vector<CAtomBasisGroup>  &aux_groups,
                 const B                             &screener,
-                const double                         threshold,
-                const size_t                         block_size) -> void
+                const double                         threshold) -> void
     {
         // NOTE: the atom basis pair groups are as many as the pairs of the unique
         // atom bases, so their number is set by the variety of the elements of
@@ -699,8 +690,7 @@ class CSparseTensor
         // threads. Batching the c side does not do this, as the cost of a block
         // follows the atom pairs on the a and b sides.
 
-        const auto nblock_pairs =
-            (block_size == 0) ? CAtomBasisPairGroup::make_block_size(groups, blocks_per_thread, min_block_size) : block_size;
+        const auto nblock_pairs = CAtomBasisPairGroup::make_block_size(groups, blocks_per_thread, min_block_size);
 
         auto blocks = (nblock_pairs == 0) ? std::move(groups) : CAtomBasisPairGroup::divide(groups, nblock_pairs);
 
