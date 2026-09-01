@@ -523,7 +523,8 @@ class XPSDriver:
         intensity = abs(amplitude)**2
         return intensity
 
-    def _NEW_compute_shakeup_intensity(self, gs_scf_results, ion_scf_results, rsp_results, state_idx, unrel_occ_b, nalpha, tda=False):
+    def _compute_shakeup_intensities(self, gs_scf_results, ion_scf_results, 
+                                     rsp_results, unrel_occ_b, nalpha, tda=False):
         """
         Computes the intensity of shake-up satellites in the sudden approximation.
 
@@ -545,39 +546,33 @@ class XPSDriver:
         :return:
             The shake-up intensity (float).
         """
+
+        assert_msg_critical(
+                        tda,
+                        'Only enabled in the TDA approximation currently.')
         
+        S = gs_scf_results['S']
         norb = gs_scf_results['C_alpha'].shape[1]
         nbeta = nalpha - 1
-        nvir_a = norb - nalpha
-        nvir_b = norb - nbeta
 
-        n_ov_a = nalpha * nvir_a
-        n_ov_b = nbeta * nvir_b
-        if tda:
-            X_a = rsp_results['eigenvectors'][:n_ov_a, state_idx].reshape(nalpha, nvir_a)
-            X_b = rsp_results['eigenvectors'][n_ov_a:, state_idx].reshape(nbeta, nvir_b)
-        else:
-            assert_msg_critical(
-                False,
-                'Only enabled in the TDA approximation currently.')
-
-        S = gs_scf_results['S']
         # Get the occupied- and virtual MOs of the ionized system, alpha and beta
         R_a = ion_scf_results['C_alpha'][:, :nalpha]
         V_a = ion_scf_results['C_alpha'][:, nalpha:]
         R_b = ion_scf_results['C_beta'][:, :nbeta]
         V_b = ion_scf_results['C_beta'][:, nbeta:]
-
-        # reference system
+            
+        # Unrelaxed (sudden-approximation) reference (beta hole)
         U_a = gs_scf_results['C_alpha'][:, :nalpha]
         U_b = unrel_occ_b
 
-        # SU_a = S @ U_a
-        # SU_b = S @ U_b
+        SU_a = S @ U_a
+        SU_b = S @ U_b
 
-        M_a = R_a.conj().T @ S @ U_a
-        M_b = R_b.conj().T @ S @ U_b
-        
+        M_a = R_a.conj().T @ SU_a
+        M_b = R_b.conj().T @ SU_b
+        W_a = V_a.conj().T @ SU_a
+        W_b = V_b.conj().T @ SU_b
+
         s0_a = np.linalg.det(M_a)
         s0_b = np.linalg.det(M_b)
 
@@ -585,14 +580,18 @@ class XPSDriver:
         # A_a, A_b = 0, 0
         # A_a_ia = X_ia * s_ia = X_ia * s0_a*(WM^-1)_ai = X_ia * s0_a * G_ai
         # A_a = sum_ia A_a_ia = s0_a * sum_ia X_ia * G_ai
-        W_a = V_a.conj().T @ S @ U_a
-        W_b = V_b.conj().T @ S @ U_b
 
         G_a = np.linalg.solve(M_a.T, W_a.T)
         G_b = np.linalg.solve(M_b.T, W_b.T)
 
-        A_a = s0_a * np.sum(X_a * G_a)
-        A_b = s0_b * np.sum(X_b * G_b)
+        n_ov_a = nalpha * (norb - nalpha)
+        eigvecs = rsp_results['eigenvectors']
+
+        #A_a = s0_a * np.sum(X_a * G_a)
+        #A_a = s0_a * np.sum(G_a.reshape(-1)[:, None] * eigvecs[:n_ov_a, :], axis=0)
+        #A_b = s0_b * np.sum(G_b.reshape(-1)[:, None] * eigvecs[n_ov_a:, :], axis=0)
+        A_a = s0_a * (G_a.ravel() @ eigvecs[:n_ov_a, :])
+        A_b = s0_b * (G_b.ravel() @ eigvecs[n_ov_a:, :])
 
         amplitude = A_a * s0_b + A_b * s0_a
         intensity = abs(amplitude)**2
@@ -836,22 +835,27 @@ class XPSDriver:
                     rsp_results = rsp_drv.compute(molecular_ion, basis, scf_ion_results)
 
                     if self.rank == mpi_master():
-                        positive = rsp_results['eigenvalues'] > 0.0
-                        assert_msg_critical(
-                            positive[-1],
-                            'Need to compute more excited states to reach the shake-up states.')
-                        assert_msg_critical(np.sum(~positive) == nbeta,
-                                            'Unexpected number of negative eigenvalues in RSP results.')
+                        eigvals = rsp_results["eigenvalues"]
+                        # shake-up states are the first positive eigenvalues after the emission states
+                        positive_indices = np.where(eigvals > 0.0)[0]
+                        assert_msg_critical(positive_indices.size > 0,
+                            'XPSDriver: increase nstates.')
+                        first_shakeup = positive_indices[0]
 
-                        for n in range(nbeta, nbeta + self.nstates):
-                            energy = rsp_results['eigenvalues'][n] * hartree_in_ev()
+                        n_emission_states = np.sum(scf_ion_results['E_beta'][:nbeta] > scf_ion_results['E_beta'][nbeta])
+                        assert_msg_critical(first_shakeup == n_emission_states,
+                                            f'XPSDriver: expected {n_emission_states} emission states, but found {first_shakeup} positive eigenvalues.')
 
-                            # TODO?: only consider shake-up states with significant oscillator strength
-                            #if excitation['oscillator_strength'] > 1e-3:
-                            shakeup_intensity = self._compute_shakeup_intensity(scf_results, scf_ion_results, rsp_results, n, O_Rb, nalpha, tda=self.tamm_dancoff)
+                        shakeup_intensities = self._compute_shakeup_intensities(
+                            scf_results, scf_ion_results, rsp_results, O_Rb,
+                            nalpha, tda=self.tamm_dancoff)
+
+                        for n in range(first_shakeup, first_shakeup + self.nstates):
+                            energy = eigvals[n] * hartree_in_ev()
+
                             # Approximate shake-up IE as mainline IE + excitation energy
                             shakeup_energy = ie + energy  
-                            ionization_energies.append((mo_index, atom_index, shakeup_energy, contribution, shakeup_intensity))
+                            ionization_energies.append((mo_index, atom_index, shakeup_energy, contribution, shakeup_intensities[n]))
 
                 if self.rank == mpi_master():
                     self.ostream.print_info(
