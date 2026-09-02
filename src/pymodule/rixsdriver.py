@@ -993,6 +993,34 @@ class RixsDriver(LinearSolver):
                 return rsp_results['eigenvalues'][k]
         raise ValueError("No core-labeled state found in excitation_details.")
 
+    def _new_core_state_indices(self, rsp_results, detuning, core_thresh=0.5, tol=1e-6):
+        """
+        Identify the intermediate (core-excited) states.
+        Keep states with detuning >= -tol.
+
+        :param rsp_results:
+            Dictionary containing the response data.
+        :param detuning:
+            Array of detuning values relative to the
+            first core-excited state.
+        :param tol:
+            Numerical tolerance used for detuning cutoff.
+        :param core_thresh:
+            Threshold for the fraction of the excitation vector
+            corresponding to core orbitals.
+
+        :return: 
+            List of core-excited states and array of detuning.
+        """
+        num_core = rsp_results['num_core']
+        core_states = []
+        for state in np.where(detuning >= -tol)[0]:
+            X = rsp_results['eigenvectors'][:, state]
+            X = X[:n_ov].reshape(n_occ_sub, n_vir_sub)
+            if np.sum(X[:num_core]**2) / np.sum(X**2) > core_thresh:
+                core_states.append(int(state))
+        return core_states
+
     def _core_state_indices(self, rsp_results, detuning, tol=1e-6):
         """
         Filter out (possibly) unphysical non-core states.
@@ -1073,7 +1101,7 @@ class RixsDriver(LinearSolver):
             The scattering amplitude tensor: shape = (3,3)
         """
         gamma_hwhm = self.gamma / 2.0
-        e_n = 1.0 / (omega - (core_eigenvalue + 1j * gamma_hwhm))
+        e_n = 1.0 / (omega - core_eigenvalue + 1j * gamma_hwhm)
 
         if val_eigenvalue is None or intermediate_tdens is None:
             # Elastic line, note that the term prop. to A^2 is not included
