@@ -99,8 +99,7 @@ class XPSDriver:
         }
 
         # Based on typical DFT (B3LYP/PBE) calculations
-        # TODO: make this a function of the functional? 
-        # or at least have separate ranges for GGA vs hybrid?
+        # separate ranges for GGA vs hybrid?
         self.energy_ranges_dft = {
             'C': (-10.5, -9.2),
             'N': (-14.6, -13.8),
@@ -302,7 +301,7 @@ class XPSDriver:
 
         return ao_to_atom
 
-    def _assign_orbital_to_atom(self, mo_index, mo_coefficients, molecule, basis, element):
+    def _assign_orbital_to_atom(self, mo_index, mo_coefficients, molecule, basis, element, S):
         """
         Assigns a core molecular orbital to a specific atom based on MO coefficient analysis.
 
@@ -319,6 +318,8 @@ class XPSDriver:
             The molecular basis set.
         :param element:
             Element symbol (e.g., 'C', 'O', 'N').
+        :param S:
+            The overlap matrix.
 
         :return:
             Tuple of (atom_index, contribution) where atom_index is the 0-based index
@@ -327,6 +328,7 @@ class XPSDriver:
 
         # Get MO coefficients for this orbital
         mo_coeff = mo_coefficients[:, mo_index]
+        SC_coeff = S @ mo_coeff
 
         # Get atom labels
         atom_labels = molecule.get_labels()
@@ -340,7 +342,10 @@ class XPSDriver:
 
         for ao_idx, atom_idx in enumerate(ao_to_atom_map):
             # Sum of squared coefficients for this atom
-            atom_contributions[atom_idx] += mo_coeff[ao_idx]**2
+            #atom_contributions[atom_idx] += mo_coeff[ao_idx]**2
+            # inner product: <C|C> = C^T S C
+            # atom-contribution = sum_{mu in atom} C_mu * (S C)_mu
+            atom_contributions[atom_idx] += mo_coeff[ao_idx] * SC_coeff[ao_idx]
 
         # Find atoms of the target element
         target_atom_indices = [i for i, label in enumerate(atom_labels)
@@ -459,7 +464,7 @@ class XPSDriver:
         assignments = []
         for mo_idx in indices:
             atom_idx, contribution = self._assign_orbital_to_atom(
-                mo_idx, mo_coefficients, molecule, basis, element_symbol)
+                mo_idx, mo_coefficients, molecule, basis, element_symbol, scf_results['S'])
             assignments.append((mo_idx, atom_idx, contribution))
 
         return assignments
@@ -778,6 +783,7 @@ class XPSDriver:
                         min_moind, max_moind = min(delocalized), max(delocalized) + 1
 
                         orb_drv = OrbitalLocalizationDriver(self.ostream)
+                        orb_drv.method = 'boys'
                         # restricted reference
                         loc_orbs = orb_drv.compute(molecule, basis, scf_results, (min_moind+1, max_moind))['loc_orbs'].alpha_to_numpy()
 
@@ -872,7 +878,7 @@ class XPSDriver:
                         self.ostream.print_blank()
                         # TODO: should not print the number of shake-up states since these include emission
                         self.ostream.print_info(
-                            f'Computing {self.nstates} [not only shake-up satellite] states for {elem} orbital {mo_index} '
+                            f'Computing {self.nstates} shake-up states for {elem} of orbital {mo_index} '
                             f'(Atom {atom_index+1})...')
                         self.ostream.print_blank()
                         self.ostream.flush()
