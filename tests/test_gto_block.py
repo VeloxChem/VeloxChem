@@ -29,7 +29,7 @@ class TestGtoBlock:
 
     def test_coordinates(self):
 
-        tol = 1.0e-12
+        # tol = 1.0e-12
 
         mol_h2o, bas_svp = self.get_data()
         gblock = GtoBlock(bas_svp, mol_h2o, 0, 1)

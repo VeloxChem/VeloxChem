@@ -1,5 +1,4 @@
 from mpi4py import MPI
-import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import mpi_master

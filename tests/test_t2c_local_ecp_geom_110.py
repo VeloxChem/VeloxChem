@@ -21,28 +21,28 @@ class TestProjectedSECPGeom110Driver:
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         return mol, bas
-        
+
     def test_local_ecp_auh2_svp_for_au1_au1(self):
 
         mol_auh2, bas_svp = self.get_svp_data()
-        
+
         lpot = BaseCorePotential([4.78982000, 2.39491000],
                                  [30.49008890, 5.17107381],
                                  [2, 2])
-                                 
+
         ecp_drv = LocalECPGeom110Driver()
         ecp_mats = ecp_drv.compute(mol_auh2, bas_svp, lpot, 0)
-        
+
         # load reference overlap data
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'auh2.def2svp.au.ecp.only.ul.geom.110.au1.au1.npy')
         ref_mat = np.load(npyfile)
-        
-        #print(ref_mat.shape)
-        
+
+        # print(ref_mat.shape)
+
         # dimension of molecular basis
         basdims = [0, 10, 25, 35, 42]
-        
+
         # indices map
         labels = ['X_X', 'X_Y', 'X_Z', 'Y_X', 'Y_Y', 'Y_Z', 'Z_X', 'Z_Y', 'Z_Z']
 
@@ -63,10 +63,10 @@ class TestProjectedSECPGeom110Driver:
                     rmat.set_values(
                         np.ascontiguousarray(ref_mat[k, sbra:ebra, sket:eket]))
                     # compare submatrices
-                    #print(cmat.to_numpy())
-                    #print(rmat.to_numpy())
-                    #assert cmat == rmat
+                    # print(cmat.to_numpy())
+                    # print(rmat.to_numpy())
+                    # assert cmat == rmat
             smat = fmat.full_matrix()
             fref = SubMatrix([0, 0, 42, 42])
             fref.set_values(np.ascontiguousarray(ref_mat[k]))
-            #assert smat == fref
+            # assert smat == fref

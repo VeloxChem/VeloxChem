@@ -1,6 +1,5 @@
 from mpi4py import MPI
 import numpy as np
-from pathlib import Path
 import pytest
 
 from veloxchem.molecule import Molecule
