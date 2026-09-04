@@ -229,15 +229,15 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
 
     gpuSafe(gpuMallocAsync(&d_atom_ids_of_points, sizeof(uint32_t) * grid_batch_size, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_grid_x, gridx, grid_batch_size * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_y, gridy, grid_batch_size * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_z, gridz, grid_batch_size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_x, gridx, grid_batch_size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_y, gridy, grid_batch_size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_z, gridz, grid_batch_size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_atom_x, atom_coords.data() + 0 * nAtoms * 2, nAtoms * 2 * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_atom_y, atom_coords.data() + 1 * nAtoms * 2, nAtoms * 2 * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_atom_z, atom_coords.data() + 2 * nAtoms * 2, nAtoms * 2 * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_atom_x, atom_coords.data() + 0 * nAtoms * 2, nAtoms * 2 * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_atom_y, atom_coords.data() + 1 * nAtoms * 2, nAtoms * 2 * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_atom_z, atom_coords.data() + 2 * nAtoms * 2, nAtoms * 2 * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_atom_ids_of_points, atom_ids, grid_batch_size * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_atom_ids_of_points, atom_ids, grid_batch_size * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -254,7 +254,7 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
                        d_atom_x, d_atom_y, d_atom_z, static_cast<uint32_t>(nAtoms),
                        d_partial_weights);
 
-    gpuSafe(gpuMemcpyAsync(partial_weights.data(), d_partial_weights, grid_batch_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(partial_weights.data(), d_partial_weights, grid_batch_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 

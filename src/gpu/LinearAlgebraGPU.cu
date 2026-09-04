@@ -111,8 +111,8 @@ computeDotProduct(const double* A, const double* B, const int64_t size_int64) ->
     gpuSafe(gpuMallocAsync(&d_A, size * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_B, size * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_A, A, size * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_B, B, size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_A, A, size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_B, B, size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpublasHandle_t handle;
     gpublasSafe(gpublasCreate(&handle));
@@ -165,7 +165,7 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
     gpuSafe(gpuMallocAsync(&d_X, size * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_Y, size * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_Y, weighted_data, size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_Y, weighted_data, size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpublasHandle_t handle;
     gpublasSafe(gpublasCreate(&handle));
@@ -175,7 +175,7 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
     {
         double alpha = weights[i];
 
-        gpuSafe(gpuMemcpyAsync(d_X, data_pointers[i], size * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_X, data_pointers[i], size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
         auto n = static_cast<int32_t>(size);
 
@@ -186,7 +186,7 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
 #endif
     }
 
-    gpuSafe(gpuMemcpyAsync(weighted_data, d_Y, size * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(weighted_data, d_Y, size * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -227,8 +227,8 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     gpuSafe(gpuMallocAsync(&d_B, nao_size * nao_size * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_C, nao_size * nao_size * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_A, F, nao_size * nao_size * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_B, D, nao_size * nao_size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_A, F, nao_size * nao_size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_B, D, nao_size * nao_size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpublasHandle_t handle;
     gpublasSafe(gpublasCreate(&handle));
@@ -249,7 +249,7 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
 #endif
 
     // S^T(FD)^T (=> FDS)
-    gpuSafe(gpuMemcpyAsync(d_A, S, nao_size * nao_size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_A, S, nao_size * nao_size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
 #if defined(USE_CUDA)
     cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, nao, nao, nao, &alpha, d_A, nao, d_C, nao, &beta, d_B, nao));
@@ -270,7 +270,7 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     double* d_X = d_A;  // note: nao >= nmo
     double* d_Y = d_B;  // note: nao >= nmo
 
-    gpuSafe(gpuMemcpyAsync(d_X, X, nmo_size * nao_size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_X, X, nmo_size * nao_size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
 #if defined(USE_CUDA)
     auto op_X  = (trans_X == std::string("N")) ? CUBLAS_OP_N : CUBLAS_OP_T;
@@ -299,7 +299,7 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_C, nmo));
 #endif
 
-    gpuSafe(gpuMemcpyAsync(errvec, d_C, nmo_size * nmo_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(errvec, d_C, nmo_size * nmo_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -341,8 +341,8 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
     gpuSafe(gpuMallocAsync(&d_X, (nmo_size * nao_size) * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_Y, (nmo_size * nao_size) * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_F, F, nao_size * nao_size * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_X, X, nmo_size * nao_size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_F, F, nao_size * nao_size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_X, X, nmo_size * nao_size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpublasHandle_t handle;
     gpublasSafe(gpublasCreate(&handle));
@@ -380,7 +380,7 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
     hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_F, nmo));
 #endif
 
-    gpuSafe(gpuMemcpyAsync(transformed_F, d_F, nmo_size * nmo_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(transformed_F, d_F, nmo_size * nmo_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -423,8 +423,8 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
     gpuSafe(gpuMallocAsync(&d_B, (k_size * n_size) * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_C, (m_size * n_size) * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_A, A, m_size * k_size * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_B, B, k_size * n_size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_A, A, m_size * k_size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_B, B, k_size * n_size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpublasHandle_t handle;
     gpublasSafe(gpublasCreate(&handle));
@@ -456,7 +456,7 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
     hipblasSafe(hipblasDgemm(handle, op_B, op_A, n, m, k, &alpha, d_B, lda_B, d_A, lda_A, &beta, d_C, n));
 #endif
 
-    gpuSafe(gpuMemcpyAsync(C, d_C, m_size * n_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(C, d_C, m_size * n_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -495,7 +495,7 @@ diagonalizeMatrix(double* A, double* D, const int64_t n_int64) -> void
     gpuSafe(gpuMallocAsync(&d_D, n_size * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_info, sizeof(int32_t), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_A, A, n_size * n_size * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_A, A, n_size * n_size * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     auto n = static_cast<int32_t>(n_int64);
 
@@ -513,9 +513,9 @@ diagonalizeMatrix(double* A, double* D, const int64_t n_int64) -> void
 
     cusolverSafe(cusolverDnDsyevd(handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_UPPER, n, d_A, n, d_D, d_work, lwork, d_info));
 
-    gpuSafe(gpuMemcpyAsync(A, d_A, n_size * n_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
-    gpuSafe(gpuMemcpyAsync(D, d_D, n_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
-    gpuSafe(gpuMemcpyAsync(&info, d_info, 1 * sizeof(int32_t), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(A, d_A, n_size * n_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(D, d_D, n_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(&info, d_info, 1 * sizeof(int32_t), gpuMemcpyDeviceToHost, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -539,9 +539,9 @@ diagonalizeMatrix(double* A, double* D, const int64_t n_int64) -> void
 
     hipsolverSafe(hipsolverDsyevd(handle, HIPSOLVER_EIG_MODE_VECTOR, HIPSOLVER_FILL_MODE_UPPER, n, d_A, n, d_D, d_work, lwork, d_info));
 
-    gpuSafe(gpuMemcpyAsync(A, d_A, n_size * n_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
-    gpuSafe(gpuMemcpyAsync(D, d_D, n_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
-    gpuSafe(gpuMemcpyAsync(&info, d_info, 1 * sizeof(int32_t), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(A, d_A, n_size * n_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(D, d_D, n_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(&info, d_info, 1 * sizeof(int32_t), gpuMemcpyDeviceToHost, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 

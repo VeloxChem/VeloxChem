@@ -269,9 +269,9 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
     gpuSafe(gpuMallocAsync(&d_p_prim_info_1, p_prim_info_1.size() * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_d_prim_info_1, d_prim_info_1.size() * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_s_prim_info_1, s_prim_info_1.data(), s_prim_info_1.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_p_prim_info_1, p_prim_info_1.data(), p_prim_info_1.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_d_prim_info_1, d_prim_info_1.data(), d_prim_info_1.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_s_prim_info_1, s_prim_info_1.data(), s_prim_info_1.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_p_prim_info_1, p_prim_info_1.data(), p_prim_info_1.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_d_prim_info_1, d_prim_info_1.data(), d_prim_info_1.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     double*   d_s_prim_info_2;
     double*   d_p_prim_info_2;
@@ -281,9 +281,9 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
     gpuSafe(gpuMallocAsync(&d_p_prim_info_2, p_prim_info_2.size() * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_d_prim_info_2, d_prim_info_2.size() * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_s_prim_info_2, s_prim_info_2.data(), s_prim_info_2.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_p_prim_info_2, p_prim_info_2.data(), p_prim_info_2.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_d_prim_info_2, d_prim_info_2.data(), d_prim_info_2.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_s_prim_info_2, s_prim_info_2.data(), s_prim_info_2.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_p_prim_info_2, p_prim_info_2.data(), p_prim_info_2.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_d_prim_info_2, d_prim_info_2.data(), d_prim_info_2.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // GTO block pairs
 
@@ -481,24 +481,24 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
     gpuSafe(gpuMallocAsync(&d_dd_first_inds_local,  dd_prim_pair_count_local * sizeof(uint32_t), stream));
     gpuSafe(gpuMallocAsync(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_ps_first_inds_local,  ps_first_inds_local.data(),  ps_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_ps_second_inds_local, ps_second_inds_local.data(), ps_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_ds_first_inds_local,  ds_first_inds_local.data(),  ds_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_ds_second_inds_local, ds_second_inds_local.data(), ds_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dp_first_inds_local,  dp_first_inds_local.data(),  dp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dp_second_inds_local, dp_second_inds_local.data(), dp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ps_first_inds_local,  ps_first_inds_local.data(),  ps_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ps_second_inds_local, ps_second_inds_local.data(), ps_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ds_first_inds_local,  ds_first_inds_local.data(),  ds_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ds_second_inds_local, ds_second_inds_local.data(), ds_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dp_first_inds_local,  dp_first_inds_local.data(),  dp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dp_second_inds_local, dp_second_inds_local.data(), dp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
     S_matrices[gpu_id].zero();
 
@@ -526,7 +526,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
                            d_ss_second_inds_local,
                            static_cast<uint32_t>(ss_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_S.data(), d_mat_S, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_S.data(), d_mat_S, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -560,7 +560,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
                            d_sp_second_inds_local,
                            static_cast<uint32_t>(sp_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_S.data(), d_mat_S, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_S.data(), d_mat_S, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -604,7 +604,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
                            d_ps_first_inds_local,
                            static_cast<uint32_t>(ps_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_S.data(), d_mat_S, ps_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_S.data(), d_mat_S, ps_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -647,7 +647,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
                            d_sd_second_inds_local,
                            static_cast<uint32_t>(sd_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_S.data(), d_mat_S, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_S.data(), d_mat_S, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -691,7 +691,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
                            d_ds_first_inds_local,
                            static_cast<uint32_t>(ds_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_S.data(), d_mat_S, ds_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_S.data(), d_mat_S, ds_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -734,7 +734,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
                            d_pp_second_inds_local,
                            static_cast<uint32_t>(pp_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_S.data(), d_mat_S, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_S.data(), d_mat_S, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -784,7 +784,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
                            d_pd_second_inds_local,
                            static_cast<uint32_t>(pd_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_S.data(), d_mat_S, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_S.data(), d_mat_S, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -835,7 +835,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
                            d_dp_first_inds_local,
                            static_cast<uint32_t>(dp_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_S.data(), d_mat_S, dp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_S.data(), d_mat_S, dp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -885,7 +885,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
                            d_dd_second_inds_local,
                            static_cast<uint32_t>(dd_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_S.data(), d_mat_S, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_S.data(), d_mat_S, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -1094,9 +1094,9 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
     gpuSafe(gpuMallocAsync(&d_p_prim_info, p_prim_info.size() * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_d_prim_info, d_prim_info.size() * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // GTO block pairs
 
@@ -1154,23 +1154,23 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
     gpuSafe(gpuMallocAsync(&d_dd_first_inds_local,  dd_prim_pair_count_local * sizeof(uint32_t), stream));
     gpuSafe(gpuMallocAsync(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
     S_matrices[gpu_id].zero();
     T_matrices[gpu_id].zero();
@@ -1199,8 +1199,8 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
                            d_ss_second_inds_local,
                            static_cast<uint32_t>(ss_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_S.data(), d_mat_S, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_T.data(), d_mat_T, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_S.data(), d_mat_S, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_T.data(), d_mat_T, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -1241,8 +1241,8 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
                            d_sp_second_inds_local,
                            static_cast<uint32_t>(sp_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_S.data(), d_mat_S, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_T.data(), d_mat_T, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_S.data(), d_mat_S, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_T.data(), d_mat_T, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -1290,8 +1290,8 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
                            d_sd_second_inds_local,
                            static_cast<uint32_t>(sd_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_S.data(), d_mat_S, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_T.data(), d_mat_T, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_S.data(), d_mat_S, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_T.data(), d_mat_T, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -1337,8 +1337,8 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
                            d_pp_second_inds_local,
                            static_cast<uint32_t>(pp_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_S.data(), d_mat_S, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_T.data(), d_mat_T, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_S.data(), d_mat_S, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_T.data(), d_mat_T, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -1395,8 +1395,8 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
                            d_pd_second_inds_local,
                            static_cast<uint32_t>(pd_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_S.data(), d_mat_S, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_T.data(), d_mat_T, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_S.data(), d_mat_S, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_T.data(), d_mat_T, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -1449,8 +1449,8 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
                            d_dd_second_inds_local,
                            static_cast<uint32_t>(dd_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_S.data(), d_mat_S, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_T.data(), d_mat_T, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_S.data(), d_mat_S, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_T.data(), d_mat_T, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -1612,8 +1612,8 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
     gpuSafe(gpuMallocAsync(&d_boys_func_table, boys_func_table.size() * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_boys_func_ft,    boys_func_ft.size()    * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_boys_func_ft,    boys_func_ft.data(),    boys_func_ft.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_boys_func_ft,    boys_func_ft.data(),    boys_func_ft.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // GTOs blocks and number of AOs
 
@@ -1699,9 +1699,9 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
     gpuSafe(gpuMallocAsync(&d_p_prim_info, p_prim_info.size() * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_d_prim_info, d_prim_info.size() * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // GTO block pairs
 
@@ -1759,20 +1759,20 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
     gpuSafe(gpuMallocAsync(&d_dd_first_inds_local,  dd_prim_pair_count_local * sizeof(uint32_t), stream));
     gpuSafe(gpuMallocAsync(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_points_info, points_info_ptr, npoints * 4 * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_points_info, points_info_ptr, npoints * 4 * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
     V_matrices[gpu_id].zero();
 
@@ -1802,7 +1802,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        gpuSafe(gpuMemcpyAsync(mat_V.data(), d_mat_V, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_V.data(), d_mat_V, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -1842,7 +1842,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        gpuSafe(gpuMemcpyAsync(mat_V.data(), d_mat_V, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_V.data(), d_mat_V, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -1890,7 +1890,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        gpuSafe(gpuMemcpyAsync(mat_V.data(), d_mat_V, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_V.data(), d_mat_V, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -1936,7 +1936,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        gpuSafe(gpuMemcpyAsync(mat_V.data(), d_mat_V, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_V.data(), d_mat_V, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -1992,7 +1992,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        gpuSafe(gpuMemcpyAsync(mat_V.data(), d_mat_V, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_V.data(), d_mat_V, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -2045,7 +2045,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        gpuSafe(gpuMemcpyAsync(mat_V.data(), d_mat_V, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_V.data(), d_mat_V, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -2253,9 +2253,9 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
     gpuSafe(gpuMallocAsync(&d_p_prim_info, p_prim_info.size() * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_d_prim_info, d_prim_info.size() * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // GTO block pairs
 
@@ -2315,18 +2315,18 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
     gpuSafe(gpuMallocAsync(&d_dd_first_inds_local,  dd_prim_pair_count_local * sizeof(uint32_t), stream));
     gpuSafe(gpuMallocAsync(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
     MX_matrices[gpu_id].zero();
     MY_matrices[gpu_id].zero();
@@ -2361,9 +2361,9 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
                            d_ss_second_inds_local,
                            static_cast<uint32_t>(ss_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MX.data(), d_mat_MX, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MY.data(), d_mat_MY, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MZ.data(), d_mat_MZ, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -2412,9 +2412,9 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
                            d_sp_second_inds_local,
                            static_cast<uint32_t>(sp_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MX.data(), d_mat_MX, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MY.data(), d_mat_MY, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MZ.data(), d_mat_MZ, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -2469,9 +2469,9 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
                            d_sd_second_inds_local,
                            static_cast<uint32_t>(sd_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MX.data(), d_mat_MX, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MY.data(), d_mat_MY, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MZ.data(), d_mat_MZ, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -2524,9 +2524,9 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
                            d_pp_second_inds_local,
                            static_cast<uint32_t>(pp_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MX.data(), d_mat_MX, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MY.data(), d_mat_MY, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MZ.data(), d_mat_MZ, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -2591,9 +2591,9 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
                            d_pd_second_inds_local,
                            static_cast<uint32_t>(pd_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MX.data(), d_mat_MX, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MY.data(), d_mat_MY, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MZ.data(), d_mat_MZ, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -2653,9 +2653,9 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
                            d_dd_second_inds_local,
                            static_cast<uint32_t>(dd_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MX.data(), d_mat_MX, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MY.data(), d_mat_MY, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MZ.data(), d_mat_MZ, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -2880,9 +2880,9 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
     gpuSafe(gpuMallocAsync(&d_p_prim_info, p_prim_info.size() * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_d_prim_info, d_prim_info.size() * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // GTO block pairs
 
@@ -2942,18 +2942,18 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
     gpuSafe(gpuMallocAsync(&d_dd_first_inds_local,  dd_prim_pair_count_local * sizeof(uint32_t), stream));
     gpuSafe(gpuMallocAsync(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
     MX_matrices[gpu_id].zero();
     MY_matrices[gpu_id].zero();
@@ -2985,9 +2985,9 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_ss_second_inds_local,
                            static_cast<uint32_t>(ss_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MX.data(), d_mat_MX, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MY.data(), d_mat_MY, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MZ.data(), d_mat_MZ, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -3033,9 +3033,9 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_sp_second_inds_local,
                            static_cast<uint32_t>(sp_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MX.data(), d_mat_MX, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MY.data(), d_mat_MY, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MZ.data(), d_mat_MZ, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -3087,9 +3087,9 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_sd_second_inds_local,
                            static_cast<uint32_t>(sd_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MX.data(), d_mat_MX, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MY.data(), d_mat_MY, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MZ.data(), d_mat_MZ, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -3139,9 +3139,9 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_pp_second_inds_local,
                            static_cast<uint32_t>(pp_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MX.data(), d_mat_MX, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MY.data(), d_mat_MY, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MZ.data(), d_mat_MZ, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -3203,9 +3203,9 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_pd_second_inds_local,
                            static_cast<uint32_t>(pd_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MX.data(), d_mat_MX, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MY.data(), d_mat_MY, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MZ.data(), d_mat_MZ, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -3262,9 +3262,9 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_dd_second_inds_local,
                            static_cast<uint32_t>(dd_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MX.data(), d_mat_MX, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MY.data(), d_mat_MY, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MZ.data(), d_mat_MZ, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -3491,9 +3491,9 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
     gpuSafe(gpuMallocAsync(&d_p_prim_info, p_prim_info.size() * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_d_prim_info, d_prim_info.size() * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // GTO block pairs
 
@@ -3553,18 +3553,18 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
     gpuSafe(gpuMallocAsync(&d_dd_first_inds_local,  dd_prim_pair_count_local * sizeof(uint32_t), stream));
     gpuSafe(gpuMallocAsync(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
     MX_matrices[gpu_id].zero();
     MY_matrices[gpu_id].zero();
@@ -3599,9 +3599,9 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_ss_second_inds_local,
                            static_cast<uint32_t>(ss_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MX.data(), d_mat_MX, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MY.data(), d_mat_MY, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MZ.data(), d_mat_MZ, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -3650,9 +3650,9 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_sp_second_inds_local,
                            static_cast<uint32_t>(sp_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MX.data(), d_mat_MX, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MY.data(), d_mat_MY, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MZ.data(), d_mat_MZ, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -3707,9 +3707,9 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_sd_second_inds_local,
                            static_cast<uint32_t>(sd_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MX.data(), d_mat_MX, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MY.data(), d_mat_MY, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MZ.data(), d_mat_MZ, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -3762,9 +3762,9 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_pp_second_inds_local,
                            static_cast<uint32_t>(pp_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MX.data(), d_mat_MX, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MY.data(), d_mat_MY, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MZ.data(), d_mat_MZ, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -3829,9 +3829,9 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_pd_second_inds_local,
                            static_cast<uint32_t>(pd_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MX.data(), d_mat_MX, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MY.data(), d_mat_MY, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MZ.data(), d_mat_MZ, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -3891,9 +3891,9 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_dd_second_inds_local,
                            static_cast<uint32_t>(dd_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpyAsync(mat_MX.data(), d_mat_MX, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MY.data(), d_mat_MY, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_MZ.data(), d_mat_MZ, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MX.data(), d_mat_MX, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MY.data(), d_mat_MY, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_MZ.data(), d_mat_MZ, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -4380,16 +4380,16 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuMallocAsync(&d_p_prim_aoinds, sizeof(uint32_t) * p_prim_aoinds.size(), stream));
     gpuSafe(gpuMallocAsync(&d_d_prim_aoinds, sizeof(uint32_t) * d_prim_aoinds.size(), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_boys_func_ft,    boys_func_ft.data(),    boys_func_ft.size()    * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_boys_func_ft,    boys_func_ft.data(),    boys_func_ft.size()    * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_d_prim_aoinds, d_prim_aoinds.data(), d_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_d_prim_aoinds, d_prim_aoinds.data(), d_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -4593,59 +4593,59 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuMallocAsync(&d_dd_first_inds_local , sizeof(uint32_t) * static_cast<size_t>(dd_prim_pair_count_local), stream));
     gpuSafe(gpuMallocAsync(&d_dd_second_inds_local, sizeof(uint32_t) * static_cast<size_t>(dd_prim_pair_count_local), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_ss_mat_Q, ss_mat_Q.data(), ss_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sp_mat_Q, sp_mat_Q.data(), sp_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sd_mat_Q, sd_mat_Q.data(), sd_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pp_mat_Q, pp_mat_Q.data(), pp_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pd_mat_Q, pd_mat_Q.data(), pd_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dd_mat_Q, dd_mat_Q.data(), dd_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_mat_Q, ss_mat_Q.data(), ss_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_mat_Q, sp_mat_Q.data(), sp_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_mat_Q, sd_mat_Q.data(), sd_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_mat_Q, pp_mat_Q.data(), pp_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_mat_Q, pd_mat_Q.data(), pd_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_mat_Q, dd_mat_Q.data(), dd_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_ss_first_inds,  ss_first_inds.data(),  ss_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_ss_second_inds, ss_second_inds.data(), ss_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sp_first_inds,  sp_first_inds.data(),  sp_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sp_second_inds, sp_second_inds.data(), sp_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sd_first_inds,  sd_first_inds.data(),  sd_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sd_second_inds, sd_second_inds.data(), sd_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pp_first_inds,  pp_first_inds.data(),  pp_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pp_second_inds, pp_second_inds.data(), pp_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pd_first_inds,  pd_first_inds.data(),  pd_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pd_second_inds, pd_second_inds.data(), pd_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dd_first_inds,  dd_first_inds.data(),  dd_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dd_second_inds, dd_second_inds.data(), dd_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_first_inds,  ss_first_inds.data(),  ss_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_second_inds, ss_second_inds.data(), ss_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_first_inds,  sp_first_inds.data(),  sp_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_second_inds, sp_second_inds.data(), sp_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_first_inds,  sd_first_inds.data(),  sd_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_second_inds, sd_second_inds.data(), sd_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_first_inds,  pp_first_inds.data(),  pp_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_second_inds, pp_second_inds.data(), pp_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_first_inds,  pd_first_inds.data(),  pd_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_second_inds, pd_second_inds.data(), pd_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_first_inds,  dd_first_inds.data(),  dd_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_second_inds, dd_second_inds.data(), dd_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_ss_pair_data, ss_pair_data.data(), ss_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sp_pair_data, sp_pair_data.data(), sp_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sd_pair_data, sd_pair_data.data(), sd_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pp_pair_data, pp_pair_data.data(), pp_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pd_pair_data, pd_pair_data.data(), pd_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dd_pair_data, dd_pair_data.data(), dd_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_pair_data, ss_pair_data.data(), ss_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_pair_data, sp_pair_data.data(), sp_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_pair_data, sd_pair_data.data(), sd_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_pair_data, pp_pair_data.data(), pp_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_pair_data, pd_pair_data.data(), pd_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_pair_data, dd_pair_data.data(), dd_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_ss_mat_Q_local, ss_mat_Q_local.data(), ss_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sp_mat_Q_local, sp_mat_Q_local.data(), sp_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sd_mat_Q_local, sd_mat_Q_local.data(), sd_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pp_mat_Q_local, pp_mat_Q_local.data(), pp_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pd_mat_Q_local, pd_mat_Q_local.data(), pd_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dd_mat_Q_local, dd_mat_Q_local.data(), dd_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_mat_Q_local, ss_mat_Q_local.data(), ss_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_mat_Q_local, sp_mat_Q_local.data(), sp_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_mat_Q_local, sd_mat_Q_local.data(), sd_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_mat_Q_local, pp_mat_Q_local.data(), pp_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_mat_Q_local, pd_mat_Q_local.data(), pd_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_mat_Q_local, dd_mat_Q_local.data(), dd_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_ss_second_inds_local, ss_second_inds_local.data(), ss_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sp_second_inds_local, sp_second_inds_local.data(), sp_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sd_second_inds_local, sd_second_inds_local.data(), sd_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pp_second_inds_local, pp_second_inds_local.data(), pp_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pd_second_inds_local, pd_second_inds_local.data(), pd_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dd_second_inds_local, dd_second_inds_local.data(), dd_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_second_inds_local, ss_second_inds_local.data(), ss_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_second_inds_local, sp_second_inds_local.data(), sp_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_second_inds_local, sd_second_inds_local.data(), sd_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_second_inds_local, pp_second_inds_local.data(), pp_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_second_inds_local, pd_second_inds_local.data(), pd_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_second_inds_local, dd_second_inds_local.data(), dd_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_ss_pair_data_local, ss_pair_data_local.data(), ss_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sp_pair_data_local, sp_pair_data_local.data(), sp_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_sd_pair_data_local, sd_pair_data_local.data(), sd_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pp_pair_data_local, pp_pair_data_local.data(), pp_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pd_pair_data_local, pd_pair_data_local.data(), pd_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_dd_pair_data_local, dd_pair_data_local.data(), dd_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_ss_pair_data_local, ss_pair_data_local.data(), ss_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sp_pair_data_local, sp_pair_data_local.data(), sp_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_sd_pair_data_local, sd_pair_data_local.data(), sd_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pp_pair_data_local, pp_pair_data_local.data(), pp_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pd_pair_data_local, pd_pair_data_local.data(), pd_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_dd_pair_data_local, dd_pair_data_local.data(), dd_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -4691,7 +4691,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockSSSS<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -4723,7 +4723,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockSSSP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -4754,7 +4754,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockSSSD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -4785,7 +4785,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockSSPP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -4816,7 +4816,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockSSPD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -4849,7 +4849,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockSSDD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -4875,7 +4875,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuStreamSynchronize(stream));
         }
 
-        gpuSafe(gpuMemcpyAsync(mat_J.data(), d_mat_J, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_J.data(), d_mat_J, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -4922,7 +4922,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockSPSS<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -4953,7 +4953,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockSPSP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -4984,7 +4984,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockSPSD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5017,7 +5017,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockSPPP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5048,7 +5048,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockSPPD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5081,7 +5081,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockSPDD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5109,7 +5109,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuStreamSynchronize(stream));
         }
 
-        gpuSafe(gpuMemcpyAsync(mat_J.data(), d_mat_J, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_J.data(), d_mat_J, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -5164,7 +5164,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockPPSS<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5195,7 +5195,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockPPSP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5226,7 +5226,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockPPSD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5259,7 +5259,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockPPPP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5288,7 +5288,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockPPPD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5319,7 +5319,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockPPDD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5345,7 +5345,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuStreamSynchronize(stream));
         }
 
-        gpuSafe(gpuMemcpyAsync(mat_J.data(), d_mat_J, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_J.data(), d_mat_J, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -5408,7 +5408,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockSDSS<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5439,7 +5439,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockSDSP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5472,7 +5472,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockSDSD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5503,7 +5503,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockSDPP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5536,7 +5536,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockSDPD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5569,7 +5569,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockSDDD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5595,7 +5595,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuStreamSynchronize(stream));
         }
 
-        gpuSafe(gpuMemcpyAsync(mat_J.data(), d_mat_J, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_J.data(), d_mat_J, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -5650,7 +5650,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockPDSS<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5683,7 +5683,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockPDSP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5716,7 +5716,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockPDSD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5749,7 +5749,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockPDPP<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5780,7 +5780,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockPDPD<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5811,7 +5811,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockPDDD0<<<num_blocks, threads_per_block, 0, stream>>>(
                                d_mat_J,
@@ -5963,7 +5963,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuStreamSynchronize(stream));
         }
 
-        gpuSafe(gpuMemcpyAsync(mat_J.data(), d_mat_J, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_J.data(), d_mat_J, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -6025,7 +6025,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
@@ -6060,7 +6060,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
@@ -6097,7 +6097,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
@@ -6132,7 +6132,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
@@ -6167,7 +6167,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
@@ -6391,7 +6391,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            gpuSafe(gpuMemcpyAsync(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
+            gpuSafe(gpuMemcpyStaged(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice, stream));
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
@@ -6970,7 +6970,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuStreamSynchronize(stream));
         }
 
-        gpuSafe(gpuMemcpyAsync(mat_J.data(), d_mat_J, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_J.data(), d_mat_J, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -7292,70 +7292,70 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuMallocAsync(&d_pair_counts_K_dp    , sizeof(uint32_t) * pair_counts_K_dp.size(), stream));
     gpuSafe(gpuMallocAsync(&d_pair_counts_K_dd    , sizeof(uint32_t) * pair_counts_K_dd.size(), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_pair_inds_i_for_K_ss, pair_inds_i_for_K_ss.data(), pair_inds_i_for_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_inds_k_for_K_ss, pair_inds_k_for_K_ss.data(), pair_inds_k_for_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_inds_i_for_K_sp, pair_inds_i_for_K_sp.data(), pair_inds_i_for_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_inds_k_for_K_sp, pair_inds_k_for_K_sp.data(), pair_inds_k_for_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_inds_i_for_K_sd, pair_inds_i_for_K_sd.data(), pair_inds_i_for_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_inds_k_for_K_sd, pair_inds_k_for_K_sd.data(), pair_inds_k_for_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_inds_i_for_K_pp, pair_inds_i_for_K_pp.data(), pair_inds_i_for_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_inds_k_for_K_pp, pair_inds_k_for_K_pp.data(), pair_inds_k_for_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_inds_i_for_K_pd, pair_inds_i_for_K_pd.data(), pair_inds_i_for_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_inds_k_for_K_pd, pair_inds_k_for_K_pd.data(), pair_inds_k_for_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_inds_i_for_K_dd, pair_inds_i_for_K_dd.data(), pair_inds_i_for_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_inds_k_for_K_dd, pair_inds_k_for_K_dd.data(), pair_inds_k_for_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_inds_i_for_K_ss, pair_inds_i_for_K_ss.data(), pair_inds_i_for_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_inds_k_for_K_ss, pair_inds_k_for_K_ss.data(), pair_inds_k_for_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_inds_i_for_K_sp, pair_inds_i_for_K_sp.data(), pair_inds_i_for_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_inds_k_for_K_sp, pair_inds_k_for_K_sp.data(), pair_inds_k_for_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_inds_i_for_K_sd, pair_inds_i_for_K_sd.data(), pair_inds_i_for_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_inds_k_for_K_sd, pair_inds_k_for_K_sd.data(), pair_inds_k_for_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_inds_i_for_K_pp, pair_inds_i_for_K_pp.data(), pair_inds_i_for_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_inds_k_for_K_pp, pair_inds_k_for_K_pp.data(), pair_inds_k_for_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_inds_i_for_K_pd, pair_inds_i_for_K_pd.data(), pair_inds_i_for_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_inds_k_for_K_pd, pair_inds_k_for_K_pd.data(), pair_inds_k_for_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_inds_i_for_K_dd, pair_inds_i_for_K_dd.data(), pair_inds_i_for_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_inds_k_for_K_dd, pair_inds_k_for_K_dd.data(), pair_inds_k_for_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_mat_D_full_AO, cart_dens_ptr, cart_naos * cart_naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_mat_D_full_AO, cart_dens_ptr, cart_naos * cart_naos * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_Q_K_ss, Q_K_ss.data(), Q_K_ss.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_Q_K_sp, Q_K_sp.data(), Q_K_sp.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_Q_K_ps, Q_K_ps.data(), Q_K_ps.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_Q_K_sd, Q_K_sd.data(), Q_K_sd.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_Q_K_ds, Q_K_ds.data(), Q_K_ds.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_Q_K_pp, Q_K_pp.data(), Q_K_pp.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_Q_K_pd, Q_K_pd.data(), Q_K_pd.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_Q_K_dp, Q_K_dp.data(), Q_K_dp.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_Q_K_dd, Q_K_dd.data(), Q_K_dd.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_Q_K_ss, Q_K_ss.data(), Q_K_ss.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_Q_K_sp, Q_K_sp.data(), Q_K_sp.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_Q_K_ps, Q_K_ps.data(), Q_K_ps.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_Q_K_sd, Q_K_sd.data(), Q_K_sd.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_Q_K_ds, Q_K_ds.data(), Q_K_ds.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_Q_K_pp, Q_K_pp.data(), Q_K_pp.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_Q_K_pd, Q_K_pd.data(), Q_K_pd.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_Q_K_dp, Q_K_dp.data(), Q_K_dp.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_Q_K_dd, Q_K_dd.data(), Q_K_dd.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_D_inds_K_ss, D_inds_K_ss.data(), D_inds_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_D_inds_K_sp, D_inds_K_sp.data(), D_inds_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_D_inds_K_ps, D_inds_K_ps.data(), D_inds_K_ps.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_D_inds_K_sd, D_inds_K_sd.data(), D_inds_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_D_inds_K_ds, D_inds_K_ds.data(), D_inds_K_ds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_D_inds_K_pp, D_inds_K_pp.data(), D_inds_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_D_inds_K_pd, D_inds_K_pd.data(), D_inds_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_D_inds_K_dp, D_inds_K_dp.data(), D_inds_K_dp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_D_inds_K_dd, D_inds_K_dd.data(), D_inds_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_D_inds_K_ss, D_inds_K_ss.data(), D_inds_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_D_inds_K_sp, D_inds_K_sp.data(), D_inds_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_D_inds_K_ps, D_inds_K_ps.data(), D_inds_K_ps.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_D_inds_K_sd, D_inds_K_sd.data(), D_inds_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_D_inds_K_ds, D_inds_K_ds.data(), D_inds_K_ds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_D_inds_K_pp, D_inds_K_pp.data(), D_inds_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_D_inds_K_pd, D_inds_K_pd.data(), D_inds_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_D_inds_K_dp, D_inds_K_dp.data(), D_inds_K_dp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_D_inds_K_dd, D_inds_K_dd.data(), D_inds_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_pair_displs_K_ss, pair_displs_K_ss.data(), pair_displs_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_displs_K_sp, pair_displs_K_sp.data(), pair_displs_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_displs_K_ps, pair_displs_K_ps.data(), pair_displs_K_ps.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_displs_K_sd, pair_displs_K_sd.data(), pair_displs_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_displs_K_ds, pair_displs_K_ds.data(), pair_displs_K_ds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_displs_K_pp, pair_displs_K_pp.data(), pair_displs_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_displs_K_pd, pair_displs_K_pd.data(), pair_displs_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_displs_K_dp, pair_displs_K_dp.data(), pair_displs_K_dp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_displs_K_dd, pair_displs_K_dd.data(), pair_displs_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_displs_K_ss, pair_displs_K_ss.data(), pair_displs_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_displs_K_sp, pair_displs_K_sp.data(), pair_displs_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_displs_K_ps, pair_displs_K_ps.data(), pair_displs_K_ps.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_displs_K_sd, pair_displs_K_sd.data(), pair_displs_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_displs_K_ds, pair_displs_K_ds.data(), pair_displs_K_ds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_displs_K_pp, pair_displs_K_pp.data(), pair_displs_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_displs_K_pd, pair_displs_K_pd.data(), pair_displs_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_displs_K_dp, pair_displs_K_dp.data(), pair_displs_K_dp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_displs_K_dd, pair_displs_K_dd.data(), pair_displs_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_pair_counts_K_ss, pair_counts_K_ss.data(), pair_counts_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_counts_K_sp, pair_counts_K_sp.data(), pair_counts_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_counts_K_ps, pair_counts_K_ps.data(), pair_counts_K_ps.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_counts_K_sd, pair_counts_K_sd.data(), pair_counts_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_counts_K_ds, pair_counts_K_ds.data(), pair_counts_K_ds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_counts_K_pp, pair_counts_K_pp.data(), pair_counts_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_counts_K_pd, pair_counts_K_pd.data(), pair_counts_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_counts_K_dp, pair_counts_K_dp.data(), pair_counts_K_dp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_counts_K_dd, pair_counts_K_dd.data(), pair_counts_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_counts_K_ss, pair_counts_K_ss.data(), pair_counts_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_counts_K_sp, pair_counts_K_sp.data(), pair_counts_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_counts_K_ps, pair_counts_K_ps.data(), pair_counts_K_ps.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_counts_K_sd, pair_counts_K_sd.data(), pair_counts_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_counts_K_ds, pair_counts_K_ds.data(), pair_counts_K_ds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_counts_K_pp, pair_counts_K_pp.data(), pair_counts_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_counts_K_pd, pair_counts_K_pd.data(), pair_counts_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_counts_K_dp, pair_counts_K_dp.data(), pair_counts_K_dp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_counts_K_dd, pair_counts_K_dd.data(), pair_counts_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_pair_data_K_ss, pair_data_K_ss.data(), pair_data_K_ss.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_data_K_sp, pair_data_K_sp.data(), pair_data_K_sp.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_data_K_ps, pair_data_K_ps.data(), pair_data_K_ps.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_data_K_sd, pair_data_K_sd.data(), pair_data_K_sd.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_data_K_ds, pair_data_K_ds.data(), pair_data_K_ds.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_data_K_pp, pair_data_K_pp.data(), pair_data_K_pp.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_data_K_pd, pair_data_K_pd.data(), pair_data_K_pd.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_data_K_dp, pair_data_K_dp.data(), pair_data_K_dp.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_pair_data_K_dd, pair_data_K_dd.data(), pair_data_K_dd.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_data_K_ss, pair_data_K_ss.data(), pair_data_K_ss.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_data_K_sp, pair_data_K_sp.data(), pair_data_K_sp.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_data_K_ps, pair_data_K_ps.data(), pair_data_K_ps.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_data_K_sd, pair_data_K_sd.data(), pair_data_K_sd.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_data_K_ds, pair_data_K_ds.data(), pair_data_K_ds.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_data_K_pp, pair_data_K_pp.data(), pair_data_K_pp.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_data_K_pd, pair_data_K_pd.data(), pair_data_K_pd.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_data_K_dp, pair_data_K_dp.data(), pair_data_K_dp.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_pair_data_K_dd, pair_data_K_dd.data(), pair_data_K_dd.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -7673,7 +7673,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -8020,7 +8020,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -8385,7 +8385,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].stop("    K block PDPD");
 
-        gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K, pair_inds_count_for_K_pp * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_K.data(), d_mat_K, pair_inds_count_for_K_pp * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -8772,7 +8772,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].stop("    K block SDDD");
 
-        gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K, pair_inds_count_for_K_sd * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_K.data(), d_mat_K, pair_inds_count_for_K_sd * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -9367,7 +9367,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].stop("    K block PDDD");
 
-        gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K, pair_inds_count_for_K_pd * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_K.data(), d_mat_K, pair_inds_count_for_K_pd * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -10453,7 +10453,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].stop("    K block DDDD");
 
-        gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K, pair_inds_count_for_K_dd * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_K.data(), d_mat_K, pair_inds_count_for_K_dd * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 

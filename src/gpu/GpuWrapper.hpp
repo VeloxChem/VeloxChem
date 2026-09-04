@@ -58,10 +58,8 @@
     // whichever CUDA context issues the transfer, not only the allocating one
     #define gpuHostMalloc(ptr, size)            cudaHostAlloc(ptr, size, cudaHostAllocPortable)
     #define gpuHostFree(ptr)                    cudaFreeHost(ptr)
-    // raw backend async copy; host<->device transfers are rerouted through the
-    // chunked pinned staging copy implemented below in this header
-    #define gpuRawMemcpyAsync(dst, src, size, kind, s)     cudaMemcpyAsync(dst, src, size, kind, s)
-    #define gpuMemcpyAsync(dst, src, size, kind, s)        gpu::chunkedMemcpyAsync(dst, src, size, kind, s)
+    #define gpuMemcpyAsync(dst, src, size, kind, s)        cudaMemcpyAsync(dst, src, size, kind, s)
+    #define gpuMemcpyStaged(dst, src, size, kind, s)       gpu::stagedMemcpy(dst, src, size, kind, s)
 
     #define gpuStream_t                         cudaStream_t
     #define gpuStreamCreate(ptr)                cudaStreamCreate(ptr)
@@ -98,10 +96,8 @@
     // whichever HIP device issues the transfer, not only the allocating one
     #define gpuHostMalloc(ptr, size)            hipHostMalloc(ptr, size, hipHostMallocPortable)
     #define gpuHostFree(ptr)                    hipHostFree(ptr)
-    // raw backend async copy; host<->device transfers are rerouted through the
-    // chunked pinned staging copy implemented below in this header
-    #define gpuRawMemcpyAsync(dst, src, size, kind, s)     hipMemcpyAsync(dst, src, size, kind, s)
-    #define gpuMemcpyAsync(dst, src, size, kind, s)        gpu::chunkedMemcpyAsync(dst, src, size, kind, s)
+    #define gpuMemcpyAsync(dst, src, size, kind, s)        hipMemcpyAsync(dst, src, size, kind, s)
+    #define gpuMemcpyStaged(dst, src, size, kind, s)       gpu::stagedMemcpy(dst, src, size, kind, s)
 
     #define gpuStream_t                         hipStream_t
     #define gpuStreamCreate(ptr)                hipStreamCreate(ptr)
@@ -119,8 +115,8 @@
 
 #endif
 
-// Chunked pinned-staging implementation of gpuMemcpyAsync.  It is kept in this
-// header next to the gpu* backend macros it is built on.
+// Pinned-staging implementation of gpuMemcpyStaged.  It is kept in this header
+// next to the gpu* backend macros it is built on.
 
 #include <algorithm>
 #include <cstddef>
@@ -133,13 +129,13 @@
 
 namespace gpu {  // gpu namespace
 
-// gpuMemcpyAsync host<->device copies are staged in chunks through a pinned
+// gpuMemcpyStaged host<->device copies are staged in chunks through a pinned
 // host buffer: pageable host memory is unreliable for asynchronous device
 // transfers on multi-NUMA systems.  Each chunk is completed before the buffer
 // is reused, and the whole copy is complete when the call returns.
 
 // maximum number of bytes staged through pinned host memory per chunk
-constexpr size_t kChunkedMemcpyChunkBytes = 8 * 1024 * 1024;  // 8 MB
+constexpr size_t kStagedMemcpyChunkBytes = 8 * 1024 * 1024;  // 8 MB
 
 // Copy sessions: every driver session (an omp parallel GPU region, or a serial
 // GPU driver function) opens with preparePinnedMemcpyBuffer after gpuSetDevice
@@ -147,7 +143,7 @@ constexpr size_t kChunkedMemcpyChunkBytes = 8 * 1024 * 1024;  // 8 MB
 // copies of the session share the calling thread's pinned buffer.  A copy
 // outside a session is a programming error (abort).
 inline char*&
-chunkedMemcpyPinnedBuffer()
+stagedMemcpyPinnedBuffer()
 {
     static thread_local char* h_pinned = nullptr;
 
@@ -162,9 +158,9 @@ chunkedMemcpyPinnedBuffer()
 inline gpuError_t
 preparePinnedMemcpyBuffer()
 {
-    if (chunkedMemcpyPinnedBuffer() == nullptr)
+    if (stagedMemcpyPinnedBuffer() == nullptr)
     {
-        gpuSafe(gpuHostMalloc(reinterpret_cast<void**>(&chunkedMemcpyPinnedBuffer()), kChunkedMemcpyChunkBytes));
+        gpuSafe(gpuHostMalloc(reinterpret_cast<void**>(&stagedMemcpyPinnedBuffer()), kStagedMemcpyChunkBytes));
     }
 
     return gpuSuccess;
@@ -175,22 +171,22 @@ preparePinnedMemcpyBuffer()
 inline gpuError_t
 releasePinnedMemcpyBuffer()
 {
-    if (chunkedMemcpyPinnedBuffer() != nullptr)
+    if (stagedMemcpyPinnedBuffer() != nullptr)
     {
-        gpuSafe(gpuHostFree(chunkedMemcpyPinnedBuffer()));
+        gpuSafe(gpuHostFree(stagedMemcpyPinnedBuffer()));
 
-        chunkedMemcpyPinnedBuffer() = nullptr;
+        stagedMemcpyPinnedBuffer() = nullptr;
     }
 
     return gpuSuccess;
 }
 
 inline gpuError_t
-chunkedMemcpyAsyncHostToDevice(void* d_ptr, const void* h_ptr, const size_t byte_count, gpuStream_t stream)
+stagedMemcpyHostToDevice(void* d_ptr, const void* h_ptr, const size_t byte_count, gpuStream_t stream)
 {
     if (byte_count == 0) return gpuSuccess;
 
-    char* h_pinned = chunkedMemcpyPinnedBuffer();
+    char* h_pinned = stagedMemcpyPinnedBuffer();
 
     if (h_pinned == nullptr)
     {
@@ -198,7 +194,7 @@ chunkedMemcpyAsyncHostToDevice(void* d_ptr, const void* h_ptr, const size_t byte
         errors::assertMsgCritical(false,
             std::string("gpu::") + std::string(__func__) +
                 ": no pinned host staging buffer on this thread; call gpu::preparePinnedMemcpyBuffer() "
-                "before the first gpuMemcpyAsync of the driver session");
+                "before the first gpuMemcpyStaged of the driver session");
     }
 
     auto*       d_bytes = static_cast<char*>(d_ptr);
@@ -208,7 +204,7 @@ chunkedMemcpyAsyncHostToDevice(void* d_ptr, const void* h_ptr, const size_t byte
 
     while (offset < byte_count)
     {
-        const size_t copy_bytes = std::min(kChunkedMemcpyChunkBytes, byte_count - offset);
+        const size_t copy_bytes = std::min(kStagedMemcpyChunkBytes, byte_count - offset);
 
         if (offset > 0)
         {
@@ -218,7 +214,7 @@ chunkedMemcpyAsyncHostToDevice(void* d_ptr, const void* h_ptr, const size_t byte
 
         std::memcpy(h_pinned, h_bytes + offset, copy_bytes);
 
-        gpuSafe(gpuRawMemcpyAsync(d_bytes + offset, h_pinned, copy_bytes, gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyAsync(d_bytes + offset, h_pinned, copy_bytes, gpuMemcpyHostToDevice, stream));
 
         offset += copy_bytes;
     }
@@ -230,11 +226,11 @@ chunkedMemcpyAsyncHostToDevice(void* d_ptr, const void* h_ptr, const size_t byte
 }
 
 inline gpuError_t
-chunkedMemcpyAsyncDeviceToHost(void* h_ptr, const void* d_ptr, const size_t byte_count, gpuStream_t stream)
+stagedMemcpyDeviceToHost(void* h_ptr, const void* d_ptr, const size_t byte_count, gpuStream_t stream)
 {
     if (byte_count == 0) return gpuSuccess;
 
-    char* h_pinned = chunkedMemcpyPinnedBuffer();
+    char* h_pinned = stagedMemcpyPinnedBuffer();
 
     if (h_pinned == nullptr)
     {
@@ -242,7 +238,7 @@ chunkedMemcpyAsyncDeviceToHost(void* h_ptr, const void* d_ptr, const size_t byte
         errors::assertMsgCritical(false,
             std::string("gpu::") + std::string(__func__) +
                 ": no pinned host staging buffer on this thread; call gpu::preparePinnedMemcpyBuffer() "
-                "before the first gpuMemcpyAsync of the driver session");
+                "before the first gpuMemcpyStaged of the driver session");
     }
 
     auto*       h_bytes = static_cast<char*>(h_ptr);
@@ -252,9 +248,9 @@ chunkedMemcpyAsyncDeviceToHost(void* h_ptr, const void* d_ptr, const size_t byte
 
     while (offset < byte_count)
     {
-        const size_t copy_bytes = std::min(kChunkedMemcpyChunkBytes, byte_count - offset);
+        const size_t copy_bytes = std::min(kStagedMemcpyChunkBytes, byte_count - offset);
 
-        gpuSafe(gpuRawMemcpyAsync(h_pinned, d_bytes + offset, copy_bytes, gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyAsync(h_pinned, d_bytes + offset, copy_bytes, gpuMemcpyDeviceToHost, stream));
 
         // the staged chunk must be fully arrived before it is copied out or refilled
         gpuSafe(gpuStreamSynchronize(stream));
@@ -267,21 +263,25 @@ chunkedMemcpyAsyncDeviceToHost(void* h_ptr, const void* d_ptr, const size_t byte
     return gpuSuccess;
 }
 
-// Memcpy dispatcher: host<->device transfers go through the chunked
-// pinned-staging copies above; other transfer kinds pass through unchanged.
+// Memcpy dispatcher: gpuMemcpyStaged handles host<->device transfers, staged in
+// chunks through the pinned-staging copies above.
 inline gpuError_t
-chunkedMemcpyAsync(void* dst, const void* src, const size_t byte_count, const gpuMemcpyKind kind, gpuStream_t stream)
+stagedMemcpy(void* dst, const void* src, const size_t byte_count, const gpuMemcpyKind kind, gpuStream_t stream)
 {
     if (kind == gpuMemcpyHostToDevice)
     {
-        return chunkedMemcpyAsyncHostToDevice(dst, src, byte_count, stream);
+        return stagedMemcpyHostToDevice(dst, src, byte_count, stream);
     }
     else if (kind == gpuMemcpyDeviceToHost)
     {
-        return chunkedMemcpyAsyncDeviceToHost(dst, src, byte_count, stream);
+        return stagedMemcpyDeviceToHost(dst, src, byte_count, stream);
     }
 
-    return gpuRawMemcpyAsync(dst, src, byte_count, kind, stream);
+    errors::assertMsgCritical(false,
+        std::string("gpu::") + std::string(__func__) +
+            ": unsupported transfer kind; gpuMemcpyStaged handles host<->device copies only");
+
+    return gpuSuccess;  // never reached: assertMsgCritical aborts
 }
 
 }  // namespace gpu

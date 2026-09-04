@@ -1787,7 +1787,7 @@ getGtoValuesForLda(double*                     d_gto_values,
 
     auto gto_info = gtoinfo::getGtoInfo(gto_block, gtos_mask);
 
-    gpuSafe(gpuMemcpyAsync(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // evaluate GTO values on grid points
 
@@ -1879,7 +1879,7 @@ getGtoValuesForGga(double*                     d_gto_values_0,
 
     auto gto_info = gtoinfo::getGtoInfo(gto_block, gtos_mask);
 
-    gpuSafe(gpuMemcpyAsync(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // evaluate GTO values on grid points
 
@@ -1986,7 +1986,7 @@ getGtoValuesForMgga(double*                     d_gto_values_0,
 
     auto gto_info = gtoinfo::getGtoInfo(gto_block, gtos_mask);
 
-    gpuSafe(gpuMemcpyAsync(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // evaluate GTO values on grid points
 
@@ -2136,9 +2136,9 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
     gpuSafe(gpuMallocAsync(&d_grid_y, n_total_grid_points * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_grid_z, n_total_grid_points * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // counts and displacements of grid points in boxes
 
@@ -2213,7 +2213,7 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
 
-        gpuSafe(gpuMemcpyAsync(mat_chi.values(), d_gaos, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_chi.values(), d_gaos, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -2304,9 +2304,9 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
     gpuSafe(gpuMallocAsync(&d_grid_y, n_total_grid_points * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_grid_z, n_total_grid_points * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // counts and displacements of grid points in boxes
 
@@ -2385,10 +2385,10 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
 
-        gpuSafe(gpuMemcpyAsync(mat_chi_0.values(), d_gaos, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_chi_x.values(), d_gaox, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_chi_y.values(), d_gaoy, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(mat_chi_z.values(), d_gaoz, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_chi_0.values(), d_gaos, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_chi_x.values(), d_gaox, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_chi_y.values(), d_gaoy, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(mat_chi_z.values(), d_gaoz, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -2515,7 +2515,7 @@ integrateVxcFockForLdaClosedShell(const CMolecule&        molecule,
     gpuSafe(gpuMallocAsync(&d_den_mat_full, naos * naos * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_mat_Vxc_full, naos * naos * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // density and functional derivatives
 
@@ -2561,10 +2561,10 @@ integrateVxcFockForLdaClosedShell(const CMolecule&        molecule,
     gpuSafe(gpuMallocAsync(&d_grid_z, n_total_grid_points * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_grid_w, n_total_grid_points * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -2648,7 +2648,7 @@ integrateVxcFockForLdaClosedShell(const CMolecule&        molecule,
             ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
         }
 
-        gpuSafe(gpuMemcpyAsync(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
         // sub density matrix for ground-state rho
 
@@ -2690,14 +2690,14 @@ integrateVxcFockForLdaClosedShell(const CMolecule&        molecule,
 
         // functional evaluation
 
-        gpuSafe(gpuMemcpyAsync(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
         xcfun_copy.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
 
-        gpuSafe(gpuMemcpyAsync(d_exc, exc, dim->zk * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_exc, exc, dim->zk * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
 
         // compute partial contribution to Vxc matrix and distribute partial
         // Vxc to full Kohn-Sham matrix
@@ -2743,7 +2743,7 @@ integrateVxcFockForLdaClosedShell(const CMolecule&        molecule,
         }
     }
 
-    gpuSafe(gpuMemcpyAsync(mat_Vxc_omp[gpu_id].alphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(mat_Vxc_omp[gpu_id].alphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -2911,8 +2911,8 @@ integrateVxcFockForLdaOpenShell(const CMolecule&        molecule,
     double* d_mat_Vxc_full_a = d_mat_Vxc_full;
     double* d_mat_Vxc_full_b = d_mat_Vxc_full_a + naos * naos;
 
-    gpuSafe(gpuMemcpyAsync(d_den_mat_full_a, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_den_mat_full_b, densityMatrix.betaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_den_mat_full_a, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_den_mat_full_b, densityMatrix.betaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // density and functional derivatives
 
@@ -2958,10 +2958,10 @@ integrateVxcFockForLdaOpenShell(const CMolecule&        molecule,
     gpuSafe(gpuMallocAsync(&d_grid_z, n_total_grid_points * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_grid_w, n_total_grid_points * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -3045,7 +3045,7 @@ integrateVxcFockForLdaOpenShell(const CMolecule&        molecule,
             ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
         }
 
-        gpuSafe(gpuMemcpyAsync(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
         // sub density matrix for ground-state rho
 
@@ -3102,14 +3102,14 @@ integrateVxcFockForLdaOpenShell(const CMolecule&        molecule,
 
         // functional evaluation
 
-        gpuSafe(gpuMemcpyAsync(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
         xcfun_copy.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
 
-        gpuSafe(gpuMemcpyAsync(d_exc, exc, dim->zk * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_exc, exc, dim->zk * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
 
         // compute partial contribution to Vxc matrix and distribute partial
         // Vxc to full Kohn-Sham matrix
@@ -3166,8 +3166,8 @@ integrateVxcFockForLdaOpenShell(const CMolecule&        molecule,
         }
     }
 
-    gpuSafe(gpuMemcpyAsync(mat_Vxc_omp[gpu_id].alphaValues(), d_mat_Vxc_full_a, naos * naos * sizeof(double), gpuMemcpyDeviceToHost, stream));
-    gpuSafe(gpuMemcpyAsync(mat_Vxc_omp[gpu_id].betaValues(), d_mat_Vxc_full_b, naos * naos * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(mat_Vxc_omp[gpu_id].alphaValues(), d_mat_Vxc_full_a, naos * naos * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(mat_Vxc_omp[gpu_id].betaValues(), d_mat_Vxc_full_b, naos * naos * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -3329,7 +3329,7 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
     gpuSafe(gpuMallocAsync(&d_mat_Vxc_full, naos * naos * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_mat_Vxc, naos * naos * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // density and functional derivatives
 
@@ -3385,10 +3385,10 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
     gpuSafe(gpuMallocAsync(&d_grid_z, n_total_grid_points * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_grid_w, n_total_grid_points * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -3485,7 +3485,7 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
             ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
         }
 
-        gpuSafe(gpuMemcpyAsync(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
         // sub density matrix for groud-state rho
 
@@ -3532,17 +3532,17 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
 
         // funtional evaluation
 
-        gpuSafe(gpuMemcpyAsync(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(sigma, d_sigma, dim->sigma * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(sigma, d_sigma, dim->sigma * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
         xcfun_copy.compute_exc_vxc_for_gga(npoints, rho, sigma, exc, vrho, vsigma);
 
-        gpuSafe(gpuMemcpyAsync(d_exc, exc, dim->zk * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_exc, exc, dim->zk * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
 
         // compute partial contribution to Vxc matrix and distribute partial
         // Vxc to full Kohn-Sham matrix
@@ -3593,7 +3593,7 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
         }
     }
 
-    gpuSafe(gpuMemcpyAsync(mat_Vxc_omp[gpu_id].alphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(mat_Vxc_omp[gpu_id].alphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -3777,8 +3777,8 @@ integrateVxcFockForGgaOpenShell(const CMolecule&        molecule,
     double* d_mat_Vxc_full_a = d_mat_Vxc_full;
     double* d_mat_Vxc_full_b = d_mat_Vxc_full_a + naos * naos;
 
-    gpuSafe(gpuMemcpyAsync(d_den_mat_full_a, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_den_mat_full_b, densityMatrix.betaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_den_mat_full_a, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_den_mat_full_b, densityMatrix.betaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // density and functional derivatives
 
@@ -3834,10 +3834,10 @@ integrateVxcFockForGgaOpenShell(const CMolecule&        molecule,
     gpuSafe(gpuMallocAsync(&d_grid_z, n_total_grid_points * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_grid_w, n_total_grid_points * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -3935,7 +3935,7 @@ integrateVxcFockForGgaOpenShell(const CMolecule&        molecule,
             ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
         }
 
-        gpuSafe(gpuMemcpyAsync(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
         // sub density matrix for groud-state rho
 
@@ -3997,17 +3997,17 @@ integrateVxcFockForGgaOpenShell(const CMolecule&        molecule,
 
         // funtional evaluation
 
-        gpuSafe(gpuMemcpyAsync(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(sigma, d_sigma, dim->sigma * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(sigma, d_sigma, dim->sigma * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
         xcfun_copy.compute_exc_vxc_for_gga(npoints, rho, sigma, exc, vrho, vsigma);
 
-        gpuSafe(gpuMemcpyAsync(d_exc, exc, dim->zk * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_exc, exc, dim->zk * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
 
         // compute partial contribution to Vxc matrix and distribute partial
         // Vxc to full Kohn-Sham matrix
@@ -4069,8 +4069,8 @@ integrateVxcFockForGgaOpenShell(const CMolecule&        molecule,
         }
     }
 
-    gpuSafe(gpuMemcpyAsync(mat_Vxc_omp[gpu_id].alphaValues(), d_mat_Vxc_full_a, naos * naos * sizeof(double), gpuMemcpyDeviceToHost, stream));
-    gpuSafe(gpuMemcpyAsync(mat_Vxc_omp[gpu_id].betaValues(),  d_mat_Vxc_full_b, naos * naos * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(mat_Vxc_omp[gpu_id].alphaValues(), d_mat_Vxc_full_a, naos * naos * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(mat_Vxc_omp[gpu_id].betaValues(),  d_mat_Vxc_full_b, naos * naos * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -4285,8 +4285,8 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
     gpuSafe(gpuMallocAsync(&d_rw_den_mat_full, naos * naos * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_mat_Fxc_full, naos * naos * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // density and functional derivatives
 
@@ -4329,10 +4329,10 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
     gpuSafe(gpuMallocAsync(&d_grid_z, n_total_grid_points * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_grid_w, n_total_grid_points * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -4416,7 +4416,7 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
             ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
         }
 
-        gpuSafe(gpuMemcpyAsync(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
         // sub density matrix for ground-state rho
 
@@ -4458,13 +4458,13 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
 
         // functional evaluation
 
-        gpuSafe(gpuMemcpyAsync(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
         xcfun_copy.compute_fxc_for_lda(npoints, rho, v2rho2);
 
-        gpuSafe(gpuMemcpyAsync(d_v2rho2, v2rho2, dim->v2rho2 * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_v2rho2, v2rho2, dim->v2rho2 * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
 
         // compute partial contribution to Fxc matrix and distribute partial
 
@@ -4543,7 +4543,7 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
                            static_cast<uint32_t>(npoints));
     }
 
-    gpuSafe(gpuMemcpyAsync(mat_Fxc_omp[gpu_id].values(), d_mat_Fxc_full, naos * naos * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(mat_Fxc_omp[gpu_id].values(), d_mat_Fxc_full, naos * naos * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -4768,13 +4768,13 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
     gpuSafe(gpuMallocAsync(&d_ao_inds, naos * sizeof(uint32_t), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -4871,7 +4871,7 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
             ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
         }
 
-        gpuSafe(gpuMemcpyAsync(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
         // sub density matrix for ground-state rho
 
@@ -4919,9 +4919,9 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
         // functional evaluation
 
-        gpuSafe(gpuMemcpyAsync(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(sigma, d_sigma, dim->sigma * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(sigma, d_sigma, dim->sigma * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
@@ -4929,11 +4929,11 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
         xcfun_copy.compute_fxc_for_gga(npoints, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
 
-        gpuSafe(gpuMemcpyAsync(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-        gpuSafe(gpuMemcpyAsync(d_v2rho2, v2rho2, dim->v2rho2 * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_v2rhosigma, v2rhosigma, dim->v2rhosigma * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_v2sigma2, v2sigma2, dim->v2sigma2 * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_v2rho2, v2rho2, dim->v2rho2 * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_v2rhosigma, v2rhosigma, dim->v2rhosigma * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_v2sigma2, v2sigma2, dim->v2sigma2 * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
 
         // compute partial contribution to Fxc matrix and distribute partial
 
@@ -5043,7 +5043,7 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
                            static_cast<uint32_t>(aocount));
     }
 
-    gpuSafe(gpuMemcpyAsync(mat_Fxc_omp[gpu_id].values(), d_mat_Fxc_full, naos * naos * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(mat_Fxc_omp[gpu_id].values(), d_mat_Fxc_full, naos * naos * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -5256,8 +5256,8 @@ integrateVxcGradientForLdaClosedShell(const CMolecule&        molecule,
     gpuSafe(gpuMallocAsync(&d_dengrad_y, natoms * max_npoints_per_box * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_dengrad_z, natoms * max_npoints_per_box * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // density and functional derivatives
 
@@ -5299,10 +5299,10 @@ integrateVxcGradientForLdaClosedShell(const CMolecule&        molecule,
     gpuSafe(gpuMallocAsync(&d_grid_z, n_total_grid_points * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_grid_w, n_total_grid_points * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -5403,9 +5403,9 @@ integrateVxcGradientForLdaClosedShell(const CMolecule&        molecule,
             ao_to_atom_ids_int32[ind] = static_cast<uint32_t>(ao_to_atom_ids[aoinds[ind]]);
         }
 
-        gpuSafe(gpuMemcpyAsync(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-        gpuSafe(gpuMemcpyAsync(d_ao_to_atom_ids, ao_to_atom_ids_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_ao_to_atom_ids, ao_to_atom_ids_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
         // sub density matrix for ground-state rho
 
@@ -5488,14 +5488,14 @@ integrateVxcGradientForLdaClosedShell(const CMolecule&        molecule,
 
         // functional evaluation
 
-        gpuSafe(gpuMemcpyAsync(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuDeviceSynchronize());
 
         xcfun_copy.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
 
-        gpuSafe(gpuMemcpyAsync(d_exc, exc, dim->zk * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_exc, exc, dim->zk * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
 
         // accumulate partial contribution to Vxc gradient
 
@@ -5516,7 +5516,7 @@ integrateVxcGradientForLdaClosedShell(const CMolecule&        molecule,
     }
 
     // copy final gradient back
-    gpuSafe(gpuMemcpyAsync(molgrad_omp.row(gpu_id), d_mol_grad, natoms * 3 * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(molgrad_omp.row(gpu_id), d_mol_grad, natoms * 3 * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -5710,11 +5710,11 @@ integrateVxcGradientForLdaOpenShell(const CMolecule&        molecule,
     double* d_dengrad_z_a = d_dengrad_z;
     double* d_dengrad_z_b = d_dengrad_z_a + natoms * max_npoints_per_box;
 
-    gpuSafe(gpuMemcpyAsync(d_rw_den_mat_full_a, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_rw_den_mat_full_b, rwDensityMatrix.betaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_rw_den_mat_full_a, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_rw_den_mat_full_b, rwDensityMatrix.betaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_gs_den_mat_full_a, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_gs_den_mat_full_b, gsDensityMatrix.betaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_gs_den_mat_full_a, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_gs_den_mat_full_b, gsDensityMatrix.betaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // density and functional derivatives
 
@@ -5756,10 +5756,10 @@ integrateVxcGradientForLdaOpenShell(const CMolecule&        molecule,
     gpuSafe(gpuMallocAsync(&d_grid_z, n_total_grid_points * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_grid_w, n_total_grid_points * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -5860,9 +5860,9 @@ integrateVxcGradientForLdaOpenShell(const CMolecule&        molecule,
             ao_to_atom_ids_int32[ind] = static_cast<uint32_t>(ao_to_atom_ids[aoinds[ind]]);
         }
 
-        gpuSafe(gpuMemcpyAsync(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-        gpuSafe(gpuMemcpyAsync(d_ao_to_atom_ids, ao_to_atom_ids_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_ao_to_atom_ids, ao_to_atom_ids_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
         // sub density matrix for ground-state rho
 
@@ -5978,14 +5978,14 @@ integrateVxcGradientForLdaOpenShell(const CMolecule&        molecule,
 
         // functional evaluation
 
-        gpuSafe(gpuMemcpyAsync(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
         xcfun_copy.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
 
-        gpuSafe(gpuMemcpyAsync(d_exc, exc, dim->zk * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_exc, exc, dim->zk * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
 
         // accumulate partial contribution to Vxc gradient
 
@@ -6009,7 +6009,7 @@ integrateVxcGradientForLdaOpenShell(const CMolecule&        molecule,
     }
 
     // copy final gradient back
-    gpuSafe(gpuMemcpyAsync(molgrad_omp.row(gpu_id), d_mol_grad, natoms * 3 * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(molgrad_omp.row(gpu_id), d_mol_grad, natoms * 3 * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -6211,8 +6211,8 @@ integrateVxcGradientForGgaClosedShell(const CMolecule&        molecule,
     gpuSafe(gpuMallocAsync(&d_dengrad_zy, natoms * max_npoints_per_box * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_dengrad_zz, natoms * max_npoints_per_box * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // density and functional derivatives
 
@@ -6261,10 +6261,10 @@ integrateVxcGradientForGgaClosedShell(const CMolecule&        molecule,
     gpuSafe(gpuMallocAsync(&d_grid_z, n_total_grid_points * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_grid_w, n_total_grid_points * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -6371,9 +6371,9 @@ integrateVxcGradientForGgaClosedShell(const CMolecule&        molecule,
             ao_to_atom_ids_int32[ind] = static_cast<uint32_t>(ao_to_atom_ids[aoinds[ind]]);
         }
 
-        gpuSafe(gpuMemcpyAsync(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-        gpuSafe(gpuMemcpyAsync(d_ao_to_atom_ids, ao_to_atom_ids_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_ao_to_atom_ids, ao_to_atom_ids_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
         // sub density matrix for groud-state rho
 
@@ -6500,16 +6500,16 @@ integrateVxcGradientForGgaClosedShell(const CMolecule&        molecule,
 
         // funtional evaluation
 
-        gpuSafe(gpuMemcpyAsync(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(sigma, d_sigma, dim->sigma * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(sigma, d_sigma, dim->sigma * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
         xcfun_copy.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
 
-        gpuSafe(gpuMemcpyAsync(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
 
         // accumulate partial contribution to Vxc gradient
 
@@ -6541,7 +6541,7 @@ integrateVxcGradientForGgaClosedShell(const CMolecule&        molecule,
     }
 
     // copy final gradient back
-    gpuSafe(gpuMemcpyAsync(molgrad_omp.row(gpu_id), d_mol_grad, natoms * 3 * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(molgrad_omp.row(gpu_id), d_mol_grad, natoms * 3 * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -6816,11 +6816,11 @@ integrateVxcGradientForGgaOpenShell(const CMolecule&        molecule,
     double* d_dengrad_zz_a = d_dengrad_zz;
     double* d_dengrad_zz_b = d_dengrad_zz_a + natoms * max_npoints_per_box;
 
-    gpuSafe(gpuMemcpyAsync(d_rw_den_mat_full_a, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_rw_den_mat_full_b, rwDensityMatrix.betaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_rw_den_mat_full_a, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_rw_den_mat_full_b, rwDensityMatrix.betaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
 
-    gpuSafe(gpuMemcpyAsync(d_gs_den_mat_full_a, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_gs_den_mat_full_b, gsDensityMatrix.betaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_gs_den_mat_full_a, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_gs_den_mat_full_b, gsDensityMatrix.betaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     // density and functional derivatives
 
@@ -6869,10 +6869,10 @@ integrateVxcGradientForGgaOpenShell(const CMolecule&        molecule,
     gpuSafe(gpuMallocAsync(&d_grid_z, n_total_grid_points * sizeof(double), stream));
     gpuSafe(gpuMallocAsync(&d_grid_w, n_total_grid_points * sizeof(double), stream));
 
-    gpuSafe(gpuMemcpyAsync(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
-    gpuSafe(gpuMemcpyAsync(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
+    gpuSafe(gpuMemcpyStaged(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
@@ -6979,9 +6979,9 @@ integrateVxcGradientForGgaOpenShell(const CMolecule&        molecule,
             ao_to_atom_ids_int32[ind] = static_cast<uint32_t>(ao_to_atom_ids[aoinds[ind]]);
         }
 
-        gpuSafe(gpuMemcpyAsync(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-        gpuSafe(gpuMemcpyAsync(d_ao_to_atom_ids, ao_to_atom_ids_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_ao_to_atom_ids, ao_to_atom_ids_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
         // sub density matrix for groud-state rho
 
@@ -7174,16 +7174,16 @@ integrateVxcGradientForGgaOpenShell(const CMolecule&        molecule,
 
         // funtional evaluation
 
-        gpuSafe(gpuMemcpyAsync(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
-        gpuSafe(gpuMemcpyAsync(sigma, d_sigma, dim->sigma * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
+        gpuSafe(gpuMemcpyStaged(sigma, d_sigma, dim->sigma * npoints * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
         gpuSafe(gpuStreamSynchronize(stream));
 
         xcfun_copy.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
 
-        gpuSafe(gpuMemcpyAsync(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
-        gpuSafe(gpuMemcpyAsync(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
+        gpuSafe(gpuMemcpyStaged(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), gpuMemcpyHostToDevice, stream));
 
         // accumulate partial contribution to Vxc gradient
 
@@ -7227,7 +7227,7 @@ integrateVxcGradientForGgaOpenShell(const CMolecule&        molecule,
     }
 
     // copy final gradient back
-    gpuSafe(gpuMemcpyAsync(molgrad_omp.row(gpu_id), d_mol_grad, natoms * 3 * sizeof(double), gpuMemcpyDeviceToHost, stream));
+    gpuSafe(gpuMemcpyStaged(molgrad_omp.row(gpu_id), d_mol_grad, natoms * 3 * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
     gpuSafe(gpuStreamSynchronize(stream));
 
