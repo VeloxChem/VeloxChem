@@ -266,13 +266,232 @@ class CSimdMatrix
     }
 
    private:
+    /// @brief Class CBlockCache keeps the blocks of values a thread has freed, so
+    /// that a matrix of a shape the thread has just freed takes its values back
+    /// instead of asking the allocator of the system for them.
+    /// @note The matrices of the integral drivers are formed and destroyed inside
+    /// a parallel region, in a handful of shapes which repeat over the atoms and
+    /// the blocks. The allocator of the system serializes the aligned requests of
+    /// the threads, so those requests cost more wall time on all threads together
+    /// than on one alone. The cache removes them from the parallel region: the
+    /// blocks it holds belong to the thread and no other thread reaches them.
+    /// @note The cache is a fallback and never a requirement. A shape it does not
+    /// hold is allocated as it was before, and one too large for its budget is
+    /// freed as it was before, so the matrices are correct whatever the cache
+    /// holds and however much of it the thread has used.
+    class CBlockCache
+    {
+       public:
+        /// @brief The default constructor.
+        CBlockCache() = default;
+
+        /// @brief The deleted copy constructor, as a cache belongs to its thread.
+        CBlockCache(const CBlockCache &other) = delete;
+
+        /// @brief The deleted copy assignment operator.
+        auto operator=(const CBlockCache &other) -> CBlockCache & = delete;
+
+        /// @brief The destructor, which frees the blocks the thread still holds.
+        ~CBlockCache()
+        {
+            for (size_t i = 0; i < _nentries; i++)
+            {
+                for (size_t j = 0; j < _entries[i].count; j++) _free(_entries[i].blocks[j]);
+            }
+        }
+
+        /// @brief Takes a block of the given size from the cache.
+        /// @param nbytes The size of the block in bytes.
+        /// @return The block, whose content is undefined, or null if the cache
+        /// holds no block of that size.
+        auto
+        take(const size_t nbytes) -> double *
+        {
+            for (size_t i = 0; i < _nentries; i++)
+            {
+                if ((_entries[i].nbytes != nbytes) || (_entries[i].count == 0)) continue;
+
+                _entries[i].tick = ++_tick;
+
+                _bytes -= nbytes;
+
+                return _entries[i].blocks[--_entries[i].count];
+            }
+
+            return nullptr;
+        }
+
+        /// @brief Gives a block of the given size to the cache.
+        /// @param values The block to give.
+        /// @param nbytes The size of the block in bytes.
+        /// @return True if the cache took the block, false if the caller must
+        /// free it.
+        auto
+        give(double *values, const size_t nbytes) -> bool
+        {
+            // NOTE: a block below the smallest size is left to the allocator of
+            // the system, which keeps the small blocks of a thread in a cache of
+            // its own and does not serialize their requests. A block above the
+            // budget of the cache never fits and is left to it as well.
+
+            if ((nbytes < _min_bytes) || (nbytes > _max_bytes)) return false;
+
+            // NOTE: room is made by evicting the sizes which have gone unused for
+            // the longest, rather than by refusing the block. A thread which moves
+            // from one block of atom pairs to another of a different size would
+            // otherwise hold the sizes of the block it has left until it ends, as
+            // a block leaves the cache only when a matrix of its own size is
+            // formed, and would never cache the sizes it has moved to.
+
+            while ((_bytes + nbytes > _max_bytes) && _evict_oldest(true))
+            {
+            }
+
+            if (_bytes + nbytes > _max_bytes) return false;
+
+            for (size_t i = 0; i < _nentries; i++)
+            {
+                if (_entries[i].nbytes != nbytes) continue;
+
+                if (_entries[i].count == _max_blocks) return false;
+
+                _entries[i].blocks[_entries[i].count++] = values;
+
+                _entries[i].tick = ++_tick;
+
+                _bytes += nbytes;
+
+                return true;
+            }
+
+            if ((_nentries == _max_entries) && !_evict_oldest(false)) return false;
+
+            auto &entry = _entries[_nentries++];
+
+            entry.nbytes    = nbytes;
+            entry.blocks[0] = values;
+            entry.count     = 1;
+            entry.tick      = ++_tick;
+
+            _bytes += nbytes;
+
+            return true;
+        }
+
+       private:
+        /// @brief The number of blocks of one size the cache holds. Two are kept
+        /// rather than one, as a matrix is copied while the matrix it is copied
+        /// from is alive.
+        static constexpr size_t _max_blocks = 2;
+
+        /// @brief The number of sizes the cache tracks. The shapes of a block of
+        /// atom pairs are the coordinates and the solid harmonics of the angular
+        /// momenta below the highest, so a handful of sizes covers a block.
+        static constexpr size_t _max_entries = 16;
+
+        /// @brief The smallest block the cache holds, in bytes.
+        static constexpr size_t _min_bytes = 4096;
+
+        /// @brief The memory the cache holds for its thread, in bytes.
+        static constexpr size_t _max_bytes = 16 * 1024 * 1024;
+
+        /// @brief Struct CEntry holds the blocks of one size.
+        struct CEntry
+        {
+            /// @brief The size of the blocks in bytes.
+            size_t nbytes = 0;
+
+            /// @brief The number of blocks held.
+            size_t count = 0;
+
+            /// @brief The value of the counter when the entry was last used.
+            size_t tick = 0;
+
+            /// @brief The blocks held.
+            double *blocks[_max_blocks] = {};
+        };
+
+        /// @brief Frees a block of the cache.
+        /// @param values The block to free.
+        static auto
+        _free(double *values) -> void
+        {
+            ::operator delete[](values, std::align_val_t{simd::cache_line_size()});
+        }
+
+        /// @brief Evicts the size which has gone unused for the longest, freeing
+        /// the blocks it holds.
+        /// @param held True to evict only a size which holds blocks, as is wanted
+        /// when the budget is what runs out, false to evict any size, as is
+        /// wanted when the table is what runs out.
+        /// @return True if a size was evicted.
+        auto
+        _evict_oldest(const bool held) -> bool
+        {
+            auto slot = _max_entries;
+
+            for (size_t i = 0; i < _nentries; i++)
+            {
+                if (held && (_entries[i].count == 0)) continue;
+
+                if ((slot == _max_entries) || (_entries[i].tick < _entries[slot].tick)) slot = i;
+            }
+
+            if (slot == _max_entries) return false;
+
+            for (size_t j = 0; j < _entries[slot].count; j++) _free(_entries[slot].blocks[j]);
+
+            _bytes -= _entries[slot].count * _entries[slot].nbytes;
+
+            // NOTE: the last entry takes the slot of the evicted one, so that the
+            // entries in use stay at the front of the table.
+
+            _entries[slot] = _entries[--_nentries];
+
+            _entries[_nentries] = CEntry{};
+
+            return true;
+        }
+
+        /// @brief The entries of the cache.
+        CEntry _entries[_max_entries] = {};
+
+        /// @brief The number of entries in use.
+        size_t _nentries = 0;
+
+        /// @brief The counter which orders the entries by their last use.
+        size_t _tick = 0;
+
+        /// @brief The memory the cache holds, in bytes.
+        size_t _bytes = 0;
+    };
+
+    /// @brief Gets the cache of blocks of the calling thread.
+    /// @return The cache of the thread.
+    static auto
+    _cache() -> CBlockCache &
+    {
+        thread_local CBlockCache cache;
+
+        return cache;
+    }
+
     /// @brief Allocates the values of matrix, leaving their content undefined.
     auto
     _allocate() -> void
     {
         if (const auto nelems = number_of_elements(); nelems > 0)
         {
-            _data = static_cast<double *>(::operator new[](nelems * sizeof(double), std::align_val_t{simd::cache_line_size()}));
+            const auto nbytes = nelems * sizeof(double);
+
+            if (auto *values = _cache().take(nbytes); values != nullptr)
+            {
+                _data = values;
+
+                return;
+            }
+
+            _data = static_cast<double *>(::operator new[](nbytes, std::align_val_t{simd::cache_line_size()}));
         }
     }
 
@@ -282,7 +501,10 @@ class CSimdMatrix
     {
         if (_data != nullptr)
         {
-            ::operator delete[](_data, std::align_val_t{simd::cache_line_size()});
+            if (!_cache().give(_data, number_of_elements() * sizeof(double)))
+            {
+                ::operator delete[](_data, std::align_val_t{simd::cache_line_size()});
+            }
 
             _data = nullptr;
         }
