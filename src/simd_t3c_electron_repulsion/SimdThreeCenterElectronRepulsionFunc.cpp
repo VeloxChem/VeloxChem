@@ -37,6 +37,8 @@
 #include <string>
 
 #include "ErrorHandler.hpp"
+#include "SimdThreeCenterElectronRepulsionRecPSS.hpp"
+#include "SimdThreeCenterElectronRepulsionRecSPS.hpp"
 #include "SimdThreeCenterElectronRepulsionRecSSD.hpp"
 #include "SimdThreeCenterElectronRepulsionRecSSF.hpp"
 #include "SimdThreeCenterElectronRepulsionRecSSG.hpp"
@@ -182,6 +184,47 @@ compute_electron_repulsion(double                         *values,
     if ((la == 0) && (lb == 0) && (lc == 6))
     {
         compute_ssi_electron_repulsion(values,
+                                       npairs,
+                                       natoms,
+                                       iatom,
+                                       a_function,
+                                       b_function,
+                                       c_function,
+                                       ab_harmonics,
+                                       bc_harmonics,
+                                       ab_coordinates,
+                                       bc_coordinates,
+                                       threshold);
+
+        return;
+    }
+
+    // NOTE: the combinations which carry the angular momentum on the a or b side
+    // expand the harmonic of the vector to the atom on c side back onto the two
+    // the block already carries, so they read the same harmonics as the ones
+    // above but weigh them with a polynomial in the Boys function.
+
+    if ((la == 1) && (lb == 0) && (lc == 0))
+    {
+        compute_pss_electron_repulsion(values,
+                                       npairs,
+                                       natoms,
+                                       iatom,
+                                       a_function,
+                                       b_function,
+                                       c_function,
+                                       ab_harmonics,
+                                       bc_harmonics,
+                                       ab_coordinates,
+                                       bc_coordinates,
+                                       threshold);
+
+        return;
+    }
+
+    if ((la == 0) && (lb == 1) && (lc == 0))
+    {
+        compute_sps_electron_repulsion(values,
                                        npairs,
                                        natoms,
                                        iatom,

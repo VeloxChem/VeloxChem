@@ -217,8 +217,14 @@ CSimdThreeCenterElectronRepulsionDriver::_compute_blocks(CSparseTensor         &
         {
             const auto bc_coordinates = simdfunc::make_coordinates(ab_coordinates, centers[static_cast<size_t>(c_atoms[iatom])]);
 
-            const auto bc_harmonics =
-                simdfunc::make_solid_harmonics(bc_coordinates, b_basis.max_angular_momentum() + c_basis.max_angular_momentum());
+            // NOTE: the harmonics of the atoms on c side reach the sum of the
+            // three angular momenta for the same reason the harmonics of the
+            // atom pairs do: the addition theorem which splits the vector from
+            // the product center of a pair carries the angular momenta of the a
+            // and b sides onto them as well as that of the c side.
+
+            const auto bc_harmonics = simdfunc::make_solid_harmonics(
+                bc_coordinates, a_basis.max_angular_momentum() + b_basis.max_angular_momentum() + c_basis.max_angular_momentum());
 
             // NOTE: the combinations of basis functions are independent, as each
             // of them writes its own values and reads the coordinates and the
