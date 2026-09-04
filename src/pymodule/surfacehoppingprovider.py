@@ -89,6 +89,12 @@ from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .surfacehoppingtracker import StateDescriptors
 
+#: Number of most recent accepted electronic archives that keep their native
+#: wave-function bundle when the caller does not say otherwise.  The bundle is
+#: over 99% of the archive volume and is only ever read for the steps around a
+#: failure, which in a trajectory are the last ones.
+DEFAULT_PROVENANCE_WAVEFUNCTION_STEPS = 10
+
 
 class StateIndexConverter:
     """
@@ -1063,6 +1069,13 @@ class BackendStateProvider(ElectronicStateProvider):
         self._restart_reference_guess = None
         self._reference_stability_request = None
 
+        # Retention bookkeeping for the native wave-function bundles.  The
+        # names are held in creation order so that a 4000-step trajectory
+        # never re-scans a 4000-entry archive directory; the directory is
+        # swept exactly once, when the first archive of a root is written.
+        self._wavefunction_archive_root = None
+        self._wavefunction_archives = []
+
     def configure_reference_stability_policy(self, enabled):
         """Configures selective OpenQP stability checks for this trajectory."""
 
@@ -1257,8 +1270,16 @@ class BackendStateProvider(ElectronicStateProvider):
         return payload
 
     def archive_accepted_provenance(self, *, step, result, tracking,
-                                    directory, calculation_index):
-        """Writes provenance for one accepted electronic transaction."""
+                                    directory, calculation_index,
+                                    wavefunction_retention=None):
+        """Writes provenance for one accepted electronic transaction.
+
+        :param wavefunction_retention:
+            Number of most recent accepted archives that keep their native
+            wave-function bundle; ``None`` selects
+            :data:`DEFAULT_PROVENANCE_WAVEFUNCTION_STEPS` and a negative
+            value keeps every bundle.
+        """
 
         return self._archive_electronic_provenance(
             step=step,
@@ -1267,12 +1288,18 @@ class BackendStateProvider(ElectronicStateProvider):
             directory=directory,
             calculation_index=calculation_index,
             accepted=True,
-            lz_history_before_rejection=None)
+            lz_history_before_rejection=None,
+            wavefunction_retention=wavefunction_retention)
 
     def archive_rejected_provenance(
             self, *, step, result, tracking, directory, calculation_index,
-            lz_history_before_rejection):
-        """Writes a non-LZ-eligible trial archive before rollback."""
+            lz_history_before_rejection, wavefunction_retention=None):
+        """Writes a non-LZ-eligible trial archive before rollback.
+
+        A rejected trial is the evidence of a failure, so its own native
+        bundle is always retained; ``wavefunction_retention`` only bounds the
+        accepted archives written so far.
+        """
 
         return self._archive_electronic_provenance(
             step=step,
@@ -1281,11 +1308,13 @@ class BackendStateProvider(ElectronicStateProvider):
             directory=directory,
             calculation_index=calculation_index,
             accepted=False,
-            lz_history_before_rejection=lz_history_before_rejection)
+            lz_history_before_rejection=lz_history_before_rejection,
+            wavefunction_retention=wavefunction_retention)
 
     def _archive_electronic_provenance(
             self, *, step, result, tracking, directory, calculation_index,
-            accepted, lz_history_before_rejection):
+            accepted, lz_history_before_rejection,
+            wavefunction_retention=None):
         """Writes one atomic, non-overwriting electronic-step archive.
 
         The adapter first materializes OpenQP's native JSON/settings/log
@@ -1485,7 +1514,108 @@ class BackendStateProvider(ElectronicStateProvider):
                 shutil.rmtree(staging)
             raise
 
+        if accepted:
+            self._prune_provenance_wavefunctions(
+                root, os.path.basename(target), wavefunction_retention)
+
         return os.path.abspath(target)
+
+    def _prune_provenance_wavefunctions(self, root, archive_name, retention):
+        """Bounds the number of retained native wave-function bundles.
+
+        The compact per-step records -- energies, tracked permutation,
+        overlaps, reference continuity -- are what an audit of a trajectory
+        actually reads, and they are a few kilobytes per step.  The native
+        OpenQP bundle beside them is three orders of magnitude larger and is
+        only ever opened for the steps around a failure.  Keeping a sliding
+        window of the most recent bundles preserves that use while turning an
+        unbounded archive into a constant-size one.
+
+        The files to remove are named by the archive itself, in the
+        ``archived_openqp_files`` block that the backend adapter wrote into
+        ``scf_reference.json``, so this stays backend-neutral and can never
+        remove a file the adapter did not put there.
+        """
+
+        keep = (DEFAULT_PROVENANCE_WAVEFUNCTION_STEPS if retention is None
+                else int(retention))
+
+        if keep < 0:
+            return
+
+        if self._wavefunction_archive_root != root:
+            # A restart resumes into an existing archive tree, so the window
+            # has to be seeded from what is already on disk.  Names carry a
+            # zero-padded step index, which makes the lexicographic order the
+            # chronological one.
+            self._wavefunction_archive_root = root
+            try:
+                self._wavefunction_archives = sorted(
+                    name for name in os.listdir(root)
+                    if name.startswith('step_') and
+                    os.path.isdir(os.path.join(root, name)) and
+                    name != archive_name)
+            except OSError:
+                self._wavefunction_archives = []
+
+        self._wavefunction_archives.append(archive_name)
+
+        while len(self._wavefunction_archives) > keep:
+            self._strip_native_bundle(
+                os.path.join(root, self._wavefunction_archives.pop(0)))
+
+    @staticmethod
+    def _strip_native_bundle(archive):
+        """Removes the native wave-function files of one accepted archive.
+
+        The removal is recorded in ``scf_reference.json`` so that the archive
+        stays self-describing: a later reader sees which files existed, that
+        they were pruned by the retention policy, and how much was freed.
+        Pruning is diagnostic housekeeping and must never abort a trajectory,
+        so a filesystem refusal is left to the next call.
+        """
+
+        reference_file = os.path.join(archive, 'scf_reference.json')
+
+        try:
+            with open(reference_file, encoding='utf-8') as infile:
+                reference = json.load(infile)
+        except (OSError, ValueError):
+            return
+
+        if reference.get('archived_openqp_files_pruned', False):
+            return
+
+        removed = []
+        freed = 0
+        for name in (reference.get('archived_openqp_files', None) or {
+        }).values():
+            # basename() keeps a malformed record from reaching outside its
+            # own archive directory.
+            path = os.path.join(archive, os.path.basename(str(name)))
+            try:
+                freed += os.path.getsize(path)
+                os.remove(path)
+            except OSError:
+                continue
+            removed.append(os.path.basename(str(name)))
+
+        if not removed:
+            return
+
+        reference['archived_openqp_files_pruned'] = True
+        reference['archived_openqp_files_removed'] = sorted(removed)
+        reference['archived_openqp_bytes_freed'] = int(freed)
+
+        temporary = reference_file + '.tmp'
+        try:
+            with open(temporary, 'w', encoding='utf-8') as outfile:
+                json.dump(reference, outfile, indent=2, sort_keys=True)
+                outfile.write('\n')
+            os.replace(temporary, reference_file)
+        except OSError:
+            if os.path.exists(temporary):
+                os.remove(temporary)
 
     def clear_cache(self):
         """

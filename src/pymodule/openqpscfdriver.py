@@ -33,6 +33,8 @@
 from contextlib import contextmanager
 from copy import deepcopy
 from mpi4py import MPI
+import atexit
+import glob
 import hashlib
 import os
 import re
@@ -41,6 +43,7 @@ import sys
 import time
 import tempfile
 import uuid
+import weakref
 import numpy as np
 
 from .veloxchemlib import mpi_master
@@ -357,6 +360,14 @@ class OpenQPScfDriver:
         - multiplicity: SCF spin multiplicity override (None => from molecule).
         - max_cycles: Maximum number of SCF iterations.
         - scratch_dir: Base scratch directory for OpenQP files.
+        - scratch_retention: Number of most recent OpenQP calculations whose
+          native scratch artefacts (log, JSON bundle, settings, molden) are
+          kept; older ones are deleted as soon as a new calculation starts.
+          A negative value keeps every calculation, which is the historical
+          behaviour and is unbounded.
+        - keep_scratch_dir: Keeps a driver-created scratch directory after the
+          process exits.  Set it when the native OpenQP files are the object
+          of the investigation.
         - openqp_verbose: Print OpenQP log to the OpenQP log file verbosely.
     """
 
@@ -403,6 +414,21 @@ class OpenQPScfDriver:
         self.scratch_dir = None
         self.openqp_verbose = False
         self._title_printed = False
+
+        # Scratch lifetime.  OpenQP writes one <project>.log and -- whenever a
+        # result bundle is requested -- one <project>.json, one
+        # <project>.settings.json and one <project>*.molden per calculation,
+        # and a dynamics run performs one calculation per nuclear step.  Left
+        # alone that is an unbounded leak into TMPDIR, so the driver keeps only
+        # a bounded window of the most recent calculations and removes a
+        # scratch root it created itself when the process exits.  A scratch
+        # directory supplied through set_scratch_dir() belongs to the user and
+        # is never removed.
+        self.scratch_retention = 10
+        self.keep_scratch_dir = False
+        self._owns_scratch_dir = False
+        self._scratch_projects = []
+        self._scratch_cleanup_hook = None
 
         # cached OpenQP molecule and calculation state
         self._oqp_mol = None
@@ -599,13 +625,43 @@ class OpenQPScfDriver:
     def set_scratch_dir(self, scratch_dir):
         """
         Sets the base scratch directory for OpenQP files.
+
+        A user-supplied directory is never removed by the driver: only the
+        per-calculation artefacts inside it are retired by
+        :attr:`scratch_retention`.
         """
 
         if self.rank == mpi_master():
             path = os.path.abspath(str(scratch_dir))
             self.scratch_dir = path + os.sep if not path.endswith(
                 os.sep) else path
+            self._owns_scratch_dir = False
             self._invalidate_cache()
+
+    def set_scratch_retention(self, n_calculations):
+        """
+        Sets how many recent OpenQP calculations keep their scratch artefacts.
+
+        Each electronic calculation gets its own OpenQP project name, and the
+        native log / JSON bundle / settings / molden files it writes are only
+        needed until the caller has consumed them (the surface-hopping
+        provenance archiver copies them out of scratch straight away).  This
+        window must therefore only cover the calculations that are still
+        reachable, which for the surface-hopping adapters is their native
+        snapshot cache.
+
+        :param n_calculations:
+            Number of recent calculations to keep.  Values below 2 are raised
+            to 2 so that the current and the immediately preceding
+            calculation always survive; a negative value keeps every
+            calculation and restores the historical unbounded behaviour.
+        """
+
+        if self.rank == mpi_master():
+            self.scratch_retention = (int(n_calculations)
+                                      if int(n_calculations) < 0 else
+                                      max(2, int(n_calculations)))
+            self._prune_scratch_projects()
 
     def get_method(self):
         """
@@ -1551,6 +1607,13 @@ class OpenQPScfDriver:
         project = f'vlx_openqp_{uuid.uuid4().hex[:10]}'
         log = os.path.join(self.scratch_dir, project + '.log')
 
+        # Every calculation gets its own project, so the scratch artefacts of
+        # the calculations that have fallen out of the retention window are
+        # retired here rather than at the end of the run: a 4000-step
+        # trajectory must not need 4000 times the scratch of a single step.
+        self._scratch_projects.append(project)
+        self._prune_scratch_projects()
+
         mol = OQPMolecule(project, None, log, silent=1)
         mol.usempi = False
         mol.load_config(config)
@@ -1891,10 +1954,105 @@ class OpenQPScfDriver:
 
     def _ensure_scratch_dir(self):
         if self.scratch_dir is None:
+            # mkdtemp() has no finalizer of its own.  The driver therefore
+            # takes ownership of the directory it creates and removes it at
+            # interpreter shutdown, so that a trajectory does not leave one
+            # TMPDIR tree per driver instance behind.
             self.scratch_dir = tempfile.mkdtemp(prefix='vlx_openqp_') + os.sep
+            self._owns_scratch_dir = True
+            self._register_scratch_cleanup()
         elif not self.scratch_dir.endswith(os.sep):
             self.scratch_dir += os.sep
         os.makedirs(self.scratch_dir, exist_ok=True)
+
+    def _register_scratch_cleanup(self):
+        """
+        Arranges for a driver-created scratch root to be removed at exit.
+
+        Only a root this driver created with ``mkdtemp`` is registered; a
+        directory handed in through :meth:`set_scratch_dir` belongs to the
+        caller.  The hook keeps no reference to the driver, so it cannot keep
+        it alive, and it is silent about a directory somebody else removed
+        first.
+        """
+
+        if self._scratch_cleanup_hook is not None:
+            return
+
+        root = self.scratch_dir
+        driver_ref = weakref.ref(self)
+
+        def remove_scratch_root():
+            driver = driver_ref()
+            if driver is not None and driver.keep_scratch_dir:
+                return
+            shutil.rmtree(root, ignore_errors=True)
+
+        atexit.register(remove_scratch_root)
+        self._scratch_cleanup_hook = remove_scratch_root
+
+    def cleanup_scratch_dir(self):
+        """
+        Removes the OpenQP scratch artefacts written by this driver.
+
+        A driver-created scratch root is removed completely; a user-supplied
+        one keeps its directory and loses only the OpenQP projects this
+        driver wrote into it.  Callers that run many trajectories in one
+        process should invoke this between trajectories.
+        """
+
+        if self.rank != mpi_master():
+            return
+
+        if self._owns_scratch_dir and self.scratch_dir is not None:
+            shutil.rmtree(self.scratch_dir, ignore_errors=True)
+            if self._scratch_cleanup_hook is not None:
+                atexit.unregister(self._scratch_cleanup_hook)
+                self._scratch_cleanup_hook = None
+            self.scratch_dir = None
+            self._owns_scratch_dir = False
+        else:
+            for project in self._scratch_projects:
+                self._remove_scratch_project(project)
+
+        self._scratch_projects = []
+        self._invalidate_cache()
+
+    def _remove_scratch_project(self, project):
+        """
+        Deletes every scratch file OpenQP wrote for one project name.
+
+        The project name is a ``uuid4`` fragment minted by
+        :meth:`_new_oqp_molecule`, so the glob cannot reach anything the
+        driver did not create.
+        """
+
+        if self.scratch_dir is None:
+            return
+
+        for path in glob.glob(os.path.join(self.scratch_dir, project + '*')):
+            try:
+                if os.path.isdir(path):
+                    shutil.rmtree(path, ignore_errors=True)
+                else:
+                    os.remove(path)
+            except OSError:
+                # A scratch file that is already gone, or that the filesystem
+                # refuses to remove, must never abort an electronic step.
+                pass
+
+    def _prune_scratch_projects(self):
+        """
+        Keeps only the most recent :attr:`scratch_retention` OpenQP projects.
+        """
+
+        if int(self.scratch_retention) < 0:
+            return
+
+        keep = max(2, int(self.scratch_retention))
+
+        while len(self._scratch_projects) > keep:
+            self._remove_scratch_project(self._scratch_projects.pop(0))
 
     @contextmanager
     def _openqp_output_context(self, mol):

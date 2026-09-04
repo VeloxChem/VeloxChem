@@ -941,6 +941,17 @@ class OpenQPMRSFAdapter(ElectronicBackendAdapter):
         self._stability_policy_active = False
         self._reference_continuity_threshold = None
 
+        # The native snapshot cache keeps whole OpenQP molecules alive, and
+        # write_native_provenance() re-reads their scratch log and result
+        # bundle.  The driver's scratch retention window must therefore cover
+        # at least the cached snapshots plus the one being computed, or a
+        # cached molecule would point at files the driver already retired.
+        retention = getattr(self.scf_driver, 'set_scratch_retention', None)
+        if callable(retention):
+            retention(max(
+                int(getattr(self.scf_driver, 'scratch_retention', 0)),
+                self.native_cache_size + 1))
+
     def configure_reference_stability_policy(self, enabled):
         """Lets the trajectory policy selectively override driver stability."""
 

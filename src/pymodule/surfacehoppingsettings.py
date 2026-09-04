@@ -180,6 +180,17 @@ class SurfaceHoppingSettings:
     :param electronic_provenance_dir:
         Diagnostic-only directory receiving one non-overwriting archive for
         every accepted OpenQP electronic calculation.
+    :param electronic_provenance_wavefunction_steps:
+        Number of most recent accepted archives that keep the heavy native
+        wave-function bundle (OpenQP result JSON, native log and resolved
+        settings).  Older accepted archives keep their compact, per-step
+        analysis records -- energies, tracking, overlaps and reference
+        continuity -- and lose only the native bundle, which is where
+        essentially all of the volume sits.  ``0`` discards the native bundle
+        immediately; a negative value keeps every bundle, which is the
+        historical behaviour and grows without bound in a production
+        trajectory.  Archives of *rejected* electronic trials are never
+        pruned: they are the primary evidence of a failure.
     :param checkpoint_interval:
         Number of steps between checkpoint writes; 0 disables checkpointing.
     :param diagnostics_file:
@@ -218,6 +229,7 @@ class SurfaceHoppingSettings:
     scf_stability_diagnostics_dir: str = 'scf_stability_logs'
     scf_reference_continuity_min_singular_value: object = None
     electronic_provenance_dir: str = 'electronic_provenance'
+    electronic_provenance_wavefunction_steps: int = 10
     checkpoint_interval: int = 10
     diagnostics_file: str = 'surface_hopping.jsonl'
     checkpoint_file: str = 'surface_hopping_checkpoint.npz'
@@ -415,6 +427,12 @@ class SurfaceHoppingSettings:
             bool(str(self.electronic_provenance_dir).strip()),
             'SurfaceHoppingSettings: electronic_provenance_dir must not be '
             'empty.')
+
+        assert_msg_critical(
+            int(self.electronic_provenance_wavefunction_steps) >= -1,
+            'SurfaceHoppingSettings: '
+            'electronic_provenance_wavefunction_steps must be -1 (keep '
+            'every bundle), 0 (keep none) or a positive retention window.')
 
         assert_msg_critical(
             int(self.checkpoint_interval) >= 0,

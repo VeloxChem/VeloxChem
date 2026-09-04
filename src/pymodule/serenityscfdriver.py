@@ -32,11 +32,14 @@
 
 from contextlib import nullcontext
 from mpi4py import MPI
+import atexit
 import hashlib
 import os
+import shutil
 import sys
 import tempfile
 import uuid
+import weakref
 import numpy as np
 
 from .veloxchemlib import mpi_master
@@ -118,6 +121,13 @@ class SerenityScfDriver:
 
         self.scratch_dir = None
         self.serenity_verbose = False
+
+        # A scratch root created by this driver is owned by it and removed at
+        # interpreter shutdown; one supplied through set_scratch_dir() belongs
+        # to the caller and is left alone.
+        self.keep_scratch_dir = False
+        self._owns_scratch_dir = False
+        self._scratch_cleanup_hook = None
 
         self._system = None # This is the systemController object from Serenity
         self._scf_task = None # This is the Task object that is executing the given Task here: SCFTask
@@ -276,6 +286,7 @@ class SerenityScfDriver:
             path = os.path.abspath(str(scratch_dir))
             self.scratch_dir = path + os.sep if not path.endswith(
                 os.sep) else path
+            self._owns_scratch_dir = False
             self._invalidate_cache()
 
     def get_method(self):
@@ -582,9 +593,44 @@ class SerenityScfDriver:
 
     def _ensure_scratch_dir(self):
         if self.scratch_dir is None:
+            # mkdtemp() has no finalizer; without this hook every driver
+            # instance leaves a Serenity scratch tree in TMPDIR forever.
             self.scratch_dir = tempfile.mkdtemp(prefix='vlx_serenity_') + os.sep
+            self._owns_scratch_dir = True
+            self._register_scratch_cleanup()
         elif not self.scratch_dir.endswith(os.sep):
             self.scratch_dir += os.sep
+
+    def _register_scratch_cleanup(self):
+        """Arranges for a driver-created scratch root to be removed at exit."""
+
+        if self._scratch_cleanup_hook is not None:
+            return
+
+        root = self.scratch_dir
+        driver_ref = weakref.ref(self)
+
+        def remove_scratch_root():
+            driver = driver_ref()
+            if driver is not None and driver.keep_scratch_dir:
+                return
+            shutil.rmtree(root, ignore_errors=True)
+
+        atexit.register(remove_scratch_root)
+        self._scratch_cleanup_hook = remove_scratch_root
+
+    def cleanup_scratch_dir(self):
+        """Removes a scratch root this driver created."""
+
+        if self.rank != mpi_master() or not self._owns_scratch_dir:
+            return
+
+        shutil.rmtree(self.scratch_dir, ignore_errors=True)
+        if self._scratch_cleanup_hook is not None:
+            atexit.unregister(self._scratch_cleanup_hook)
+            self._scratch_cleanup_hook = None
+        self.scratch_dir = None
+        self._owns_scratch_dir = False
 
     def _get_effective_scf_mode(self, molecule=None):
         if self.scf_mode in ('restricted', 'unrestricted'):

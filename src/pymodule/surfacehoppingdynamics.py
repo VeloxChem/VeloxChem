@@ -905,7 +905,10 @@ class LandauZenerSurfaceHoppingDynamics:
                     tracking=tracking,
                     directory=self.settings.electronic_provenance_dir,
                     calculation_index=
-                        self._electronic_provenance_calculation_index)
+                        self._electronic_provenance_calculation_index,
+                    wavefunction_retention=
+                        self.settings
+                        .electronic_provenance_wavefunction_steps)
             except Exception as exc:
                 rollback_electronic_transaction()
                 raise SurfaceHoppingError(
@@ -965,7 +968,9 @@ class LandauZenerSurfaceHoppingDynamics:
                 directory=self.settings.electronic_provenance_dir,
                 calculation_index=(
                     self._electronic_provenance_calculation_index),
-                lz_history_before_rejection=serializable_history)
+                lz_history_before_rejection=serializable_history,
+                wavefunction_retention=(
+                    self.settings.electronic_provenance_wavefunction_steps))
         except Exception as archive_error:
             self._write_diagnostics_record({
                 'record_type': 'rejected_electronic_provenance_error',
