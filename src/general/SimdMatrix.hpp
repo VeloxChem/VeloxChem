@@ -265,6 +265,55 @@ class CSimdMatrix
         return number_of_elements() * sizeof(double);
     }
 
+   public:
+    /// @brief Class CBlockReuse turns on the reuse of the freed blocks of values
+    /// for the calling thread while it is alive.
+    /// @note The reuse is off unless a scope asks for it, and a driver which does
+    /// not construct this guard allocates and frees exactly as it did before the
+    /// cache existed. That is deliberate. A driver which forms a few matrices per
+    /// block of atom pairs gains nothing from the reuse, as the allocations are
+    /// already rare against the work of the block, and loses five to eight percent
+    /// on the largest cases of the overlap and the kinetic energy to the memory
+    /// the cache holds back from the allocator. A driver which forms them once per
+    /// atom on c side, as the three-center electron repulsion does, gains a factor
+    /// of three and a half on the same measurement. The two live in the same range
+    /// of sizes, so no floor and no budget separates them and the scope has to say
+    /// which of the two it is.
+    /// @note The guard nests. An inner guard leaves the reuse on when it ends and
+    /// the outermost one frees what the thread still holds, so a scope never keeps
+    /// memory beyond itself.
+    class CBlockReuse
+    {
+       public:
+        /// @brief The constructor, which turns the reuse on for the thread.
+        CBlockReuse()
+
+            : _previous(_reusing())
+        {
+            _reusing() = true;
+        }
+
+        /// @brief The deleted copy constructor, as the guard owns a state of its
+        /// thread.
+        CBlockReuse(const CBlockReuse &other) = delete;
+
+        /// @brief The deleted copy assignment operator.
+        auto operator=(const CBlockReuse &other) -> CBlockReuse & = delete;
+
+        /// @brief The destructor, which restores the reuse and frees the blocks
+        /// the thread holds if no guard is left.
+        ~CBlockReuse()
+        {
+            _reusing() = _previous;
+
+            if (!_reusing()) _cache().clear();
+        }
+
+       private:
+        /// @brief The state of the reuse before the guard was constructed.
+        bool _previous;
+    };
+
    private:
     /// @brief Class CBlockCache keeps the blocks of values a thread has freed, so
     /// that a matrix of a shape the thread has just freed takes its values back
@@ -298,6 +347,22 @@ class CSimdMatrix
             {
                 for (size_t j = 0; j < _entries[i].count; j++) _free(_entries[i].blocks[j]);
             }
+        }
+
+        /// @brief Frees every block the cache holds, leaving it empty.
+        auto
+        clear() -> void
+        {
+            for (size_t i = 0; i < _nentries; i++)
+            {
+                for (size_t j = 0; j < _entries[i].count; j++) _free(_entries[i].blocks[j]);
+
+                _entries[i] = CEntry{};
+            }
+
+            _nentries = 0;
+
+            _bytes = 0;
         }
 
         /// @brief Takes a block of the given size from the cache.
@@ -476,6 +541,16 @@ class CSimdMatrix
         return cache;
     }
 
+    /// @brief Gets whether the calling thread reuses the blocks it frees.
+    /// @return The reference to the state of the thread, which CBlockReuse sets.
+    static auto
+    _reusing() -> bool &
+    {
+        thread_local bool reusing = false;
+
+        return reusing;
+    }
+
     /// @brief Allocates the values of matrix, leaving their content undefined.
     auto
     _allocate() -> void
@@ -484,11 +559,14 @@ class CSimdMatrix
         {
             const auto nbytes = nelems * sizeof(double);
 
-            if (auto *values = _cache().take(nbytes); values != nullptr)
+            if (_reusing())
             {
-                _data = values;
+                if (auto *values = _cache().take(nbytes); values != nullptr)
+                {
+                    _data = values;
 
-                return;
+                    return;
+                }
             }
 
             _data = static_cast<double *>(::operator new[](nbytes, std::align_val_t{simd::cache_line_size()}));
@@ -501,7 +579,7 @@ class CSimdMatrix
     {
         if (_data != nullptr)
         {
-            if (!_cache().give(_data, number_of_elements() * sizeof(double)))
+            if (!_reusing() || !_cache().give(_data, number_of_elements() * sizeof(double)))
             {
                 ::operator delete[](_data, std::align_val_t{simd::cache_line_size()});
             }

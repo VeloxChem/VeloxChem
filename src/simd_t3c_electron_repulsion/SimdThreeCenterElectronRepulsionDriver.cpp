@@ -154,6 +154,17 @@ CSimdThreeCenterElectronRepulsionDriver::_compute_blocks(CSparseTensor         &
 
         if (block.number_of_pairs() == 0) continue;
 
+        // NOTE: the thread reuses the blocks of values it frees for as long as it
+        // works on this block of atom pairs. The coordinates and the solid
+        // harmonics of the atoms on c side are formed once for every one of them,
+        // in shapes which are the same for all of them, and the allocator of the
+        // system serializes those requests across the threads: they cost more
+        // wall time on all threads together than on one alone. The guard is
+        // declared before the matrices it governs, so it is destroyed after them
+        // and frees what the thread holds when the block is finished.
+
+        const auto reuse = CSimdMatrix::CBlockReuse();
+
         // NOTE: the coordinates of the atom pairs and the solid harmonics of the
         // vectors between their atoms are formed once for the whole block, as
         // every atom on c side and every combination of basis functions of the
