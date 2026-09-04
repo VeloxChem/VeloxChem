@@ -3749,6 +3749,7 @@ def build_forcefield(
         partial_charges=None,
         metal_blind_typing=True,
         average_metal_terms=False,
+        metal_hessian_fitting_method='seminario',
         prune_weak_bridge_bonds=True,
         reparameterize_metal_angles=True,
         comm=None,
@@ -3798,6 +3799,11 @@ def build_forcefield(
         one and the fitted one -- since both call this function.
     :param metal_planarity_force_constant:
         The barrier of that improper, in kJ/mol.
+    :param metal_hessian_fitting_method:
+        The method MMForceFieldGenerator.reparameterize fits the metal
+        bonds and angles with: 'seminario' (default), 'improved-seminario'
+        or 'phf'/'phf(k)'. Only used when a Hessian is given; the seeded
+        pass ignores it.
 
     :return:
         The force field generator.
@@ -3829,9 +3835,9 @@ def build_forcefield(
 
     # the generator shares the output stream of the builder, so muting it
     # has to be balanced before anything of our own is printed
-    forcefield.ostream.mute()
+    
     forcefield.create_topology(molecule, resp=False)
-    forcefield.ostream.unmute()
+    
 
     # The charges have to be applied after create_topology: setting
     # topology_update_flag, which is what makes the custom connectivity
@@ -3881,11 +3887,12 @@ def build_forcefield(
             hessian.shape == (3 * n_atoms, 3 * n_atoms),
             'build_forcefield: Hessian shape '
             f'{hessian.shape} does not match {(3 * n_atoms, 3 * n_atoms)}')
-        forcefield.ostream.mute()
+        
         forcefield.reparameterize(hessian,
                                   reparameterize_keys=bonds + angles,
-                                  average_metal_terms=average_metal_terms)
-        forcefield.ostream.unmute()
+                                  average_metal_terms=average_metal_terms,
+                                  method=metal_hessian_fitting_method)
+        
 
         if prune_weak_bridge_bonds:
             bonds, angles = _prune_weak_bridges(

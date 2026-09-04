@@ -2915,22 +2915,33 @@ class MMForceFieldGenerator:
             reparameterize.  Keys are matched against the four coordinate
             dicts by set membership.
         :param method:
-            Parameterization method: ``'seminario'`` (default) or ``'phf'``.
+            Parameterization method: ``'seminario'`` (default),
+            ``'improved-seminario'`` or ``'phf'``.
+
+            ``'improved-seminario'``
+                The modified Seminario method of Allen, Payne & Cole
+                (J. Chem. Theory Comput. 2018, 14, 274-281).  Bond force
+                constants are unchanged from ``'seminario'``; angle force
+                constants are corrected for every other angle at the
+                central atom that shares one of the two bonds, which is
+                what keeps a densely bonded centre (e.g. an aromatic ring)
+                from coming out too stiff.
         :param average_metal_terms:
             If True (default), bonds and angles involving a metal centre are
             averaged over equivalent atoms like any other term, which is the
             desired behaviour whenever the equivalent metal-ligand bonds really
-            are identical (e.g. in a MOF).  Set to False in a strained or 
+            are identical (e.g. in a MOF).  Set to False in a strained or
             low-symmetry site where two ligands can be topologically
             equivalent while sitting at genuinely different distances from the
-            metal, such as a metallo-enzyme. Only used by the ``'seminario'`` 
-            method.
+            metal, such as a metallo-enzyme. Only used by the ``'seminario'``
+            and ``'improved-seminario'`` methods.
         """
 
         assert_msg_critical(
-            method.lower() in ('seminario', 'phf', 'phf(k)'),
+            method.lower() in ('seminario', 'improved-seminario', 'phf',
+                               'phf(k)'),
             "MMForceFieldGenerator.reparameterize: method must be "
-            "'Seminario', 'PHF' or 'PHF(K)'")
+            "'Seminario', 'Improved-Seminario', 'PHF' or 'PHF(K)'")
 
         assert_msg_critical(
             hessian is not None,
@@ -3081,7 +3092,9 @@ class MMForceFieldGenerator:
                     self.impropers[key]['comment'] += ' from Hessian (PHF)'
 
             return
-        elif method == 'seminario':
+        elif method.lower() in ('seminario', 'improved-seminario'):
+
+            is_improved = (method.lower() == 'improved-seminario')
 
             bohr_to_nm = bohr_in_angstrom() * 0.1
 
@@ -3089,11 +3102,20 @@ class MMForceFieldGenerator:
 
             seminario = Seminario(hessian, coords_in_au)
 
-            self.ostream.print_info(
-                'Force-field reparameterization based on the Seminario method')
-            self.ostream.print_blank()
-            self.ostream.print_reference('Reference:')
-            self.ostream.print_reference(seminario.get_reference())
+            if is_improved:
+                self.ostream.print_info(
+                    'Force-field reparameterization based on the modified '
+                    'Seminario method')
+                self.ostream.print_blank()
+                self.ostream.print_reference('Reference:')
+                self.ostream.print_reference(seminario.get_reference())
+                self.ostream.print_reference(seminario.get_modified_reference())
+            else:
+                self.ostream.print_info(
+                    'Force-field reparameterization based on the Seminario method')
+                self.ostream.print_blank()
+                self.ostream.print_reference('Reference:')
+                self.ostream.print_reference(seminario.get_reference())
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -3178,6 +3200,16 @@ class MMForceFieldGenerator:
 
             # Reparameterize angles
 
+            # Bonded neighbours of every atom, needed by the modified
+            # Seminario method to find every other angle at a central atom
+            # that shares one of the two bonds being fitted (eq. 12).
+            if is_improved:
+                n_atoms = self.molecule.number_of_atoms()
+                bonded_neighbors = [
+                    np.nonzero(self.connectivity_matrix[i])[0].tolist()
+                    for i in range(n_atoms)
+                ]
+
             reparameterized_angles = []
 
             for i, j, k in self.angles:
@@ -3196,8 +3228,19 @@ class MMForceFieldGenerator:
                     np.dot(a, b) / np.linalg.norm(a) /
                     np.linalg.norm(b)) * 180 / np.pi
 
-                new_force_constant = seminario.calculate_angle_force_constant(
-                    i, j, k)
+                if is_improved:
+                    neighbors_i = [
+                        x for x in bonded_neighbors[j] if x != i
+                    ]
+                    neighbors_k = [
+                        x for x in bonded_neighbors[j] if x != k
+                    ]
+                    new_force_constant = (
+                        seminario.calculate_angle_force_constant_modified(
+                            i, j, k, neighbors_i, neighbors_k))
+                else:
+                    new_force_constant = seminario.calculate_angle_force_constant(
+                        i, j, k)
                 new_force_constant *= hartree_in_kjpermol()
 
                 self.angles[(i, j, k)]['equilibrium'] = new_equilibrium

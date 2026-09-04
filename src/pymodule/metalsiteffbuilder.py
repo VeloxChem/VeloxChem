@@ -179,6 +179,10 @@ class MetalSiteForceFieldBuilder:
           hydrogens in addition to the beta carbons.
         - average_metal_terms: The flag for averaging the fitted metal terms
           over equivalent atoms.
+        - metal_hessian_fitting_method: The method the metal bonds and angles
+          are fitted with: 'seminario' (default), 'improved-seminario' or
+          'phf'/'phf(k)'. Only used when a Hessian is fitted; the seeded pass
+          ignores it.
         - metal_blind_typing: The flag for perceiving the GAFF atom types as
           if the metal bonds were not there, so that a coordinating residue
           is typed as the amino acid it is.
@@ -287,6 +291,11 @@ class MetalSiteForceFieldBuilder:
         # two topologically equivalent ligands of a strained site sit at
         # genuinely different distances, and that asymmetry is the signal
         self.average_metal_terms = False
+        # 'seminario' derives force constants from partial Hessian blocks;
+        # 'phf'/'phf(k)' least-squares fits them instead (see
+        # MMForceFieldGenerator.reparameterize). average_metal_terms only
+        # applies to 'seminario'.
+        self.metal_hessian_fitting_method = 'seminario'
 
         # GAFF types an atom from what it is bonded to, so a carboxylate
         # oxygen that grips a metal is typed as an ether one, its carbon
@@ -1975,6 +1984,7 @@ class MetalSiteForceFieldBuilder:
         return {
             'metal_blind_typing': self.metal_blind_typing,
             'average_metal_terms': self.average_metal_terms,
+            'metal_hessian_fitting_method': self.metal_hessian_fitting_method,
             'prune_weak_bridge_bonds': self.prune_weak_bridge_bonds,
             'weak_bridge_tolerance': self.weak_bridge_tolerance,
             'add_metal_planarity_impropers': self.add_metal_planarity_impropers,
