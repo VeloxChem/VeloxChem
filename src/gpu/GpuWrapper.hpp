@@ -59,7 +59,7 @@
     #define gpuHostMalloc(ptr, size)            cudaHostAlloc(ptr, size, cudaHostAllocPortable)
     #define gpuHostFree(ptr)                    cudaFreeHost(ptr)
     #define gpuMemcpyAsync(dst, src, size, kind, s)        cudaMemcpyAsync(dst, src, size, kind, s)
-    #define gpuMemcpyStaged(dst, src, size, kind, s)       gpu::stagedMemcpy(dst, src, size, kind, s)
+    #define gpuMemcpyStaged(dst, src, size, kind, s)       ::gpu::stagedMemcpy(dst, src, size, kind, s)
 
     #define gpuStream_t                         cudaStream_t
     #define gpuStreamCreate(ptr)                cudaStreamCreate(ptr)
@@ -97,7 +97,7 @@
     #define gpuHostMalloc(ptr, size)            hipHostMalloc(ptr, size, hipHostMallocPortable)
     #define gpuHostFree(ptr)                    hipHostFree(ptr)
     #define gpuMemcpyAsync(dst, src, size, kind, s)        hipMemcpyAsync(dst, src, size, kind, s)
-    #define gpuMemcpyStaged(dst, src, size, kind, s)       gpu::stagedMemcpy(dst, src, size, kind, s)
+    #define gpuMemcpyStaged(dst, src, size, kind, s)       ::gpu::stagedMemcpy(dst, src, size, kind, s)
 
     #define gpuStream_t                         hipStream_t
     #define gpuStreamCreate(ptr)                hipStreamCreate(ptr)

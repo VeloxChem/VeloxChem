@@ -94,7 +94,7 @@ computeDotProduct(const double* A, const double* B, const int64_t size_int64) ->
     gpuSafe(gpuSetDevice(0));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
 
-    gpuSafe(gpu::preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -136,7 +136,7 @@ computeDotProduct(const double* A, const double* B, const int64_t size_int64) ->
     gpuSafe(gpuStreamSynchronize(stream));
     gpublasSafe(gpublasDestroy(handle));
     gpuSafe(gpuStreamDestroy(stream));
-    gpuSafe(gpu::releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
 
     return dot_product;
@@ -148,7 +148,7 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
     gpuSafe(gpuSetDevice(0));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
 
-    gpuSafe(gpu::preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -196,7 +196,7 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
     gpuSafe(gpuStreamSynchronize(stream));
     gpublasSafe(gpublasDestroy(handle));
     gpuSafe(gpuStreamDestroy(stream));
-    gpuSafe(gpu::releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
 }
 
@@ -207,7 +207,7 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     gpuSafe(gpuSetDevice(0));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
 
-    gpuSafe(gpu::preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -310,7 +310,7 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     gpuSafe(gpuStreamSynchronize(stream));
     gpublasSafe(gpublasDestroy(handle));
     gpuSafe(gpuStreamDestroy(stream));
-    gpuSafe(gpu::releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
 }
 
@@ -321,7 +321,7 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
     gpuSafe(gpuSetDevice(0));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
 
-    gpuSafe(gpu::preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -391,7 +391,7 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
     gpuSafe(gpuStreamSynchronize(stream));
     gpublasSafe(gpublasDestroy(handle));
     gpuSafe(gpuStreamDestroy(stream));
-    gpuSafe(gpu::releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
 }
 
@@ -402,7 +402,7 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
     gpuSafe(gpuSetDevice(0));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
 
-    gpuSafe(gpu::preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -467,7 +467,7 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
     gpuSafe(gpuStreamSynchronize(stream));
     gpublasSafe(gpublasDestroy(handle));
     gpuSafe(gpuStreamDestroy(stream));
-    gpuSafe(gpu::releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
 }
 
@@ -477,7 +477,7 @@ diagonalizeMatrix(double* A, double* D, const int64_t n_int64) -> void
     gpuSafe(gpuSetDevice(0));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
 
-    gpuSafe(gpu::preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     errors::assertMsgCritical(
         !omp_in_parallel(),
@@ -559,7 +559,7 @@ diagonalizeMatrix(double* A, double* D, const int64_t n_int64) -> void
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
-    gpuSafe(gpu::releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
 }
 
