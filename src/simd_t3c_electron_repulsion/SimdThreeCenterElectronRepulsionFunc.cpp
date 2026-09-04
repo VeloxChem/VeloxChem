@@ -37,6 +37,7 @@
 #include <string>
 
 #include "ErrorHandler.hpp"
+#include "SimdThreeCenterElectronRepulsionRecSSD.hpp"
 #include "SimdThreeCenterElectronRepulsionRecSSP.hpp"
 #include "SimdThreeCenterElectronRepulsionRecSSS.hpp"
 
@@ -90,6 +91,29 @@ compute_electron_repulsion(double                         *values,
                                        c_function,
                                        ab_harmonics[0],
                                        bc_harmonics[0],
+                                       ab_coordinates,
+                                       bc_coordinates,
+                                       threshold);
+
+        return;
+    }
+
+    // NOTE: the kernel of two S type functions and one of angular momentum two
+    // takes the solid harmonics of angular momenta one and two of both sides, as
+    // the addition theorem splits the vector to the atom on c side into three
+    // bidegrees and the middle one couples the orders of the two.
+
+    if ((la == 0) && (lb == 0) && (lc == 2))
+    {
+        compute_ssd_electron_repulsion(values,
+                                       npairs,
+                                       natoms,
+                                       iatom,
+                                       a_function,
+                                       b_function,
+                                       c_function,
+                                       ab_harmonics,
+                                       bc_harmonics,
                                        ab_coordinates,
                                        bc_coordinates,
                                        threshold);

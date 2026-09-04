@@ -37,6 +37,32 @@ The ratio belongs to the side carrying no angular momentum, which is easy to get
 backwards: `(s|.|l)` takes `alpha / p` and `(l|.|s)` takes `-beta / p`, as the
 overlap kernels of the same combinations do.
 
+## make_addition_table.py
+
+Builds the coefficients of the addition theorem for the real regular solid
+harmonics, which the three-center kernels need. With `a` and `b` two vectors,
+
+    S_{l,m}(a + b) = sum_{l1} sum_{m1,m2} C^{l,m}_{l1 m1, l2 m2} S_{l1,m1}(a) S_{l2,m2}(b)
+
+with `l2 = l - l1`. The degree-`l1`-in-`a` part is separately harmonic in `a` and
+in `b`, so the split is by bidegree and leaves no `r^2` remainder, and each
+bidegree is solved on its own. In the complex harmonics the coefficient is the
+square root of a product of two binomials, but Tabula's harmonics are real and
+that form does not survive the transformation, so the table is generated instead
+of written down.
+
+The generator does not use the complex form at all. It builds the real harmonics
+symbolically **with the recursion of `make_solid_harmonics.py`**, expands
+`S_{l,m}(a + b)`, and solves the linear system over the monomials of each
+bidegree exactly. The coefficients come out as exact rationals and surds.
+
+Run it as `python codegen/make_addition_table.py <l>`. Set `VLX_HARM_PROBE` to a
+program which prints the harmonics the library computes for one vector, and the
+symbolic recursion is checked against it for `l <= 6` before the table is built;
+without it that check is skipped and the table rests on the recursion alone being
+transcribed correctly. **Set it.** The convention is what the table depends on,
+and it is the one thing this generator cannot verify by itself.
+
 ## make_coulomb_formula_kernels.py
 
 Emits the thirteen two-center electron repulsion kernels which follow a closed
