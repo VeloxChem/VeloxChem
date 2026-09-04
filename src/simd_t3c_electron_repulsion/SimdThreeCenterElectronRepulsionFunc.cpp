@@ -38,6 +38,10 @@
 
 #include "ErrorHandler.hpp"
 #include "SimdThreeCenterElectronRepulsionRecSSD.hpp"
+#include "SimdThreeCenterElectronRepulsionRecSSF.hpp"
+#include "SimdThreeCenterElectronRepulsionRecSSG.hpp"
+#include "SimdThreeCenterElectronRepulsionRecSSH.hpp"
+#include "SimdThreeCenterElectronRepulsionRecSSI.hpp"
 #include "SimdThreeCenterElectronRepulsionRecSSP.hpp"
 #include "SimdThreeCenterElectronRepulsionRecSSS.hpp"
 
@@ -106,6 +110,78 @@ compute_electron_repulsion(double                         *values,
     if ((la == 0) && (lb == 0) && (lc == 2))
     {
         compute_ssd_electron_repulsion(values,
+                                       npairs,
+                                       natoms,
+                                       iatom,
+                                       a_function,
+                                       b_function,
+                                       c_function,
+                                       ab_harmonics,
+                                       bc_harmonics,
+                                       ab_coordinates,
+                                       bc_coordinates,
+                                       threshold);
+
+        return;
+    }
+
+    if ((la == 0) && (lb == 0) && (lc == 3))
+    {
+        compute_ssf_electron_repulsion(values,
+                                       npairs,
+                                       natoms,
+                                       iatom,
+                                       a_function,
+                                       b_function,
+                                       c_function,
+                                       ab_harmonics,
+                                       bc_harmonics,
+                                       ab_coordinates,
+                                       bc_coordinates,
+                                       threshold);
+
+        return;
+    }
+
+    if ((la == 0) && (lb == 0) && (lc == 4))
+    {
+        compute_ssg_electron_repulsion(values,
+                                       npairs,
+                                       natoms,
+                                       iatom,
+                                       a_function,
+                                       b_function,
+                                       c_function,
+                                       ab_harmonics,
+                                       bc_harmonics,
+                                       ab_coordinates,
+                                       bc_coordinates,
+                                       threshold);
+
+        return;
+    }
+
+    if ((la == 0) && (lb == 0) && (lc == 5))
+    {
+        compute_ssh_electron_repulsion(values,
+                                       npairs,
+                                       natoms,
+                                       iatom,
+                                       a_function,
+                                       b_function,
+                                       c_function,
+                                       ab_harmonics,
+                                       bc_harmonics,
+                                       ab_coordinates,
+                                       bc_coordinates,
+                                       threshold);
+
+        return;
+    }
+
+    if ((la == 0) && (lb == 0) && (lc == 6))
+    {
+        compute_ssi_electron_repulsion(values,
                                        npairs,
                                        natoms,
                                        iatom,

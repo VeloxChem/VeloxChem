@@ -37,6 +37,39 @@ The ratio belongs to the side carrying no angular momentum, which is easy to get
 backwards: `(s|.|l)` takes `alpha / p` and `(l|.|s)` takes `-beta / p`, as the
 overlap kernels of the same combinations do.
 
+## make_coulomb_addition_kernels.py
+
+Emits the three-center electron repulsion kernels of two S type functions on the
+a and b sides and one of angular momentum two to six on the c side:
+
+    (ss|J|l)_m = (ss|J|s)^(l) sum_{l1} (alpha^l1 p^l2 / q^l)
+                              sum_{m1,m2} C^{l,m}_{l1 m1, l2 m2} S_{l1,m1}(AB) S_{l2,m2}(BC)
+
+with `l2 = l - l1`, `p = alpha + beta`, `q = p + gamma`, and the auxiliary
+integral of order n the integral of three S type functions with the Boys function
+of order n in place of the order zero,
+
+    (ss|J|s)^(n) = 2 pi^(5/2) N_a N_b N_c exp(-mu AB^2) F_n(rho PC^2) / (p gamma sqrt(q))
+
+The collapsed form is `(p/q)^l S_{l,m}(PC) (ss|J|s)^(l)`, and the sum above is
+what the addition theorem makes of it: `p PC = alpha AB + p BC`, so the harmonic
+of `PC` splits into the harmonics of the two vectors the driver already carries.
+The ratio belongs to the side carrying no angular momentum, as it does for the
+two-center kernels, and the sign is positive throughout: the harmonic is of `PC`
+and not of `CP`.
+
+The coefficients come from `make_addition_table.py`. The first and the last
+bidegree are the identity, the harmonic of the other side being of degree zero;
+the ones between them couple the orders, and their products of harmonics are
+formed once per bidegree and read by the angular components which carry them,
+each of those in a loop of its own so the vectorizer is not asked to hold every
+product at once.
+
+Run as `python codegen/make_coulomb_addition_kernels.py 2 3 4 5 6` **from the
+root of the checkout**, with `VLX_HARM_PROBE` set so the convention check of the
+table generator runs. `(ss|J|s)` and `(ss|J|p)` are not emitted: the first needs
+no harmonics and the second is linear in them, so both are written by hand.
+
 ## make_addition_table.py
 
 Builds the coefficients of the addition theorem for the real regular solid

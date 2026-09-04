@@ -33,8 +33,8 @@
 
 
 
-#ifndef SimdThreeCenterElectronRepulsionRecSSD_hpp
-#define SimdThreeCenterElectronRepulsionRecSSD_hpp
+#ifndef SimdThreeCenterElectronRepulsionRecSSG_hpp
+#define SimdThreeCenterElectronRepulsionRecSSG_hpp
 
 #include <cstddef>
 #include <vector>
@@ -46,7 +46,7 @@ namespace simdt3ceri {  // simdt3ceri namespace
 
 /// @brief Computes the three-center electron repulsion integrals of two basis
 /// functions of zero angular momentum on a and b sides and one of angular
-/// momentum two on c side, over the atom pairs of a block and for one atom on
+/// momentum four on c side, over the atom pairs of a block and for one atom on
 /// c side.
 /// @param values The values of the combination of basis functions, whose slices
 /// of the atom on c side this kernel writes.
@@ -57,9 +57,9 @@ namespace simdt3ceri {  // simdt3ceri namespace
 /// @param b_function The basis function on b side.
 /// @param c_function The basis function on c side.
 /// @param ab_harmonics The solid harmonics of the vectors between the atoms of
-/// the atom pairs, reaching at least angular momentum two.
+/// the atom pairs, reaching at least angular momentum four.
 /// @param bc_harmonics The solid harmonics of the vectors from the atoms on b
-/// side to the atom on c side, reaching at least angular momentum two.
+/// side to the atom on c side, reaching at least angular momentum four.
 /// @param ab_coordinates The coordinates of the atom pairs, whose rows zero to
 /// two carry the atoms on a side and whose row six carries their squared
 /// distances.
@@ -67,10 +67,10 @@ namespace simdt3ceri {  // simdt3ceri namespace
 /// two and of the atom on c side in rows three to five.
 /// @param threshold The screening threshold of the integrals.
 /// @note The addition theorem splits the harmonic of the vector from the product
-/// center of an atom pair to the atom on c side into 3 bidegrees. The first and
+/// center of an atom pair to the atom on c side into 5 bidegrees. The first and
 /// the last are the harmonics of one side alone, and the ones between them couple
 /// the orders of both, with the coefficients make_addition_table.py produces.
-auto compute_ssd_electron_repulsion(double                         *values,
+auto compute_ssg_electron_repulsion(double                         *values,
                                     const size_t                    npairs,
                                     const size_t                    natoms,
                                     const size_t                    iatom,
@@ -85,4 +85,4 @@ auto compute_ssd_electron_repulsion(double                         *values,
 
 }  // namespace simdt3ceri
 
-#endif /* SimdThreeCenterElectronRepulsionRecSSD_hpp */
+#endif /* SimdThreeCenterElectronRepulsionRecSSG_hpp */
