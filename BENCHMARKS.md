@@ -4,14 +4,18 @@ Notes on the performance of the sparse matrix and SIMD integrals path. Each
 entry records what was measured, on what, and what the numbers do and do not
 cover.
 
-The tables which describe the three drivers as they stand — the def2, diffuse and
-correlation consistent tables of the overlap and the kinetic energy, the parallel
-scaling of the kinetic energy, and the fitting set table of the two-center
-Coulomb — were all measured again on one build, so they can be read against each
-other. The sections which record an intermediate state of the code, the kernel
-profile, the sweeps of the blocks and the block floor, the Instruments findings
-and the dense reconstruction, keep the numbers of the run which produced them and
-were not repeated; they say so where it matters.
+The tables which describe the three drivers as they stand — the def2 tables of the
+overlap and the kinetic energy and the fitting set table of the two-center Coulomb
+— were measured again on the build which carries the opt-in reuse of the freed
+blocks of values, so they can be read against each other. The diffuse and
+correlation consistent tables of the overlap and the kinetic energy and the
+parallel scaling of the kinetic energy were measured on the build before it; the
+reuse is off for these three drivers, so those numbers still describe them, but
+they were taken on a different day and the machine drifts by a few per cent
+between runs. The sections which record an intermediate state of the code, the
+kernel profile, the sweeps of the blocks and the block floor, the Instruments
+findings and the dense reconstruction, keep the numbers of the run which produced
+them and were not repeated; they say so where it matters.
 
 ## Machine
 
@@ -1076,51 +1080,51 @@ Warm, seconds. This supersedes the table of the previous section.
 
 | molecule | basis | nao | sparsity 1 thr | sparsity 14 thr | compute 1 thr | compute 14 thr | sparsity | compute |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| tagrisso | def2-svp | 683 | 0.0008 | 0.0004 | 0.0010 | 0.0005 | 1.81x | 2.21x |
-| tagrisso | def2-tzvp | 1345 | 0.0008 | 0.0004 | 0.0016 | 0.0008 | 1.96x | 2.00x |
-| tagrisso | def2-qzvp | 3099 | 0.0010 | 0.0005 | 0.0029 | 0.0011 | 2.09x | 2.71x |
-| taxol | def2-svp | 1099 | 0.0007 | 0.0005 | 0.0012 | 0.0005 | 1.62x | 2.23x |
-| taxol | def2-tzvp | 2185 | 0.0008 | 0.0005 | 0.0020 | 0.0009 | 1.80x | 2.25x |
-| taxol | def2-qzvp | 4947 | 0.0010 | 0.0005 | 0.0046 | 0.0016 | 2.02x | 2.77x |
-| crambin | def2-svp | 6177 | 0.0032 | 0.0009 | 0.0070 | 0.0016 | 3.57x | 4.48x |
-| crambin | def2-tzvp | 12063 | 0.0034 | 0.0010 | 0.0141 | 0.0032 | 3.43x | 4.40x |
-| crambin | def2-qzvp | 28167 | 0.0039 | 0.0010 | 0.0386 | 0.0065 | 3.89x | 5.95x |
-| ubiquitin | def2-svp | 11577 | 0.0089 | 0.0016 | 0.0167 | 0.0028 | 5.66x | 5.92x |
-| ubiquitin | def2-tzvp | 22442 | 0.0092 | 0.0017 | 0.0312 | 0.0050 | 5.53x | 6.19x |
-| ubiquitin | def2-qzvp | 53197 | 0.0097 | 0.0018 | 0.0832 | 0.0128 | 5.44x | 6.49x |
+| tagrisso | def2-svp | 683 | 0.0008 | 0.0003 | 0.0011 | 0.0005 | 2.54x | 2.12x |
+| tagrisso | def2-tzvp | 1345 | 0.0009 | 0.0003 | 0.0017 | 0.0007 | 2.73x | 2.30x |
+| tagrisso | def2-qzvp | 3099 | 0.0011 | 0.0003 | 0.0033 | 0.0011 | 3.20x | 2.96x |
+| taxol | def2-svp | 1099 | 0.0008 | 0.0004 | 0.0013 | 0.0005 | 2.29x | 2.40x |
+| taxol | def2-tzvp | 2185 | 0.0009 | 0.0003 | 0.0022 | 0.0009 | 2.60x | 2.44x |
+| taxol | def2-qzvp | 4947 | 0.0011 | 0.0004 | 0.0052 | 0.0017 | 2.85x | 3.04x |
+| crambin | def2-svp | 6177 | 0.0035 | 0.0009 | 0.0077 | 0.0016 | 3.93x | 4.93x |
+| crambin | def2-tzvp | 12063 | 0.0037 | 0.0009 | 0.0152 | 0.0030 | 4.14x | 5.05x |
+| crambin | def2-qzvp | 28167 | 0.0043 | 0.0011 | 0.0412 | 0.0065 | 3.93x | 6.34x |
+| ubiquitin | def2-svp | 11577 | 0.0097 | 0.0016 | 0.0176 | 0.0027 | 5.88x | 6.49x |
+| ubiquitin | def2-tzvp | 22442 | 0.0100 | 0.0017 | 0.0334 | 0.0053 | 5.84x | 6.34x |
+| ubiquitin | def2-qzvp | 53197 | 0.0104 | 0.0018 | 0.0875 | 0.0131 | 5.78x | 6.68x |
 
-The scaling reaches 5.9 to 6.5 times on the three ubiquitin cases and rises with
+The scaling reaches 6.3 to 6.7 times on the three ubiquitin cases and rises with
 the size of the problem throughout.
 
 ### Against the reference driver
 
 | molecule | basis | driver 1 thr | reference 1 thr | 1 thr | driver 14 thr | reference 14 thr | 14 thr |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| tagrisso | def2-svp | 0.0010 | 0.0011 | 1.09x | 0.0005 | 0.0004 | 0.84x |
-| tagrisso | def2-tzvp | 0.0016 | 0.0038 | 2.46x | 0.0008 | 0.0015 | 1.89x |
-| tagrisso | def2-qzvp | 0.0029 | 0.0185 | 6.29x | 0.0011 | 0.0031 | 2.86x |
-| taxol | def2-svp | 0.0012 | 0.0026 | 2.20x | 0.0005 | 0.0009 | 1.69x |
-| taxol | def2-tzvp | 0.0020 | 0.0087 | 4.34x | 0.0009 | 0.0017 | 1.92x |
-| taxol | def2-qzvp | 0.0046 | 0.0471 | 10.32x | 0.0016 | 0.0067 | 4.05x |
-| crambin | def2-svp | 0.0070 | 0.0921 | 13.23x | 0.0016 | 0.0125 | 8.06x |
-| crambin | def2-tzvp | 0.0141 | 0.3154 | 22.44x | 0.0032 | 0.0401 | 12.53x |
-| crambin | def2-qzvp | 0.0386 | 1.7087 | 44.29x | 0.0065 | 0.1990 | 30.70x |
-| ubiquitin | def2-svp | 0.0167 | 0.3284 | 19.68x | 0.0028 | 0.0414 | 14.70x |
-| ubiquitin | def2-tzvp | 0.0312 | 1.1116 | 35.64x | 0.0050 | 0.1344 | 26.68x |
-| ubiquitin | def2-qzvp | 0.0832 | 6.2043 | 74.60x | 0.0128 | 0.6904 | 53.91x |
+| tagrisso | def2-svp | 0.0011 | 0.0012 | 1.09x | 0.0005 | 0.0004 | 0.72x |
+| tagrisso | def2-tzvp | 0.0017 | 0.0042 | 2.46x | 0.0007 | 0.0012 | 1.62x |
+| tagrisso | def2-qzvp | 0.0033 | 0.0203 | 6.12x | 0.0011 | 0.0061 | 5.42x |
+| taxol | def2-svp | 0.0013 | 0.0029 | 2.18x | 0.0005 | 0.0006 | 1.16x |
+| taxol | def2-tzvp | 0.0022 | 0.0096 | 4.31x | 0.0009 | 0.0017 | 1.84x |
+| taxol | def2-qzvp | 0.0052 | 0.0513 | 9.88x | 0.0017 | 0.0066 | 3.86x |
+| crambin | def2-svp | 0.0077 | 0.0990 | 12.85x | 0.0016 | 0.0125 | 8.00x |
+| crambin | def2-tzvp | 0.0152 | 0.3380 | 22.19x | 0.0030 | 0.0422 | 14.00x |
+| crambin | def2-qzvp | 0.0412 | 1.8104 | 43.93x | 0.0065 | 0.2066 | 31.78x |
+| ubiquitin | def2-svp | 0.0176 | 0.3543 | 20.10x | 0.0027 | 0.0426 | 15.68x |
+| ubiquitin | def2-tzvp | 0.0334 | 1.1749 | 35.16x | 0.0053 | 0.1363 | 25.86x |
+| ubiquitin | def2-qzvp | 0.0875 | 6.4360 | 73.56x | 0.0131 | 0.6944 | 53.02x |
 
 Every case beats the reference on a single thread and all but one of them on
-fourteen. Tagrisso in def2-svp is the exception at 0.84 times, which is half a
+fourteen. Tagrisso in def2-svp is the exception at 0.72 times, which is half a
 millisecond of work against four tenths of one, and it has moved either side of
-parity between runs: an earlier measurement of the same build put it at 1.06.
+parity between runs: earlier measurements put it at 0.84 and at 1.06.
 
-The margin runs to 75 times on a single thread and 54 on fourteen, both of them
+The margin runs to 74 times on a single thread and 53 on fourteen, both of them
 ubiquitin in def2-qzvp. That case had no reference at all in an earlier version of
 this table, on the assumption that its 21 gigabytes as a dense matrix would not
 fit. The reference driver does not store the full square, and the case in fact
 runs in 13.5 gigabytes of resident memory without swapping, so it is measured
-here: 6.2043 seconds on one thread and 0.6904 on fourteen, against 0.0832 and
-0.0128 for 0.87 gigabytes sparse.
+here: 6.4360 seconds on one thread and 0.6944 on fourteen, against 0.0875 and
+0.0131 for 0.87 gigabytes sparse.
 
 ### What is left
 
@@ -1459,18 +1463,18 @@ Warm, seconds, best of three after one cold call, each case in its own process.
 
 | molecule | basis | nao | lmax | sparse GB | compute 1 thr | compute 14 thr | scaling | reference 14 thr | against it |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| tagrisso | def2-svp | 683 | 2 | 0.00 | 0.0011 | 0.0005 | 2.20x | 0.0005 | 1.07x |
-| tagrisso | def2-tzvp | 1345 | 3 | 0.00 | 0.0017 | 0.0008 | 2.03x | 0.0011 | 1.36x |
-| tagrisso | def2-qzvp | 3099 | 4 | 0.02 | 0.0036 | 0.0013 | 2.85x | 0.0037 | 2.93x |
-| taxol | def2-svp | 1099 | 2 | 0.00 | 0.0013 | 0.0006 | 2.22x | 0.0008 | 1.39x |
-| taxol | def2-tzvp | 2185 | 3 | 0.01 | 0.0022 | 0.0010 | 2.23x | 0.0022 | 2.17x |
-| taxol | def2-qzvp | 4947 | 4 | 0.04 | 0.0060 | 0.0022 | 2.77x | 0.0087 | 4.05x |
-| crambin | def2-svp | 6177 | 2 | 0.03 | 0.0075 | 0.0016 | 4.63x | 0.0144 | 8.85x |
-| crambin | def2-tzvp | 12063 | 3 | 0.10 | 0.0167 | 0.0032 | 5.26x | 0.0493 | 15.56x |
-| crambin | def2-qzvp | 28167 | 4 | 0.44 | 0.0522 | 0.0080 | 6.50x | 0.2625 | 32.71x |
-| ubiquitin | def2-svp | 11577 | 2 | 0.06 | 0.0178 | 0.0030 | 6.03x | 0.0488 | 16.51x |
-| ubiquitin | def2-tzvp | 22442 | 3 | 0.22 | 0.0361 | 0.0057 | 6.38x | 0.1658 | 29.30x |
-| ubiquitin | def2-qzvp | 53197 | 4 | 0.95 | 0.1116 | 0.0155 | 7.22x | 0.9114 | 58.91x |
+| tagrisso | def2-svp | 683 | 2 | 0.00 | 0.0012 | 0.0005 | 2.24x | 0.0005 | 0.91x |
+| tagrisso | def2-tzvp | 1345 | 3 | 0.00 | 0.0018 | 0.0008 | 2.25x | 0.0010 | 1.28x |
+| tagrisso | def2-qzvp | 3099 | 4 | 0.02 | 0.0040 | 0.0013 | 2.96x | 0.0041 | 3.07x |
+| taxol | def2-svp | 1099 | 2 | 0.00 | 0.0014 | 0.0006 | 2.20x | 0.0008 | 1.26x |
+| taxol | def2-tzvp | 2185 | 3 | 0.01 | 0.0025 | 0.0010 | 2.39x | 0.0022 | 2.15x |
+| taxol | def2-qzvp | 4947 | 4 | 0.04 | 0.0065 | 0.0022 | 2.92x | 0.0087 | 3.89x |
+| crambin | def2-svp | 6177 | 2 | 0.03 | 0.0082 | 0.0016 | 5.04x | 0.0154 | 9.42x |
+| crambin | def2-tzvp | 12063 | 3 | 0.10 | 0.0179 | 0.0034 | 5.27x | 0.0503 | 14.79x |
+| crambin | def2-qzvp | 28167 | 4 | 0.44 | 0.0549 | 0.0082 | 6.68x | 0.2666 | 32.45x |
+| ubiquitin | def2-svp | 11577 | 2 | 0.06 | 0.0191 | 0.0029 | 6.65x | 0.0489 | 16.98x |
+| ubiquitin | def2-tzvp | 22442 | 3 | 0.22 | 0.0381 | 0.0058 | 6.59x | 0.1676 | 29.00x |
+| ubiquitin | def2-qzvp | 53197 | 4 | 0.95 | 0.1172 | 0.0150 | 7.79x | 0.9166 | 60.95x |
 
 ### The def2 sets with diffuse functions
 
@@ -1565,11 +1569,12 @@ The knee visible at eight to ten threads on several rows is the machine and not
 the code, its ten performance cores being filled before the four efficiency cores
 are reached.
 
-Against the reference where it is valid, the driver is between 8.9 and 58.9 times
-faster on the four large def2 cases and between 1.1 and 4.1 on the two small ones,
-and it wins every case of every table. Tagrisso in def2-svp, which was the one
-loss of the previous run at 0.93 times, is 1.07 times here; it is half a
-millisecond of work and it sits on the parity line either way.
+Against the reference where it is valid, the driver is between 9.4 and 61.0 times
+faster on the six crambin and ubiquitin def2 cases and between 1.26 and 3.89 on
+the five larger tagrisso and taxol ones. The single loss of the def2 table is tagrisso
+in def2-svp at 0.91 times, which has been measured at 0.93, at 1.07 and at 0.91 on
+three runs of builds which do not differ in this driver: it is half a millisecond
+of work against four tenths of one and it sits on the parity line.
 
 The largest case is ubiquitin in aug-cc-pv6z, 193665 basis functions and 19.6
 gigabytes sparse, whose kinetic energy matrix is formed in 0.31 seconds on
@@ -1608,14 +1613,14 @@ included: its dense matrix for jkfit peaks at 15.9 gigabytes resident, not the
 
 | molecule | basis | nao | lmax | packed GB | compute 1 thr | compute 14 thr | scaling | reference 14 thr | against it |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| tagrisso | jfit | 2176 | 4 | 0.02 | 0.0063 | 0.0013 | 4.83x | 0.0024 | 1.83x |
-| tagrisso | jkfit | 3387 | 4 | 0.04 | 0.0137 | 0.0025 | 5.53x | 0.0040 | 1.61x |
-| taxol | jfit | 3528 | 4 | 0.05 | 0.0168 | 0.0027 | 6.15x | 0.0048 | 1.76x |
-| taxol | jkfit | 5489 | 4 | 0.11 | 0.0363 | 0.0060 | 6.06x | 0.0088 | 1.47x |
-| crambin | jfit | 19500 | 4 | 1.42 | 0.5864 | 0.0717 | 8.18x | 0.1234 | 1.72x |
-| crambin | jkfit | 30751 | 4 | 3.52 | 1.4821 | 0.1572 | 9.43x | 0.2543 | 1.62x |
-| ubiquitin | jfit | 36419 | 4 | 4.94 | 2.2069 | 0.3166 | 6.97x | 0.4098 | 1.29x |
-| ubiquitin | jkfit | 56971 | 4 | 12.09 | 5.5086 | 0.7383 | 7.46x | 0.8483 | 1.15x |
+| tagrisso | jfit | 2176 | 4 | 0.02 | 0.0069 | 0.0014 | 4.79x | 0.0024 | 1.70x |
+| tagrisso | jkfit | 3387 | 4 | 0.04 | 0.0147 | 0.0026 | 5.71x | 0.0042 | 1.62x |
+| taxol | jfit | 3528 | 4 | 0.05 | 0.0179 | 0.0029 | 6.21x | 0.0049 | 1.70x |
+| taxol | jkfit | 5489 | 4 | 0.11 | 0.0391 | 0.0061 | 6.43x | 0.0088 | 1.45x |
+| crambin | jfit | 19500 | 4 | 1.42 | 0.6163 | 0.0729 | 8.45x | 0.1355 | 1.86x |
+| crambin | jkfit | 30751 | 4 | 3.52 | 1.5387 | 0.1603 | 9.60x | 0.2702 | 1.69x |
+| ubiquitin | jfit | 36419 | 4 | 4.94 | 2.2433 | 0.3120 | 7.19x | 0.4160 | 1.33x |
+| ubiquitin | jkfit | 56971 | 4 | 12.09 | 5.5422 | 0.7321 | 7.57x | 0.8610 | 1.18x |
 
 The values were checked against the reference on tagrisso and taxol in both sets
 while the timings were taken: the largest deviation is 6.1e-13 on elements
@@ -1839,11 +1844,15 @@ the trap and were not measured again.
 
 ### What these numbers say
 
-The driver beats the reference everywhere, from **1.15 times** on ubiquitin in
-jkfit to **1.83** on tagrisso in jfit. It did not at first: crambin in jkfit was
+The driver beats the reference everywhere, from **1.18 times** on ubiquitin in
+jkfit to **1.86** on crambin in jfit. It did not at first: crambin in jkfit was
 12 per cent slower and ubiquitin in jkfit 48 per cent, and the loss grew
 monotonically with the size of the matrix. Two changes closed it, and the largest
-case more than halved, 1.6366 seconds to 0.7383.
+case more than halved, 1.6366 seconds to 0.7321.
+
+The table below compares the first version against the run which was current when
+the two changes were made; its `now` column is that run and not the fitting set
+table above, which was measured later.
 
 | molecule | basis | first version | now | gain | against the reference, then and now |
 |---|---|---|---|---|---|
@@ -1886,3 +1895,85 @@ and they are not memory bound, since the integrals scale to seven and ten times
 where the zero fill of the same data saturates at 1.5 and 2.8. The ceiling and the
 floor on the block size meet within a factor of two of each other and the timings
 are flat between them, so there is nothing more to win there.
+
+## The blocks of values a thread frees, and who should reuse them
+
+`CSimdMatrix` allocates the values of every matrix through `::operator new[]` with
+a 128 byte alignment, and the drivers form those matrices inside a parallel
+region. When several threads ask for the same large aligned size at the same
+moment, the allocator of the system serializes them. The cost does not divide by
+the threads; it grows with them.
+
+Measured on the coordinates and the solid harmonics of one atom on c side, the
+shapes the three-center driver forms, against a loop which allocates and frees the
+same seven buffers and computes nothing:
+
+| ncols | threads | coordinates and harmonics | allocation alone |
+| --- | --- | --- | --- |
+| 1830 | 1 | 15.758 ms | 0.348 ms |
+| 1830 | 14 | 3.977 ms | **4.229 ms** |
+| 10133 | 1 | 56.509 ms | 0.199 ms |
+| 10133 | 14 | 8.377 ms | **3.838 ms** |
+
+The allocation alone takes 4.2 milliseconds of wall time on fourteen threads
+against 0.35 on one, which is 170 times the processor time for the same work. It
+is a lock, and on the small case it costs as much as the arithmetic it serves.
+
+### A cache of the freed blocks, and why it cannot be on for everyone
+
+Each thread keeps the blocks it frees, keyed by size, and takes one back when a
+matrix of that size is formed. Two blocks per size, sixteen sizes, sixteen
+megabytes per thread, nothing below four kilobytes, and the size which has gone
+unused for the longest is evicted when either bound is reached.
+
+Turned on for every matrix this is not an improvement. The two-center drivers form
+a few matrices per block of atom pairs, where the allocations are already rare
+against the work of the block, and they pay for the memory the cache holds back
+from the allocator:
+
+| case | cache off | always on | opt in |
+| --- | --- | --- | --- |
+| overlap crambin def2-qzvp | 0.00641 | 0.00673 (+5.0%) | 0.00655 (+2.2%) |
+| overlap ubiquitin def2-qzvp | 0.01261 | 0.01335 (+5.9%) | 0.01259 (−0.2%) |
+| kinetic ubiquitin def2-qzvp | 0.01498 | 0.01618 (+8.0%) | 0.01506 (+0.5%) |
+| coulomb crambin jkfit | 0.16227 | 0.15783 (−2.7%) | 0.15874 (−2.2%) |
+| coulomb ubiquitin jfit | 0.31609 | 0.29996 (−5.1%) | 0.30737 (−2.8%) |
+
+The two Coulomb rows are the control. The reuse is off for that driver in both the
+`always on` and the `opt in` column, so the 2 to 5 per cent they move is the noise
+of the measurement and nothing else. Read against them, the overlap and the
+kinetic energy lose 5 to 8 per cent when the cache is on for everyone and lose
+nothing when it is not.
+
+### No floor and no budget separates the two
+
+The obvious repair is to cache only the sizes which benefit. There are none. The
+budget scales the harm and the supposed gain together, and the floor which frees
+the overlap is the floor which destroys what the three-center driver gains:
+
+| floor | overlap ubiquitin def2-qzvp | three-center pattern, ncols 1830 |
+| --- | --- | --- |
+| off | 0.01271 | 4.760 ms |
+| 4 KB | +5.3% | **1.368 ms** |
+| 64 KB | +6.5% | 1.424 ms |
+| 512 KB | 0.0% | 3.915 ms |
+
+The three-center driver's per-atom buffers are 44 to 200 kilobytes at a typical
+block, which is exactly the range whose caching costs the overlap 5 to 6 per cent.
+The two populations are the same sizes. What separates them is not the size of the
+block but how often it is asked for, and only the caller knows that.
+
+### The guard
+
+`CSimdMatrix::CBlockReuse` turns the reuse on for the calling thread while it is
+alive. It is off otherwise, so a driver which does not construct it allocates and
+frees exactly as it did before the cache existed, and the two-center drivers are
+untouched by construction rather than by measurement. The three-center driver
+constructs one per block of atom pairs, inside the parallel region and before the
+matrices it governs, so it spans the loop over the atoms on c side and frees what
+the thread holds when the block ends.
+
+On the pattern it serves, with the guard placed as the driver places it, fourteen
+threads: **3.774 ms to 2.099 ms, 1.80 times**. An earlier figure of 2.9 times for
+the same case came from a cache which also persisted through the warm up of the
+measurement and is an upper bound rather than what the driver sees.
