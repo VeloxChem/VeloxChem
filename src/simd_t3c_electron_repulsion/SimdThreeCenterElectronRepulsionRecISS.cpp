@@ -32,7 +32,7 @@
 
 
 
-#include "SimdThreeCenterElectronRepulsionRecSSI.hpp"
+#include "SimdThreeCenterElectronRepulsionRecISS.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -51,7 +51,7 @@
 namespace simdt3ceri {  // simdt3ceri namespace
 
 auto
-compute_ssi_electron_repulsion(double                         *values,
+compute_iss_electron_repulsion(double                         *values,
                                const size_t                    npairs,
                                const size_t                    natoms,
                                const size_t                    iatom,
@@ -64,30 +64,30 @@ compute_ssi_electron_repulsion(double                         *values,
                                const CSimdMatrix              &bc_coordinates,
                                const double                    threshold) -> void
 {
-    if ((a_function.get_angular_momentum() != 0) || (b_function.get_angular_momentum() != 0) ||
-        (c_function.get_angular_momentum() != 6))
+    if ((a_function.get_angular_momentum() != 6) || (b_function.get_angular_momentum() != 0) ||
+        (c_function.get_angular_momentum() != 0))
     {
         errors::assertMsgCritical(
             false,
-            std::string("SimdThreeCenterElectronRepulsionRecSSI.compute_ssi_electron_repulsion: Basis functions must be of angular momenta zero, zero and six"));
+            std::string("SimdThreeCenterElectronRepulsionRecISS.compute_iss_electron_repulsion: Basis functions must be of angular momenta six, zero and zero"));
     }
 
     if ((ab_harmonics.size() < 6) || (bc_harmonics.size() < 6))
     {
         errors::assertMsgCritical(
-            false, std::string("SimdThreeCenterElectronRepulsionRecSSI.compute_ssi_electron_repulsion: Harmonics must reach angular momentum six"));
+            false, std::string("SimdThreeCenterElectronRepulsionRecISS.compute_iss_electron_repulsion: Harmonics must reach angular momentum six"));
     }
 
     if (npairs > ab_coordinates.number_of_columns())
     {
         errors::assertMsgCritical(
-            false, std::string("SimdThreeCenterElectronRepulsionRecSSI.compute_ssi_electron_repulsion: Number of atom pairs exceeds coordinates"));
+            false, std::string("SimdThreeCenterElectronRepulsionRecISS.compute_iss_electron_repulsion: Number of atom pairs exceeds coordinates"));
     }
 
     if (iatom >= natoms)
     {
         errors::assertMsgCritical(
-            false, std::string("SimdThreeCenterElectronRepulsionRecSSI.compute_ssi_electron_repulsion: Index of atom on c side is out of range"));
+            false, std::string("SimdThreeCenterElectronRepulsionRecISS.compute_iss_electron_repulsion: Index of atom on c side is out of range"));
     }
 
     if (npairs == 0) return;
@@ -267,59 +267,104 @@ compute_ssi_electron_repulsion(double                         *values,
 
                 const auto qexp = pexp + cexp;
 
-                // NOTE: the total exponent is raised to the angular momentum by
-                // repeated multiplication, as the angular momentum is small.
-
-                auto faux = fcoul * anorm * b_norms[j] * c_norms[k] / (pexp * cexp * std::sqrt(qexp));
+                const auto fbase = fcoul * anorm * b_norms[j] * c_norms[k] / (pexp * cexp * std::sqrt(qexp));
 
                 const auto frq = 1.0 / qexp;
 
-                faux *= frq;
+                const auto frat = bexp * frp;
 
-                faux *= frq;
+                const auto fag = aexp * cexp * frp * frq;
 
-                faux *= frq;
+                const auto fgq = cexp * frq;
 
-                faux *= frq;
+                const auto w_0_0 = fgq * fgq * fgq * fgq * fgq * fgq;
 
-                faux *= frq;
+                const auto w_1_0 = frat * fgq * fgq * fgq * fgq * fgq;
 
-                faux *= frq;
+                const auto w_1_1 = fag * fgq * fgq * fgq * fgq * fgq;
 
-                const auto f_0 = faux * pexp * pexp * pexp * pexp * pexp * pexp;
+                const auto w_2_0 = frat * frat * fgq * fgq * fgq * fgq;
 
-                const auto f_1 = faux * aexp * pexp * pexp * pexp * pexp * pexp;
+                const auto w_2_1 = 2.0 * frat * fag * fgq * fgq * fgq * fgq;
 
-                const auto f_2 = faux * aexp * aexp * pexp * pexp * pexp * pexp;
+                const auto w_2_2 = fag * fag * fgq * fgq * fgq * fgq;
 
-                const auto f_3 = faux * aexp * aexp * aexp * pexp * pexp * pexp;
+                const auto w_3_0 = frat * frat * frat * fgq * fgq * fgq;
 
-                const auto f_4 = faux * aexp * aexp * aexp * aexp * pexp * pexp;
+                const auto w_3_1 = 3.0 * frat * frat * fag * fgq * fgq * fgq;
 
-                const auto f_5 = faux * aexp * aexp * aexp * aexp * aexp * pexp;
+                const auto w_3_2 = 3.0 * frat * fag * fag * fgq * fgq * fgq;
 
-                const auto f_6 = faux * aexp * aexp * aexp * aexp * aexp * aexp;
+                const auto w_3_3 = fag * fag * fag * fgq * fgq * fgq;
+
+                const auto w_4_0 = frat * frat * frat * frat * fgq * fgq;
+
+                const auto w_4_1 = 4.0 * frat * frat * frat * fag * fgq * fgq;
+
+                const auto w_4_2 = 6.0 * frat * frat * fag * fag * fgq * fgq;
+
+                const auto w_4_3 = 4.0 * frat * fag * fag * fag * fgq * fgq;
+
+                const auto w_4_4 = fag * fag * fag * fag * fgq * fgq;
+
+                const auto w_5_0 = frat * frat * frat * frat * frat * fgq;
+
+                const auto w_5_1 = 5.0 * frat * frat * frat * frat * fag * fgq;
+
+                const auto w_5_2 = 10.0 * frat * frat * frat * fag * fag * fgq;
+
+                const auto w_5_3 = 10.0 * frat * frat * fag * fag * fag * fgq;
+
+                const auto w_5_4 = 5.0 * frat * fag * fag * fag * fag * fgq;
+
+                const auto w_5_5 = fag * fag * fag * fag * fag * fgq;
+
+                const auto w_6_0 = frat * frat * frat * frat * frat * frat;
+
+                const auto w_6_1 = 6.0 * frat * frat * frat * frat * frat * fag;
+
+                const auto w_6_2 = 15.0 * frat * frat * frat * frat * fag * fag;
+
+                const auto w_6_3 = 20.0 * frat * frat * frat * fag * fag * fag;
+
+                const auto w_6_4 = 15.0 * frat * frat * fag * fag * fag * fag;
+
+                const auto w_6_5 = 6.0 * frat * fag * fag * fag * fag * fag;
+
+                const auto w_6_6 = fag * fag * fag * fag * fag * fag;
+
+                const auto *bv_0 = boys.data(1, k);
+
+                const auto *bv_1 = boys.data(2, k);
+
+                const auto *bv_2 = boys.data(3, k);
+
+                const auto *bv_3 = boys.data(4, k);
+
+                const auto *bv_4 = boys.data(5, k);
+
+                const auto *bv_5 = boys.data(6, k);
 
                 const auto *bv_6 = boys.data(7, k);
 
-#pragma omp simd aligned(acc_0, acc_1, acc_2, acc_3, acc_4, acc_5, acc_6, e_ab, bv_6 : simd::cache_line_size())
+#pragma omp simd aligned(acc_0, acc_1, acc_2, acc_3, acc_4, acc_5, acc_6, e_ab, bv_0, bv_1, bv_2, bv_3, bv_4, bv_5, bv_6 : simd::cache_line_size())
                 for (size_t l = 0; l < ncols; l++)
                 {
-                    const auto fval = e_ab[l] * bv_6[l];
+                    const auto fval = fbase * e_ab[l];
 
-                    acc_0[l] += f_0 * fval;
+                    acc_0[l] += fval * (w_0_0 * bv_6[l]);
 
-                    acc_1[l] += f_1 * fval;
+                    acc_1[l] += fval * (w_1_0 * bv_5[l] + w_1_1 * bv_6[l]);
 
-                    acc_2[l] += f_2 * fval;
+                    acc_2[l] += fval * (w_2_0 * bv_4[l] + w_2_1 * bv_5[l] + w_2_2 * bv_6[l]);
 
-                    acc_3[l] += f_3 * fval;
+                    acc_3[l] += fval * (w_3_0 * bv_3[l] + w_3_1 * bv_4[l] + w_3_2 * bv_5[l] + w_3_3 * bv_6[l]);
 
-                    acc_4[l] += f_4 * fval;
+                    acc_4[l] += fval * (w_4_0 * bv_2[l] + w_4_1 * bv_3[l] + w_4_2 * bv_4[l] + w_4_3 * bv_5[l] + w_4_4 * bv_6[l]);
 
-                    acc_5[l] += f_5 * fval;
+                    acc_5[l] += fval * (w_5_0 * bv_1[l] + w_5_1 * bv_2[l] + w_5_2 * bv_3[l] + w_5_3 * bv_4[l] + w_5_4 * bv_5[l] + w_5_5 * bv_6[l]);
 
-                    acc_6[l] += f_6 * fval;
+                    acc_6[l] += fval * (w_6_0 * bv_0[l] + w_6_1 * bv_1[l] + w_6_2 * bv_2[l] + w_6_3 * bv_3[l] + w_6_4 * bv_4[l] + w_6_5 * bv_5[l] + w_6_6 * bv_6[l]);
                 }
             }
         }

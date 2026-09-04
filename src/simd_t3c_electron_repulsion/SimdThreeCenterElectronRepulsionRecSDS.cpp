@@ -32,7 +32,7 @@
 
 
 
-#include "SimdThreeCenterElectronRepulsionRecSPS.hpp"
+#include "SimdThreeCenterElectronRepulsionRecSDS.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -51,7 +51,7 @@
 namespace simdt3ceri {  // simdt3ceri namespace
 
 auto
-compute_sps_electron_repulsion(double                         *values,
+compute_sds_electron_repulsion(double                         *values,
                                const size_t                    npairs,
                                const size_t                    natoms,
                                const size_t                    iatom,
@@ -64,30 +64,30 @@ compute_sps_electron_repulsion(double                         *values,
                                const CSimdMatrix              &bc_coordinates,
                                const double                    threshold) -> void
 {
-    if ((a_function.get_angular_momentum() != 0) || (b_function.get_angular_momentum() != 1) ||
+    if ((a_function.get_angular_momentum() != 0) || (b_function.get_angular_momentum() != 2) ||
         (c_function.get_angular_momentum() != 0))
     {
         errors::assertMsgCritical(
             false,
-            std::string("SimdThreeCenterElectronRepulsionRecSPS.compute_sps_electron_repulsion: Basis functions must be of angular momenta zero, one and zero"));
+            std::string("SimdThreeCenterElectronRepulsionRecSDS.compute_sds_electron_repulsion: Basis functions must be of angular momenta zero, two and zero"));
     }
 
-    if ((ab_harmonics.size() < 1) || (bc_harmonics.size() < 1))
+    if ((ab_harmonics.size() < 2) || (bc_harmonics.size() < 2))
     {
         errors::assertMsgCritical(
-            false, std::string("SimdThreeCenterElectronRepulsionRecSPS.compute_sps_electron_repulsion: Harmonics must reach angular momentum one"));
+            false, std::string("SimdThreeCenterElectronRepulsionRecSDS.compute_sds_electron_repulsion: Harmonics must reach angular momentum two"));
     }
 
     if (npairs > ab_coordinates.number_of_columns())
     {
         errors::assertMsgCritical(
-            false, std::string("SimdThreeCenterElectronRepulsionRecSPS.compute_sps_electron_repulsion: Number of atom pairs exceeds coordinates"));
+            false, std::string("SimdThreeCenterElectronRepulsionRecSDS.compute_sds_electron_repulsion: Number of atom pairs exceeds coordinates"));
     }
 
     if (iatom >= natoms)
     {
         errors::assertMsgCritical(
-            false, std::string("SimdThreeCenterElectronRepulsionRecSPS.compute_sps_electron_repulsion: Index of atom on c side is out of range"));
+            false, std::string("SimdThreeCenterElectronRepulsionRecSDS.compute_sds_electron_repulsion: Index of atom on c side is out of range"));
     }
 
     if (npairs == 0) return;
@@ -133,13 +133,13 @@ compute_sps_electron_repulsion(double                         *values,
 
     const auto stride = natoms * npairs;
 
-    double *slices[3];
+    double *slices[5];
 
-    for (size_t m = 0; m < 3; m++) slices[m] = values + m * stride + iatom * npairs;
+    for (size_t m = 0; m < 5; m++) slices[m] = values + m * stride + iatom * npairs;
 
     if (nmax == 0)
     {
-        for (size_t m = 0; m < 3; m++) std::fill(slices[m], slices[m] + npairs, 0.0);
+        for (size_t m = 0; m < 5; m++) std::fill(slices[m], slices[m] + npairs, 0.0);
 
         return;
     }
@@ -167,15 +167,17 @@ compute_sps_electron_repulsion(double                         *values,
     // NOTE: one row accumulates for each bidegree of the addition theorem, as
     // they carry different powers of the exponents and cannot share an
     // accumulator. The row of index l1 multiplies the harmonics of degree l1 of
-    // the atom pairs and of degree 1 less l1 of the atoms on c side.
+    // the atom pairs and of degree 2 less l1 of the atoms on c side.
 
-    auto buffer = CSimdMatrix(2, nmax);
+    auto buffer = CSimdMatrix(3, nmax);
 
     buffer.zero();
 
     auto *acc_0 = buffer.data(0);
 
     auto *acc_1 = buffer.data(1);
+
+    auto *acc_2 = buffer.data(2);
 
     constexpr auto fpi = mathconst::pi_value();
 
@@ -222,11 +224,11 @@ compute_sps_electron_repulsion(double                         *values,
             }
 
             // NOTE: the Boys function of every primitive on c side of this pair
-            // is computed by one call, which fills the orders zero to one of
-            // every row. The integrals need the order one alone, and the lower
+            // is computed by one call, which fills the orders zero to two of
+            // every row. The integrals need the order two alone, and the lower
             // orders are formed on the way to it by the recursion.
 
-            auto boys = CSimdVariableMatrix(std::vector<size_t>(first, first + static_cast<long>(nprim_c)), 3);
+            auto boys = CSimdVariableMatrix(std::vector<size_t>(first, first + static_cast<long>(nprim_c)), 4);
 
             for (size_t k = 0; k < nprim_c; k++)
             {
@@ -265,24 +267,34 @@ compute_sps_electron_repulsion(double                         *values,
 
                 const auto fgq = cexp * frq;
 
-                const auto w_0_0 = -fgq;
+                const auto w_0_0 = fgq * fgq;
 
-                const auto w_1_0 = frat;
+                const auto w_1_0 = -frat * fgq;
 
-                const auto w_1_1 = -frat * fgq;
+                const auto w_1_1 = frat * fgq * fgq;
+
+                const auto w_2_0 = frat * frat;
+
+                const auto w_2_1 = -2.0 * frat * frat * fgq;
+
+                const auto w_2_2 = frat * frat * fgq * fgq;
 
                 const auto *bv_0 = boys.data(1, k);
 
                 const auto *bv_1 = boys.data(2, k);
 
-#pragma omp simd aligned(acc_0, acc_1, e_ab, bv_0, bv_1 : simd::cache_line_size())
+                const auto *bv_2 = boys.data(3, k);
+
+#pragma omp simd aligned(acc_0, acc_1, acc_2, e_ab, bv_0, bv_1, bv_2 : simd::cache_line_size())
                 for (size_t l = 0; l < ncols; l++)
                 {
                     const auto fval = fbase * e_ab[l];
 
-                    acc_0[l] += fval * (w_0_0 * bv_1[l]);
+                    acc_0[l] += fval * (w_0_0 * bv_2[l]);
 
-                    acc_1[l] += fval * (w_1_0 * bv_0[l] + w_1_1 * bv_1[l]);
+                    acc_1[l] += fval * (w_1_0 * bv_1[l] + w_1_1 * bv_2[l]);
+
+                    acc_2[l] += fval * (w_2_0 * bv_0[l] + w_2_1 * bv_1[l] + w_2_2 * bv_2[l]);
                 }
             }
         }
@@ -292,58 +304,142 @@ compute_sps_electron_repulsion(double                         *values,
     // time, so that no loop holds the harmonics of every degree at once and the
     // vectorizer keeps its registers.
 
-    auto components = CSimdMatrix(3, nmax);
+    auto components = CSimdMatrix(5, nmax);
 
     components.zero();
 
-    auto *out_m1 = components.data(0);
-    auto *out_0 = components.data(1);
-    auto *out_p1 = components.data(2);
+    auto *out_m2 = components.data(0);
+    auto *out_m1 = components.data(1);
+    auto *out_0 = components.data(2);
+    auto *out_p1 = components.data(3);
+    auto *out_p2 = components.data(4);
 
-    // the bidegree of degree zero on the atom pairs and one on the atoms
+    // the bidegree of degree zero on the atom pairs and two on the atoms
     // on c side, whose coefficients are one: the harmonic of the other side is
     // of degree zero and is one for every atom pair
 
     {
-        const auto *h_m1 = bc_harmonics[0].data(0);
-        const auto *h_0 = bc_harmonics[0].data(1);
-        const auto *h_p1 = bc_harmonics[0].data(2);
+        const auto *h_m2 = bc_harmonics[1].data(0);
+        const auto *h_m1 = bc_harmonics[1].data(1);
+        const auto *h_0 = bc_harmonics[1].data(2);
+        const auto *h_p1 = bc_harmonics[1].data(3);
+        const auto *h_p2 = bc_harmonics[1].data(4);
 
-#pragma omp simd aligned(out_m1, out_0, out_p1, acc_0, h_m1, h_0, h_p1 : simd::cache_line_size())
+#pragma omp simd aligned(out_m2, out_m1, out_0, out_p1, out_p2, acc_0, h_m2, h_m1, h_0, h_p1, h_p2 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
             const auto f = acc_0[k];
 
+            out_m2[k] += f * h_m2[k];
             out_m1[k] += f * h_m1[k];
             out_0[k] += f * h_0[k];
             out_p1[k] += f * h_p1[k];
+            out_p2[k] += f * h_p2[k];
         }
     }
 
-    // the bidegree of degree one on the atom pairs and zero on the atoms
+    // the bidegree of degree one on the atom pairs and one on the atoms
+    // on c side, whose 9 products of harmonics are formed once and read by
+    // the angular components which carry them
+
+    {
+        auto products = CSimdMatrix(9, nmax);
+
+        const auto *p_m1 = ab_harmonics[0].data(0);
+        const auto *p_0 = ab_harmonics[0].data(1);
+        const auto *p_p1 = ab_harmonics[0].data(2);
+
+        const auto *q_m1 = bc_harmonics[0].data(0);
+        const auto *q_0 = bc_harmonics[0].data(1);
+        const auto *q_p1 = bc_harmonics[0].data(2);
+
+        auto *r_m1_m1 = products.data(0);
+        auto *r_m1_0 = products.data(1);
+        auto *r_m1_p1 = products.data(2);
+        auto *r_0_m1 = products.data(3);
+        auto *r_0_0 = products.data(4);
+        auto *r_0_p1 = products.data(5);
+        auto *r_p1_m1 = products.data(6);
+        auto *r_p1_0 = products.data(7);
+        auto *r_p1_p1 = products.data(8);
+
+#pragma omp simd aligned(r_m1_m1, r_m1_0, r_m1_p1, r_0_m1, r_0_0, r_0_p1, r_p1_m1, r_p1_0, r_p1_p1, p_m1, p_0, p_p1, q_m1, q_0, q_p1 : simd::cache_line_size())
+        for (size_t k = 0; k < nmax; k++)
+        {
+            r_m1_m1[k] = p_m1[k] * q_m1[k];
+            r_m1_0[k] = p_m1[k] * q_0[k];
+            r_m1_p1[k] = p_m1[k] * q_p1[k];
+            r_0_m1[k] = p_0[k] * q_m1[k];
+            r_0_0[k] = p_0[k] * q_0[k];
+            r_0_p1[k] = p_0[k] * q_p1[k];
+            r_p1_m1[k] = p_p1[k] * q_m1[k];
+            r_p1_0[k] = p_p1[k] * q_0[k];
+            r_p1_p1[k] = p_p1[k] * q_p1[k];
+        }
+
+        // NOTE: an angular component is accumulated by a loop of its own, as
+        // it reads only the products which carry it and the vectorizer would
+        // otherwise hold every product of the bidegree at once.
+
+#pragma omp simd aligned(out_m2, acc_1, r_m1_p1, r_p1_m1 : simd::cache_line_size())
+        for (size_t k = 0; k < nmax; k++)
+        {
+            out_m2[k] += acc_1[k] * (std::sqrt(3.0) * r_m1_p1[k] + std::sqrt(3.0) * r_p1_m1[k]);
+        }
+
+#pragma omp simd aligned(out_m1, acc_1, r_m1_0, r_0_m1 : simd::cache_line_size())
+        for (size_t k = 0; k < nmax; k++)
+        {
+            out_m1[k] += acc_1[k] * (std::sqrt(3.0) * r_m1_0[k] + std::sqrt(3.0) * r_0_m1[k]);
+        }
+
+#pragma omp simd aligned(out_0, acc_1, r_m1_m1, r_0_0, r_p1_p1 : simd::cache_line_size())
+        for (size_t k = 0; k < nmax; k++)
+        {
+            out_0[k] += acc_1[k] * (-r_m1_m1[k] + 2.0 * r_0_0[k] - r_p1_p1[k]);
+        }
+
+#pragma omp simd aligned(out_p1, acc_1, r_0_p1, r_p1_0 : simd::cache_line_size())
+        for (size_t k = 0; k < nmax; k++)
+        {
+            out_p1[k] += acc_1[k] * (std::sqrt(3.0) * r_0_p1[k] + std::sqrt(3.0) * r_p1_0[k]);
+        }
+
+#pragma omp simd aligned(out_p2, acc_1, r_m1_m1, r_p1_p1 : simd::cache_line_size())
+        for (size_t k = 0; k < nmax; k++)
+        {
+            out_p2[k] += acc_1[k] * (-std::sqrt(3.0) * r_m1_m1[k] + std::sqrt(3.0) * r_p1_p1[k]);
+        }
+    }
+
+    // the bidegree of degree two on the atom pairs and zero on the atoms
     // on c side, whose coefficients are one: the harmonic of the other side is
     // of degree zero and is one for every atom pair
 
     {
-        const auto *h_m1 = ab_harmonics[0].data(0);
-        const auto *h_0 = ab_harmonics[0].data(1);
-        const auto *h_p1 = ab_harmonics[0].data(2);
+        const auto *h_m2 = ab_harmonics[1].data(0);
+        const auto *h_m1 = ab_harmonics[1].data(1);
+        const auto *h_0 = ab_harmonics[1].data(2);
+        const auto *h_p1 = ab_harmonics[1].data(3);
+        const auto *h_p2 = ab_harmonics[1].data(4);
 
-#pragma omp simd aligned(out_m1, out_0, out_p1, acc_1, h_m1, h_0, h_p1 : simd::cache_line_size())
+#pragma omp simd aligned(out_m2, out_m1, out_0, out_p1, out_p2, acc_2, h_m2, h_m1, h_0, h_p1, h_p2 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            const auto f = acc_1[k];
+            const auto f = acc_2[k];
 
+            out_m2[k] += f * h_m2[k];
             out_m1[k] += f * h_m1[k];
             out_0[k] += f * h_0[k];
             out_p1[k] += f * h_p1[k];
+            out_p2[k] += f * h_p2[k];
         }
     }
 
     // NOTE: the atom pairs beyond the reach of every triple of primitives have no
     // contribution and are set to zero.
 
-    for (size_t m = 0; m < 3; m++)
+    for (size_t m = 0; m < 5; m++)
     {
         const auto *row = components.data(m);
 

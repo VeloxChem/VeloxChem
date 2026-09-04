@@ -276,12 +276,12 @@ compute_ssd_electron_repulsion(double                         *values,
 
                 const auto f_2 = faux * aexp * aexp;
 
-                const auto *bvals = boys.data(3, k);
+                const auto *bv_2 = boys.data(3, k);
 
-#pragma omp simd aligned(acc_0, acc_1, acc_2, e_ab, bvals : simd::cache_line_size())
+#pragma omp simd aligned(acc_0, acc_1, acc_2, e_ab, bv_2 : simd::cache_line_size())
                 for (size_t l = 0; l < ncols; l++)
                 {
-                    const auto fval = e_ab[l] * bvals[l];
+                    const auto fval = e_ab[l] * bv_2[l];
 
                     acc_0[l] += f_0 * fval;
 

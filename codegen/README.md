@@ -65,10 +65,34 @@ formed once per bidegree and read by the angular components which carry them,
 each of those in a loop of its own so the vectorizer is not asked to hold every
 product at once.
 
-Run as `python codegen/make_coulomb_addition_kernels.py 2 3 4 5 6` **from the
-root of the checkout**, with `VLX_HARM_PROBE` set so the convention check of the
-table generator runs. `(ss|J|s)` and `(ss|J|p)` are not emitted: the first needs
-no harmonics and the second is linear in them, so both are written by hand.
+The same generator emits the combinations which carry the angular momentum on the
+a or the b side, where the harmonic of `PC` is expanded back onto `AB` and `BC`
+by the same theorem. The angular half is then identical to the one above, and
+only the scalar changes: a bidegree accumulates a binomial in the order of the
+auxiliary rather than a single order,
+
+    (ls|J|s)_m = (-1)^l sum_{K1+k2=l} [ sum_{k1=0}^{K1} binom(K1,k1)
+                     (beta/p)^(K1-k1) (alpha gamma/pq)^k1 (gamma/q)^k2 aux^(k1+k2) ]
+                 sum_{N,n} C^{l,m}_{K1 N, k2 n} S_{K1,N}(AB) S_{k2,n}(BC)
+
+    (sl|J|s)_m = sum_{K1+k2=l} [ sum_{k1=0}^{K1} binom(K1,k1)
+                     (alpha/p)^K1 (-gamma/q)^(k1+k2) aux^(k1+k2) ]
+                 sum_{N,n} C^{l,m}_{K1 N, k2 n} S_{K1,N}(AB) S_{k2,n}(BC)
+
+The two differ by `alpha <-> beta` and a factor `(-1)^k1`, which is
+`S_{K1,N}(-AB) = (-1)^K1 S_{K1,N}(AB)`. Both collapse at `K1 = l`, `k2 = 0` to
+the two-center rules `(-beta/p)^l` and `(alpha/p)^l` of the section above, which
+is a cheap check on the signs.
+
+Run as `python codegen/make_coulomb_addition_kernels.py <kind> 2 3 4 5 6` **from
+the root of the checkout**, with `kind` one of `ssl`, `lss` or `sls`, and with
+`VLX_HARM_PROBE` set so the convention check of the table generator runs.
+`(ss|J|s)` and `(ss|J|p)` are not emitted: the first needs no harmonics and the
+second is linear in them, so both are written by hand.
+
+Nothing is emitted yet for a combination carrying angular momentum on more than
+one side. Those abort in the dispatch, which is why a basis with p functions can
+only be run against an s-only one on the other side.
 
 ## make_addition_table.py
 

@@ -72,7 +72,7 @@ compute_pss_electron_repulsion(double                         *values,
             std::string("SimdThreeCenterElectronRepulsionRecPSS.compute_pss_electron_repulsion: Basis functions must be of angular momenta one, zero and zero"));
     }
 
-    if (ab_harmonics.empty() || bc_harmonics.empty())
+    if ((ab_harmonics.size() < 1) || (bc_harmonics.size() < 1))
     {
         errors::assertMsgCritical(
             false, std::string("SimdThreeCenterElectronRepulsionRecPSS.compute_pss_electron_repulsion: Harmonics must reach angular momentum one"));
@@ -127,10 +127,9 @@ compute_pss_electron_repulsion(double                         *values,
     const auto nmax = *std::ranges::max_element(dimensions);
 
     // NOTE: the values of one atom on c side are contiguous over the atom pairs,
-    // the atoms are npairs apart and the angular components are npairs times the
-    // number of those atoms apart, as the sparsity pattern lays them out. The
-    // sides of zero angular momentum carry one component each, so the component
-    // of this side is the slowest running index of the combination.
+    // the atoms are npairs apart and the angular components of the atoms on c
+    // side are npairs times the number of those atoms apart, as the sparsity
+    // pattern lays them out.
 
     const auto stride = natoms * npairs;
 
@@ -165,19 +164,18 @@ compute_pss_electron_repulsion(double                         *values,
 
     auto *pc_2 = factors.data(1);
 
-    // NOTE: one row accumulates for each bidegree of the addition theorem. The
-    // first multiplies the harmonics of the atom pairs and the second those of
-    // the atoms on c side, and each carries a polynomial in the Boys function
-    // rather than a single order, which is what the expansion of the harmonic of
-    // the vector to the atom on c side leaves behind.
+    // NOTE: one row accumulates for each bidegree of the addition theorem, as
+    // they carry different powers of the exponents and cannot share an
+    // accumulator. The row of index l1 multiplies the harmonics of degree l1 of
+    // the atom pairs and of degree 1 less l1 of the atoms on c side.
 
     auto buffer = CSimdMatrix(2, nmax);
 
     buffer.zero();
 
-    auto *acc_ab = buffer.data(0);
+    auto *acc_0 = buffer.data(0);
 
-    auto *acc_bc = buffer.data(1);
+    auto *acc_1 = buffer.data(1);
 
     constexpr auto fpi = mathconst::pi_value();
 
@@ -224,9 +222,9 @@ compute_pss_electron_repulsion(double                         *values,
             }
 
             // NOTE: the Boys function of every primitive on c side of this pair
-            // is computed by one call, which fills the orders zero and one of
-            // every row. Both of them are read, unlike the combinations which
-            // carry the angular momentum on c side and read the highest alone.
+            // is computed by one call, which fills the orders zero to one of
+            // every row. The integrals need the order one alone, and the lower
+            // orders are formed on the way to it by the recursion.
 
             auto boys = CSimdVariableMatrix(std::vector<size_t>(first, first + static_cast<long>(nprim_c)), 3);
 
@@ -259,64 +257,89 @@ compute_pss_electron_repulsion(double                         *values,
 
                 const auto qexp = pexp + cexp;
 
+                const auto fbase = -fcoul * anorm * b_norms[j] * c_norms[k] / (pexp * cexp * std::sqrt(qexp));
+
                 const auto frq = 1.0 / qexp;
 
-                const auto fbase = fcoul * anorm * b_norms[j] * c_norms[k] / (pexp * cexp * std::sqrt(qexp));
-
-            // NOTE: the angular momentum sits on a side, so the bidegree of degree
-            // one on the atom pairs carries the exponent on b side and the whole
-            // combination changes sign, the vector between the atoms running the
-            // wrong way for it.
-
-                const auto fbe = bexp * frp;
+                const auto frat = bexp * frp;
 
                 const auto fag = aexp * cexp * frp * frq;
 
                 const auto fgq = cexp * frq;
 
+                const auto w_0_0 = fgq;
+
+                const auto w_1_0 = frat;
+
+                const auto w_1_1 = fag;
+
                 const auto *bv_0 = boys.data(1, k);
 
                 const auto *bv_1 = boys.data(2, k);
 
-#pragma omp simd aligned(acc_ab, acc_bc, e_ab, bv_0, bv_1 : simd::cache_line_size())
+#pragma omp simd aligned(acc_0, acc_1, e_ab, bv_0, bv_1 : simd::cache_line_size())
                 for (size_t l = 0; l < ncols; l++)
                 {
                     const auto fval = fbase * e_ab[l];
 
-                    acc_ab[l] += fval * (-(fbe * bv_0[l] + fag * bv_1[l]));
+                    acc_0[l] += fval * (w_0_0 * bv_1[l]);
 
-                    acc_bc[l] += fval * (-fgq * bv_1[l]);
+                    acc_1[l] += fval * (w_1_0 * bv_0[l] + w_1_1 * bv_1[l]);
                 }
             }
         }
     }
 
-    // NOTE: the harmonics of angular momentum one are the components of the
-    // vector taken in the order of the spherical components, so the row of index
-    // m + 1 holds the harmonic of order m on both sides.
-
-    const auto *hab_m1 = ab_harmonics[0].data(0);
-    const auto *hab_z0 = ab_harmonics[0].data(1);
-    const auto *hab_p1 = ab_harmonics[0].data(2);
-
-    const auto *hbc_m1 = bc_harmonics[0].data(0);
-    const auto *hbc_z0 = bc_harmonics[0].data(1);
-    const auto *hbc_p1 = bc_harmonics[0].data(2);
+    // NOTE: the bidegrees are accumulated into the angular components one at a
+    // time, so that no loop holds the harmonics of every degree at once and the
+    // vectorizer keeps its registers.
 
     auto components = CSimdMatrix(3, nmax);
 
+    components.zero();
+
     auto *out_m1 = components.data(0);
-    auto *out_z0 = components.data(1);
+    auto *out_0 = components.data(1);
     auto *out_p1 = components.data(2);
 
-#pragma omp simd aligned(out_m1, out_z0, out_p1, acc_ab, acc_bc, hab_m1, hab_z0, hab_p1, hbc_m1, hbc_z0, hbc_p1 : simd::cache_line_size())
-    for (size_t k = 0; k < nmax; k++)
+    // the bidegree of degree zero on the atom pairs and one on the atoms
+    // on c side, whose coefficients are one: the harmonic of the other side is
+    // of degree zero and is one for every atom pair
+
     {
-        out_m1[k] = acc_ab[k] * hab_m1[k] + acc_bc[k] * hbc_m1[k];
+        const auto *h_m1 = bc_harmonics[0].data(0);
+        const auto *h_0 = bc_harmonics[0].data(1);
+        const auto *h_p1 = bc_harmonics[0].data(2);
 
-        out_z0[k] = acc_ab[k] * hab_z0[k] + acc_bc[k] * hbc_z0[k];
+#pragma omp simd aligned(out_m1, out_0, out_p1, acc_0, h_m1, h_0, h_p1 : simd::cache_line_size())
+        for (size_t k = 0; k < nmax; k++)
+        {
+            const auto f = acc_0[k];
 
-        out_p1[k] = acc_ab[k] * hab_p1[k] + acc_bc[k] * hbc_p1[k];
+            out_m1[k] += f * h_m1[k];
+            out_0[k] += f * h_0[k];
+            out_p1[k] += f * h_p1[k];
+        }
+    }
+
+    // the bidegree of degree one on the atom pairs and zero on the atoms
+    // on c side, whose coefficients are one: the harmonic of the other side is
+    // of degree zero and is one for every atom pair
+
+    {
+        const auto *h_m1 = ab_harmonics[0].data(0);
+        const auto *h_0 = ab_harmonics[0].data(1);
+        const auto *h_p1 = ab_harmonics[0].data(2);
+
+#pragma omp simd aligned(out_m1, out_0, out_p1, acc_1, h_m1, h_0, h_p1 : simd::cache_line_size())
+        for (size_t k = 0; k < nmax; k++)
+        {
+            const auto f = acc_1[k];
+
+            out_m1[k] += f * h_m1[k];
+            out_0[k] += f * h_0[k];
+            out_p1[k] += f * h_p1[k];
+        }
     }
 
     // NOTE: the atom pairs beyond the reach of every triple of primitives have no

@@ -38,7 +38,17 @@
 
 #include "ErrorHandler.hpp"
 #include "SimdThreeCenterElectronRepulsionRecPSS.hpp"
+#include "SimdThreeCenterElectronRepulsionRecDSS.hpp"
+#include "SimdThreeCenterElectronRepulsionRecFSS.hpp"
+#include "SimdThreeCenterElectronRepulsionRecGSS.hpp"
+#include "SimdThreeCenterElectronRepulsionRecHSS.hpp"
+#include "SimdThreeCenterElectronRepulsionRecISS.hpp"
 #include "SimdThreeCenterElectronRepulsionRecSPS.hpp"
+#include "SimdThreeCenterElectronRepulsionRecSDS.hpp"
+#include "SimdThreeCenterElectronRepulsionRecSFS.hpp"
+#include "SimdThreeCenterElectronRepulsionRecSGS.hpp"
+#include "SimdThreeCenterElectronRepulsionRecSHS.hpp"
+#include "SimdThreeCenterElectronRepulsionRecSIS.hpp"
 #include "SimdThreeCenterElectronRepulsionRecSSD.hpp"
 #include "SimdThreeCenterElectronRepulsionRecSSF.hpp"
 #include "SimdThreeCenterElectronRepulsionRecSSG.hpp"
@@ -225,6 +235,186 @@ compute_electron_repulsion(double                         *values,
     if ((la == 0) && (lb == 1) && (lc == 0))
     {
         compute_sps_electron_repulsion(values,
+                                       npairs,
+                                       natoms,
+                                       iatom,
+                                       a_function,
+                                       b_function,
+                                       c_function,
+                                       ab_harmonics,
+                                       bc_harmonics,
+                                       ab_coordinates,
+                                       bc_coordinates,
+                                       threshold);
+
+        return;
+    }
+
+    if ((la == 2) && (lb == 0) && (lc == 0))
+    {
+        compute_dss_electron_repulsion(values,
+                                       npairs,
+                                       natoms,
+                                       iatom,
+                                       a_function,
+                                       b_function,
+                                       c_function,
+                                       ab_harmonics,
+                                       bc_harmonics,
+                                       ab_coordinates,
+                                       bc_coordinates,
+                                       threshold);
+
+        return;
+    }
+
+    if ((la == 0) && (lb == 2) && (lc == 0))
+    {
+        compute_sds_electron_repulsion(values,
+                                       npairs,
+                                       natoms,
+                                       iatom,
+                                       a_function,
+                                       b_function,
+                                       c_function,
+                                       ab_harmonics,
+                                       bc_harmonics,
+                                       ab_coordinates,
+                                       bc_coordinates,
+                                       threshold);
+
+        return;
+    }
+
+    if ((la == 3) && (lb == 0) && (lc == 0))
+    {
+        compute_fss_electron_repulsion(values,
+                                       npairs,
+                                       natoms,
+                                       iatom,
+                                       a_function,
+                                       b_function,
+                                       c_function,
+                                       ab_harmonics,
+                                       bc_harmonics,
+                                       ab_coordinates,
+                                       bc_coordinates,
+                                       threshold);
+
+        return;
+    }
+
+    if ((la == 0) && (lb == 3) && (lc == 0))
+    {
+        compute_sfs_electron_repulsion(values,
+                                       npairs,
+                                       natoms,
+                                       iatom,
+                                       a_function,
+                                       b_function,
+                                       c_function,
+                                       ab_harmonics,
+                                       bc_harmonics,
+                                       ab_coordinates,
+                                       bc_coordinates,
+                                       threshold);
+
+        return;
+    }
+
+    if ((la == 4) && (lb == 0) && (lc == 0))
+    {
+        compute_gss_electron_repulsion(values,
+                                       npairs,
+                                       natoms,
+                                       iatom,
+                                       a_function,
+                                       b_function,
+                                       c_function,
+                                       ab_harmonics,
+                                       bc_harmonics,
+                                       ab_coordinates,
+                                       bc_coordinates,
+                                       threshold);
+
+        return;
+    }
+
+    if ((la == 0) && (lb == 4) && (lc == 0))
+    {
+        compute_sgs_electron_repulsion(values,
+                                       npairs,
+                                       natoms,
+                                       iatom,
+                                       a_function,
+                                       b_function,
+                                       c_function,
+                                       ab_harmonics,
+                                       bc_harmonics,
+                                       ab_coordinates,
+                                       bc_coordinates,
+                                       threshold);
+
+        return;
+    }
+
+    if ((la == 5) && (lb == 0) && (lc == 0))
+    {
+        compute_hss_electron_repulsion(values,
+                                       npairs,
+                                       natoms,
+                                       iatom,
+                                       a_function,
+                                       b_function,
+                                       c_function,
+                                       ab_harmonics,
+                                       bc_harmonics,
+                                       ab_coordinates,
+                                       bc_coordinates,
+                                       threshold);
+
+        return;
+    }
+
+    if ((la == 0) && (lb == 5) && (lc == 0))
+    {
+        compute_shs_electron_repulsion(values,
+                                       npairs,
+                                       natoms,
+                                       iatom,
+                                       a_function,
+                                       b_function,
+                                       c_function,
+                                       ab_harmonics,
+                                       bc_harmonics,
+                                       ab_coordinates,
+                                       bc_coordinates,
+                                       threshold);
+
+        return;
+    }
+
+    if ((la == 6) && (lb == 0) && (lc == 0))
+    {
+        compute_iss_electron_repulsion(values,
+                                       npairs,
+                                       natoms,
+                                       iatom,
+                                       a_function,
+                                       b_function,
+                                       c_function,
+                                       ab_harmonics,
+                                       bc_harmonics,
+                                       ab_coordinates,
+                                       bc_coordinates,
+                                       threshold);
+
+        return;
+    }
+
+    if ((la == 0) && (lb == 6) && (lc == 0))
+    {
+        compute_sis_electron_repulsion(values,
                                        npairs,
                                        natoms,
                                        iatom,

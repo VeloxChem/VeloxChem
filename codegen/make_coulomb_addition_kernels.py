@@ -1,19 +1,37 @@
-"""Emits the three-center electron repulsion kernels of two S type functions on
-the a and b sides and one of angular momentum l on the c side, for l of two to
-six.
+"""Emits the three-center electron repulsion kernels which carry one angular
+momentum of two to six and zero on the other two sides, in each of the three
+positions.
 
-    (ss|J|l)_m = (ss|J|s)^(l) sum_{l1} (alpha^l1 p^l2 / q^l)
-                              sum_{m1,m2} C^{l,m}_{l1 m1, l2 m2} S_{l1,m1}(AB) S_{l2,m2}(BC)
+The angular momentum on the c side:
 
-with l2 = l - l1 and the auxiliary integral of order n the integral of three S
-type functions with the Boys function of order n,
+    (ss|J|l)_m = sum_{K1+k2=l} (alpha^K1 p^k2 / q^l) aux^(l)
+                 sum_{N,n} C^{l,m}_{K1 N, k2 n} S_{K1,N}(AB) S_{k2,n}(BC)
+
+The angular momentum on the a or the b side, where the harmonic of the vector to
+the atom on c side is expanded back onto the two the block carries, which leaves
+a binomial in the order of the auxiliary rather than a single order:
+
+    (ls|J|s)_m = (-1)^l sum_{K1+k2=l} [ sum_{k1=0}^{K1} binom(K1,k1)
+                     (beta/p)^(K1-k1) (alpha gamma/pq)^k1 (gamma/q)^k2 aux^(k1+k2) ]
+                 sum_{N,n} C^{l,m}_{K1 N, k2 n} S_{K1,N}(AB) S_{k2,n}(BC)
+
+    (sl|J|s)_m = sum_{K1+k2=l} [ sum_{k1=0}^{K1} binom(K1,k1)
+                     (alpha/p)^K1 (-gamma/q)^(k1+k2) aux^(k1+k2) ]
+                 sum_{N,n} C^{l,m}_{K1 N, k2 n} S_{K1,N}(AB) S_{k2,n}(BC)
+
+with k2 = l - K1, p = alpha + beta, q = p + gamma, and the auxiliary integral of
+order n the integral of three S type functions with the Boys function of order n,
 
     (ss|J|s)^(n) = 2 pi^(5/2) N_a N_b N_c exp(-mu AB^2) F_n(rho PC^2) / (p gamma sqrt(q))
 
-The coefficients come from make_addition_table.py; see the section on it in
-README.md, and set VLX_HARM_PROBE so that its convention check runs.
+The three share their whole angular half: the same bidegree split, the same
+coefficients from make_addition_table.py, the same products of the harmonics of
+AB and BC. Only the scalar each bidegree accumulates differs, which is what the
+`kind` of the emitter selects.
 
-Run as `python codegen/make_coulomb_addition_kernels.py <l> [<l> ...]`.
+Run as `python codegen/make_coulomb_addition_kernels.py <kind> <l> [<l> ...]` from
+the root of the checkout, with `kind` one of ssl, lss or sls, and with
+VLX_HARM_PROBE set so the convention check of the table generator runs.
 """
 import io
 import os
@@ -91,13 +109,94 @@ def _terms(coeffs, m, rows):
     return out
 
 
-def emit(l):
-    me = LETTER[l]
+# NOTE: the three kinds differ only in the scalar a bidegree accumulates. `name`
+# builds the file and function name from the position of the angular momentum,
+# `moments` the angular momenta the kernel asserts, and `scalars` emits the
+# declarations and the accumulation expression of one bidegree.
+
+KINDS = {
+    'ssl': dict(name=lambda l: 'SS' + LETTER[l], moments=lambda l: (0, 0, l)),
+    'lss': dict(name=lambda l: LETTER[l] + 'SS', moments=lambda l: (l, 0, 0)),
+    'sls': dict(name=lambda l: 'S' + LETTER[l] + 'S', moments=lambda l: (0, l, 0)),
+}
+
+
+def _power(var, n):
+    return [var] * n
+
+
+def scalar_declarations(kind, l):
+    """The ratios of exponents a kernel of this kind needs, once per triple."""
+    out = ""
+    if kind == 'ssl':
+        out += ("                // NOTE: the total exponent is raised to the angular momentum by\n"
+                "                // repeated multiplication, as the angular momentum is small.\n\n"
+                "                auto faux = fcoul * anorm * b_norms[j] * c_norms[k] / (pexp * cexp * std::sqrt(qexp));\n\n"
+                "                const auto frq = 1.0 / qexp;\n\n")
+        out += "".join("                faux *= frq;\n\n" for _ in range(l))
+        for K1 in range(l + 1):
+            terms = ["faux"] + _power("aexp", K1) + _power("pexp", l - K1)
+            out += f"                const auto f_{K1} = {' * '.join(terms)};\n\n"
+        return out
+
+    sign = "-" if (kind == 'lss' and l % 2) else ""
+    out += (f"                const auto fbase = {sign}fcoul * anorm * b_norms[j] * c_norms[k] / (pexp * cexp * std::sqrt(qexp));\n\n"
+            "                const auto frq = 1.0 / qexp;\n\n")
+    out += ("                const auto frat = " + ("bexp" if kind == 'lss' else "aexp") + " * frp;\n\n")
+    if kind == 'lss':
+        out += "                const auto fag = aexp * cexp * frp * frq;\n\n"
+    out += "                const auto fgq = cexp * frq;\n\n"
+
+    # the weight of each term of the binomial, tagged by the order of the auxiliary
+    for K1 in range(l + 1):
+        k2 = l - K1
+        for k1 in range(K1 + 1):
+            from math import comb
+            c = comb(K1, k1)
+            if kind == 'lss':
+                terms = _power("frat", K1 - k1) + _power("fag", k1) + _power("fgq", k2)
+            else:
+                terms = _power("frat", K1) + _power("fgq", k1 + k2)
+            pre = "" if c == 1 else f"{float(c)} * "
+            neg = "-" if (kind == 'sls' and (k1 + k2) % 2) else ""
+            body = " * ".join(terms) if terms else "1.0"
+            out += f"                const auto w_{K1}_{k1} = {neg}{pre}{body};\n\n"
+    return out
+
+
+def boys_rows(kind, l):
+    """The orders of the Boys function a kernel of this kind reads."""
+    if kind == 'ssl':
+        return [l]
+    return list(range(l + 1))
+
+
+def accumulation(kind, l):
+    """The body of the loop which accumulates the bidegrees over the triples."""
+    out = ""
+    if kind == 'ssl':
+        out += "                    const auto fval = e_ab[l] * bv_%d[l];\n\n" % l
+        for K1 in range(l + 1):
+            out += f"                    acc_{K1}[l] += f_{K1} * fval;\n\n"
+        return out.rstrip("\n") + "\n"
+    out += "                    const auto fval = fbase * e_ab[l];\n\n"
+    for K1 in range(l + 1):
+        k2 = l - K1
+        terms = [f"w_{K1}_{k1} * bv_{k1 + k2}[l]" for k1 in range(K1 + 1)]
+        out += f"                    acc_{K1}[l] += fval * ({' + '.join(terms)});\n\n"
+    return out.rstrip("\n") + "\n"
+
+
+def emit(l, kind='ssl'):
+    spec = KINDS[kind]
+    me = spec['name'](l)
+    lo = me.lower()
+    la, lb, lc = spec['moments'](l)
     ncomps = 2 * l + 1
     coeffs = table(l)
 
-    hpp = LIC_HPP + f"\n#ifndef SimdThreeCenterElectronRepulsionRecSS{me}_hpp\n"
-    hpp += f"#define SimdThreeCenterElectronRepulsionRecSS{me}_hpp\n\n"
+    hpp = LIC_HPP + f"\n#ifndef SimdThreeCenterElectronRepulsionRec{me}_hpp\n"
+    hpp += f"#define SimdThreeCenterElectronRepulsionRec{me}_hpp\n\n"
     hpp += "#include <cstddef>\n#include <vector>\n\n"
     hpp += '#include "BasisFunction.hpp"\n#include "SimdMatrix.hpp"\n\n'
     hpp += "namespace simdt3ceri {  // simdt3ceri namespace\n\n"
@@ -127,8 +226,8 @@ def emit(l):
             f"/// center of an atom pair to the atom on c side into {l + 1} bidegrees. The first and\n"
             "/// the last are the harmonics of one side alone, and the ones between them couple\n"
             "/// the orders of both, with the coefficients make_addition_table.py produces.\n")
-    hpp += f"auto compute_ss{me.lower()}_electron_repulsion(double                         *values,\n"
-    pad = " " * len(f"auto compute_ss{me.lower()}_electron_repulsion(")
+    hpp += f"auto compute_{lo}_electron_repulsion(double                         *values,\n"
+    pad = " " * len(f"auto compute_{lo}_electron_repulsion(")
     for a in ["const size_t                    npairs,", "const size_t                    natoms,",
               "const size_t                    iatom,", "const CBasisFunction           &a_function,",
               "const CBasisFunction           &b_function,", "const CBasisFunction           &c_function,",
@@ -136,16 +235,16 @@ def emit(l):
               "const CSimdMatrix              &ab_coordinates,", "const CSimdMatrix              &bc_coordinates,",
               "const double                    threshold) -> void;"]:
         hpp += pad + a + "\n"
-    hpp += f"\n}}  // namespace simdt3ceri\n\n#endif /* SimdThreeCenterElectronRepulsionRecSS{me}_hpp */\n"
+    hpp += f"\n}}  // namespace simdt3ceri\n\n#endif /* SimdThreeCenterElectronRepulsionRec{me}_hpp */\n"
 
-    c = LICENSE + f'#include "SimdThreeCenterElectronRepulsionRecSS{me}.hpp"\n\n'
+    c = LICENSE + f'#include "SimdThreeCenterElectronRepulsionRec{me}.hpp"\n\n'
     c += "#include <algorithm>\n#include <cmath>\n#include <ranges>\n#include <string>\n#include <vector>\n\n"
     c += ('#include "ErrorHandler.hpp"\n#include "MathConst.hpp"\n#include "ScreeningFunc.hpp"\n'
           '#include "SimdAlign.hpp"\n#include "SimdBoysFunc.hpp"\n#include "SimdDimensions.hpp"\n'
           '#include "SimdVariableMatrix.hpp"\n\n')
     c += "namespace simdt3ceri {  // simdt3ceri namespace\n\nauto\n"
-    c += f"compute_ss{me.lower()}_electron_repulsion(double                         *values,\n"
-    pad = " " * len(f"compute_ss{me.lower()}_electron_repulsion(")
+    c += f"compute_{lo}_electron_repulsion(double                         *values,\n"
+    pad = " " * len(f"compute_{lo}_electron_repulsion(")
     for a in ["const size_t                    npairs,", "const size_t                    natoms,",
               "const size_t                    iatom,", "const CBasisFunction           &a_function,",
               "const CBasisFunction           &b_function,", "const CBasisFunction           &c_function,",
@@ -154,11 +253,12 @@ def emit(l):
               "const double                    threshold) -> void"]:
         c += pad + a + "\n"
     c += "{\n"
-    n = f"SimdThreeCenterElectronRepulsionRecSS{me}.compute_ss{me.lower()}_electron_repulsion"
-    c += (f"    if ((a_function.get_angular_momentum() != 0) || (b_function.get_angular_momentum() != 0) ||\n"
-          f"        (c_function.get_angular_momentum() != {l}))\n    {{\n"
+    n = f"SimdThreeCenterElectronRepulsionRec{me}.compute_{lo}_electron_repulsion"
+    words = ', '.join(WORD[v] for v in (la, lb))
+    c += (f"    if ((a_function.get_angular_momentum() != {la}) || (b_function.get_angular_momentum() != {lb}) ||\n"
+          f"        (c_function.get_angular_momentum() != {lc}))\n    {{\n"
           f"        errors::assertMsgCritical(\n            false,\n"
-          f'            std::string("{n}: Basis functions must be of angular momenta zero, zero and {WORD[l]}"));\n    }}\n\n')
+          f'            std::string("{n}: Basis functions must be of angular momenta {words} and {WORD[lc]}"));\n    }}\n\n')
     c += (f"    if ((ab_harmonics.size() < {l}) || (bc_harmonics.size() < {l}))\n    {{\n"
           f"        errors::assertMsgCritical(\n            false, std::string(\"{n}: Harmonics must reach angular momentum {WORD[l]}\"));\n    }}\n\n")
     c += (f"    if (npairs > ab_coordinates.number_of_columns())\n    {{\n"
@@ -247,21 +347,18 @@ def emit(l):
           "                if (ncols == 0) continue;\n\n"
           "                const auto cexp = c_exps[k];\n\n"
           "                const auto qexp = pexp + cexp;\n\n")
-    c += ("                // NOTE: the total exponent is raised to the angular momentum by\n"
-          "                // repeated multiplication, as the angular momentum is small.\n\n"
-          "                auto faux = fcoul * anorm * b_norms[j] * c_norms[k] / (pexp * cexp * std::sqrt(qexp));\n\n"
-          "                const auto frq = 1.0 / qexp;\n\n")
-    c += "".join("                faux *= frq;\n\n" for _ in range(l))
-    for l1 in range(l + 1):
-        terms = ["faux"] + ["aexp"] * l1 + ["pexp"] * (l - l1)
-        c += f"                const auto f_{l1} = {' * '.join(terms)};\n\n"
-    c += f"                const auto *bvals = boys.data({l + 1}, k);\n\n"
-    accs = ", ".join(f"acc_{l1}" for l1 in range(l + 1))
-    c += (f"#pragma omp simd aligned({accs}, e_ab, bvals : simd::cache_line_size())\n"
-          "                for (size_t l = 0; l < ncols; l++)\n                {\n"
-          "                    const auto fval = e_ab[l] * bvals[l];\n\n")
-    for l1 in range(l + 1):
-        c += f"                    acc_{l1}[l] += f_{l1} * fval;\n\n"
+    c += scalar_declarations(kind, l)
+
+    rows = boys_rows(kind, l)
+
+    for nb in rows:
+        c += f"                const auto *bv_{nb} = boys.data({nb + 1}, k);\n\n"
+
+    accs = ", ".join(f"acc_{K1}" for K1 in range(l + 1))
+    bvs = ", ".join(f"bv_{nb}" for nb in rows)
+    c += (f"#pragma omp simd aligned({accs}, e_ab, {bvs} : simd::cache_line_size())\n"
+          "                for (size_t l = 0; l < ncols; l++)\n                {\n")
+    c += accumulation(kind, l)
     c = c.rstrip("\n") + "\n                }\n            }\n        }\n    }\n\n"
 
     c += ("    // NOTE: the bidegrees are accumulated into the angular components one at a\n"
@@ -343,9 +440,14 @@ def emit(l):
     return c, hpp
 
 
-for l in [int(a) for a in sys.argv[1:]] or [3, 4, 5, 6]:
-    cpp, hpp = emit(l)
-    u = LETTER[l]
-    io.open(SRC + f'SimdThreeCenterElectronRepulsionRecSS{u}.cpp', 'w').write(cpp)
-    io.open(SRC + f'SimdThreeCenterElectronRepulsionRecSS{u}.hpp', 'w').write(hpp)
-    print(f"wrote SimdThreeCenterElectronRepulsionRecSS{u}.cpp ({len(cpp.splitlines())} lines) and .hpp")
+kind = sys.argv[1] if len(sys.argv) > 1 else 'ssl'
+
+if kind not in KINDS:
+    raise SystemExit('kind must be one of %s' % ', '.join(sorted(KINDS)))
+
+for l in [int(a) for a in sys.argv[2:]] or [2, 3, 4, 5, 6]:
+    cpp, hpp = emit(l, kind)
+    u = KINDS[kind]['name'](l)
+    io.open(SRC + f'SimdThreeCenterElectronRepulsionRec{u}.cpp', 'w').write(cpp)
+    io.open(SRC + f'SimdThreeCenterElectronRepulsionRec{u}.hpp', 'w').write(hpp)
+    print(f"wrote SimdThreeCenterElectronRepulsionRec{u}.cpp ({len(cpp.splitlines())} lines) and .hpp")

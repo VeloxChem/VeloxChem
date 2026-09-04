@@ -32,7 +32,7 @@
 
 
 
-#include "SimdThreeCenterElectronRepulsionRecSSF.hpp"
+#include "SimdThreeCenterElectronRepulsionRecSFS.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -51,7 +51,7 @@
 namespace simdt3ceri {  // simdt3ceri namespace
 
 auto
-compute_ssf_electron_repulsion(double                         *values,
+compute_sfs_electron_repulsion(double                         *values,
                                const size_t                    npairs,
                                const size_t                    natoms,
                                const size_t                    iatom,
@@ -64,30 +64,30 @@ compute_ssf_electron_repulsion(double                         *values,
                                const CSimdMatrix              &bc_coordinates,
                                const double                    threshold) -> void
 {
-    if ((a_function.get_angular_momentum() != 0) || (b_function.get_angular_momentum() != 0) ||
-        (c_function.get_angular_momentum() != 3))
+    if ((a_function.get_angular_momentum() != 0) || (b_function.get_angular_momentum() != 3) ||
+        (c_function.get_angular_momentum() != 0))
     {
         errors::assertMsgCritical(
             false,
-            std::string("SimdThreeCenterElectronRepulsionRecSSF.compute_ssf_electron_repulsion: Basis functions must be of angular momenta zero, zero and three"));
+            std::string("SimdThreeCenterElectronRepulsionRecSFS.compute_sfs_electron_repulsion: Basis functions must be of angular momenta zero, three and zero"));
     }
 
     if ((ab_harmonics.size() < 3) || (bc_harmonics.size() < 3))
     {
         errors::assertMsgCritical(
-            false, std::string("SimdThreeCenterElectronRepulsionRecSSF.compute_ssf_electron_repulsion: Harmonics must reach angular momentum three"));
+            false, std::string("SimdThreeCenterElectronRepulsionRecSFS.compute_sfs_electron_repulsion: Harmonics must reach angular momentum three"));
     }
 
     if (npairs > ab_coordinates.number_of_columns())
     {
         errors::assertMsgCritical(
-            false, std::string("SimdThreeCenterElectronRepulsionRecSSF.compute_ssf_electron_repulsion: Number of atom pairs exceeds coordinates"));
+            false, std::string("SimdThreeCenterElectronRepulsionRecSFS.compute_sfs_electron_repulsion: Number of atom pairs exceeds coordinates"));
     }
 
     if (iatom >= natoms)
     {
         errors::assertMsgCritical(
-            false, std::string("SimdThreeCenterElectronRepulsionRecSSF.compute_ssf_electron_repulsion: Index of atom on c side is out of range"));
+            false, std::string("SimdThreeCenterElectronRepulsionRecSFS.compute_sfs_electron_repulsion: Index of atom on c side is out of range"));
     }
 
     if (npairs == 0) return;
@@ -261,41 +261,54 @@ compute_ssf_electron_repulsion(double                         *values,
 
                 const auto qexp = pexp + cexp;
 
-                // NOTE: the total exponent is raised to the angular momentum by
-                // repeated multiplication, as the angular momentum is small.
-
-                auto faux = fcoul * anorm * b_norms[j] * c_norms[k] / (pexp * cexp * std::sqrt(qexp));
+                const auto fbase = fcoul * anorm * b_norms[j] * c_norms[k] / (pexp * cexp * std::sqrt(qexp));
 
                 const auto frq = 1.0 / qexp;
 
-                faux *= frq;
+                const auto frat = aexp * frp;
 
-                faux *= frq;
+                const auto fgq = cexp * frq;
 
-                faux *= frq;
+                const auto w_0_0 = -fgq * fgq * fgq;
 
-                const auto f_0 = faux * pexp * pexp * pexp;
+                const auto w_1_0 = frat * fgq * fgq;
 
-                const auto f_1 = faux * aexp * pexp * pexp;
+                const auto w_1_1 = -frat * fgq * fgq * fgq;
 
-                const auto f_2 = faux * aexp * aexp * pexp;
+                const auto w_2_0 = -frat * frat * fgq;
 
-                const auto f_3 = faux * aexp * aexp * aexp;
+                const auto w_2_1 = 2.0 * frat * frat * fgq * fgq;
+
+                const auto w_2_2 = -frat * frat * fgq * fgq * fgq;
+
+                const auto w_3_0 = frat * frat * frat;
+
+                const auto w_3_1 = -3.0 * frat * frat * frat * fgq;
+
+                const auto w_3_2 = 3.0 * frat * frat * frat * fgq * fgq;
+
+                const auto w_3_3 = -frat * frat * frat * fgq * fgq * fgq;
+
+                const auto *bv_0 = boys.data(1, k);
+
+                const auto *bv_1 = boys.data(2, k);
+
+                const auto *bv_2 = boys.data(3, k);
 
                 const auto *bv_3 = boys.data(4, k);
 
-#pragma omp simd aligned(acc_0, acc_1, acc_2, acc_3, e_ab, bv_3 : simd::cache_line_size())
+#pragma omp simd aligned(acc_0, acc_1, acc_2, acc_3, e_ab, bv_0, bv_1, bv_2, bv_3 : simd::cache_line_size())
                 for (size_t l = 0; l < ncols; l++)
                 {
-                    const auto fval = e_ab[l] * bv_3[l];
+                    const auto fval = fbase * e_ab[l];
 
-                    acc_0[l] += f_0 * fval;
+                    acc_0[l] += fval * (w_0_0 * bv_3[l]);
 
-                    acc_1[l] += f_1 * fval;
+                    acc_1[l] += fval * (w_1_0 * bv_2[l] + w_1_1 * bv_3[l]);
 
-                    acc_2[l] += f_2 * fval;
+                    acc_2[l] += fval * (w_2_0 * bv_1[l] + w_2_1 * bv_2[l] + w_2_2 * bv_3[l]);
 
-                    acc_3[l] += f_3 * fval;
+                    acc_3[l] += fval * (w_3_0 * bv_0[l] + w_3_1 * bv_1[l] + w_3_2 * bv_2[l] + w_3_3 * bv_3[l]);
                 }
             }
         }

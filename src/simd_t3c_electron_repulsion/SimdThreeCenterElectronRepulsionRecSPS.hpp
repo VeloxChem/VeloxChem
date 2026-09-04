@@ -32,6 +32,7 @@
 
 
 
+
 #ifndef SimdThreeCenterElectronRepulsionRecSPS_hpp
 #define SimdThreeCenterElectronRepulsionRecSPS_hpp
 
@@ -43,10 +44,10 @@
 
 namespace simdt3ceri {  // simdt3ceri namespace
 
-/// @brief Computes the three-center electron repulsion integrals of a basis
-/// function of angular momentum one on b side and two of zero angular momentum
-/// on the other two sides, over the atom pairs of a block and for one atom on c
-/// side.
+/// @brief Computes the three-center electron repulsion integrals of two basis
+/// functions of zero angular momentum on a and b sides and one of angular
+/// momentum one on c side, over the atom pairs of a block and for one atom on
+/// c side.
 /// @param values The values of the combination of basis functions, whose slices
 /// of the atom on c side this kernel writes.
 /// @param npairs The number of surviving atom pairs of the combination.
@@ -65,14 +66,10 @@ namespace simdt3ceri {  // simdt3ceri namespace
 /// @param bc_coordinates The coordinates of the atoms on b side in rows zero to
 /// two and of the atom on c side in rows three to five.
 /// @param threshold The screening threshold of the integrals.
-/// @note The angular momentum sits on b side, so the ratio of the addition
-/// theorem carries the exponent on a side, and the harmonic of the vector
-/// between the atoms needs no sign, that vector already running from a side
-/// to b side.
-/// @note Unlike the combinations which carry the angular momentum on c side, the
-/// auxiliary integrals of every order up to the angular momentum enter, one for
-/// each term of the binomial the expansion leaves, so the Boys function is read
-/// at more than one order.
+/// @note The addition theorem splits the harmonic of the vector from the product
+/// center of an atom pair to the atom on c side into 2 bidegrees. The first and
+/// the last are the harmonics of one side alone, and the ones between them couple
+/// the orders of both, with the coefficients make_addition_table.py produces.
 auto compute_sps_electron_repulsion(double                         *values,
                                     const size_t                    npairs,
                                     const size_t                    natoms,
