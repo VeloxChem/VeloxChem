@@ -39,6 +39,7 @@
 #include "GridPartitionFuncGPU.hpp"
 #include "GpuConstants.hpp"
 #include "GpuSafeChecks.hpp"
+#include "GpuThreadCheck.hpp"
 #include "GpuWrapper.hpp"
 #include "GpuDevices.hpp"
 #include "MathFunc.hpp"
@@ -157,24 +158,23 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
     CGpuDevices gpu_devices;
     const auto ndevices = gpu_devices.getNumberOfDevices();
 
-    const auto nthreads = omp_get_max_threads();
-
     errors::assertMsgCritical(
         static_cast<int64_t>(ndevices) == num_gpus_per_node,
         std::string(__func__) + std::string(": Number of devices does not match numGpusPerNode."));
 
-    errors::assertMsgCritical(
-        static_cast<int64_t>(nthreads) == num_gpus_per_node,
-        std::string(__func__) + std::string(": Number of OMP threads does not match numGpusPerNode."));
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
 
-#pragma omp parallel
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     auto thread_id = omp_get_thread_num();
 
     auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -272,6 +272,7 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
 
     for (int64_t i = 0; i < grid_batch_size; i++)

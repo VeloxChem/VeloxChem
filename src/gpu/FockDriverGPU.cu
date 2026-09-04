@@ -55,6 +55,7 @@
 #include "ErrorHandler.hpp"
 #include "GpuConstants.hpp"
 #include "GpuSafeChecks.hpp"
+#include "GpuThreadCheck.hpp"
 #include "GpuWrapper.hpp"
 #include "GpuDevices.hpp"
 #include "GtoFunc.hpp"
@@ -110,16 +111,21 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
         S_matrices[gpu_id] = CDenseMatrix(naos_1, naos_2);
     }
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     auto thread_id = omp_get_thread_num();
 
     auto gpu_id = thread_id;
+
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -946,6 +952,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
     }
 
@@ -976,7 +983,6 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
-    auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
 
     std::vector<CDenseMatrix> S_matrices(num_gpus_per_node);
@@ -988,14 +994,18 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
         T_matrices[gpu_id] = CDenseMatrix(naos, naos);
     }
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     auto thread_id = omp_get_thread_num();
 
     auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -1504,6 +1514,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
     }
 
@@ -1565,7 +1576,6 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
-    auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
 
     std::vector<CDenseMatrix> V_matrices(num_gpus_per_node);
@@ -1575,14 +1585,18 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
         V_matrices[gpu_id] = CDenseMatrix(naos, naos);
     }
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     auto thread_id = omp_get_thread_num();
 
     auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -2094,6 +2108,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
     }
 
@@ -2125,7 +2140,6 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
-    auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
 
     std::vector<CDenseMatrix> MX_matrices(num_gpus_per_node);
@@ -2139,14 +2153,18 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
         MZ_matrices[gpu_id] = CDenseMatrix(naos, naos);
     }
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     auto thread_id = omp_get_thread_num();
 
     auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -2706,6 +2724,7 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
     }
 
@@ -2748,7 +2767,6 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
-    auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
 
     std::vector<CDenseMatrix> MX_matrices(num_gpus_per_node);
@@ -2762,14 +2780,18 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
         MZ_matrices[gpu_id] = CDenseMatrix(naos, naos);
     }
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     auto thread_id = omp_get_thread_num();
 
     auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -3311,6 +3333,7 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
     }
 
@@ -3354,7 +3377,6 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
-    auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
 
     std::vector<CDenseMatrix> MX_matrices(num_gpus_per_node);
@@ -3368,14 +3390,18 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
         MZ_matrices[gpu_id] = CDenseMatrix(naos, naos);
     }
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     auto thread_id = omp_get_thread_num();
 
     auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -3936,6 +3962,7 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
     }
 
@@ -4075,7 +4102,6 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     // TODO sanity check for flag_K: SYMM or ANTISYMM
 
-    auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
 
     timer.start("Prep. blocks");
@@ -4263,16 +4289,20 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     timer.start("Compute Fockmat");
 
-    std::vector<CMultiTimer> omptimers(nthreads);
+    std::vector<CMultiTimer> omptimers(num_gpus_per_node);
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     auto thread_id = omp_get_thread_num();
 
     auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -10542,6 +10572,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
 
     omptimers[thread_id].stop("K compute");
@@ -10574,10 +10605,10 @@ computeFockOnGPU(const              CMolecule& molecule,
     auto timer_summary = timer.getSummary();
     screening.setTimerSummary(timer_summary);
 
-    for (int thread_id = 0; thread_id < nthreads; thread_id++)
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
     {
-        auto gpu_timer_summary = omptimers[thread_id].getSummary();
-        screening.setGpuTimerSummary(thread_id, gpu_timer_summary);
+        auto gpu_timer_summary = omptimers[gpu_id].getSummary();
+        screening.setGpuTimerSummary(gpu_id, gpu_timer_summary);
     }
 
     return mat_Fock_sum;

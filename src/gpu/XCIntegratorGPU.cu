@@ -46,6 +46,7 @@
 #include "FunctionalParser.hpp"
 #include "GpuConstants.hpp"
 #include "GpuSafeChecks.hpp"
+#include "GpuThreadCheck.hpp"
 #include "GpuWrapper.hpp"
 #include "GpuDevices.hpp"
 #include "GtoFunc.hpp"
@@ -2081,6 +2082,8 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
     gpuSafe(gpuSetDevice(0));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
 
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
+
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
 
@@ -2228,6 +2231,7 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
 
     return allgtovalues;
@@ -2239,6 +2243,8 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
 {
     gpuSafe(gpuSetDevice(0));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -2406,6 +2412,7 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
 
     return std::vector<CDenseMatrix>({allgtovalues_0, allgtovalues_x, allgtovalues_y, allgtovalues_z});
@@ -2426,15 +2433,9 @@ integrateVxcFockForLdaClosedShell(const CMolecule&        molecule,
     CGpuDevices gpu_devices;
     const auto ndevices = gpu_devices.getNumberOfDevices();
 
-    const auto nthreads = omp_get_max_threads();
-
     errors::assertMsgCritical(
         static_cast<int64_t>(ndevices) == num_gpus_per_node,
         std::string(__func__) + std::string(": Number of devices does not match numGpusPerNode."));
-
-    errors::assertMsgCritical(
-        static_cast<int64_t>(nthreads) == num_gpus_per_node,
-        std::string(__func__) + std::string(": Number of OMP threads does not match numGpusPerNode."));
 
     // GTOs blocks and number of AOs
 
@@ -2474,14 +2475,18 @@ integrateVxcFockForLdaClosedShell(const CMolecule&        molecule,
         mat_Vxc_omp[gpu_id] = CAOKohnShamMatrix(naos, naos, is_closed_shell);
     }
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     const auto thread_id = omp_get_thread_num();
 
     const auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -2764,6 +2769,7 @@ integrateVxcFockForLdaClosedShell(const CMolecule&        molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
 
     mat_Vxc_omp[gpu_id].setNumberOfElectrons(nele);
@@ -2810,15 +2816,9 @@ integrateVxcFockForLdaOpenShell(const CMolecule&        molecule,
     CGpuDevices gpu_devices;
     const auto ndevices = gpu_devices.getNumberOfDevices();
 
-    const auto nthreads = omp_get_max_threads();
-
     errors::assertMsgCritical(
         static_cast<int64_t>(ndevices) == num_gpus_per_node,
         std::string(__func__) + std::string(": Number of devices does not match numGpusPerNode."));
-
-    errors::assertMsgCritical(
-        static_cast<int64_t>(nthreads) == num_gpus_per_node,
-        std::string(__func__) + std::string(": Number of OMP threads does not match numGpusPerNode."));
 
     // GTOs blocks and number of AOs
 
@@ -2858,14 +2858,18 @@ integrateVxcFockForLdaOpenShell(const CMolecule&        molecule,
         mat_Vxc_omp[gpu_id] = CAOKohnShamMatrix(naos, naos, is_closed_shell);
     }
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     const auto thread_id = omp_get_thread_num();
 
     const auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -3189,6 +3193,7 @@ integrateVxcFockForLdaOpenShell(const CMolecule&        molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
 
     mat_Vxc_omp[gpu_id].setNumberOfElectrons(nele);
@@ -3238,15 +3243,9 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
     CGpuDevices gpu_devices;
     const auto ndevices = gpu_devices.getNumberOfDevices();
 
-    const auto nthreads = omp_get_max_threads();
-
     errors::assertMsgCritical(
         static_cast<int64_t>(ndevices) == num_gpus_per_node,
         std::string(__func__) + std::string(": Number of devices does not match numGpusPerNode."));
-
-    errors::assertMsgCritical(
-        static_cast<int64_t>(nthreads) == num_gpus_per_node,
-        std::string(__func__) + std::string(": Number of OMP threads does not match numGpusPerNode."));
 
     // GTOs blocks and number of AOs
 
@@ -3286,14 +3285,18 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
         mat_Vxc_omp[gpu_id] = CAOKohnShamMatrix(naos, naos, is_closed_shell);
     }
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     const auto thread_id = omp_get_thread_num();
 
     const auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -3627,6 +3630,7 @@ integrateVxcFockForGgaClosedShell(const CMolecule&        molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
 
     mat_Vxc_omp[gpu_id].setNumberOfElectrons(nele);
@@ -3674,15 +3678,9 @@ integrateVxcFockForGgaOpenShell(const CMolecule&        molecule,
     CGpuDevices gpu_devices;
     const auto ndevices = gpu_devices.getNumberOfDevices();
 
-    const auto nthreads = omp_get_max_threads();
-
     errors::assertMsgCritical(
         static_cast<int64_t>(ndevices) == num_gpus_per_node,
         std::string(__func__) + std::string(": Number of devices does not match numGpusPerNode."));
-
-    errors::assertMsgCritical(
-        static_cast<int64_t>(nthreads) == num_gpus_per_node,
-        std::string(__func__) + std::string(": Number of OMP threads does not match numGpusPerNode."));
 
     // GTOs blocks and number of AOs
 
@@ -3722,14 +3720,18 @@ integrateVxcFockForGgaOpenShell(const CMolecule&        molecule,
         mat_Vxc_omp[gpu_id] = CAOKohnShamMatrix(naos, naos, is_closed_shell);
     }
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     const auto thread_id = omp_get_thread_num();
 
     const auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -4105,6 +4107,7 @@ integrateVxcFockForGgaOpenShell(const CMolecule&        molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
 
     mat_Vxc_omp[gpu_id].setNumberOfElectrons(nele);
@@ -4204,15 +4207,9 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
     CGpuDevices gpu_devices;
     const auto ndevices = gpu_devices.getNumberOfDevices();
 
-    const auto nthreads = omp_get_max_threads();
-
     errors::assertMsgCritical(
         static_cast<int64_t>(ndevices) == num_gpus_per_node,
         std::string(__func__) + std::string(": Number of devices does not match numGpusPerNode."));
-
-    errors::assertMsgCritical(
-        static_cast<int64_t>(nthreads) == num_gpus_per_node,
-        std::string(__func__) + std::string(": Number of OMP threads does not match numGpusPerNode."));
 
     // GTOs blocks and number of AOs
 
@@ -4247,14 +4244,18 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
         mat_Fxc_omp[gpu_id] = CDenseMatrix(naos, naos);
     }
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     const auto thread_id = omp_get_thread_num();
 
     const auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -4569,6 +4570,7 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
     }
 
@@ -4602,15 +4604,9 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
     CGpuDevices gpu_devices;
     const auto ndevices = gpu_devices.getNumberOfDevices();
 
-    const auto nthreads = omp_get_max_threads();
-
     errors::assertMsgCritical(
         static_cast<int64_t>(ndevices) == num_gpus_per_node,
         std::string(__func__) + std::string(": Number of devices does not match numGpusPerNode."));
-
-    errors::assertMsgCritical(
-        static_cast<int64_t>(nthreads) == num_gpus_per_node,
-        std::string(__func__) + std::string(": Number of OMP threads does not match numGpusPerNode."));
 
     // GTOs blocks and number of AOs
 
@@ -4645,14 +4641,18 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
         mat_Fxc_omp[gpu_id] = CDenseMatrix(naos, naos);
     }
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     const auto thread_id = omp_get_thread_num();
 
     const auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -5080,6 +5080,7 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
     }
 
@@ -5157,15 +5158,9 @@ integrateVxcGradientForLdaClosedShell(const CMolecule&        molecule,
     CGpuDevices gpu_devices;
     const auto ndevices = gpu_devices.getNumberOfDevices();
 
-    const auto nthreads = omp_get_max_threads();
-
     errors::assertMsgCritical(
         static_cast<int64_t>(ndevices) == num_gpus_per_node,
         std::string(__func__) + std::string(": Number of devices does not match numGpusPerNode."));
-
-    errors::assertMsgCritical(
-        static_cast<int64_t>(nthreads) == num_gpus_per_node,
-        std::string(__func__) + std::string(": Number of OMP threads does not match numGpusPerNode."));
 
     // GTOs blocks and number of AOs
 
@@ -5210,14 +5205,18 @@ integrateVxcGradientForLdaClosedShell(const CMolecule&        molecule,
 
     auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     const auto thread_id = omp_get_thread_num();
 
     const auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -5554,6 +5553,7 @@ integrateVxcGradientForLdaClosedShell(const CMolecule&        molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
     }
 
@@ -5591,15 +5591,9 @@ integrateVxcGradientForLdaOpenShell(const CMolecule&        molecule,
     CGpuDevices gpu_devices;
     const auto ndevices = gpu_devices.getNumberOfDevices();
 
-    const auto nthreads = omp_get_max_threads();
-
     errors::assertMsgCritical(
         static_cast<int64_t>(ndevices) == num_gpus_per_node,
         std::string(__func__) + std::string(": Number of devices does not match numGpusPerNode."));
-
-    errors::assertMsgCritical(
-        static_cast<int64_t>(nthreads) == num_gpus_per_node,
-        std::string(__func__) + std::string(": Number of OMP threads does not match numGpusPerNode."));
 
     // GTOs blocks and number of AOs
 
@@ -5644,14 +5638,18 @@ integrateVxcGradientForLdaOpenShell(const CMolecule&        molecule,
 
     auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     const auto thread_id = omp_get_thread_num();
 
     const auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -6048,6 +6046,7 @@ integrateVxcGradientForLdaOpenShell(const CMolecule&        molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
     }
 
@@ -6085,15 +6084,9 @@ integrateVxcGradientForGgaClosedShell(const CMolecule&        molecule,
     CGpuDevices gpu_devices;
     const auto ndevices = gpu_devices.getNumberOfDevices();
 
-    const auto nthreads = omp_get_max_threads();
-
     errors::assertMsgCritical(
         static_cast<int64_t>(ndevices) == num_gpus_per_node,
         std::string(__func__) + std::string(": Number of devices does not match numGpusPerNode."));
-
-    errors::assertMsgCritical(
-        static_cast<int64_t>(nthreads) == num_gpus_per_node,
-        std::string(__func__) + std::string(": Number of OMP threads does not match numGpusPerNode."));
 
     // GTOs blocks and number of AOs
 
@@ -6138,14 +6131,18 @@ integrateVxcGradientForGgaClosedShell(const CMolecule&        molecule,
 
     auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     const auto thread_id = omp_get_thread_num();
 
     const auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -6606,6 +6603,7 @@ integrateVxcGradientForGgaClosedShell(const CMolecule&        molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
     }
 
@@ -6643,15 +6641,9 @@ integrateVxcGradientForGgaOpenShell(const CMolecule&        molecule,
     CGpuDevices gpu_devices;
     const auto ndevices = gpu_devices.getNumberOfDevices();
 
-    const auto nthreads = omp_get_max_threads();
-
     errors::assertMsgCritical(
         static_cast<int64_t>(ndevices) == num_gpus_per_node,
         std::string(__func__) + std::string(": Number of devices does not match numGpusPerNode."));
-
-    errors::assertMsgCritical(
-        static_cast<int64_t>(nthreads) == num_gpus_per_node,
-        std::string(__func__) + std::string(": Number of OMP threads does not match numGpusPerNode."));
 
     // GTOs blocks and number of AOs
 
@@ -6696,14 +6688,18 @@ integrateVxcGradientForGgaOpenShell(const CMolecule&        molecule,
 
     auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     const auto thread_id = omp_get_thread_num();
 
     const auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -7293,6 +7289,7 @@ integrateVxcGradientForGgaOpenShell(const CMolecule&        molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
     }
 

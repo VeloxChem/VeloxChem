@@ -63,6 +63,7 @@
 #include "ErrorHandler.hpp"
 #include "GpuConstants.hpp"
 #include "GpuSafeChecks.hpp"
+#include "GpuThreadCheck.hpp"
 #include "GpuWrapper.hpp"
 #include "GpuDevices.hpp"
 #include "GtoFunc.hpp"
@@ -118,14 +119,18 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
         S_grad_omp[gpu_id] = CDenseMatrix(3, natoms);
     }
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     auto thread_id = omp_get_thread_num();
 
     auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -622,6 +627,7 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
     }
 
@@ -662,14 +668,18 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
         T_grad_omp[gpu_id] = CDenseMatrix(3, natoms);
     }
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     auto thread_id = omp_get_thread_num();
 
     auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -1166,6 +1176,7 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
     }
 
@@ -1218,14 +1229,18 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
         V_grad_omp[gpu_id] = CDenseMatrix(3, natoms);
     }
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     auto thread_id = omp_get_thread_num();
 
     auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -1783,6 +1798,7 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
     }
 
@@ -1825,14 +1841,18 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
         V_grad_omp[gpu_id] = CDenseMatrix(3, natoms);
     }
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     auto thread_id = omp_get_thread_num();
 
     auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -2388,6 +2408,7 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
     }
 
@@ -2427,6 +2448,8 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
     gpuSafe(gpuSetDevice(0));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     CMultiTimer timer;
 
@@ -2641,6 +2664,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuStreamSynchronize(gemm_stream));
     gpublasSafe(gpublasDestroy(handle));
     gpuSafe(gpuStreamDestroy(gemm_stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
 
     timer.stop("Prep. Q_prime");
@@ -2679,14 +2703,18 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
     screening.initTimers(num_gpus_per_node);
 
-#pragma omp parallel
+    checkNumGpusPerNode(num_gpus_per_node, __func__);
+#pragma omp parallel num_threads(static_cast<int>(num_gpus_per_node))
     {
     auto thread_id = omp_get_thread_num();
 
     auto gpu_id = thread_id;
 
+    checkNumGpuThreads(num_gpus_per_node, __func__);
     gpuSafe(gpuSetDevice(gpu_id));
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
+
+    gpuSafe(preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
 
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
@@ -24788,6 +24816,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
 
     timer.stop("Total timing");

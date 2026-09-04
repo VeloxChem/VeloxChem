@@ -167,6 +167,8 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
 
+    gpuSafe(gpu::preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
+
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
 
@@ -452,6 +454,8 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
         gpuSafe(gpuMemcpyAsync(h_mat_Q.data(), d_mat_Q, ss_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
+        gpuSafe(gpuStreamSynchronize(stream));
+
         for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
         {
             const auto i = ss_first_inds[ij];
@@ -485,6 +489,8 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
         gpuSafe(gpuMemcpyAsync(h_mat_Q.data(), d_mat_Q, sp_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
+        gpuSafe(gpuStreamSynchronize(stream));
+
         for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
         {
             const auto i = sp_first_inds[ij];
@@ -516,6 +522,8 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
         gpuSafe(gpuMemcpyAsync(h_mat_Q.data(), d_mat_Q, sd_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
+        gpuSafe(gpuStreamSynchronize(stream));
+
         for (int64_t ij = 0; ij < sd_prim_pair_count; ij++)
         {
             const auto i = sd_first_inds[ij];
@@ -544,6 +552,8 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
                            d_boys_func_ft);
 
         gpuSafe(gpuMemcpyAsync(h_mat_Q.data(), d_mat_Q, pp_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ij = 0; ij < pp_prim_pair_count; ij++)
         {
@@ -578,6 +588,8 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
         gpuSafe(gpuMemcpyAsync(h_mat_Q.data(), d_mat_Q, pd_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost, stream));
 
+        gpuSafe(gpuStreamSynchronize(stream));
+
         for (int64_t ij = 0; ij < pd_prim_pair_count; ij++)
         {
             const auto i = pd_first_inds[ij];
@@ -606,6 +618,8 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
                            d_boys_func_ft);
 
         gpuSafe(gpuMemcpyAsync(h_mat_Q.data(), d_mat_Q, dd_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+        gpuSafe(gpuStreamSynchronize(stream));
 
         for (int64_t ij = 0; ij < dd_prim_pair_count; ij++)
         {
@@ -642,6 +656,7 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
     gpuSafe(gpuStreamSynchronize(stream));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(gpu::releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
 }
 
@@ -2127,6 +2142,8 @@ auto CScreeningData::get_Q_prime_slice(const CDenseMatrix& Q_mat,
 
     gpuSafe(gpuDeviceSynchronize());  // early context initialization after setdevice
 
+    gpuSafe(gpu::preparePinnedMemcpyBuffer());  // per-thread pinned staging buffer for chunked copies
+
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
 
@@ -2202,6 +2219,7 @@ auto CScreeningData::get_Q_prime_slice(const CDenseMatrix& Q_mat,
     gpuSafe(gpuStreamSynchronize(stream));
     gpublasSafe(gpublasDestroy(handle));
     gpuSafe(gpuStreamDestroy(stream));
+    gpuSafe(gpu::releasePinnedMemcpyBuffer());  // session end: free per-thread pinned staging buffer
     gpuSafe(gpuDeviceSynchronize());
 
     return Q_prime_slice;
