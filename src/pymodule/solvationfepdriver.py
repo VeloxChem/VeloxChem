@@ -126,11 +126,11 @@ class SolvationFepDriver:
         self.ostream = ostream
 
         # Create directory for storing all generated data
-        self.output_folder = Path("solvation_fep_output")
+        self.output_folder = "solvation_fep_output"
 
         # Options for the SolvationBuilder
         self.padding = 1.0
-        self.solvent_name = 'cspce'
+        self.solvent_name = 'spce'
         self.resname = None
 
         # Ensemble and MD options
@@ -174,7 +174,7 @@ class SolvationFepDriver:
         self.final_free_energy = 0.0
         self.delta_f = None
 
-    def compute(self, molecule, ff_gen_solute=None, solvent='cspce', solvent_molecule=None, ff_gen_solvent=None, target_density=None):
+    def compute(self, molecule, ff_gen_solute=None, solvent='spce', solvent_molecule=None, ff_gen_solvent=None, target_density=None):
         """
         Run the solvation free energy calculation using OpenMM.
 
@@ -211,7 +211,7 @@ class SolvationFepDriver:
         sol_builder.write_openmm_files(ff_gen_solute, ff_gen_solvent)
 
         if self.save_trajectory_xtc or self.save_system_xml or self.save_energies_txt:
-            self.output_folder.mkdir(parents=True, exist_ok=True)
+            Path(self.output_folder).mkdir(parents=True, exist_ok=True)
 
         if not ff_gen_solute:
             self.solute_ff = sol_builder.solute_ff
@@ -231,7 +231,7 @@ class SolvationFepDriver:
 
         return self.compute_solvation_from_gromacs_files("system.gro", "system.top", solute_gro, solute_top)
 
-    def compute_solvation_from_openmm_files(self, solute_pdb, solute_xml, solvent='cspce', solvent_molecule=None, ff_gen_solvent=None, target_density=None, system_pdb=None, other_xml_files=None, system_xml=None):
+    def compute_solvation_from_openmm_files(self, solute_pdb, solute_xml, solvent='spce', solvent_molecule=None, ff_gen_solvent=None, target_density=None, system_pdb=None, other_xml_files=None, system_xml=None):
         """
         Run the solvation free energy calculation using OpenMM.
         :param solute_pdb:
@@ -303,7 +303,7 @@ class SolvationFepDriver:
             self.solvent_name = 'omm_files'
 
         if self.save_trajectory_xtc or self.save_system_xml or self.save_energies_txt:
-            self.output_folder.mkdir(parents=True, exist_ok=True)
+            Path(self.output_folder).mkdir(parents=True, exist_ok=True)
 
         delta_f = self._run_stages()
 
@@ -334,7 +334,7 @@ class SolvationFepDriver:
         self.solute_top = solute_top
 
         if self.save_trajectory_xtc or self.save_system_xml or self.save_energies_txt:
-            self.output_folder.mkdir(parents=True, exist_ok=True)
+            Path(self.output_folder).mkdir(parents=True, exist_ok=True)
 
         delta_f = self._run_stages()
 
@@ -580,7 +580,7 @@ class SolvationFepDriver:
         Create vacuum system with alchemical scaling.
         """
         # Reading the system from files
-        if self.solvent_name == 'omm_files':
+        if self.solvent_name == 'omm_files' or self.solvent_name == 'omm_system_xml':
             pdb = app.PDBFile(self.solute_pdb)
             forcefield_solute = app.ForceField(self.solute_xml)
             topology = pdb.topology
