@@ -37,6 +37,7 @@
 #include <string>
 
 #include "ErrorHandler.hpp"
+#include "SimdThreeCenterElectronRepulsionRecSSP.hpp"
 #include "SimdThreeCenterElectronRepulsionRecSSS.hpp"
 
 namespace simdt3ceri {  // simdt3ceri namespace
@@ -68,6 +69,30 @@ compute_electron_repulsion(double                         *values,
     {
         compute_sss_electron_repulsion(
             values, npairs, natoms, iatom, a_function, b_function, c_function, ab_coordinates, bc_coordinates, threshold);
+
+        return;
+    }
+
+    // NOTE: the kernel of two S type functions and one of angular momentum one
+    // takes the solid harmonics of angular momentum one of both the atom pairs
+    // and the atoms on c side, as the addition theorem which splits the vector
+    // from the product center of a pair to the atom on c side carries the
+    // angular momentum onto both of them.
+
+    if ((la == 0) && (lb == 0) && (lc == 1))
+    {
+        compute_ssp_electron_repulsion(values,
+                                       npairs,
+                                       natoms,
+                                       iatom,
+                                       a_function,
+                                       b_function,
+                                       c_function,
+                                       ab_harmonics[0],
+                                       bc_harmonics[0],
+                                       ab_coordinates,
+                                       bc_coordinates,
+                                       threshold);
 
         return;
     }

@@ -179,7 +179,16 @@ CSimdThreeCenterElectronRepulsionDriver::_compute_blocks(CSparseTensor         &
 
         const auto &c_basis = aux_basis.basis_set(block.c_index());
 
-        const auto ab_harmonics = simdfunc::make_solid_harmonics(ab_coordinates, a_basis.max_angular_momentum() + b_basis.max_angular_momentum());
+        // NOTE: the solid harmonics of the atom pairs reach the sum of the three
+        // angular momenta and not that of the two on a and b sides. The vector
+        // from the product center of a pair to the atom on c side is the sum of
+        // the vector between the atoms of the pair and the vector to that atom,
+        // and the addition theorem which splits its harmonics carries the angular
+        // momentum on c side onto both of them, so the atom pairs need harmonics
+        // of degrees the a and b sides alone never ask for.
+
+        const auto ab_harmonics = simdfunc::make_solid_harmonics(
+            ab_coordinates, a_basis.max_angular_momentum() + b_basis.max_angular_momentum() + c_basis.max_angular_momentum());
 
         const auto a_indices = denseidx::index_functions(a_basis);
 
