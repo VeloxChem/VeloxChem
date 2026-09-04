@@ -156,7 +156,7 @@ class MMHessianDriver:
         delta = self._DISPLACEMENT
 
         integrator = mm.VerletIntegrator(0.001)
-        platform = mm.Platform.getPlatformByName('Reference')
+        platform = mm.Platform.getPlatformByName('CPU')
         context = mm.Context(self._system, integrator, platform)
 
         pos_vec3 = [mm.Vec3(*self._positions_nm[n]) for n in range(n_atoms)]
@@ -199,7 +199,63 @@ class MMHessianDriver:
         # Symmetrise then convert kJ/mol/nm^2 -> Hartree/Bohr^2
         return 0.5 * (hessian + hessian.T) * self._to_hartree_bohr2()
 
-    def compute_h_unit(self, coord_type: str,
+    def compute_partial_hessian(self, indices):
+        n_atoms = self._positions_nm.shape[0]
+        n_dof = 3 * n_atoms
+        delta = self._DISPLACEMENT
+
+        integrator = mm.VerletIntegrator(0.001)
+        platform = mm.Platform.getPlatformByName('CPU')
+        context = mm.Context(self._system, integrator, platform)
+
+        pos_vec3 = [mm.Vec3(*self._positions_nm[n]) for n in range(n_atoms)]
+        context.setPositions(pos_vec3)
+
+        hessian = np.zeros((n_dof, n_dof))
+
+        for i in range(n_atoms):
+            if i not in indices:
+                continue
+            for p in range(3):
+                # +delta
+                pos_fwd = list(pos_vec3)
+                v = list(pos_fwd[i])
+                v[p] += delta
+                pos_fwd[i] = mm.Vec3(*v)
+                context.setPositions(pos_fwd)
+                f_fwd = (context.getState(getForces=True).getForces(
+                    asNumpy=True))
+
+                # -delta
+                pos_bwd = list(pos_vec3)
+                v = list(pos_bwd[i])
+                v[p] -= delta
+                pos_bwd[i] = mm.Vec3(*v)
+                context.setPositions(pos_bwd)
+                f_bwd = (context.getState(getForces=True).getForces(
+                    asNumpy=True))
+
+                # H[3i+p, 3j+s] = -(F_fwd[j,s] - F_bwd[j,s]) / (2*delta)
+
+                for j in range(n_atoms):
+                    if j not in indices:
+                        continue
+
+                    for s in range(3):
+                        fwd_s = f_fwd[j][s].value_in_unit(
+                            unit.kilojoules_per_mole / unit.nanometer)
+                        bwd_s = f_bwd[j][s].value_in_unit(
+                            unit.kilojoules_per_mole / unit.nanometer)
+                        hessian[3 * i + p,
+                                3 * j + s] = -(fwd_s - bwd_s) / (2.0 * delta)
+
+        del context, integrator
+
+        # Symmetrise then convert kJ/mol/nm^2 -> Hartree/Bohr^2
+        return 0.5 * (hessian + hessian.T) * self._to_hartree_bohr2()
+
+    def compute_h_unit(self,
+                       coord_type: str,
                        atom_indices: tuple,
                        first_term_only: bool = False) -> np.ndarray:
         """
@@ -228,7 +284,9 @@ class MMHessianDriver:
         if first_term_only and coord_type == 'dihedral':
             self._set_first_dihedral_term_k(system, atom_indices, 1.0)
         else:
-            self._set_target_force_constant(system, coord_type, atom_indices,
+            self._set_target_force_constant(system,
+                                            coord_type,
+                                            atom_indices,
                                             k=1.0)
         pair = self._terminal_pair(coord_type, atom_indices)
         return self._numerical_partial_hessian(system, pair)
@@ -597,7 +655,7 @@ class MMHessianDriver:
         np.ndarray, shape (3, 3), units Hartree/Bohr^2
         """
         integrator = mm.VerletIntegrator(0.001)
-        platform = mm.Platform.getPlatformByName('Reference')
+        platform = mm.Platform.getPlatformByName('CPU')
         context = mm.Context(system, integrator, platform)
 
         # Build position list as Vec3 objects (OpenMM requirement)

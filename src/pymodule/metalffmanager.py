@@ -68,8 +68,24 @@ class MetalForceFieldManager:
     built: a template that is monodentate builds a monodentate site out of a
     structure the cutoffs called bidentate, and the other way round.
 
-    Only settings are kept on the object, apart from the templates themselves.
-    Everything a match produces is returned by match_enzyme_to_template.
+    One workflow, three calls:
+
+        manager.load_templates_from_folders([...])
+        manager.compare_active_site(builder)   # builder has built_active_site
+        manager.build_ff_from_template()
+
+    At most one active site is tracked at a time -- the MetalSiteForceFieldBuilder
+    handed to compare_active_site, read back through the active_site property.
+    It can be edited in between (add_metal_bond, update_protonation_state, ...)
+    and compared again with compare_active_site(), with no argument, to pick
+    up the edit; build_ff_from_template hands the transferred force field back
+    to that same builder so create_enzyme_system can be called on it directly.
+    There is no other way to reach a result: a bare structure path is not
+    accepted here, since building the active site is exactly what the builder
+    already does.
+
+    Settings are kept on the object, apart from the templates and the active
+    site itself.
 
     :param comm:
         The MPI communicator.
@@ -78,9 +94,11 @@ class MetalForceFieldManager:
 
     Instance variables
         - templates: The loaded templates, keyed by name.
-        - builder: A MetalSiteForceFieldBuilder held for its settings. The
-          steps themselves are the functions of metalsitecore, which are
-          called with the settings this carries, so set them on it.
+        - builder: A MetalSiteForceFieldBuilder held for its settings alone --
+          never given an active site of its own. The steps themselves are the
+          functions of metalsitecore, which are called with the settings this
+          carries, so set them on it. Distinct from active_site, which is the
+          builder that holds the real, loaded site.
         - metal_shell_bonds: How many bonds out from a metal the metal_shell
           region reaches.
         - selection_criteria: What a template has to be within before
@@ -95,17 +113,11 @@ class MetalForceFieldManager:
           cartesian numbers are printed either way.
         - max_mappings: The limit on the number of isomorphisms evaluated for
           one template.
-        - do_prepare_protein: The flag for repairing the query structure before
-          anything is extracted from it. Needed for an enzyme system, and it
-          needs pdbfixer.
         - mm_fallback_literature_bonds: The flag for pulling the metal bonds
           of the crude relaxation toward LITERATURE_METAL_BONDS, which
           normalizes the query toward the geometry a template was optimized
           to. Ignored when the builder already carries metal bond equilibria
           of its own.
-        - build_enzyme_system: The flag for going on to build a protein system
-          from a matched force field. Off by default, since it needs pdbfixer
-          and a structure a protein force field can template.
         - comm: The MPI communicator.
         - rank: The rank of the MPI process.
         - nodes: The number of MPI processes.
@@ -114,7 +126,7 @@ class MetalForceFieldManager:
 
     # The geometry a run leaves behind, in the order it is looked for. Which
     # of them a template is allowed to be built from is what the fallback
-    # argument of load_ff_from_folder decides.
+    # argument of load_template_from_folder decides.
     GEOMETRY_KINDS = ('qm_opt', 'mm_opt')
 
     # Which atoms an RMSD is measured over. The whole active site answers
@@ -215,8 +227,15 @@ class MetalForceFieldManager:
         self.templates = {}
 
         # the builder carries every setting of the structural pipeline, so it
-        # is exposed rather than wrapped
+        # is exposed rather than wrapped. It never gets an active site of its
+        # own -- that is _active_site_builder, below.
         self.builder = MetalSiteForceFieldBuilder(comm, ostream)
+
+        # the one active site the manager tracks, and the last comparison
+        # made against it; see the active_site property and
+        # compare_active_site
+        self._active_site_builder = None
+        self._comparison = None
 
         # matching
         self.metal_shell_bonds = 2
@@ -232,11 +251,22 @@ class MetalForceFieldManager:
         self.max_mappings = 10000
 
         # what to run on the query structure
-        self.do_prepare_protein = True
         self.mm_fallback_literature_bonds = True
-        self.build_enzyme_system = False
 
-    def load_ff_from_folder(self, folder, name=None, fallback=None):
+    @property
+    def active_site(self):
+        """
+        The MetalSiteForceFieldBuilder tracked as the current active site, or
+        None before compare_active_site has been given one. Editing happens
+        on this object directly (add_metal_bond, update_protonation_state,
+        show_active_site, print_active_site, ...); create_enzyme_system is
+        called on it once build_ff_from_template has adopted a force field
+        onto it.
+        """
+
+        return self._active_site_builder
+
+    def load_template_from_folder(self, folder, name=None, fallback=None):
         """
         Loads one template from a folder left behind by a builder run.
 
@@ -262,9 +292,6 @@ class MetalForceFieldManager:
             The lowest geometry kind that is acceptable. None accepts a QM
             optimized geometry only; 'mm_opt' also accepts one that was merely
             relaxed on the crude force field.
-
-        :return:
-            The template dictionary.
         """
 
         folder = Path(folder)
@@ -304,23 +331,78 @@ class MetalForceFieldManager:
         self._print_template(template)
         self._print_templates()
 
-        return template
-
-    def load_folders(self, folders):
+    def load_templates_from_folders(self, folders):
         """
-        Loads several template folders at once.
-
-        Not implemented yet. It is where a shared naming policy and a single
-        summary over a whole series of runs will live; until then, call
-        load_ff_from_folder once per folder.
+        Loads several template folders at once, each under the name
+        load_template_from_folder would give it on its own.
 
         :param folders:
             The folders of earlier runs.
         """
 
-        raise NotImplementedError(
-            'MetalForceFieldManager.load_folders is not implemented yet; call '
-            'load_ff_from_folder once per folder.')
+        for folder in folders:
+            self.load_template_from_folder(folder)
+
+    def show_template(self, name, **kwargs):
+        """
+        Draws one loaded template, with its own explicit metal-ligand bonds.
+
+        core.show_active_site is not used here: it reads
+        active_site['labels'] and active_site['connectivity_matrix'], and a
+        template dictionary (built by _build_template) has neither -- it
+        carries forcefield.bonds instead, which is the same source every
+        other template computation (_describe, _metal_keys, ...) reads its
+        bonds from.
+
+        :param name:
+            The name of the template to show.
+        :param kwargs:
+            Further keyword arguments for Molecule.show. Passing bonds
+            explicitly overrides what is worked out here.
+
+        :return:
+            Whatever Molecule.show returns.
+        """
+
+        known = name in self.templates
+        assert_msg_critical(
+            known, f'MetalForceFieldManager.show_template: no template '
+            f'named {name}. Loaded: {sorted(self.templates)}')
+
+        template = self.templates[name]
+        kwargs.setdefault('bonds', list(template['forcefield'].bonds))
+
+        return template['molecule'].show(**kwargs)
+
+    def show_all_templates(self, **kwargs):
+        """
+        Draws every loaded template at once, in a grid, each with its own
+        explicit metal-ligand bonds.
+
+        :param kwargs:
+            Further keyword arguments for Molecule.show_grid (e.g. grid,
+            linked, width, height). Passing bonds explicitly overrides what
+            is worked out here for every pane alike.
+
+        :return:
+            Whatever Molecule.show_grid returns.
+        """
+
+        names = list(self.templates)
+        assert_msg_critical(
+            len(names) > 0,
+            'MetalForceFieldManager.show_all_templates: no templates '
+            'loaded. Call load_template_from_folder first.')
+
+        molecules = [self.templates[name]['molecule'] for name in names]
+        bonds = [
+            list(self.templates[name]['forcefield'].bonds) for name in names
+        ]
+        kwargs.setdefault('bonds', bonds)
+
+        # print a grid of titles for reference
+
+        return Molecule.show_grid(molecules, **kwargs)
 
     def _load_geometry(self, folder, fallback):
         """
@@ -330,7 +412,7 @@ class MetalForceFieldManager:
         :param folder:
             The folder of an earlier run.
         :param fallback:
-            The lowest acceptable kind, as given to load_ff_from_folder.
+            The lowest acceptable kind, as given to load_template_from_folder.
 
         :return:
             The tuple of the molecule and its kind.
@@ -460,12 +542,10 @@ class MetalForceFieldManager:
                 index for index, atom in forcefield.atoms.items()
                 if role in (atom.get('comment', '') or '')
             ]
-            for role in (core.BETA_CARBON_COMMENT,
-                         core.CAP_COMMENT)
+            for role in (core.BETA_CARBON_COMMENT, core.CAP_COMMENT)
         }
 
-        beta_carbon_indices = marked[
-            core.BETA_CARBON_COMMENT]
+        beta_carbon_indices = marked[core.BETA_CARBON_COMMENT]
         cap_indices = marked[core.CAP_COMMENT]
 
         assert_msg_critical(
@@ -715,8 +795,7 @@ class MetalForceFieldManager:
 
         spec['residues'] = sorted(coarse.nodes[node]['key']
                                   for node in residues)
-        spec['bridging'] = sorted(coarse.nodes[node]['key']
-                                  for node in residues
+        spec['bridging'] = sorted(coarse.nodes[node]['key'] for node in residues
                                   if coarse.degree(node) > 1)
 
         return spec
@@ -736,35 +815,34 @@ class MetalForceFieldManager:
             The bonds.
         """
 
-        return core.connectivity_bonds(
-            connectivity_matrix)
+        return core.connectivity_bonds(connectivity_matrix)
 
-    def compare_to_templates(self,
-                             structure,
-                             mm_opt=True,
-                             include_hydrogens=False):
+    def compare_active_site(self,
+                            active_site=None,
+                            mm_opt=True,
+                            include_hydrogens=False):
         """
-        Measures a structure against every template and reports, deciding
-        nothing.
+        Compares the current active site against every loaded template,
+        prints the full comparison, and reports whether an unforced match
+        exists.
 
-        Where match_enzyme_to_template picks one template and builds a force
-        field from it, this walks the whole set and says how each of them
-        stands: whether it holds the same atoms at all, whether it is wired
-        the same way, and how far away it is in every region under both
-        measures. It is what to reach for when a match came back None and the
-        question is which template was closest, and by what.
-
-        Every number it returns is also printed as a table, and the dictionary
-        holds one entry per template, so a decision the thresholds cannot make
-        can be made on the numbers afterwards.
+        An active site is a MetalSiteForceFieldBuilder on which
+        build_active_site has already been called. Handing one in here
+        replaces whatever active site was tracked before -- there is at most
+        one at a time -- and it is then read back through the active_site
+        property, so it can be edited (add_metal_bond,
+        update_protonation_state, ...) and compared again by calling this
+        with no argument, which describes it again from scratch and so picks
+        up any edit made since the last call.
 
         The hydrogens are left out of every measurement by default, since
         protonate does not place them reproducibly; include_hydrogens puts
         them back for this call whatever rmsd_heavy_atoms_only says. One
         geometry is measured per call, so call it twice to see both.
 
-        :param structure:
-            The path to a PDB or mmCIF file.
+        :param active_site:
+            A MetalSiteForceFieldBuilder with a built active site, to become
+            the one the manager tracks. None reuses the one already tracked.
         :param mm_opt:
             Whether to relax the active site on a crude force field first,
             which is what takes the slack out of an unrelaxed structure.
@@ -773,27 +851,52 @@ class MetalForceFieldManager:
             coordinates.
 
         :return:
-            The findings, with one entry per template under 'templates'.
+            True when at least one template is within selection_criteria,
+            i.e. an unnamed build_ff_from_template() call would succeed.
         """
 
         assert_msg_critical(
             len(self.templates) > 0,
-            'MetalForceFieldManager.compare_to_templates: no templates '
-            'loaded. Call load_ff_from_folder first.')
+            'MetalForceFieldManager.compare_active_site: no templates '
+            'loaded. Call load_template_from_folder first.')
 
-        query = self._extract_active_site(structure)
-        active_site = query['active_site']
+        if active_site is not None:
+            is_builder = isinstance(active_site, MetalSiteForceFieldBuilder)
+            assert_msg_critical(
+                is_builder,
+                'MetalForceFieldManager.compare_active_site: active_site '
+                'must be a MetalSiteForceFieldBuilder, got '
+                f'{type(active_site).__name__}')
+            has_site = active_site.active_site_molecule is not None
+            assert_msg_critical(
+                has_site,
+                'MetalForceFieldManager.compare_active_site: this builder '
+                'has no active site yet. Call build_active_site on it '
+                'first.')
+            self._active_site_builder = active_site
+
+        have_builder = self._active_site_builder is not None
+        assert_msg_critical(
+            have_builder,
+            'MetalForceFieldManager.compare_active_site: no active site '
+            'loaded. Call compare_active_site with a '
+            'MetalSiteForceFieldBuilder first.')
+
+        builder = self._active_site_builder
+        described = self._describe(
+            builder.active_site,
+            self._matrix_edges(builder.active_site['connectivity_matrix']))
 
         if mm_opt:
-            molecule = self._mm_relax(query)
+            molecule = self._mm_relax({'active_site': described})
             geometry = 'mm_relaxed'
         else:
-            molecule = active_site['molecule']
+            molecule = described['molecule']
             geometry = 'input'
 
         coordinates = molecule.get_coordinates_in_angstrom()
         heavy_only = not include_hydrogens
-        composition = sorted(active_site['molecule'].get_labels())
+        composition = sorted(described['molecule'].get_labels())
 
         findings = {}
 
@@ -815,7 +918,7 @@ class MetalForceFieldManager:
 
             # which residue coordinates which metal, with nothing said about
             # how many atoms of it do the coordinating
-            coarse = self._coarse_mappings(template, active_site)
+            coarse = self._coarse_mappings(template, described)
 
             if not coarse:
                 # what it holds instead is printed from the template
@@ -826,7 +929,7 @@ class MetalForceFieldManager:
             maps = []
             for coarse_mapping in coarse:
                 maps.extend(
-                    self._heavy_atom_maps(template, active_site, coarse_mapping))
+                    self._heavy_atom_maps(template, described, coarse_mapping))
 
             if not maps:
                 # what it holds instead is printed from the template
@@ -839,12 +942,12 @@ class MetalForceFieldManager:
 
             heavy_map, rot, trans = self._best_heavy_map(
                 template, maps, coordinates)
-            mapping = self._complete_hydrogens(template, active_site, heavy_map,
+            mapping = self._complete_hydrogens(template, described, heavy_map,
                                                coordinates, rot, trans)
 
             entry['mapping'] = mapping
             entry['metal_bonds'] = self._metal_bond_summary(
-                template, active_site, mapping, coordinates)
+                template, described, mapping, coordinates)
 
             for region in self.RMSD_REGIONS:
                 entry['regions'][region] = self._measure_region(
@@ -853,47 +956,49 @@ class MetalForceFieldManager:
             findings[name] = entry
 
         results = {
-            'structure': str(structure),
+            'source': str(builder.output_folder),
             'geometry': geometry,
             'include_hydrogens': include_hydrogens,
-            'active_site': active_site,
-            'binding_modes': query['binding_modes'],
-            'topology': query['topology'],
-            'positions': query['positions'],
+            'active_site': described,
             # the geometry every number above was measured on, which is the
             # relaxed one rather than the site's own when mm_opt is set
             'molecule': molecule,
             'templates': findings,
         }
 
+        self._comparison = results
         self._print_comparison(results)
 
-        return results
+        return self._select_template(None)['name'] is not None
 
-    def select_template(self, comparison, template=None):
+    def _select_template(self, template=None):
         """
         Picks the template a force field should be built from, and says why.
 
-        A template is usable only if it maps onto every atom of the site
+        Reads the last comparison made by compare_active_site. A template is
+        usable only if it maps onto every atom of the site. If none is
+        named, every template that maps completely is held to
+        selection_criteria and the passing ones are ranked, the best one
+        winning. If one is named, its verdict is reported but does not
+        decide whether it is picked here -- naming a template is a statement
+        that it is the right one, and build_ff_from_template is what turns an
+        outside-the-criteria verdict into a refusal.
 
-        If no template is specified, every template that maps completely is held to
-        the the specified criteria. The passing templates are ranked and the best one is picked
-
-        If, the criteria are measured and reported but do
-        not decide, since naming a template is a statement that it is the
-        right one.
-
-        :param comparison:
-            The findings of compare_to_templates, or a structure to run it on.
         :param template:
             The name of the template to use, or None to choose one.
 
         :return:
-            The decision, with the chosen name under 'name', None when nothing
-            passed, and what was made of every template under 'verdicts'.
+            The decision, with the chosen name under 'name', None when
+            nothing passed, and what was made of every template under
+            'verdicts'.
         """
 
-        comparison = self._comparison(comparison)
+        assert_msg_critical(
+            self._comparison is not None,
+            'MetalForceFieldManager._select_template: no comparison yet. '
+            'Call compare_active_site first.')
+
+        comparison = self._comparison
         criteria_name, criteria = self._selection_criteria()
 
         decision = {
@@ -916,7 +1021,7 @@ class MetalForceFieldManager:
         if template is not None:
             assert_msg_critical(
                 template in comparison['templates'],
-                'MetalForceFieldManager.select_template: no template named '
+                'MetalForceFieldManager._select_template: no template named '
                 f'{template} was compared. Loaded: '
                 f'{sorted(comparison["templates"])}')
 
@@ -925,17 +1030,10 @@ class MetalForceFieldManager:
 
             assert_msg_critical(
                 self._maps_every_atom(comparison, entry),
-                f'MetalForceFieldManager.select_template: template {template} '
+                f'MetalForceFieldManager._select_template: template {template} '
                 f'does not map onto every atom of the site ({verdict}), so '
                 'its parameters cannot be transferred. Build this site with '
                 'MetalSiteForceFieldBuilder.')
-
-            if verdict is not None:
-                self.ostream.print_warning(
-                    f'Template {template} was named rather than chosen, and '
-                    f'it is outside the {criteria_name} criteria: {verdict}. '
-                    'Transferring it anyway.')
-                self.ostream.flush()
 
             decision['name'] = template
             decision['entry'] = entry
@@ -967,7 +1065,7 @@ class MetalForceFieldManager:
         Says which template came closest when none of them was good enough.
 
         :param decision:
-            The decision, as select_template makes it.
+            The decision, as _select_template makes it.
         """
 
         closest = min(decision['scores'],
@@ -989,112 +1087,125 @@ class MetalForceFieldManager:
             'match, or build this site with MetalSiteForceFieldBuilder.')
         self.ostream.flush()
 
-    def build_ff_from_template(self, comparison, template=None):
+    def build_ff_from_template(self, template=None):
         """
-        Builds a force field for a structure out of the template that fits it.
+        Builds a force field for the current active site out of the template
+        that fits it, and adopts it onto the active site so
+        create_enzyme_system can be called on it directly.
 
         This is the half of a builder run that QM was paid for: the fitted
         metal bonds and angles and the RESP charges are taken from a template
         that describes the same site, and everything else is built for the
-        structure in front of us. Which template that is comes from
-        select_template, on the numbers compare_to_templates measured.
+        site in front of us. Which template that is: with no name, the best
+        match under selection_criteria, on the numbers compare_active_site
+        measured; named, that template exactly. Either way a template that
+        does not pass -- outside the criteria, or no match at all -- is a
+        hard error naming why, since transferring parameters that were
+        measured not to fit would silently mis-parameterize the site.
 
         The coordination comes from the template too. Denticity is a distance
         cutoff on an unrelaxed structure rather than chemistry, so a site that
         matched a template on every other count is wired the way the template
         is wired before the force field is built, and what that changed is
-        reported and returned under 'forced_bonds'. The active site returned
-        is that rewired one; the one compare_to_templates measured is left as
-        it was measured. Note that 'binding_modes' still describes the
-        coordination the structure was detected with, which is what it is a
-        record of.
+        reported by _print_forced_bonds.
 
-        :param comparison:
-            The findings of compare_to_templates, or a structure to run it on.
         :param template:
-            The name of the template to use, or None to choose one.
+            The name of the template to use, or None to choose the best
+            match.
 
         :return:
-            The results dictionary, or None when no template was good enough.
+            The force field, carrying the template's transferred metal terms
+            and charges.
         """
 
-        comparison = self._comparison(comparison)
-        decision = self.select_template(comparison, template)
+        assert_msg_critical(
+            self._comparison is not None,
+            'MetalForceFieldManager.build_ff_from_template: no comparison '
+            'yet. Call compare_active_site first.')
 
-        if decision['name'] is None:
-            return None
+        decision = self._select_template(template)
+
+        matched = decision['name'] is not None
+        assert_msg_critical(
+            matched,
+            'MetalForceFieldManager.build_ff_from_template: no template is '
+            f'within the {decision["criteria_name"]} criteria; see the '
+            'comparison above, or loosen selection_criteria.')
+
+        if template is not None:
+            within_criteria = decision['verdicts'][template] is None
+            assert_msg_critical(
+                within_criteria,
+                f'MetalForceFieldManager.build_ff_from_template: {template} '
+                'does not match the active site: '
+                f'{decision["verdicts"][template]}')
 
         name = decision['name']
-        template = self.templates[name]
         entry = decision['entry']
-        active_site = comparison['active_site']
+        template_obj = self.templates[name]
+        active_site = self._comparison['active_site']
 
         self.ostream.print_info(
             f'Building the force field from {name}, measured on the '
-            f'{comparison["geometry"]} geometry. Transferring its metal terms '
-            'and charges.')
+            f'{self._comparison["geometry"]} geometry. Transferring its '
+            'metal terms and charges.')
         self.ostream.flush()
 
-        forcefield, forced_bonds, active_site = self._transfer(
-            template, entry['mapping'], active_site)
+        forcefield, _, active_site = self._build_ff_from_template(
+            template_obj, entry['mapping'], active_site)
 
-        enzyme_system = None
-        if self.build_enzyme_system:
-            enzyme_system, _ = core.create_enzyme_system(
-                comparison['topology'],
-                active_site,
-                forcefield,
-                partial_charges=forcefield.partial_charges,
-                forcefield_files=self.builder.protein_forcefield_files,
-                ostream=self.ostream)
+        # strip the manager-only description keys before handing the site
+        # back to the builder, which never produces them
+        builder_active_site = {
+            key: value
+            for key, value in active_site.items()
+            if key not in ('fine_topology', 'coarse_topology')
+        }
+
+        forcefield = self._active_site_builder.adopt_forcefield(
+            forcefield, active_site=builder_active_site)
 
         core._print_metal_parameters(active_site,
                                      forcefield,
                                      ostream=self.ostream)
 
-        return {
-            'template': name,
-            'forcefield': forcefield,
-            'mapping': entry['mapping'],
-            'forced': decision['forced'],
-            'criteria': decision['criteria_name'],
-            'score': decision['score'],
-            'verdicts': decision['verdicts'],
-            'candidates': decision['candidates'],
-            'regions': entry['regions'],
-            'metal_bonds': entry['metal_bonds'],
-            'forced_bonds': forced_bonds,
-            'geometry': comparison['geometry'],
-            'geometry_kind': template['geometry_kind'],
-            'topology': comparison['topology'],
-            'positions': comparison['positions'],
-            'binding_modes': comparison['binding_modes'],
-            'active_site': active_site,
-            'enzyme_system': enzyme_system,
-        }
+        return forcefield
 
-    def _comparison(self, comparison):
+    def shoehorn(self, template):
         """
-        Takes either the findings of compare_to_templates or a structure to
-        measure, and returns the findings.
+        Tries to shoehorn the current active site into a template's bonding
+        and protonation, for the cases compare_active_site calls a mismatch
+        on denticity or protonation alone rather than on a different set of
+        residues.
 
-        :param comparison:
-            The findings, or the path to a PDB or mmCIF file.
+        Not implemented yet: always reports failure and leaves the active
+        site unchanged.
+
+        :param template:
+            The name of the template to shoehorn the active site into.
 
         :return:
-            The findings.
+            True when the active site was updated to match the template.
+            Always False for now.
         """
 
-        if isinstance(comparison, (str, Path)):
-            return self.compare_to_templates(comparison)
-
+        have_site = self._active_site_builder is not None
         assert_msg_critical(
-            isinstance(comparison, dict) and 'templates' in comparison,
-            'MetalForceFieldManager: expected the findings of '
-            'compare_to_templates or a structure to measure, got '
-            f'{type(comparison).__name__}')
+            have_site,
+            'MetalForceFieldManager.shoehorn: no active site loaded. Call '
+            'compare_active_site with a MetalSiteForceFieldBuilder first.')
 
-        return comparison
+        known = template in self.templates
+        assert_msg_critical(
+            known, f'MetalForceFieldManager.shoehorn: no template named '
+            f'{template}. Loaded: {sorted(self.templates)}')
+
+        self.ostream.print_info(
+            'MetalForceFieldManager.shoehorn: not implemented yet; the '
+            'active site is unchanged.')
+        self.ostream.flush()
+
+        return False
 
     def _selection_criteria(self):
         """
@@ -1158,7 +1269,7 @@ class MetalForceFieldManager:
         back incomplete, which would leave part of a site unparameterized.
 
         :param comparison:
-            The findings of compare_to_templates.
+            The last comparison, from compare_active_site.
         :param entry:
             What it measured for the template.
 
@@ -1180,7 +1291,7 @@ class MetalForceFieldManager:
         Holds one template to the criteria, region by region.
 
         :param comparison:
-            The findings of compare_to_templates.
+            The last comparison, from compare_active_site.
         :param entry:
             What it measured for the template.
         :param criteria:
@@ -1222,7 +1333,7 @@ class MetalForceFieldManager:
         Returns what several templates that all pass are ranked on.
 
         :param entry:
-            What compare_to_templates measured for the template.
+            What compare_active_site measured for the template.
 
         :return:
             The measure named by SELECTION_RANKED_ON, or infinity where it was
@@ -1240,67 +1351,6 @@ class MetalForceFieldManager:
             return math.inf
 
         return found[measure]
-
-    def _extract_active_site(self, structure):
-        """
-        Runs the structural half of the builder pipeline on a structure.
-
-        :param structure:
-            The path to a PDB or mmCIF file.
-
-        :return:
-            A dictionary with the topology, the positions, the binding modes
-            and the described active site, whose connectivity comes with it.
-        """
-
-        assert_msg_critical('openmm' in sys.modules,
-                            'MetalForceFieldManager: openmm is required')
-
-        builder = self.builder
-
-        topology, positions = core.load_and_prepare_protein(
-            structure, prepare=self.do_prepare_protein)
-
-        request = core.site_request()
-
-        def derive(topology, positions):
-            return core.suggest_binding_modes(
-                topology,
-                positions,
-                metal_elements=builder.metal_elements,
-                metal_formal_charges=builder.metal_formal_charges,
-                ostream=self.ostream,
-                request=request,
-                **builder.detection_settings())
-
-        binding_modes = derive(topology, positions)
-
-        # the coordination is derived again on the protonated structure
-        # rather than remapped onto it, so its atom indices belong to the
-        # topology the active site is extracted from
-        topology, positions, variants, _ = core.protonate(
-            topology,
-            positions,
-            binding_modes,
-            protonation_overrides=builder.protonation_overrides)
-        request['variants'] = variants
-        binding_modes = derive(topology, positions)
-
-        active_site = core.extract_active_site(
-            topology,
-            positions,
-            binding_modes,
-            cap_bond_length=builder.cap_bond_length,
-            ostream=self.ostream)
-
-        return {
-            'topology': topology,
-            'positions': positions,
-            'binding_modes': binding_modes,
-            'active_site': self._describe(
-                active_site,
-                self._matrix_edges(active_site['connectivity_matrix'])),
-        }
 
     def _mm_relax(self, query):
         """
@@ -1668,12 +1718,7 @@ class MetalForceFieldManager:
             'ic_rmsd': ic_rmsd,
         }
 
-    def _ic_rmsd(self,
-                 template,
-                 mapping,
-                 coordinates,
-                 region,
-                 heavy_only=None):
+    def _ic_rmsd(self, template, mapping, coordinates, region, heavy_only=None):
         """
         Measures the internal coordinate deviations from a template.
 
@@ -1835,9 +1880,8 @@ class MetalForceFieldManager:
 
         # get_metal_keys reads nothing of the active site but the metal
         # indices, and a template knows those from its elements
-        return core.get_metal_keys(
-            template['forcefield'],
-            {'metal_indices': template['metal_indices']})
+        return core.get_metal_keys(template['forcefield'],
+                                   {'metal_indices': template['metal_indices']})
 
     def _template_connectivity(self, template, mapping, active_site):
         """
@@ -1876,7 +1920,8 @@ class MetalForceFieldManager:
         metals = set(active_site['metal_indices'])
 
         assert_msg_critical(
-            {mapping[index] for index in template['metal_indices']} == metals,
+            {mapping[index]
+             for index in template['metal_indices']} == metals,
             'MetalForceFieldManager: the template maps its metal centers onto '
             'atoms of the site that are not metal centers')
 
@@ -1913,8 +1958,7 @@ class MetalForceFieldManager:
             'connectivity_matrix': matrix,
         }
 
-        return self._describe(active_site,
-                              self._matrix_edges(matrix)), changes
+        return self._describe(active_site, self._matrix_edges(matrix)), changes
 
     def _print_forced_bonds(self, template, active_site, changes):
         """
@@ -1946,8 +1990,8 @@ class MetalForceFieldManager:
             f'forcing it onto the template: {len(changes["added"])} metal '
             f'bond(s) added, {len(changes["removed"])} removed.')
 
-        for kind, pairs in (('adding', changes['added']),
-                            ('removing', changes['removed'])):
+        for kind, pairs in (('adding', changes['added']), ('removing',
+                                                           changes['removed'])):
             for first, second in pairs:
                 distance = np.linalg.norm(coordinates[first] -
                                           coordinates[second])
@@ -1965,8 +2009,7 @@ class MetalForceFieldManager:
 
         self.ostream.flush()
 
-    # todo come up with a more descriptive name for this
-    def _transfer(self, template, mapping, active_site):
+    def _build_ff_from_template(self, template, mapping, active_site):
         """
         Builds a force field for an active site out of a template.
 
@@ -2125,8 +2168,7 @@ class MetalForceFieldManager:
 
         bonds, angles = self._metal_keys(template)
         labels = template['molecule'].get_labels()
-        metals = ', '.join(labels[index]
-                           for index in template['metal_indices'])
+        metals = ', '.join(labels[index] for index in template['metal_indices'])
 
         self.ostream.print_blank()
         self.ostream.print_header(f'Template {template["name"]}')
@@ -2170,7 +2212,7 @@ class MetalForceFieldManager:
 
     def _print_comparison(self, results):
         """
-        Prints everything compare_to_templates measured.
+        Prints everything compare_active_site measured.
 
         One table of numbers and one of verdicts per template that could be
         measured, and a closing summary ranking the templates by the region
@@ -2178,7 +2220,7 @@ class MetalForceFieldManager:
         every table.
 
         :param results:
-            The findings of compare_to_templates.
+            The last comparison, from compare_active_site.
         """
 
         active_site = results['active_site']
@@ -2190,8 +2232,8 @@ class MetalForceFieldManager:
         self.ostream.print_header('Comparison against every template')
         self.ostream.print_header(33 * '-')
         self.ostream.print_header(
-            self._param('structure',
-                        Path(results['structure']).name))
+            self._param('source',
+                        Path(results['source']).name))
         self.ostream.print_header(
             self._param('active site atoms',
                         active_site['molecule'].number_of_atoms()))
@@ -2260,7 +2302,7 @@ class MetalForceFieldManager:
         :param name:
             The name of the template.
         :param entry:
-            What compare_to_templates measured for it.
+            What compare_active_site measured for it.
         """
 
         self.ostream.print_blank()
@@ -2338,7 +2380,7 @@ class MetalForceFieldManager:
         Ranks the templates on what a selection is decided by.
 
         :param results:
-            The findings of compare_to_templates.
+            The last comparison, from compare_active_site.
         """
 
         region, ic_type, measure = self.SELECTION_RANKED_ON
@@ -2389,9 +2431,9 @@ class MetalForceFieldManager:
         chosen one is worth.
 
         :param comparison:
-            The findings of compare_to_templates.
+            The last comparison, from compare_active_site.
         :param decision:
-            The decision, as select_template makes it.
+            The decision, as _select_template makes it.
         """
 
         regions = [

@@ -140,6 +140,20 @@ class MMForceFieldGenerator:
         self.force_field_data_extension = None
         self.topology_update_flag = False
 
+        # atom typing settings
+        # GAFF types an atom from what it is bonded to, and a metal bond is
+        # a bond like any other to that perception, so a ligand atom stops
+        # looking like the functional group it belongs to and the covalent
+        # terms around it fall back to a guessed constant. Setting
+        # metal_blind_typing perceives the atom types as if the bonds to
+        # metals were not there, which is what a residue coordinating a
+        # metal is usually meant to behave like. It changes no bond: the
+        # topology, and the metal terms in it, are untouched.
+        self.metal_blind_typing = False
+        # Individual bonds the perception should ignore, as pairs of
+        # 0-based atom indices, for when only some of them should be.
+        self.typing_ignored_bonds = None
+
         # number of rounds for fitting dihedral potentials
         self.n_rounds = 3
 
@@ -202,6 +216,7 @@ class MMForceFieldGenerator:
             'force_field_data': 'str',
             'force_field_data_extension': 'str',
             'n_rounds': 'int',
+            'metal_blind_typing': 'bool',
             'partial_charges': 'seq_fixed',
             'original_top_file': 'str',
             'keep_files': 'bool',
@@ -1240,6 +1255,11 @@ class MMForceFieldGenerator:
         atomtypeidentifier.ostream.mute()
         # set GAFF version
         atomtypeidentifier.gaff_version = gaff_version
+        # perceive the atom types as if the metal bonds were not there. The
+        # identifier keeps the real connectivity for the equivalences and
+        # for what it hands back, so the topology below is unaffected.
+        atomtypeidentifier.metal_blind_typing = self.metal_blind_typing
+        atomtypeidentifier.typing_ignored_bonds = self.typing_ignored_bonds
 
         if self.topology_update_flag:
             self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(

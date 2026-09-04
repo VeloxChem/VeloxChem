@@ -1703,7 +1703,11 @@ def _Molecule_show_grid(molecules,
         The height of a single pane.
     :param show_kwargs:
         Additional keyword arguments that are forwarded to every pane. See
-        Molecule.show for the full list.
+        Molecule.show for the full list. bonds may be given either as a
+        single list of (i, j) tuples, shared by every pane, or as a list of
+        such lists, one per entry in molecules, when the panes hold
+        different structures whose bonds are not perceivable by distance
+        (e.g. metal-ligand bonds).
     """
 
     entries = [
@@ -1713,6 +1717,18 @@ def _Molecule_show_grid(molecules,
 
     assert_msg_critical(
         len(entries) > 0, 'Molecule.show_grid: No molecules provided')
+
+    per_pane_bonds = None
+    bonds = show_kwargs.get('bonds')
+    if bonds is not None and len(bonds) > 0 and not (
+            len(bonds[0]) == 2 and all(
+                isinstance(index, (int, np.integer)) for index in bonds[0])):
+        assert_msg_critical(
+            len(bonds) == len(entries),
+            'Molecule.show_grid: given one list of bonds per entry, there '
+            f'must be {len(entries)} of them, got {len(bonds)}')
+        per_pane_bonds = bonds
+        del show_kwargs['bonds']
 
     if grid is None:
         n_rows, n_cols = 1, len(entries)
@@ -1741,8 +1757,11 @@ def _Molecule_show_grid(molecules,
 
     for i, entry in enumerate(entries):
         pane = (i // n_cols, i % n_cols)
+        pane_kwargs = show_kwargs
+        if per_pane_bonds is not None:
+            pane_kwargs = {**show_kwargs, 'bonds': per_pane_bonds[i]}
         for mol in entry:
-            _add_molecule_to_viewer(mol, viewer, pane, **show_kwargs)
+            _add_molecule_to_viewer(mol, viewer, pane, **pane_kwargs)
 
     viewer.setViewStyle({"style": "outline", "width": 0.05})
     viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})

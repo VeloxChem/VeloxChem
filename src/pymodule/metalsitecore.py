@@ -191,6 +191,15 @@ FORCEFIELD_FILE = 'forcefield.json'
 BETA_CARBON_COMMENT = 'beta carbon'
 CAP_COMMENT = 'capping hydrogen'
 
+# What the generator writes on a term it found no parameters for, and on
+# an atom GAFF could not type at all. A term marked this way carries a
+# flat fallback constant rather than a tabulated or fitted one, which is
+# what _check_atom_types looks for. Match these exactly: 'Guessed from
+# Hessian' is a Seminario fit and 'X-c2-os-X(Guessed for ...)' is a
+# wildcard match, and neither is a missing parameter.
+UNPARAMETERIZED_COMMENT = 'Guessed'
+UFF_TYPE_COMMENT = 'UFF'
+
 # Literature equilibrium metal-ligand distances in nm. The crude pre-QM
 # pass measures its equilibrium values on the input geometry instead;
 # assign this to metal_bond_equilibria to impose these in their place.
@@ -206,6 +215,15 @@ LITERATURE_METAL_BONDS = {
 # carry information until the Hessian is fitted.
 DEFAULT_METAL_BOND_FORCE_CONSTANT = 100000.0
 DEFAULT_METAL_ANGLE_FORCE_CONSTANT = 200.0
+
+# Barrier, in kJ/mol, for the improper that nudges a metal into the plane
+# of a coordinating histidine ring or a bidentate carboxylate
+# (_add_metal_planarity_impropers). Deliberately weak -- of the same order
+# as the generic sp2-planarity improper GAFF itself falls back on
+# (1.1 kcal/mol, see MMForceFieldGenerator.populate_impropers) -- since it
+# is a soft nudge towards the coordination geometry the lone pair actually
+# favours, not a restraint the fit is meant to enforce.
+DEFAULT_METAL_PLANARITY_FORCE_CONSTANT = 4.184
 
 # ----------------------------------------------------------------------
 # utilities
@@ -2531,6 +2549,75 @@ def apply_metal_bonds(active_site, binding_modes):
     return new_active_site
 
 
+def connectivity_from_forcefield(active_site, forcefield):
+    """
+    Rewrites the metal-ligand bonds of an active site from a fitted force
+    field, leaving everything else alone.
+
+    This is what the weak bridge pruning needs: the fit is the only step
+    that can decide a metal contact is not a bond after all, and it
+    decides it on the force field, which it is handed and may edit. The
+    active site it was built from is not, so without this the site goes
+    on claiming a bond the force field no longer has -- and the site's
+    matrix is what show_active_site draws, what the run summary counts,
+    what a later Hessian walks its pairs out of, and what the manager
+    describes a query site by, while a template is described by
+    forcefield.bonds. That last disagreement is the expensive one: a
+    structure would not reproduce the coarse topology of a template built
+    from itself.
+
+    The reverse of apply_metal_bonds and shaped the same way. The
+    covalent bonds are untouched, and so is a metal-metal bond, which is
+    not a ligand contact for the fit to have an opinion about.
+
+    Note that the pruning cannot be undone from here: a rebuild derives
+    the connectivity afresh and a rebuild is what drops the fit, which is
+    the right way round. The one consequence worth knowing is that
+    extract_pairs walked over a pruned matrix no longer covers the
+    dropped pair, so a Hessian computed after a fit holds nothing for it.
+    That is harmless -- the refit gives it no force constant and prunes
+    it again -- but it is why the coverage is not a bug when it is
+    missing.
+
+    :param active_site:
+        The active site to rewrite. Not modified.
+    :param forcefield:
+        The force field to read the metal bonds off.
+
+    :return:
+        A new active site carrying the new connectivity, or the argument
+        itself when nothing changed.
+    """
+
+    metals = set(active_site['metal_indices'])
+
+    matrix = np.array(active_site['connectivity_matrix'], copy=True)
+
+    for metal in metals:
+        for other in range(matrix.shape[0]):
+            if other in metals:
+                continue
+            matrix[metal, other] = 0
+            matrix[other, metal] = 0
+
+    for key in forcefield.bonds:
+        first, second = key
+        if not (metals & {first, second}):
+            continue
+        if first in metals and second in metals:
+            continue
+        matrix[first, second] = 1
+        matrix[second, first] = 1
+
+    if np.array_equal(matrix, np.asarray(active_site['connectivity_matrix'])):
+        return active_site
+
+    new_active_site = dict(active_site)
+    new_active_site['connectivity_matrix'] = matrix
+
+    return new_active_site
+
+
 def derive_site_coordination(topology,
                              geometry,
                              active_site,
@@ -3544,10 +3631,123 @@ def manual_bond_equilibria(active_site, topology, binding_modes):
     }
 
 
+def _add_metal_planarity_impropers(
+        forcefield,
+        active_site,
+        force_constant=DEFAULT_METAL_PLANARITY_FORCE_CONSTANT,
+        ostream=None):
+    """
+    Adds a weak improper nudging each metal into the plane of a
+    coordinating histidine ring or a bidentate carboxylate.
+
+    An imidazole nitrogen's coordinating lone pair, and a carboxylate's
+    two, both sit in the plane of the group they belong to, so a metal
+    they grip belongs there too. Read straight off
+    forcefield.connectivity_matrix -- the final metal-ligand bonding,
+    already pruned of any weak bridge arm when a Hessian was fitted -- so a
+    mu-1,3 carboxylate (one oxygen per metal) never qualifies as bidentate,
+    and a histidine reaching a metal through two ring nitrogens, which
+    _assign_binding_modes already trims to one, is never seen with both.
+
+    The central atom of each improper key is the donor heavy atom itself
+    (the ring nitrogen, or the carboxylate carbon); the ordering of the
+    other three does not matter here, since with periodicity 2 and phase
+    180 degrees the energy is invariant to exchanging any two of them.
+
+    A coordinating, deprotonated ring nitrogen has only two ring carbons
+    as covalent neighbours of its own, so the metal bond is what fills the
+    third slot a substituent hydrogen would otherwise occupy -- and GAFF's
+    own generic sp2-planarity improper (populate_impropers) already picks
+    it up as that slot's atom, over the same four atoms in some other
+    order. Adding a second, differently-ordered term over the same set
+    would double the effective restraint rather than set it, so any
+    existing improper covering the same four atoms is replaced rather than
+    added to.
+
+    :param forcefield:
+        The force field generator to add the impropers to. Modified in
+        place.
+    :param active_site:
+        The active site, for the metal indices and the elements.
+    :param force_constant:
+        The improper barrier, in kJ/mol. Deliberately weak; see
+        DEFAULT_METAL_PLANARITY_FORCE_CONSTANT.
+
+    :return:
+        The number of impropers added, for the caller to report.
+    """
+
+    ostream = _stream(ostream)
+
+    matrix = forcefield.connectivity_matrix
+    elements = active_site['molecule'].get_labels()
+    metals = set(active_site['metal_indices'])
+
+    def neighbors(index):
+        return set(np.where(matrix[index])[0].tolist()) - {index}
+
+    def install(key):
+        # a term already covering the same four atoms in some other order
+        # -- GAFF's own generic sp2-planarity guess can produce exactly
+        # this for a coordinating ring nitrogen -- is replaced rather than
+        # layered under a second one, so the restraint this atom set gets
+        # is the one force_constant names, not the sum of two
+        target = frozenset(key)
+        for existing in [k for k in forcefield.impropers if len(k) == 4]:
+            if frozenset(existing) == target:
+                del forcefield.impropers[existing]
+        forcefield.impropers[key] = {
+            'type': 'Fourier',
+            'barrier': force_constant,
+            'phase': 180.0,
+            'periodicity': 2,
+            'comment': 'metal coordination planarity restraint',
+        }
+
+    added = 0
+
+    for metal in sorted(metals):
+        ligand_atoms = neighbors(metal) - metals
+
+        # coordinating histidine ring nitrogen: bonded to the metal and to
+        # exactly two other heavy atoms, its ring carbons
+        for donor in sorted(ligand_atoms):
+            if elements[donor] != 'N':
+                continue
+            ring_neighbors = sorted(atom for atom in neighbors(donor) -
+                                    metals if elements[atom] != 'H')
+            if len(ring_neighbors) != 2:
+                continue
+            install((donor, ring_neighbors[0], ring_neighbors[1], metal))
+            added += 1
+
+        # bidentate carboxylate: two oxygens on this metal sharing one
+        # covalently bonded carbon
+        oxygens = sorted(atom for atom in ligand_atoms
+                         if elements[atom] == 'O')
+        for i, oxygen_1 in enumerate(oxygens):
+            for oxygen_2 in oxygens[i + 1:]:
+                shared = (neighbors(oxygen_1) & neighbors(oxygen_2)) - metals
+                for carbon in sorted(shared):
+                    if elements[carbon] != 'C':
+                        continue
+                    install((carbon, oxygen_1, oxygen_2, metal))
+                    added += 1
+
+    if added:
+        ostream.print_info(
+            f'Added {added} weak metal coordination planarity improper(s) '
+            f'at {force_constant:.2f} kJ/mol.')
+        ostream.flush()
+
+    return added
+
+
 def build_forcefield(
         active_site,
         hessian=None,
         partial_charges=None,
+        metal_blind_typing=True,
         average_metal_terms=False,
         prune_weak_bridge_bonds=True,
         reparameterize_metal_angles=True,
@@ -3559,7 +3759,9 @@ def build_forcefield(
         metal_bond_equilibria=None,
         protected_bonds=None,
         bond_equilibria=None,
-        weak_bridge_tolerance=0.25):
+        weak_bridge_tolerance=0.25,
+        add_metal_planarity_impropers=True,
+        metal_planarity_force_constant=DEFAULT_METAL_PLANARITY_FORCE_CONSTANT):
     """
     Builds the active site force field and fits the metal terms.
 
@@ -3583,6 +3785,19 @@ def build_forcefield(
         Equilibrium distances in nanometers for individual metal bonds,
         from manual_bond_equilibria. Only the seeded pass reads them: with
         a Hessian the equilibria come from the geometry it was computed on.
+    :param metal_blind_typing:
+        Whether the generator perceives the atom types as if the metal
+        bonds were not there, so that a coordinating residue is typed as
+        the amino acid it is. On by default, since the covalent terms of
+        the residues are what this would otherwise lose; a site whose
+        ligands are genuinely not amino acids may want it off.
+    :param add_metal_planarity_impropers:
+        Whether to add a weak improper nudging each metal into the plane
+        of a coordinating histidine ring or a bidentate carboxylate; see
+        _add_metal_planarity_impropers. Added on both passes -- the seeded
+        one and the fitted one -- since both call this function.
+    :param metal_planarity_force_constant:
+        The barrier of that improper, in kJ/mol.
 
     :return:
         The force field generator.
@@ -3599,9 +3814,18 @@ def build_forcefield(
     n_atoms = molecule.number_of_atoms()
 
     forcefield = MMForceFieldGenerator(comm, ostream)
-    forcefield.connectivity_matrix = np.asarray(
-        active_site['connectivity_matrix'])
+    # copied, not aliased: np.asarray hands back the caller's own array, and
+    # the weak bridge pruning edits the generator's matrix, so sharing it
+    # would have this function quietly rewriting the active site it was
+    # given -- which no core function may do
+    forcefield.connectivity_matrix = np.array(
+        active_site['connectivity_matrix'], copy=True)
     forcefield.topology_update_flag = True
+    # A metal bond is a bond like any other to the GAFF perception, so a
+    # carboxylate oxygen gripping a metal is typed as an ether one and the
+    # covalent terms around it lose their parameters. The bonds are still
+    # made -- only the typing looks past them.
+    forcefield.metal_blind_typing = metal_blind_typing
 
     # the generator shares the output stream of the builder, so muting it
     # has to be balanced before anything of our own is printed
@@ -3679,6 +3903,24 @@ def build_forcefield(
                                angles,
                                hessian,
                                ostream=ostream)
+
+    # after the pruning, so that a mu-1,3 arm just dropped cannot leave a
+    # bidentate improper behind it; outside the Hessian branch, since the
+    # seeded pass wants this nudge just as much as the fitted one does
+    if add_metal_planarity_impropers:
+        _add_metal_planarity_impropers(
+            forcefield,
+            active_site,
+            force_constant=metal_planarity_force_constant,
+            ostream=ostream)
+
+    # after the pruning, so that what is reported is what is handed back,
+    # and outside the Hessian branch, since the typing that puts a term
+    # here is done by create_topology either way
+    _check_atom_types(forcefield,
+                      active_site,
+                      metal_blind_typing=metal_blind_typing,
+                      ostream=ostream)
 
     return forcefield
 
@@ -3859,7 +4101,17 @@ def _prune_weak_bridges(forcefield,
     the pair at an equilibrium the dynamics never restores while its
     angles, torsions and exclusions all still act as though the two were
     bonded. So the bond goes, and with it every angle, torsion and
-    improper that crosses it.
+    improper that crosses it, the entry in the generator's own
+    connectivity matrix and the 1-4 pairs derived from it. The generator
+    is left describing one topology rather than two: a stale matrix would
+    put the bond straight back the next time anything called
+    create_topology on it, and a stale pair list keeps a scaled 1-4
+    interaction for atoms that are no longer 1-4 at all.
+
+    The active site's connectivity is not this function's to rewrite --
+    it must not mutate its arguments -- so a caller that keeps a site
+    beside the force field lifts it across with
+    connectivity_from_forcefield.
 
     Only the longer arms are ever dropped, so a bridging residue can
     never lose the contact it is held by.
@@ -3943,6 +4195,9 @@ def _prune_weak_bridges(forcefield,
             for crossed in found:
                 del table[crossed]
 
+        forcefield.connectivity_matrix[key[0], key[1]] = 0
+        forcefield.connectivity_matrix[key[1], key[0]] = 0
+
         counts = ', '.join(
             f'{len(found)} {name}(s)' for name, found in crossing.items())
         ostream.print_info(
@@ -3950,6 +4205,14 @@ def _prune_weak_bridges(forcefield,
             f'no force constant and is {length:.2f} A long against '
             f'{shortest:.2f} A for the shortest metal bond of the same '
             f'residue. {counts} crossing it were removed with it.')
+
+    # The 1-4 pairs are a function of the connectivity and are not a table
+    # a term can be deleted out of: a pair reached by a second dihedral path
+    # is still 1-4 once this bond is gone, so filtering by key would drop
+    # pairs that must stay. Re-deriving them off the pruned matrix gives
+    # exactly what create_topology would have produced had the bond never
+    # been there, which is the point.
+    *_, forcefield.pairs = forcefield.generate_topology_indices(len(labels))
 
     ostream.flush()
 
@@ -4161,6 +4424,147 @@ def _hessian_covers(hessian, key):
             return False
 
     return True
+
+
+def _check_atom_types(forcefield,
+                      active_site,
+                      metal_blind_typing=True,
+                      ostream=None):
+    """
+    Warns about covalent terms left without parameters.
+
+    GAFF types an atom from what it is bonded to, and a metal bond is a
+    bond like any other to that perception. A carboxylate oxygen that
+    grips a metal stops looking like a carbonyl oxygen and is typed as an
+    ether one, which costs its carbon the carbonyl type in turn, and the
+    combinations that leaves behind are not always in the parameter set.
+    What is missing falls back to a flat constant -- 2.5e5 kJ/mol/nm^2 for
+    a bond, 1000 kJ/mol/rad^2 for an angle -- several times the tabulated
+    values it stands in for, on terms that carry hydrogen bending modes.
+
+    metal_blind_typing is what stops that happening, and is on by
+    default, so what this reports depends on it: with it on, a term in
+    the ligand shell is a gap in the parameter set like any other, and
+    with it off it is the coordination that put it there.
+
+    Nothing downstream repairs these. reparameterize would fit a guessed
+    term by default, but the fit here is restricted to the metal keys and
+    the Hessian behind it to the pairs of the coordination, so a covalent
+    term left flat stays flat.
+
+    Only bonds and angles are looked at, which is the same line
+    reparameterize draws when it picks its own terms: their fallbacks
+    stand several times off the tabulated values they replace, while a
+    guessed improper gets the generic 1.1 kcal/mol every force field uses
+    and says nothing about the typing. Impropers also come out guessed in
+    roughly the same number whatever the coordination does, so counting
+    them would bury the part of the report that varies.
+
+    The report is split by how far a term sits from the metal, because
+    without the blind typing that is what separates the two cures. Inside
+    the ligand shell -- a term holding a ligand atom or a neighbour of one
+    -- the typing follows from the coordination, and it is the
+    coordination that has to change. Outside it the gap is in the
+    parameter set and has nothing to do with the metal.
+
+    Terms are grouped by their atom types rather than listed one by one,
+    since the types are what names the gap and a site can hold a dozen
+    terms saying the same thing.
+
+    :param forcefield:
+        The force field generator, as it will be handed back.
+    :param active_site:
+        The active site, for the indices of the metal centers.
+    :param metal_blind_typing:
+        Whether the types were perceived with the metal bonds ignored,
+        which decides what a term in the ligand shell is evidence of.
+    :param ostream:
+        The output stream.
+    """
+
+    ostream = _stream(ostream)
+
+    metals = set(active_site['metal_indices'])
+    atoms = forcefield.atoms
+
+    neighbours = {}
+    for first, second in forcefield.bonds:
+        neighbours.setdefault(first, set()).add(second)
+        neighbours.setdefault(second, set()).add(first)
+
+    ligands = {
+        index for metal in metals for index in neighbours.get(metal, ())
+    } - metals
+    shell = (ligands | {
+        index for ligand in ligands for index in neighbours.get(ligand, ())
+    }) - metals
+
+    def flat_keys(terms):
+        return [
+            key for key, term in terms.items()
+            if term.get('comment') == UNPARAMETERIZED_COMMENT and
+            not metals & set(key)
+        ]
+
+    flat = [(key, 'bond') for key in flat_keys(forcefield.bonds)]
+    flat += [(key, 'angle') for key in flat_keys(forcefield.angles)]
+
+    untyped = sorted(index for index, atom in atoms.items()
+                     if UFF_TYPE_COMMENT in (atom.get('comment') or ''))
+
+    if not flat and not untyped:
+        return
+
+    def describe(indices):
+        return '-'.join(f'{atoms[index]["name"]}({atoms[index]["type"]})'
+                        for index in indices)
+
+    def report(terms):
+        groups = {}
+        for key, kind in terms:
+            types = '-'.join(atoms[index]['type'] for index in key)
+            groups.setdefault((kind, types), []).append(key)
+
+        # the detail lines go through print_info: print_warning boxes
+        # every line it is given, and a site can put a dozen groups here
+        for (kind, types), keys in sorted(groups.items()):
+            count = f' x{len(keys)}' if len(keys) > 1 else ''
+            ostream.print_info(
+                f'  guessed {kind} {types}{count}, e.g. {describe(keys[0])}')
+
+    if untyped:
+        names = ', '.join(describe([index]) for index in untyped)
+        ostream.print_warning(
+            f'{len(untyped)} atom(s) fell back to UFF because GAFF could '
+            f'not type them at all: {names}.')
+
+    from_metal = [term for term in flat if shell & set(term[0])]
+    elsewhere = [term for term in flat if term not in from_metal]
+
+    if from_metal:
+        if metal_blind_typing:
+            cause = ('These were typed with the metal bonds ignored, so '
+                     'the coordination is not what put them here: the '
+                     'combination is missing from the parameter set.')
+        else:
+            cause = ('The metal bonds are part of what GAFF typed these '
+                     'atoms from, so the coordination is what put them '
+                     'here. Turning metal_blind_typing on types these '
+                     'residues as the amino acids they are.')
+        ostream.print_warning(
+            f'{len(from_metal)} covalent term(s) in the ligand shell have '
+            'no force field parameters and carry a flat guessed constant. '
+            f'{cause} The fit does not repair them.')
+        report(from_metal)
+
+    if elsewhere:
+        ostream.print_warning(
+            f'{len(elsewhere)} covalent term(s) away from the metals also '
+            'carry a guessed constant. Those are gaps in the parameter set '
+            'rather than a consequence of the coordination.')
+        report(elsewhere)
+
+    ostream.flush()
 
 
 # ----------------------------------------------------------------------
