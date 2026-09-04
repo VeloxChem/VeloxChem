@@ -99,10 +99,12 @@ class CSimdThreeCenterElectronRepulsionDriver
     /// @param molecule The molecule to take the atomic coordinates from.
     /// @param basis The molecular basis on a and b sides.
     /// @param aux_basis The auxiliary molecular basis on c side.
+    /// @param threshold The screening threshold of the integrals.
     auto _compute_blocks(CSparseTensor         &tensor,
                          const CMolecule       &molecule,
                          const CMolecularBasis &basis,
-                         const CMolecularBasis &aux_basis) const -> void;
+                         const CMolecularBasis &aux_basis,
+                         const double           threshold) const -> void;
 
 };
 

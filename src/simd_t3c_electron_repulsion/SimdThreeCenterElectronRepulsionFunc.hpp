@@ -76,10 +76,10 @@ namespace simdt3ceri {  // simdt3ceri namespace
 /// atom pairs of the block, which the ordering by interatomic distance and the
 /// bisection of the screening give, so the coordinates and the harmonics of the
 /// block are read over their first npairs columns and no gathering is needed.
-/// @note This is the stub of the skeleton. It writes a value which encodes the
-/// position of every element it is responsible for, so that the layout of the
-/// values blocks and the loops of the driver are checked before the kernels
-/// exist. It is not the integral.
+/// @param threshold The screening threshold of the integrals.
+/// @note Only the combination of three S type functions has a kernel. The others
+/// abort, as a tensor whose blocks were partly computed and partly not would
+/// carry no sign of which of the two any one of its values is.
 auto compute_electron_repulsion(double                         *values,
                                 const size_t                    npairs,
                                 const size_t                    natoms,
@@ -90,7 +90,8 @@ auto compute_electron_repulsion(double                         *values,
                                 const std::vector<CSimdMatrix> &ab_harmonics,
                                 const std::vector<CSimdMatrix> &bc_harmonics,
                                 const CSimdMatrix              &ab_coordinates,
-                                const CSimdMatrix              &bc_coordinates) -> void;
+                                const CSimdMatrix              &bc_coordinates,
+                                const double                    threshold) -> void;
 
 }  // namespace simdt3ceri
 

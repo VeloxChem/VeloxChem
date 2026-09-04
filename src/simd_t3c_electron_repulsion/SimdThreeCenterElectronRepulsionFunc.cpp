@@ -34,6 +34,11 @@
 
 #include "SimdThreeCenterElectronRepulsionFunc.hpp"
 
+#include <string>
+
+#include "ErrorHandler.hpp"
+#include "SimdThreeCenterElectronRepulsionRecSSS.hpp"
+
 namespace simdt3ceri {  // simdt3ceri namespace
 
 auto
@@ -47,38 +52,36 @@ compute_electron_repulsion(double                         *values,
                            const std::vector<CSimdMatrix> &ab_harmonics,
                            const std::vector<CSimdMatrix> &bc_harmonics,
                            const CSimdMatrix              &ab_coordinates,
-                           const CSimdMatrix              &bc_coordinates) -> void
+                           const CSimdMatrix              &bc_coordinates,
+                           const double                    threshold) -> void
 {
-    // NOTE: this is the stub of the skeleton and not the integral. It writes the
-    // position of every element within the values of the combination, so that
-    // the sizes and the offsets the sparsity pattern lays out are checked before
-    // the kernels exist: the values of a combination must read 0, 1, 2 and so on
-    // over its whole extent once every atom on c side has been visited, which no
-    // two combinations can do if their storage overlaps or is sized wrongly.
+    const auto la = a_function.get_angular_momentum();
 
-    const auto ncomps_a = static_cast<size_t>(2 * a_function.get_angular_momentum() + 1);
+    const auto lb = b_function.get_angular_momentum();
 
-    const auto ncomps_b = static_cast<size_t>(2 * b_function.get_angular_momentum() + 1);
+    const auto lc = c_function.get_angular_momentum();
 
-    const auto ncomps_c = static_cast<size_t>(2 * c_function.get_angular_momentum() + 1);
+    // NOTE: the kernel of three S type functions needs no solid harmonics, as the
+    // harmonics of angular momentum zero are one for every atom pair.
 
-    for (size_t ma = 0; ma < ncomps_a; ma++)
+    if ((la == 0) && (lb == 0) && (lc == 0))
     {
-        for (size_t mb = 0; mb < ncomps_b; mb++)
-        {
-            for (size_t mc = 0; mc < ncomps_c; mc++)
-            {
-                const auto offset = (((ma * ncomps_b + mb) * ncomps_c + mc) * natoms + iatom) * npairs;
+        compute_sss_electron_repulsion(
+            values, npairs, natoms, iatom, a_function, b_function, c_function, ab_coordinates, bc_coordinates, threshold);
 
-                auto *prim = values + offset;
-
-                for (size_t k = 0; k < npairs; k++)
-                {
-                    prim[k] = static_cast<double>(offset + k);
-                }
-            }
-        }
+        return;
     }
+
+    // NOTE: the remaining combinations of angular momenta have no kernel yet. The
+    // driver aborts on them rather than leaving their values undefined or filling
+    // them with something which is not the integral: a tensor whose blocks were
+    // partly computed and partly not would carry no sign of which of the two any
+    // one of its values is.
+
+    errors::assertMsgCritical(false,
+                              std::string("SimdThreeCenterElectronRepulsionFunc.compute_electron_repulsion: Combination of angular momenta ") +
+                                  std::to_string(la) + std::string(", ") + std::to_string(lb) + std::string(" and ") + std::to_string(lc) +
+                                  std::string(" is not implemented"));
 }
 
 }  // namespace simdt3ceri

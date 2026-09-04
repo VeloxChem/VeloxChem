@@ -62,7 +62,7 @@ CSimdThreeCenterElectronRepulsionDriver::compute(const CMolecule       &molecule
 
     tensor.allocate();
 
-    _compute_blocks(tensor, molecule, basis, aux_basis);
+    _compute_blocks(tensor, molecule, basis, aux_basis, threshold);
 
     return tensor;
 }
@@ -79,7 +79,7 @@ CSimdThreeCenterElectronRepulsionDriver::compute(const CMolecule        &molecul
 
     tensor.allocate();
 
-    _compute_blocks(tensor, molecule, basis, aux_basis);
+    _compute_blocks(tensor, molecule, basis, aux_basis, threshold);
 
     return tensor;
 }
@@ -88,7 +88,8 @@ auto
 CSimdThreeCenterElectronRepulsionDriver::_compute_blocks(CSparseTensor         &tensor,
                                                          const CMolecule       &molecule,
                                                          const CMolecularBasis &basis,
-                                                         const CMolecularBasis &aux_basis) const -> void
+                                                         const CMolecularBasis &aux_basis,
+                                                         const double           threshold) const -> void
 {
     // NOTE: the blocks are independent, as each of them forms its own
     // coordinates and solid harmonics and writes the values of its own block,
@@ -250,7 +251,8 @@ CSimdThreeCenterElectronRepulsionDriver::_compute_blocks(CSparseTensor         &
                                                                ab_harmonics,
                                                                bc_harmonics,
                                                                ab_coordinates,
-                                                               bc_coordinates);
+                                                               bc_coordinates,
+                                                               threshold);
                     }
                 }
             }
