@@ -36,7 +36,6 @@
 #define SimdOverlapRecIP_hpp
 
 #include <cstddef>
-#include <vector>
 
 #include "BasisFunction.hpp"
 #include "SimdMatrix.hpp"
@@ -51,22 +50,20 @@ namespace simdovl {  // simdovl namespace
 /// surviving the screening of the combination of basis functions.
 /// @param bra The basis function on bra side.
 /// @param ket The basis function on ket side.
-/// @param harmonics The solid harmonics of the vectors between the atoms of the
-/// atom pairs, with the element of index l - 1 holding those of angular momentum l.
-/// @param coordinates The coordinates of the atom pairs, as seven rows ordered by
-/// ascending interatomic distance, the last of which holds the squared distance
-/// of the atom pair.
+/// @param coordinates The coordinates of the atom pairs, as ten rows ordered by
+/// ascending interatomic distance, holding the vector between the atoms in rows
+/// six to eight and its squared length in row nine.
 /// @param threshold The screening threshold of the integrals.
-/// @note The integrals are the overlap of the S type functions times a sum of terms,
-/// each of which is a power of the exponents times a solid harmonic of the vector
-/// between the atoms times a power of their squared distance.
-auto compute_ip_overlap(double                         *values,
-                   const size_t                    nvalues,
-                   const CBasisFunction           &bra,
-                   const CBasisFunction           &ket,
-                   const std::vector<CSimdMatrix> &harmonics,
-                   const CSimdMatrix              &coordinates,
-                   const double                    threshold) -> void;
+/// @note The integrals carry 2 terms, one for each order of the harmonic which
+/// survives the integration over the Gaussian product center. Only their
+/// prefactors depend on the pair of primitives, so the buffer holds those alone and
+/// the integrals of the angular components are formed straight into the values.
+auto compute_ip_overlap(double               *values,
+                        const size_t          nvalues,
+                        const CBasisFunction &bra,
+                        const CBasisFunction &ket,
+                        const CSimdMatrix    &coordinates,
+                        const double          threshold) -> void;
 
 }  // namespace simdovl
 

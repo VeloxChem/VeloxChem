@@ -35,8 +35,9 @@
 #include "SimdOverlapRecDD.hpp"
 
 #include <algorithm>
-#include <ranges>
 #include <cmath>
+#include <cstddef>
+#include <ranges>
 #include <string>
 
 #include "ErrorHandler.hpp"
@@ -44,28 +45,22 @@
 #include "ScreeningFunc.hpp"
 #include "SimdAlign.hpp"
 #include "SimdDimensions.hpp"
+#include "SimdPrimitives.hpp"
 
 namespace simdovl {  // simdovl namespace
 
 auto
-compute_dd_overlap(double                         *values,
-                   const size_t                    nvalues,
-                   const CBasisFunction           &bra,
-                   const CBasisFunction           &ket,
-                   const std::vector<CSimdMatrix> &harmonics,
-                   const CSimdMatrix              &coordinates,
-                   const double                    threshold) -> void
+compute_dd_overlap(double               *values,
+                   const size_t          nvalues,
+                   const CBasisFunction &bra,
+                   const CBasisFunction &ket,
+                   const CSimdMatrix    &coordinates,
+                   const double          threshold) -> void
 {
     if ((bra.get_angular_momentum() != 2) || (ket.get_angular_momentum() != 2))
     {
         errors::assertMsgCritical(
             false, std::string("SimdOverlapRecDD.compute_dd_overlap: Basis functions must be of angular momenta two and two"));
-    }
-
-    if (harmonics.size() < 4)
-    {
-        errors::assertMsgCritical(
-            false, std::string("SimdOverlapRecDD.compute_dd_overlap: Harmonics must reach angular momentum four"));
     }
 
     if (nvalues > coordinates.number_of_columns())
@@ -76,19 +71,7 @@ compute_dd_overlap(double                         *values,
 
     if (nvalues == 0) return;
 
-    const auto &a_exps = bra.exponents();
-
-    const auto &b_exps = ket.exponents();
-
-    const auto &a_norms = bra.normalization_factors();
-
-    const auto &b_norms = ket.normalization_factors();
-
-    const auto nprim_a = a_exps.size();
-
-    const auto nprim_b = b_exps.size();
-
-    const auto nprims = nprim_a * nprim_b;
+    const auto nprims = bra.exponents().size() * ket.exponents().size();
 
     // NOTE: the pairs of primitives are screened with the threshold of the
     // integrals divided by their number, as their contributions accumulate into
@@ -97,106 +80,84 @@ compute_dd_overlap(double                         *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, threshold / static_cast<double>(nprims));
 
-    // NOTE: the buffer spans the atom pairs reached by the pair of primitives
-    // reaching furthest, which is searched for rather than assumed. The
-    // primitives are sorted by descending exponent, but the bound of a pair of
-    // primitives carries their prefactor as well as their decay, so a tighter
-    // pair with a larger prefactor reaches further than a more diffuse pair with
-    // a smaller one, and the last pair is not always the furthest reaching.
+    // NOTE: the buffer holds the contracted prefactors of the terms alone, as the
+    // integrals of the angular components are formed straight into the values and
+    // are not written a second time.
 
-    const auto nmax = *std::ranges::max_element(dimensions);
+    auto buffer = simdfunc::make_primitive_buffer(dimensions, 3);
 
-    if (nmax == 0)
+    if (buffer.number_of_columns() == 0)
     {
         std::fill(values, values + 25 * nvalues, 0.0);
 
         return;
     }
 
-    // NOTE: the buffer holds the contracted prefactors of the terms alone, as the
-    // integrals of the angular components are formed straight into the values and
-    // are not written a second time.
-
-    auto buffer = CSimdMatrix(3, nmax);
+    const auto nmax = buffer.number_of_columns();
 
     auto *pe_0 = buffer.data(0);
     auto *pe_1 = buffer.data(1);
     auto *pe_2 = buffer.data(2);
 
-    std::fill(pe_0, pe_0 + nmax, 0.0);
-    std::fill(pe_1, pe_1 + nmax, 0.0);
-    std::fill(pe_2, pe_2 + nmax, 0.0);
+    // NOTE: the components of the vector between the atoms and its squared length
+    // are carried by the coordinates, so the angular half below reads rows which
+    // are already in place.
 
-    const auto *ab_2 = coordinates.data(6);
+    const auto *ab_x = coordinates.data(6);
+    const auto *ab_y = coordinates.data(7);
+    const auto *ab_z = coordinates.data(8);
+
+    const auto *ab_2 = coordinates.data(9);
 
     constexpr auto fpi = mathconst::pi_value();
 
     // accumulate the prefactor of each term over the pairs of primitives
 
-    for (size_t i = 0; i < nprim_a; i++)
-    {
-        const auto aexp = a_exps[i];
+    simdfunc::accumulate_primitives(bra, ket, dimensions, [&](const simdfunc::CPrimitivePair &pair) {
+        const auto ncols = pair.ncols;
 
-        const auto anorm = a_norms[i];
+        const auto fexp = pair.aexp + pair.bexp;
 
-        for (size_t j = 0; j < nprim_b; j++)
-        {
-            const auto ncols = dimensions[i * nprim_b + j];
+        const auto fmu = pair.aexp * pair.bexp / fexp;
 
-            if (ncols == 0) continue;
+        const auto fovl = fpi / fexp;
 
-            const auto bexp = b_exps[j];
+        const auto fbase = pair.anorm * pair.bnorm * fovl * std::sqrt(fovl);
 
-            const auto fexp = aexp + bexp;
+        // NOTE: the Gaussian product center is displaced from the atom on bra side
+        // by fal times the vector between the atoms and from the atom on ket side by
+        // fbe times it, and fh is the second moment the integration over that center
+        // leaves behind.
 
-            const auto fmu = aexp * bexp / fexp;
+        const auto fal = -pair.bexp / fexp;
 
-            const auto fovl = fpi / fexp;
+        const auto fbe = pair.aexp / fexp;
 
-            const auto fbase = anorm * b_norms[j] * fovl * std::sqrt(fovl);
+        const auto fh = 0.5 / fexp;
 
-            const auto f_0 = fbase * fmu / fexp / fexp;
+        const auto f_0 = fbase * fal * fal * fbe * fbe;
 
-            const auto f_1 = fbase * fmu * fmu / fexp / fexp;
+        const auto f_1 = fbase * fal * fbe * fh;
 
-            const auto f_2 = fbase / fexp / fexp;
+        const auto f_2 = fbase * fh * fh;
 
-            // NOTE: the exponential depends on the pair of primitives alone, so it is
-            // evaluated once and shared by the prefactors of all terms.
+        // NOTE: the exponential depends on the pair of primitives alone, so it is
+        // evaluated once and shared by the prefactors of all terms.
 
 #pragma omp simd aligned(pe_0, pe_1, pe_2, ab_2 : simd::cache_line_size())
-            for (size_t k = 0; k < ncols; k++)
-            {
-                const auto fss = std::exp(-fmu * ab_2[k]);
+        for (size_t k = 0; k < ncols; k++)
+        {
+            const auto fss = std::exp(-fmu * ab_2[k]);
 
-                pe_0[k] += f_0 * fss;
-                pe_1[k] += f_1 * fss;
-                pe_2[k] += f_2 * fss;
-            }
+            pe_0[k] += f_0 * fss;
+            pe_1[k] += f_1 * fss;
+            pe_2[k] += f_2 * fss;
         }
-    }
+    });
 
-    // NOTE: the geometry of a term is a solid harmonic of the vector between the
-    // atoms times a power of their squared distance.
-
-    const auto *ph2_m2 = harmonics[1].data(0);
-    const auto *ph2_m1 = harmonics[1].data(1);
-    const auto *ph2_0 = harmonics[1].data(2);
-    const auto *ph2_p1 = harmonics[1].data(3);
-    const auto *ph2_p2 = harmonics[1].data(4);
-    const auto *ph4_m4 = harmonics[3].data(0);
-    const auto *ph4_m3 = harmonics[3].data(1);
-    const auto *ph4_m2 = harmonics[3].data(2);
-    const auto *ph4_m1 = harmonics[3].data(3);
-    const auto *ph4_0 = harmonics[3].data(4);
-    const auto *ph4_p1 = harmonics[3].data(5);
-    const auto *ph4_p2 = harmonics[3].data(6);
-    const auto *ph4_p3 = harmonics[3].data(7);
-    const auto *ph4_p4 = harmonics[3].data(8);
-
-    // NOTE: the rows of the values are not aligned, as they start at the offset
-    // of this combination of basis functions in the values block, so they are kept
-    // out of the aligned clauses below.
+    // NOTE: the rows of the values are not aligned, as they start at the offset of
+    // this combination of basis functions in the values block, so they are kept out
+    // of the aligned clauses below.
 
     auto *pc_0 = values + 0 * nvalues;
     auto *pc_1 = values + 1 * nvalues;
@@ -214,107 +175,86 @@ compute_dd_overlap(double                         *values,
     auto *pc_13 = values + 19 * nvalues;
     auto *pc_14 = values + 24 * nvalues;
 
-    // NOTE: the factors of the terms depend on the angular momenta alone, so they
-    // are formed once for the whole matrix instead of once for every atom pair.
+    // NOTE: the components are formed in 4 loops, as the vectorizer runs out
+    // of registers with all of them in one. Only the prefactors and the vector
+    // between the atoms are loaded by more than one loop.
 
-    const auto f_1 = 1.0;
-    const auto f_3_35 = 3.0 / 35.0;
-    const auto fs_9_35 = std::sqrt(9.0 / 35.0);
-    const auto f_2_7 = 2.0 / 7.0;
-    const auto f_1_5 = 1.0 / 5.0;
-    const auto f_3_4 = 0.75;
-    const auto fs_3_4 = std::sqrt(0.75);
-    const auto fs_9_490 = std::sqrt(9.0 / 490.0);
-    const auto fs_9_70 = std::sqrt(9.0 / 70.0);
-    const auto fs_3_49 = std::sqrt(3.0 / 49.0);
-    const auto fs_27_245 = std::sqrt(27.0 / 245.0);
-    const auto f_1_2 = 0.5;
-    const auto f_12_35 = 12.0 / 35.0;
-    const auto fs_36_245 = std::sqrt(36.0 / 245.0);
-    const auto f_1_7 = 1.0 / 7.0;
-    const auto fs_54_245 = std::sqrt(54.0 / 245.0);
-    const auto f_18_35 = 18.0 / 35.0;
-
-    // NOTE: the rows are formed in 2 loops, as the vectorizer runs out of
-    // registers with all 15 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_m2, ph2_m1, ph2_0, ph2_p1, ph2_p2, ph4_m4, ph4_m3, ph4_m2, ph4_m1, ph4_0, ph4_p1, ph4_p2, ph4_p3, ph4_p4, ab_2 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, ab_x, ab_y, ab_z : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
+        const auto x = ab_x[k];
+        const auto y = ab_y[k];
+        const auto z = ab_z[k];
+
         const auto e_0 = pe_0[k];
         const auto e_1 = pe_1[k];
         const auto e_2 = pe_2[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
+        pc_0[k] = e_0 * (3.0 * x * x * y * y) + e_1 * (3.0 * x * x + 3.0 * y * y) + e_2 * (3.0);
 
-        const auto h2_m2 = ph2_m2[k];
-        const auto h2_m1 = ph2_m1[k];
-        const auto h2_0 = ph2_0[k];
-        const auto h2_p1 = ph2_p1[k];
-        const auto h2_p2 = ph2_p2[k];
-        const auto h4_m4 = ph4_m4[k];
-        const auto h4_m3 = ph4_m3[k];
-        const auto h4_m2 = ph4_m2[k];
-        const auto h4_m1 = ph4_m1[k];
-        const auto h4_0 = ph4_0[k];
-        const auto h4_p1 = ph4_p1[k];
-        const auto h4_p2 = ph4_p2[k];
-        const auto h4_p3 = ph4_p3[k];
-        const auto h4_p4 = ph4_p4[k];
+        pc_1[k] = e_0 * (3.0 * x * y * y * z) + e_1 * (3.0 * x * z);
 
-        pc_0[k] = e_0 * (f_1 * h2_0 - f_1 * r_2) + e_1 * (f_3_35 * h4_0 - fs_9_35 * h4_p4 - f_2_7 * r_2 * h2_0 + f_1_5 * r_4) + f_3_4 * e_2;
+        pc_2[k] = e_0 * (-std::sqrt(0.75) * x * x * x * y - std::sqrt(0.75) * x * y * y * y + std::sqrt(3.0) * x * y * z * z) + e_1 * (-std::sqrt(12.0) * x * y);
 
-        pc_1[k] = -fs_3_4 * e_0 * h2_p1 + e_1 * (-fs_9_490 * h4_p1 - fs_9_70 * h4_p3 + fs_3_49 * r_2 * h2_p1);
-
-        pc_2[k] = f_1 * e_0 * h2_m2 + e_1 * (fs_27_245 * h4_m2 - f_2_7 * r_2 * h2_m2);
-
-        pc_3[k] = -fs_3_4 * e_0 * h2_m1 + e_1 * (fs_9_70 * h4_m3 - fs_9_490 * h4_m1 + fs_3_49 * r_2 * h2_m1);
-
-        pc_4[k] = fs_9_35 * e_1 * h4_m4;
-
-        pc_5[k] = e_0 * (-f_1_2 * h2_0 + fs_3_4 * h2_p2 - f_1 * r_2) + e_1 * (-f_12_35 * h4_0 - fs_36_245 * h4_p2 + f_1_7 * r_2 * h2_0 - fs_3_49 * r_2 * h2_p2 + f_1_5 * r_4) + f_3_4 * e_2;
-
-        pc_6[k] = -f_1_2 * e_0 * h2_m1 + e_1 * (fs_54_245 * h4_m1 + f_1_7 * r_2 * h2_m1);
-
-        pc_7[k] = -fs_3_4 * e_0 * h2_m2 + e_1 * (fs_36_245 * h4_m2 + fs_3_49 * r_2 * h2_m2);
-
-        pc_8[k] = fs_3_4 * e_0 * h2_m1 + e_1 * (fs_9_70 * h4_m3 + fs_9_490 * h4_m1 - fs_3_49 * r_2 * h2_m1);
-
-        pc_9[k] = e_0 * (-f_1 * h2_0 - f_1 * r_2) + e_1 * (f_18_35 * h4_0 + f_2_7 * r_2 * h2_0 + f_1_5 * r_4) + f_3_4 * e_2;
-
-        pc_10[k] = -f_1_2 * e_0 * h2_p1 + e_1 * (fs_54_245 * h4_p1 + f_1_7 * r_2 * h2_p1);
-
-        pc_11[k] = f_1 * e_0 * h2_p2 + e_1 * (fs_27_245 * h4_p2 - f_2_7 * r_2 * h2_p2);
+        pc_3[k] = e_0 * (3.0 * x * x * y * z) + e_1 * (3.0 * y * z);
     }
 
-    // NOTE: the rows are formed in 2 loops, as the vectorizer runs out of
-    // registers with all 15 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, ph2_0, ph2_p1, ph2_p2, ph4_0, ph4_p1, ph4_p2, ph4_p3, ph4_p4, ab_2 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, ab_x, ab_y, ab_z : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
+        const auto x = ab_x[k];
+        const auto y = ab_y[k];
+        const auto z = ab_z[k];
+
         const auto e_0 = pe_0[k];
         const auto e_1 = pe_1[k];
         const auto e_2 = pe_2[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
+        pc_4[k] = e_0 * (1.5 * x * x * x * y - 1.5 * x * y * y * y);
 
-        const auto h2_0 = ph2_0[k];
-        const auto h2_p1 = ph2_p1[k];
-        const auto h2_p2 = ph2_p2[k];
-        const auto h4_0 = ph4_0[k];
-        const auto h4_p1 = ph4_p1[k];
-        const auto h4_p2 = ph4_p2[k];
-        const auto h4_p3 = ph4_p3[k];
-        const auto h4_p4 = ph4_p4[k];
+        pc_5[k] = e_0 * (3.0 * y * y * z * z) + e_1 * (3.0 * y * y + 3.0 * z * z) + e_2 * (3.0);
 
-        pc_12[k] = e_0 * (-f_1_2 * h2_0 - fs_3_4 * h2_p2 - f_1 * r_2) + e_1 * (-f_12_35 * h4_0 + fs_36_245 * h4_p2 + f_1_7 * r_2 * h2_0 + fs_3_49 * r_2 * h2_p2 + f_1_5 * r_4) + f_3_4 * e_2;
+        pc_6[k] = e_0 * (-std::sqrt(0.75) * x * x * y * z - std::sqrt(0.75) * y * y * y * z + std::sqrt(3.0) * y * z * z * z) + e_1 * (std::sqrt(3.0) * y * z);
 
-        pc_13[k] = -fs_3_4 * e_0 * h2_p1 + e_1 * (-fs_9_490 * h4_p1 + fs_9_70 * h4_p3 + fs_3_49 * r_2 * h2_p1);
+        pc_7[k] = e_0 * (3.0 * x * y * z * z) + e_1 * (3.0 * x * y);
+    }
 
-        pc_14[k] = e_0 * (f_1 * h2_0 - f_1 * r_2) + e_1 * (f_3_35 * h4_0 + fs_9_35 * h4_p4 - f_2_7 * r_2 * h2_0 + f_1_5 * r_4) + f_3_4 * e_2;
+#pragma omp simd aligned(pe_0, pe_1, pe_2, ab_x, ab_y, ab_z : simd::cache_line_size())
+    for (size_t k = 0; k < nmax; k++)
+    {
+        const auto x = ab_x[k];
+        const auto y = ab_y[k];
+        const auto z = ab_z[k];
+
+        const auto e_0 = pe_0[k];
+        const auto e_1 = pe_1[k];
+        const auto e_2 = pe_2[k];
+
+        pc_8[k] = e_0 * (1.5 * x * x * y * z - 1.5 * y * y * y * z) + e_1 * (-3.0 * y * z);
+
+        pc_9[k] = e_0 * (0.25 * x * x * x * x + 0.5 * x * x * y * y - x * x * z * z + 0.25 * y * y * y * y - y * y * z * z + z * z * z * z) + e_1 * (x * x + y * y + 4.0 * z * z) + e_2 * (3.0);
+
+        pc_10[k] = e_0 * (-std::sqrt(0.75) * x * x * x * z - std::sqrt(0.75) * x * y * y * z + std::sqrt(3.0) * x * z * z * z) + e_1 * (std::sqrt(3.0) * x * z);
+
+        pc_11[k] = e_0 * (-std::sqrt(0.1875) * x * x * x * x + std::sqrt(0.75) * x * x * z * z + std::sqrt(0.1875) * y * y * y * y - std::sqrt(0.75) * y * y * z * z) + e_1 * (-std::sqrt(3.0) * x * x + std::sqrt(3.0) * y * y);
+    }
+
+#pragma omp simd aligned(pe_0, pe_1, pe_2, ab_x, ab_y, ab_z : simd::cache_line_size())
+    for (size_t k = 0; k < nmax; k++)
+    {
+        const auto x = ab_x[k];
+        const auto y = ab_y[k];
+        const auto z = ab_z[k];
+
+        const auto e_0 = pe_0[k];
+        const auto e_1 = pe_1[k];
+        const auto e_2 = pe_2[k];
+
+        pc_12[k] = e_0 * (3.0 * x * x * z * z) + e_1 * (3.0 * x * x + 3.0 * z * z) + e_2 * (3.0);
+
+        pc_13[k] = e_0 * (1.5 * x * x * x * z - 1.5 * x * y * y * z) + e_1 * (3.0 * x * z);
+
+        pc_14[k] = e_0 * (0.75 * x * x * x * x - 1.5 * x * x * y * y + 0.75 * y * y * y * y) + e_1 * (3.0 * x * x + 3.0 * y * y) + e_2 * (3.0);
     }
 
     // NOTE: the values of a combination of angular components are stored as one

@@ -40,6 +40,42 @@
 #include "SimdOverlapRecGS.hpp"
 #include "SimdOverlapRecHS.hpp"
 #include "SimdOverlapRecIS.hpp"
+#include "SimdOverlapRecPP.hpp"
+#include "SimdOverlapRecPD.hpp"
+#include "SimdOverlapRecPF.hpp"
+#include "SimdOverlapRecDP.hpp"
+#include "SimdOverlapRecDD.hpp"
+#include "SimdOverlapRecDF.hpp"
+#include "SimdOverlapRecFP.hpp"
+#include "SimdOverlapRecFD.hpp"
+#include "SimdOverlapRecFF.hpp"
+#include "SimdOverlapRecDG.hpp"
+#include "SimdOverlapRecDH.hpp"
+#include "SimdOverlapRecDI.hpp"
+#include "SimdOverlapRecFG.hpp"
+#include "SimdOverlapRecFH.hpp"
+#include "SimdOverlapRecFI.hpp"
+#include "SimdOverlapRecGD.hpp"
+#include "SimdOverlapRecGF.hpp"
+#include "SimdOverlapRecGG.hpp"
+#include "SimdOverlapRecGH.hpp"
+#include "SimdOverlapRecGI.hpp"
+#include "SimdOverlapRecGP.hpp"
+#include "SimdOverlapRecHD.hpp"
+#include "SimdOverlapRecHF.hpp"
+#include "SimdOverlapRecHG.hpp"
+#include "SimdOverlapRecHH.hpp"
+#include "SimdOverlapRecHI.hpp"
+#include "SimdOverlapRecHP.hpp"
+#include "SimdOverlapRecID.hpp"
+#include "SimdOverlapRecIF.hpp"
+#include "SimdOverlapRecIG.hpp"
+#include "SimdOverlapRecIH.hpp"
+#include "SimdOverlapRecII.hpp"
+#include "SimdOverlapRecIP.hpp"
+#include "SimdOverlapRecPG.hpp"
+#include "SimdOverlapRecPH.hpp"
+#include "SimdOverlapRecPI.hpp"
 #include "SimdOverlapRecDS.hpp"
 #include "SimdOverlapRecFS.hpp"
 #include "SimdOverlapRecPS.hpp"
@@ -164,10 +200,263 @@ compute_overlap(double               *values,
         return;
     }
 
-    // NOTE: the kernels of the higher angular momenta took the solid harmonics of
-    // the vectors between the atoms, which the driver no longer forms, and are
-    // not dispatched while they are redesigned. The combination stops here rather
-    // than leaving the values of the sparsity pattern unwritten.
+    if ((lbra == 1) && (lket == 1))
+    {
+        compute_pp_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 1) && (lket == 2))
+    {
+        compute_pd_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 1) && (lket == 3))
+    {
+        compute_pf_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 2) && (lket == 1))
+    {
+        compute_dp_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 2) && (lket == 2))
+    {
+        compute_dd_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 2) && (lket == 3))
+    {
+        compute_df_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 3) && (lket == 1))
+    {
+        compute_fp_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 3) && (lket == 2))
+    {
+        compute_fd_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 3) && (lket == 3))
+    {
+        compute_ff_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 1) && (lket == 4))
+    {
+        compute_pg_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 1) && (lket == 5))
+    {
+        compute_ph_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 1) && (lket == 6))
+    {
+        compute_pi_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 2) && (lket == 4))
+    {
+        compute_dg_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 2) && (lket == 5))
+    {
+        compute_dh_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 2) && (lket == 6))
+    {
+        compute_di_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 3) && (lket == 4))
+    {
+        compute_fg_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 3) && (lket == 5))
+    {
+        compute_fh_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 3) && (lket == 6))
+    {
+        compute_fi_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 4) && (lket == 1))
+    {
+        compute_gp_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 4) && (lket == 2))
+    {
+        compute_gd_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 4) && (lket == 3))
+    {
+        compute_gf_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 4) && (lket == 4))
+    {
+        compute_gg_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 4) && (lket == 5))
+    {
+        compute_gh_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 4) && (lket == 6))
+    {
+        compute_gi_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 5) && (lket == 1))
+    {
+        compute_hp_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 5) && (lket == 2))
+    {
+        compute_hd_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 5) && (lket == 3))
+    {
+        compute_hf_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 5) && (lket == 4))
+    {
+        compute_hg_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 5) && (lket == 5))
+    {
+        compute_hh_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 5) && (lket == 6))
+    {
+        compute_hi_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 6) && (lket == 1))
+    {
+        compute_ip_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 6) && (lket == 2))
+    {
+        compute_id_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 6) && (lket == 3))
+    {
+        compute_if_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 6) && (lket == 4))
+    {
+        compute_ig_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 6) && (lket == 5))
+    {
+        compute_ih_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 6) && (lket == 6))
+    {
+        compute_ii_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    // NOTE: every combination of angular momenta up to six on both sides is
+    // dispatched above, and the sparsity patterns carry no combination beyond that,
+    // so this is reached only if a basis of a higher angular momentum is handed in.
+    // The combination stops here rather than leaving the values of the sparsity
+    // pattern unwritten.
 
     errors::assertMsgCritical(
         false, std::string("SimdOverlapFunc.compute_overlap: Overlap integrals of the requested angular momenta are not implemented"));

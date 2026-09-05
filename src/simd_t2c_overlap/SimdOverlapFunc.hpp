@@ -122,9 +122,9 @@ one_center_overlap(const CBasisFunction &bra, const CBasisFunction &ket) -> doub
 /// @note The values of the combination of basis functions are stored as one row
 /// of nvalues columns for each of the (2 l_bra + 1) (2 l_ket + 1) spherical
 /// components, with the components of the bra side running slowest.
-/// @note Only the combination of two S type functions is dispatched while the
-/// kernels of the higher angular momenta are redesigned. Every other combination
-/// stops with an error rather than returning values it did not compute.
+/// @note Every combination of angular momenta up to six on both sides is
+/// dispatched. A combination beyond that stops with an error rather than
+/// returning values it did not compute.
 auto compute_overlap(double               *values,
                      const size_t          nvalues,
                      const CBasisFunction &bra,

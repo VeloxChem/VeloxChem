@@ -35,8 +35,9 @@
 #include "SimdOverlapRecGG.hpp"
 
 #include <algorithm>
-#include <ranges>
 #include <cmath>
+#include <cstddef>
+#include <ranges>
 #include <string>
 
 #include "ErrorHandler.hpp"
@@ -44,28 +45,22 @@
 #include "ScreeningFunc.hpp"
 #include "SimdAlign.hpp"
 #include "SimdDimensions.hpp"
+#include "SimdPrimitives.hpp"
 
 namespace simdovl {  // simdovl namespace
 
 auto
-compute_gg_overlap(double                         *values,
-                   const size_t                    nvalues,
-                   const CBasisFunction           &bra,
-                   const CBasisFunction           &ket,
-                   const std::vector<CSimdMatrix> &harmonics,
-                   const CSimdMatrix              &coordinates,
-                   const double                    threshold) -> void
+compute_gg_overlap(double               *values,
+                   const size_t          nvalues,
+                   const CBasisFunction &bra,
+                   const CBasisFunction &ket,
+                   const CSimdMatrix    &coordinates,
+                   const double          threshold) -> void
 {
     if ((bra.get_angular_momentum() != 4) || (ket.get_angular_momentum() != 4))
     {
         errors::assertMsgCritical(
             false, std::string("SimdOverlapRecGG.compute_gg_overlap: Basis functions must be of angular momenta four and four"));
-    }
-
-    if (harmonics.size() < 8)
-    {
-        errors::assertMsgCritical(
-            false, std::string("SimdOverlapRecGG.compute_gg_overlap: Harmonics must reach angular momentum eight"));
     }
 
     if (nvalues > coordinates.number_of_columns())
@@ -76,19 +71,7 @@ compute_gg_overlap(double                         *values,
 
     if (nvalues == 0) return;
 
-    const auto &a_exps = bra.exponents();
-
-    const auto &b_exps = ket.exponents();
-
-    const auto &a_norms = bra.normalization_factors();
-
-    const auto &b_norms = ket.normalization_factors();
-
-    const auto nprim_a = a_exps.size();
-
-    const auto nprim_b = b_exps.size();
-
-    const auto nprims = nprim_a * nprim_b;
+    const auto nprims = bra.exponents().size() * ket.exponents().size();
 
     // NOTE: the pairs of primitives are screened with the threshold of the
     // integrals divided by their number, as their contributions accumulate into
@@ -97,27 +80,20 @@ compute_gg_overlap(double                         *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, threshold / static_cast<double>(nprims));
 
-    // NOTE: the buffer spans the atom pairs reached by the pair of primitives
-    // reaching furthest, which is searched for rather than assumed. The
-    // primitives are sorted by descending exponent, but the bound of a pair of
-    // primitives carries their prefactor as well as their decay, so a tighter
-    // pair with a larger prefactor reaches further than a more diffuse pair with
-    // a smaller one, and the last pair is not always the furthest reaching.
+    // NOTE: the buffer holds the contracted prefactors of the terms alone, as the
+    // integrals of the angular components are formed straight into the values and
+    // are not written a second time.
 
-    const auto nmax = *std::ranges::max_element(dimensions);
+    auto buffer = simdfunc::make_primitive_buffer(dimensions, 5);
 
-    if (nmax == 0)
+    if (buffer.number_of_columns() == 0)
     {
         std::fill(values, values + 81 * nvalues, 0.0);
 
         return;
     }
 
-    // NOTE: the buffer holds the contracted prefactors of the terms alone, as the
-    // integrals of the angular components are formed straight into the values and
-    // are not written a second time.
-
-    auto buffer = CSimdMatrix(5, nmax);
+    const auto nmax = buffer.number_of_columns();
 
     auto *pe_0 = buffer.data(0);
     auto *pe_1 = buffer.data(1);
@@ -125,118 +101,71 @@ compute_gg_overlap(double                         *values,
     auto *pe_3 = buffer.data(3);
     auto *pe_4 = buffer.data(4);
 
-    std::fill(pe_0, pe_0 + nmax, 0.0);
-    std::fill(pe_1, pe_1 + nmax, 0.0);
-    std::fill(pe_2, pe_2 + nmax, 0.0);
-    std::fill(pe_3, pe_3 + nmax, 0.0);
-    std::fill(pe_4, pe_4 + nmax, 0.0);
+    // NOTE: the components of the vector between the atoms and its squared length
+    // are carried by the coordinates, so the angular half below reads rows which
+    // are already in place.
 
-    const auto *ab_2 = coordinates.data(6);
+    const auto *ab_x = coordinates.data(6);
+    const auto *ab_y = coordinates.data(7);
+    const auto *ab_z = coordinates.data(8);
+
+    const auto *ab_2 = coordinates.data(9);
 
     constexpr auto fpi = mathconst::pi_value();
 
     // accumulate the prefactor of each term over the pairs of primitives
 
-    for (size_t i = 0; i < nprim_a; i++)
-    {
-        const auto aexp = a_exps[i];
+    simdfunc::accumulate_primitives(bra, ket, dimensions, [&](const simdfunc::CPrimitivePair &pair) {
+        const auto ncols = pair.ncols;
 
-        const auto anorm = a_norms[i];
+        const auto fexp = pair.aexp + pair.bexp;
 
-        for (size_t j = 0; j < nprim_b; j++)
-        {
-            const auto ncols = dimensions[i * nprim_b + j];
+        const auto fmu = pair.aexp * pair.bexp / fexp;
 
-            if (ncols == 0) continue;
+        const auto fovl = fpi / fexp;
 
-            const auto bexp = b_exps[j];
+        const auto fbase = pair.anorm * pair.bnorm * fovl * std::sqrt(fovl);
 
-            const auto fexp = aexp + bexp;
+        // NOTE: the Gaussian product center is displaced from the atom on bra side
+        // by fal times the vector between the atoms and from the atom on ket side by
+        // fbe times it, and fh is the second moment the integration over that center
+        // leaves behind.
 
-            const auto fmu = aexp * bexp / fexp;
+        const auto fal = -pair.bexp / fexp;
 
-            const auto fovl = fpi / fexp;
+        const auto fbe = pair.aexp / fexp;
 
-            const auto fbase = anorm * b_norms[j] * fovl * std::sqrt(fovl);
+        const auto fh = 0.5 / fexp;
 
-            const auto f_0 = fbase * fmu / fexp / fexp / fexp / fexp;
+        const auto f_0 = fbase * fal * fal * fal * fal * fbe * fbe * fbe * fbe;
 
-            const auto f_1 = fbase * fmu * fmu / fexp / fexp / fexp / fexp;
+        const auto f_1 = fbase * fal * fal * fal * fbe * fbe * fbe * fh;
 
-            const auto f_2 = fbase * fmu * fmu * fmu / fexp / fexp / fexp / fexp;
+        const auto f_2 = fbase * fal * fal * fbe * fbe * fh * fh;
 
-            const auto f_3 = fbase * fmu * fmu * fmu * fmu / fexp / fexp / fexp / fexp;
+        const auto f_3 = fbase * fal * fbe * fh * fh * fh;
 
-            const auto f_4 = fbase / fexp / fexp / fexp / fexp;
+        const auto f_4 = fbase * fh * fh * fh * fh;
 
-            // NOTE: the exponential depends on the pair of primitives alone, so it is
-            // evaluated once and shared by the prefactors of all terms.
+        // NOTE: the exponential depends on the pair of primitives alone, so it is
+        // evaluated once and shared by the prefactors of all terms.
 
 #pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, pe_4, ab_2 : simd::cache_line_size())
-            for (size_t k = 0; k < ncols; k++)
-            {
-                const auto fss = std::exp(-fmu * ab_2[k]);
+        for (size_t k = 0; k < ncols; k++)
+        {
+            const auto fss = std::exp(-fmu * ab_2[k]);
 
-                pe_0[k] += f_0 * fss;
-                pe_1[k] += f_1 * fss;
-                pe_2[k] += f_2 * fss;
-                pe_3[k] += f_3 * fss;
-                pe_4[k] += f_4 * fss;
-            }
+            pe_0[k] += f_0 * fss;
+            pe_1[k] += f_1 * fss;
+            pe_2[k] += f_2 * fss;
+            pe_3[k] += f_3 * fss;
+            pe_4[k] += f_4 * fss;
         }
-    }
+    });
 
-    // NOTE: the geometry of a term is a solid harmonic of the vector between the
-    // atoms times a power of their squared distance.
-
-    const auto *ph2_m2 = harmonics[1].data(0);
-    const auto *ph2_m1 = harmonics[1].data(1);
-    const auto *ph2_0 = harmonics[1].data(2);
-    const auto *ph2_p1 = harmonics[1].data(3);
-    const auto *ph2_p2 = harmonics[1].data(4);
-    const auto *ph4_m4 = harmonics[3].data(0);
-    const auto *ph4_m3 = harmonics[3].data(1);
-    const auto *ph4_m2 = harmonics[3].data(2);
-    const auto *ph4_m1 = harmonics[3].data(3);
-    const auto *ph4_0 = harmonics[3].data(4);
-    const auto *ph4_p1 = harmonics[3].data(5);
-    const auto *ph4_p2 = harmonics[3].data(6);
-    const auto *ph4_p3 = harmonics[3].data(7);
-    const auto *ph4_p4 = harmonics[3].data(8);
-    const auto *ph6_m6 = harmonics[5].data(0);
-    const auto *ph6_m5 = harmonics[5].data(1);
-    const auto *ph6_m4 = harmonics[5].data(2);
-    const auto *ph6_m3 = harmonics[5].data(3);
-    const auto *ph6_m2 = harmonics[5].data(4);
-    const auto *ph6_m1 = harmonics[5].data(5);
-    const auto *ph6_0 = harmonics[5].data(6);
-    const auto *ph6_p1 = harmonics[5].data(7);
-    const auto *ph6_p2 = harmonics[5].data(8);
-    const auto *ph6_p3 = harmonics[5].data(9);
-    const auto *ph6_p4 = harmonics[5].data(10);
-    const auto *ph6_p5 = harmonics[5].data(11);
-    const auto *ph6_p6 = harmonics[5].data(12);
-    const auto *ph8_m8 = harmonics[7].data(0);
-    const auto *ph8_m7 = harmonics[7].data(1);
-    const auto *ph8_m6 = harmonics[7].data(2);
-    const auto *ph8_m5 = harmonics[7].data(3);
-    const auto *ph8_m4 = harmonics[7].data(4);
-    const auto *ph8_m3 = harmonics[7].data(5);
-    const auto *ph8_m2 = harmonics[7].data(6);
-    const auto *ph8_m1 = harmonics[7].data(7);
-    const auto *ph8_0 = harmonics[7].data(8);
-    const auto *ph8_p1 = harmonics[7].data(9);
-    const auto *ph8_p2 = harmonics[7].data(10);
-    const auto *ph8_p3 = harmonics[7].data(11);
-    const auto *ph8_p4 = harmonics[7].data(12);
-    const auto *ph8_p5 = harmonics[7].data(13);
-    const auto *ph8_p6 = harmonics[7].data(14);
-    const auto *ph8_p7 = harmonics[7].data(15);
-    const auto *ph8_p8 = harmonics[7].data(16);
-
-    // NOTE: the rows of the values are not aligned, as they start at the offset
-    // of this combination of basis functions in the values block, so they are kept
-    // out of the aligned clauses below.
+    // NOTE: the rows of the values are not aligned, as they start at the offset of
+    // this combination of basis functions in the values block, so they are kept out
+    // of the aligned clauses below.
 
     auto *pc_0 = values + 0 * nvalues;
     auto *pc_1 = values + 1 * nvalues;
@@ -284,878 +213,262 @@ compute_gg_overlap(double                         *values,
     auto *pc_43 = values + 71 * nvalues;
     auto *pc_44 = values + 80 * nvalues;
 
-    // NOTE: the factors of the terms depend on the angular momenta alone, so they
-    // are formed once for the whole matrix instead of once for every atom pair.
+    // NOTE: the components are formed in 12 loops, as the vectorizer runs out
+    // of registers with all of them in one. Only the prefactors and the vector
+    // between the atoms are loaded by more than one loop.
 
-    const auto f_35_2 = 17.5;
-    const auto f_9_2 = 4.5;
-    const auto f_15 = 15.0;
-    const auto f_21_2 = 10.5;
-    const auto f_10_33 = 10.0 / 33.0;
-    const auto f_18_11 = 18.0 / 11.0;
-    const auto f_10_3 = 10.0 / 3.0;
-    const auto f_2 = 2.0;
-    const auto f_7_1287 = 7.0 / 1287.0;
-    const auto fs_245_1287 = std::sqrt(245.0 / 1287.0);
-    const auto f_4_99 = 4.0 / 99.0;
-    const auto f_18_143 = 18.0 / 143.0;
-    const auto f_20_99 = 20.0 / 99.0;
-    const auto f_1_9 = 1.0 / 9.0;
-    const auto f_105_16 = 6.5625;
-    const auto fs_3675_32 = std::sqrt(114.84375);
-    const auto fs_405_16 = std::sqrt(25.3125);
-    const auto fs_675_8 = std::sqrt(84.375);
-    const auto fs_175_726 = std::sqrt(175.0 / 726.0);
-    const auto fs_405_121 = std::sqrt(405.0 / 121.0);
-    const auto fs_25_6 = std::sqrt(25.0 / 6.0);
-    const auto fs_49_368082 = std::sqrt(49.0 / 368082.0);
-    const auto fs_245_2574 = std::sqrt(245.0 / 2574.0);
-    const auto fs_14_3267 = std::sqrt(14.0 / 3267.0);
-    const auto fs_405_20449 = std::sqrt(405.0 / 20449.0);
-    const auto fs_50_3267 = std::sqrt(50.0 / 3267.0);
-    const auto fs_525_16 = std::sqrt(32.8125);
-    const auto fs_3645_112 = std::sqrt(3645.0 / 112.0);
-    const auto fs_675_28 = std::sqrt(675.0 / 28.0);
-    const auto fs_250_363 = std::sqrt(250.0 / 363.0);
-    const auto fs_50_33 = std::sqrt(50.0 / 33.0);
-    const auto fs_3645_847 = std::sqrt(3645.0 / 847.0);
-    const auto fs_25_21 = std::sqrt(25.0 / 21.0);
-    const auto fs_245_368082 = std::sqrt(245.0 / 368082.0);
-    const auto fs_343_7722 = std::sqrt(343.0 / 7722.0);
-    const auto fs_40_3267 = std::sqrt(40.0 / 3267.0);
-    const auto fs_8_297 = std::sqrt(8.0 / 297.0);
-    const auto fs_3645_143143 = std::sqrt(3645.0 / 143143.0);
-    const auto fs_100_22869 = std::sqrt(100.0 / 22869.0);
-    const auto fs_500_363 = std::sqrt(500.0 / 363.0);
-    const auto fs_25_11 = std::sqrt(25.0 / 11.0);
-    const auto fs_245_100386 = std::sqrt(245.0 / 100386.0);
-    const auto fs_49_2574 = std::sqrt(49.0 / 2574.0);
-    const auto fs_80_3267 = std::sqrt(80.0 / 3267.0);
-    const auto fs_4_99 = std::sqrt(4.0 / 99.0);
-    const auto fs_500_121 = std::sqrt(500.0 / 121.0);
-    const auto fs_245_16731 = std::sqrt(245.0 / 16731.0);
-    const auto fs_80_1089 = std::sqrt(80.0 / 1089.0);
-    const auto f_35_8 = 4.375;
-    const auto f_27_4 = 6.75;
-    const auto f_15_4 = 3.75;
-    const auto f_85_66 = 85.0 / 66.0;
-    const auto fs_175_66 = std::sqrt(175.0 / 66.0);
-    const auto f_27_11 = 27.0 / 11.0;
-    const auto f_5_6 = 5.0 / 6.0;
-    const auto f_56_1287 = 56.0 / 1287.0;
-    const auto fs_392_3861 = std::sqrt(392.0 / 3861.0);
-    const auto f_17_99 = 17.0 / 99.0;
-    const auto fs_14_297 = std::sqrt(14.0 / 297.0);
-    const auto f_27_143 = 27.0 / 143.0;
-    const auto f_5_99 = 5.0 / 99.0;
-    const auto fs_13125_128 = std::sqrt(102.5390625);
-    const auto fs_405_112 = std::sqrt(405.0 / 112.0);
-    const auto fs_16875_224 = std::sqrt(16875.0 / 224.0);
-    const auto fs_4225_2904 = std::sqrt(4225.0 / 2904.0);
-    const auto fs_25_44 = std::sqrt(25.0 / 44.0);
-    const auto fs_405_847 = std::sqrt(405.0 / 847.0);
-    const auto fs_625_168 = std::sqrt(625.0 / 168.0);
-    const auto fs_686_184041 = std::sqrt(686.0 / 184041.0);
-    const auto fs_98_1287 = std::sqrt(98.0 / 1287.0);
-    const auto fs_169_6534 = std::sqrt(169.0 / 6534.0);
-    const auto fs_1_99 = std::sqrt(1.0 / 99.0);
-    const auto fs_405_143143 = std::sqrt(405.0 / 143143.0);
-    const auto fs_625_45738 = std::sqrt(625.0 / 45738.0);
-    const auto fs_4725_64 = std::sqrt(73.828125);
-    const auto fs_6075_112 = std::sqrt(6075.0 / 112.0);
-    const auto fs_375_242 = std::sqrt(375.0 / 242.0);
-    const auto f_5_22 = 5.0 / 22.0;
-    const auto fs_75_28 = std::sqrt(75.0 / 28.0);
-    const auto fs_1960_184041 = std::sqrt(1960.0 / 184041.0);
-    const auto fs_784_16731 = std::sqrt(784.0 / 16731.0);
-    const auto fs_10_363 = std::sqrt(10.0 / 363.0);
-    const auto f_1_33 = 1.0 / 33.0;
-    const auto fs_25_2541 = std::sqrt(25.0 / 2541.0);
-    const auto fs_625_363 = std::sqrt(625.0 / 363.0);
-    const auto fs_2450_50193 = std::sqrt(2450.0 / 50193.0);
-    const auto fs_100_3267 = std::sqrt(100.0 / 3267.0);
-    const auto f_5 = 5.0;
-    const auto f_99_28 = 99.0 / 28.0;
-    const auto f_30_7 = 30.0 / 7.0;
-    const auto f_5_3 = 5.0 / 3.0;
-    const auto fs_175_121 = std::sqrt(175.0 / 121.0);
-    const auto f_9_7 = 9.0 / 7.0;
-    const auto f_20_21 = 20.0 / 21.0;
-    const auto f_196_1287 = 196.0 / 1287.0;
-    const auto fs_1372_16731 = std::sqrt(1372.0 / 16731.0);
-    const auto f_2_9 = 2.0 / 9.0;
-    const auto fs_28_1089 = std::sqrt(28.0 / 1089.0);
-    const auto f_9_91 = 9.0 / 91.0;
-    const auto f_40_693 = 40.0 / 693.0;
-    const auto fs_6075_128 = std::sqrt(47.4609375);
-    const auto fs_3645_196 = std::sqrt(3645.0 / 196.0);
-    const auto fs_54675_1568 = std::sqrt(54675.0 / 1568.0);
-    const auto fs_525_968 = std::sqrt(525.0 / 968.0);
-    const auto fs_875_1452 = std::sqrt(875.0 / 1452.0);
-    const auto fs_14580_5929 = std::sqrt(14580.0 / 5929.0);
-    const auto fs_675_392 = std::sqrt(675.0 / 392.0);
-    const auto fs_4802_184041 = std::sqrt(4802.0 / 184041.0);
-    const auto fs_3430_50193 = std::sqrt(3430.0 / 50193.0);
-    const auto fs_7_726 = std::sqrt(7.0 / 726.0);
-    const auto fs_35_3267 = std::sqrt(35.0 / 3267.0);
-    const auto fs_14580_1002001 = std::sqrt(14580.0 / 1002001.0);
-    const auto fs_75_11858 = std::sqrt(75.0 / 11858.0);
-    const auto fs_3375_16 = std::sqrt(210.9375);
-    const auto fs_30375_196 = std::sqrt(30375.0 / 196.0);
-    const auto fs_375_49 = std::sqrt(375.0 / 49.0);
-    const auto fs_17150_184041 = std::sqrt(17150.0 / 184041.0);
-    const auto fs_500_17787 = std::sqrt(500.0 / 17787.0);
-    const auto f_85_8 = 10.625;
-    const auto fs_1875_16 = std::sqrt(117.1875);
-    const auto f_81_28 = 81.0 / 28.0;
-    const auto f_255_28 = 255.0 / 28.0;
-    const auto fs_16875_196 = std::sqrt(16875.0 / 196.0);
-    const auto f_5_66 = 5.0 / 66.0;
-    const auto fs_875_726 = std::sqrt(875.0 / 726.0);
-    const auto f_81_77 = 81.0 / 77.0;
-    const auto f_85_42 = 85.0 / 42.0;
-    const auto fs_625_147 = std::sqrt(625.0 / 147.0);
-    const auto f_392_1287 = 392.0 / 1287.0;
-    const auto fs_13720_184041 = std::sqrt(13720.0 / 184041.0);
-    const auto f_1_99 = 1.0 / 99.0;
-    const auto fs_70_3267 = std::sqrt(70.0 / 3267.0);
-    const auto f_81_1001 = 81.0 / 1001.0;
-    const auto f_85_693 = 85.0 / 693.0;
-    const auto fs_2500_160083 = std::sqrt(2500.0 / 160083.0);
-    const auto fs_375_32 = std::sqrt(11.71875);
-    const auto fs_3375_392 = std::sqrt(3375.0 / 392.0);
-    const auto fs_125_294 = std::sqrt(125.0 / 294.0);
-    const auto fs_24010_184041 = std::sqrt(24010.0 / 184041.0);
-    const auto fs_250_160083 = std::sqrt(250.0 / 160083.0);
-    const auto f_25_2 = 12.5;
-    const auto f_81_14 = 81.0 / 14.0;
-    const auto f_75_7 = 75.0 / 7.0;
-    const auto f_50_33 = 50.0 / 33.0;
-    const auto f_162_77 = 162.0 / 77.0;
-    const auto f_50_21 = 50.0 / 21.0;
-    const auto f_490_1287 = 490.0 / 1287.0;
-    const auto f_162_1001 = 162.0 / 1001.0;
-    const auto f_100_693 = 100.0 / 693.0;
-
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, pe_4, ph2_0, ph2_p1, ph4_0, ph4_p1, ph6_0, ph6_p1, ph8_0, ph8_p1, ph8_p7, ph8_p8, ab_2 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, pe_4, ab_x, ab_y, ab_z : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
+        const auto x = ab_x[k];
+        const auto y = ab_y[k];
+        const auto z = ab_z[k];
+
         const auto e_0 = pe_0[k];
         const auto e_1 = pe_1[k];
         const auto e_2 = pe_2[k];
         const auto e_3 = pe_3[k];
         const auto e_4 = pe_4[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
-        const auto r_8 = r_6 * r_2;
+        pc_0[k] = e_0 * (8.75 * x * x * x * x * x * x * y * y - 17.5 * x * x * x * x * y * y * y * y + 8.75 * x * x * y * y * y * y * y * y) + e_1 * (8.75 * x * x * x * x * x * x + 26.25 * x * x * x * x * y * y + 26.25 * x * x * y * y * y * y + 8.75 * y * y * y * y * y * y) + e_2 * (78.75 * x * x * x * x + 157.5 * x * x * y * y + 78.75 * y * y * y * y) + e_3 * (210.0 * x * x + 210.0 * y * y) + e_4 * (105.0);
 
-        const auto h2_0 = ph2_0[k];
-        const auto h2_p1 = ph2_p1[k];
-        const auto h4_0 = ph4_0[k];
-        const auto h4_p1 = ph4_p1[k];
-        const auto h6_0 = ph6_0[k];
-        const auto h6_p1 = ph6_p1[k];
-        const auto h8_0 = ph8_0[k];
-        const auto h8_p1 = ph8_p1[k];
-        const auto h8_p7 = ph8_p7[k];
-        const auto h8_p8 = ph8_p8[k];
+        pc_1[k] = e_0 * (std::sqrt(344.53125) * x * x * x * x * x * y * y * z - std::sqrt(612.5) * x * x * x * y * y * y * y * z + std::sqrt(38.28125) * x * y * y * y * y * y * y * z) + e_1 * (std::sqrt(344.53125) * x * x * x * x * x * z + std::sqrt(1378.125) * x * x * x * y * y * z + std::sqrt(344.53125) * x * y * y * y * y * z) + e_2 * (std::sqrt(12403.125) * x * x * x * z + std::sqrt(12403.125) * x * y * y * z) + e_3 * (std::sqrt(22050.0) * x * z);
 
-        pc_0[k] = e_0 * (f_35_2 * h2_0 - f_35_2 * r_2) + e_1 * (f_9_2 * h4_0 - f_15 * r_2 * h2_0 + f_21_2 * r_4) + e_2 * (f_10_33 * h6_0 - f_18_11 * r_2 * h4_0 + f_10_3 * r_4 * h2_0 - f_2 * r_6) + e_3 * (f_7_1287 * h8_0 - fs_245_1287 * h8_p8 - f_4_99 * r_2 * h6_0 + f_18_143 * r_4 * h4_0 - f_20_99 * r_6 * h2_0 + f_1_9 * r_8) + f_105_16 * e_4;
+        pc_2[k] = e_0 * (-std::sqrt(10.9375) * x * x * x * x * x * x * y * y + std::sqrt(393.75) * x * x * x * x * y * y * z * z + std::sqrt(10.9375) * x * x * y * y * y * y * y * y - std::sqrt(393.75) * x * x * y * y * y * y * z * z) + e_1 * (-std::sqrt(10.9375) * x * x * x * x * x * x - std::sqrt(885.9375) * x * x * x * x * y * y + std::sqrt(393.75) * x * x * x * x * z * z + std::sqrt(885.9375) * x * x * y * y * y * y + std::sqrt(10.9375) * y * y * y * y * y * y - std::sqrt(393.75) * y * y * y * y * z * z) + e_2 * (-std::sqrt(885.9375) * x * x * x * x + std::sqrt(3543.75) * x * x * z * z + std::sqrt(885.9375) * y * y * y * y - std::sqrt(3543.75) * y * y * z * z) + e_3 * (-std::sqrt(1575.0) * x * x + std::sqrt(1575.0) * y * y);
 
-        pc_1[k] = -fs_3675_32 * e_0 * h2_p1 + e_1 * (-fs_405_16 * h4_p1 + fs_675_8 * r_2 * h2_p1) + e_2 * (-fs_175_726 * h6_p1 + fs_405_121 * r_2 * h4_p1 - fs_25_6 * r_4 * h2_p1) + e_3 * (-fs_49_368082 * h8_p1 - fs_245_2574 * h8_p7 + fs_14_3267 * r_2 * h6_p1 - fs_405_20449 * r_4 * h4_p1 + fs_50_3267 * r_6 * h2_p1);
+        pc_3[k] = e_0 * (-std::sqrt(49.21875) * x * x * x * x * x * y * y * z + std::sqrt(87.5) * x * x * x * y * y * z * z * z + std::sqrt(49.21875) * x * y * y * y * y * y * y * z - std::sqrt(87.5) * x * y * y * y * y * z * z * z) + e_1 * (-std::sqrt(49.21875) * x * x * x * x * x * z - std::sqrt(1771.875) * x * x * x * y * y * z + std::sqrt(87.5) * x * x * x * z * z * z + std::sqrt(5955.46875) * x * y * y * y * y * z - std::sqrt(787.5) * x * y * y * z * z * z) + e_2 * (-std::sqrt(1771.875) * x * x * x * z + std::sqrt(15946.875) * x * y * y * z);
     }
 
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, ph2_p2, ph4_p2, ph4_p3, ph6_p2, ph6_p3, ph6_p5, ph6_p6, ph8_p2, ph8_p3, ph8_p5, ph8_p6, ab_2 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, ab_x, ab_y, ab_z : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
+        const auto x = ab_x[k];
+        const auto y = ab_y[k];
+        const auto z = ab_z[k];
+
         const auto e_0 = pe_0[k];
         const auto e_1 = pe_1[k];
         const auto e_2 = pe_2[k];
         const auto e_3 = pe_3[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
+        pc_4[k] = e_0 * (std::sqrt(1.23046875) * x * x * x * x * x * x * x * y + std::sqrt(1.23046875) * x * x * x * x * x * y * y * y - std::sqrt(78.75) * x * x * x * x * x * y * z * z - std::sqrt(1.23046875) * x * x * x * y * y * y * y * y + std::sqrt(8.75) * x * x * x * y * z * z * z * z - std::sqrt(1.23046875) * x * y * y * y * y * y * y * y + std::sqrt(78.75) * x * y * y * y * y * y * z * z - std::sqrt(8.75) * x * y * y * y * z * z * z * z) + e_1 * (std::sqrt(315.0) * x * x * x * x * x * y - std::sqrt(5040.0) * x * x * x * y * z * z - std::sqrt(315.0) * x * y * y * y * y * y + std::sqrt(5040.0) * x * y * y * y * z * z) + e_2 * (std::sqrt(2835.0) * x * x * x * y - std::sqrt(2835.0) * x * y * y * y);
 
-        const auto h2_p2 = ph2_p2[k];
-        const auto h4_p2 = ph4_p2[k];
-        const auto h4_p3 = ph4_p3[k];
-        const auto h6_p2 = ph6_p2[k];
-        const auto h6_p3 = ph6_p3[k];
-        const auto h6_p5 = ph6_p5[k];
-        const auto h6_p6 = ph6_p6[k];
-        const auto h8_p2 = ph8_p2[k];
-        const auto h8_p3 = ph8_p3[k];
-        const auto h8_p5 = ph8_p5[k];
-        const auto h8_p6 = ph8_p6[k];
+        pc_5[k] = e_0 * (-std::sqrt(49.21875) * x * x * x * x * x * x * y * z + std::sqrt(87.5) * x * x * x * x * y * z * z * z + std::sqrt(49.21875) * x * x * y * y * y * y * y * z - std::sqrt(87.5) * x * x * y * y * y * z * z * z) + e_1 * (-std::sqrt(5955.46875) * x * x * x * x * y * z + std::sqrt(1771.875) * x * x * y * y * y * z + std::sqrt(787.5) * x * x * y * z * z * z + std::sqrt(49.21875) * y * y * y * y * y * z - std::sqrt(87.5) * y * y * y * z * z * z) + e_2 * (-std::sqrt(15946.875) * x * x * y * z + std::sqrt(1771.875) * y * y * y * z);
 
-        pc_2[k] = fs_525_16 * e_0 * h2_p2 + e_1 * (fs_3645_112 * h4_p2 - fs_675_28 * r_2 * h2_p2) + e_2 * (fs_250_363 * h6_p2 - fs_50_33 * h6_p6 - fs_3645_847 * r_2 * h4_p2 + fs_25_21 * r_4 * h2_p2) + e_3 * (fs_245_368082 * h8_p2 - fs_343_7722 * h8_p6 - fs_40_3267 * r_2 * h6_p2 + fs_8_297 * r_2 * h6_p6 + fs_3645_143143 * r_4 * h4_p2 - fs_100_22869 * r_6 * h2_p2);
+        pc_6[k] = e_0 * (-std::sqrt(2.734375) * x * x * x * x * x * x * x * y + std::sqrt(2.734375) * x * x * x * x * x * y * y * y + std::sqrt(98.4375) * x * x * x * x * x * y * z * z + std::sqrt(2.734375) * x * x * x * y * y * y * y * y - std::sqrt(393.75) * x * x * x * y * y * y * z * z - std::sqrt(2.734375) * x * y * y * y * y * y * y * y + std::sqrt(98.4375) * x * y * y * y * y * y * z * z) + e_1 * (-std::sqrt(393.75) * x * x * x * x * x * y + std::sqrt(175.0) * x * x * x * y * y * y + std::sqrt(1575.0) * x * x * x * y * z * z - std::sqrt(393.75) * x * y * y * y * y * y + std::sqrt(1575.0) * x * y * y * y * z * z) + e_2 * (-std::sqrt(3543.75) * x * x * x * y - std::sqrt(3543.75) * x * y * y * y + std::sqrt(14175.0) * x * y * z * z) + e_3 * (-std::sqrt(6300.0) * x * y);
 
-        pc_3[k] = -fs_405_16 * e_1 * h4_p3 + e_2 * (-fs_500_363 * h6_p3 - fs_25_11 * h6_p5 + fs_405_121 * r_2 * h4_p3) + e_3 * (-fs_245_100386 * h8_p3 - fs_49_2574 * h8_p5 + fs_80_3267 * r_2 * h6_p3 + fs_4_99 * r_2 * h6_p5 - fs_405_20449 * r_4 * h4_p3);
+        pc_7[k] = e_0 * (std::sqrt(38.28125) * x * x * x * x * x * x * y * z - std::sqrt(612.5) * x * x * x * x * y * y * y * z + std::sqrt(344.53125) * x * x * y * y * y * y * y * z) + e_1 * (std::sqrt(344.53125) * x * x * x * x * y * z + std::sqrt(1378.125) * x * x * y * y * y * z + std::sqrt(344.53125) * y * y * y * y * y * z) + e_2 * (std::sqrt(12403.125) * x * x * y * z + std::sqrt(12403.125) * y * y * y * z) + e_3 * (std::sqrt(22050.0) * y * z);
     }
 
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_1, pe_2, pe_3, ph4_m4, ph4_m3, ph6_m5, ph6_m4, ph6_m3, ph8_m5, ph8_m4, ph8_m3, ab_2 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, pe_4, ab_x, ab_y, ab_z : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
-        const auto e_1 = pe_1[k];
-        const auto e_2 = pe_2[k];
-        const auto e_3 = pe_3[k];
+        const auto x = ab_x[k];
+        const auto y = ab_y[k];
+        const auto z = ab_z[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-
-        const auto h4_m4 = ph4_m4[k];
-        const auto h4_m3 = ph4_m3[k];
-        const auto h6_m5 = ph6_m5[k];
-        const auto h6_m4 = ph6_m4[k];
-        const auto h6_m3 = ph6_m3[k];
-        const auto h8_m5 = ph8_m5[k];
-        const auto h8_m4 = ph8_m4[k];
-        const auto h8_m3 = ph8_m3[k];
-
-        pc_4[k] = f_9_2 * e_1 * h4_m4 + e_2 * (fs_500_121 * h6_m4 - f_18_11 * r_2 * h4_m4) + e_3 * (fs_245_16731 * h8_m4 - fs_80_1089 * r_2 * h6_m4 + f_18_143 * r_4 * h4_m4);
-
-        pc_5[k] = -fs_405_16 * e_1 * h4_m3 + e_2 * (fs_25_11 * h6_m5 - fs_500_363 * h6_m3 + fs_405_121 * r_2 * h4_m3) + e_3 * (fs_49_2574 * h8_m5 - fs_245_100386 * h8_m3 - fs_4_99 * r_2 * h6_m5 + fs_80_3267 * r_2 * h6_m3 - fs_405_20449 * r_4 * h4_m3);
-    }
-
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, ph2_m2, ph2_m1, ph4_m2, ph4_m1, ph6_m6, ph6_m2, ph6_m1, ph8_m8, ph8_m7, ph8_m6, ph8_m2, ph8_m1, ab_2 : simd::cache_line_size())
-    for (size_t k = 0; k < nmax; k++)
-    {
-        const auto e_0 = pe_0[k];
-        const auto e_1 = pe_1[k];
-        const auto e_2 = pe_2[k];
-        const auto e_3 = pe_3[k];
-
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
-
-        const auto h2_m2 = ph2_m2[k];
-        const auto h2_m1 = ph2_m1[k];
-        const auto h4_m2 = ph4_m2[k];
-        const auto h4_m1 = ph4_m1[k];
-        const auto h6_m6 = ph6_m6[k];
-        const auto h6_m2 = ph6_m2[k];
-        const auto h6_m1 = ph6_m1[k];
-        const auto h8_m8 = ph8_m8[k];
-        const auto h8_m7 = ph8_m7[k];
-        const auto h8_m6 = ph8_m6[k];
-        const auto h8_m2 = ph8_m2[k];
-        const auto h8_m1 = ph8_m1[k];
-
-        pc_6[k] = fs_525_16 * e_0 * h2_m2 + e_1 * (fs_3645_112 * h4_m2 - fs_675_28 * r_2 * h2_m2) + e_2 * (fs_50_33 * h6_m6 + fs_250_363 * h6_m2 - fs_3645_847 * r_2 * h4_m2 + fs_25_21 * r_4 * h2_m2) + e_3 * (fs_343_7722 * h8_m6 + fs_245_368082 * h8_m2 - fs_8_297 * r_2 * h6_m6 - fs_40_3267 * r_2 * h6_m2 + fs_3645_143143 * r_4 * h4_m2 - fs_100_22869 * r_6 * h2_m2);
-
-        pc_7[k] = -fs_3675_32 * e_0 * h2_m1 + e_1 * (-fs_405_16 * h4_m1 + fs_675_8 * r_2 * h2_m1) + e_2 * (-fs_175_726 * h6_m1 + fs_405_121 * r_2 * h4_m1 - fs_25_6 * r_4 * h2_m1) + e_3 * (fs_245_2574 * h8_m7 - fs_49_368082 * h8_m1 + fs_14_3267 * r_2 * h6_m1 - fs_405_20449 * r_4 * h4_m1 + fs_50_3267 * r_6 * h2_m1);
-
-        pc_8[k] = fs_245_1287 * e_3 * h8_m8;
-    }
-
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, pe_4, ph2_0, ph2_p1, ph4_0, ph4_p1, ph6_0, ph6_p1, ph6_p5, ph6_p6, ph8_0, ph8_p1, ph8_p5, ph8_p6, ab_2 : simd::cache_line_size())
-    for (size_t k = 0; k < nmax; k++)
-    {
         const auto e_0 = pe_0[k];
         const auto e_1 = pe_1[k];
         const auto e_2 = pe_2[k];
         const auto e_3 = pe_3[k];
         const auto e_4 = pe_4[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
-        const auto r_8 = r_6 * r_2;
+        pc_8[k] = e_0 * (2.1875 * x * x * x * x * x * x * x * y - 15.3125 * x * x * x * x * x * y * y * y + 15.3125 * x * x * x * y * y * y * y * y - 2.1875 * x * y * y * y * y * y * y * y);
 
-        const auto h2_0 = ph2_0[k];
-        const auto h2_p1 = ph2_p1[k];
-        const auto h4_0 = ph4_0[k];
-        const auto h4_p1 = ph4_p1[k];
-        const auto h6_0 = ph6_0[k];
-        const auto h6_p1 = ph6_p1[k];
-        const auto h6_p5 = ph6_p5[k];
-        const auto h6_p6 = ph6_p6[k];
-        const auto h8_0 = ph8_0[k];
-        const auto h8_p1 = ph8_p1[k];
-        const auto h8_p5 = ph8_p5[k];
-        const auto h8_p6 = ph8_p6[k];
+        pc_9[k] = e_0 * (39.375 * x * x * x * x * y * y * z * z - 26.25 * x * x * y * y * y * y * z * z + 4.375 * y * y * y * y * y * y * z * z) + e_1 * (39.375 * x * x * x * x * y * y + 39.375 * x * x * x * x * z * z - 26.25 * x * x * y * y * y * y + 78.75 * x * x * y * y * z * z + 4.375 * y * y * y * y * y * y + 39.375 * y * y * y * y * z * z) + e_2 * (39.375 * x * x * x * x + 78.75 * x * x * y * y + 157.5 * x * x * z * z + 39.375 * y * y * y * y + 157.5 * y * y * z * z) + e_3 * (157.5 * x * x + 157.5 * y * y + 105.0 * z * z) + e_4 * (105.0);
 
-        pc_9[k] = e_0 * (f_35_8 * h2_0 - f_35_2 * r_2) + e_1 * (-f_27_4 * h4_0 - f_15_4 * r_2 * h2_0 + f_21_2 * r_4) + e_2 * (-f_85_66 * h6_0 + fs_175_66 * h6_p6 + f_27_11 * r_2 * h4_0 + f_5_6 * r_4 * h2_0 - f_2 * r_6) + e_3 * (-f_56_1287 * h8_0 - fs_392_3861 * h8_p6 + f_17_99 * r_2 * h6_0 - fs_14_297 * r_2 * h6_p6 - f_27_143 * r_4 * h4_0 - f_5_99 * r_6 * h2_0 + f_1_9 * r_8) + f_105_16 * e_4;
+        pc_10[k] = e_0 * (-std::sqrt(49.21875) * x * x * x * x * x * y * y * z - std::sqrt(21.875) * x * x * x * y * y * y * y * z + std::sqrt(1771.875) * x * x * x * y * y * z * z * z + std::sqrt(5.46875) * x * y * y * y * y * y * y * z - std::sqrt(196.875) * x * y * y * y * y * z * z * z) + e_1 * (-std::sqrt(49.21875) * x * x * x * x * x * z + std::sqrt(787.5) * x * x * x * y * y * z + std::sqrt(1771.875) * x * x * x * z * z * z - std::sqrt(442.96875) * x * y * y * y * y * z + std::sqrt(1771.875) * x * y * y * z * z * z) + e_2 * (std::sqrt(1771.875) * x * x * x * z + std::sqrt(1771.875) * x * y * y * z + std::sqrt(7087.5) * x * z * z * z) + e_3 * (std::sqrt(19687.5) * x * z);
 
-        pc_10[k] = -fs_13125_128 * e_0 * h2_p1 + e_1 * (fs_405_112 * h4_p1 + fs_16875_224 * r_2 * h2_p1) + e_2 * (fs_4225_2904 * h6_p1 + fs_25_44 * h6_p5 - fs_405_847 * r_2 * h4_p1 - fs_625_168 * r_4 * h2_p1) + e_3 * (fs_686_184041 * h8_p1 - fs_98_1287 * h8_p5 - fs_169_6534 * r_2 * h6_p1 - fs_1_99 * r_2 * h6_p5 + fs_405_143143 * r_4 * h4_p1 + fs_625_45738 * r_6 * h2_p1);
+        pc_11[k] = e_0 * (-std::sqrt(221.484375) * x * x * x * x * y * y * z * z - std::sqrt(98.4375) * x * x * y * y * y * y * z * z + std::sqrt(393.75) * x * x * y * y * z * z * z * z + std::sqrt(24.609375) * y * y * y * y * y * y * z * z - std::sqrt(43.75) * y * y * y * y * z * z * z * z) + e_1 * (-std::sqrt(221.484375) * x * x * x * x * y * y - std::sqrt(221.484375) * x * x * x * x * z * z - std::sqrt(98.4375) * x * x * y * y * y * y - std::sqrt(885.9375) * x * x * y * y * z * z + std::sqrt(393.75) * x * x * z * z * z * z + std::sqrt(24.609375) * y * y * y * y * y * y + std::sqrt(615.234375) * y * y * y * y * z * z - std::sqrt(393.75) * y * y * z * z * z * z) + e_2 * (-std::sqrt(221.484375) * x * x * x * x - std::sqrt(7973.4375) * x * x * y * y + std::sqrt(1993.359375) * y * y * y * y) + e_3 * (-std::sqrt(3543.75) * x * x + std::sqrt(3543.75) * y * y);
     }
 
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, ph2_p2, ph4_m3, ph4_p2, ph4_p4, ph6_m3, ph6_p2, ph6_p4, ph8_m3, ph8_p2, ph8_p4, ab_2 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, ab_x, ab_y, ab_z : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
+        const auto x = ab_x[k];
+        const auto y = ab_y[k];
+        const auto z = ab_z[k];
+
         const auto e_0 = pe_0[k];
         const auto e_1 = pe_1[k];
         const auto e_2 = pe_2[k];
         const auto e_3 = pe_3[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
+        pc_12[k] = e_0 * (std::sqrt(5.537109375) * x * x * x * x * x * x * y * z + std::sqrt(15.380859375) * x * x * x * x * y * y * y * z - std::sqrt(354.375) * x * x * x * x * y * z * z * z + std::sqrt(0.615234375) * x * x * y * y * y * y * y * z - std::sqrt(157.5) * x * x * y * y * y * z * z * z + std::sqrt(39.375) * x * x * y * z * z * z * z * z - std::sqrt(0.615234375) * y * y * y * y * y * y * y * z + std::sqrt(39.375) * y * y * y * y * y * z * z * z - std::sqrt(4.375) * y * y * y * z * z * z * z * z) + e_1 * (-std::sqrt(88.59375) * x * x * x * x * y * z - std::sqrt(39.375) * x * x * y * y * y * z - std::sqrt(7717.5) * x * x * y * z * z * z + std::sqrt(9.84375) * y * y * y * y * y * z + std::sqrt(857.5) * y * y * y * z * z * z) + e_2 * (-std::sqrt(28704.375) * x * x * y * z + std::sqrt(3189.375) * y * y * y * z);
 
-        const auto h2_p2 = ph2_p2[k];
-        const auto h4_m3 = ph4_m3[k];
-        const auto h4_p2 = ph4_p2[k];
-        const auto h4_p4 = ph4_p4[k];
-        const auto h6_m3 = ph6_m3[k];
-        const auto h6_p2 = ph6_p2[k];
-        const auto h6_p4 = ph6_p4[k];
-        const auto h8_m3 = ph8_m3[k];
-        const auto h8_p2 = ph8_p2[k];
-        const auto h8_p4 = ph8_p4[k];
+        pc_13[k] = e_0 * (-std::sqrt(221.484375) * x * x * x * x * x * y * z * z - std::sqrt(98.4375) * x * x * x * y * y * y * z * z + std::sqrt(393.75) * x * x * x * y * z * z * z * z + std::sqrt(24.609375) * x * y * y * y * y * y * z * z - std::sqrt(43.75) * x * y * y * y * z * z * z * z) + e_1 * (-std::sqrt(221.484375) * x * x * x * x * x * y - std::sqrt(98.4375) * x * x * x * y * y * y - std::sqrt(3543.75) * x * x * x * y * z * z + std::sqrt(24.609375) * x * y * y * y * y * y - std::sqrt(393.75) * x * y * y * y * z * z + std::sqrt(1575.0) * x * y * z * z * z * z) + e_2 * (-std::sqrt(14175.0) * x * x * x * y) + e_3 * (-std::sqrt(14175.0) * x * y);
 
-        pc_11[k] = fs_4725_64 * e_0 * h2_p2 + e_1 * (fs_405_112 * h4_p2 + fs_405_16 * h4_p4 - fs_6075_112 * r_2 * h2_p2) + e_2 * (-fs_375_242 * h6_p2 - f_5_22 * h6_p4 - fs_405_847 * r_2 * h4_p2 - fs_405_121 * r_2 * h4_p4 + fs_75_28 * r_4 * h2_p2) + e_3 * (-fs_1960_184041 * h8_p2 - fs_784_16731 * h8_p4 + fs_10_363 * r_2 * h6_p2 + f_1_33 * r_2 * h6_p4 + fs_405_143143 * r_4 * h4_p2 + fs_405_20449 * r_4 * h4_p4 - fs_25_2541 * r_6 * h2_p2);
+        pc_14[k] = e_0 * (-std::sqrt(12.3046875) * x * x * x * x * x * x * y * z + std::sqrt(1.3671875) * x * x * x * x * y * y * y * z + std::sqrt(442.96875) * x * x * x * x * y * z * z * z + std::sqrt(12.3046875) * x * x * y * y * y * y * y * z - std::sqrt(787.5) * x * x * y * y * y * z * z * z - std::sqrt(1.3671875) * y * y * y * y * y * y * y * z + std::sqrt(49.21875) * y * y * y * y * y * z * z * z) + e_1 * (std::sqrt(196.875) * x * x * x * x * y * z - std::sqrt(1771.875) * x * x * y * y * y * z + std::sqrt(1771.875) * x * x * y * z * z * z + std::sqrt(1771.875) * y * y * y * z * z * z) + e_2 * (std::sqrt(1771.875) * x * x * y * z + std::sqrt(1771.875) * y * y * y * z + std::sqrt(7087.5) * y * z * z * z) + e_3 * (std::sqrt(19687.5) * y * z);
 
-        pc_12[k] = -f_27_4 * e_1 * h4_m3 + e_2 * (fs_625_363 * h6_m3 + f_27_11 * r_2 * h4_m3) + e_3 * (fs_2450_50193 * h8_m3 - fs_100_3267 * r_2 * h6_m3 - f_27_143 * r_4 * h4_m3);
+        pc_15[k] = e_0 * (13.125 * x * x * x * x * x * y * z * z - 43.75 * x * x * x * y * y * y * z * z + 13.125 * x * y * y * y * y * y * z * z) + e_1 * (13.125 * x * x * x * x * x * y - 43.75 * x * x * x * y * y * y + 13.125 * x * y * y * y * y * y);
     }
 
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, ph2_m2, ph2_m1, ph4_m4, ph4_m2, ph4_m1, ph6_m5, ph6_m4, ph6_m2, ph6_m1, ph8_m5, ph8_m4, ph8_m2, ph8_m1, ab_2 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, pe_4, ab_x, ab_y, ab_z : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
-        const auto e_0 = pe_0[k];
-        const auto e_1 = pe_1[k];
-        const auto e_2 = pe_2[k];
-        const auto e_3 = pe_3[k];
+        const auto x = ab_x[k];
+        const auto y = ab_y[k];
+        const auto z = ab_z[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
-
-        const auto h2_m2 = ph2_m2[k];
-        const auto h2_m1 = ph2_m1[k];
-        const auto h4_m4 = ph4_m4[k];
-        const auto h4_m2 = ph4_m2[k];
-        const auto h4_m1 = ph4_m1[k];
-        const auto h6_m5 = ph6_m5[k];
-        const auto h6_m4 = ph6_m4[k];
-        const auto h6_m2 = ph6_m2[k];
-        const auto h6_m1 = ph6_m1[k];
-        const auto h8_m5 = ph8_m5[k];
-        const auto h8_m4 = ph8_m4[k];
-        const auto h8_m2 = ph8_m2[k];
-        const auto h8_m1 = ph8_m1[k];
-
-        pc_13[k] = fs_4725_64 * e_0 * h2_m2 + e_1 * (-fs_405_16 * h4_m4 + fs_405_112 * h4_m2 - fs_6075_112 * r_2 * h2_m2) + e_2 * (f_5_22 * h6_m4 - fs_375_242 * h6_m2 + fs_405_121 * r_2 * h4_m4 - fs_405_847 * r_2 * h4_m2 + fs_75_28 * r_4 * h2_m2) + e_3 * (fs_784_16731 * h8_m4 - fs_1960_184041 * h8_m2 - f_1_33 * r_2 * h6_m4 + fs_10_363 * r_2 * h6_m2 - fs_405_20449 * r_4 * h4_m4 + fs_405_143143 * r_4 * h4_m2 - fs_25_2541 * r_6 * h2_m2);
-
-        pc_14[k] = -fs_13125_128 * e_0 * h2_m1 + e_1 * (fs_405_112 * h4_m1 + fs_16875_224 * r_2 * h2_m1) + e_2 * (-fs_25_44 * h6_m5 + fs_4225_2904 * h6_m1 - fs_405_847 * r_2 * h4_m1 - fs_625_168 * r_4 * h2_m1) + e_3 * (fs_98_1287 * h8_m5 + fs_686_184041 * h8_m1 + fs_1_99 * r_2 * h6_m5 - fs_169_6534 * r_2 * h6_m1 + fs_405_143143 * r_4 * h4_m1 + fs_625_45738 * r_6 * h2_m1);
-    }
-
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, ph2_m1, ph4_m1, ph6_m6, ph6_m1, ph8_m7, ph8_m6, ph8_m1, ab_2 : simd::cache_line_size())
-    for (size_t k = 0; k < nmax; k++)
-    {
-        const auto e_0 = pe_0[k];
-        const auto e_1 = pe_1[k];
-        const auto e_2 = pe_2[k];
-        const auto e_3 = pe_3[k];
-
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
-
-        const auto h2_m1 = ph2_m1[k];
-        const auto h4_m1 = ph4_m1[k];
-        const auto h6_m6 = ph6_m6[k];
-        const auto h6_m1 = ph6_m1[k];
-        const auto h8_m7 = ph8_m7[k];
-        const auto h8_m6 = ph8_m6[k];
-        const auto h8_m1 = ph8_m1[k];
-
-        pc_15[k] = -fs_175_66 * e_2 * h6_m6 + e_3 * (fs_392_3861 * h8_m6 + fs_14_297 * r_2 * h6_m6);
-
-        pc_16[k] = fs_3675_32 * e_0 * h2_m1 + e_1 * (fs_405_16 * h4_m1 - fs_675_8 * r_2 * h2_m1) + e_2 * (fs_175_726 * h6_m1 - fs_405_121 * r_2 * h4_m1 + fs_25_6 * r_4 * h2_m1) + e_3 * (fs_245_2574 * h8_m7 + fs_49_368082 * h8_m1 - fs_14_3267 * r_2 * h6_m1 + fs_405_20449 * r_4 * h4_m1 - fs_50_3267 * r_6 * h2_m1);
-    }
-
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, pe_4, ph2_0, ph4_0, ph4_p4, ph6_0, ph6_p4, ph8_0, ph8_p4, ab_2 : simd::cache_line_size())
-    for (size_t k = 0; k < nmax; k++)
-    {
         const auto e_0 = pe_0[k];
         const auto e_1 = pe_1[k];
         const auto e_2 = pe_2[k];
         const auto e_3 = pe_3[k];
         const auto e_4 = pe_4[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
-        const auto r_8 = r_6 * r_2;
+        pc_16[k] = e_0 * (std::sqrt(21.533203125) * x * x * x * x * x * x * y * z - std::sqrt(863.720703125) * x * x * x * x * y * y * y * z + std::sqrt(193.798828125) * x * x * y * y * y * y * y * z - std::sqrt(2.392578125) * y * y * y * y * y * y * y * z) + e_1 * (-std::sqrt(344.53125) * x * x * x * x * y * z - std::sqrt(1378.125) * x * x * y * y * y * z - std::sqrt(344.53125) * y * y * y * y * y * z) + e_2 * (-std::sqrt(12403.125) * x * x * y * z - std::sqrt(12403.125) * y * y * y * z) + e_3 * (-std::sqrt(22050.0) * y * z);
 
-        const auto h2_0 = ph2_0[k];
-        const auto h4_0 = ph4_0[k];
-        const auto h4_p4 = ph4_p4[k];
-        const auto h6_0 = ph6_0[k];
-        const auto h6_p4 = ph6_p4[k];
-        const auto h8_0 = ph8_0[k];
-        const auto h8_p4 = ph8_p4[k];
+        pc_17[k] = e_0 * (1.25 * x * x * x * x * x * x * y * y + 2.5 * x * x * x * x * y * y * y * y - 15.0 * x * x * x * x * y * y * z * z + 1.25 * x * x * y * y * y * y * y * y - 15.0 * x * x * y * y * y * y * z * z + 45.0 * x * x * y * y * z * z * z * z) + e_1 * (1.25 * x * x * x * x * x * x + 18.75 * x * x * x * x * y * y - 15.0 * x * x * x * x * z * z + 18.75 * x * x * y * y * y * y + 90.0 * x * x * y * y * z * z + 45.0 * x * x * z * z * z * z + 1.25 * y * y * y * y * y * y - 15.0 * y * y * y * y * z * z + 45.0 * y * y * z * z * z * z) + e_2 * (11.25 * x * x * x * x + 157.5 * x * x * y * y + 135.0 * x * x * z * z + 11.25 * y * y * y * y + 135.0 * y * y * z * z + 45.0 * z * z * z * z) + e_3 * (120.0 * x * x + 120.0 * y * y + 180.0 * z * z) + e_4 * (105.0);
 
-        pc_17[k] = e_0 * (-f_5 * h2_0 - f_35_2 * r_2) + e_1 * (-f_99_28 * h4_0 - fs_3645_112 * h4_p4 + f_30_7 * r_2 * h2_0 + f_21_2 * r_4) + e_2 * (f_5_3 * h6_0 + fs_175_121 * h6_p4 + f_9_7 * r_2 * h4_0 + fs_3645_847 * r_2 * h4_p4 - f_20_21 * r_4 * h2_0 - f_2 * r_6) + e_3 * (f_196_1287 * h8_0 - fs_1372_16731 * h8_p4 - f_2_9 * r_2 * h6_0 - fs_28_1089 * r_2 * h6_p4 - f_9_91 * r_4 * h4_0 - fs_3645_143143 * r_4 * h4_p4 + f_40_693 * r_6 * h2_0 + f_1_9 * r_8) + f_105_16 * e_4;
+        pc_18[k] = e_0 * (std::sqrt(7.03125) * x * x * x * x * x * y * y * z + std::sqrt(28.125) * x * x * x * y * y * y * y * z - std::sqrt(378.125) * x * x * x * y * y * z * z * z + std::sqrt(7.03125) * x * y * y * y * y * y * y * z - std::sqrt(378.125) * x * y * y * y * y * z * z * z + std::sqrt(450.0) * x * y * y * z * z * z * z * z) + e_1 * (std::sqrt(7.03125) * x * x * x * x * x * z - std::sqrt(378.125) * x * x * x * z * z * z - std::sqrt(7.03125) * x * y * y * y * y * z + std::sqrt(1378.125) * x * y * y * z * z * z + std::sqrt(450.0) * x * z * z * z * z * z) + e_2 * (-std::sqrt(253.125) * x * x * x * z + std::sqrt(2278.125) * x * y * y * z + std::sqrt(9112.5) * x * z * z * z) + e_3 * (std::sqrt(9112.5) * x * z);
+
+        pc_19[k] = e_0 * (-std::sqrt(0.17578125) * x * x * x * x * x * x * x * y - std::sqrt(1.58203125) * x * x * x * x * x * y * y * y + std::sqrt(34.453125) * x * x * x * x * x * y * z * z - std::sqrt(1.58203125) * x * x * x * y * y * y * y * y + std::sqrt(137.8125) * x * x * x * y * y * y * z * z - std::sqrt(451.25) * x * x * x * y * z * z * z * z - std::sqrt(0.17578125) * x * y * y * y * y * y * y * y + std::sqrt(34.453125) * x * y * y * y * y * y * z * z - std::sqrt(451.25) * x * y * y * y * z * z * z * z + std::sqrt(45.0) * x * y * z * z * z * z * z * z) + e_1 * (-std::sqrt(45.0) * x * x * x * x * x * y - std::sqrt(180.0) * x * x * x * y * y * y - std::sqrt(1125.0) * x * x * x * y * z * z - std::sqrt(45.0) * x * y * y * y * y * y - std::sqrt(1125.0) * x * y * y * y * z * z - std::sqrt(720.0) * x * y * z * z * z * z) + e_2 * (-std::sqrt(4961.25) * x * x * x * y - std::sqrt(4961.25) * x * y * y * y - std::sqrt(32805.0) * x * y * z * z) + e_3 * (-std::sqrt(40500.0) * x * y);
     }
 
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, ph2_m2, ph2_p1, ph4_m2, ph4_p1, ph4_p3, ph6_p1, ph6_p3, ph8_m2, ph8_p1, ph8_p3, ab_2 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, ab_x, ab_y, ab_z : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
+        const auto x = ab_x[k];
+        const auto y = ab_y[k];
+        const auto z = ab_z[k];
+
         const auto e_0 = pe_0[k];
         const auto e_1 = pe_1[k];
         const auto e_2 = pe_2[k];
         const auto e_3 = pe_3[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
+        pc_20[k] = e_0 * (std::sqrt(7.03125) * x * x * x * x * x * x * y * z + std::sqrt(28.125) * x * x * x * x * y * y * y * z - std::sqrt(378.125) * x * x * x * x * y * z * z * z + std::sqrt(7.03125) * x * x * y * y * y * y * y * z - std::sqrt(378.125) * x * x * y * y * y * z * z * z + std::sqrt(450.0) * x * x * y * z * z * z * z * z) + e_1 * (-std::sqrt(7.03125) * x * x * x * x * y * z + std::sqrt(1378.125) * x * x * y * z * z * z + std::sqrt(7.03125) * y * y * y * y * y * z - std::sqrt(378.125) * y * y * y * z * z * z + std::sqrt(450.0) * y * z * z * z * z * z) + e_2 * (std::sqrt(2278.125) * x * x * y * z - std::sqrt(253.125) * y * y * y * z + std::sqrt(9112.5) * y * z * z * z) + e_3 * (std::sqrt(9112.5) * y * z);
 
-        const auto h2_m2 = ph2_m2[k];
-        const auto h2_p1 = ph2_p1[k];
-        const auto h4_m2 = ph4_m2[k];
-        const auto h4_p1 = ph4_p1[k];
-        const auto h4_p3 = ph4_p3[k];
-        const auto h6_p1 = ph6_p1[k];
-        const auto h6_p3 = ph6_p3[k];
-        const auto h8_m2 = ph8_m2[k];
-        const auto h8_p1 = ph8_p1[k];
-        const auto h8_p3 = ph8_p3[k];
+        pc_21[k] = e_0 * (0.625 * x * x * x * x * x * x * x * y + 0.625 * x * x * x * x * x * y * y * y - 7.5 * x * x * x * x * x * y * z * z - 0.625 * x * x * x * y * y * y * y * y + 22.5 * x * x * x * y * z * z * z * z - 0.625 * x * y * y * y * y * y * y * y + 7.5 * x * y * y * y * y * y * z * z - 22.5 * x * y * y * y * z * z * z * z) + e_1 * (7.5 * x * x * x * x * x * y + 60.0 * x * x * x * y * z * z - 7.5 * x * y * y * y * y * y - 60.0 * x * y * y * y * z * z) + e_2 * (67.5 * x * x * x * y - 67.5 * x * y * y * y);
 
-        pc_18[k] = -fs_6075_128 * e_0 * h2_p1 + e_1 * (fs_3645_196 * h4_p1 - fs_405_112 * h4_p3 + fs_54675_1568 * r_2 * h2_p1) + e_2 * (-fs_525_968 * h6_p1 + fs_875_1452 * h6_p3 - fs_14580_5929 * r_2 * h4_p1 + fs_405_847 * r_2 * h4_p3 - fs_675_392 * r_4 * h2_p1) + e_3 * (-fs_4802_184041 * h8_p1 - fs_3430_50193 * h8_p3 + fs_7_726 * r_2 * h6_p1 - fs_35_3267 * r_2 * h6_p3 + fs_14580_1002001 * r_4 * h4_p1 - fs_405_143143 * r_4 * h4_p3 + fs_75_11858 * r_6 * h2_p1);
+        pc_22[k] = e_0 * (-std::sqrt(5.46875) * x * x * x * x * x * x * y * z + std::sqrt(21.875) * x * x * x * x * y * y * y * z + std::sqrt(196.875) * x * x * x * x * y * z * z * z + std::sqrt(49.21875) * x * x * y * y * y * y * y * z - std::sqrt(1771.875) * x * x * y * y * y * z * z * z) + e_1 * (std::sqrt(442.96875) * x * x * x * x * y * z - std::sqrt(787.5) * x * x * y * y * y * z - std::sqrt(1771.875) * x * x * y * z * z * z + std::sqrt(49.21875) * y * y * y * y * y * z - std::sqrt(1771.875) * y * y * y * z * z * z) + e_2 * (-std::sqrt(1771.875) * x * x * y * z - std::sqrt(1771.875) * y * y * y * z - std::sqrt(7087.5) * y * z * z * z) + e_3 * (-std::sqrt(19687.5) * y * z);
 
-        pc_19[k] = fs_3375_16 * e_0 * h2_m2 + e_1 * (-f_99_28 * h4_m2 - fs_30375_196 * r_2 * h2_m2) + e_2 * (f_9_7 * r_2 * h4_m2 + fs_375_49 * r_4 * h2_m2) + e_3 * (fs_17150_184041 * h8_m2 - f_9_91 * r_4 * h4_m2 - fs_500_17787 * r_6 * h2_m2);
+        pc_23[k] = e_0 * (-std::sqrt(0.68359375) * x * x * x * x * x * x * x * y + std::sqrt(17.08984375) * x * x * x * x * x * y * y * y + std::sqrt(24.609375) * x * x * x * x * x * y * z * z + std::sqrt(17.08984375) * x * x * x * y * y * y * y * y - std::sqrt(885.9375) * x * x * x * y * y * y * z * z - std::sqrt(0.68359375) * x * y * y * y * y * y * y * y + std::sqrt(24.609375) * x * y * y * y * y * y * z * z) + e_1 * (std::sqrt(2800.0) * x * x * x * y * y * y - std::sqrt(1575.0) * x * x * x * y * z * z - std::sqrt(1575.0) * x * y * y * y * z * z) + e_2 * (std::sqrt(3543.75) * x * x * x * y + std::sqrt(3543.75) * x * y * y * y - std::sqrt(14175.0) * x * y * z * z) + e_3 * (std::sqrt(6300.0) * x * y);
     }
 
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, ph2_m1, ph4_m4, ph4_m3, ph4_m1, ph6_m5, ph6_m4, ph6_m3, ph6_m1, ph8_m5, ph8_m4, ph8_m3, ph8_m1, ab_2 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, pe_4, ab_x, ab_y, ab_z : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
-        const auto e_0 = pe_0[k];
-        const auto e_1 = pe_1[k];
-        const auto e_2 = pe_2[k];
-        const auto e_3 = pe_3[k];
+        const auto x = ab_x[k];
+        const auto y = ab_y[k];
+        const auto z = ab_z[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
-
-        const auto h2_m1 = ph2_m1[k];
-        const auto h4_m4 = ph4_m4[k];
-        const auto h4_m3 = ph4_m3[k];
-        const auto h4_m1 = ph4_m1[k];
-        const auto h6_m5 = ph6_m5[k];
-        const auto h6_m4 = ph6_m4[k];
-        const auto h6_m3 = ph6_m3[k];
-        const auto h6_m1 = ph6_m1[k];
-        const auto h8_m5 = ph8_m5[k];
-        const auto h8_m4 = ph8_m4[k];
-        const auto h8_m3 = ph8_m3[k];
-        const auto h8_m1 = ph8_m1[k];
-
-        pc_20[k] = -fs_6075_128 * e_0 * h2_m1 + e_1 * (fs_405_112 * h4_m3 + fs_3645_196 * h4_m1 + fs_54675_1568 * r_2 * h2_m1) + e_2 * (-fs_875_1452 * h6_m3 - fs_525_968 * h6_m1 - fs_405_847 * r_2 * h4_m3 - fs_14580_5929 * r_2 * h4_m1 - fs_675_392 * r_4 * h2_m1) + e_3 * (fs_3430_50193 * h8_m3 - fs_4802_184041 * h8_m1 + fs_35_3267 * r_2 * h6_m3 + fs_7_726 * r_2 * h6_m1 + fs_405_143143 * r_4 * h4_m3 + fs_14580_1002001 * r_4 * h4_m1 + fs_75_11858 * r_6 * h2_m1);
-
-        pc_21[k] = fs_3645_112 * e_1 * h4_m4 + e_2 * (-fs_175_121 * h6_m4 - fs_3645_847 * r_2 * h4_m4) + e_3 * (fs_1372_16731 * h8_m4 + fs_28_1089 * r_2 * h6_m4 + fs_3645_143143 * r_4 * h4_m4);
-
-        pc_22[k] = fs_13125_128 * e_0 * h2_m1 + e_1 * (-fs_405_112 * h4_m1 - fs_16875_224 * r_2 * h2_m1) + e_2 * (-fs_25_44 * h6_m5 - fs_4225_2904 * h6_m1 + fs_405_847 * r_2 * h4_m1 + fs_625_168 * r_4 * h2_m1) + e_3 * (fs_98_1287 * h8_m5 - fs_686_184041 * h8_m1 + fs_1_99 * r_2 * h6_m5 + fs_169_6534 * r_2 * h6_m1 - fs_405_143143 * r_4 * h4_m1 - fs_625_45738 * r_6 * h2_m1);
-    }
-
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, ph2_m2, ph4_m2, ph6_m6, ph6_m2, ph8_m6, ph8_m2, ab_2 : simd::cache_line_size())
-    for (size_t k = 0; k < nmax; k++)
-    {
-        const auto e_0 = pe_0[k];
-        const auto e_1 = pe_1[k];
-        const auto e_2 = pe_2[k];
-        const auto e_3 = pe_3[k];
-
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
-
-        const auto h2_m2 = ph2_m2[k];
-        const auto h4_m2 = ph4_m2[k];
-        const auto h6_m6 = ph6_m6[k];
-        const auto h6_m2 = ph6_m2[k];
-        const auto h8_m6 = ph8_m6[k];
-        const auto h8_m2 = ph8_m2[k];
-
-        pc_23[k] = -fs_525_16 * e_0 * h2_m2 + e_1 * (-fs_3645_112 * h4_m2 + fs_675_28 * r_2 * h2_m2) + e_2 * (fs_50_33 * h6_m6 - fs_250_363 * h6_m2 + fs_3645_847 * r_2 * h4_m2 - fs_25_21 * r_4 * h2_m2) + e_3 * (fs_343_7722 * h8_m6 - fs_245_368082 * h8_m2 - fs_8_297 * r_2 * h6_m6 + fs_40_3267 * r_2 * h6_m2 - fs_3645_143143 * r_4 * h4_m2 + fs_100_22869 * r_6 * h2_m2);
-    }
-
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, pe_4, ph2_m1, ph2_0, ph2_p2, ph4_m1, ph4_0, ph4_p2, ph6_m1, ph6_0, ph6_p2, ph8_m1, ph8_0, ph8_p2, ab_2 : simd::cache_line_size())
-    for (size_t k = 0; k < nmax; k++)
-    {
         const auto e_0 = pe_0[k];
         const auto e_1 = pe_1[k];
         const auto e_2 = pe_2[k];
         const auto e_3 = pe_3[k];
         const auto e_4 = pe_4[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
-        const auto r_8 = r_6 * r_2;
+        pc_24[k] = e_0 * (5.625 * x * x * x * x * y * y * z * z + 11.25 * x * x * y * y * y * y * z * z - 15.0 * x * x * y * y * z * z * z * z + 5.625 * y * y * y * y * y * y * z * z - 15.0 * y * y * y * y * z * z * z * z + 10.0 * y * y * z * z * z * z * z * z) + e_1 * (5.625 * x * x * x * x * y * y + 5.625 * x * x * x * x * z * z + 11.25 * x * x * y * y * y * y + 11.25 * x * x * y * y * z * z - 15.0 * x * x * z * z * z * z + 5.625 * y * y * y * y * y * y + 5.625 * y * y * y * y * z * z + 45.0 * y * y * z * z * z * z + 10.0 * z * z * z * z * z * z) + e_2 * (5.625 * x * x * x * x + 56.25 * x * x * y * y - 22.5 * x * x * z * z + 50.625 * y * y * y * y + 157.5 * y * y * z * z + 90.0 * z * z * z * z) + e_3 * (22.5 * x * x + 172.5 * y * y + 225.0 * z * z) + e_4 * (105.0);
 
-        const auto h2_m1 = ph2_m1[k];
-        const auto h2_0 = ph2_0[k];
-        const auto h2_p2 = ph2_p2[k];
-        const auto h4_m1 = ph4_m1[k];
-        const auto h4_0 = ph4_0[k];
-        const auto h4_p2 = ph4_p2[k];
-        const auto h6_m1 = ph6_m1[k];
-        const auto h6_0 = ph6_0[k];
-        const auto h6_p2 = ph6_p2[k];
-        const auto h8_m1 = ph8_m1[k];
-        const auto h8_0 = ph8_0[k];
-        const auto h8_p2 = ph8_p2[k];
+        pc_25[k] = e_0 * (-std::sqrt(0.791015625) * x * x * x * x * x * x * y * z - std::sqrt(7.119140625) * x * x * x * x * y * y * y * z + std::sqrt(68.90625) * x * x * x * x * y * z * z * z - std::sqrt(7.119140625) * x * x * y * y * y * y * y * z + std::sqrt(275.625) * x * x * y * y * y * z * z * z - std::sqrt(140.625) * x * x * y * z * z * z * z * z - std::sqrt(0.791015625) * y * y * y * y * y * y * y * z + std::sqrt(68.90625) * y * y * y * y * y * z * z * z - std::sqrt(140.625) * y * y * y * z * z * z * z * z + std::sqrt(10.0) * y * z * z * z * z * z * z * z) + e_1 * (std::sqrt(12.65625) * x * x * x * x * y * z + std::sqrt(50.625) * x * x * y * y * y * z - std::sqrt(360.0) * x * x * y * z * z * z + std::sqrt(12.65625) * y * y * y * y * y * z - std::sqrt(360.0) * y * y * y * z * z * z + std::sqrt(360.0) * y * z * z * z * z * z) + e_2 * (-std::sqrt(50.625) * x * x * y * z - std::sqrt(50.625) * y * y * y * z + std::sqrt(3240.0) * y * z * z * z) + e_3 * (std::sqrt(2250.0) * y * z);
 
-        pc_24[k] = e_0 * (-f_85_8 * h2_0 + fs_1875_16 * h2_p2 - f_35_2 * r_2) + e_1 * (f_81_28 * h4_0 - fs_3645_196 * h4_p2 + f_255_28 * r_2 * h2_0 - fs_16875_196 * r_2 * h2_p2 + f_21_2 * r_4) + e_2 * (f_5_66 * h6_0 + fs_875_726 * h6_p2 - f_81_77 * r_2 * h4_0 + fs_14580_5929 * r_2 * h4_p2 - f_85_42 * r_4 * h2_0 + fs_625_147 * r_4 * h2_p2 - f_2 * r_6) + e_3 * (-f_392_1287 * h8_0 - fs_13720_184041 * h8_p2 - f_1_99 * r_2 * h6_0 - fs_70_3267 * r_2 * h6_p2 + f_81_1001 * r_4 * h4_0 - fs_14580_1002001 * r_4 * h4_p2 + f_85_693 * r_6 * h2_0 - fs_2500_160083 * r_6 * h2_p2 + f_1_9 * r_8) + f_105_16 * e_4;
+        pc_26[k] = e_0 * (5.625 * x * x * x * x * x * y * z * z + 11.25 * x * x * x * y * y * y * z * z - 15.0 * x * x * x * y * z * z * z * z + 5.625 * x * y * y * y * y * y * z * z - 15.0 * x * y * y * y * z * z * z * z + 10.0 * x * y * z * z * z * z * z * z) + e_1 * (5.625 * x * x * x * x * x * y + 11.25 * x * x * x * y * y * y + 5.625 * x * y * y * y * y * y + 60.0 * x * y * z * z * z * z) + e_2 * (45.0 * x * x * x * y + 45.0 * x * y * y * y + 180.0 * x * y * z * z) + e_3 * (150.0 * x * y);
 
-        pc_25[k] = -fs_375_32 * e_0 * h2_m1 + e_1 * (f_81_28 * h4_m1 + fs_3375_392 * r_2 * h2_m1) + e_2 * (-fs_875_726 * h6_m1 - f_81_77 * r_2 * h4_m1 - fs_125_294 * r_4 * h2_m1) + e_3 * (fs_24010_184041 * h8_m1 + fs_70_3267 * r_2 * h6_m1 + f_81_1001 * r_4 * h4_m1 + fs_250_160083 * r_6 * h2_m1);
+        pc_27[k] = e_0 * (std::sqrt(1.7578125) * x * x * x * x * x * x * y * z + std::sqrt(1.7578125) * x * x * x * x * y * y * y * z - std::sqrt(94.53125) * x * x * x * x * y * z * z * z - std::sqrt(1.7578125) * x * x * y * y * y * y * y * z + std::sqrt(112.5) * x * x * y * z * z * z * z * z - std::sqrt(1.7578125) * y * y * y * y * y * y * y * z + std::sqrt(94.53125) * y * y * y * y * y * z * z * z - std::sqrt(112.5) * y * y * y * z * z * z * z * z) + e_1 * (-std::sqrt(28.125) * x * x * x * x * y * z - std::sqrt(28.125) * x * x * y * y * y * z + std::sqrt(2278.125) * x * x * y * z * z * z - std::sqrt(78.125) * y * y * y * z * z * z - std::sqrt(450.0) * y * z * z * z * z * z) + e_2 * (std::sqrt(2278.125) * x * x * y * z - std::sqrt(253.125) * y * y * y * z - std::sqrt(9112.5) * y * z * z * z) + e_3 * (-std::sqrt(9112.5) * y * z);
     }
 
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, ph2_m2, ph2_m1, ph4_m3, ph4_m2, ph4_m1, ph6_m3, ph6_m2, ph6_m1, ph8_m3, ph8_m2, ph8_m1, ab_2 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, pe_4, ab_x, ab_y, ab_z : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
-        const auto e_0 = pe_0[k];
-        const auto e_1 = pe_1[k];
-        const auto e_2 = pe_2[k];
-        const auto e_3 = pe_3[k];
+        const auto x = ab_x[k];
+        const auto y = ab_y[k];
+        const auto z = ab_z[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
-
-        const auto h2_m2 = ph2_m2[k];
-        const auto h2_m1 = ph2_m1[k];
-        const auto h4_m3 = ph4_m3[k];
-        const auto h4_m2 = ph4_m2[k];
-        const auto h4_m1 = ph4_m1[k];
-        const auto h6_m3 = ph6_m3[k];
-        const auto h6_m2 = ph6_m2[k];
-        const auto h6_m1 = ph6_m1[k];
-        const auto h8_m3 = ph8_m3[k];
-        const auto h8_m2 = ph8_m2[k];
-        const auto h8_m1 = ph8_m1[k];
-
-        pc_26[k] = -fs_1875_16 * e_0 * h2_m2 + e_1 * (fs_3645_196 * h4_m2 + fs_16875_196 * r_2 * h2_m2) + e_2 * (-fs_875_726 * h6_m2 - fs_14580_5929 * r_2 * h4_m2 - fs_625_147 * r_4 * h2_m2) + e_3 * (fs_13720_184041 * h8_m2 + fs_70_3267 * r_2 * h6_m2 + fs_14580_1002001 * r_4 * h4_m2 + fs_2500_160083 * r_6 * h2_m2);
-
-        pc_27[k] = fs_6075_128 * e_0 * h2_m1 + e_1 * (fs_405_112 * h4_m3 - fs_3645_196 * h4_m1 - fs_54675_1568 * r_2 * h2_m1) + e_2 * (-fs_875_1452 * h6_m3 + fs_525_968 * h6_m1 - fs_405_847 * r_2 * h4_m3 + fs_14580_5929 * r_2 * h4_m1 + fs_675_392 * r_4 * h2_m1) + e_3 * (fs_3430_50193 * h8_m3 + fs_4802_184041 * h8_m1 + fs_35_3267 * r_2 * h6_m3 - fs_7_726 * r_2 * h6_m1 + fs_405_143143 * r_4 * h4_m3 - fs_14580_1002001 * r_4 * h4_m1 - fs_75_11858 * r_6 * h2_m1);
-    }
-
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, ph2_m2, ph4_m4, ph4_m3, ph4_m2, ph6_m5, ph6_m4, ph6_m3, ph6_m2, ph8_m5, ph8_m4, ph8_m3, ph8_m2, ab_2 : simd::cache_line_size())
-    for (size_t k = 0; k < nmax; k++)
-    {
-        const auto e_0 = pe_0[k];
-        const auto e_1 = pe_1[k];
-        const auto e_2 = pe_2[k];
-        const auto e_3 = pe_3[k];
-
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
-
-        const auto h2_m2 = ph2_m2[k];
-        const auto h4_m4 = ph4_m4[k];
-        const auto h4_m3 = ph4_m3[k];
-        const auto h4_m2 = ph4_m2[k];
-        const auto h6_m5 = ph6_m5[k];
-        const auto h6_m4 = ph6_m4[k];
-        const auto h6_m3 = ph6_m3[k];
-        const auto h6_m2 = ph6_m2[k];
-        const auto h8_m5 = ph8_m5[k];
-        const auto h8_m4 = ph8_m4[k];
-        const auto h8_m3 = ph8_m3[k];
-        const auto h8_m2 = ph8_m2[k];
-
-        pc_28[k] = -fs_4725_64 * e_0 * h2_m2 + e_1 * (-fs_405_16 * h4_m4 - fs_405_112 * h4_m2 + fs_6075_112 * r_2 * h2_m2) + e_2 * (f_5_22 * h6_m4 + fs_375_242 * h6_m2 + fs_405_121 * r_2 * h4_m4 + fs_405_847 * r_2 * h4_m2 - fs_75_28 * r_4 * h2_m2) + e_3 * (fs_784_16731 * h8_m4 + fs_1960_184041 * h8_m2 - f_1_33 * r_2 * h6_m4 - fs_10_363 * r_2 * h6_m2 - fs_405_20449 * r_4 * h4_m4 - fs_405_143143 * r_4 * h4_m2 + fs_25_2541 * r_6 * h2_m2);
-
-        pc_29[k] = fs_405_16 * e_1 * h4_m3 + e_2 * (fs_25_11 * h6_m5 + fs_500_363 * h6_m3 - fs_405_121 * r_2 * h4_m3) + e_3 * (fs_49_2574 * h8_m5 + fs_245_100386 * h8_m3 - fs_4_99 * r_2 * h6_m5 - fs_80_3267 * r_2 * h6_m3 + fs_405_20449 * r_4 * h4_m3);
-    }
-
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, pe_4, ph2_0, ph2_p1, ph2_p2, ph4_0, ph4_p1, ph4_p2, ph6_0, ph6_p1, ph8_0, ph8_p1, ph8_p2, ab_2 : simd::cache_line_size())
-    for (size_t k = 0; k < nmax; k++)
-    {
         const auto e_0 = pe_0[k];
         const auto e_1 = pe_1[k];
         const auto e_2 = pe_2[k];
         const auto e_3 = pe_3[k];
         const auto e_4 = pe_4[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
-        const auto r_8 = r_6 * r_2;
+        pc_28[k] = e_0 * (-std::sqrt(24.609375) * x * x * x * x * x * y * z * z + std::sqrt(98.4375) * x * x * x * y * y * y * z * z + std::sqrt(43.75) * x * x * x * y * z * z * z * z + std::sqrt(221.484375) * x * y * y * y * y * y * z * z - std::sqrt(393.75) * x * y * y * y * z * z * z * z) + e_1 * (-std::sqrt(24.609375) * x * x * x * x * x * y + std::sqrt(98.4375) * x * x * x * y * y * y + std::sqrt(393.75) * x * x * x * y * z * z + std::sqrt(221.484375) * x * y * y * y * y * y + std::sqrt(3543.75) * x * y * y * y * z * z - std::sqrt(1575.0) * x * y * z * z * z * z) + e_2 * (std::sqrt(14175.0) * x * y * y * y) + e_3 * (std::sqrt(14175.0) * x * y);
 
-        const auto h2_0 = ph2_0[k];
-        const auto h2_p1 = ph2_p1[k];
-        const auto h2_p2 = ph2_p2[k];
-        const auto h4_0 = ph4_0[k];
-        const auto h4_p1 = ph4_p1[k];
-        const auto h4_p2 = ph4_p2[k];
-        const auto h6_0 = ph6_0[k];
-        const auto h6_p1 = ph6_p1[k];
-        const auto h8_0 = ph8_0[k];
-        const auto h8_p1 = ph8_p1[k];
-        const auto h8_p2 = ph8_p2[k];
+        pc_29[k] = e_0 * (-std::sqrt(3.076171875) * x * x * x * x * x * x * y * z + std::sqrt(76.904296875) * x * x * x * x * y * y * y * z + std::sqrt(5.46875) * x * x * x * x * y * z * z * z + std::sqrt(76.904296875) * x * x * y * y * y * y * y * z - std::sqrt(196.875) * x * x * y * y * y * z * z * z - std::sqrt(3.076171875) * y * y * y * y * y * y * y * z + std::sqrt(5.46875) * y * y * y * y * y * z * z * z) + e_1 * (std::sqrt(49.21875) * x * x * x * x * y * z + std::sqrt(9646.875) * x * x * y * y * y * z - std::sqrt(787.5) * x * x * y * z * z * z - std::sqrt(442.96875) * y * y * y * y * y * z + std::sqrt(87.5) * y * y * y * z * z * z) + e_2 * (std::sqrt(15946.875) * x * x * y * z - std::sqrt(1771.875) * y * y * y * z);
 
-        pc_30[k] = e_0 * (-f_25_2 * h2_0 - f_35_2 * r_2) + e_1 * (f_81_14 * h4_0 + f_75_7 * r_2 * h2_0 + f_21_2 * r_4) + e_2 * (-f_50_33 * h6_0 - f_162_77 * r_2 * h4_0 - f_50_21 * r_4 * h2_0 - f_2 * r_6) + e_3 * (f_490_1287 * h8_0 + f_20_99 * r_2 * h6_0 + f_162_1001 * r_4 * h4_0 + f_100_693 * r_6 * h2_0 + f_1_9 * r_8) + f_105_16 * e_4;
+        pc_30[k] = e_0 * (0.140625 * x * x * x * x * x * x * x * x + 0.5625 * x * x * x * x * x * x * y * y - 2.25 * x * x * x * x * x * x * z * z + 0.84375 * x * x * x * x * y * y * y * y - 6.75 * x * x * x * x * y * y * z * z + 9.75 * x * x * x * x * z * z * z * z + 0.5625 * x * x * y * y * y * y * y * y - 6.75 * x * x * y * y * y * y * z * z + 19.5 * x * x * y * y * z * z * z * z - 6.0 * x * x * z * z * z * z * z * z + 0.140625 * y * y * y * y * y * y * y * y - 2.25 * y * y * y * y * y * y * z * z + 9.75 * y * y * y * y * z * z * z * z - 6.0 * y * y * z * z * z * z * z * z + z * z * z * z * z * z * z * z) + e_1 * (2.25 * x * x * x * x * x * x + 6.75 * x * x * x * x * y * y + 18.0 * x * x * x * x * z * z + 6.75 * x * x * y * y * y * y + 36.0 * x * x * y * y * z * z - 12.0 * x * x * z * z * z * z + 2.25 * y * y * y * y * y * y + 18.0 * y * y * y * y * z * z - 12.0 * y * y * z * z * z * z + 16.0 * z * z * z * z * z * z) + e_2 * (29.25 * x * x * x * x + 58.5 * x * x * y * y + 36.0 * x * x * z * z + 29.25 * y * y * y * y + 36.0 * y * y * z * z + 108.0 * z * z * z * z) + e_3 * (90.0 * x * x + 90.0 * y * y + 240.0 * z * z) + e_4 * (105.0);
 
-        pc_31[k] = -fs_375_32 * e_0 * h2_p1 + e_1 * (f_81_28 * h4_p1 + fs_3375_392 * r_2 * h2_p1) + e_2 * (-fs_875_726 * h6_p1 - f_81_77 * r_2 * h4_p1 - fs_125_294 * r_4 * h2_p1) + e_3 * (fs_24010_184041 * h8_p1 + fs_70_3267 * r_2 * h6_p1 + f_81_1001 * r_4 * h4_p1 + fs_250_160083 * r_6 * h2_p1);
-
-        pc_32[k] = fs_3375_16 * e_0 * h2_p2 + e_1 * (-f_99_28 * h4_p2 - fs_30375_196 * r_2 * h2_p2) + e_2 * (f_9_7 * r_2 * h4_p2 + fs_375_49 * r_4 * h2_p2) + e_3 * (fs_17150_184041 * h8_p2 - f_9_91 * r_4 * h4_p2 - fs_500_17787 * r_6 * h2_p2);
+        pc_31[k] = e_0 * (-std::sqrt(0.791015625) * x * x * x * x * x * x * x * z - std::sqrt(7.119140625) * x * x * x * x * x * y * y * z + std::sqrt(68.90625) * x * x * x * x * x * z * z * z - std::sqrt(7.119140625) * x * x * x * y * y * y * y * z + std::sqrt(275.625) * x * x * x * y * y * z * z * z - std::sqrt(140.625) * x * x * x * z * z * z * z * z - std::sqrt(0.791015625) * x * y * y * y * y * y * y * z + std::sqrt(68.90625) * x * y * y * y * y * z * z * z - std::sqrt(140.625) * x * y * y * z * z * z * z * z + std::sqrt(10.0) * x * z * z * z * z * z * z * z) + e_1 * (std::sqrt(12.65625) * x * x * x * x * x * z + std::sqrt(50.625) * x * x * x * y * y * z - std::sqrt(360.0) * x * x * x * z * z * z + std::sqrt(12.65625) * x * y * y * y * y * z - std::sqrt(360.0) * x * y * y * z * z * z + std::sqrt(360.0) * x * z * z * z * z * z) + e_2 * (-std::sqrt(50.625) * x * x * x * z - std::sqrt(50.625) * x * y * y * z + std::sqrt(3240.0) * x * z * z * z) + e_3 * (std::sqrt(2250.0) * x * z);
     }
 
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_1, pe_2, pe_3, ph4_p3, ph4_p4, ph6_p3, ph6_p4, ph8_p3, ph8_p4, ab_2 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, pe_4, ab_x, ab_y, ab_z : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
-        const auto e_1 = pe_1[k];
-        const auto e_2 = pe_2[k];
-        const auto e_3 = pe_3[k];
+        const auto x = ab_x[k];
+        const auto y = ab_y[k];
+        const auto z = ab_z[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-
-        const auto h4_p3 = ph4_p3[k];
-        const auto h4_p4 = ph4_p4[k];
-        const auto h6_p3 = ph6_p3[k];
-        const auto h6_p4 = ph6_p4[k];
-        const auto h8_p3 = ph8_p3[k];
-        const auto h8_p4 = ph8_p4[k];
-
-        pc_33[k] = -f_27_4 * e_1 * h4_p3 + e_2 * (fs_625_363 * h6_p3 + f_27_11 * r_2 * h4_p3) + e_3 * (fs_2450_50193 * h8_p3 - fs_100_3267 * r_2 * h6_p3 - f_27_143 * r_4 * h4_p3);
-
-        pc_34[k] = f_9_2 * e_1 * h4_p4 + e_2 * (fs_500_121 * h6_p4 - f_18_11 * r_2 * h4_p4) + e_3 * (fs_245_16731 * h8_p4 - fs_80_1089 * r_2 * h6_p4 + f_18_143 * r_4 * h4_p4);
-    }
-
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, pe_4, ph2_0, ph2_p2, ph4_0, ph4_p2, ph6_0, ph6_p2, ph8_0, ph8_p2, ab_2 : simd::cache_line_size())
-    for (size_t k = 0; k < nmax; k++)
-    {
         const auto e_0 = pe_0[k];
         const auto e_1 = pe_1[k];
         const auto e_2 = pe_2[k];
         const auto e_3 = pe_3[k];
         const auto e_4 = pe_4[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
-        const auto r_8 = r_6 * r_2;
+        pc_32[k] = e_0 * (-std::sqrt(0.0439453125) * x * x * x * x * x * x * x * x - std::sqrt(0.17578125) * x * x * x * x * x * x * y * y + std::sqrt(8.61328125) * x * x * x * x * x * x * z * z + std::sqrt(8.61328125) * x * x * x * x * y * y * z * z - std::sqrt(112.8125) * x * x * x * x * z * z * z * z + std::sqrt(0.17578125) * x * x * y * y * y * y * y * y - std::sqrt(8.61328125) * x * x * y * y * y * y * z * z + std::sqrt(11.25) * x * x * z * z * z * z * z * z + std::sqrt(0.0439453125) * y * y * y * y * y * y * y * y - std::sqrt(8.61328125) * y * y * y * y * y * y * z * z + std::sqrt(112.8125) * y * y * y * y * z * z * z * z - std::sqrt(11.25) * y * y * z * z * z * z * z * z) + e_1 * (-std::sqrt(11.25) * x * x * x * x * x * x - std::sqrt(11.25) * x * x * x * x * y * y - std::sqrt(281.25) * x * x * x * x * z * z + std::sqrt(11.25) * x * x * y * y * y * y - std::sqrt(180.0) * x * x * z * z * z * z + std::sqrt(11.25) * y * y * y * y * y * y + std::sqrt(281.25) * y * y * y * y * z * z + std::sqrt(180.0) * y * y * z * z * z * z) + e_2 * (-std::sqrt(1240.3125) * x * x * x * x - std::sqrt(8201.25) * x * x * z * z + std::sqrt(1240.3125) * y * y * y * y + std::sqrt(8201.25) * y * y * z * z) + e_3 * (-std::sqrt(10125.0) * x * x + std::sqrt(10125.0) * y * y);
 
-        const auto h2_0 = ph2_0[k];
-        const auto h2_p2 = ph2_p2[k];
-        const auto h4_0 = ph4_0[k];
-        const auto h4_p2 = ph4_p2[k];
-        const auto h6_0 = ph6_0[k];
-        const auto h6_p2 = ph6_p2[k];
-        const auto h8_0 = ph8_0[k];
-        const auto h8_p2 = ph8_p2[k];
+        pc_33[k] = e_0 * (std::sqrt(0.615234375) * x * x * x * x * x * x * x * z - std::sqrt(0.615234375) * x * x * x * x * x * y * y * z - std::sqrt(39.375) * x * x * x * x * x * z * z * z - std::sqrt(15.380859375) * x * x * x * y * y * y * y * z + std::sqrt(157.5) * x * x * x * y * y * z * z * z + std::sqrt(4.375) * x * x * x * z * z * z * z * z - std::sqrt(5.537109375) * x * y * y * y * y * y * y * z + std::sqrt(354.375) * x * y * y * y * y * z * z * z - std::sqrt(39.375) * x * y * y * z * z * z * z * z) + e_1 * (-std::sqrt(9.84375) * x * x * x * x * x * z + std::sqrt(39.375) * x * x * x * y * y * z - std::sqrt(857.5) * x * x * x * z * z * z + std::sqrt(88.59375) * x * y * y * y * y * z + std::sqrt(7717.5) * x * y * y * z * z * z) + e_2 * (-std::sqrt(3189.375) * x * x * x * z + std::sqrt(28704.375) * x * y * y * z);
 
-        pc_35[k] = e_0 * (-f_85_8 * h2_0 - fs_1875_16 * h2_p2 - f_35_2 * r_2) + e_1 * (f_81_28 * h4_0 + fs_3645_196 * h4_p2 + f_255_28 * r_2 * h2_0 + fs_16875_196 * r_2 * h2_p2 + f_21_2 * r_4) + e_2 * (f_5_66 * h6_0 - fs_875_726 * h6_p2 - f_81_77 * r_2 * h4_0 - fs_14580_5929 * r_2 * h4_p2 - f_85_42 * r_4 * h2_0 - fs_625_147 * r_4 * h2_p2 - f_2 * r_6) + e_3 * (-f_392_1287 * h8_0 + fs_13720_184041 * h8_p2 - f_1_99 * r_2 * h6_0 + fs_70_3267 * r_2 * h6_p2 + f_81_1001 * r_4 * h4_0 + fs_14580_1002001 * r_4 * h4_p2 + f_85_693 * r_6 * h2_0 + fs_2500_160083 * r_6 * h2_p2 + f_1_9 * r_8) + f_105_16 * e_4;
+        pc_34[k] = e_0 * (std::sqrt(0.076904296875) * x * x * x * x * x * x * x * x - std::sqrt(1.23046875) * x * x * x * x * x * x * y * y - std::sqrt(4.921875) * x * x * x * x * x * x * z * z - std::sqrt(7.6904296875) * x * x * x * x * y * y * y * y + std::sqrt(123.046875) * x * x * x * x * y * y * z * z + std::sqrt(0.546875) * x * x * x * x * z * z * z * z - std::sqrt(1.23046875) * x * x * y * y * y * y * y * y + std::sqrt(123.046875) * x * x * y * y * y * y * z * z - std::sqrt(19.6875) * x * x * y * y * z * z * z * z + std::sqrt(0.076904296875) * y * y * y * y * y * y * y * y - std::sqrt(4.921875) * y * y * y * y * y * y * z * z + std::sqrt(0.546875) * y * y * y * y * z * z * z * z) + e_1 * (std::sqrt(19.6875) * x * x * x * x * x * x - std::sqrt(492.1875) * x * x * x * x * y * y - std::sqrt(315.0) * x * x * x * x * z * z - std::sqrt(492.1875) * x * x * y * y * y * y + std::sqrt(11340.0) * x * x * y * y * z * z + std::sqrt(19.6875) * y * y * y * y * y * y - std::sqrt(315.0) * y * y * y * y * z * z) + e_2 * (std::sqrt(177.1875) * x * x * x * x - std::sqrt(6378.75) * x * x * y * y + std::sqrt(177.1875) * y * y * y * y);
+
+        pc_35[k] = e_0 * (5.625 * x * x * x * x * x * x * z * z + 11.25 * x * x * x * x * y * y * z * z - 15.0 * x * x * x * x * z * z * z * z + 5.625 * x * x * y * y * y * y * z * z - 15.0 * x * x * y * y * z * z * z * z + 10.0 * x * x * z * z * z * z * z * z) + e_1 * (5.625 * x * x * x * x * x * x + 11.25 * x * x * x * x * y * y + 5.625 * x * x * x * x * z * z + 5.625 * x * x * y * y * y * y + 11.25 * x * x * y * y * z * z + 45.0 * x * x * z * z * z * z + 5.625 * y * y * y * y * z * z - 15.0 * y * y * z * z * z * z + 10.0 * z * z * z * z * z * z) + e_2 * (50.625 * x * x * x * x + 56.25 * x * x * y * y + 157.5 * x * x * z * z + 5.625 * y * y * y * y - 22.5 * y * y * z * z + 90.0 * z * z * z * z) + e_3 * (172.5 * x * x + 22.5 * y * y + 225.0 * z * z) + e_4 * (105.0);
     }
 
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, ph2_p1, ph4_p1, ph4_p3, ph6_p1, ph6_p3, ph8_p1, ph8_p3, ab_2 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, pe_4, ab_x, ab_y, ab_z : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
-        const auto e_0 = pe_0[k];
-        const auto e_1 = pe_1[k];
-        const auto e_2 = pe_2[k];
-        const auto e_3 = pe_3[k];
+        const auto x = ab_x[k];
+        const auto y = ab_y[k];
+        const auto z = ab_z[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
-
-        const auto h2_p1 = ph2_p1[k];
-        const auto h4_p1 = ph4_p1[k];
-        const auto h4_p3 = ph4_p3[k];
-        const auto h6_p1 = ph6_p1[k];
-        const auto h6_p3 = ph6_p3[k];
-        const auto h8_p1 = ph8_p1[k];
-        const auto h8_p3 = ph8_p3[k];
-
-        pc_36[k] = -fs_6075_128 * e_0 * h2_p1 + e_1 * (fs_3645_196 * h4_p1 + fs_405_112 * h4_p3 + fs_54675_1568 * r_2 * h2_p1) + e_2 * (-fs_525_968 * h6_p1 - fs_875_1452 * h6_p3 - fs_14580_5929 * r_2 * h4_p1 - fs_405_847 * r_2 * h4_p3 - fs_675_392 * r_4 * h2_p1) + e_3 * (-fs_4802_184041 * h8_p1 + fs_3430_50193 * h8_p3 + fs_7_726 * r_2 * h6_p1 + fs_35_3267 * r_2 * h6_p3 + fs_14580_1002001 * r_4 * h4_p1 + fs_405_143143 * r_4 * h4_p3 + fs_75_11858 * r_6 * h2_p1);
-    }
-
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, ph2_p2, ph4_p2, ph4_p3, ph4_p4, ph6_p2, ph6_p3, ph6_p4, ph6_p5, ph8_p2, ph8_p3, ph8_p4, ph8_p5, ab_2 : simd::cache_line_size())
-    for (size_t k = 0; k < nmax; k++)
-    {
-        const auto e_0 = pe_0[k];
-        const auto e_1 = pe_1[k];
-        const auto e_2 = pe_2[k];
-        const auto e_3 = pe_3[k];
-
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
-
-        const auto h2_p2 = ph2_p2[k];
-        const auto h4_p2 = ph4_p2[k];
-        const auto h4_p3 = ph4_p3[k];
-        const auto h4_p4 = ph4_p4[k];
-        const auto h6_p2 = ph6_p2[k];
-        const auto h6_p3 = ph6_p3[k];
-        const auto h6_p4 = ph6_p4[k];
-        const auto h6_p5 = ph6_p5[k];
-        const auto h8_p2 = ph8_p2[k];
-        const auto h8_p3 = ph8_p3[k];
-        const auto h8_p4 = ph8_p4[k];
-        const auto h8_p5 = ph8_p5[k];
-
-        pc_37[k] = fs_4725_64 * e_0 * h2_p2 + e_1 * (fs_405_112 * h4_p2 - fs_405_16 * h4_p4 - fs_6075_112 * r_2 * h2_p2) + e_2 * (-fs_375_242 * h6_p2 + f_5_22 * h6_p4 - fs_405_847 * r_2 * h4_p2 + fs_405_121 * r_2 * h4_p4 + fs_75_28 * r_4 * h2_p2) + e_3 * (-fs_1960_184041 * h8_p2 + fs_784_16731 * h8_p4 + fs_10_363 * r_2 * h6_p2 - f_1_33 * r_2 * h6_p4 + fs_405_143143 * r_4 * h4_p2 - fs_405_20449 * r_4 * h4_p4 - fs_25_2541 * r_6 * h2_p2);
-
-        pc_38[k] = -fs_405_16 * e_1 * h4_p3 + e_2 * (-fs_500_363 * h6_p3 + fs_25_11 * h6_p5 + fs_405_121 * r_2 * h4_p3) + e_3 * (-fs_245_100386 * h8_p3 + fs_49_2574 * h8_p5 + fs_80_3267 * r_2 * h6_p3 - fs_4_99 * r_2 * h6_p5 - fs_405_20449 * r_4 * h4_p3);
-    }
-
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, pe_4, ph2_0, ph4_0, ph4_p4, ph6_0, ph6_p4, ph8_0, ph8_p4, ab_2 : simd::cache_line_size())
-    for (size_t k = 0; k < nmax; k++)
-    {
         const auto e_0 = pe_0[k];
         const auto e_1 = pe_1[k];
         const auto e_2 = pe_2[k];
         const auto e_3 = pe_3[k];
         const auto e_4 = pe_4[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
-        const auto r_8 = r_6 * r_2;
+        pc_36[k] = e_0 * (std::sqrt(1.7578125) * x * x * x * x * x * x * x * z + std::sqrt(1.7578125) * x * x * x * x * x * y * y * z - std::sqrt(94.53125) * x * x * x * x * x * z * z * z - std::sqrt(1.7578125) * x * x * x * y * y * y * y * z + std::sqrt(112.5) * x * x * x * z * z * z * z * z - std::sqrt(1.7578125) * x * y * y * y * y * y * y * z + std::sqrt(94.53125) * x * y * y * y * y * z * z * z - std::sqrt(112.5) * x * y * y * z * z * z * z * z) + e_1 * (std::sqrt(28.125) * x * x * x * y * y * z + std::sqrt(78.125) * x * x * x * z * z * z + std::sqrt(28.125) * x * y * y * y * y * z - std::sqrt(2278.125) * x * y * y * z * z * z + std::sqrt(450.0) * x * z * z * z * z * z) + e_2 * (std::sqrt(253.125) * x * x * x * z - std::sqrt(2278.125) * x * y * y * z + std::sqrt(9112.5) * x * z * z * z) + e_3 * (std::sqrt(9112.5) * x * z);
 
-        const auto h2_0 = ph2_0[k];
-        const auto h4_0 = ph4_0[k];
-        const auto h4_p4 = ph4_p4[k];
-        const auto h6_0 = ph6_0[k];
-        const auto h6_p4 = ph6_p4[k];
-        const auto h8_0 = ph8_0[k];
-        const auto h8_p4 = ph8_p4[k];
+        pc_37[k] = e_0 * (-std::sqrt(24.609375) * x * x * x * x * x * x * z * z + std::sqrt(98.4375) * x * x * x * x * y * y * z * z + std::sqrt(43.75) * x * x * x * x * z * z * z * z + std::sqrt(221.484375) * x * x * y * y * y * y * z * z - std::sqrt(393.75) * x * x * y * y * z * z * z * z) + e_1 * (-std::sqrt(24.609375) * x * x * x * x * x * x + std::sqrt(98.4375) * x * x * x * x * y * y - std::sqrt(615.234375) * x * x * x * x * z * z + std::sqrt(221.484375) * x * x * y * y * y * y + std::sqrt(885.9375) * x * x * y * y * z * z + std::sqrt(393.75) * x * x * z * z * z * z + std::sqrt(221.484375) * y * y * y * y * z * z - std::sqrt(393.75) * y * y * z * z * z * z) + e_2 * (-std::sqrt(1993.359375) * x * x * x * x + std::sqrt(7973.4375) * x * x * y * y + std::sqrt(221.484375) * y * y * y * y) + e_3 * (-std::sqrt(3543.75) * x * x + std::sqrt(3543.75) * y * y);
 
-        pc_39[k] = e_0 * (-f_5 * h2_0 - f_35_2 * r_2) + e_1 * (-f_99_28 * h4_0 + fs_3645_112 * h4_p4 + f_30_7 * r_2 * h2_0 + f_21_2 * r_4) + e_2 * (f_5_3 * h6_0 - fs_175_121 * h6_p4 + f_9_7 * r_2 * h4_0 - fs_3645_847 * r_2 * h4_p4 - f_20_21 * r_4 * h2_0 - f_2 * r_6) + e_3 * (f_196_1287 * h8_0 + fs_1372_16731 * h8_p4 - f_2_9 * r_2 * h6_0 + fs_28_1089 * r_2 * h6_p4 - f_9_91 * r_4 * h4_0 + fs_3645_143143 * r_4 * h4_p4 + f_40_693 * r_6 * h2_0 + f_1_9 * r_8) + f_105_16 * e_4;
+        pc_38[k] = e_0 * (-std::sqrt(3.076171875) * x * x * x * x * x * x * x * z + std::sqrt(76.904296875) * x * x * x * x * x * y * y * z + std::sqrt(5.46875) * x * x * x * x * x * z * z * z + std::sqrt(76.904296875) * x * x * x * y * y * y * y * z - std::sqrt(196.875) * x * x * x * y * y * z * z * z - std::sqrt(3.076171875) * x * y * y * y * y * y * y * z + std::sqrt(5.46875) * x * y * y * y * y * z * z * z) + e_1 * (-std::sqrt(442.96875) * x * x * x * x * x * z + std::sqrt(9646.875) * x * x * x * y * y * z + std::sqrt(87.5) * x * x * x * z * z * z + std::sqrt(49.21875) * x * y * y * y * y * z - std::sqrt(787.5) * x * y * y * z * z * z) + e_2 * (-std::sqrt(1771.875) * x * x * x * z + std::sqrt(15946.875) * x * y * y * z);
+
+        pc_39[k] = e_0 * (0.3125 * x * x * x * x * x * x * x * x - 3.75 * x * x * x * x * x * x * z * z - 0.625 * x * x * x * x * y * y * y * y + 3.75 * x * x * x * x * y * y * z * z + 11.25 * x * x * x * x * z * z * z * z + 3.75 * x * x * y * y * y * y * z * z - 22.5 * x * x * y * y * z * z * z * z + 0.3125 * y * y * y * y * y * y * y * y - 3.75 * y * y * y * y * y * y * z * z + 11.25 * y * y * y * y * z * z * z * z) + e_1 * (5.0 * x * x * x * x * x * x + 15.0 * x * x * x * x * z * z - 90.0 * x * x * y * y * z * z + 45.0 * x * x * z * z * z * z + 5.0 * y * y * y * y * y * y + 15.0 * y * y * y * y * z * z + 45.0 * y * y * z * z * z * z) + e_2 * (45.0 * x * x * x * x - 45.0 * x * x * y * y + 135.0 * x * x * z * z + 45.0 * y * y * y * y + 135.0 * y * y * z * z + 45.0 * z * z * z * z) + e_3 * (120.0 * x * x + 120.0 * y * y + 180.0 * z * z) + e_4 * (105.0);
     }
 
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, ph2_p1, ph2_p2, ph4_p1, ph4_p2, ph6_p1, ph6_p2, ph6_p5, ph6_p6, ph8_p1, ph8_p2, ph8_p5, ph8_p6, ab_2 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, pe_4, ab_x, ab_y, ab_z : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
-        const auto e_0 = pe_0[k];
-        const auto e_1 = pe_1[k];
-        const auto e_2 = pe_2[k];
-        const auto e_3 = pe_3[k];
+        const auto x = ab_x[k];
+        const auto y = ab_y[k];
+        const auto z = ab_z[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
-
-        const auto h2_p1 = ph2_p1[k];
-        const auto h2_p2 = ph2_p2[k];
-        const auto h4_p1 = ph4_p1[k];
-        const auto h4_p2 = ph4_p2[k];
-        const auto h6_p1 = ph6_p1[k];
-        const auto h6_p2 = ph6_p2[k];
-        const auto h6_p5 = ph6_p5[k];
-        const auto h6_p6 = ph6_p6[k];
-        const auto h8_p1 = ph8_p1[k];
-        const auto h8_p2 = ph8_p2[k];
-        const auto h8_p5 = ph8_p5[k];
-        const auto h8_p6 = ph8_p6[k];
-
-        pc_40[k] = -fs_13125_128 * e_0 * h2_p1 + e_1 * (fs_405_112 * h4_p1 + fs_16875_224 * r_2 * h2_p1) + e_2 * (fs_4225_2904 * h6_p1 - fs_25_44 * h6_p5 - fs_405_847 * r_2 * h4_p1 - fs_625_168 * r_4 * h2_p1) + e_3 * (fs_686_184041 * h8_p1 + fs_98_1287 * h8_p5 - fs_169_6534 * r_2 * h6_p1 + fs_1_99 * r_2 * h6_p5 + fs_405_143143 * r_4 * h4_p1 + fs_625_45738 * r_6 * h2_p1);
-
-        pc_41[k] = fs_525_16 * e_0 * h2_p2 + e_1 * (fs_3645_112 * h4_p2 - fs_675_28 * r_2 * h2_p2) + e_2 * (fs_250_363 * h6_p2 + fs_50_33 * h6_p6 - fs_3645_847 * r_2 * h4_p2 + fs_25_21 * r_4 * h2_p2) + e_3 * (fs_245_368082 * h8_p2 + fs_343_7722 * h8_p6 - fs_40_3267 * r_2 * h6_p2 - fs_8_297 * r_2 * h6_p6 + fs_3645_143143 * r_4 * h4_p2 - fs_100_22869 * r_6 * h2_p2);
-    }
-
-    // NOTE: the rows are formed in 23 loops, as the vectorizer runs out of
-    // registers with all 45 of them in one.
-
-#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, pe_4, ph2_0, ph2_p1, ph4_0, ph4_p1, ph6_0, ph6_p1, ph6_p6, ph8_0, ph8_p1, ph8_p6, ph8_p7, ph8_p8, ab_2 : simd::cache_line_size())
-    for (size_t k = 0; k < nmax; k++)
-    {
         const auto e_0 = pe_0[k];
         const auto e_1 = pe_1[k];
         const auto e_2 = pe_2[k];
         const auto e_3 = pe_3[k];
         const auto e_4 = pe_4[k];
 
-        const auto r_2 = ab_2[k];
-        const auto r_4 = r_2 * r_2;
-        const auto r_6 = r_4 * r_2;
-        const auto r_8 = r_6 * r_2;
+        pc_40[k] = e_0 * (-std::sqrt(1.3671875) * x * x * x * x * x * x * x * z + std::sqrt(12.3046875) * x * x * x * x * x * y * y * z + std::sqrt(49.21875) * x * x * x * x * x * z * z * z + std::sqrt(1.3671875) * x * x * x * y * y * y * y * z - std::sqrt(787.5) * x * x * x * y * y * z * z * z - std::sqrt(12.3046875) * x * y * y * y * y * y * y * z + std::sqrt(442.96875) * x * y * y * y * y * z * z * z) + e_1 * (-std::sqrt(1771.875) * x * x * x * y * y * z + std::sqrt(1771.875) * x * x * x * z * z * z + std::sqrt(196.875) * x * y * y * y * y * z + std::sqrt(1771.875) * x * y * y * z * z * z) + e_2 * (std::sqrt(1771.875) * x * x * x * z + std::sqrt(1771.875) * x * y * y * z + std::sqrt(7087.5) * x * z * z * z) + e_3 * (std::sqrt(19687.5) * x * z);
 
-        const auto h2_0 = ph2_0[k];
-        const auto h2_p1 = ph2_p1[k];
-        const auto h4_0 = ph4_0[k];
-        const auto h4_p1 = ph4_p1[k];
-        const auto h6_0 = ph6_0[k];
-        const auto h6_p1 = ph6_p1[k];
-        const auto h6_p6 = ph6_p6[k];
-        const auto h8_0 = ph8_0[k];
-        const auto h8_p1 = ph8_p1[k];
-        const auto h8_p6 = ph8_p6[k];
-        const auto h8_p7 = ph8_p7[k];
-        const auto h8_p8 = ph8_p8[k];
+        pc_41[k] = e_0 * (-std::sqrt(0.1708984375) * x * x * x * x * x * x * x * x + std::sqrt(6.15234375) * x * x * x * x * x * x * y * y + std::sqrt(6.15234375) * x * x * x * x * x * x * z * z - std::sqrt(301.46484375) * x * x * x * x * y * y * z * z - std::sqrt(6.15234375) * x * x * y * y * y * y * y * y + std::sqrt(301.46484375) * x * x * y * y * y * y * z * z + std::sqrt(0.1708984375) * y * y * y * y * y * y * y * y - std::sqrt(6.15234375) * y * y * y * y * y * y * z * z) + e_1 * (-std::sqrt(43.75) * x * x * x * x * x * x + std::sqrt(393.75) * x * x * x * x * y * y + std::sqrt(393.75) * x * x * x * x * z * z - std::sqrt(393.75) * x * x * y * y * y * y + std::sqrt(43.75) * y * y * y * y * y * y - std::sqrt(393.75) * y * y * y * y * z * z) + e_2 * (-std::sqrt(885.9375) * x * x * x * x + std::sqrt(3543.75) * x * x * z * z + std::sqrt(885.9375) * y * y * y * y - std::sqrt(3543.75) * y * y * z * z) + e_3 * (-std::sqrt(1575.0) * x * x + std::sqrt(1575.0) * y * y);
 
-        pc_42[k] = e_0 * (f_35_8 * h2_0 - f_35_2 * r_2) + e_1 * (-f_27_4 * h4_0 - f_15_4 * r_2 * h2_0 + f_21_2 * r_4) + e_2 * (-f_85_66 * h6_0 - fs_175_66 * h6_p6 + f_27_11 * r_2 * h4_0 + f_5_6 * r_4 * h2_0 - f_2 * r_6) + e_3 * (-f_56_1287 * h8_0 + fs_392_3861 * h8_p6 + f_17_99 * r_2 * h6_0 + fs_14_297 * r_2 * h6_p6 - f_27_143 * r_4 * h4_0 - f_5_99 * r_6 * h2_0 + f_1_9 * r_8) + f_105_16 * e_4;
+        pc_42[k] = e_0 * (4.375 * x * x * x * x * x * x * z * z - 26.25 * x * x * x * x * y * y * z * z + 39.375 * x * x * y * y * y * y * z * z) + e_1 * (4.375 * x * x * x * x * x * x - 26.25 * x * x * x * x * y * y + 39.375 * x * x * x * x * z * z + 39.375 * x * x * y * y * y * y + 78.75 * x * x * y * y * z * z + 39.375 * y * y * y * y * z * z) + e_2 * (39.375 * x * x * x * x + 78.75 * x * x * y * y + 157.5 * x * x * z * z + 39.375 * y * y * y * y + 157.5 * y * y * z * z) + e_3 * (157.5 * x * x + 157.5 * y * y + 105.0 * z * z) + e_4 * (105.0);
 
-        pc_43[k] = -fs_3675_32 * e_0 * h2_p1 + e_1 * (-fs_405_16 * h4_p1 + fs_675_8 * r_2 * h2_p1) + e_2 * (-fs_175_726 * h6_p1 + fs_405_121 * r_2 * h4_p1 - fs_25_6 * r_4 * h2_p1) + e_3 * (-fs_49_368082 * h8_p1 + fs_245_2574 * h8_p7 + fs_14_3267 * r_2 * h6_p1 - fs_405_20449 * r_4 * h4_p1 + fs_50_3267 * r_6 * h2_p1);
+        pc_43[k] = e_0 * (std::sqrt(2.392578125) * x * x * x * x * x * x * x * z - std::sqrt(193.798828125) * x * x * x * x * x * y * y * z + std::sqrt(863.720703125) * x * x * x * y * y * y * y * z - std::sqrt(21.533203125) * x * y * y * y * y * y * y * z) + e_1 * (std::sqrt(344.53125) * x * x * x * x * x * z + std::sqrt(1378.125) * x * x * x * y * y * z + std::sqrt(344.53125) * x * y * y * y * y * z) + e_2 * (std::sqrt(12403.125) * x * x * x * z + std::sqrt(12403.125) * x * y * y * z) + e_3 * (std::sqrt(22050.0) * x * z);
+    }
 
-        pc_44[k] = e_0 * (f_35_2 * h2_0 - f_35_2 * r_2) + e_1 * (f_9_2 * h4_0 - f_15 * r_2 * h2_0 + f_21_2 * r_4) + e_2 * (f_10_33 * h6_0 - f_18_11 * r_2 * h4_0 + f_10_3 * r_4 * h2_0 - f_2 * r_6) + e_3 * (f_7_1287 * h8_0 + fs_245_1287 * h8_p8 - f_4_99 * r_2 * h6_0 + f_18_143 * r_4 * h4_0 - f_20_99 * r_6 * h2_0 + f_1_9 * r_8) + f_105_16 * e_4;
+#pragma omp simd aligned(pe_0, pe_1, pe_2, pe_3, pe_4, ab_x, ab_y : simd::cache_line_size())
+    for (size_t k = 0; k < nmax; k++)
+    {
+        const auto x = ab_x[k];
+        const auto y = ab_y[k];
+
+        const auto e_0 = pe_0[k];
+        const auto e_1 = pe_1[k];
+        const auto e_2 = pe_2[k];
+        const auto e_3 = pe_3[k];
+        const auto e_4 = pe_4[k];
+
+        pc_44[k] = e_0 * (0.546875 * x * x * x * x * x * x * x * x - 6.5625 * x * x * x * x * x * x * y * y + 20.78125 * x * x * x * x * y * y * y * y - 6.5625 * x * x * y * y * y * y * y * y + 0.546875 * y * y * y * y * y * y * y * y) + e_1 * (8.75 * x * x * x * x * x * x + 26.25 * x * x * x * x * y * y + 26.25 * x * x * y * y * y * y + 8.75 * y * y * y * y * y * y) + e_2 * (78.75 * x * x * x * x + 157.5 * x * x * y * y + 78.75 * y * y * y * y) + e_3 * (210.0 * x * x + 210.0 * y * y) + e_4 * (105.0);
     }
 
     // NOTE: the values of a combination of angular components are stored as one
