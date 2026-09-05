@@ -115,22 +115,22 @@ one_center_overlap(const CBasisFunction &bra, const CBasisFunction &ket) -> doub
 /// surviving the screening of the combination of basis functions.
 /// @param bra The basis function on bra side.
 /// @param ket The basis function on ket side.
-/// @param harmonics The solid harmonics of the vectors between the atoms of the
-/// atom pairs, with the element of index l - 1 holding those of angular momentum l.
-/// @param coordinates The coordinates of the atom pairs, as seven rows ordered by
+/// @param coordinates The coordinates of the atom pairs, as ten rows ordered by
 /// ascending interatomic distance, the last of which holds the squared distance
 /// of the atom pair.
 /// @param threshold The screening threshold of the integrals.
 /// @note The values of the combination of basis functions are stored as one row
 /// of nvalues columns for each of the (2 l_bra + 1) (2 l_ket + 1) spherical
 /// components, with the components of the bra side running slowest.
-auto compute_overlap(double                         *values,
-                     const size_t                    nvalues,
-                     const CBasisFunction           &bra,
-                     const CBasisFunction           &ket,
-                     const std::vector<CSimdMatrix> &harmonics,
-                     const CSimdMatrix              &coordinates,
-                     const double                    threshold) -> void;
+/// @note Only the combination of two S type functions is dispatched while the
+/// kernels of the higher angular momenta are redesigned. Every other combination
+/// stops with an error rather than returning values it did not compute.
+auto compute_overlap(double               *values,
+                     const size_t          nvalues,
+                     const CBasisFunction &bra,
+                     const CBasisFunction &ket,
+                     const CSimdMatrix    &coordinates,
+                     const double          threshold) -> void;
 
 }  // namespace simdovl
 

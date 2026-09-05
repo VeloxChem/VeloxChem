@@ -45,7 +45,6 @@
 #include "Matrix.hpp"
 #include "ScreeningFunc.hpp"
 #include "SimdCoordinates.hpp"
-#include "SimdHarmonics.hpp"
 #include "SimdOverlapFunc.hpp"
 
 auto
@@ -100,8 +99,8 @@ CSimdOverlapDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
                                          const CMolecularBasis &ket_basis) const -> void
 {
     // NOTE: the blocks are independent, as each of them forms its own coordinates
-    // and solid harmonics and writes the values of its own combinations of basis
-    // functions, which no other block addresses. Dynamic scheduling is used as
+    // and writes the values of its own combinations of basis functions, which no
+    // other block addresses. Dynamic scheduling is used as
     // the blocks hold a comparable number of atom pairs but differ in the number
     // of the combinations of basis functions and in the cost of their kernels.
 
@@ -167,17 +166,6 @@ CSimdOverlapDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
 
         const auto &b_basis = ket_basis.basis_set(block.ket_index());
 
-        // NOTE: the solid harmonics of the vectors between the atoms are created
-        // once for the whole block, as all combinations of basis functions of the
-        // block share them. They reach the sum of the angular momenta of the atom
-        // bases of the block, as that is the highest angular momentum the
-        // recursions of the integrals reach, and are empty when both atom bases
-        // carry S type functions only.
-
-        const auto lmax = a_basis.max_angular_momentum() + b_basis.max_angular_momentum();
-
-        const auto harmonics = simdfunc::make_solid_harmonics(coordinates, lmax);
-
         const auto a_indices = denseidx::index_functions(a_basis);
 
         const auto b_indices = denseidx::index_functions(b_basis);
@@ -187,8 +175,8 @@ CSimdOverlapDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
         // shares its storage with the reverse order.
 
         // NOTE: the combinations of basis functions are independent, as each of
-        // them writes its own values and reads the coordinates and the harmonics
-        // of the block without changing them.
+        // them writes its own values and reads the coordinates of the block
+        // without changing them.
 
         for (size_t i = 0; i < a_indices.size(); i++)
         {
@@ -206,7 +194,6 @@ CSimdOverlapDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
                                          nvalues,
                                          a_basis.functions()[i],
                                          b_basis.functions()[j],
-                                         harmonics,
                                          coordinates,
                                          _threshold);
             }

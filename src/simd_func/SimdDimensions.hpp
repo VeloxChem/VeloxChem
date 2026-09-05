@@ -51,7 +51,7 @@ namespace simdfunc {  // simdfunc namespace
 /// @param bra The basis function on bra side.
 /// @param ket The basis function on ket side.
 /// @param npairs The number of atom pairs to screen.
-/// @param coordinates The coordinates of the atom pairs, as seven rows of npairs
+/// @param coordinates The coordinates of the atom pairs, as ten rows of npairs
 /// columns, ordered by ascending interatomic distance.
 /// @param bound The integral bound, evaluated as bound(bra, iprim, ket, jprim,
 /// distance).
@@ -70,8 +70,8 @@ make_column_dimensions(const CBasisFunction &bra,
                        const B              &bound,
                        const double          threshold) -> std::vector<size_t>
 {
-    errors::assertMsgCritical(coordinates.number_of_rows() == 7,
-                              std::string("SimdDimensions.make_column_dimensions: Coordinates must have seven rows"));
+    errors::assertMsgCritical(coordinates.number_of_rows() == 10,
+                              std::string("SimdDimensions.make_column_dimensions: Coordinates must have ten rows"));
 
     errors::assertMsgCritical(npairs <= coordinates.number_of_columns(),
                               std::string("SimdDimensions.make_column_dimensions: Number of atom pairs exceeds coordinates"));
@@ -80,7 +80,7 @@ make_column_dimensions(const CBasisFunction &bra,
     // so that the bisection below reads it instead of recomputing it from the
     // coordinates of the atoms.
 
-    const auto *ab_2 = coordinates.data(6);
+    const auto *ab_2 = coordinates.data(9);
 
     const auto distance = [&](const size_t i) { return std::sqrt(ab_2[i]); };
 
@@ -111,7 +111,7 @@ make_column_dimensions(const CBasisFunction &bra,
 /// @param c The basis function on c side.
 /// @param npairs The number of atom pairs to screen.
 /// @param coordinates The coordinates of the atom pairs on a and b sides, as
-/// seven rows of npairs columns, ordered by ascending interatomic distance.
+/// ten rows of npairs columns, ordered by ascending interatomic distance.
 /// @param bound The integral bound, evaluated as bound(a, iprim, b, jprim, c,
 /// kprim, distance).
 /// @param threshold The screening threshold.
@@ -132,8 +132,8 @@ make_column_dimensions(const CBasisFunction &a,
                        const B              &bound,
                        const double          threshold) -> std::vector<size_t>
 {
-    errors::assertMsgCritical(coordinates.number_of_rows() == 7,
-                              std::string("SimdDimensions.make_column_dimensions: Coordinates must have seven rows"));
+    errors::assertMsgCritical(coordinates.number_of_rows() == 10,
+                              std::string("SimdDimensions.make_column_dimensions: Coordinates must have ten rows"));
 
     errors::assertMsgCritical(npairs <= coordinates.number_of_columns(),
                               std::string("SimdDimensions.make_column_dimensions: Number of atom pairs exceeds coordinates"));
@@ -142,7 +142,7 @@ make_column_dimensions(const CBasisFunction &a,
     // so that the bisection below reads it instead of recomputing it from the
     // coordinates of the atoms.
 
-    const auto *ab_2 = coordinates.data(6);
+    const auto *ab_2 = coordinates.data(9);
 
     const auto distance = [&](const size_t i) { return std::sqrt(ab_2[i]); };
 

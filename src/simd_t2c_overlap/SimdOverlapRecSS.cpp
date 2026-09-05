@@ -120,7 +120,7 @@ compute_ss_overlap(double               *values,
     // coordinates, so that they are formed once for the whole block instead of
     // once for every combination of basis functions.
 
-    const auto *ab_2 = coordinates.data(6);
+    const auto *ab_2 = coordinates.data(9);
 
     constexpr auto fpi = mathconst::pi_value();
 

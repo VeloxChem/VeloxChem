@@ -50,7 +50,7 @@ namespace simdovl {  // simdovl namespace
 /// surviving the screening of the combination of basis functions.
 /// @param bra The basis function on bra side.
 /// @param ket The basis function on ket side.
-/// @param coordinates The coordinates of the atom pairs, as seven rows ordered by
+/// @param coordinates The coordinates of the atom pairs, as ten rows ordered by
 /// ascending interatomic distance, the last of which holds the squared distance
 /// of the atom pair. Only the leading nvalues columns are read, as the atom pairs
 /// surviving the screening are the closest ones.
