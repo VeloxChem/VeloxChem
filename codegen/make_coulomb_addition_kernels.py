@@ -79,45 +79,82 @@ def _literal(fr):
     return f"{fr.p}.0 / {fr.q}.0"
 
 
-def coefficient(c):
-    """A coefficient of the table as the kernels write it. Every one of them is a
-    signed square root of a rational, so it is exact whenever that root is."""
-    c = sp.nsimplify(sp.simplify(c))
-    sign = '-' if c < 0 else ''
-    sq = sp.Rational(sp.simplify(c ** 2))
+def magnitude(c):
+    """The absolute value of a coefficient of the table as the kernels write it.
+    Every one of them is a square root of a rational, so it is exact whenever that
+    root is. The string is a function of that rational alone, so two coefficients
+    share it exactly when they share a magnitude, which is what lets the brackets
+    below group by it."""
+    sq = sp.Rational(sp.simplify(sp.nsimplify(sp.simplify(c)) ** 2))
     p, q = _isqrt_exact(sq.p), _isqrt_exact(sq.q)
     if p is not None and q is not None:
-        return sign + _literal(sp.Rational(p, q))
-    return sign + f"std::sqrt({_literal(sq)})"
+        return _literal(sp.Rational(p, q))
+    return f"std::sqrt({_literal(sq)})"
 
 
-def _terms(coeffs, m, rows):
-    """The bracket of one angular component, as a sum over the products."""
-    out = []
+def _bracket(coeffs, m, rows):
+    """The bracket of one angular component, as a sum over the products which
+    carry it, or None if no product does.
+
+    The products are grouped by the magnitude of their coefficient, so that a
+    magnitude shared by several of them multiplies their sum once instead of
+    multiplying each of them in turn. The compiler cannot do this itself:
+    distributing a product over a sum does not preserve the rounding and is not
+    performed without -ffast-math, which this project does not build with. The
+    signs are left inside the group, so that no sign algebra is done on the
+    coefficients of the table."""
+    groups = {}
     for key in rows:
         c = coeffs.get(key, {}).get(m)
         if c is None:
             continue
-        s = coefficient(c)
-        var = rows[key]
-        if s == '1.0':
-            out.append(f"{var}[k]")
-        elif s == '-1.0':
-            out.append(f"-{var}[k]")
+        c = sp.nsimplify(sp.simplify(c))
+        groups.setdefault(magnitude(c), []).append(('-' if c < 0 else '', rows[key]))
+
+    if not groups:
+        return None
+
+    out = []
+    for mag, items in groups.items():
+        body = ""
+        for i, (sign, var) in enumerate(items):
+            body += f"{sign}{var}[k]" if i == 0 else (" - " if sign else " + ") + f"{var}[k]"
+        if mag == '1.0':
+            out.append(body)
+        elif len(items) == 1:
+            out.append(f"{items[0][0]}{mag} * {items[0][1]}[k]")
         else:
-            out.append(f"{s} * {var}[k]")
-    return out
+            out.append(f"{mag} * ({body})")
+    return " + ".join(out).replace("+ -", "- ")
 
 
 # NOTE: the three kinds differ only in the scalar a bidegree accumulates. `name`
 # builds the file and function name from the position of the angular momentum,
-# `moments` the angular momenta the kernel asserts, and `scalars` emits the
-# declarations and the accumulation expression of one bidegree.
+# `moments` the angular momenta the kernel asserts, `scalars` emits the
+# declarations and the accumulation expression of one bidegree, and `blurb` opens
+# the documentation of the header, which has to name the side the angular
+# momentum sits on.
+
+
+def _blurb(side, others):
+    """The opening of the header documentation, naming the side which carries the
+    angular momentum. The two sides which do not carry it follow it."""
+    return lambda l: ("/// @brief Computes the three-center electron repulsion integrals of one basis\n"
+                      f"/// function of angular momentum {WORD[l]} on {side} side and two of zero angular\n"
+                      f"/// momentum on {others} sides, over the atom pairs of a block and for one atom\n"
+                      "/// on c side.\n")
+
 
 KINDS = {
-    'ssl': dict(name=lambda l: 'SS' + LETTER[l], moments=lambda l: (0, 0, l)),
-    'lss': dict(name=lambda l: LETTER[l] + 'SS', moments=lambda l: (l, 0, 0)),
-    'sls': dict(name=lambda l: 'S' + LETTER[l] + 'S', moments=lambda l: (0, l, 0)),
+    'ssl': dict(name=lambda l: 'SS' + LETTER[l], moments=lambda l: (0, 0, l),
+                blurb=lambda l: ("/// @brief Computes the three-center electron repulsion integrals of two basis\n"
+                                 "/// functions of zero angular momentum on a and b sides and one of angular\n"
+                                 f"/// momentum {WORD[l]} on c side, over the atom pairs of a block and for one atom on\n"
+                                 "/// c side.\n")),
+    'lss': dict(name=lambda l: LETTER[l] + 'SS', moments=lambda l: (l, 0, 0),
+                blurb=_blurb('a', 'b and c')),
+    'sls': dict(name=lambda l: 'S' + LETTER[l] + 'S', moments=lambda l: (0, l, 0),
+                blurb=_blurb('b', 'a and c')),
 }
 
 
@@ -200,11 +237,8 @@ def emit(l, kind='ssl'):
     hpp += "#include <cstddef>\n#include <vector>\n\n"
     hpp += '#include "BasisFunction.hpp"\n#include "SimdMatrix.hpp"\n\n'
     hpp += "namespace simdt3ceri {  // simdt3ceri namespace\n\n"
-    hpp += ("/// @brief Computes the three-center electron repulsion integrals of two basis\n"
-            "/// functions of zero angular momentum on a and b sides and one of angular\n"
-            f"/// momentum {WORD[l]} on c side, over the atom pairs of a block and for one atom on\n"
-            "/// c side.\n"
-            "/// @param values The values of the combination of basis functions, whose slices\n"
+    hpp += (spec['blurb'](l)
+            + "/// @param values The values of the combination of basis functions, whose slices\n"
             "/// of the atom on c side this kernel writes.\n"
             "/// @param npairs The number of surviving atom pairs of the combination.\n"
             "/// @param natoms The number of atoms on c side of the block.\n"
@@ -226,6 +260,11 @@ def emit(l, kind='ssl'):
             f"/// center of an atom pair to the atom on c side into {l + 1} bidegrees. The first and\n"
             "/// the last are the harmonics of one side alone, and the ones between them couple\n"
             "/// the orders of both, with the coefficients make_addition_table.py produces.\n")
+    if kind != 'ssl':
+        hpp += ("/// @note The scalar which multiplies a bidegree is a binomial over the orders of\n"
+                "/// the auxiliary integral rather than a single order, as the harmonic of the\n"
+                "/// vector to the atom on c side is expanded back onto the vectors between the\n"
+                "/// atoms of an atom pair and from the atom on b side to the atom on c side.\n")
     hpp += f"auto compute_{lo}_electron_repulsion(double                         *values,\n"
     pad = " " * len(f"auto compute_{lo}_electron_repulsion(")
     for a in ["const size_t                    npairs,", "const size_t                    natoms,",
@@ -328,10 +367,18 @@ def emit(l, kind='ssl'):
           "                const auto p_y = frp * (aexp * (a_y[k] - c_y[k]) + bexp * (b_y[k] - c_y[k]));\n\n"
           "                const auto p_z = frp * (aexp * (a_z[k] - c_z[k]) + bexp * (b_z[k] - c_z[k]));\n\n"
           "                pc_2[k] = p_x * p_x + p_y * p_y + p_z * p_z;\n            }\n\n")
+    # NOTE: every kind fills the orders zero to l, as the recursion of the Boys
+    # function forms them on the way. Only the kinds which expand the harmonic of
+    # the vector to the atom on c side go on to read them all.
+
     c += (f"            // NOTE: the Boys function of every primitive on c side of this pair\n"
-          f"            // is computed by one call, which fills the orders zero to {WORD[l]} of\n"
-          f"            // every row. The integrals need the order {WORD[l]} alone, and the lower\n"
-          f"            // orders are formed on the way to it by the recursion.\n\n")
+          f"            // is computed by one call, which fills the orders zero to {WORD[l]} of\n")
+    if boys_rows(kind, l) == [l]:
+        c += (f"            // every row. The integrals need the order {WORD[l]} alone, and the lower\n"
+              f"            // orders are formed on the way to it by the recursion.\n\n")
+    else:
+        c += (f"            // every row. The integrals read every one of those orders, as the\n"
+              f"            // scalar which multiplies a bidegree is a binomial over them.\n\n")
     c += (f"            auto boys = CSimdVariableMatrix(std::vector<size_t>(first, first + static_cast<long>(nprim_c)), {l + 2});\n\n")
     c += ("            for (size_t k = 0; k < nprim_c; k++)\n            {\n"
           "                const auto ncols = dimensions[(i * nprim_b + j) * nprim_c + k];\n\n"
@@ -420,13 +467,13 @@ def emit(l, kind='ssl'):
               "        // it reads only the products which carry it and the vectorizer would\n"
               "        // otherwise hold every product of the bidegree at once.\n")
         for m in range(-l, l + 1):
-            ts = _terms(coeffs, m, rows)
-            if not ts:
+            body = _bracket(coeffs, m, rows)
+            if body is None:
                 continue
             used = [rows[k] for k in keys if coeffs.get(k, {}).get(m) is not None]
             c += (f"\n#pragma omp simd aligned(out_{name(m)}, acc_{l1}, {', '.join(used)} : simd::cache_line_size())\n"
                   "        for (size_t k = 0; k < nmax; k++)\n        {\n"
-                  f"            out_{name(m)}[k] += acc_{l1}[k] * ({' + '.join(ts).replace('+ -', '- ')});\n"
+                  f"            out_{name(m)}[k] += acc_{l1}[k] * ({body});\n"
                   "        }\n")
         c += "    }\n\n"
 

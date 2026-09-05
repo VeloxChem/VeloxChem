@@ -461,67 +461,67 @@ compute_ssh_electron_repulsion(double                         *values,
 #pragma omp simd aligned(out_m5, acc_1, r_m1_p4, r_p1_m4 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m5[k] += acc_1[k] * (std::sqrt(22.5) * r_m1_p4[k] + std::sqrt(22.5) * r_p1_m4[k]);
+            out_m5[k] += acc_1[k] * (std::sqrt(22.5) * (r_m1_p4[k] + r_p1_m4[k]));
         }
 
 #pragma omp simd aligned(out_m4, acc_1, r_m1_p3, r_0_m4, r_p1_m3 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m4[k] += acc_1[k] * (std::sqrt(18.0) * r_m1_p3[k] + 3.0 * r_0_m4[k] + std::sqrt(18.0) * r_p1_m3[k]);
+            out_m4[k] += acc_1[k] * (std::sqrt(18.0) * (r_m1_p3[k] + r_p1_m3[k]) + 3.0 * r_0_m4[k]);
         }
 
 #pragma omp simd aligned(out_m3, acc_1, r_m1_p2, r_m1_p4, r_0_m3, r_p1_m4, r_p1_m2 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m3[k] += acc_1[k] * (std::sqrt(14.0) * r_m1_p2[k] + std::sqrt(0.5) * r_m1_p4[k] + 4.0 * r_0_m3[k] - std::sqrt(0.5) * r_p1_m4[k] + std::sqrt(14.0) * r_p1_m2[k]);
+            out_m3[k] += acc_1[k] * (std::sqrt(14.0) * (r_m1_p2[k] + r_p1_m2[k]) + std::sqrt(0.5) * (r_m1_p4[k] - r_p1_m4[k]) + 4.0 * r_0_m3[k]);
         }
 
 #pragma omp simd aligned(out_m2, acc_1, r_m1_p1, r_m1_p3, r_0_m2, r_p1_m3, r_p1_m1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m2[k] += acc_1[k] * (std::sqrt(10.5) * r_m1_p1[k] + std::sqrt(1.5) * r_m1_p3[k] + std::sqrt(21.0) * r_0_m2[k] - std::sqrt(1.5) * r_p1_m3[k] + std::sqrt(10.5) * r_p1_m1[k]);
+            out_m2[k] += acc_1[k] * (std::sqrt(10.5) * (r_m1_p1[k] + r_p1_m1[k]) + std::sqrt(1.5) * (r_m1_p3[k] - r_p1_m3[k]) + std::sqrt(21.0) * r_0_m2[k]);
         }
 
 #pragma omp simd aligned(out_m1, acc_1, r_m1_0, r_m1_p2, r_0_m1, r_p1_m2 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m1[k] += acc_1[k] * (std::sqrt(15.0) * r_m1_0[k] + std::sqrt(3.0) * r_m1_p2[k] + std::sqrt(24.0) * r_0_m1[k] - std::sqrt(3.0) * r_p1_m2[k]);
+            out_m1[k] += acc_1[k] * (std::sqrt(15.0) * r_m1_0[k] + std::sqrt(3.0) * (r_m1_p2[k] - r_p1_m2[k]) + std::sqrt(24.0) * r_0_m1[k]);
         }
 
 #pragma omp simd aligned(out_0, acc_1, r_m1_m1, r_0_0, r_p1_p1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_0[k] += acc_1[k] * (-std::sqrt(10.0) * r_m1_m1[k] + 5.0 * r_0_0[k] - std::sqrt(10.0) * r_p1_p1[k]);
+            out_0[k] += acc_1[k] * (std::sqrt(10.0) * (-r_m1_m1[k] - r_p1_p1[k]) + 5.0 * r_0_0[k]);
         }
 
 #pragma omp simd aligned(out_p1, acc_1, r_m1_m2, r_0_p1, r_p1_0, r_p1_p2 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p1[k] += acc_1[k] * (-std::sqrt(3.0) * r_m1_m2[k] + std::sqrt(24.0) * r_0_p1[k] + std::sqrt(15.0) * r_p1_0[k] - std::sqrt(3.0) * r_p1_p2[k]);
+            out_p1[k] += acc_1[k] * (std::sqrt(3.0) * (-r_m1_m2[k] - r_p1_p2[k]) + std::sqrt(24.0) * r_0_p1[k] + std::sqrt(15.0) * r_p1_0[k]);
         }
 
 #pragma omp simd aligned(out_p2, acc_1, r_m1_m3, r_m1_m1, r_0_p2, r_p1_p1, r_p1_p3 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p2[k] += acc_1[k] * (-std::sqrt(1.5) * r_m1_m3[k] - std::sqrt(10.5) * r_m1_m1[k] + std::sqrt(21.0) * r_0_p2[k] + std::sqrt(10.5) * r_p1_p1[k] - std::sqrt(1.5) * r_p1_p3[k]);
+            out_p2[k] += acc_1[k] * (std::sqrt(1.5) * (-r_m1_m3[k] - r_p1_p3[k]) + std::sqrt(10.5) * (-r_m1_m1[k] + r_p1_p1[k]) + std::sqrt(21.0) * r_0_p2[k]);
         }
 
 #pragma omp simd aligned(out_p3, acc_1, r_m1_m4, r_m1_m2, r_0_p3, r_p1_p2, r_p1_p4 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p3[k] += acc_1[k] * (-std::sqrt(0.5) * r_m1_m4[k] - std::sqrt(14.0) * r_m1_m2[k] + 4.0 * r_0_p3[k] + std::sqrt(14.0) * r_p1_p2[k] - std::sqrt(0.5) * r_p1_p4[k]);
+            out_p3[k] += acc_1[k] * (std::sqrt(0.5) * (-r_m1_m4[k] - r_p1_p4[k]) + std::sqrt(14.0) * (-r_m1_m2[k] + r_p1_p2[k]) + 4.0 * r_0_p3[k]);
         }
 
 #pragma omp simd aligned(out_p4, acc_1, r_m1_m3, r_0_p4, r_p1_p3 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p4[k] += acc_1[k] * (-std::sqrt(18.0) * r_m1_m3[k] + 3.0 * r_0_p4[k] + std::sqrt(18.0) * r_p1_p3[k]);
+            out_p4[k] += acc_1[k] * (std::sqrt(18.0) * (-r_m1_m3[k] + r_p1_p3[k]) + 3.0 * r_0_p4[k]);
         }
 
 #pragma omp simd aligned(out_p5, acc_1, r_m1_m4, r_p1_p4 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p5[k] += acc_1[k] * (-std::sqrt(22.5) * r_m1_m4[k] + std::sqrt(22.5) * r_p1_p4[k]);
+            out_p5[k] += acc_1[k] * (std::sqrt(22.5) * (-r_m1_m4[k] + r_p1_p4[k]));
         }
     }
 
@@ -629,67 +629,67 @@ compute_ssh_electron_repulsion(double                         *values,
 #pragma omp simd aligned(out_m5, acc_2, r_m2_p3, r_p2_m3 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m5[k] += acc_2[k] * (std::sqrt(105.0) * r_m2_p3[k] + std::sqrt(105.0) * r_p2_m3[k]);
+            out_m5[k] += acc_2[k] * (std::sqrt(105.0) * (r_m2_p3[k] + r_p2_m3[k]));
         }
 
 #pragma omp simd aligned(out_m4, acc_2, r_m2_p2, r_m1_p3, r_p1_m3, r_p2_m2 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m4[k] += acc_2[k] * (std::sqrt(63.0) * r_m2_p2[k] + std::sqrt(42.0) * r_m1_p3[k] + std::sqrt(42.0) * r_p1_m3[k] + std::sqrt(63.0) * r_p2_m2[k]);
+            out_m4[k] += acc_2[k] * (std::sqrt(63.0) * (r_m2_p2[k] + r_p2_m2[k]) + std::sqrt(42.0) * (r_m1_p3[k] + r_p1_m3[k]));
         }
 
 #pragma omp simd aligned(out_m3, acc_2, r_m2_p1, r_m1_p2, r_0_m3, r_p1_m2, r_p2_m1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m3[k] += acc_2[k] * (std::sqrt(35.0) * r_m2_p1[k] + std::sqrt(56.0) * r_m1_p2[k] + std::sqrt(28.0) * r_0_m3[k] + std::sqrt(56.0) * r_p1_m2[k] + std::sqrt(35.0) * r_p2_m1[k]);
+            out_m3[k] += acc_2[k] * (std::sqrt(35.0) * (r_m2_p1[k] + r_p2_m1[k]) + std::sqrt(56.0) * (r_m1_p2[k] + r_p1_m2[k]) + std::sqrt(28.0) * r_0_m3[k]);
         }
 
 #pragma omp simd aligned(out_m2, acc_2, r_m2_0, r_m1_p1, r_m1_p3, r_0_m2, r_p1_m3, r_p1_m1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m2[k] += acc_2[k] * (std::sqrt(35.0) * r_m2_0[k] + std::sqrt(52.5) * r_m1_p1[k] + std::sqrt(3.5) * r_m1_p3[k] + std::sqrt(63.0) * r_0_m2[k] - std::sqrt(3.5) * r_p1_m3[k] + std::sqrt(52.5) * r_p1_m1[k]);
+            out_m2[k] += acc_2[k] * (std::sqrt(35.0) * r_m2_0[k] + std::sqrt(52.5) * (r_m1_p1[k] + r_p1_m1[k]) + std::sqrt(3.5) * (r_m1_p3[k] - r_p1_m3[k]) + std::sqrt(63.0) * r_0_m2[k]);
         }
 
 #pragma omp simd aligned(out_m1, acc_2, r_m2_p1, r_m2_p3, r_m1_0, r_m1_p2, r_0_m1, r_p1_m2, r_p2_m3, r_p2_m1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m1[k] += acc_2[k] * (-std::sqrt(7.5) * r_m2_p1[k] - std::sqrt(0.5) * r_m2_p3[k] + std::sqrt(80.0) * r_m1_0[k] + std::sqrt(12.0) * r_m1_p2[k] + std::sqrt(90.0) * r_0_m1[k] - std::sqrt(12.0) * r_p1_m2[k] + std::sqrt(0.5) * r_p2_m3[k] + std::sqrt(7.5) * r_p2_m1[k]);
+            out_m1[k] += acc_2[k] * (std::sqrt(7.5) * (-r_m2_p1[k] + r_p2_m1[k]) + std::sqrt(0.5) * (-r_m2_p3[k] + r_p2_m3[k]) + std::sqrt(80.0) * r_m1_0[k] + std::sqrt(12.0) * (r_m1_p2[k] - r_p1_m2[k]) + std::sqrt(90.0) * r_0_m1[k]);
         }
 
 #pragma omp simd aligned(out_0, acc_2, r_m2_m2, r_m1_m1, r_0_0, r_p1_p1, r_p2_p2 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_0[k] += acc_2[k] * (std::sqrt(5.0) * r_m2_m2[k] - std::sqrt(50.0) * r_m1_m1[k] + 10.0 * r_0_0[k] - std::sqrt(50.0) * r_p1_p1[k] + std::sqrt(5.0) * r_p2_p2[k]);
+            out_0[k] += acc_2[k] * (std::sqrt(5.0) * (r_m2_m2[k] + r_p2_p2[k]) + std::sqrt(50.0) * (-r_m1_m1[k] - r_p1_p1[k]) + 10.0 * r_0_0[k]);
         }
 
 #pragma omp simd aligned(out_p1, acc_2, r_m2_m3, r_m2_m1, r_m1_m2, r_0_p1, r_p1_0, r_p1_p2, r_p2_p1, r_p2_p3 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p1[k] += acc_2[k] * (std::sqrt(0.5) * r_m2_m3[k] - std::sqrt(7.5) * r_m2_m1[k] - std::sqrt(12.0) * r_m1_m2[k] + std::sqrt(90.0) * r_0_p1[k] + std::sqrt(80.0) * r_p1_0[k] - std::sqrt(12.0) * r_p1_p2[k] - std::sqrt(7.5) * r_p2_p1[k] + std::sqrt(0.5) * r_p2_p3[k]);
+            out_p1[k] += acc_2[k] * (std::sqrt(0.5) * (r_m2_m3[k] + r_p2_p3[k]) + std::sqrt(7.5) * (-r_m2_m1[k] - r_p2_p1[k]) + std::sqrt(12.0) * (-r_m1_m2[k] - r_p1_p2[k]) + std::sqrt(90.0) * r_0_p1[k] + std::sqrt(80.0) * r_p1_0[k]);
         }
 
 #pragma omp simd aligned(out_p2, acc_2, r_m1_m3, r_m1_m1, r_0_p2, r_p1_p1, r_p1_p3, r_p2_0 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p2[k] += acc_2[k] * (-std::sqrt(3.5) * r_m1_m3[k] - std::sqrt(52.5) * r_m1_m1[k] + std::sqrt(63.0) * r_0_p2[k] + std::sqrt(52.5) * r_p1_p1[k] - std::sqrt(3.5) * r_p1_p3[k] + std::sqrt(35.0) * r_p2_0[k]);
+            out_p2[k] += acc_2[k] * (std::sqrt(3.5) * (-r_m1_m3[k] - r_p1_p3[k]) + std::sqrt(52.5) * (-r_m1_m1[k] + r_p1_p1[k]) + std::sqrt(63.0) * r_0_p2[k] + std::sqrt(35.0) * r_p2_0[k]);
         }
 
 #pragma omp simd aligned(out_p3, acc_2, r_m2_m1, r_m1_m2, r_0_p3, r_p1_p2, r_p2_p1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p3[k] += acc_2[k] * (-std::sqrt(35.0) * r_m2_m1[k] - std::sqrt(56.0) * r_m1_m2[k] + std::sqrt(28.0) * r_0_p3[k] + std::sqrt(56.0) * r_p1_p2[k] + std::sqrt(35.0) * r_p2_p1[k]);
+            out_p3[k] += acc_2[k] * (std::sqrt(35.0) * (-r_m2_m1[k] + r_p2_p1[k]) + std::sqrt(56.0) * (-r_m1_m2[k] + r_p1_p2[k]) + std::sqrt(28.0) * r_0_p3[k]);
         }
 
 #pragma omp simd aligned(out_p4, acc_2, r_m2_m2, r_m1_m3, r_p1_p3, r_p2_p2 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p4[k] += acc_2[k] * (-std::sqrt(63.0) * r_m2_m2[k] - std::sqrt(42.0) * r_m1_m3[k] + std::sqrt(42.0) * r_p1_p3[k] + std::sqrt(63.0) * r_p2_p2[k]);
+            out_p4[k] += acc_2[k] * (std::sqrt(63.0) * (-r_m2_m2[k] + r_p2_p2[k]) + std::sqrt(42.0) * (-r_m1_m3[k] + r_p1_p3[k]));
         }
 
 #pragma omp simd aligned(out_p5, acc_2, r_m2_m3, r_p2_p3 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p5[k] += acc_2[k] * (-std::sqrt(105.0) * r_m2_m3[k] + std::sqrt(105.0) * r_p2_p3[k]);
+            out_p5[k] += acc_2[k] * (std::sqrt(105.0) * (-r_m2_m3[k] + r_p2_p3[k]));
         }
     }
 
@@ -797,67 +797,67 @@ compute_ssh_electron_repulsion(double                         *values,
 #pragma omp simd aligned(out_m5, acc_3, r_m3_p2, r_p3_m2 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m5[k] += acc_3[k] * (std::sqrt(105.0) * r_m3_p2[k] + std::sqrt(105.0) * r_p3_m2[k]);
+            out_m5[k] += acc_3[k] * (std::sqrt(105.0) * (r_m3_p2[k] + r_p3_m2[k]));
         }
 
 #pragma omp simd aligned(out_m4, acc_3, r_m3_p1, r_m2_p2, r_p2_m2, r_p3_m1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m4[k] += acc_3[k] * (std::sqrt(42.0) * r_m3_p1[k] + std::sqrt(63.0) * r_m2_p2[k] + std::sqrt(63.0) * r_p2_m2[k] + std::sqrt(42.0) * r_p3_m1[k]);
+            out_m4[k] += acc_3[k] * (std::sqrt(42.0) * (r_m3_p1[k] + r_p3_m1[k]) + std::sqrt(63.0) * (r_m2_p2[k] + r_p2_m2[k]));
         }
 
 #pragma omp simd aligned(out_m3, acc_3, r_m3_0, r_m2_p1, r_m1_p2, r_p1_m2, r_p2_m1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m3[k] += acc_3[k] * (std::sqrt(28.0) * r_m3_0[k] + std::sqrt(56.0) * r_m2_p1[k] + std::sqrt(35.0) * r_m1_p2[k] + std::sqrt(35.0) * r_p1_m2[k] + std::sqrt(56.0) * r_p2_m1[k]);
+            out_m3[k] += acc_3[k] * (std::sqrt(28.0) * r_m3_0[k] + std::sqrt(56.0) * (r_m2_p1[k] + r_p2_m1[k]) + std::sqrt(35.0) * (r_m1_p2[k] + r_p1_m2[k]));
         }
 
 #pragma omp simd aligned(out_m2, acc_3, r_m3_p1, r_m2_0, r_m1_p1, r_0_m2, r_p1_m1, r_p3_m1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m2[k] += acc_3[k] * (-std::sqrt(3.5) * r_m3_p1[k] + std::sqrt(63.0) * r_m2_0[k] + std::sqrt(52.5) * r_m1_p1[k] + std::sqrt(35.0) * r_0_m2[k] + std::sqrt(52.5) * r_p1_m1[k] + std::sqrt(3.5) * r_p3_m1[k]);
+            out_m2[k] += acc_3[k] * (std::sqrt(3.5) * (-r_m3_p1[k] + r_p3_m1[k]) + std::sqrt(63.0) * r_m2_0[k] + std::sqrt(52.5) * (r_m1_p1[k] + r_p1_m1[k]) + std::sqrt(35.0) * r_0_m2[k]);
         }
 
 #pragma omp simd aligned(out_m1, acc_3, r_m3_p2, r_m2_p1, r_m1_0, r_m1_p2, r_0_m1, r_p1_m2, r_p2_m1, r_p3_m2 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m1[k] += acc_3[k] * (std::sqrt(0.5) * r_m3_p2[k] - std::sqrt(12.0) * r_m2_p1[k] + std::sqrt(90.0) * r_m1_0[k] + std::sqrt(7.5) * r_m1_p2[k] + std::sqrt(80.0) * r_0_m1[k] - std::sqrt(7.5) * r_p1_m2[k] + std::sqrt(12.0) * r_p2_m1[k] - std::sqrt(0.5) * r_p3_m2[k]);
+            out_m1[k] += acc_3[k] * (std::sqrt(0.5) * (r_m3_p2[k] - r_p3_m2[k]) + std::sqrt(12.0) * (-r_m2_p1[k] + r_p2_m1[k]) + std::sqrt(90.0) * r_m1_0[k] + std::sqrt(7.5) * (r_m1_p2[k] - r_p1_m2[k]) + std::sqrt(80.0) * r_0_m1[k]);
         }
 
 #pragma omp simd aligned(out_0, acc_3, r_m2_m2, r_m1_m1, r_0_0, r_p1_p1, r_p2_p2 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_0[k] += acc_3[k] * (std::sqrt(5.0) * r_m2_m2[k] - std::sqrt(50.0) * r_m1_m1[k] + 10.0 * r_0_0[k] - std::sqrt(50.0) * r_p1_p1[k] + std::sqrt(5.0) * r_p2_p2[k]);
+            out_0[k] += acc_3[k] * (std::sqrt(5.0) * (r_m2_m2[k] + r_p2_p2[k]) + std::sqrt(50.0) * (-r_m1_m1[k] - r_p1_p1[k]) + 10.0 * r_0_0[k]);
         }
 
 #pragma omp simd aligned(out_p1, acc_3, r_m3_m2, r_m2_m1, r_m1_m2, r_0_p1, r_p1_0, r_p1_p2, r_p2_p1, r_p3_p2 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p1[k] += acc_3[k] * (std::sqrt(0.5) * r_m3_m2[k] - std::sqrt(12.0) * r_m2_m1[k] - std::sqrt(7.5) * r_m1_m2[k] + std::sqrt(80.0) * r_0_p1[k] + std::sqrt(90.0) * r_p1_0[k] - std::sqrt(7.5) * r_p1_p2[k] - std::sqrt(12.0) * r_p2_p1[k] + std::sqrt(0.5) * r_p3_p2[k]);
+            out_p1[k] += acc_3[k] * (std::sqrt(0.5) * (r_m3_m2[k] + r_p3_p2[k]) + std::sqrt(12.0) * (-r_m2_m1[k] - r_p2_p1[k]) + std::sqrt(7.5) * (-r_m1_m2[k] - r_p1_p2[k]) + std::sqrt(80.0) * r_0_p1[k] + std::sqrt(90.0) * r_p1_0[k]);
         }
 
 #pragma omp simd aligned(out_p2, acc_3, r_m3_m1, r_m1_m1, r_0_p2, r_p1_p1, r_p2_0, r_p3_p1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p2[k] += acc_3[k] * (-std::sqrt(3.5) * r_m3_m1[k] - std::sqrt(52.5) * r_m1_m1[k] + std::sqrt(35.0) * r_0_p2[k] + std::sqrt(52.5) * r_p1_p1[k] + std::sqrt(63.0) * r_p2_0[k] - std::sqrt(3.5) * r_p3_p1[k]);
+            out_p2[k] += acc_3[k] * (std::sqrt(3.5) * (-r_m3_m1[k] - r_p3_p1[k]) + std::sqrt(52.5) * (-r_m1_m1[k] + r_p1_p1[k]) + std::sqrt(35.0) * r_0_p2[k] + std::sqrt(63.0) * r_p2_0[k]);
         }
 
 #pragma omp simd aligned(out_p3, acc_3, r_m2_m1, r_m1_m2, r_p1_p2, r_p2_p1, r_p3_0 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p3[k] += acc_3[k] * (-std::sqrt(56.0) * r_m2_m1[k] - std::sqrt(35.0) * r_m1_m2[k] + std::sqrt(35.0) * r_p1_p2[k] + std::sqrt(56.0) * r_p2_p1[k] + std::sqrt(28.0) * r_p3_0[k]);
+            out_p3[k] += acc_3[k] * (std::sqrt(56.0) * (-r_m2_m1[k] + r_p2_p1[k]) + std::sqrt(35.0) * (-r_m1_m2[k] + r_p1_p2[k]) + std::sqrt(28.0) * r_p3_0[k]);
         }
 
 #pragma omp simd aligned(out_p4, acc_3, r_m3_m1, r_m2_m2, r_p2_p2, r_p3_p1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p4[k] += acc_3[k] * (-std::sqrt(42.0) * r_m3_m1[k] - std::sqrt(63.0) * r_m2_m2[k] + std::sqrt(63.0) * r_p2_p2[k] + std::sqrt(42.0) * r_p3_p1[k]);
+            out_p4[k] += acc_3[k] * (std::sqrt(42.0) * (-r_m3_m1[k] + r_p3_p1[k]) + std::sqrt(63.0) * (-r_m2_m2[k] + r_p2_p2[k]));
         }
 
 #pragma omp simd aligned(out_p5, acc_3, r_m3_m2, r_p3_p2 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p5[k] += acc_3[k] * (-std::sqrt(105.0) * r_m3_m2[k] + std::sqrt(105.0) * r_p3_p2[k]);
+            out_p5[k] += acc_3[k] * (std::sqrt(105.0) * (-r_m3_m2[k] + r_p3_p2[k]));
         }
     }
 
@@ -949,67 +949,67 @@ compute_ssh_electron_repulsion(double                         *values,
 #pragma omp simd aligned(out_m5, acc_4, r_m4_p1, r_p4_m1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m5[k] += acc_4[k] * (std::sqrt(22.5) * r_m4_p1[k] + std::sqrt(22.5) * r_p4_m1[k]);
+            out_m5[k] += acc_4[k] * (std::sqrt(22.5) * (r_m4_p1[k] + r_p4_m1[k]));
         }
 
 #pragma omp simd aligned(out_m4, acc_4, r_m4_0, r_m3_p1, r_p3_m1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m4[k] += acc_4[k] * (3.0 * r_m4_0[k] + std::sqrt(18.0) * r_m3_p1[k] + std::sqrt(18.0) * r_p3_m1[k]);
+            out_m4[k] += acc_4[k] * (3.0 * r_m4_0[k] + std::sqrt(18.0) * (r_m3_p1[k] + r_p3_m1[k]));
         }
 
 #pragma omp simd aligned(out_m3, acc_4, r_m4_p1, r_m3_0, r_m2_p1, r_p2_m1, r_p4_m1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m3[k] += acc_4[k] * (-std::sqrt(0.5) * r_m4_p1[k] + 4.0 * r_m3_0[k] + std::sqrt(14.0) * r_m2_p1[k] + std::sqrt(14.0) * r_p2_m1[k] + std::sqrt(0.5) * r_p4_m1[k]);
+            out_m3[k] += acc_4[k] * (std::sqrt(0.5) * (-r_m4_p1[k] + r_p4_m1[k]) + 4.0 * r_m3_0[k] + std::sqrt(14.0) * (r_m2_p1[k] + r_p2_m1[k]));
         }
 
 #pragma omp simd aligned(out_m2, acc_4, r_m3_p1, r_m2_0, r_m1_p1, r_p1_m1, r_p3_m1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m2[k] += acc_4[k] * (-std::sqrt(1.5) * r_m3_p1[k] + std::sqrt(21.0) * r_m2_0[k] + std::sqrt(10.5) * r_m1_p1[k] + std::sqrt(10.5) * r_p1_m1[k] + std::sqrt(1.5) * r_p3_m1[k]);
+            out_m2[k] += acc_4[k] * (std::sqrt(1.5) * (-r_m3_p1[k] + r_p3_m1[k]) + std::sqrt(21.0) * r_m2_0[k] + std::sqrt(10.5) * (r_m1_p1[k] + r_p1_m1[k]));
         }
 
 #pragma omp simd aligned(out_m1, acc_4, r_m2_p1, r_m1_0, r_0_m1, r_p2_m1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m1[k] += acc_4[k] * (-std::sqrt(3.0) * r_m2_p1[k] + std::sqrt(24.0) * r_m1_0[k] + std::sqrt(15.0) * r_0_m1[k] + std::sqrt(3.0) * r_p2_m1[k]);
+            out_m1[k] += acc_4[k] * (std::sqrt(3.0) * (-r_m2_p1[k] + r_p2_m1[k]) + std::sqrt(24.0) * r_m1_0[k] + std::sqrt(15.0) * r_0_m1[k]);
         }
 
 #pragma omp simd aligned(out_0, acc_4, r_m1_m1, r_0_0, r_p1_p1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_0[k] += acc_4[k] * (-std::sqrt(10.0) * r_m1_m1[k] + 5.0 * r_0_0[k] - std::sqrt(10.0) * r_p1_p1[k]);
+            out_0[k] += acc_4[k] * (std::sqrt(10.0) * (-r_m1_m1[k] - r_p1_p1[k]) + 5.0 * r_0_0[k]);
         }
 
 #pragma omp simd aligned(out_p1, acc_4, r_m2_m1, r_0_p1, r_p1_0, r_p2_p1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p1[k] += acc_4[k] * (-std::sqrt(3.0) * r_m2_m1[k] + std::sqrt(15.0) * r_0_p1[k] + std::sqrt(24.0) * r_p1_0[k] - std::sqrt(3.0) * r_p2_p1[k]);
+            out_p1[k] += acc_4[k] * (std::sqrt(3.0) * (-r_m2_m1[k] - r_p2_p1[k]) + std::sqrt(15.0) * r_0_p1[k] + std::sqrt(24.0) * r_p1_0[k]);
         }
 
 #pragma omp simd aligned(out_p2, acc_4, r_m3_m1, r_m1_m1, r_p1_p1, r_p2_0, r_p3_p1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p2[k] += acc_4[k] * (-std::sqrt(1.5) * r_m3_m1[k] - std::sqrt(10.5) * r_m1_m1[k] + std::sqrt(10.5) * r_p1_p1[k] + std::sqrt(21.0) * r_p2_0[k] - std::sqrt(1.5) * r_p3_p1[k]);
+            out_p2[k] += acc_4[k] * (std::sqrt(1.5) * (-r_m3_m1[k] - r_p3_p1[k]) + std::sqrt(10.5) * (-r_m1_m1[k] + r_p1_p1[k]) + std::sqrt(21.0) * r_p2_0[k]);
         }
 
 #pragma omp simd aligned(out_p3, acc_4, r_m4_m1, r_m2_m1, r_p2_p1, r_p3_0, r_p4_p1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p3[k] += acc_4[k] * (-std::sqrt(0.5) * r_m4_m1[k] - std::sqrt(14.0) * r_m2_m1[k] + std::sqrt(14.0) * r_p2_p1[k] + 4.0 * r_p3_0[k] - std::sqrt(0.5) * r_p4_p1[k]);
+            out_p3[k] += acc_4[k] * (std::sqrt(0.5) * (-r_m4_m1[k] - r_p4_p1[k]) + std::sqrt(14.0) * (-r_m2_m1[k] + r_p2_p1[k]) + 4.0 * r_p3_0[k]);
         }
 
 #pragma omp simd aligned(out_p4, acc_4, r_m3_m1, r_p3_p1, r_p4_0 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p4[k] += acc_4[k] * (-std::sqrt(18.0) * r_m3_m1[k] + std::sqrt(18.0) * r_p3_p1[k] + 3.0 * r_p4_0[k]);
+            out_p4[k] += acc_4[k] * (std::sqrt(18.0) * (-r_m3_m1[k] + r_p3_p1[k]) + 3.0 * r_p4_0[k]);
         }
 
 #pragma omp simd aligned(out_p5, acc_4, r_m4_m1, r_p4_p1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p5[k] += acc_4[k] * (-std::sqrt(22.5) * r_m4_m1[k] + std::sqrt(22.5) * r_p4_p1[k]);
+            out_p5[k] += acc_4[k] * (std::sqrt(22.5) * (-r_m4_m1[k] + r_p4_p1[k]));
         }
     }
 

@@ -377,31 +377,31 @@ compute_ssd_electron_repulsion(double                         *values,
 #pragma omp simd aligned(out_m2, acc_1, r_m1_p1, r_p1_m1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m2[k] += acc_1[k] * (std::sqrt(3.0) * r_m1_p1[k] + std::sqrt(3.0) * r_p1_m1[k]);
+            out_m2[k] += acc_1[k] * (std::sqrt(3.0) * (r_m1_p1[k] + r_p1_m1[k]));
         }
 
 #pragma omp simd aligned(out_m1, acc_1, r_m1_0, r_0_m1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m1[k] += acc_1[k] * (std::sqrt(3.0) * r_m1_0[k] + std::sqrt(3.0) * r_0_m1[k]);
+            out_m1[k] += acc_1[k] * (std::sqrt(3.0) * (r_m1_0[k] + r_0_m1[k]));
         }
 
 #pragma omp simd aligned(out_0, acc_1, r_m1_m1, r_0_0, r_p1_p1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_0[k] += acc_1[k] * (-r_m1_m1[k] + 2.0 * r_0_0[k] - r_p1_p1[k]);
+            out_0[k] += acc_1[k] * (-r_m1_m1[k] - r_p1_p1[k] + 2.0 * r_0_0[k]);
         }
 
 #pragma omp simd aligned(out_p1, acc_1, r_0_p1, r_p1_0 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p1[k] += acc_1[k] * (std::sqrt(3.0) * r_0_p1[k] + std::sqrt(3.0) * r_p1_0[k]);
+            out_p1[k] += acc_1[k] * (std::sqrt(3.0) * (r_0_p1[k] + r_p1_0[k]));
         }
 
 #pragma omp simd aligned(out_p2, acc_1, r_m1_m1, r_p1_p1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p2[k] += acc_1[k] * (-std::sqrt(3.0) * r_m1_m1[k] + std::sqrt(3.0) * r_p1_p1[k]);
+            out_p2[k] += acc_1[k] * (std::sqrt(3.0) * (-r_m1_m1[k] + r_p1_p1[k]));
         }
     }
 

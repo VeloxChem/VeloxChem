@@ -223,8 +223,8 @@ compute_pss_electron_repulsion(double                         *values,
 
             // NOTE: the Boys function of every primitive on c side of this pair
             // is computed by one call, which fills the orders zero to one of
-            // every row. The integrals need the order one alone, and the lower
-            // orders are formed on the way to it by the recursion.
+            // every row. The integrals read every one of those orders, as the
+            // scalar which multiplies a bidegree is a binomial over them.
 
             auto boys = CSimdVariableMatrix(std::vector<size_t>(first, first + static_cast<long>(nprim_c)), 3);
 

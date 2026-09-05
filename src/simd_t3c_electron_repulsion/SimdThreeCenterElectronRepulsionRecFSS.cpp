@@ -227,8 +227,8 @@ compute_fss_electron_repulsion(double                         *values,
 
             // NOTE: the Boys function of every primitive on c side of this pair
             // is computed by one call, which fills the orders zero to three of
-            // every row. The integrals need the order three alone, and the lower
-            // orders are formed on the way to it by the recursion.
+            // every row. The integrals read every one of those orders, as the
+            // scalar which multiplies a bidegree is a binomial over them.
 
             auto boys = CSimdVariableMatrix(std::vector<size_t>(first, first + static_cast<long>(nprim_c)), 5);
 
@@ -420,43 +420,43 @@ compute_fss_electron_repulsion(double                         *values,
 #pragma omp simd aligned(out_m3, acc_1, r_m1_p2, r_p1_m2 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m3[k] += acc_1[k] * (std::sqrt(7.5) * r_m1_p2[k] + std::sqrt(7.5) * r_p1_m2[k]);
+            out_m3[k] += acc_1[k] * (std::sqrt(7.5) * (r_m1_p2[k] + r_p1_m2[k]));
         }
 
 #pragma omp simd aligned(out_m2, acc_1, r_m1_p1, r_0_m2, r_p1_m1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m2[k] += acc_1[k] * (std::sqrt(5.0) * r_m1_p1[k] + std::sqrt(5.0) * r_0_m2[k] + std::sqrt(5.0) * r_p1_m1[k]);
+            out_m2[k] += acc_1[k] * (std::sqrt(5.0) * (r_m1_p1[k] + r_0_m2[k] + r_p1_m1[k]));
         }
 
 #pragma omp simd aligned(out_m1, acc_1, r_m1_0, r_m1_p2, r_0_m1, r_p1_m2 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m1[k] += acc_1[k] * (std::sqrt(6.0) * r_m1_0[k] + std::sqrt(0.5) * r_m1_p2[k] + std::sqrt(8.0) * r_0_m1[k] - std::sqrt(0.5) * r_p1_m2[k]);
+            out_m1[k] += acc_1[k] * (std::sqrt(6.0) * r_m1_0[k] + std::sqrt(0.5) * (r_m1_p2[k] - r_p1_m2[k]) + std::sqrt(8.0) * r_0_m1[k]);
         }
 
 #pragma omp simd aligned(out_0, acc_1, r_m1_m1, r_0_0, r_p1_p1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_0[k] += acc_1[k] * (-std::sqrt(3.0) * r_m1_m1[k] + 3.0 * r_0_0[k] - std::sqrt(3.0) * r_p1_p1[k]);
+            out_0[k] += acc_1[k] * (std::sqrt(3.0) * (-r_m1_m1[k] - r_p1_p1[k]) + 3.0 * r_0_0[k]);
         }
 
 #pragma omp simd aligned(out_p1, acc_1, r_m1_m2, r_0_p1, r_p1_0, r_p1_p2 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p1[k] += acc_1[k] * (-std::sqrt(0.5) * r_m1_m2[k] + std::sqrt(8.0) * r_0_p1[k] + std::sqrt(6.0) * r_p1_0[k] - std::sqrt(0.5) * r_p1_p2[k]);
+            out_p1[k] += acc_1[k] * (std::sqrt(0.5) * (-r_m1_m2[k] - r_p1_p2[k]) + std::sqrt(8.0) * r_0_p1[k] + std::sqrt(6.0) * r_p1_0[k]);
         }
 
 #pragma omp simd aligned(out_p2, acc_1, r_m1_m1, r_0_p2, r_p1_p1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p2[k] += acc_1[k] * (-std::sqrt(5.0) * r_m1_m1[k] + std::sqrt(5.0) * r_0_p2[k] + std::sqrt(5.0) * r_p1_p1[k]);
+            out_p2[k] += acc_1[k] * (std::sqrt(5.0) * (-r_m1_m1[k] + r_0_p2[k] + r_p1_p1[k]));
         }
 
 #pragma omp simd aligned(out_p3, acc_1, r_m1_m2, r_p1_p2 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p3[k] += acc_1[k] * (-std::sqrt(7.5) * r_m1_m2[k] + std::sqrt(7.5) * r_p1_p2[k]);
+            out_p3[k] += acc_1[k] * (std::sqrt(7.5) * (-r_m1_m2[k] + r_p1_p2[k]));
         }
     }
 
@@ -520,43 +520,43 @@ compute_fss_electron_repulsion(double                         *values,
 #pragma omp simd aligned(out_m3, acc_2, r_m2_p1, r_p2_m1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m3[k] += acc_2[k] * (std::sqrt(7.5) * r_m2_p1[k] + std::sqrt(7.5) * r_p2_m1[k]);
+            out_m3[k] += acc_2[k] * (std::sqrt(7.5) * (r_m2_p1[k] + r_p2_m1[k]));
         }
 
 #pragma omp simd aligned(out_m2, acc_2, r_m2_0, r_m1_p1, r_p1_m1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m2[k] += acc_2[k] * (std::sqrt(5.0) * r_m2_0[k] + std::sqrt(5.0) * r_m1_p1[k] + std::sqrt(5.0) * r_p1_m1[k]);
+            out_m2[k] += acc_2[k] * (std::sqrt(5.0) * (r_m2_0[k] + r_m1_p1[k] + r_p1_m1[k]));
         }
 
 #pragma omp simd aligned(out_m1, acc_2, r_m2_p1, r_m1_0, r_0_m1, r_p2_m1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_m1[k] += acc_2[k] * (-std::sqrt(0.5) * r_m2_p1[k] + std::sqrt(8.0) * r_m1_0[k] + std::sqrt(6.0) * r_0_m1[k] + std::sqrt(0.5) * r_p2_m1[k]);
+            out_m1[k] += acc_2[k] * (std::sqrt(0.5) * (-r_m2_p1[k] + r_p2_m1[k]) + std::sqrt(8.0) * r_m1_0[k] + std::sqrt(6.0) * r_0_m1[k]);
         }
 
 #pragma omp simd aligned(out_0, acc_2, r_m1_m1, r_0_0, r_p1_p1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_0[k] += acc_2[k] * (-std::sqrt(3.0) * r_m1_m1[k] + 3.0 * r_0_0[k] - std::sqrt(3.0) * r_p1_p1[k]);
+            out_0[k] += acc_2[k] * (std::sqrt(3.0) * (-r_m1_m1[k] - r_p1_p1[k]) + 3.0 * r_0_0[k]);
         }
 
 #pragma omp simd aligned(out_p1, acc_2, r_m2_m1, r_0_p1, r_p1_0, r_p2_p1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p1[k] += acc_2[k] * (-std::sqrt(0.5) * r_m2_m1[k] + std::sqrt(6.0) * r_0_p1[k] + std::sqrt(8.0) * r_p1_0[k] - std::sqrt(0.5) * r_p2_p1[k]);
+            out_p1[k] += acc_2[k] * (std::sqrt(0.5) * (-r_m2_m1[k] - r_p2_p1[k]) + std::sqrt(6.0) * r_0_p1[k] + std::sqrt(8.0) * r_p1_0[k]);
         }
 
 #pragma omp simd aligned(out_p2, acc_2, r_m1_m1, r_p1_p1, r_p2_0 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p2[k] += acc_2[k] * (-std::sqrt(5.0) * r_m1_m1[k] + std::sqrt(5.0) * r_p1_p1[k] + std::sqrt(5.0) * r_p2_0[k]);
+            out_p2[k] += acc_2[k] * (std::sqrt(5.0) * (-r_m1_m1[k] + r_p1_p1[k] + r_p2_0[k]));
         }
 
 #pragma omp simd aligned(out_p3, acc_2, r_m2_m1, r_p2_p1 : simd::cache_line_size())
         for (size_t k = 0; k < nmax; k++)
         {
-            out_p3[k] += acc_2[k] * (-std::sqrt(7.5) * r_m2_m1[k] + std::sqrt(7.5) * r_p2_p1[k]);
+            out_p3[k] += acc_2[k] * (std::sqrt(7.5) * (-r_m2_m1[k] + r_p2_p1[k]));
         }
     }
 

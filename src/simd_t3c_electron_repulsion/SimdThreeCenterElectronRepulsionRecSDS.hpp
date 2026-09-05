@@ -44,10 +44,10 @@
 
 namespace simdt3ceri {  // simdt3ceri namespace
 
-/// @brief Computes the three-center electron repulsion integrals of two basis
-/// functions of zero angular momentum on a and b sides and one of angular
-/// momentum two on c side, over the atom pairs of a block and for one atom on
-/// c side.
+/// @brief Computes the three-center electron repulsion integrals of one basis
+/// function of angular momentum two on b side and two of zero angular
+/// momentum on a and c sides, over the atom pairs of a block and for one atom
+/// on c side.
 /// @param values The values of the combination of basis functions, whose slices
 /// of the atom on c side this kernel writes.
 /// @param npairs The number of surviving atom pairs of the combination.
@@ -70,6 +70,10 @@ namespace simdt3ceri {  // simdt3ceri namespace
 /// center of an atom pair to the atom on c side into 3 bidegrees. The first and
 /// the last are the harmonics of one side alone, and the ones between them couple
 /// the orders of both, with the coefficients make_addition_table.py produces.
+/// @note The scalar which multiplies a bidegree is a binomial over the orders of
+/// the auxiliary integral rather than a single order, as the harmonic of the
+/// vector to the atom on c side is expanded back onto the vectors between the
+/// atoms of an atom pair and from the atom on b side to the atom on c side.
 auto compute_sds_electron_repulsion(double                         *values,
                                     const size_t                    npairs,
                                     const size_t                    natoms,

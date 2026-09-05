@@ -65,6 +65,15 @@ formed once per bidegree and read by the angular components which carry them,
 each of those in a loop of its own so the vectorizer is not asked to hold every
 product at once.
 
+Within a bracket the products are grouped by the magnitude of their coefficient,
+so that a magnitude shared by several of them multiplies their sum once instead
+of multiplying each of them in turn. The compiler will not do this: distributing
+a product over a sum does not preserve the rounding, and it is not performed
+without `-ffast-math`, which this project does not build with. Roughly two in
+five of the multiplies of the angular half are duplicates without the grouping.
+The signs stay inside the group, so no sign algebra is done on the coefficients
+of the table.
+
 The same generator emits the combinations which carry the angular momentum on the
 a or the b side, where the harmonic of `PC` is expanded back onto `AB` and `BC`
 by the same theorem. The angular half is then identical to the one above, and
@@ -84,11 +93,14 @@ The two differ by `alpha <-> beta` and a factor `(-1)^k1`, which is
 the two-center rules `(-beta/p)^l` and `(alpha/p)^l` of the section above, which
 is a cheap check on the signs.
 
-Run as `python codegen/make_coulomb_addition_kernels.py <kind> 2 3 4 5 6` **from
+Run as `python codegen/make_coulomb_addition_kernels.py <kind> <l> ...` **from
 the root of the checkout**, with `kind` one of `ssl`, `lss` or `sls`, and with
-`VLX_HARM_PROBE` set so the convention check of the table generator runs.
-`(ss|J|s)` and `(ss|J|p)` are not emitted: the first needs no harmonics and the
-second is linear in them, so both are written by hand.
+`VLX_HARM_PROBE` set so the convention check of the table generator runs. The
+committed files come from `ssl 2 3 4 5 6`, `lss 1 2 3 4 5 6` and
+`sls 1 2 3 4 5 6`, and the generator reproduces every one of them byte for byte.
+`(ss|J|s)` and `(ss|J|p)` are the exception and are written by hand: the first
+needs no harmonics and the second is linear in them, and `(ss|J|p)` takes a
+single matrix of harmonics rather than a vector of them, so do not regenerate it.
 
 Nothing is emitted yet for a combination carrying angular momentum on more than
 one side. Those abort in the dispatch, which is why a basis with p functions can
