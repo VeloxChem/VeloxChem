@@ -44,6 +44,7 @@
 #include "ScreeningFunc.hpp"
 #include "SimdAlign.hpp"
 #include "SimdDimensions.hpp"
+#include "SimdPrimitives.hpp"
 
 namespace simdovl {  // simdovl namespace
 
@@ -69,19 +70,7 @@ compute_ss_overlap(double               *values,
 
     if (nvalues == 0) return;
 
-    const auto &a_exps = bra.exponents();
-
-    const auto &b_exps = ket.exponents();
-
-    const auto &a_norms = bra.normalization_factors();
-
-    const auto &b_norms = ket.normalization_factors();
-
-    const auto nprim_a = a_exps.size();
-
-    const auto nprim_b = b_exps.size();
-
-    const auto nprims = nprim_a * nprim_b;
+    const auto nprims = bra.exponents().size() * ket.exponents().size();
 
     // NOTE: the pairs of primitives are screened with the threshold of the
     // integrals divided by their number, as their contributions accumulate into
@@ -90,16 +79,9 @@ compute_ss_overlap(double               *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, threshold / static_cast<double>(nprims));
 
-    // NOTE: the buffer spans the atom pairs reached by the pair of primitives
-    // reaching furthest, which is searched for rather than assumed. The
-    // primitives are sorted by descending exponent, but the bound of a pair of
-    // primitives carries their prefactor as well as their decay, so a tighter
-    // pair with a larger prefactor reaches further than a more diffuse pair with
-    // a smaller one, and the last pair is not always the furthest reaching.
+    auto buffer = simdfunc::make_primitive_buffer(dimensions, 1);
 
-    const auto nmax = *std::ranges::max_element(dimensions);
-
-    if (nmax == 0)
+    if (buffer.number_of_columns() == 0)
     {
         std::fill(values, values + nvalues, 0.0);
 
@@ -110,9 +92,7 @@ compute_ss_overlap(double               *values,
     // row, which starts at a cache line boundary and spans only the atom pairs
     // reached by the furthest reaching pair of primitives.
 
-    auto buffer = CSimdMatrix(1, nmax);
-
-    buffer.zero();
+    const auto nmax = buffer.number_of_columns();
 
     auto *prim = buffer.data(0);
 
@@ -126,43 +106,33 @@ compute_ss_overlap(double               *values,
 
     // accumulate the integrals of each pair of primitives
 
-    for (size_t i = 0; i < nprim_a; i++)
-    {
-        const auto aexp = a_exps[i];
+    simdfunc::accumulate_primitives(bra, ket, dimensions, [&](const simdfunc::CPrimitivePair &pair) {
+        const auto ncols = pair.ncols;
 
-        const auto anorm = a_norms[i];
+        const auto fexp = pair.aexp + pair.bexp;
 
-        for (size_t j = 0; j < nprim_b; j++)
-        {
-            const auto ncols = dimensions[i * nprim_b + j];
+        const auto fmu = pair.aexp * pair.bexp / fexp;
 
-            if (ncols == 0) continue;
+        const auto fovl = fpi / fexp;
 
-            const auto fexp = aexp + b_exps[j];
+        const auto ffact = pair.anorm * pair.bnorm * fovl * std::sqrt(fovl);
 
-            const auto fmu = aexp * b_exps[j] / fexp;
+        // NOTE: the row of the buffer and the row of the coordinates start at a
+        // cache line boundary, so the loop is vectorized with aligned loads and
+        // stores. A pair of primitives contributes only to the atom pairs it
+        // reaches, so the loop shortens as the primitives get tighter.
 
-            const auto fovl = fpi / fexp;
-
-            const auto ffact = anorm * b_norms[j] * fovl * std::sqrt(fovl);
-
-            // NOTE: the row of the buffer and the row of the coordinates start at
-            // a cache line boundary, so the loop is vectorized with aligned loads
-            // and stores. A pair of primitives contributes only to the atom pairs
-            // it reaches, so the loop shortens as the primitives get tighter.
-
-            // NOTE: the exponential is issued as a call to the vector math library
-            // of the platform, so it does not break the vectorization of the loop.
-            // It costs about nine tenths of the loop, which is therefore bound by
-            // the throughput of the exponential and not by the memory it touches.
+        // NOTE: the exponential is issued as a call to the vector math library of
+        // the platform, so it does not break the vectorization of the loop. It
+        // costs about nine tenths of the loop, which is therefore bound by the
+        // throughput of the exponential and not by the memory it touches.
 
 #pragma omp simd aligned(prim, ab_2 : simd::cache_line_size())
-            for (size_t k = 0; k < ncols; k++)
-            {
-                prim[k] += ffact * std::exp(-fmu * ab_2[k]);
-            }
+        for (size_t k = 0; k < ncols; k++)
+        {
+            prim[k] += ffact * std::exp(-fmu * ab_2[k]);
         }
-    }
+    });
 
     // NOTE: the atom pairs beyond the reach of every pair of primitives have no
     // contribution and are set to zero.
