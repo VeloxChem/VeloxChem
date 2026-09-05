@@ -67,12 +67,19 @@ product at once.
 
 Within a bracket the products are grouped by the magnitude of their coefficient,
 so that a magnitude shared by several of them multiplies their sum once instead
-of multiplying each of them in turn. The compiler will not do this: distributing
-a product over a sum does not preserve the rounding, and it is not performed
-without `-ffast-math`, which this project does not build with. Roughly two in
-five of the multiplies of the angular half are duplicates without the grouping.
-The signs stay inside the group, so no sign algebra is done on the coefficients
-of the table.
+of multiplying each of them in turn. The compiler will not do this itself:
+distributing a product over a sum does not preserve the rounding, and it is not
+performed without `-ffast-math`, which this project does not build with.
+
+This is for the source and not for the instruction count. Contraction is on by
+default, so a bracket compiles to a chain of fused multiply-adds whether or not
+its coefficients repeat, and the grouping only turns the shared multiply-adds
+into plain adds: over the whole of `RecSSI` it takes 1373 vector floating point
+operations to 1331. What it buys is that a coefficient is written once and the
+longest bracket falls from 342 characters to 237. The angular half is in any
+case memory bound, at roughly two vector loads and stores per arithmetic
+operation, so its arithmetic is not where its time goes. The signs stay inside
+the group, so no sign algebra is done on the coefficients of the table.
 
 The same generator emits the combinations which carry the angular momentum on the
 a or the b side, where the harmonic of `PC` is expanded back onto `AB` and `BC`
