@@ -37,6 +37,18 @@
 #include <string>
 
 #include "ErrorHandler.hpp"
+#include "SimdOverlapRecGS.hpp"
+#include "SimdOverlapRecHS.hpp"
+#include "SimdOverlapRecIS.hpp"
+#include "SimdOverlapRecDS.hpp"
+#include "SimdOverlapRecFS.hpp"
+#include "SimdOverlapRecPS.hpp"
+#include "SimdOverlapRecSG.hpp"
+#include "SimdOverlapRecSH.hpp"
+#include "SimdOverlapRecSI.hpp"
+#include "SimdOverlapRecSD.hpp"
+#include "SimdOverlapRecSF.hpp"
+#include "SimdOverlapRecSP.hpp"
 #include "SimdOverlapRecSS.hpp"
 
 namespace simdovl {  // simdovl namespace
@@ -60,6 +72,94 @@ compute_overlap(double               *values,
     if ((lbra == 0) && (lket == 0))
     {
         compute_ss_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    // NOTE: the kernels of one S type function and one P type function read the
+    // solid harmonic of angular momentum one from the coordinates, as it is the
+    // vector between the atoms itself.
+
+    if ((lbra == 0) && (lket == 1))
+    {
+        compute_sp_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 1) && (lket == 0))
+    {
+        compute_ps_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 0) && (lket == 2))
+    {
+        compute_sd_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 2) && (lket == 0))
+    {
+        compute_ds_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 0) && (lket == 3))
+    {
+        compute_sf_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 3) && (lket == 0))
+    {
+        compute_fs_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 0) && (lket == 4))
+    {
+        compute_sg_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 4) && (lket == 0))
+    {
+        compute_gs_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 0) && (lket == 5))
+    {
+        compute_sh_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 5) && (lket == 0))
+    {
+        compute_hs_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 0) && (lket == 6))
+    {
+        compute_si_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 6) && (lket == 0))
+    {
+        compute_is_overlap(values, nvalues, bra, ket, coordinates, threshold);
 
         return;
     }

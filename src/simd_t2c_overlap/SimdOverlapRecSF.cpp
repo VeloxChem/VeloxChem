@@ -35,8 +35,8 @@
 #include "SimdOverlapRecSF.hpp"
 
 #include <algorithm>
-#include <ranges>
 #include <cmath>
+#include <ranges>
 #include <string>
 
 #include "ErrorHandler.hpp"
@@ -44,6 +44,8 @@
 #include "ScreeningFunc.hpp"
 #include "SimdAlign.hpp"
 #include "SimdDimensions.hpp"
+#include "SimdPrimitives.hpp"
+#include "SimdStorage.hpp"
 
 namespace simdovl {  // simdovl namespace
 
@@ -52,7 +54,6 @@ compute_sf_overlap(double               *values,
                    const size_t          nvalues,
                    const CBasisFunction &bra,
                    const CBasisFunction &ket,
-                   const CSimdMatrix    &harmonics,
                    const CSimdMatrix    &coordinates,
                    const double          threshold) -> void
 {
@@ -60,12 +61,6 @@ compute_sf_overlap(double               *values,
     {
         errors::assertMsgCritical(
             false, std::string("SimdOverlapRecSF.compute_sf_overlap: Basis functions must be of angular momenta zero and three"));
-    }
-
-    if (harmonics.number_of_rows() != 7)
-    {
-        errors::assertMsgCritical(
-            false, std::string("SimdOverlapRecSF.compute_sf_overlap: Harmonics must have seven rows"));
     }
 
     if (nvalues > coordinates.number_of_columns())
@@ -76,19 +71,7 @@ compute_sf_overlap(double               *values,
 
     if (nvalues == 0) return;
 
-    const auto &a_exps = bra.exponents();
-
-    const auto &b_exps = ket.exponents();
-
-    const auto &a_norms = bra.normalization_factors();
-
-    const auto &b_norms = ket.normalization_factors();
-
-    const auto nprim_a = a_exps.size();
-
-    const auto nprim_b = b_exps.size();
-
-    const auto nprims = nprim_a * nprim_b;
+    const auto nprims = bra.exponents().size() * ket.exponents().size();
 
     // NOTE: the pairs of primitives are screened with the threshold of the
     // integrals divided by their number, as their contributions accumulate into
@@ -97,127 +80,99 @@ compute_sf_overlap(double               *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, threshold / static_cast<double>(nprims));
 
-    // NOTE: the buffer spans the atom pairs reached by the pair of primitives
-    // reaching furthest, which is searched for rather than assumed. The
-    // primitives are sorted by descending exponent, but the bound of a pair of
-    // primitives carries their prefactor as well as their decay, so a tighter
-    // pair with a larger prefactor reaches further than a more diffuse pair with
-    // a smaller one, and the last pair is not always the furthest reaching.
+    // NOTE: the buffer holds the prefactor shared by the angular components in
+    // its first row and the integrals of the components in the rows which follow,
+    // as the harmonic factors out of the sum over the pairs of primitives and
+    // multiplies the accumulated prefactor once.
 
-    const auto nmax = *std::ranges::max_element(dimensions);
+    auto buffer = simdfunc::make_primitive_buffer(dimensions, 8);
 
-    if (nmax == 0)
+    if (buffer.number_of_columns() == 0)
     {
-        std::fill(values, values + 7 * nvalues, 0.0);
+        simdfunc::store_components(values, nvalues, buffer, 1, 7);
 
         return;
     }
 
-    // NOTE: the first row accumulates the prefactor which the angular components
-    // share, and the remaining rows hold the integrals of the angular components.
-
-    auto buffer = CSimdMatrix(8, nmax);
+    const auto nmax = buffer.number_of_columns();
 
     auto *prim = buffer.data(0);
 
-    std::fill(prim, prim + nmax, 0.0);
+    auto *out_m3 = buffer.data(1);
+    auto *out_m2 = buffer.data(2);
+    auto *out_m1 = buffer.data(3);
+    auto *out_0 = buffer.data(4);
+    auto *out_p1 = buffer.data(5);
+    auto *out_p2 = buffer.data(6);
+    auto *out_p3 = buffer.data(7);
 
-    // NOTE: the squared distances of the atom pairs are carried by the
-    // coordinates, so that they are formed once for the whole block instead of
-    // once for every combination of basis functions.
+    // NOTE: the components of the vector between the atoms and its squared length
+    // are carried by the coordinates, so the harmonic below is formed from rows
+    // which are already in place.
 
-    const auto *ab_2 = coordinates.data(6);
+    const auto *ab_x = coordinates.data(6);
+    const auto *ab_y = coordinates.data(7);
+    const auto *ab_z = coordinates.data(8);
+
+    const auto *ab_2 = coordinates.data(9);
 
     constexpr auto fpi = mathconst::pi_value();
 
     // accumulate the prefactor of each pair of primitives
 
-    for (size_t i = 0; i < nprim_a; i++)
-    {
-        const auto aexp = a_exps[i];
+    simdfunc::accumulate_primitives(bra, ket, dimensions, [&](const simdfunc::CPrimitivePair &pair) {
+        const auto ncols = pair.ncols;
 
-        const auto anorm = a_norms[i];
+        const auto fexp = pair.aexp + pair.bexp;
 
-        for (size_t j = 0; j < nprim_b; j++)
-        {
-            const auto ncols = dimensions[i * nprim_b + j];
+        const auto fmu = pair.aexp * pair.bexp / fexp;
 
-            if (ncols == 0) continue;
+        const auto fovl = fpi / fexp;
 
-            const auto fexp = aexp + b_exps[j];
+        // NOTE: the harmonic sits on the ket side, so the Gaussian product center is
+        // displaced from it by (a / p) times the vector between the atoms and the
+        // prefactor carries that ratio raised to the power three.
 
-            const auto fmu = aexp * b_exps[j] / fexp;
+        const auto fr = pair.aexp / fexp;
 
-            const auto fovl = fpi / fexp;
-
-            // NOTE: the ratio is raised to the angular momentum by repeated
-            // multiplication, as the angular momentum is small.
-
-            const auto frat = aexp / fexp;
-
-            auto ffact = anorm * b_norms[j] * fovl * std::sqrt(fovl);
-
-            ffact *= frat;
-            ffact *= frat;
-            ffact *= frat;
-
-            // NOTE: the row of the buffer and the row of the coordinates start at
-            // a cache line boundary, so the loop is vectorized with aligned loads
-            // and stores.
+        const auto ffact = pair.anorm * pair.bnorm * fovl * std::sqrt(fovl) * fr * fr * fr;
 
 #pragma omp simd aligned(prim, ab_2 : simd::cache_line_size())
-            for (size_t k = 0; k < ncols; k++)
-            {
-                prim[k] += ffact * std::exp(-fmu * ab_2[k]);
-            }
+        for (size_t k = 0; k < ncols; k++)
+        {
+            prim[k] += ffact * std::exp(-fmu * ab_2[k]);
         }
-    }
+    });
 
-    // NOTE: the integral of an angular component is the accumulated prefactor
-    // times the solid harmonic of that component.
+    // NOTE: the integrals of the angular components are the accumulated prefactor
+    // times the components of the harmonic, formed in one pass over the rows of
+    // the buffer and of the coordinates, all of which start at a cache line
+    // boundary.
 
-    const auto *ph_m3 = harmonics.data(0);
-    const auto *ph_m2 = harmonics.data(1);
-    const auto *ph_m1 = harmonics.data(2);
-    const auto *ph_0 = harmonics.data(3);
-    const auto *ph_p1 = harmonics.data(4);
-    const auto *ph_p2 = harmonics.data(5);
-    const auto *ph_p3 = harmonics.data(6);
-
-    auto *pb_m3 = buffer.data(1);
-    auto *pb_m2 = buffer.data(2);
-    auto *pb_m1 = buffer.data(3);
-    auto *pb_0 = buffer.data(4);
-    auto *pb_p1 = buffer.data(5);
-    auto *pb_p2 = buffer.data(6);
-    auto *pb_p3 = buffer.data(7);
-
-#pragma omp simd aligned(prim, ph_m3, ph_m2, ph_m1, ph_0, ph_p1, ph_p2, ph_p3, pb_m3, pb_m2, pb_m1, pb_0, pb_p1, pb_p2, pb_p3 : simd::cache_line_size())
+#pragma omp simd aligned(out_m3, out_m2, out_m1, out_0, out_p1, out_p2, out_p3, prim, ab_x, ab_y, ab_z, ab_2 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
-        const auto fval = prim[k];
+        const auto x = ab_x[k];
+        const auto y = ab_y[k];
+        const auto z = ab_z[k];
+        const auto r_2 = ab_2[k];
 
-        pb_m3[k] = fval * ph_m3[k];
-        pb_m2[k] = fval * ph_m2[k];
-        pb_m1[k] = fval * ph_m1[k];
-        pb_0[k] = fval * ph_0[k];
-        pb_p1[k] = fval * ph_p1[k];
-        pb_p2[k] = fval * ph_p2[k];
-        pb_p3[k] = fval * ph_p3[k];
+        out_m3[k] = prim[k] * (std::sqrt(5.625) * x * x * y - std::sqrt(0.625) * y * y * y);
+
+        out_m2[k] = prim[k] * (std::sqrt(15.0) * x * y * z);
+
+        out_m1[k] = prim[k] * (std::sqrt(9.375) * y * z * z - std::sqrt(0.375) * y * r_2);
+
+        out_0[k] = prim[k] * (2.5 * z * z * z - 1.5 * z * r_2);
+
+        out_p1[k] = prim[k] * (std::sqrt(9.375) * x * z * z - std::sqrt(0.375) * x * r_2);
+
+        out_p2[k] = prim[k] * (std::sqrt(3.75) * x * x * z - std::sqrt(3.75) * y * y * z);
+
+        out_p3[k] = prim[k] * (std::sqrt(0.625) * x * x * x - std::sqrt(5.625) * x * y * y);
     }
 
-    // NOTE: the values of an angular component are stored as one row of nvalues
-    // columns, and the atom pairs beyond the reach of every pair of primitives
-    // have no contribution and are set to zero.
-
-    for (size_t m = 0; m < 7; m++)
-    {
-        const auto *pb = buffer.data(m + 1);
-
-        std::copy(pb, pb + nmax, values + m * nvalues);
-
-        std::fill(values + m * nvalues + nmax, values + (m + 1) * nvalues, 0.0);
-    }
+    simdfunc::store_components(values, nvalues, buffer, 1, 7);
 }
 
 }  // namespace simdovl

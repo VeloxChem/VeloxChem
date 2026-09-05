@@ -31,7 +31,6 @@
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-
 #ifndef SimdOverlapRecPS_hpp
 #define SimdOverlapRecPS_hpp
 
@@ -50,21 +49,19 @@ namespace simdovl {  // simdovl namespace
 /// surviving the screening of the combination of basis functions.
 /// @param bra The basis function on bra side.
 /// @param ket The basis function on ket side.
-/// @param harmonics The solid harmonics of angular momentum one of the vectors
-/// between the atoms of the atom pairs.
-/// @param coordinates The coordinates of the atom pairs, as seven rows ordered by
-/// ascending interatomic distance, the last of which holds the squared distance
-/// of the atom pair.
+/// @param coordinates The coordinates of the atom pairs, as ten rows ordered by
+/// ascending interatomic distance, holding the vector between the atoms in rows
+/// six to eight and its squared length in row nine.
 /// @param threshold The screening threshold of the integrals.
-/// @note The Gaussian product center lies at the distance (- b / p) times the vector
-/// between the atoms from the atom carrying the solid harmonic, and the harmonic
-/// is homogeneous of degree one, so the integrals are the overlap of the S type
-/// functions times that ratio raised to the power one times the harmonic.
+/// @note The Gaussian product center lies at -(b / p) times the vector between the atoms from the atom on bra side, so the integrals carry the exponent of the ket side over the total exponent and a sign, the harmonic being homogeneous of degree one and odd.
+/// @note The solid harmonic of angular momentum one is the vector between the
+/// atoms itself, so it is read from the coordinates and not formed by a
+/// recursion. Its spherical components run m = -1, 0, 1 and are the y, z and x
+/// components of that vector in that order.
 auto compute_ps_overlap(double               *values,
                         const size_t          nvalues,
                         const CBasisFunction &bra,
                         const CBasisFunction &ket,
-                        const CSimdMatrix    &harmonics,
                         const CSimdMatrix    &coordinates,
                         const double          threshold) -> void;
 
