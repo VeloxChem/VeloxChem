@@ -45,7 +45,6 @@
 #include <vector>
 
 #include "SimdMatrix.hpp"
-#include "SimdOverlapRecSS.hpp"
 
 namespace simdovl {  // simdovl namespace
 
@@ -122,9 +121,10 @@ one_center_overlap(const CBasisFunction &bra, const CBasisFunction &ket) -> doub
 /// @note The values of the combination of basis functions are stored as one row
 /// of nvalues columns for each of the (2 l_bra + 1) (2 l_ket + 1) spherical
 /// components, with the components of the bra side running slowest.
-/// @note Every combination of angular momenta up to six on both sides is
-/// dispatched. A combination beyond that stops with an error rather than
-/// returning values it did not compute.
+/// @note The kernels of the off-diagonal atom pair blocks are being rewritten, so
+/// every combination stops with an error rather than returning values it did not
+/// compute. The overlap of two basis functions on the same atom is unaffected and
+/// is computed by one_center_overlap above.
 auto compute_overlap(double               *values,
                      const size_t          nvalues,
                      const CBasisFunction &bra,
